@@ -43,7 +43,11 @@ Reusing proven digests there is the next opportunity; it is not implemented.
 
 A package that is not an unmodified owned source is serialized and reopened,
 so the decision depends only on its bytes. Redo after undo and byte-identical
-destinations therefore publish the first copy's bytes.
+destinations therefore publish the first copy's bytes. A copy never transfers
+at the price of a refusal or of a caller's part: captures that alone would
+cross `max_patch_bytes`, a re-read its package's own read limits refuse, and a
+destination holding a caller-defined `Part` each make planning record the
+recompressing route.
 
 Results, by median process p50:
 
@@ -66,10 +70,12 @@ trade-offs:
 - **Format.** The durable cross-copy format bumps to `LPCP0004`, and genuine
   legacy patches are refused by name.
 - **Destinations.** A transferring copy into a destination that is not an
-  unmodified owned source publishes the reopened candidate: save preferences
-  are carried, and caller-defined parts become built-in parts. Keeping the
-  captures would retain source bytes in the caller's package, against ADR
-  0005's retained-state rule.
+  unmodified owned source publishes the reopened candidate, with save
+  preferences carried. A destination holding a caller-defined part is planned
+  with the recompressing route, which keeps the part; a transferring plan or
+  patch that meets one is refused with `SlideCopyRefusal::CallerDefinedPart`.
+  Keeping the captures instead would retain source bytes in the caller's
+  package, against ADR 0005's retained-state rule.
 - **What stays recompressed.** Members whose own bytes disprove the capture or
   fail the size guard are recompressed deterministically, as are
   relationship-bearing and XML parts and unprovable layouts. Resource failures

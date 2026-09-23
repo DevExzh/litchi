@@ -1,6 +1,6 @@
 # 0742 — the owned PPTX cross-copy frames copied images from their verified source-compressed bytes: media-rich lifecycle p50 410 → 183 ms
 
-Status: retained, implemented in `litchi-opc` and `litchi-pptx`, with two
+Status: retained, implemented in `litchi-opc` and `litchi-pptx`, with
 additions to `soapberry-zip`.
 `performance_claim: none` — no claim-registry entry; the paired medians and
 counts below are reported as evidence, not registered as claims.
@@ -10,8 +10,9 @@ that goal completes; iWork is excluded.
 
 Base `009d515bef`; production commits `317920af5c`, `52db88c24c` and
 `b2132486af` (after the first review), `172501ac89` and `d2b2aa3d75` (after
-the second) on `perf/0742-pptx-owned-cross-copy-media-transfer`. Evidence
-packet: [`results/change-0742/`](results/change-0742/README.md).
+the second), `34255fea84`, `ddefc2cfe8` and `bc1dcbfd90` (after the third)
+on `perf/0742-pptx-owned-cross-copy-media-transfer`. Evidence packet:
+[`results/change-0742/`](results/change-0742/README.md).
 
 ## Result
 
@@ -31,7 +32,15 @@ Application depends only on the recorded revisions and the two packages'
 bytes, so a redo after an undo, or a copy into any destination with the
 recorded revisions, publishes the same bytes as the first copy. The second
 review's fixes that make this so did not slow the measured path: the matrix
-of `b2132486af` measured 0.4609 on the same case.
+of `b2132486af` measured 0.4609 on the same case. The third review's fixes
+add only constant-time checks to that path, and the matrix was not repeated
+for them (see *Measurement*).
+
+A copy never transfers at the price of a refusal or of a caller's part: when
+the captures alone would cross `max_patch_bytes`, when a package's own read
+limits refuse the re-read of its bytes, or when the destination holds a
+caller-defined `Part` implementation, planning records the recompressing
+route, as the base would have copied.
 
 ## What changed
 
@@ -59,7 +68,12 @@ the source archive, and the source-backed route already transfers them
 - `Error::is_content_fault` (new) names the errors that are properties of the
   archive's own bytes: malformed, inconsistent or unsupported records and
   payloads. Only these disprove a layout. Allocation, limits, I/O,
-  cancellation and any other kind are returned as errors.
+  cancellation and any other kind are returned as errors. A declared size
+  that does not fit the platform's `usize` counts as a content fault, a
+  property of the bytes on that platform.
+- The strict-layout proof's guard against a reader that re-enters the archive
+  on its own thread now reports `ErrorKind::Reentered` (new) instead of
+  `InvalidInput`, so a reader's re-entry is never taken for a content fault.
 
 `crates/litchi-opc`, `package/compressed_transfer.rs` (new) keeps two
 questions apart:
@@ -92,12 +106,19 @@ questions apart:
 Other `litchi-opc` changes:
 
 - A deferred part uses the index its own decode builds. An eagerly
-  materialized owned package builds one transfer index per open, shared by
-  clones. The index cell stores only a built index or a content fault; an
+  materialized owned package, or a deferred part whose own index was refused,
+  uses one transfer index per open, shared by clones. The decode index caches
+  its refusal as a converted `OpcError` that no longer says whether the bytes
+  caused it, so that refusal is classified again through the transfer index.
+  The transfer index cell stores only a built index or a content fault; an
   allocation or limit failure is not stored, so a later call or a clone tries
   again.
 - `OpcPackage::source_read_limits` (new) reports the limits the owned archive
   was admitted under.
+- `OpcPackage::holds_only_built_in_parts` (new) says whether every part is a
+  `BlobPart` or an `XmlPart`. It rests on a hidden `Part::is_built_in` method
+  whose argument cannot be named outside litchi-opc, so no caller-defined
+  implementation can claim to be built in.
 - `payload.rs`: `PartPayload::Transferred` holds the decoded allocation and the
   verified capture as one value. `BlobPart::with_compressed_transfer`
   (`part.rs`) builds a part over it. `set_blob`, `set_blob_shared` and
@@ -118,10 +139,15 @@ Other `litchi-opc` changes:
   part is eligible (`owned_view`). The owned view is the source itself when it
   is an unmodified owned source, and otherwise the reopen of its
   serialization.
-- `preflight_parts` then checks the candidate estimate, including the eligible
-  members' declared compressed sizes, against `max_patch_bytes`. Only after
-  that does `MediaTransfers::capture` take any capture.
+- `preflight_parts` then checks the candidate estimate every route builds
+  against `max_patch_bytes`, and refuses as before when it does not fit. When
+  the eligible members' declared compressed sizes would take it past the bound,
+  a first planning records the recompressing route instead of refusing. Only
+  after that does `MediaTransfers::capture` take any capture.
 - A member whose capture is disproved by its own bytes is recompressed.
+- A first planning also records the recompressing route when the destination
+  holds a caller-defined part, or when a package's own read limits refuse the
+  re-read of its bytes, which that route never needs.
 - The copied-media encoding (`CopiedMedia::{Recompressed, SourceCompressed}`)
   follows from the members that transfer. It is recorded in the plan and in
   the durable patch. Every later proof (the fresh re-plan in
@@ -130,8 +156,10 @@ Other `litchi-opc` changes:
 - A transferring copy's candidate is built from the destination's owned view.
   Into a destination that is not an unmodified owned source, it publishes the
   candidate reopened from its archive and carries the destination's save
-  preferences onto it. A recompressing copy keeps the clone-and-apply
-  publication it had. See *Deciding from bytes*.
+  preferences onto it. A transferring plan or forward patch that meets a
+  destination holding a caller-defined part is refused with
+  `SlideCopyRefusal::CallerDefinedPart` (new). A recompressing copy keeps the
+  clone-and-apply publication it had. See *Deciding from bytes*.
 - The retained candidate archive of change 0656 records the plan indexes of
   its transferred members. It is reused only when a fresh classification
   yields the same list, and a release build that reuses it skips the captures.
@@ -159,9 +187,10 @@ The owner decisions of 2026-09-16
     guard, keeps the re-deflating route. The ordinary reader accepts such
     members, and the base copied them. Every resource failure stays a typed
     error, never a quiet change of route.
-  - A transferring copy into a destination with caller-defined parts publishes
-    the reopened candidate rather than keeping source captures in the caller's
-    package.
+  - A copy into a destination holding a caller-defined part is planned with
+    the recompressing route, and a transferring plan or patch meeting one is
+    refused by type. It neither keeps source captures in the caller's package
+    nor silently turns the caller's part into a built-in one.
 - **Trade-off 3** is the scope. The common benign path (untouched images
   copied between unmodified owned packages) gets the transfer at no extra
   cost. Modified packages pay one bounded serialization and reopen.
@@ -176,14 +205,21 @@ Other authority:
 - **The first review** led to the header-only layout proof. A member the
   ordinary reader accepts, but whose local header disagrees with its central
   record, keeps today's route.
-- **The second review** (verdict: merge after fixes) required three things:
+- **The second review** (verdict: merge after fixes) required, through the
+  coordinator's instructions, three things:
   - application depends only on recorded revisions and bytes;
   - a capture failure caused by the member's bytes selects recompression at
     planning;
   - a header-only size guard, with the captures charged against
     `max_patch_bytes`.
 
-  A measured unit replaces its prescribed guard unit (see *The size guard*).
+  A measured unit replaces the coordinator's prescribed guard unit (see *The
+  size guard*).
+- **The third review** (verdict: fixes required) led to three rules: a charge
+  for the captures never refuses a copy the recompressing route performs; a
+  destination's caller-defined parts are never converted silently; and a
+  read-limit refusal of a re-read at planning selects the recompressing
+  route.
 - **ADR 0030** (lazy decode): eligibility decodes nothing. Authorization
   decodes through the package's own route, so its refusal is the one
   `get_part` reports.
@@ -213,7 +249,10 @@ or refuse the same patch. The library's own undo publishes a restored clone,
 which is a modified package, so the redo of a transferring copy failed. The
 second review reproduced both.
 
-Every decision is now a function of bytes and recorded revisions:
+Every decision is now a function of the packages' bytes, the operation's
+limits and whether the destination holds caller-defined parts (see below),
+never of edit history or allocation identity; application re-proves it
+against the recorded revisions:
 
 - **Source.** Eligibility and captures are asked of the source's owned view.
   - In an unmodified owned source, every part still holds its opened
@@ -245,9 +284,13 @@ Cost and bounds of the normalization:
   - a source that is not an unmodified owned source and has at least one
     copied image of an eligible format;
   - a transferring copy into a destination that is not an unmodified owned
-    source.
+    source and holds only built-in parts.
 
   The unmodified owned packages of the measured cases pay nothing.
+- When the package's own read limits refuse the re-read at a first planning,
+  the copy is planned with the recompressing route, which never re-reads
+  either package. Applying a transferring plan or patch whose re-read a
+  package's limits now refuse returns the read-limit error.
 - While it runs, the call holds one bounded serialization per normalized
   package, besides the candidate's.
 
@@ -262,11 +305,18 @@ destination that is not an unmodified owned source:
 - Making it carry the captures would keep copies of source bytes inside a
   caller's package for its whole lifetime, against ADR 0005's retained-state
   rule (the 0656 amendment).
-- So the copy now publishes the reopened candidate:
-  - save preferences are carried, since they do not change what a package
-    serializes to;
-  - caller-defined `Part` implementations become built-in parts with the same
-    bytes.
+- So a transferring copy publishes the reopened candidate, and carries the
+  save preferences onto it, since they do not change what a package
+  serializes to.
+- A reopen would turn a caller-defined `Part` implementation into a built-in
+  part with the same bytes, so its behavior (refusing a retype, observing
+  writes, counting relationship references its own way) would change
+  depending on whether the copied slide has images. The second round did
+  exactly that; the third review found it. Now a destination holding one
+  (`OpcPackage::holds_only_built_in_parts` is false) is planned with the
+  recompressing route, and a transferring plan or forward patch planned
+  against a byte-identical ordinary destination is refused with
+  `SlideCopyRefusal::CallerDefinedPart`, leaving the destination untouched.
 - A recompressing copy keeps the clone-and-apply publication.
 
 The inverse still publishes the restored clone, as the base did. The reviewer
@@ -285,8 +335,9 @@ decoded size, plus 5 bytes per started 4 KiB, plus 64 bytes. The check reads
 the central record only. A member that fails it is recompressed,
 deterministically.
 
-The review prescribed one 5-byte stored-block header per 65,535 bytes, which
-allows 229 bytes on a 2 MiB member. But zlib at its default memory level frames
+The coordinator's instruction, relaying the second review's nit, prescribed
+one 5-byte stored-block header per 65,535 bytes, which allows 229 bytes on a
+2 MiB member. But zlib at its default memory level frames
 incompressible data in 16 KiB stored blocks. So does zlib-rs in soapberry-zip's
 writer, which produced the harness corpus. The packet's
 `size-guard/zlib_framing.py` measures zlib 1.3.1 on 2 MiB of seeded random
@@ -318,15 +369,39 @@ bytes:
 A member its producer Stored is transferred Stored, as the source-backed route
 does and as the producer chose. For a compressible image, that output is larger
 than recompression would give: 113,791 against 81,255 bytes (+40%) in the
-reviewer's example. The review noted that this runs against decision 10's "make
-files smaller where possible". The coordinator kept the transfer for Stored
-members for these reasons:
+reviewer's example. The reviewer noted that this runs against decision 10's
+"make files smaller where possible". The coordinator kept the transfer for
+Stored members for these reasons:
 
 - it matches the source-backed route and the producer's choice;
 - the guard cannot tell compressible from incompressible Stored bytes without
   the decode-and-deflate this change removes;
 - images are almost always in compressed formats, where Store costs nothing;
 - the published member is the source's own representation in fresh framing.
+
+### The capture budget
+
+Every route builds a candidate whose estimate (twice the planned closure and
+the presentation owner, the new names and content types, and a constant) is
+checked against the destination's `max_patch_bytes`; a copy over it is refused
+as in the base. A transfer also holds its captures, the eligible members'
+declared compressed bytes, while the candidate is built. The second round
+charged them on top and refused when they crossed the bound; the third review
+showed that this refused copies the recompressing route performs, since it
+holds comparable buffers uncharged. On the media fixture the charge reaches
+219,574 bytes with the captures and 170,245 without, so a bound of 219,573
+refused the copy while the same copy from a source with ineligible images
+planned fine; under the default 128 MiB a slide's images were capped near
+43 MiB rather than 64 MiB.
+
+Now, when only the captures cross the bound, a first planning records the
+recompressing route. The decision is a function of the bytes and the limits,
+and it is recorded, so application does not decide again. A plan is always
+re-proved under the limits it was planned with. A durable patch read under
+limits its recorded captures do not fit cannot be rebuilt, so it is refused,
+with the generic `UnsafeEdit` that route maps a failed rebuild to, and the
+destination is untouched. A test pins each case at the fixture's exact
+bounds.
 
 ## Breaking changes (relative to the base)
 
@@ -336,25 +411,34 @@ members for these reasons:
 | `CrossSlideCopyPatch::from_bytes*` on `LPCP0003` | parsed | `Error::DurablePatchRevisionFormat { found: CrossSlideCopyV3, expected: CrossSlideCopyV4 }` before any header field is read. `LPCP0002` now reports `expected: CrossSlideCopyV4`. An unknown encoding byte is `Error::Invalid` |
 | published bytes of an owned copy with eligible images | copied images deflated again, with a data descriptor | the source member's compressed bytes and method, in fresh sized framing; target physical revisions change accordingly. Copies without eligible images are byte-identical to the base |
 | a copied image its producer Stored | deflated | Stored, as in the source; larger for compressible bytes (+40% in the reviewer's example) |
-| a transferring copy (plan or forward patch) into a destination that is not an unmodified owned source | a clone of the destination with the patch applied; caller-defined parts kept | the reopened candidate: the same published bytes, save preferences carried, caller-defined `Part` implementations replaced by built-in parts with the same bytes |
-| a source that is not an unmodified owned source and has a copied image of an eligible format, or such a destination of a transferring copy | not re-read | serialized (charged against `max_patch_bytes`, as its physical revision already is) and reopened under its own read limits; a read-limit refusal of that reopen is returned |
+| a transferring copy (plan or forward patch) into a destination that is not an unmodified owned source and holds only built-in parts | a clone of the destination with the patch applied | the reopened candidate: the same published bytes, save preferences carried |
+| a transferring plan or forward patch applied to a destination holding a caller-defined `Part` implementation (planned against a byte-identical ordinary destination; planning against such a destination records the recompressing route) | published, the part kept | `Error::SlideCopyPlan { kind: SlideCopyRefusal::CallerDefinedPart, .. }`, destination untouched |
+| applying a transferring plan or patch whose source or destination must be re-read, when that package's own read limits refuse its serialization (at planning the recompressing route is recorded instead) | not re-read | the read-limit error of the re-read |
+| a reader re-entering `IndexedArchive`'s strict-layout proof on its own thread | `ErrorKind::InvalidInput` | `ErrorKind::Reentered`; the display text loses the "Invalid input: " prefix |
 | `CrossSlideCopyPlan` / `CrossSlideCopyPatch` `Debug`, `PartialEq` | — | carry the encoding; the plan's candidate slot reports `transferred_members` |
 
-The branch's first commits also refused two things: a transferring copy into
-a modified destination, and a source whose image had been re-provenanced. The
-second review's fixes removed both refusals, and neither exists relative to
-the base.
+The branch's earlier rounds also refused copies the base published: a
+transferring copy into a modified destination and a source whose image had
+been re-provenanced (first round), and a copy whose captures alone crossed
+`max_patch_bytes`, or whose re-read a package's own read limits refused
+(second round). The later rounds removed the first three. The fourth now
+arises only when a transferring plan or patch is applied, as the table
+states; planning records the recompressing route instead.
 
 Additive:
 
 - `soapberry_zip::Error::is_content_fault`;
+- `soapberry_zip::ErrorKind::Reentered` (the enum is `#[non_exhaustive]`);
 - `soapberry_zip::office::IndexedArchive::precompressed_layout_provable`;
 - `litchi_opc::CompressedPartTransfer`;
 - `litchi_opc::OpcPackage::compressed_transfer_size`;
 - `litchi_opc::OpcPackage::authorize_compressed_transfer`;
 - `litchi_opc::OpcPackage::source_read_limits`;
+- `litchi_opc::OpcPackage::holds_only_built_in_parts`, with the hidden, sealed
+  `Part::is_built_in`, which has a default;
 - `litchi_opc::BlobPart::with_compressed_transfer`;
-- `litchi_pptx::DurablePatchFormat::CrossSlideCopyV4` (the enum is
+- `litchi_pptx::DurablePatchFormat::CrossSlideCopyV4` and
+  `litchi_pptx::SlideCopyRefusal::CallerDefinedPart` (both enums are
   `#[non_exhaustive]`);
 - `CrossSlideCopyPlan::transfers_source_compressed_media`;
 - `CrossSlideCopyPatch::transfers_source_compressed_media`.
@@ -390,6 +474,17 @@ Method:
 - **No run was discarded or selectively repeated.** Three earlier complete
   matrices were superseded, by code changes and by the build-matching rule;
   their summaries are kept (see below).
+- **The third round was not measured.** On the measured path both packages
+  are unmodified owned sources, and the third round's commits (`34255fea84`,
+  `ddefc2cfe8`) change only constant-time checks there:
+  - the caller-defined-part predicate short-circuits on
+    `is_unmodified_owned_source`;
+  - one comparison of the estimate plus the captures with the bound replaces
+    the same comparison inside the estimate;
+  - a durable patch's forward route tests one flag after its rebuild.
+
+  Classification, captures, the candidate build, its serialization and its
+  reopen are unchanged, so the numbers below are those of `d2b2aa3d75`.
 
 | binary | SHA-256 |
 | --- | --- |
@@ -588,6 +683,8 @@ sink.
 - No statement that the lifecycle is faster by the same factor in every host
   state. The fault-mode spread above depends on the host and the allocator.
 - The source-backed control's 0.9830 is not an improvement.
+- The third round's commits are not timed; they add only constant-time checks
+  to the measured path.
 - The attribution shares are one diagnostic capture of a frame-pointer build of
   an earlier commit, not ordinary-release timings.
 
@@ -632,6 +729,36 @@ findings and the resolution in `172501ac89` and `d2b2aa3d75`:
   failures are no longer cached.
 - **Missing tests.** Added, as listed below.
 
+**Third review, of `fb63589fd4`.** The reviewer confirmed the second round's
+fixes: redo after undo is byte-identical by patch and by plan, the
+trailing-bytes member recompresses while the photo still transfers, stale and
+same-semantic-different-physical destinations are still refused,
+`is_content_fault` is scoped correctly, the padding case publishes about
+131 KB, and the tables regenerate exactly. Its findings and the resolution in
+`34255fea84` and `ddefc2cfe8`:
+
+- **Should-fix: the capture charge refused copies the recompressing route
+  performs.** A first planning now records the recompressing route when only
+  the captures cross the bound (*The capture budget*).
+- **Should-fix: caller-defined parts silently lost their behavior.**
+  `OpcPackage::holds_only_built_in_parts` now tells them apart: planning
+  records the recompressing route for such a destination, and a transferring
+  plan or patch that meets one is refused with
+  `SlideCopyRefusal::CallerDefinedPart` (*Deciding from bytes*).
+- **Nit: a read-limit refusal of the owned view's reopen refused the copy.** At
+  a first planning it now records the recompressing route; the breaking
+  change it introduced is narrowed to applying a transferring plan or patch
+  whose re-read is refused.
+- **Nit: the record attributed the 65,535-byte guard unit to the review.** It
+  was the coordinator's instruction; corrected in *The size guard*.
+- **Observation: `InvalidInput` covers two conditions that are not about the
+  bytes.** The strict-layout proof's re-entrancy guard now has its own kind,
+  `ErrorKind::Reentered`. A size that does not fit the platform's `usize` is
+  a property of the bytes on that platform, and its documentation says so.
+- **Observation: the deferred-index branch treated any `OpcError::ZipError`
+  as a verdict.** That cached, converted error is now classified again through
+  the package's transfer index with `is_content_fault`.
+
 **New tests.**
 
 `soapberry-zip`, 2 tests:
@@ -640,9 +767,9 @@ findings and the resolution in `172501ac89` and `d2b2aa3d75`:
   as provable and a renamed local header as disproven, and a provable member
   captures;
 - content faults are classified apart from allocation, limit, I/O,
-  cancellation and buffer errors.
+  cancellation, buffer and re-entry errors.
 
-`litchi-opc`, 21 tests in `package/compressed_transfer/tests.rs`:
+`litchi-opc`, 23 tests in `package/compressed_transfer/tests.rs`:
 
 - **Exact span and fresh framing:**
   - Deflate with and without a descriptor;
@@ -671,8 +798,13 @@ findings and the resolution in `172501ac89` and `d2b2aa3d75`:
     20,000 not);
   - a default encoder's 1 MiB incompressible member stays eligible, although
     the prescribed unit would reject it.
+- **The third review's cases:**
+  - a deferred part whose decode index was refused is classified again through
+    the transfer index, while its own decode still reports the refusal;
+  - a caller-defined part is not built in, in the package and its clone, and
+    the reopen of the package's serialization holds only built-in parts.
 
-`litchi-pptx`, 19 tests in `opened/cross_copy_plan/media_transfer_tests.rs`:
+`litchi-pptx`, 22 tests in `opened/cross_copy_plan/media_transfer_tests.rs`:
 
 - **Span and framing** through the PPTX route, with renamed media.
 - **Byte identity:** retained, released, durable and independently planned
@@ -695,13 +827,30 @@ findings and the resolution in `172501ac89` and `d2b2aa3d75`:
   - genuine `LPCP0003` patches from the base tree are refused by name in both
     directions, with their input hashes re-derived and the changed target
     physical revision shown.
-- **Budget:** captures are charged against `max_patch_bytes`. One byte below
-  the charge is refused by name, although the copy fits without the captures.
+- **Budget:** at 219,573 bytes, one byte short of the charge with the captures
+  and the review's example bound, the copy records the recompressing route and
+  publishes, by plan and by durable patch, what the copy from a source with
+  ineligible images publishes. One byte short of the charge without them,
+  both sources are refused by name. With room for the captures the copy
+  transfers, and its durable patch read under the tighter bound is refused
+  with the destination untouched.
+- **Read limits:** a source, and separately a destination, opened under read
+  limits that admit exactly its members and then given one more part, has
+  its re-read refused by those limits; each copy records the recompressing
+  route and publishes what the copy from a source with ineligible images
+  publishes.
 - **Chaining:** a published candidate lends its media to a further copy,
   which frames the original source's bytes, and the durable patch round-trips.
-- **Destination state:** a transferring copy keeps save options but not
-  caller part types, with output equal to the same copy into the destination's
-  bytes.
+- **Destination state:**
+  - a transferring copy into a destination whose only departure from an
+    unmodified owned source is its save preferences carries them, with output
+    equal to the same copy into the destination's bytes;
+  - plain and image copies into a destination holding a caller-defined part
+    (which refuses retyping, counts writes and answers relationship counts
+    with a sentinel) keep that behavior, by plan and by durable patch;
+  - a transferring plan and patch planned against a byte-identical ordinary
+    destination are refused by such a destination with
+    `SlideCopyRefusal::CallerDefinedPart`, and it is untouched.
 - **Stored images:** a Stored compressible image is transferred Stored.
 
 The existing superseded-magic test now covers `LPCP0002` and `LPCP0003`
@@ -712,8 +861,9 @@ against the base tree. soapberry-zip's existing capture tests cover a corrupt
 compressed payload, a truncated Deflate stream, an expected-byte mismatch and
 ZIP64 members.
 
-**Gates on `d2b2aa3d75`**, run with a fresh target directory (commands, exit
-codes and counts in [`gates.txt`](results/change-0742/gates.txt)):
+**Gates on `ddefc2cfe8`**, run with a fresh target directory (commands, exit
+codes and counts in [`gates.txt`](results/change-0742/gates.txt), with the
+earlier rounds' below them):
 
 - `cargo fmt --all --check`;
 - `cargo check --all-targets` of `soapberry-zip`, `litchi-sign`, `litchi-opc`,
@@ -722,23 +872,27 @@ codes and counts in [`gates.txt`](results/change-0742/gates.txt)):
   `litchi-opc` all targets. `litchi-pptx --all-targets` fails only on three
   `err_expect` lints at `opened/tests.rs:464/538/557`, present unchanged on the
   base.
-- Tests of the three crates (2,361 passed), of their seven in-scope dependents
+- Tests of the three crates (2,366 passed), of their seven in-scope dependents
   (5,205) and of the facade with `doc,docx,ppt,pptx,xls,xlsx,xlsb,odt` (382);
 - rustdoc `-D warnings` for the three crates;
 - the crate-boundary, non-iWork and structural claim gates.
 
+`bc1dcbfd90` changes one rustdoc paragraph; fmt, rustdoc, library Clippy and
+the 22 media-transfer tests were re-run on it.
+
 `soapberry-zip`'s ODF and iWork dependents were not rebuilt; its change is two
-additive methods.
+additive methods, an additive error kind and the kind one guard reports.
 
 ## Cleanup
 
-Binary identities are recorded above and in
-[`cleanup.json`](results/change-0742/cleanup.json), taken before removal.
+Binary identities are recorded above and in the packet's cleanup records,
+taken before removal.
 
-- **Removed:**
-  - the target directories `targets/0742` (fresh for this round),
-    `targets/0742-before` and `targets/0742-after`;
-  - the scratch directory's contents;
-  - the raw reports of the `b2132486af` matrix.
-- **The first round's cleanup** is in `cleanup-b2132486af.json`.
+- **Third round** ([`cleanup.json`](results/change-0742/cleanup.json)): the
+  fresh `targets/0742` of its gates and the scratch directory's contents were
+  removed. It built no measurement binaries.
+- **Second round** (`cleanup-d2b2aa3d75.json`): `targets/0742`,
+  `targets/0742-before` and `targets/0742-after`, the scratch directory's
+  contents and the raw reports of the `b2132486af` matrix were removed.
+- **First round** (`cleanup-b2132486af.json`).
 - **Kept:** the worktree and branch, and the coordinator's shared base build.

@@ -6,9 +6,10 @@ size and file count, and for every retained-identity binary its SHA-256,
 taken before removal. The worktree, the branch and the shared base build
 (`targets/base-009d515bef`) are kept.
 
-This is the second review's cleanup (its commits `172501ac89` and
-`d2b2aa3d75`); the first review's run of the earlier version of this script
-wrote what is now `cleanup-b2132486af.json`.
+This is the third review's cleanup (its commits `34255fea84` and
+`ddefc2cfe8`, which built no measurement binaries). Earlier versions of this
+script wrote what are now `cleanup-b2132486af.json` (first review) and
+`cleanup-d2b2aa3d75.json` (second review).
 
 Usage: cleanup.py [--dry-run]
 """
@@ -26,20 +27,11 @@ from pathlib import Path
 ROOT = Path("/home/zhuhe/code/litchi-worktrees")
 TREES = [
     ROOT / "targets" / "0742",
-    ROOT / "targets" / "0742-before",
-    ROOT / "targets" / "0742-after",
 ]
 SCRATCH = ROOT / "scratch" / "0742"
 PACKET = Path(__file__).resolve().parent
-SUPERSEDED_RAW = [
-    PACKET / "superseded-b2132486af" / "raw",
-]
-BINARIES = [
-    ROOT / "targets" / "0742-before" / "release" / "litchi-perf-baseline",
-    ROOT / "targets" / "0742-before" / "release" / "litchi-perf-baseline-alloc",
-    ROOT / "targets" / "0742-after" / "release" / "litchi-perf-baseline",
-    ROOT / "targets" / "0742-after" / "release" / "litchi-perf-baseline-alloc",
-]
+SUPERSEDED_RAW: list[Path] = []
+BINARIES: list[Path] = []
 
 
 def sha256(path: Path) -> str:
