@@ -97,8 +97,9 @@ pub struct OpcPackage {
     /// decides an untouched part without decoding it.
     source_xml_parts: HashMap<PackURI, PartPayload>,
 
-    /// Owned source archive retained for exact and targeted publication.
-    source_archive: Option<Arc<Vec<u8>>>,
+    /// Owned source archive retained for exact and targeted publication,
+    /// with the digest memo bound to exactly those bytes (change 0751).
+    source_archive: Option<owned_source::OwnedSource>,
 
     /// Read limits the owned source archive was admitted under. Meaningful
     /// only while `source_archive` is `Some`; a compressed transfer out of the
@@ -266,6 +267,33 @@ impl OpcPackage {
             .all(|part| part.is_built_in(crate::part::Seal(())))
     }
 
+    /// SHA-256 of the exact owned source archive, while the exact-source
+    /// authorization is intact.
+    ///
+    /// For such a package [`Self::to_stream`] writes exactly the retained
+    /// archive and nothing else, so this is the digest of the bytes the
+    /// package publishes. It is computed on first request, at most once per
+    /// owned ingress, and shared by every clone of that ingress, because the
+    /// clones share the archive: the memo is created together with the
+    /// archive by one private constructor, is filled only from those bytes,
+    /// and the archive is never mutated (change 0751). A second caller
+    /// therefore reads the digest instead of hashing the archive again.
+    ///
+    /// Returns `None` exactly when [`Self::exact_source_shared`] does: for a
+    /// package that was not opened from owned bytes, and for one whose
+    /// exact-source authorization has been revoked by an edit. Like that
+    /// handle, a digest already taken is not evidence about the package's
+    /// state after a later edit.
+    #[must_use]
+    pub fn exact_source_sha256(&self) -> Option<[u8; 32]> {
+        if !self.exact_source_authorized {
+            return None;
+        }
+        self.source_archive
+            .as_ref()
+            .map(owned_source::OwnedSource::sha256)
+    }
+
     /// The read limits this package's owned source archive was admitted
     /// under, or `None` when the package retains no owned source archive.
     ///
@@ -379,13 +407,53 @@ impl OpcPackage {
         limits: ReadLimits,
         donor: &Self,
     ) -> Result<Self> {
+        Self::from_shared_vec_reusing_payloads(Arc::new(data), limits, donor)
+    }
+
+    /// [`Self::from_vec_reusing_payloads`] over an archive allocation the
+    /// caller keeps a handle to, instead of one it moves in.
+    ///
+    /// The package becomes a further owner of `data` rather than a copy of
+    /// it: it reads, validates and decodes exactly as the owned ingress does,
+    /// retains `data` as its exact owned source, and republishes it verbatim
+    /// while that authorization is intact. Sharing cannot change what the
+    /// package reads or publishes: a `Vec<u8>` behind an `Arc` held by more
+    /// than one owner can be mutated in place by none of them, and no path of
+    /// this crate mutates a retained source archive (change 0751).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the archive violates `limits` or is not a valid
+    /// OPC package. The donor is used only after those checks and does not
+    /// relax any read or allocation limit.
+    pub fn from_shared_vec_reusing_payloads(
+        data: Arc<Vec<u8>>,
+        limits: ReadLimits,
+        donor: &Self,
+    ) -> Result<Self> {
         let mut package = {
-            let phys_reader = PhysPkgReader::new_with_limits(&data, limits)?;
+            let phys_reader = PhysPkgReader::new_with_limits(data.as_slice(), limits)?;
             let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
             Self::unmarshal_with_payload_donor(pkg_reader, Some(donor))?
         };
-        package.authorize_owned_source(data, limits);
+        package.authorize_shared_owned_source(data, limits);
         Ok(package)
+    }
+
+    /// [`Self::from_vec_with_limits`] over an archive allocation the caller
+    /// keeps a handle to, instead of one it moves in.
+    ///
+    /// Parts are decoded on first access from `data`, exactly as for the owned
+    /// ingress, and the package retains `data` as its exact owned source
+    /// rather than a copy of it (see
+    /// [`Self::from_shared_vec_reusing_payloads`] for why sharing is safe).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the archive violates `limits` or is not a valid
+    /// OPC package.
+    pub fn from_shared_vec_with_limits(data: Arc<Vec<u8>>, limits: ReadLimits) -> Result<Self> {
+        Self::from_shared_bytes_with_limits(data, limits)
     }
 
     /// Moves an owned ZIP archive into an explicitly scheduled eager open.
@@ -1275,12 +1343,14 @@ impl OpcPackage {
     /// Shared handle to the exact owned source archive, while the
     /// exact-source authorization is intact.
     ///
-    /// The returned handle borrows nothing: it is a second owner of the very
+    /// The returned handle borrows nothing: it is a further owner of the very
     /// allocation an owned ingress (`from_vec`, `from_vec_reusing_payloads`,
-    /// `open`, `from_reader`) moved into this package, so a caller may keep
-    /// the archive alive after the package is dropped without copying it.
-    /// The bytes are immutable through the handle and are exactly the bytes
-    /// this package republishes verbatim.
+    /// `open`, `from_reader`) moved into this package, or a shared ingress
+    /// (`from_shared_vec_with_limits`, `from_shared_vec_reusing_payloads`)
+    /// shared into it, so a caller may keep the archive alive after the
+    /// package is dropped without copying it. The bytes are immutable through
+    /// the handle and are exactly the bytes this package republishes
+    /// verbatim.
     ///
     /// Returns `None` for a package that was not opened from owned bytes, and
     /// for one whose exact-source authorization has been revoked by an edit;
@@ -1290,20 +1360,28 @@ impl OpcPackage {
     #[must_use]
     pub fn exact_source_shared(&self) -> Option<Arc<Vec<u8>>> {
         self.exact_source_authorized
-            .then(|| self.source_archive.clone())
+            .then(|| {
+                self.source_archive
+                    .as_ref()
+                    .map(|source| Arc::clone(source.bytes()))
+            })
             .flatten()
     }
 
     pub(crate) fn exact_source(&self) -> Option<&[u8]> {
         self.exact_source_authorized
-            .then(|| self.source_archive.as_deref().map(Vec::as_slice))
+            .then(|| {
+                self.source_archive
+                    .as_ref()
+                    .map(|source| source.bytes().as_slice())
+            })
             .flatten()
     }
 
     pub(crate) fn preservation_source(&self) -> Option<(&[u8], &PreservationProvenance)> {
         self.source_archive
-            .as_deref()
-            .map(Vec::as_slice)
+            .as_ref()
+            .map(|source| source.bytes().as_slice())
             .zip(self.preservation.as_deref())
     }
 
@@ -1339,7 +1417,10 @@ impl OpcPackage {
     }
 
     fn from_owned_bytes_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
-        let data = Arc::new(data);
+        Self::from_shared_bytes_with_limits(Arc::new(data), limits)
+    }
+
+    fn from_shared_bytes_with_limits(data: Arc<Vec<u8>>, limits: ReadLimits) -> Result<Self> {
         let mut package = {
             let phys_reader = PhysPkgReader::new_with_limits(data.as_slice(), limits)?;
             let pkg_reader = PackageReader::from_phys_reader_deferred(&phys_reader, &data)?;
@@ -1389,7 +1470,7 @@ impl OpcPackage {
             self.bind_relationship_captures(preservation);
         }
         self.preservation = preservation.map(Arc::new);
-        self.source_archive = Some(source);
+        self.source_archive = Some(owned_source::OwnedSource::new(source));
         self.source_limits = limits;
         self.transfer_index = Some(Arc::new(OnceLock::new()));
         self.exact_source_authorized = true;
@@ -1415,6 +1496,71 @@ impl OpcPackage {
         }
         self.rels
             .set_source_capture(Arc::clone(&preservation.package_relationships_xml));
+    }
+}
+
+/// The retained owned source archive and the digest memo bound to it.
+///
+/// The fields are private to this module and [`OwnedSource::new`] is the only
+/// constructor, so an archive always enters a package with a fresh, empty
+/// memo, and a digest can never be attached to other bytes: struct-update
+/// syntax or field assignment elsewhere in the crate cannot pair one archive's
+/// digest with another archive. The memo is filled at most once, from exactly
+/// the bytes it describes; clones share both the archive and the memo, so an
+/// ingress and every clone of it hash the archive at most once between them.
+mod owned_source {
+    use std::sync::{Arc, OnceLock};
+
+    use sha2::{Digest as _, Sha256};
+
+    #[derive(Clone)]
+    pub(super) struct OwnedSource {
+        /// The retained archive. It is never mutated: no path reaches it
+        /// through `Arc::get_mut` or `Arc::make_mut`, and a further owner of
+        /// the allocation cannot mutate it in place while this one exists.
+        bytes: Arc<Vec<u8>>,
+        /// SHA-256 of `bytes`, computed on first request.
+        sha256: Arc<OnceLock<[u8; 32]>>,
+    }
+
+    impl OwnedSource {
+        pub(super) fn new(bytes: Arc<Vec<u8>>) -> Self {
+            Self {
+                bytes,
+                sha256: Arc::new(OnceLock::new()),
+            }
+        }
+
+        pub(super) const fn bytes(&self) -> &Arc<Vec<u8>> {
+            &self.bytes
+        }
+
+        pub(super) fn sha256(&self) -> [u8; 32] {
+            let digest = *self
+                .sha256
+                .get_or_init(|| Sha256::digest(self.bytes.as_slice()).into());
+            // Test and debug builds re-derive every read, so the suite proves
+            // the memo describes its own bytes rather than only that it
+            // compiles.
+            debug_assert_eq!(
+                digest,
+                <[u8; 32]>::from(Sha256::digest(self.bytes.as_slice())),
+                "an owned source's digest memo answered for different bytes"
+            );
+            digest
+        }
+
+        /// Whether the digest has been computed, for the memo tests.
+        #[cfg(test)]
+        pub(super) fn sha256_is_memoized(&self) -> bool {
+            self.sha256.get().is_some()
+        }
+
+        /// Whether two values share one memo, for the memo tests.
+        #[cfg(test)]
+        pub(super) fn shares_memo_with(&self, other: &Self) -> bool {
+            Arc::ptr_eq(&self.sha256, &other.sha256)
+        }
     }
 }
 
@@ -1865,11 +2011,16 @@ mod tests {
         );
 
         assert!(Arc::ptr_eq(
-            package.source_archive.as_ref().expect("source authorized"),
+            package
+                .source_archive
+                .as_ref()
+                .expect("source authorized")
+                .bytes(),
             clone
                 .source_archive
                 .as_ref()
                 .expect("clone source authorized")
+                .bytes()
         ));
 
         let unchanged_options = clone.save_options().clone();
@@ -1880,6 +2031,170 @@ mod tests {
         assert!(clone.source_archive.is_some());
         assert!(clone.preservation.is_some());
         assert!(package.exact_source_authorized);
+    }
+
+    fn sha256_of(bytes: &[u8]) -> [u8; 32] {
+        use sha2::{Digest as _, Sha256};
+        Sha256::digest(bytes).into()
+    }
+
+    /// The exact-source digest is the digest of exactly the bytes the package
+    /// streams, on every owned and shared ingress, and is absent otherwise.
+    #[test]
+    fn exact_source_sha256_is_the_digest_of_the_published_bytes() {
+        let bytes = with_eocd_comment(create_minimal_docx(), b"exact source digest");
+        let expected = sha256_of(&bytes);
+        let file = NamedTempFile::new().unwrap();
+        fs::write(file.path(), &bytes).unwrap();
+        let donor = OpcPackage::from_vec(bytes.clone()).unwrap();
+        let shared = Arc::new(bytes.clone());
+        let packages = [
+            OpcPackage::from_vec(bytes.clone()).unwrap(),
+            OpcPackage::from_reader(Cursor::new(bytes.clone())).unwrap(),
+            OpcPackage::open(file.path()).unwrap(),
+            OpcPackage::from_vec_reusing_payloads(bytes.clone(), ReadLimits::default(), &donor)
+                .unwrap(),
+            OpcPackage::from_shared_vec_reusing_payloads(
+                Arc::clone(&shared),
+                ReadLimits::default(),
+                &donor,
+            )
+            .unwrap(),
+            OpcPackage::from_shared_vec_with_limits(Arc::clone(&shared), ReadLimits::default())
+                .unwrap(),
+        ];
+        for package in &packages {
+            assert_eq!(package.exact_source_sha256(), Some(expected));
+            let mut streamed = Vec::new();
+            package.to_stream(&mut streamed).unwrap();
+            assert_eq!(sha256_of(&streamed), expected);
+            assert_eq!(streamed, bytes);
+        }
+
+        assert_eq!(OpcPackage::new().exact_source_sha256(), None);
+        assert_eq!(
+            OpcPackage::from_bytes(&bytes)
+                .unwrap()
+                .exact_source_sha256(),
+            None,
+            "borrowed ingress retains no exact source"
+        );
+    }
+
+    /// Clones share one memo, filled at most once from the archive they share;
+    /// a revoked clone answers nothing, and a second ingress of equal bytes
+    /// owns a memo of its own.
+    #[test]
+    fn exact_source_sha256_memo_is_bound_to_its_archive() {
+        let bytes = with_eocd_comment(create_minimal_docx(), b"memo binding");
+        let package = OpcPackage::from_vec(bytes.clone()).unwrap();
+        let source = package.source_archive.as_ref().unwrap();
+        assert!(!source.sha256_is_memoized(), "ingress hashes nothing");
+
+        let mut clone = package.clone();
+        let cloned_source = clone.source_archive.as_ref().unwrap();
+        assert!(source.shares_memo_with(cloned_source));
+        assert_eq!(clone.exact_source_sha256(), Some(sha256_of(&bytes)));
+        assert!(
+            source.sha256_is_memoized(),
+            "a clone's digest is the original's: they share one archive"
+        );
+
+        clone.set_save_options(SaveOptions::default());
+        assert_eq!(clone.exact_source_sha256(), None, "an edit revokes it");
+        assert_eq!(package.exact_source_sha256(), Some(sha256_of(&bytes)));
+
+        let again = OpcPackage::from_vec(bytes.clone()).unwrap();
+        let again_source = again.source_archive.as_ref().unwrap();
+        assert!(!again_source.shares_memo_with(source));
+        assert!(!again_source.sha256_is_memoized());
+        assert_eq!(again.exact_source_sha256(), package.exact_source_sha256());
+
+        let other = with_eocd_comment(create_minimal_docx(), b"other bytes");
+        let different = OpcPackage::from_vec(other.clone()).unwrap();
+        assert_eq!(different.exact_source_sha256(), Some(sha256_of(&other)));
+        assert_ne!(
+            different.exact_source_sha256(),
+            package.exact_source_sha256()
+        );
+    }
+
+    /// Shared ingress keeps the caller's allocation instead of a copy, reads
+    /// and refuses exactly as the owned ingress does, and donates the same
+    /// payload allocations.
+    #[test]
+    fn shared_ingress_matches_owned_ingress_without_copying() {
+        let bytes = with_eocd_comment(create_minimal_docx(), b"shared ingress");
+        let donor = OpcPackage::from_vec(bytes.clone()).unwrap();
+        let shared = Arc::new(bytes.clone());
+
+        let owned =
+            OpcPackage::from_vec_reusing_payloads(bytes.clone(), ReadLimits::default(), &donor)
+                .unwrap();
+        let reused = OpcPackage::from_shared_vec_reusing_payloads(
+            Arc::clone(&shared),
+            ReadLimits::default(),
+            &donor,
+        )
+        .unwrap();
+        let deferred =
+            OpcPackage::from_shared_vec_with_limits(Arc::clone(&shared), ReadLimits::default())
+                .unwrap();
+        for package in [&reused, &deferred] {
+            assert!(package.is_unmodified_owned_source());
+            assert!(Arc::ptr_eq(
+                &package.exact_source_shared().unwrap(),
+                &shared
+            ));
+            assert_eq!(package.source_read_limits(), Some(ReadLimits::default()));
+            assert_eq!(package.part_count(), owned.part_count());
+        }
+        for metadata in owned.iter_parts() {
+            let name = metadata.partname();
+            let expected = owned.get_part(name).unwrap();
+            let donated = reused.get_part(name).unwrap();
+            let lazy = deferred.get_part(name).unwrap();
+            assert_eq!(expected.content_type(), donated.content_type());
+            assert_eq!(expected.content_type(), lazy.content_type());
+            assert_eq!(expected.blob(), donated.blob());
+            assert_eq!(expected.blob(), lazy.blob());
+            assert_eq!(
+                Arc::ptr_eq(
+                    &expected.blob_arc(),
+                    &donor.get_part(name).unwrap().blob_arc()
+                ),
+                Arc::ptr_eq(
+                    &donated.blob_arc(),
+                    &donor.get_part(name).unwrap().blob_arc()
+                ),
+                "shared ingress donates exactly what owned ingress donates"
+            );
+        }
+
+        let tight = ReadLimits::builder()
+            .max_input_bytes(8)
+            .unwrap()
+            .build()
+            .unwrap();
+        let handles = Arc::strong_count(&shared);
+        let owned_refusal = OpcPackage::from_vec_with_limits(bytes.clone(), tight)
+            .err()
+            .map(|error| error.to_string());
+        let shared_refusal = OpcPackage::from_shared_vec_with_limits(Arc::clone(&shared), tight)
+            .err()
+            .map(|error| error.to_string());
+        assert!(owned_refusal.is_some());
+        assert_eq!(owned_refusal, shared_refusal);
+        let reused_refusal =
+            OpcPackage::from_shared_vec_reusing_payloads(Arc::clone(&shared), tight, &donor)
+                .err()
+                .map(|error| error.to_string());
+        assert_eq!(owned_refusal, reused_refusal);
+        assert_eq!(
+            Arc::strong_count(&shared),
+            handles,
+            "a refused shared ingress keeps no handle"
+        );
     }
 
     #[test]

@@ -317,7 +317,7 @@ impl OpcPackage {
         part: &'package dyn Part,
         source_part: &'package SourcePart,
     ) -> Result<Option<TransferMember<'package>>> {
-        let Some(source_archive) = self.source_archive.as_ref() else {
+        let Some(source_archive) = self.source_archive.as_ref().map(|source| source.bytes()) else {
             return Ok(None);
         };
         let deferred = source_part.blob.as_deferred();
