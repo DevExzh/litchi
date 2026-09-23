@@ -108,7 +108,7 @@ fn edge_cases() -> Vec<Vec<u8>> {
         // Missing pieces and forbidden markup.
         format!(r#"<w:document xmlns:w="{WORD}"></w:document>"#).into_bytes(),
         format!(r#"<w:document xmlns:w="{WORD}"><w:body/></w:document>"#).into_bytes(),
-        format!(r#"<w:document xmlns:w="urn:x"><w:body></w:body></w:document>"#).into_bytes(),
+        br#"<w:document xmlns:w="urn:x"><w:body></w:body></w:document>"#.to_vec(),
         format!(r#"<!DOCTYPE x><w:document xmlns:w="{WORD}"><w:body/></w:document>"#)
             .into_bytes(),
         format!(r#"<w:document xmlns:w="{WORD}"><w:body><?pi x?></w:body></w:document>"#)
