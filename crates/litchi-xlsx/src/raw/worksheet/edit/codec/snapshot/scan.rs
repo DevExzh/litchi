@@ -335,7 +335,6 @@ impl Scanner {
                         )));
                     }
                     let parent = stack.last().map(|frame| frame.kind);
-                    let name_len = element.name().as_ref().len();
                     let kind = scanner.start(
                         parent,
                         &namespace,
@@ -357,7 +356,7 @@ impl Scanner {
                         && let Some(entry) = lane::Entry::locate(
                             content,
                             reader_start,
-                            name_len,
+                            element.name().as_ref(),
                             reader.buffer_position(),
                         )
                     {

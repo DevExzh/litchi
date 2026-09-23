@@ -30,6 +30,19 @@ pub(crate) struct OmittedCells {
     pub(crate) end: usize,
 }
 
+impl OmittedCells {
+    /// The single-row cell range this omission covers.
+    pub(crate) fn range(&self) -> Option<Rect> {
+        let start = Address::at(self.row, self.first_column).ok()?;
+        Rect::new(
+            start,
+            self.row.checked_add(1)?,
+            self.last_column.checked_add(1)?,
+        )
+        .ok()
+    }
+}
+
 /// Complete value-only output plus its private readback provenance.
 ///
 /// Borrowing the exact input slice ties the omission metadata to the source

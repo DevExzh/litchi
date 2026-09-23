@@ -19,6 +19,8 @@ pub(crate) use model::{
 pub(crate) use scan::scan;
 #[cfg(test)]
 pub(crate) use scan::scan_with_event_limit;
+#[cfg(test)]
+pub(crate) use write::writer_fault;
 pub(crate) use write::{
     write_columns, write_defaults, write_new_columns, write_new_defaults, write_root,
     write_sheet_data, write_sheet_data_from_facts, write_sheet_data_with_provenance,

@@ -4,6 +4,7 @@ use quick_xml::Writer;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::reader::NsReader;
 
+use super::namespace::is_spreadsheetml_name;
 use super::worksheet::lane;
 use crate::error::{Error, Result, allocation};
 
@@ -175,20 +176,27 @@ fn changed_observed(
 
 /// Compact reader events until end of file.
 ///
-/// With `lane` set to the reader's own input, stop right after a
-/// `<sheetData>` start tag that is a direct child of the root.
+/// With `lane` set to the reader's own input, stop right after the start tag
+/// of the worksheet's `<sheetData>`: the first `SpreadsheetML` `sheetData`
+/// child of a `SpreadsheetML` `worksheet` root, exactly the element the
+/// worksheet parser and edit scanner treat as the sheet's body (a later one
+/// is their duplicate refusal). The lane is decided once, at that element,
+/// and only when its unprefixed children resolve to `SpreadsheetML` too, so
+/// an admitted body is always that element's body.
 fn compact_events(
     reader: &mut NsReader<&[u8]>,
     writer: &mut Writer<Vec<u8>>,
     preserve: &mut Vec<bool>,
     observer: &mut impl Observer,
-    lane: Option<&[u8]>,
+    mut lane: Option<&[u8]>,
 ) -> Result<Option<lane::Entry>> {
+    let mut root_seen = false;
+    let mut worksheet_root = false;
     // Slice-backed events borrow the immutable input and are consumed before the next read.
     loop {
         let event_start = reader.buffer_position();
         let event = reader.read_event().map_err(xml_error)?;
-        let mut sheet_data_name = None;
+        let mut candidate = None;
         match &event {
             Event::Start(element) => {
                 let local = element.local_name();
@@ -199,15 +207,42 @@ fn compact_events(
                         explicit = Some(attribute.value.as_ref() == b"preserve");
                     }
                 }
+                let depth = preserve.len();
                 let inherited = preserve.last().copied().unwrap_or(false);
                 preserve.push(explicit.unwrap_or(inherited) || text_bearing(local.as_ref()));
                 write_start(writer, element, false)?;
-                if lane.is_some() && preserve.len() == 2 && local.as_ref() == b"sheetData" {
-                    sheet_data_name = Some(element.name().as_ref().len());
+                if let Some(content) = lane {
+                    let (namespace, _) = reader.resolver().resolve_element(element.name());
+                    if depth == 0 {
+                        // Only the first root can own the worksheet's body.
+                        worksheet_root = !root_seen
+                            && is_spreadsheetml_name(&namespace, element.name(), b"worksheet");
+                        root_seen = true;
+                    } else if depth == 1
+                        && worksheet_root
+                        && is_spreadsheetml_name(&namespace, element.name(), b"sheetData")
+                    {
+                        candidate = Some(
+                            lane::children_are_spreadsheetml(reader.resolver())
+                                .then(|| {
+                                    lane::Entry::locate(
+                                        content,
+                                        event_start,
+                                        element.name().as_ref(),
+                                        reader.buffer_position(),
+                                    )
+                                })
+                                .flatten(),
+                        );
+                    }
                 }
             },
             Event::Empty(element) => {
                 write_start(writer, element, true)?;
+                if preserve.is_empty() {
+                    root_seen = true;
+                    worksheet_root = false;
+                }
             },
             Event::End(element) => {
                 let _ = preserve.pop();
@@ -234,11 +269,11 @@ fn compact_events(
         }
         // Discarded formatting is absent from the bytes that web validation sees.
         observer.event(reader, &event);
-        if let (Some(content), Some(name_len)) = (lane, sheet_data_name)
-            && let Some(entry) =
-                lane::Entry::locate(content, event_start, name_len, reader.buffer_position())
-        {
-            return Ok(Some(entry));
+        match candidate {
+            Some(Some(entry)) => return Ok(Some(entry)),
+            // The worksheet's body cannot take the lane; no later element may.
+            Some(None) => lane = None,
+            None => {},
         }
     }
 }
@@ -910,17 +945,25 @@ mod tests {
                 ),
                 true,
             ),
-            // Prefixed documents and foreign namespaces compact identically.
+            // Prefixed documents and foreign namespaces compact identically;
+            // the lane takes only a SpreadsheetML worksheet body whose
+            // unprefixed children resolve to SpreadsheetML.
             (
                 format!(
                     "<x:worksheet xmlns:x=\"{MAIN_NAMESPACE}\"><x:sheetData><row r=\"1\"/></x:sheetData></x:worksheet>"
+                ),
+                false,
+            ),
+            (
+                format!(
+                    "<x:worksheet xmlns:x=\"{MAIN_NAMESPACE}\"><x:sheetData xmlns=\"{MAIN_NAMESPACE}\"><row r=\"1\"/></x:sheetData></x:worksheet>"
                 ),
                 true,
             ),
             (
                 "<worksheet xmlns=\"urn:other\"><sheetData><row/></sheetData></worksheet>"
                     .to_owned(),
-                true,
+                false,
             ),
             // A web extension after the body still reaches the full reader.
             (
@@ -977,5 +1020,65 @@ mod tests {
             "<worksheet xmlns=\"{MAIN_NAMESPACE}\"><sheetData><row r=\"1\"><c r=\"A1\" t=\"str\"><v>\u{e9}</v></c></row></sheetData></worksheet>"
         );
         assert!(assert_lane_parity(document.as_bytes()));
+    }
+
+    #[test]
+    fn lane_compaction_keeps_the_reader_for_byte_order_marked_worksheets() {
+        use crate::raw::worksheet::lane::corpus::{Lcg, generated_body, worksheet};
+        let mut random = Lcg(0xB0D);
+        for _ in 0..50 {
+            let document = format!("\u{feff}{}", worksheet(&generated_body(&mut random, false)));
+            assert!(!assert_lane_parity(document.as_bytes()), "{document}");
+            let compacted = changed_worksheet(document.as_bytes(), "test XML").expect("compact");
+            assert!(!compacted.body_admitted());
+        }
+    }
+
+    #[test]
+    fn lane_compaction_admits_only_the_worksheet_body() {
+        let benign = "<row r=\"2\"><c r=\"A2\"><v>1</v></c></row>";
+        let declined = "<row r=\"2\"><c r=\"A2\"><f>1+1</f><v>2</v></c><c r=\"B2\" t=\"inlineStr\"><is><t>x</t></is></c></row>";
+        let foreign = [
+            "<x:sheetData xmlns:x=\"urn:foreign\"><row r=\"1\"/></x:sheetData>",
+            "<sheetData xmlns=\"urn:foreign\"><row r=\"1\"/></sheetData>",
+        ];
+        let admitted = |document: &str| {
+            assert_lane_parity(document.as_bytes());
+            changed_worksheet(document.as_bytes(), "test XML")
+                .expect("compact")
+                .body_admitted()
+        };
+        for foreign in foreign {
+            // A foreign sheetData before the worksheet's own body is never
+            // taken for it: the admission describes the worksheet's body.
+            assert!(!admitted(&format!(
+                "<worksheet xmlns=\"{MAIN_NAMESPACE}\">{foreign}<sheetData>{declined}</sheetData></worksheet>"
+            )));
+            assert!(admitted(&format!(
+                "<worksheet xmlns=\"{MAIN_NAMESPACE}\">{foreign}<sheetData>{benign}</sheetData></worksheet>"
+            )));
+        }
+        for document in [
+            // The root is not a SpreadsheetML worksheet.
+            format!(
+                "<workbook xmlns=\"{MAIN_NAMESPACE}\"><sheetData>{benign}</sheetData></workbook>"
+            ),
+            format!("<worksheet xmlns=\"urn:foreign\"><sheetData>{benign}</sheetData></worksheet>"),
+            // A nested sheetData is not the root's child.
+            format!(
+                "<worksheet xmlns=\"{MAIN_NAMESPACE}\"><a><sheetData>{benign}</sheetData></a></worksheet>"
+            ),
+            // The worksheet's body resolves its children elsewhere, and no
+            // later sheetData can stand in for it.
+            format!(
+                "<x:worksheet xmlns:x=\"{MAIN_NAMESPACE}\"><x:sheetData xmlns=\"urn:other\">{benign}</x:sheetData><x:sheetData xmlns=\"{MAIN_NAMESPACE}\">{benign}</x:sheetData></x:worksheet>"
+            ),
+            // Only the first root can own the body.
+            format!(
+                "<worksheet xmlns=\"{MAIN_NAMESPACE}\"/><worksheet xmlns=\"{MAIN_NAMESPACE}\"><sheetData>{benign}</sheetData></worksheet>"
+            ),
+        ] {
+            assert!(!admitted(&document), "{document}");
+        }
     }
 }

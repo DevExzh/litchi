@@ -88,7 +88,11 @@ impl VerifiedStore {
 ///   the markup-compatibility namespace, so no preprocessing can relate an
 ///   omitted record to a retained one;
 /// * the complete store would exceed the validated-store handoff bounds, so
-///   the reduced store never reaches a published snapshot.
+///   the reduced store never reaches a published snapshot;
+/// * the worksheet fits the web-extension reader's limit. Every larger
+///   changed worksheet is refused at that later step anyway, and below it the
+///   complete parse's whole-document input limits cannot apply, so no first
+///   error can move.
 ///
 /// Anything else, and any refusal of the reduced readback itself, takes the
 /// complete parse, whose result and error remain authoritative.
@@ -100,11 +104,41 @@ fn reduced_readback_admitted(
     changed_cells: usize,
 ) -> bool {
     !omitted.is_empty()
+        && after.len() <= raw::web::MAX_XML_BYTES
         && compacted.body_admitted()
         && compacted.bytes() == after
         && (after.len() > MAX_VALIDATED_STORE_HANDOFF_BYTES
             || source_cells.saturating_sub(changed_cells) > MAX_VALIDATED_STORE_HANDOFF_CELLS)
         && memchr::memmem::find(after, litchi_ooxml_common::mce::NAMESPACE.as_bytes()).is_none()
+}
+
+/// Verify a changed worksheet through the reduced readback, or `None` when
+/// the complete parse must verify it.
+///
+/// Besides [`reduced_readback_admitted`], the reduced store is refused when
+/// one of its cells falls inside an omitted range, as change 0525's merge
+/// refuses it: such a record would sit beside the omitted verbatim record of
+/// the same address, a duplicate only the complete parse would see.
+fn reduced_readback_store<'s>(
+    after: &[u8],
+    compacted: &raw::compact::WorksheetOutput,
+    omitted: &[raw::worksheet::edit::OmittedCells],
+    source_cells: usize,
+    changed_cells: usize,
+    strings: impl FnOnce() -> Result<Option<&'s [crate::cell::Text]>>,
+) -> Option<crate::cell::Store> {
+    if !reduced_readback_admitted(after, compacted, omitted, source_cells, changed_cells) {
+        return None;
+    }
+    let mut ranges = Vec::new();
+    ranges.try_reserve_exact(omitted.len()).ok()?;
+    for span in omitted {
+        ranges.push(span.range()?);
+    }
+    // The speculative buffer is dropped before any complete-parse fallback.
+    let reduced = raw::worksheet::edit::reduced_readback(after, omitted).ok()?;
+    let store = raw::worksheet::parse(&reduced, strings).ok()?;
+    store.avoids_omitted_cells(&ranges).then_some(store)
 }
 const MAX_HYPERLINK_EDITS: usize = 4_096;
 
@@ -1751,33 +1785,28 @@ impl Edit {
                 after.ok_or_else(|| invalid("effective worksheet edit produced no bytes"))?;
             let compacted =
                 raw::compact::changed_worksheet(&after, "compact changed worksheet output")?;
-            let reduced = (requires_store_verification
-                && reduced_readback_admitted(
-                    &after,
-                    &compacted,
-                    &omitted,
-                    store.stored_cell_count(),
-                    changed_cells,
-                ))
-            .then(|| raw::worksheet::edit::reduced_readback(&after, &omitted).ok())
-            .flatten();
             let parsed = if requires_store_verification {
                 let strings = || base.inner.shared_strings();
                 Some(
-                    match reduced
-                        .as_deref()
-                        .map(|reduced| raw::worksheet::parse(reduced, strings))
-                    {
-                        Some(Ok(reduced)) => {
+                    match reduced_readback_store(
+                        &after,
+                        &compacted,
+                        &omitted,
+                        store.stored_cell_count(),
+                        changed_cells,
+                        strings,
+                    ) {
+                        Some(reduced) => {
                             #[cfg(test)]
                             raw::worksheet::lane::route::note_admitted(
                                 raw::worksheet::lane::route::Pass::Readback,
                             );
                             VerifiedStore::Reduced(reduced)
                         },
-                        // A refused reduced readback falls back to the complete
-                        // parse, whose result and error stay authoritative.
-                        Some(Err(_)) | None => VerifiedStore::Complete(raw::worksheet::parse(
+                        // A declined or refused reduced readback falls back to
+                        // the complete parse, whose result and error stay
+                        // authoritative.
+                        None => VerifiedStore::Complete(raw::worksheet::parse(
                             compacted.bytes(),
                             strings,
                         )?),
@@ -1786,7 +1815,6 @@ impl Edit {
             } else {
                 None
             };
-            drop(reduced);
             // Resolve web validation after grid parsing to preserve error order.
             // Compaction may already prove that an ordinary worksheet has no bindings.
             let (after, parsed_web) = compacted.into_bytes_and_web()?;

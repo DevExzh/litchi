@@ -294,3 +294,13 @@ fn compact_lane_cells_match_every_value_form() {
         assert!(assert_parity(&worksheet(body), &strings), "{body}");
     }
 }
+
+#[test]
+fn byte_order_marked_worksheets_keep_the_reader_with_identical_stores() {
+    let strings = shared_strings();
+    let mut random = Lcg(0xB0B);
+    for _ in 0..50 {
+        let document = format!("\u{feff}{}", worksheet(&generated_body(&mut random, false)));
+        assert!(!assert_parity(&document, &strings), "{document}");
+    }
+}

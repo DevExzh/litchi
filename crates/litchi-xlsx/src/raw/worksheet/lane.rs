@@ -54,6 +54,9 @@ use crate::raw::namespace::is_spreadsheetml_name;
 /// the pairwise duplicate check stays a small bounded loop.
 const MAX_TAG_ATTRIBUTES: usize = 32;
 
+/// The UTF-8 byte-order mark `quick_xml`'s slice reader skips uncounted.
+const UTF8_BOM: &[u8] = b"\xEF\xBB\xBF";
+
 const ROW_CLOSE: &[u8] = b"</row>";
 const CELL_CLOSE: &[u8] = b"</c>";
 const VALUE_OPEN: &[u8] = b"<v>";
@@ -171,24 +174,41 @@ pub(crate) struct Entry {
 impl Entry {
     /// Locate the `<sheetData>` start tag a slice reader just delivered.
     ///
-    /// A slice reader positioned before a start tag stands on its `<`, and
-    /// the qualified name follows it directly; `event_start` and `position`
-    /// are the reader's positions before and after the event. `None` keeps
-    /// the ordinary reader.
+    /// `event_start` and `position` are the reader's positions before and
+    /// after the event and `name` is the element's qualified name. The lane
+    /// works in offsets into `content`, so the reader's positions are used
+    /// only after the tag they claim to delimit is found at exactly those
+    /// offsets: `<`, the same name bytes, and a closing `>`.
+    ///
+    /// A part that starts with a UTF-8 byte-order mark always declines:
+    /// `quick_xml`'s slice reader drops the mark without counting it, so its
+    /// positions are three bytes short of document offsets there. Such a part
+    /// keeps the ordinary reader for all three passes. `None` keeps the
+    /// ordinary reader.
     pub(crate) fn locate(
         content: &[u8],
         event_start: u64,
-        name_len: usize,
+        name: &[u8],
         position: u64,
     ) -> Option<Self> {
+        if content.starts_with(UTF8_BOM) {
+            return None;
+        }
         let tag_start = usize::try_from(event_start).ok()?;
         let position = usize::try_from(position).ok()?;
         if content.get(tag_start) != Some(&b'<') {
             return None;
         }
         let name_start = tag_start.checked_add(1)?;
-        let name_end = name_start.checked_add(name_len)?;
-        if name_end > position || content.get(position.checked_sub(1)?) != Some(&b'>') {
+        let name_end = name_start.checked_add(name.len())?;
+        if content.get(name_start..name_end) != Some(name)
+            || !matches!(
+                content.get(name_end),
+                Some(b'>' | b' ' | b'\t' | b'\r' | b'\n')
+            )
+            || name_end >= position
+            || content.get(position.checked_sub(1)?) != Some(&b'>')
+        {
             return None;
         }
         Some(Self {
@@ -1050,6 +1070,41 @@ mod tests {
             attributes.push_str(&format!(" a{index}=\"1\""));
         }
         assert!(events(&format!("<row r=\"1\"><c{attributes}/></row>")).is_some());
+    }
+
+    #[test]
+    fn entries_require_the_named_tag_at_the_reader_positions() {
+        let content = b"<w><sheetData><row/></sheetData></w>";
+        let (start, end) = (3, 14);
+        let entry = Entry::locate(content, start, b"sheetData", end).expect("aligned tag");
+        assert_eq!(entry.position, 14);
+        assert_eq!(entry.name(content).expect("name"), b"sheetData");
+        // A different or truncated name, or shifted positions, decline.
+        for (start, name, end) in [
+            (start, b"sheetDat".as_slice(), end),
+            (start, b"sheetDatb".as_slice(), end),
+            (start, b"x:sheetData".as_slice(), end),
+            (start + 1, b"sheetData".as_slice(), end),
+            (start, b"sheetData".as_slice(), end - 1),
+            (start, b"sheetData".as_slice(), end + 1),
+        ] {
+            assert!(
+                Entry::locate(content, start, name, end).is_none(),
+                "{start} {end}"
+            );
+        }
+        let spaced = b"<w><sheetData\n a=\"1\"><row/></sheetData></w>";
+        assert!(Entry::locate(spaced, start, b"sheetData", 21).is_some());
+    }
+
+    #[test]
+    fn byte_order_marked_parts_always_decline() {
+        let mut content = UTF8_BOM.to_vec();
+        content.extend_from_slice(b"<w><sheetData><row/></sheetData></w>");
+        // quick-xml reports positions without the mark; neither those nor the
+        // document offsets are taken.
+        assert!(Entry::locate(&content, 3, b"sheetData", 14).is_none());
+        assert!(Entry::locate(&content, 6, b"sheetData", 17).is_none());
     }
 
     #[test]

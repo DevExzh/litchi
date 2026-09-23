@@ -867,6 +867,18 @@ impl Store {
         .map(Some)
     }
 
+    /// Whether `omitted` are ordered single-row ranges none of which holds a
+    /// cell of this store.
+    ///
+    /// This is the collision refusal of [`Self::merge_omitted_cells`] for a
+    /// readback that only verifies: a parsed record inside a range whose
+    /// records were omitted would be a second record at an omitted address,
+    /// which the complete parse refuses as a duplicate.
+    pub(crate) fn avoids_omitted_cells(&self, omitted: &[Rect]) -> bool {
+        omitted_ranges_are_ordered(omitted)
+            && omitted_entries(&self.cells, omitted).next().is_none()
+    }
+
     pub(crate) fn view(&self, address: Address) -> View<'_> {
         if let Some(range) = self.merges.containing(address)
             && range.start() != address
@@ -1103,6 +1115,24 @@ mod tests {
             .collect();
         Store::from_unsorted(cells, Vec::new(), Box::new([]), None, Vec::new(), None)
             .expect("valid cell store")
+    }
+
+    #[test]
+    fn omitted_range_collisions_are_detected() {
+        let store = empty_store(&[(0, 1), (2, 3)]);
+        let range = |row: u32, first: u32, last: u32| {
+            Rect::new(Address::at(row, first).expect("start"), row + 1, last + 1)
+                .expect("single-row range")
+        };
+        assert!(store.avoids_omitted_cells(&[]));
+        assert!(store.avoids_omitted_cells(&[range(0, 2, 5), range(1, 0, 9), range(2, 0, 2)]));
+        // A stored cell inside an omitted range collides.
+        assert!(!store.avoids_omitted_cells(&[range(0, 0, 1)]));
+        assert!(!store.avoids_omitted_cells(&[range(0, 2, 5), range(2, 3, 3)]));
+        // Unordered or multi-row omissions are refused like the merge refuses them.
+        assert!(!store.avoids_omitted_cells(&[range(1, 0, 0), range(0, 5, 6)]));
+        let tall = Rect::new(Address::at(0, 2).expect("start"), 2, 3).expect("two rows");
+        assert!(!store.avoids_omitted_cells(&[tall]));
     }
 
     #[test]

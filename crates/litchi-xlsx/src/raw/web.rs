@@ -22,7 +22,9 @@ pub const XM_NAMESPACE: &str = "http://schemas.microsoft.com/office/excel/2006/m
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_SML: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
-const MAX_XML_BYTES: usize = 16 * 1024 * 1024;
+/// Largest worksheet the web-extension reader accepts; every changed eager
+/// worksheet passes through it, so no larger worksheet edit can publish.
+pub(crate) const MAX_XML_BYTES: usize = 16 * 1024 * 1024;
 const MAX_DEPTH: usize = 128;
 
 /// Read the checked worksheet binding collection embedded in `extLst`.

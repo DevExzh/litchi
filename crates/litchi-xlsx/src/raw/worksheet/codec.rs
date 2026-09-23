@@ -379,11 +379,18 @@ impl<'c> Parser<'c> {
             let event = reader
                 .read_event()
                 .map_err(|error| invalid(error.to_string()))?;
-            let sheet_data_name = match (&lane, &event) {
-                (Some(_), Event::Start(element))
+            // Locate the tag while the event still holds its name; whether it
+            // is the worksheet's `<sheetData>` is decided by the transition.
+            let candidate = match (lane, &event) {
+                (Some(content), Event::Start(element))
                     if element.local_name().as_ref() == b"sheetData" =>
                 {
-                    Some(element.name().as_ref().len())
+                    lane::Entry::locate(
+                        content,
+                        event_start,
+                        element.name().as_ref(),
+                        reader.buffer_position(),
+                    )
                 },
                 _ => None,
             };
@@ -394,11 +401,9 @@ impl<'c> Parser<'c> {
                 return Ok(None);
             }
             // `SheetData` is pushed only for the root's `<sheetData>` child.
-            if let (Some(content), Some(name_len)) = (lane, sheet_data_name)
+            if let Some(entry) = candidate
                 && stack.last() == Some(&Context::SheetData)
                 && lane::children_are_spreadsheetml(reader.resolver())
-                && let Some(entry) =
-                    lane::Entry::locate(content, event_start, name_len, reader.buffer_position())
             {
                 return Ok(Some((entry, decoder)));
             }

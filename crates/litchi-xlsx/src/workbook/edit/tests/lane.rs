@@ -9,6 +9,7 @@ use litchi_opc::PackURI;
 
 use super::super::super::Workbook;
 use super::support::styled_workbook;
+use crate::raw::worksheet::edit::writer_fault;
 use crate::raw::worksheet::lane::corpus::Lcg;
 use crate::raw::worksheet::lane::route::{self, Pass};
 use crate::{Address, Formula};
@@ -31,11 +32,38 @@ fn column_name(column: u32) -> String {
 
 /// A dense generated worksheet above the validated-store handoff bound.
 fn dense_sheet(random: &mut Lcg, rows: u32, columns: u32, suffix: &str) -> String {
+    dense_sheet_with(random, rows, columns, "", suffix, false)
+}
+
+/// A dense worksheet with `prefix` and `suffix` markup around its
+/// `<sheetData>`; `mixed` adds formula and inline-string cells, which the
+/// lane never admits, in columns congruent to 3 and 5 modulo 7.
+fn dense_sheet_with(
+    random: &mut Lcg,
+    rows: u32,
+    columns: u32,
+    prefix: &str,
+    suffix: &str,
+    mixed: bool,
+) -> String {
     let mut body = String::new();
     for row in 1..=rows {
         body.push_str(&format!("<row r=\"{row}\">"));
         for column in 0..columns {
             let address = format!("{}{row}", column_name(column));
+            if mixed && column % 7 == 3 {
+                body.push_str(&format!(
+                    "<c r=\"{address}\"><f>{row}+1</f><v>{}</v></c>",
+                    row + 1
+                ));
+                continue;
+            }
+            if mixed && column % 7 == 5 {
+                body.push_str(&format!(
+                    "<c r=\"{address}\" t=\"inlineStr\"><is><t>inline {row}</t></is></c>"
+                ));
+                continue;
+            }
             match random.next() % 10 {
                 0 => body.push_str(&format!("<c r=\"{address}\" s=\"1\"><v>{row}.5</v></c>")),
                 1 => body.push_str(&format!(
@@ -53,7 +81,7 @@ fn dense_sheet(random: &mut Lcg, rows: u32, columns: u32, suffix: &str) -> Strin
     }
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
-         <worksheet xmlns=\"{MAIN}\"><dimension ref=\"A1:{}{rows}\"/><sheetData>{body}</sheetData>{suffix}</worksheet>",
+         <worksheet xmlns=\"{MAIN}\"><dimension ref=\"A1:{}{rows}\"/>{prefix}<sheetData>{body}</sheetData>{suffix}</worksheet>",
         column_name(columns - 1)
     )
 }
@@ -241,4 +269,79 @@ fn refused_edits_keep_their_refusal_on_the_reduced_route() {
     assert_parity(&xml, &operations);
     let source = workbook_with_sheet(&xml);
     assert!(commit_and_save(&source, &operations).is_err());
+}
+
+#[test]
+fn a_foreign_sheet_data_before_the_body_keeps_the_complete_readback() {
+    let operations = [Operation::Number(Address::at(40, 0).expect("A41"), 42)];
+    for foreign in [
+        "<x:sheetData xmlns:x=\"urn:foreign\"><row r=\"1\"/></x:sheetData>",
+        "<sheetData xmlns=\"urn:foreign\"><row r=\"1\"/></sheetData>",
+    ] {
+        // The worksheet's own body holds formulas and inline strings, so only
+        // the foreign element's body is lane-benign.
+        let mut random = Lcg(31);
+        let mixed = dense_sheet_with(&mut random, 80, 60, foreign, "", true);
+        assert!(!assert_parity(&mixed, &operations), "{foreign}");
+        // A benign worksheet body behind the same foreign element still
+        // verifies through the reduced readback.
+        let mut random = Lcg(37);
+        let benign = dense_sheet_with(&mut random, 80, 60, foreign, "", false);
+        assert!(assert_parity(&benign, &operations), "{foreign}");
+    }
+}
+
+#[test]
+fn worksheets_above_the_web_reader_limit_never_take_the_reduced_readback() {
+    let mut random = Lcg(41);
+    // A comment survives compaction unchanged and pushes the part past the
+    // limit, so the edit is refused at the web-extension step on both routes.
+    let padding = format!("<!--{}-->", "x".repeat(crate::raw::web::MAX_XML_BYTES));
+    let xml = dense_sheet(&mut random, 80, 60, &padding);
+    let operations = [Operation::Number(Address::at(40, 30).expect("AE41"), 42)];
+    assert!(!assert_parity(&xml, &operations));
+    let source = workbook_with_sheet(&xml);
+    let error = commit_and_save(&source, &operations).expect_err("above the web limit");
+    assert!(error.contains("web-extension parser limit"), "{error}");
+}
+
+#[test]
+fn a_changed_cell_reemitted_into_an_omitted_run_keeps_the_complete_readback() {
+    let mut random = Lcg(43);
+    let xml = dense_sheet(&mut random, 80, 60, "");
+    let operations = [Operation::Number(Address::at(40, 30).expect("AE41"), 42)];
+    // Without the fault this edit verifies through the reduced readback.
+    assert!(assert_parity(&xml, &operations));
+    // The faulty writer keeps the old AE41 inside the preceding omitted run
+    // and writes the new one after it. Only the complete parse sees both.
+    let (fast, reduced) = writer_fault::with_reemitted_changed_cells(|| {
+        route::reset();
+        let result = commit_and_save(&workbook_with_sheet(&xml), &operations);
+        (result, route::admitted(Pass::Readback))
+    });
+    let slow = writer_fault::with_reemitted_changed_cells(|| {
+        route::without_lane(|| commit_and_save(&workbook_with_sheet(&xml), &operations))
+    });
+    assert_eq!(
+        reduced, 0,
+        "the collision check must refuse the reduced store"
+    );
+    assert_eq!(fast, slow);
+    let error = fast.expect_err("the published row holds two AE41 records");
+    assert!(error.contains("duplicate worksheet cell"), "{error}");
+}
+
+#[test]
+fn byte_order_marked_worksheets_publish_identical_outcomes() {
+    let mut random = Lcg(47);
+    let xml = format!("\u{feff}{}", dense_sheet(&mut random, 80, 60, ""));
+    for operations in [
+        vec![Operation::Number(Address::at(0, 0).expect("A1"), 42)],
+        vec![Operation::Text(
+            Address::at(3, 3).expect("D4"),
+            "bom".to_owned(),
+        )],
+    ] {
+        assert!(!assert_parity(&xml, &operations));
+    }
 }
