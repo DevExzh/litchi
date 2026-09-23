@@ -1,0 +1,7 @@
+src=/home/zhuhe/code/litchi-worktrees/0757-xls-fresh-writer-sst-determinism head=921787e2c0bee3d99da9f9001f5e6917c9d92516 dirty=0
+rustc: rustc 1.95.0 (59807616e 2026-04-14)
+   Compiling litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0757-xls-fresh-writer-sst-determinism/crates/litchi-xls)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi-worktrees/0757-xls-fresh-writer-sst-determinism/tools/perf-baseline)
+    Finished `release` profile [optimized] target(s) in 56.64s
+build done 2026-09-23T12:33:14Z exit=0
+exit=0

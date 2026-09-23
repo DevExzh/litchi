@@ -1,0 +1,758 @@
+[
+ {
+  "case": "doc_fresh_write_to",
+  "shape": "tiny",
+  "warmup": 100,
+  "samples": 1000,
+  "corpus": "doc-tiny",
+  "archive_sha256_before": [
+   "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+  ],
+  "archive_sha256_after": [
+   "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+  ],
+  "before_median_p50": 5810.0,
+  "after_median_p50": 5765.0,
+  "before_median_p95": 5910.0,
+  "after_median_p95": 5870.0,
+  "before_median_mean": 5859.1155,
+  "after_median_mean": 5810.3795,
+  "paired_p50_ratios": [
+   0.9878892733564014,
+   1.0007737941707506,
+   1.0034423407917383,
+   0.9810671256454389
+  ],
+  "paired_mean_ratios": [
+   0.9883210387406351,
+   1.0006735739983037,
+   1.0059294624323765,
+   0.9823117262063081
+  ],
+  "median_paired_p50_ratio": 0.9943315337635761,
+  "bootstrap_95ci_p50_ratio": [
+   0.9810671256454389,
+   1.0034423407917383
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/doc_fresh_write_to-tiny-0-A.json",
+    "p50": 5780.0,
+    "p95": 5880.0,
+    "mean": 5821.665,
+    "n": 1000,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/doc_fresh_write_to-tiny-1-B.json",
+    "p50": 5710.0,
+    "p95": 5820.0,
+    "mean": 5753.674,
+    "n": 1000,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/doc_fresh_write_to-tiny-2-B.json",
+    "p50": 5820.0,
+    "p95": 5920.0,
+    "mean": 5866.705,
+    "n": 1000,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/doc_fresh_write_to-tiny-3-A.json",
+    "p50": 5815.5,
+    "p95": 5920.0,
+    "mean": 5862.756,
+    "n": 1000,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/doc_fresh_write_to-tiny-4-A.json",
+    "p50": 5810.0,
+    "p95": 5910.0,
+    "mean": 5860.565,
+    "n": 1000,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/doc_fresh_write_to-tiny-5-B.json",
+    "p50": 5830.0,
+    "p95": 5940.0,
+    "mean": 5895.315,
+    "n": 1000,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/doc_fresh_write_to-tiny-6-B.json",
+    "p50": 5700.0,
+    "p95": 5801.45,
+    "mean": 5754.054,
+    "n": 1000,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/doc_fresh_write_to-tiny-7-A.json",
+    "p50": 5810.0,
+    "p95": 5910.0,
+    "mean": 5857.666,
+    "n": 1000,
+    "corpus": "doc-tiny",
+    "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+   }
+  ]
+ },
+ {
+  "case": "doc_fresh_write_to",
+  "shape": "large",
+  "warmup": 20,
+  "samples": 200,
+  "corpus": "doc-large",
+  "archive_sha256_before": [
+   "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+  ],
+  "archive_sha256_after": [
+   "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+  ],
+  "before_median_p50": 142490.75,
+  "after_median_p50": 136235.75,
+  "before_median_p95": 193286.49999999994,
+  "after_median_p95": 186992.5,
+  "before_median_mean": 156590.26,
+  "after_median_mean": 150139.46,
+  "paired_p50_ratios": [
+   0.953731087319448,
+   0.957680829299672,
+   0.9559637080093394,
+   0.9566277162555624
+  ],
+  "paired_mean_ratios": [
+   0.9588443501509418,
+   0.9575408383051521,
+   0.9583402466783691,
+   0.9606014897297519
+  ],
+  "median_paired_p50_ratio": 0.9562957121324509,
+  "bootstrap_95ci_p50_ratio": [
+   0.953731087319448,
+   0.957680829299672
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/doc_fresh_write_to-large-0-A.json",
+    "p50": 142860.5,
+    "p95": 189621.5,
+    "mean": 156754.055,
+    "n": 200,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/doc_fresh_write_to-large-1-B.json",
+    "p50": 136250.5,
+    "p95": 185710.5,
+    "mean": 150302.74,
+    "n": 200,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/doc_fresh_write_to-large-2-B.json",
+    "p50": 136221.0,
+    "p95": 188274.49999999997,
+    "mean": 149950.225,
+    "n": 200,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/doc_fresh_write_to-large-3-A.json",
+    "p50": 142240.5,
+    "p95": 196653.55,
+    "mean": 156599.3,
+    "n": 200,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/doc_fresh_write_to-large-4-A.json",
+    "p50": 142621.0,
+    "p95": 190674.4999999999,
+    "mean": 156581.22,
+    "n": 200,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/doc_fresh_write_to-large-5-B.json",
+    "p50": 136340.5,
+    "p95": 183118.45,
+    "mean": 150058.085,
+    "n": 200,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/doc_fresh_write_to-large-6-B.json",
+    "p50": 136186.0,
+    "p95": 188729.0,
+    "mean": 150220.835,
+    "n": 200,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/doc_fresh_write_to-large-7-A.json",
+    "p50": 142360.5,
+    "p95": 195898.5,
+    "mean": 156382.055,
+    "n": 200,
+    "corpus": "doc-large",
+    "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6"
+   }
+  ]
+ },
+ {
+  "case": "doc_fresh_write_to",
+  "shape": "payload-heavy",
+  "warmup": 5,
+  "samples": 40,
+  "corpus": "doc-payload-heavy",
+  "archive_sha256_before": [
+   "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388"
+  ],
+  "archive_sha256_after": [
+   "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388"
+  ],
+  "before_median_p50": 1611701.75,
+  "after_median_p50": 1612334.25,
+  "before_median_p95": 1629639.775,
+  "after_median_p95": 1640997.0,
+  "before_median_mean": 1613014.2999999998,
+  "after_median_mean": 1619090.5875,
+  "paired_p50_ratios": [
+   1.0022186005659588,
+   0.9985665112712355,
+   1.0084692381390967,
+   0.9952981794712189
+  ],
+  "paired_mean_ratios": [
+   1.0084225137374063,
+   0.9991169477458692,
+   1.0127849336072945,
+   0.9958608261615622
+  ],
+  "median_paired_p50_ratio": 1.000392555918597,
+  "bootstrap_95ci_p50_ratio": [
+   0.9952981794712189,
+   1.0084692381390967
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/doc_fresh_write_to-payload-heavy-0-A.json",
+    "p50": 1611601.5,
+    "p95": 1631355.5,
+    "mean": 1612081.075,
+    "n": 40,
+    "corpus": "doc-payload-heavy",
+    "archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388"
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/doc_fresh_write_to-payload-heavy-1-B.json",
+    "p50": 1615177.0,
+    "p95": 1666786.5,
+    "mean": 1625658.85,
+    "n": 40,
+    "corpus": "doc-payload-heavy",
+    "archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388"
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/doc_fresh_write_to-payload-heavy-2-B.json",
+    "p50": 1609491.5,
+    "p95": 1637133.0,
+    "mean": 1612522.325,
+    "n": 40,
+    "corpus": "doc-payload-heavy",
+    "archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388"
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/doc_fresh_write_to-payload-heavy-3-A.json",
+    "p50": 1611802.0,
+    "p95": 1631795.0,
+    "mean": 1613947.525,
+    "n": 40,
+    "corpus": "doc-payload-heavy",
+    "archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388"
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/doc_fresh_write_to-payload-heavy-4-A.json",
+    "p50": 1605811.5,
+    "p95": 1620235.5,
+    "mean": 1606590.275,
+    "n": 40,
+    "corpus": "doc-payload-heavy",
+    "archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388"
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/doc_fresh_write_to-payload-heavy-5-B.json",
+    "p50": 1619411.5,
+    "p95": 1644861.0,
+    "mean": 1627130.425,
+    "n": 40,
+    "corpus": "doc-payload-heavy",
+    "archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388"
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/doc_fresh_write_to-payload-heavy-6-B.json",
+    "p50": 1604561.5,
+    "p95": 1631990.0,
+    "mean": 1610561.0,
+    "n": 40,
+    "corpus": "doc-payload-heavy",
+    "archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388"
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/doc_fresh_write_to-payload-heavy-7-A.json",
+    "p50": 1612141.5,
+    "p95": 1627924.05,
+    "mean": 1617255.1,
+    "n": 40,
+    "corpus": "doc-payload-heavy",
+    "archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388"
+   }
+  ]
+ },
+ {
+  "case": "ppt_fresh_write_to",
+  "shape": "tiny",
+  "warmup": 100,
+  "samples": 1000,
+  "corpus": "ppt-tiny",
+  "archive_sha256_before": [
+   "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+  ],
+  "archive_sha256_after": [
+   "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+  ],
+  "before_median_p50": 9805.0,
+  "after_median_p50": 9535.0,
+  "before_median_p95": 10350.25,
+  "after_median_p95": 9720.0,
+  "before_median_mean": 9910.303,
+  "after_median_mean": 9627.2205,
+  "paired_p50_ratios": [
+   0.9399796541200407,
+   0.9409785932721713,
+   1.0030612244897958,
+   1.0246153846153847
+  ],
+  "paired_mean_ratios": [
+   0.9365053325530858,
+   0.9393164185828313,
+   1.0036907368965393,
+   1.0220483504064113
+  ],
+  "median_paired_p50_ratio": 0.9720199088809836,
+  "bootstrap_95ci_p50_ratio": [
+   0.9399796541200407,
+   1.0246153846153847
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/ppt_fresh_write_to-tiny-0-A.json",
+    "p50": 9830.0,
+    "p95": 10390.05,
+    "mean": 9942.142,
+    "n": 1000,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/ppt_fresh_write_to-tiny-1-B.json",
+    "p50": 9240.0,
+    "p95": 9420.0,
+    "mean": 9310.869,
+    "n": 1000,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/ppt_fresh_write_to-tiny-2-B.json",
+    "p50": 9231.0,
+    "p95": 9411.449999999999,
+    "mean": 9328.589,
+    "n": 1000,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/ppt_fresh_write_to-tiny-3-A.json",
+    "p50": 9810.0,
+    "p95": 10350.0,
+    "mean": 9931.253,
+    "n": 1000,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/ppt_fresh_write_to-tiny-4-A.json",
+    "p50": 9800.0,
+    "p95": 10340.5,
+    "mean": 9889.353,
+    "n": 1000,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/ppt_fresh_write_to-tiny-5-B.json",
+    "p50": 9830.0,
+    "p95": 10020.0,
+    "mean": 9925.852,
+    "n": 1000,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/ppt_fresh_write_to-tiny-6-B.json",
+    "p50": 9990.0,
+    "p95": 10170.0,
+    "mean": 10099.613,
+    "n": 1000,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/ppt_fresh_write_to-tiny-7-A.json",
+    "p50": 9750.0,
+    "p95": 10350.5,
+    "mean": 9881.737,
+    "n": 1000,
+    "corpus": "ppt-tiny",
+    "archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+   }
+  ]
+ },
+ {
+  "case": "ppt_fresh_write_to",
+  "shape": "large",
+  "warmup": 20,
+  "samples": 200,
+  "corpus": "ppt-large",
+  "archive_sha256_before": [
+   "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+  ],
+  "archive_sha256_after": [
+   "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+  ],
+  "before_median_p50": 71730.0,
+  "after_median_p50": 73832.75,
+  "before_median_p95": 79832.75,
+  "after_median_p95": 82005.47499999998,
+  "before_median_mean": 73032.39249999999,
+  "after_median_mean": 74871.285,
+  "paired_p50_ratios": [
+   1.0241706779463164,
+   1.0154386208814126,
+   1.0221662820781763,
+   1.0866070180343912
+  ],
+  "paired_mean_ratios": [
+   1.0213349788239034,
+   1.0057685442243587,
+   1.0178222982710718,
+   1.0775639840100675
+  ],
+  "median_paired_p50_ratio": 1.0231684800122465,
+  "bootstrap_95ci_p50_ratio": [
+   1.0154386208814126,
+   1.0866070180343912
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/ppt_fresh_write_to-large-0-A.json",
+    "p50": 72815.5,
+    "p95": 81232.5,
+    "mean": 74174.435,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/ppt_fresh_write_to-large-1-B.json",
+    "p50": 74575.5,
+    "p95": 82157.44999999998,
+    "mean": 75756.945,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/ppt_fresh_write_to-large-2-B.json",
+    "p50": 73040.5,
+    "p95": 79711.55,
+    "mean": 73797.93,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/ppt_fresh_write_to-large-3-A.json",
+    "p50": 71930.0,
+    "p95": 80671.0,
+    "mean": 73374.665,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/ppt_fresh_write_to-large-4-A.json",
+    "p50": 71505.0,
+    "p95": 78604.55,
+    "mean": 72690.12,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/ppt_fresh_write_to-large-5-B.json",
+    "p50": 73090.0,
+    "p95": 81853.49999999999,
+    "mean": 73985.625,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/ppt_fresh_write_to-large-6-B.json",
+    "p50": 77725.0,
+    "p95": 83663.54999999999,
+    "mean": 78219.75,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/ppt_fresh_write_to-large-7-A.json",
+    "p50": 71530.0,
+    "p95": 78994.5,
+    "mean": 72589.425,
+    "n": 200,
+    "corpus": "ppt-large",
+    "archive_sha256": "229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52"
+   }
+  ]
+ },
+ {
+  "case": "ppt_fresh_write_to",
+  "shape": "payload-heavy",
+  "warmup": 5,
+  "samples": 40,
+  "corpus": "ppt-payload-heavy",
+  "archive_sha256_before": [
+   "51686d86b2ca22c444c382565d065be7d92aecd9b6f7fdfb8597a2593d155ffb"
+  ],
+  "archive_sha256_after": [
+   "51686d86b2ca22c444c382565d065be7d92aecd9b6f7fdfb8597a2593d155ffb"
+  ],
+  "before_median_p50": 805954.5,
+  "after_median_p50": 637431.0,
+  "before_median_p95": 857519.5,
+  "after_median_p95": 661456.5,
+  "before_median_mean": 803321.45,
+  "after_median_mean": 638329.075,
+  "paired_p50_ratios": [
+   0.8013722449187808,
+   0.7913410159374751,
+   0.7752511532861006,
+   0.7927334776613865
+  ],
+  "paired_mean_ratios": [
+   0.8041035768060537,
+   0.797153077628883,
+   0.7762442328134501,
+   0.79661776799007
+  ],
+  "median_paired_p50_ratio": 0.7920372467994308,
+  "bootstrap_95ci_p50_ratio": [
+   0.7752511532861006,
+   0.8013722449187808
+  ],
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/ppt_fresh_write_to-payload-heavy-0-A.json",
+    "p50": 803719.5,
+    "p95": 858202.5,
+    "mean": 803333.325,
+    "n": 40,
+    "corpus": "ppt-payload-heavy",
+    "archive_sha256": "51686d86b2ca22c444c382565d065be7d92aecd9b6f7fdfb8597a2593d155ffb"
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/ppt_fresh_write_to-payload-heavy-1-B.json",
+    "p50": 644078.5,
+    "p95": 666701.5,
+    "mean": 645963.2,
+    "n": 40,
+    "corpus": "ppt-payload-heavy",
+    "archive_sha256": "51686d86b2ca22c444c382565d065be7d92aecd9b6f7fdfb8597a2593d155ffb"
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/ppt_fresh_write_to-payload-heavy-2-B.json",
+    "p50": 639553.5,
+    "p95": 657313.5,
+    "mean": 640360.7,
+    "n": 40,
+    "corpus": "ppt-payload-heavy",
+    "archive_sha256": "51686d86b2ca22c444c382565d065be7d92aecd9b6f7fdfb8597a2593d155ffb"
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/ppt_fresh_write_to-payload-heavy-3-A.json",
+    "p50": 808189.5,
+    "p95": 854510.0,
+    "mean": 803309.575,
+    "n": 40,
+    "corpus": "ppt-payload-heavy",
+    "archive_sha256": "51686d86b2ca22c444c382565d065be7d92aecd9b6f7fdfb8597a2593d155ffb"
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/ppt_fresh_write_to-payload-heavy-4-A.json",
+    "p50": 817230.0,
+    "p95": 873577.0,
+    "mean": 819712.95,
+    "n": 40,
+    "corpus": "ppt-payload-heavy",
+    "archive_sha256": "51686d86b2ca22c444c382565d065be7d92aecd9b6f7fdfb8597a2593d155ffb"
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/ppt_fresh_write_to-payload-heavy-5-B.json",
+    "p50": 633558.5,
+    "p95": 665599.5,
+    "mean": 636297.45,
+    "n": 40,
+    "corpus": "ppt-payload-heavy",
+    "archive_sha256": "51686d86b2ca22c444c382565d065be7d92aecd9b6f7fdfb8597a2593d155ffb"
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/ppt_fresh_write_to-payload-heavy-6-B.json",
+    "p50": 635308.5,
+    "p95": 650629.0,
+    "mean": 635607.675,
+    "n": 40,
+    "corpus": "ppt-payload-heavy",
+    "archive_sha256": "51686d86b2ca22c444c382565d065be7d92aecd9b6f7fdfb8597a2593d155ffb"
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/ppt_fresh_write_to-payload-heavy-7-A.json",
+    "p50": 801415.0,
+    "p95": 856836.5,
+    "mean": 797882.875,
+    "n": 40,
+    "corpus": "ppt-payload-heavy",
+    "archive_sha256": "51686d86b2ca22c444c382565d065be7d92aecd9b6f7fdfb8597a2593d155ffb"
+   }
+  ]
+ }
+]

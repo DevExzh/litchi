@@ -1,0 +1,40 @@
+# Gates for change 0757 at the final head a400341bdf97885bcc3d4573083b2a5e7382b13d (2026-09-23T13:11:24Z)
+# CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0757 CARGO_BUILD_JOBS=6 TMPDIR=scratch/0757/tmp; rustc 1.95.0; worktree clean: 0 changes
+cargo fmt --all --check -> exit 0
+cargo check -p litchi-xls -p litchi-doc -p litchi-ppt --all-targets --locked -> exit 0
+cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked -> exit 0
+cargo clippy -p litchi-xls -p litchi-doc -p litchi-ppt --lib --no-deps --locked -- -D warnings -> exit 0
+cargo clippy -p litchi-doc -p litchi-ppt --all-targets --no-deps --locked -- -D warnings -> exit 0
+cargo clippy -p litchi-xls --all-targets --no-deps --locked -- -D warnings -> exit 101
+error: digits of hex, binary or octal literal not in groups of equal size
+   --> crates/litchi-xls/tests/xls_query_index_cache.rs:546:32
+    |
+546 |             SourceVersion::new(0x584C_535F_43414348, self.revision.load(Ordering::Relaxed));
+    |                                ^^^^^^^^^^^^^^^^^^^^ help: consider: `0x584C_535F_4341_4348`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unusual_byte_groupings
+--
+error: could not compile `litchi-xls` (test "xls_query_index_cache") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+cargo clippy -p litchi-xls --all-targets --no-deps --locked -- -D warnings -A clippy::unusual_byte_groupings -> exit 0
+RUSTDOCFLAGS='-D warnings' cargo doc -p litchi-xls -p litchi-doc -p litchi-ppt --no-deps --locked -> exit 0
+  (the base 9ff78bbf1c fails this identically: cargo clippy -p litchi-xls --all-targets --no-deps --locked -- -D warnings -> exit 101 at tests/xls_query_index_cache.rs:546:32, unusual_byte_groupings; checked in the before worktree)
+cargo test -p litchi-xls --locked --no-fail-fast -> exit 0 (passed 1535, failed 0, ignored 1)
+cargo test -p litchi-doc --locked --no-fail-fast -> exit 0 (passed 1206, failed 0, ignored 13)
+cargo test -p litchi-ppt --locked --no-fail-fast -> exit 0 (passed 1235, failed 0, ignored 11)
+cargo test -p litchi-ppt --features encryption --locked --no-fail-fast -> exit 0 (passed 1246, failed 0, ignored 11)
+cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --no-fail-fast -> exit 0 (passed 382, failed 0, ignored 7)
+python3 tools/check_crate_boundaries.py -> exit 0 (  [017] litchi-iwa -> litchi-pages)
+python3 tools/non_iwork_gate.py verify -> exit 0 (verified_facade_combined_tree=1)
+python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural -> exit 0 (OK: 10 performance claims validated (structural))
+cargo build --release --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline (scripts/build_leg.sh, CARGO_TARGET_DIR=targets/0757-final) -> exit 0 (logs: build done 2026-09-23T13:14:07Z)
+tests/xls_writer_text_goldens.rs run as 12 separate processes, each with fresh hash seeds: 12 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+the same test file copied onto the base 9ff78bbf1c (then restored):
+  test a_writer_written_twice_and_extended_restages_its_strings ... ok
+  test the_sst_lists_strings_in_first_occurrence_order ... FAILED
+  test many_distinct_and_repeated_strings_read_back_cell_by_cell ... ok
+  test multi_string_worksheets_are_pinned_across_processes ... FAILED
+  test fresh_xls_writer_shared_strings_match_the_pre_0753_goldens ... ok
+  assertion `left == right` failed: many_strings is not deterministic
+  test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+xls_fresh_write_to/large user instructions per iteration: measured build 921787e2c0 17,033,997, final head a400341bdf 17,060,215 (+0.15%)

@@ -1,0 +1,66 @@
+[
+ {
+  "setting": "default",
+  "leg": "A",
+  "p50_ms": 1.0974595,
+  "page-faults": 207.54,
+  "instructions:u": 17688066.56,
+  "cycles:u": 4553064.115
+ },
+ {
+  "setting": "default",
+  "leg": "B",
+  "p50_ms": 1.179705,
+  "page-faults": 414.045,
+  "instructions:u": 17053450.975,
+  "cycles:u": 4714700.025
+ },
+ {
+  "setting": "default",
+  "leg": "B",
+  "p50_ms": 1.18945,
+  "page-faults": 435.335,
+  "instructions:u": 17075934.495,
+  "cycles:u": 4687819.79
+ },
+ {
+  "setting": "default",
+  "leg": "A",
+  "p50_ms": 1.11325,
+  "page-faults": 230.0,
+  "instructions:u": 17648736.765,
+  "cycles:u": 4627248.765
+ },
+ {
+  "setting": "pinned",
+  "leg": "A",
+  "p50_ms": 0.991134,
+  "page-faults": -0.08,
+  "instructions:u": 17626835.65,
+  "cycles:u": 4468135.96
+ },
+ {
+  "setting": "pinned",
+  "leg": "B",
+  "p50_ms": 0.9780195,
+  "page-faults": 0.0,
+  "instructions:u": 17057992.475,
+  "cycles:u": 4443952.035
+ },
+ {
+  "setting": "pinned",
+  "leg": "B",
+  "p50_ms": 0.9759745,
+  "page-faults": 0.03,
+  "instructions:u": 17030537.565,
+  "cycles:u": 4375358.36
+ },
+ {
+  "setting": "pinned",
+  "leg": "A",
+  "p50_ms": 0.996589,
+  "page-faults": 0.025,
+  "instructions:u": 17680547.82,
+  "cycles:u": 4479766.66
+ }
+]

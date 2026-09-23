@@ -1,0 +1,658 @@
+[
+ {
+  "case": "xls_multi_string/distinct",
+  "iterations": 30,
+  "rounds": 4,
+  "pinned_malloc_thresholds": false,
+  "before_median_p50_ns": 12901675.75,
+  "after_median_p50_ns": 14469819.75,
+  "before_median_p95_ns": 13309094.349999998,
+  "after_median_p95_ns": 14767865.75,
+  "paired_p50_ratios": [
+   1.1212202625695735,
+   1.1222327895470043,
+   1.1234989501156727,
+   1.005187950194045,
+   1.1297014914070724,
+   1.1212124744638192,
+   1.1145458868517728,
+   1.1256855668036043
+  ],
+  "median_paired_p50_ratio": 1.121726526058289,
+  "bootstrap_95ci_p50_ratio": [
+   1.1145458868517728,
+   1.1256855668036043
+  ],
+  "instructions_per_write": {
+   "A": 166172723.0,
+   "B": 188615049.0
+  },
+  "instructions_ratio": 1.135054211033179,
+  "callgrind_iterations": [
+   1,
+   3
+  ],
+  "outputs_before": [
+   [
+    2854912,
+    "1da9cc638b29cebf"
+   ],
+   [
+    2854912,
+    "1dcfdddddbefa90b"
+   ],
+   [
+    2854912,
+    "3b7b0ebe1ad35023"
+   ],
+   [
+    2854912,
+    "8529831e378c8a46"
+   ],
+   [
+    2854912,
+    "9e3c87da2f121004"
+   ],
+   [
+    2854912,
+    "bd343c2e25f6a702"
+   ],
+   [
+    2854912,
+    "d5a532f4f8ead154"
+   ],
+   [
+    2854912,
+    "e7779194f567e9aa"
+   ]
+  ],
+  "outputs_after": [
+   [
+    2854912,
+    "e111c247ca4e8a06"
+   ]
+  ],
+  "allocations_before": {
+   "allocations_per_write": 21834,
+   "reallocations_per_write": 30184,
+   "allocated_bytes_per_write": 29662300,
+   "peak_live_bytes": 13137049
+  },
+  "allocations_after": {
+   "allocations_per_write": 21832,
+   "reallocations_per_write": 30145,
+   "allocated_bytes_per_write": 29604101,
+   "peak_live_bytes": 12772761
+  },
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-distinct-0-A.json",
+    "p50": 12757533.0,
+    "p95": 13416677.599999998,
+    "mean": 12847736.433333334,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "8529831e378c8a46",
+    "allocations_per_write": 21834,
+    "reallocations_per_write": 30184,
+    "allocated_bytes_per_write": 29662300,
+    "peak_live_bytes": 13137049
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-distinct-1-B.json",
+    "p50": 14304004.5,
+    "p95": 14757790.0,
+    "mean": 13922082.2,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "e111c247ca4e8a06",
+    "allocations_per_write": 21832,
+    "reallocations_per_write": 30145,
+    "allocated_bytes_per_write": 29604101,
+    "peak_live_bytes": 12772761
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-distinct-2-B.json",
+    "p50": 14468939.5,
+    "p95": 14901898.549999999,
+    "mean": 14514334.0,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "e111c247ca4e8a06",
+    "allocations_per_write": 21832,
+    "reallocations_per_write": 30145,
+    "allocated_bytes_per_write": 29603996,
+    "peak_live_bytes": 12772761
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-distinct-3-A.json",
+    "p50": 12892993.0,
+    "p95": 13141083.55,
+    "mean": 12946962.833333334,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "d5a532f4f8ead154",
+    "allocations_per_write": 21831,
+    "reallocations_per_write": 30184,
+    "allocated_bytes_per_write": 29661979,
+    "peak_live_bytes": 13137049
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-distinct-4-A.json",
+    "p50": 12785218.0,
+    "p95": 13008182.5,
+    "mean": 12837630.733333332,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "1da9cc638b29cebf",
+    "allocations_per_write": 21835,
+    "reallocations_per_write": 30184,
+    "allocated_bytes_per_write": 29662225,
+    "peak_live_bytes": 13137049
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-distinct-5-B.json",
+    "p50": 14364179.0,
+    "p95": 14725776.5,
+    "mean": 14285527.7,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "e111c247ca4e8a06",
+    "allocations_per_write": 21832,
+    "reallocations_per_write": 30145,
+    "allocated_bytes_per_write": 29604108,
+    "peak_live_bytes": 12772761
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-distinct-6-B.json",
+    "p50": 13048484.0,
+    "p95": 13568799.049999999,
+    "mean": 13127269.933333334,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "e111c247ca4e8a06",
+    "allocations_per_write": 21836,
+    "reallocations_per_write": 30145,
+    "allocated_bytes_per_write": 29604409,
+    "peak_live_bytes": 12772761
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-distinct-7-A.json",
+    "p50": 12981138.5,
+    "p95": 14088155.549999999,
+    "mean": 13112068.866666667,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "9e3c87da2f121004",
+    "allocations_per_write": 21832,
+    "reallocations_per_write": 30184,
+    "allocated_bytes_per_write": 29661976,
+    "peak_live_bytes": 13137049
+   },
+   {
+    "index": 8,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-distinct-8-A.json",
+    "p50": 12809313.0,
+    "p95": 13201511.1,
+    "mean": 12889218.966666667,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "1dcfdddddbefa90b",
+    "allocations_per_write": 21830,
+    "reallocations_per_write": 30184,
+    "allocated_bytes_per_write": 29661927,
+    "peak_live_bytes": 13137049
+   },
+   {
+    "index": 9,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-distinct-9-B.json",
+    "p50": 14470700.0,
+    "p95": 14885619.5,
+    "mean": 14389444.866666667,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "e111c247ca4e8a06",
+    "allocations_per_write": 21837,
+    "reallocations_per_write": 30145,
+    "allocated_bytes_per_write": 29604490,
+    "peak_live_bytes": 12772761
+   },
+   {
+    "index": 10,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-distinct-10-B.json",
+    "p50": 14475255.0,
+    "p95": 14672948.0,
+    "mean": 14097872.366666667,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "e111c247ca4e8a06",
+    "allocations_per_write": 21833,
+    "reallocations_per_write": 30145,
+    "allocated_bytes_per_write": 29604229,
+    "peak_live_bytes": 12772761
+   },
+   {
+    "index": 11,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-distinct-11-A.json",
+    "p50": 12910358.5,
+    "p95": 13127369.0,
+    "mean": 12968366.933333334,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "3b7b0ebe1ad35023",
+    "allocations_per_write": 21833,
+    "reallocations_per_write": 30184,
+    "allocated_bytes_per_write": 29662123,
+    "peak_live_bytes": 13137049
+   },
+   {
+    "index": 12,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-distinct-12-A.json",
+    "p50": 12987424.0,
+    "p95": 14229835.5,
+    "mean": 13220624.0,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "bd343c2e25f6a702",
+    "allocations_per_write": 21836,
+    "reallocations_per_write": 30184,
+    "allocated_bytes_per_write": 29662286,
+    "peak_live_bytes": 13137049
+   },
+   {
+    "index": 13,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-distinct-13-B.json",
+    "p50": 14475080.0,
+    "p95": 14790644.549999999,
+    "mean": 14480465.466666667,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "e111c247ca4e8a06",
+    "allocations_per_write": 21836,
+    "reallocations_per_write": 30145,
+    "allocated_bytes_per_write": 29604440,
+    "peak_live_bytes": 12772761
+   },
+   {
+    "index": 14,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-distinct-14-B.json",
+    "p50": 14569065.0,
+    "p95": 14777941.5,
+    "mean": 14154536.2,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "e111c247ca4e8a06",
+    "allocations_per_write": 21833,
+    "reallocations_per_write": 30145,
+    "allocated_bytes_per_write": 29604200,
+    "peak_live_bytes": 12772761
+   },
+   {
+    "index": 15,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-distinct-15-A.json",
+    "p50": 12942393.0,
+    "p95": 14129326.0,
+    "mean": 13093141.5,
+    "n": 30,
+    "output_bytes": 2854912,
+    "output_fnv1a": "e7779194f567e9aa",
+    "allocations_per_write": 21833,
+    "reallocations_per_write": 30184,
+    "allocated_bytes_per_write": 29662125,
+    "peak_live_bytes": 13137049
+   }
+  ]
+ },
+ {
+  "case": "xls_multi_string/repeated",
+  "iterations": 30,
+  "rounds": 4,
+  "pinned_malloc_thresholds": false,
+  "before_median_p50_ns": 10425818.25,
+  "after_median_p50_ns": 10994055.5,
+  "before_median_p95_ns": 10642486.25,
+  "after_median_p95_ns": 11266900.55,
+  "paired_p50_ratios": [
+   1.0326367959804321,
+   1.0805211531952117,
+   1.0580687704223588,
+   1.049470573080483,
+   1.0649505815746187,
+   1.0559288103017341,
+   1.0943309170997229,
+   1.0354755939584641
+  ],
+  "median_paired_p50_ratio": 1.0569987903620466,
+  "bootstrap_95ci_p50_ratio": [
+   1.0354755939584641,
+   1.0805211531952117
+  ],
+  "instructions_per_write": {
+   "A": 141101098.5,
+   "B": 160299156.5
+  },
+  "instructions_ratio": 1.136058884049014,
+  "callgrind_iterations": [
+   1,
+   3
+  ],
+  "outputs_before": [
+   [
+    1359360,
+    "16881bfd866e5dc4"
+   ],
+   [
+    1359360,
+    "18ffaada1981e22e"
+   ],
+   [
+    1359360,
+    "4282cd702beaa47d"
+   ],
+   [
+    1359360,
+    "6353c61101dcd9a6"
+   ],
+   [
+    1359360,
+    "a11ce40f14fc2340"
+   ],
+   [
+    1359360,
+    "d2ed144473746b7a"
+   ],
+   [
+    1359360,
+    "dba1879257ac7dbc"
+   ],
+   [
+    1359360,
+    "f41effcf5b44f6f8"
+   ]
+  ],
+  "outputs_after": [
+   [
+    1359360,
+    "1529ea839cb29260"
+   ]
+  ],
+  "allocations_before": {
+   "allocations_per_write": 21799,
+   "reallocations_per_write": 30173,
+   "allocated_bytes_per_write": 14447918,
+   "peak_live_bytes": 5353541
+  },
+  "allocations_after": {
+   "allocations_per_write": 21801,
+   "reallocations_per_write": 30134,
+   "allocated_bytes_per_write": 14389935,
+   "peak_live_bytes": 5353541
+  },
+  "processes": [
+   {
+    "index": 0,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-repeated-0-A.json",
+    "p50": 10588999.0,
+    "p95": 10679911.0,
+    "mean": 10583400.266666668,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "dba1879257ac7dbc",
+    "allocations_per_write": 21799,
+    "reallocations_per_write": 30173,
+    "allocated_bytes_per_write": 14447918,
+    "peak_live_bytes": 5353541
+   },
+   {
+    "index": 1,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-repeated-1-B.json",
+    "p50": 10934590.0,
+    "p95": 11278424.05,
+    "mean": 11029636.266666668,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "1529ea839cb29260",
+    "allocations_per_write": 21801,
+    "reallocations_per_write": 30134,
+    "allocated_bytes_per_write": 14389935,
+    "peak_live_bytes": 5353541
+   },
+   {
+    "index": 2,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-repeated-2-B.json",
+    "p50": 11132731.0,
+    "p95": 11245809.5,
+    "mean": 11089172.733333332,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "1529ea839cb29260",
+    "allocations_per_write": 21804,
+    "reallocations_per_write": 30134,
+    "allocated_bytes_per_write": 14390225,
+    "peak_live_bytes": 5353541
+   },
+   {
+    "index": 3,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-repeated-3-A.json",
+    "p50": 10303112.5,
+    "p95": 10742481.5,
+    "mean": 10372139.466666667,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "16881bfd866e5dc4",
+    "allocations_per_write": 21799,
+    "reallocations_per_write": 30173,
+    "allocated_bytes_per_write": 14447870,
+    "peak_live_bytes": 5353541
+   },
+   {
+    "index": 4,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-repeated-4-A.json",
+    "p50": 10271218.0,
+    "p95": 10606509.0,
+    "mean": 10347025.366666667,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "18ffaada1981e22e",
+    "allocations_per_write": 21801,
+    "reallocations_per_write": 30173,
+    "allocated_bytes_per_write": 14447954,
+    "peak_live_bytes": 5353541
+   },
+   {
+    "index": 5,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-repeated-5-B.json",
+    "p50": 10867655.0,
+    "p95": 11053594.549999999,
+    "mean": 10884786.3,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "1529ea839cb29260",
+    "allocations_per_write": 21801,
+    "reallocations_per_write": 30134,
+    "allocated_bytes_per_write": 14389972,
+    "peak_live_bytes": 5353541
+   },
+   {
+    "index": 6,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-repeated-6-B.json",
+    "p50": 11053521.0,
+    "p95": 11258986.55,
+    "mean": 11044365.266666668,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "1529ea839cb29260",
+    "allocations_per_write": 21803,
+    "reallocations_per_write": 30134,
+    "allocated_bytes_per_write": 14390183,
+    "peak_live_bytes": 5353541
+   },
+   {
+    "index": 7,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-repeated-7-A.json",
+    "p50": 10532473.5,
+    "p95": 10652524.5,
+    "mean": 10508628.0,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "4282cd702beaa47d",
+    "allocations_per_write": 21803,
+    "reallocations_per_write": 30173,
+    "allocated_bytes_per_write": 14448059,
+    "peak_live_bytes": 5353541
+   },
+   {
+    "index": 8,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-repeated-8-A.json",
+    "p50": 10532053.5,
+    "p95": 10802106.0,
+    "mean": 10542901.933333334,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "6353c61101dcd9a6",
+    "allocations_per_write": 21799,
+    "reallocations_per_write": 30173,
+    "allocated_bytes_per_write": 14447856,
+    "peak_live_bytes": 5353541
+   },
+   {
+    "index": 9,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-repeated-9-B.json",
+    "p50": 11216116.5,
+    "p95": 11283397.0,
+    "mean": 11207078.066666666,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "1529ea839cb29260",
+    "allocations_per_write": 21801,
+    "reallocations_per_write": 30134,
+    "allocated_bytes_per_write": 14389976,
+    "peak_live_bytes": 5353541
+   },
+   {
+    "index": 10,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-repeated-10-B.json",
+    "p50": 10896745.0,
+    "p95": 11168433.549999999,
+    "mean": 10933433.866666667,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "1529ea839cb29260",
+    "allocations_per_write": 21803,
+    "reallocations_per_write": 30134,
+    "allocated_bytes_per_write": 14390104,
+    "peak_live_bytes": 5353541
+   },
+   {
+    "index": 11,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-repeated-11-A.json",
+    "p50": 10319583.0,
+    "p95": 10518155.5,
+    "mean": 10352477.433333334,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "d2ed144473746b7a",
+    "allocations_per_write": 21801,
+    "reallocations_per_write": 30173,
+    "allocated_bytes_per_write": 14448067,
+    "peak_live_bytes": 5353541
+   },
+   {
+    "index": 12,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-repeated-12-A.json",
+    "p50": 10239628.0,
+    "p95": 10524115.549999999,
+    "mean": 10268449.1,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "f41effcf5b44f6f8",
+    "allocations_per_write": 21799,
+    "reallocations_per_write": 30173,
+    "allocated_bytes_per_write": 14447654,
+    "peak_live_bytes": 5353541
+   },
+   {
+    "index": 13,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-repeated-13-B.json",
+    "p50": 11205541.5,
+    "p95": 11332400.0,
+    "mean": 11145278.866666667,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "1529ea839cb29260",
+    "allocations_per_write": 21800,
+    "reallocations_per_write": 30134,
+    "allocated_bytes_per_write": 14389931,
+    "peak_live_bytes": 5353541
+   },
+   {
+    "index": 14,
+    "leg": "B",
+    "raw": "raw/xls_multi_string-repeated-14-B.json",
+    "p50": 10919845.0,
+    "p95": 11274814.549999999,
+    "mean": 10959725.966666667,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "1529ea839cb29260",
+    "allocations_per_write": 21805,
+    "reallocations_per_write": 30134,
+    "allocated_bytes_per_write": 14390194,
+    "peak_live_bytes": 5353541
+   },
+   {
+    "index": 15,
+    "leg": "A",
+    "raw": "raw/xls_multi_string-repeated-15-A.json",
+    "p50": 10545729.0,
+    "p95": 10632448.0,
+    "mean": 10520473.533333333,
+    "n": 30,
+    "output_bytes": 1359360,
+    "output_fnv1a": "a11ce40f14fc2340",
+    "allocations_per_write": 21799,
+    "reallocations_per_write": 30173,
+    "allocated_bytes_per_write": 14447810,
+    "peak_live_bytes": 5353541
+   }
+  ]
+ }
+]

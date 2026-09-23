@@ -1,0 +1,5 @@
+d49cc06b4858284ca1d8f707861df9736fc58e1ea1e75046ed9e750fcf1f6a4a  bin/A/lpb
+e276dfcb507b9e0f7797435c8db3c2d2f55df116d4e0dd2aca3b023e04927230  bin/B/lpb
+5f53619e24ec05da5616b52174828214707688139548c2dabe41d8b327cc5371  bin/A/prb
+082b3bb9734ee4ff22a384fbb0dad593bc31026885399137a3da3218eb65fa53  bin/B/prb
+cb9ffc35ce2530203f645f5ff1e30b1e22324dd660b5fb1fc72e1d158d157f5e  litchi-perf-baseline at the final head a400341bdf (not timed; instruction check only)

@@ -1,0 +1,8 @@
+FINDING data validation input title "Cafe": written; reader accepted it
+FINDING data validation input title "Café": written; reader accepted it
+FINDING number format "0.0" (id 164): written; reader accepted it
+FINDING number format "" (id 164): written; reader refused the workbook: Invalid record 0x041E: format string has 0 UTF-16 code units; expected 1 through 255
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+FINDING data validation input title "Cafe": 1 rule(s) read back; titles [Some("Cafe")]; messages [Some("pick")]
+FINDING data validation input title "Café": workbook opens but its worksheet is refused: Worksheet 'Sheet index 0' not found
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
