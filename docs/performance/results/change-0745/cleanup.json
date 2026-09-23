@@ -1,58 +1,70 @@
 {
-  "change": "0745",
-  "date": "2026-09-22",
-  "binary_identities_recorded_before_removal": "binaries.json",
-  "removed": [
-    {
-      "path": "/home/zhuhe/code/litchi-worktrees/targets/0745",
-      "bytes": 4760099313,
-      "contents": "release target dirs for the B/C probes (probe, probeB), frame-pointer profiling probe (probe-fp), sealed 0734 probe (p0734) and harness (harness)"
-    },
-    {
-      "path": "/home/zhuhe/code/litchi-worktrees/targets/0745/debug and /doc",
-      "bytes_approx": 48000000000,
-      "contents": "gate build output (workspace tests, facade tests, rustdoc); removed earlier in the session after both commits' gates passed, when /home free space fell to 212 GB"
-    },
-    {
-      "path": "/home/zhuhe/code/litchi-worktrees/targets/0745-before",
-      "bytes": 2731879297,
-      "contents": "release target dirs for the A probe, A frame-pointer probe and A sealed 0734 probe"
-    },
-    {
-      "path": "/home/zhuhe/code/litchi-worktrees/scratch/0745/*",
-      "bytes": 1193073050,
-      "contents": "copied measurement binaries (bin/A, bin/B, bin/C, bin/A-fp, bin/B-fp; 1.1 GB), argv0 layout symlinks, pilot and qualification matrices, unreduced 0734-probe reports (86 MB before reduction; SHA-256 of each kept in matrix/reduction-manifest.json), gate logs, probe build dirs; everything cited is copied into this packet"
-    },
-    {
-      "path": "/home/zhuhe/code/litchi-worktrees/0745-B-src",
-      "bytes": 10150321623,
-      "contents": "detached checkout of f5f2922750 used to build the exact B probe; removed with git worktree remove --force"
-    },
-    {
-      "path": "/home/zhuhe/.debug/home/zhuhe/code/litchi-worktrees/scratch/0745 and its four ~/.debug/.build-id links",
-      "bytes_approx": 354000000,
-      "contents": "perf build-id cache copies of the four profiled probe binaries (A, B, A-fp, B-fp); other agents' cache entries untouched"
-    },
-    {
-      "path": "perf.data files",
-      "contents": "dwarf and frame-pointer perf record outputs (about 160 MB each run); summarized into profiles/*.json, then deleted"
-    }
-  ],
-  "kept": [
-    "/home/zhuhe/code/litchi-worktrees/0745-ppt-lazy-artifact-digests (worktree) and branch perf/0745-ppt-lazy-artifact-digests",
-    "/home/zhuhe/code/litchi-worktrees/scratch/0745 (now empty directory)",
-    "this packet: 6.1 MB of sources, scripts, reduced reports and summaries"
-  ],
-  "not_touched": [
-    "/home/zhuhe/code/litchi-worktrees/base-009d515bef (read-only shared base)",
-    "/home/zhuhe/code/litchi-worktrees/targets/base-009d515bef (shared prebuilt base harness; copied, not modified)",
-    "the main checkout /home/zhuhe/code/litchi and other agents' worktrees"
-  ],
-  "verification": {
-    "targets_0745_present": false,
-    "targets_0745_before_present": false,
-    "scratch_0745_entries": 0,
-    "b_src_worktree_registered": false,
-    "home_free_after_cleanup": "501G"
+ "change": "0745",
+ "date": "2026-09-22",
+ "binary_identities_recorded_before_removal": "binaries.json",
+ "removed": [
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0745",
+   "bytes": 4760099313,
+   "contents": "release target dirs for the B/C probes (probe, probeB), frame-pointer profiling probe (probe-fp), sealed 0734 probe (p0734) and harness (harness)"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0745/debug and /doc",
+   "bytes_approx": 48000000000,
+   "contents": "gate build output (workspace tests, facade tests, rustdoc); removed earlier in the session after both commits' gates passed, when /home free space fell to 212 GB"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0745-before",
+   "bytes": 2731879297,
+   "contents": "release target dirs for the A probe, A frame-pointer probe and A sealed 0734 probe"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/scratch/0745/*",
+   "bytes": 1193073050,
+   "contents": "copied measurement binaries (bin/A, bin/B, bin/C, bin/A-fp, bin/B-fp; 1.1 GB), argv0 layout symlinks, pilot and qualification matrices, unreduced 0734-probe reports (86 MB before reduction; SHA-256 of each kept in matrix/reduction-manifest.json), gate logs, probe build dirs; everything cited is copied into this packet"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/0745-B-src",
+   "bytes": 10150321623,
+   "contents": "detached checkout of f5f2922750 used to build the exact B probe; removed with git worktree remove --force"
+  },
+  {
+   "path": "/home/zhuhe/.debug/home/zhuhe/code/litchi-worktrees/scratch/0745 and its four ~/.debug/.build-id links",
+   "bytes_approx": 354000000,
+   "contents": "perf build-id cache copies of the four profiled probe binaries (A, B, A-fp, B-fp); other agents' cache entries untouched"
+  },
+  {
+   "path": "perf.data files",
+   "contents": "dwarf and frame-pointer perf record outputs (about 160 MB each run); summarized into profiles/*.json, then deleted"
   }
+ ],
+ "kept": [
+  "/home/zhuhe/code/litchi-worktrees/0745-ppt-lazy-artifact-digests (worktree) and branch perf/0745-ppt-lazy-artifact-digests",
+  "/home/zhuhe/code/litchi-worktrees/scratch/0745 (now empty directory)",
+  "this packet: 6.1 MB of sources, scripts, reduced reports and summaries"
+ ],
+ "not_touched": [
+  "/home/zhuhe/code/litchi-worktrees/base-009d515bef (read-only shared base)",
+  "/home/zhuhe/code/litchi-worktrees/targets/base-009d515bef (shared prebuilt base harness; copied, not modified)",
+  "the main checkout /home/zhuhe/code/litchi and other agents' worktrees"
+ ],
+ "verification": {
+  "targets_0745_present": false,
+  "targets_0745_before_present": false,
+  "scratch_0745_entries": 0,
+  "b_src_worktree_registered": false,
+  "home_free_after_cleanup": "501G"
+ },
+ "review_fix": {
+  "removed": [
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0745",
+    "contents": "fresh target directory for the review-fix gates (fmt, litchi-ppt tests with and without performance-diagnostics, Clippy, rustdoc) and the one-off mutation check; deleted after the gates passed"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/scratch/0745/gates-fix",
+    "contents": "review-fix gate logs; their commands and exit codes are appended to gates.txt"
+   }
+  ]
+ }
 }

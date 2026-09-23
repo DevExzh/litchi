@@ -78,12 +78,15 @@ command lines) showed `chain-durable` at +12% for B against A. The same pair
 measured −15% when started from the shell. Scans then isolated the cause:
 
 - Padding the environment by 0–4,032 bytes changed nothing (`layout/`).
-- The length of argv[0] changed everything. Rust's runtime copies it into a
-  heap allocation.
+- The length of argv[0] changed everything. The probe's own
+  `std::env::args()` call (`probe/src/lib.rs:116`) copies it into a heap
+  allocation. Rust's startup does not.
 - Per-owner user instructions stayed fixed per arm across layouts (±0.01 M).
 - Page faults per owner varied by up to 3.5× with layout (`counters/`).
 
-The effect is allocator state, not code. The final matrix therefore starts
+The effect is allocator state, not code. glibc's mmap-threshold and trim
+behaviour is the suspected mechanism, but that is inferred, not tested: no run
+fixed the `MALLOC_*` settings. The final matrix therefore starts
 each binary through a symlink whose path grows by 8 bytes per round:
 `argv0/<arm>/<binary>-p` followed by `8*round` `q` characters. Every arm in a
 round uses the same argv[0] length, so the comparison stays paired, and 18
