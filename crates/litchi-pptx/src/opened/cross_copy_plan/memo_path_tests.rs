@@ -6,8 +6,8 @@
 //! saving is real and bounded: which fingerprints consulted a memo, how many
 //! payloads each still hashed, that the live physical revision of an
 //! unmodified owned source is sealed from the digest bound to its archive, and
-//! that the facade keeps a capture's memo only when every entry names an
-//! allocation its own graph holds.
+//! that the facade keeps a capture's memo only as re-projected onto the
+//! allocations its own graph holds.
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
@@ -16,7 +16,7 @@
 
 use std::sync::Arc;
 
-use litchi_opc::{BlobPart, OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 use super::{
@@ -26,6 +26,7 @@ use super::{
 use crate::media_parts::Resource;
 use crate::opened::Limits;
 use crate::opened::model::fingerprint_log::{self, Entry};
+use crate::opened::tests::{CopyingPart, assert_memo_retains_only_allocations_of};
 use crate::{Error, Package, Result};
 
 const PHOTO: &str = "/ppt/media/memo-photo.png";
@@ -291,70 +292,41 @@ fn a_capture_fills_the_facade_memo_and_the_next_capture_reuses_it() -> Result<()
     Ok(())
 }
 
-/// A caller-defined part that copies its payload when cloned: a capture's
-/// memo would name the clone's allocation, not the facade's.
-struct CopyingPart {
-    inner: BlobPart,
-}
-
-impl Clone for CopyingPart {
-    fn clone(&self) -> Self {
-        Self {
-            inner: BlobPart::new(
-                litchi_opc::Part::partname(&self.inner).clone(),
-                litchi_opc::Part::content_type(&self.inner).to_owned(),
-                litchi_opc::Part::blob(&self.inner).to_vec(),
-            ),
-        }
-    }
-}
-
-impl litchi_opc::Part for CopyingPart {
-    fn blob(&self) -> &[u8] {
-        litchi_opc::Part::blob(&self.inner)
-    }
-    fn blob_arc(&self) -> Arc<Vec<u8>> {
-        litchi_opc::Part::blob_arc(&self.inner)
-    }
-    fn content_type(&self) -> &str {
-        litchi_opc::Part::content_type(&self.inner)
-    }
-    fn partname(&self) -> &PackURI {
-        litchi_opc::Part::partname(&self.inner)
-    }
-    fn rels(&self) -> &litchi_opc::Relationships {
-        litchi_opc::Part::rels(&self.inner)
-    }
-    fn rels_mut(&mut self) -> &mut litchi_opc::Relationships {
-        litchi_opc::Part::rels_mut(&mut self.inner)
-    }
-    fn set_blob(&mut self, blob: Vec<u8>) {
-        litchi_opc::Part::set_blob(&mut self.inner, blob);
-    }
-}
-
-/// A facade holding a caller-defined part keeps no capture memo, because the
-/// capture's clone of that part may hold a different allocation; captures and
-/// applications still compute every value.
+/// A capture's memo is re-projected onto the facade's own allocations (change
+/// 0751's review). A facade holding a caller-defined part that copies its
+/// payload when cloned keeps every entry but that part's: the snapshot's memo
+/// names the snapshot's copy, which the facade does not hold, and every entry
+/// the facade keeps retains the facade's own `Arc`. A later capture still
+/// computes every value.
 #[test]
-fn a_facade_holding_a_caller_defined_part_keeps_no_capture_memo() -> Result<()> {
+fn a_capture_memo_is_projected_onto_the_facade_allocations() -> Result<()> {
     let (source_bytes, _destination) = media_pair()?;
     let mut package = Package::from_vec(source_bytes)?;
-    package.opc.try_add_part(Box::new(CopyingPart {
-        inner: BlobPart::new(
-            PackURI::new("/custom/copying.bin").expect("URI"),
-            "application/octet-stream".to_owned(),
-            b"copied on clone".to_vec(),
-        ),
-    }))?;
+    let custom = PackURI::new("/custom/copying.bin").expect("URI");
+    package.opc.try_add_part(Box::new(CopyingPart::new(
+        custom.clone(),
+        b"copied on clone".to_vec(),
+    )))?;
     assert!(!package.opc.holds_only_built_in_parts());
     let first = package.opened_presentation()?;
-    assert!(package.part_digest_memo().is_none());
-    // The capture's own memo names its clone's allocation for that part.
-    let custom = PackURI::new("/custom/copying.bin").expect("URI");
-    let facade_blob = package.opc.get_part(&custom)?.blob_arc();
-    let snapshot_blob = first.package.get_part(&custom)?.blob_arc();
-    assert!(!Arc::ptr_eq(&facade_blob, &snapshot_blob));
+    let copy = first.package.get_part(&custom)?.blob_arc();
+    let held = package.opc.get_part(&custom)?.blob_arc();
+    assert!(!Arc::ptr_eq(&copy, &held), "the part copies its payload");
+    let copy_key = (copy.as_ptr() as usize, copy.len());
+    assert!(
+        first.part_digests.get_for_test(copy_key).is_some(),
+        "the snapshot's memo names its copy, an entry the facade would not hold"
+    );
+    let memo = package
+        .part_digest_memo()
+        .expect("the capture offered its memo");
+    assert_eq!(
+        memo.get_for_test(copy_key),
+        None,
+        "the entry naming the snapshot's copy is dropped"
+    );
+    assert_eq!(memo.len(), first.part_digests.len() - 1);
+    assert_memo_retains_only_allocations_of("capture memo", memo, &package.opc);
     let second = package.opened_presentation()?;
     assert_eq!(second.revision(), first.revision());
     Ok(())
