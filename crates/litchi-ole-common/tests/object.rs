@@ -10,7 +10,10 @@
     reason = "integration tests use concise assertions and checked fixture-sized literals"
 )]
 
-use litchi_cfb::{OleFile, OleWriter, SectorLayoutPolicy};
+use litchi_cfb::{
+    OleFile, OleWriter, OverlayLimits, SameLengthStreamOverlay, SectorLayoutPolicy, SharedOleFile,
+};
+use litchi_core::OwnedSource;
 use litchi_ole_common::object::{Editor, EntryKind, Limits, Snapshot, Target, Targets, discover};
 use std::io::Cursor;
 use std::sync::Arc;
@@ -417,6 +420,98 @@ fn same_length_editor_edit_uses_source_backed_copy_through() {
     );
     let mut ole = OleFile::open(Cursor::new(output)).expect("copy-through output should reopen");
     assert_eq!(ole.open_stream(&["A"]).unwrap(), vec![0x44; 6_000]);
+    assert_eq!(ole.open_stream(&["B"]).unwrap(), vec![0x22; 5_000]);
+}
+
+/// Publishes `overlays` over `source` through a generic positional CFB plan:
+/// the exact route `render_copy_through` took before change 0748 sealed the
+/// editor's original allocation.
+fn generic_overlay_publication(source: &[u8], overlays: Vec<SameLengthStreamOverlay>) -> Vec<u8> {
+    let shared = SharedOleFile::open(Arc::new(OwnedSource::new(source.to_vec())))
+        .expect("generic source should open");
+    let plan = shared
+        .plan_same_length_stream_overlays(overlays, OverlayLimits::default())
+        .expect("generic overlay should plan");
+    let mut output = Vec::new();
+    plan.write_to(&mut output)
+        .expect("generic overlay should publish");
+    output
+}
+
+#[test]
+fn sealed_copy_through_publishes_the_generic_overlay_bytes() {
+    let base = write_cfb(|writer| {
+        writer
+            .create_stream(&["A"], &vec![0x11u8; 40_000])
+            .expect("source stream should write");
+        writer
+            .create_stream(&["B"], &vec![0x22u8; 5_000])
+            .expect("source stream should write");
+        writer
+            .create_stream(&["Mini"], &vec![0x55u8; 700])
+            .expect("source stream should write");
+    });
+    // Shrinking `A` under the adopted layout frees sectors; a byte in one of
+    // them distinguishes copy-through from a re-render.
+    let shrunk = {
+        let mut writer = OleWriter::new();
+        assert!(writer.adopt_source_layout(&base).unwrap());
+        writer.create_stream(&["A"], &vec![0x33u8; 6_000]).unwrap();
+        writer.create_stream(&["B"], &vec![0x22u8; 5_000]).unwrap();
+        writer.create_stream(&["Mini"], &vec![0x55u8; 700]).unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    };
+    let free_offset = {
+        let sector_size = 1usize << u16::from_le_bytes(shrunk[0x1E..0x20].try_into().unwrap());
+        (first_free_sector(&shrunk) + 1) * sector_size
+    };
+    let mut source = shrunk;
+    source[free_offset] = 0xA7;
+
+    let a = vec![0x44u8; 6_000];
+    let mini = vec![0x66u8; 700];
+    let expected_a = generic_overlay_publication(
+        &source,
+        vec![SameLengthStreamOverlay::new(
+            vec!["A".into()],
+            Arc::from(a.clone()),
+        )],
+    );
+    let expected_both = generic_overlay_publication(
+        &source,
+        vec![
+            SameLengthStreamOverlay::new(vec!["A".into()], Arc::from(a.clone())),
+            SameLengthStreamOverlay::new(vec!["Mini".into()], Arc::from(mini.clone())),
+        ],
+    );
+    assert_eq!(expected_a[free_offset], 0xA7);
+
+    // One edit: the editor's commit-time render and its finish both take the
+    // sealed copy-through and publish the generic plan's bytes.
+    let mut editor =
+        Editor::open(source.clone(), Targets::default(), Limits::default()).expect("open");
+    editor
+        .put_stream(&["A".into()], a.clone())
+        .expect("same-length edit should commit");
+    let snapshot = editor.snapshot();
+    assert_eq!(snapshot.finish().expect("snapshot finish"), expected_a);
+    let commit = editor.clone().commit().expect("commit");
+    assert_eq!(commit.patch().before(), source.as_slice());
+    assert_eq!(commit.patch().after(), expected_a.as_slice());
+    assert_eq!(editor.finish().expect("finish"), expected_a);
+
+    // Chained edits still overlay the one original allocation.
+    let mut editor =
+        Editor::open(source.clone(), Targets::default(), Limits::default()).expect("open");
+    editor.put_stream(&["A".into()], a).expect("first edit");
+    editor
+        .put_stream(&["Mini".into()], mini)
+        .expect("second edit");
+    let chained = editor.finish().expect("chained finish");
+    assert_eq!(chained, expected_both);
+    let mut ole = OleFile::open(Cursor::new(chained)).expect("reopen");
     assert_eq!(ole.open_stream(&["B"]).unwrap(), vec![0x22; 5_000]);
 }
 
