@@ -86,6 +86,8 @@ fn assert_operation_shape(
     // An effective plan hashes source and composed target; a no-op plan
     // composes the source, so one digest is both identities.
     let fingerprint_bytes = source_bytes * if is_noop { 1 } else { 2 };
+    // Every complete recheck is a freshness proof, so only a generic source
+    // takes one; sealed owned bytes compute their digests once at planning.
     let fenced = u64::from(source_mode == OverlaySourceMode::GenericReadAt);
     assert_eq!(
         shape.counter_scope,
@@ -109,9 +111,15 @@ fn assert_operation_shape(
         shape.planning_fingerprint_chunks,
         fingerprint_chunks * (1 + fenced)
     );
-    assert_eq!(shape.composed_source_preflight_scans, 1);
-    assert_eq!(shape.composed_source_preflight_bytes, fingerprint_bytes);
-    assert_eq!(shape.composed_source_preflight_chunks, fingerprint_chunks);
+    assert_eq!(shape.composed_source_preflight_scans, fenced);
+    assert_eq!(
+        shape.composed_source_preflight_bytes,
+        fingerprint_bytes * fenced
+    );
+    assert_eq!(
+        shape.composed_source_preflight_chunks,
+        fingerprint_chunks * fenced
+    );
     assert_eq!(shape.target_materialization_write_pre_scans, fenced);
     assert_eq!(
         shape.target_materialization_write_pre_bytes,
@@ -121,10 +129,12 @@ fn assert_operation_shape(
         shape.target_materialization_write_pre_chunks,
         fingerprint_chunks * fenced
     );
+    // Every emission reads and emits each chunk; only a generic source's
+    // emission hashes them.
     assert_eq!(shape.target_materialization_emission_scans, 1);
     assert_eq!(
         shape.target_materialization_emission_bytes,
-        fingerprint_bytes
+        fingerprint_bytes * fenced
     );
     assert_eq!(
         shape.target_materialization_emission_chunks,
@@ -143,7 +153,7 @@ fn assert_operation_shape(
     assert_eq!(shape.direct_write_pre_bytes, fingerprint_bytes * fenced);
     assert_eq!(shape.direct_write_pre_chunks, fingerprint_chunks * fenced);
     assert_eq!(shape.direct_emission_scans, 1);
-    assert_eq!(shape.direct_emission_bytes, fingerprint_bytes);
+    assert_eq!(shape.direct_emission_bytes, fingerprint_bytes * fenced);
     assert_eq!(shape.direct_emission_chunks, publication_chunks);
     assert_eq!(shape.direct_write_post_scans, fenced);
     assert_eq!(shape.direct_write_post_bytes, fingerprint_bytes * fenced);
@@ -155,7 +165,7 @@ fn assert_operation_shape(
         fingerprint_chunks * fenced
     );
     assert_eq!(shape.atomic_save_emission_scans, 1);
-    assert_eq!(shape.atomic_save_emission_bytes, fingerprint_bytes);
+    assert_eq!(shape.atomic_save_emission_bytes, fingerprint_bytes * fenced);
     assert_eq!(shape.atomic_save_emission_chunks, publication_chunks);
     assert_eq!(shape.atomic_save_pre_rename_scans, fenced);
     assert_eq!(
@@ -195,6 +205,29 @@ fn operation_shape_matches_generic_and_owned_overlay_policy() {
         OverlaySourceMode::OwnedImmutableArc,
         bytes.len() as u64,
         false,
+    );
+    let owned_vec =
+        SharedOleFile::open_owned_vec(Arc::new(bytes.clone()), SourceVersion::new(0xcafe_0748, 0))
+            .unwrap()
+            .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x66, 4_096)], limits())
+            .unwrap();
+    assert_operation_shape(
+        owned_vec.operation_shape(),
+        OverlaySourceMode::OwnedImmutableArc,
+        bytes.len() as u64,
+        false,
+    );
+    let owned_noop =
+        SharedOleFile::open_owned(Arc::from(bytes.clone()), SourceVersion::new(0xcafe_0749, 0))
+            .unwrap()
+            .plan_same_length_stream_overlays(vec![noop_overlay()], limits())
+            .unwrap();
+    assert!(owned_noop.is_noop());
+    assert_operation_shape(
+        owned_noop.operation_shape(),
+        OverlaySourceMode::OwnedImmutableArc,
+        bytes.len() as u64,
+        true,
     );
 
     // An exact byte no-op keeps every pass and chunk count and halves only the
@@ -429,9 +462,24 @@ impl Write for FailingSink {
 #[test]
 fn hostile_sink_progress_is_typed() {
     let source = sample_bytes();
-    let plan = shared(source.clone())
+    let generic = shared(source.clone())
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x81, 4_096)], limits())
         .unwrap();
+    // A sealed plan emits without hashing, but its sink progress contract is
+    // the same one, byte for byte.
+    let sealed = SharedOleFile::open_owned(
+        Arc::from(source.clone()),
+        SourceVersion::new(0xcafe_0748, 1),
+    )
+    .unwrap()
+    .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x81, 4_096)], limits())
+    .unwrap();
+    for plan in [&generic, &sealed] {
+        assert_hostile_sink_progress(plan, &source);
+    }
+}
+
+fn assert_hostile_sink_progress(plan: &crate::ValidatedOverlayPlan, source: &[u8]) {
     let mut zero = FailingSink {
         bytes: Vec::new(),
         remaining: usize::MAX,
@@ -630,7 +678,7 @@ fn direct_write_to_retains_three_complete_source_scans() {
 }
 
 #[test]
-fn owned_direct_write_uses_only_the_hashed_emission_scan() {
+fn owned_composed_view_and_direct_write_take_no_recheck_scan() {
     let source: Arc<[u8]> = Arc::from(sample_bytes());
     let reads = Arc::new(AtomicUsize::new(0));
     let file =
@@ -639,14 +687,20 @@ fn owned_direct_write_uses_only_the_hashed_emission_scan() {
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x67, 4_096)], limits())
         .unwrap();
 
+    // Planning computed both digests over bytes that cannot change, so the
+    // checked composed view reads nothing to re-prove them.
     reads.store(0, Ordering::SeqCst);
     let candidate = plan.composed_source().unwrap();
-    assert_eq!(
-        reads.load(Ordering::SeqCst),
-        fingerprint_chunks(file.file_size())
-    );
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+
+    // Every positional read of the view still goes to the sealed source.
+    let length = usize::try_from(file.file_size()).unwrap();
+    let mut viewed = vec![0; length];
+    candidate.read_exact_at(0, &mut viewed).unwrap();
+    assert!(reads.load(Ordering::SeqCst) > 0);
     drop(candidate);
 
+    // The emission reads each 64 KiB chunk once and hashes none of them.
     reads.store(0, Ordering::SeqCst);
     let mut output = Vec::new();
     let report = plan.write_to(&mut output).unwrap();
@@ -655,7 +709,11 @@ fn owned_direct_write_uses_only_the_hashed_emission_scan() {
         publication_chunks(file.file_size())
     );
     assert_eq!(report.bytes(), file.file_size());
-    assert_eq!(output.len() as u64, file.file_size());
+    assert_eq!(output, viewed);
+    assert_eq!(report.source_fingerprint().as_bytes(), &sha256_of(&source));
+    assert_eq!(report.target_fingerprint().as_bytes(), &sha256_of(&output));
+    assert_eq!(report.source_fingerprint(), plan.source_fingerprint());
+    assert_eq!(report.target_fingerprint(), plan.target_fingerprint());
     let mut reopened = OleFile::open(Cursor::new(output)).unwrap();
     assert_eq!(
         reopened.open_stream(&["Fat4096"]).unwrap(),
@@ -784,7 +842,7 @@ fn atomic_save_skips_only_the_duplicate_post_emission_source_scan() {
 }
 
 #[test]
-fn owned_atomic_save_uses_only_hashed_emission_scan() {
+fn owned_atomic_save_reads_only_its_emission() {
     static NEXT: AtomicU64 = AtomicU64::new(0);
     let directory = std::env::temp_dir().join(format!(
         "litchi-cfb-owned-overlay-scan-count-{}-{}",
@@ -797,12 +855,15 @@ fn owned_atomic_save_uses_only_hashed_emission_scan() {
 
     let source: Arc<[u8]> = Arc::from(sample_bytes());
     let reads = Arc::new(AtomicUsize::new(0));
-    let file = SharedOleFile::open_owned_arc_source_for_test(source, reads.clone()).unwrap();
+    let file =
+        SharedOleFile::open_owned_arc_source_for_test(source.clone(), reads.clone()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x69, 4_096)], limits())
         .unwrap();
     reads.store(0, Ordering::SeqCst);
 
+    // No pre-temporary-file, emission-hash or pre-rename recheck: one read of
+    // each 64 KiB chunk, then the unchanged flush/fsync/rename sequence.
     let report = plan.save(&destination).unwrap();
     assert_eq!(
         reads.load(Ordering::SeqCst),
@@ -810,7 +871,274 @@ fn owned_atomic_save_uses_only_hashed_emission_scan() {
     );
     assert_eq!(report.bytes(), file.file_size());
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
+    let published = std::fs::read(&destination).unwrap();
+    assert_eq!(report.source_fingerprint().as_bytes(), &sha256_of(&source));
+    assert_eq!(
+        report.target_fingerprint().as_bytes(),
+        &sha256_of(&published)
+    );
+    let mut direct = Vec::new();
+    plan.write_to(&mut direct).unwrap();
+    assert_eq!(published, direct);
 
+    std::fs::remove_file(destination).unwrap();
+    std::fs::remove_dir(directory).unwrap();
+}
+
+// ---------------------------------------------------------------------------
+// Change 0748: a sealed plan computes each digest once. These tests pin that
+// the values, the published bytes and every generic-source fence are unchanged.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn owned_vec_source_is_sealed_and_publishes_the_generic_bytes() {
+    let bytes = sample_bytes();
+    let overlays = || vec![replacement("Fat4097", 0x6b, 4_097)];
+
+    let generic_source = Arc::new(MutableSource::new(bytes.clone()));
+    let generic_file = SharedOleFile::open(generic_source.clone()).unwrap();
+    generic_source.reads.store(0, Ordering::SeqCst);
+    let generic = generic_file
+        .plan_same_length_stream_overlays(overlays(), limits())
+        .unwrap();
+    let generic_planning_reads = generic_source.reads.load(Ordering::SeqCst);
+    assert_eq!(
+        generic.operation_shape().source_mode,
+        OverlaySourceMode::GenericReadAt
+    );
+
+    let reads = Arc::new(AtomicUsize::new(0));
+    let sealed_bytes = Arc::new(bytes.clone());
+    let file =
+        SharedOleFile::open_owned_vec_source_for_test(Arc::clone(&sealed_bytes), reads.clone())
+            .unwrap();
+    reads.store(0, Ordering::SeqCst);
+    let sealed = file
+        .plan_same_length_stream_overlays(overlays(), limits())
+        .unwrap();
+    assert_eq!(
+        sealed.operation_shape().source_mode,
+        OverlaySourceMode::OwnedImmutableArc
+    );
+    // Only the generic planner's confirming scan is missing.
+    assert_eq!(
+        generic_planning_reads,
+        reads.load(Ordering::SeqCst) + fingerprint_chunks(file.file_size())
+    );
+    assert_eq!(sealed.source_fingerprint(), generic.source_fingerprint());
+    assert_eq!(sealed.target_fingerprint(), generic.target_fingerprint());
+
+    reads.store(0, Ordering::SeqCst);
+    let view = sealed.composed_source().unwrap();
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        view.version().unwrap(),
+        SharedOleFile::open_owned_vec(
+            Arc::clone(&sealed_bytes),
+            SourceVersion::new(0xcafe_0181, 0)
+        )
+        .unwrap()
+        .plan_same_length_stream_overlays(overlays(), limits())
+        .unwrap()
+        .composed_source()
+        .unwrap()
+        .version()
+        .unwrap(),
+        "the composed version is still derived from the source version and target digest"
+    );
+
+    let mut generic_output = Vec::new();
+    let generic_report = generic.write_to(&mut generic_output).unwrap();
+    reads.store(0, Ordering::SeqCst);
+    let mut sealed_output = Vec::new();
+    let sealed_report = sealed.write_to(&mut sealed_output).unwrap();
+    assert_eq!(
+        reads.load(Ordering::SeqCst),
+        publication_chunks(file.file_size())
+    );
+    assert_eq!(sealed_output, generic_output);
+    assert_eq!(sealed_report, generic_report);
+
+    // The public constructor seals the same provenance.
+    let public = SharedOleFile::open_owned_vec(sealed_bytes, SourceVersion::new(0xcafe_0748, 2))
+        .unwrap()
+        .plan_same_length_stream_overlays(overlays(), limits())
+        .unwrap();
+    assert_eq!(
+        public.operation_shape().source_mode,
+        OverlaySourceMode::OwnedImmutableArc
+    );
+    assert_eq!(public.target_fingerprint(), generic.target_fingerprint());
+}
+
+/// Publishes one overlay set through every provenance and returns the direct
+/// output, after asserting that all of them agree on every byte and digest.
+fn assert_provenances_agree(bytes: &[u8], overlays: &dyn Fn() -> Vec<SameLengthStreamOverlay>) {
+    let generic = shared(bytes.to_vec())
+        .plan_same_length_stream_overlays(overlays(), limits())
+        .unwrap();
+    let owned_arc = SharedOleFile::open_owned(
+        Arc::from(bytes.to_vec()),
+        SourceVersion::new(0xcafe_0748, 3),
+    )
+    .unwrap()
+    .plan_same_length_stream_overlays(overlays(), limits())
+    .unwrap();
+    let owned_vec =
+        SharedOleFile::open_owned_vec(Arc::new(bytes.to_vec()), SourceVersion::new(0xcafe_0748, 4))
+            .unwrap()
+            .plan_same_length_stream_overlays(overlays(), limits())
+            .unwrap();
+
+    let mut expected = Vec::new();
+    let expected_report = generic.write_to(&mut expected).unwrap();
+    assert_eq!(expected.len(), bytes.len());
+    assert_eq!(generic.source_fingerprint().as_bytes(), &sha256_of(bytes));
+    assert_eq!(
+        generic.target_fingerprint().as_bytes(),
+        &sha256_of(&expected)
+    );
+    assert_eq!(generic.is_noop(), expected == bytes);
+
+    for plan in [&generic, &owned_arc, &owned_vec] {
+        assert_eq!(plan.source_fingerprint(), generic.source_fingerprint());
+        assert_eq!(plan.target_fingerprint(), generic.target_fingerprint());
+        assert_eq!(plan.changed_spans(), generic.changed_spans());
+        assert_eq!(plan.is_noop(), generic.is_noop());
+
+        let mut output = Vec::new();
+        let report = plan.write_to(&mut output).unwrap();
+        assert_eq!(output, expected);
+        assert_eq!(report, expected_report);
+
+        // Publishing twice from one plan is deterministic.
+        let mut again = Vec::new();
+        assert_eq!(plan.write_to(&mut again).unwrap(), report);
+        assert_eq!(again, expected);
+
+        let view = plan.composed_source().unwrap();
+        assert_eq!(view.len().unwrap(), bytes.len() as u64);
+        let mut viewed = vec![0; bytes.len()];
+        view.read_exact_at(0, &mut viewed).unwrap();
+        assert_eq!(viewed, expected);
+    }
+}
+
+#[test]
+fn sealed_and_generic_plans_publish_identical_bytes_and_digests() {
+    let bytes = sample_bytes();
+    assert_provenances_agree(&bytes, &|| {
+        vec![
+            replacement("MiniTiny", 0xb1, 70),
+            replacement("Mini4095", 0xb2, 4_095),
+            replacement("Fat4096", 0xb3, 4_096),
+            replacement("Fat4097", 0xb4, 4_097),
+            replacement("LargeOpaque", 0xb5, 130_123),
+        ]
+    });
+    assert_provenances_agree(&bytes, &|| vec![replacement("Mini4095", 0xc1, 4_095)]);
+    assert_provenances_agree(&bytes, &|| vec![noop_overlay()]);
+    assert_provenances_agree(&bytes, &Vec::new);
+    assert_provenances_agree(&version_four_bytes(), &|| {
+        vec![
+            replacement("Mini", 0xd1, 1_003),
+            replacement("Fat", 0xd2, 5_003),
+        ]
+    });
+}
+
+#[test]
+fn generic_composed_view_still_rechecks_both_digests() {
+    let bytes = sample_bytes();
+    let unselected = unselected_payload_offset(&bytes);
+
+    // A byte change under a stable version token, in a payload no check but
+    // the complete fingerprint reads, is refused before a view is returned.
+    let source = Arc::new(MutableSource::new(bytes.clone()));
+    let file = SharedOleFile::open(source.clone()).unwrap();
+    let plan = file
+        .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x6c, 4_096)], limits())
+        .unwrap();
+    source.reads.store(0, Ordering::SeqCst);
+    let view = plan.composed_source().unwrap();
+    assert_eq!(
+        source.reads.load(Ordering::SeqCst),
+        fingerprint_chunks(file.file_size()),
+        "a generic view still takes its complete preflight"
+    );
+    drop(view);
+    source.mutate_offset.store(unselected, Ordering::SeqCst);
+    source.change_bytes_without_version();
+    assert!(matches!(
+        plan.composed_source(),
+        Err(OverlayError::SourceFingerprintChanged { .. })
+    ));
+    let mut output = Vec::new();
+    assert!(matches!(
+        plan.write_to(&mut output),
+        Err(OverlayError::SourceFingerprintChanged { .. })
+    ));
+    assert!(output.is_empty());
+
+    // A version change is refused by name.
+    let source = Arc::new(MutableSource::new(bytes));
+    let file = SharedOleFile::open(source.clone()).unwrap();
+    let plan = file
+        .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x6d, 4_096)], limits())
+        .unwrap();
+    source.change_version();
+    assert!(matches!(
+        plan.composed_source(),
+        Err(OverlayError::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn generic_atomic_save_still_hashes_its_emission() {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let directory = std::env::temp_dir().join(format!(
+        "litchi-cfb-overlay-emission-hash-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    std::fs::create_dir(&directory).unwrap();
+    let destination = directory.join("document.ole");
+    std::fs::write(&destination, b"old destination").unwrap();
+
+    let bytes = sample_bytes();
+    let source = Arc::new(MutableSource::new(bytes.clone()));
+    let file = SharedOleFile::open(source.clone()).unwrap();
+    let plan = file
+        .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x6e, 4_096)], limits())
+        .unwrap();
+    source.reads.store(0, Ordering::SeqCst);
+    // Change an unselected payload byte of the last 64 KiB chunk right after
+    // the first chunk is emitted: the pre-temporary-file preflight has
+    // passed, and the emission hash is the first check that reads the
+    // changed chunk.
+    let last_chunk = (publication_chunks(file.file_size()) - 1) * 65_536;
+    let late = last_chunk
+        + bytes[last_chunk..]
+            .windows(64)
+            .position(|window| window.iter().all(|byte| *byte == 0x45))
+            .expect("an unselected payload run in the last chunk")
+        + 32;
+    source.mutate_offset.store(late, Ordering::SeqCst);
+    source
+        .mutate_after_read
+        .store(fingerprint_chunks(file.file_size()) + 1, Ordering::SeqCst);
+
+    assert!(matches!(
+        plan.save(&destination),
+        Err(OverlayError::SourceFingerprintChanged { .. })
+    ));
+    assert_eq!(
+        source.reads.load(Ordering::SeqCst),
+        fingerprint_chunks(file.file_size()) + publication_chunks(file.file_size()),
+        "the emission hash, not the pre-rename preflight, refused it"
+    );
+    assert_eq!(std::fs::read(&destination).unwrap(), b"old destination");
+    assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
     std::fs::remove_file(destination).unwrap();
     std::fs::remove_dir(directory).unwrap();
 }

@@ -589,17 +589,42 @@ impl SharedOleFile {
     /// Opens bytes whose immutable ownership is retained by the CFB reader.
     ///
     /// Unlike a type-erased [`ReadAt`] adapter, an `Arc<[u8]>` cannot change
-    /// while this reader and its derived plans retain a clone. Publication may
-    /// use that sealed provenance internally; callers cannot mark an arbitrary
-    /// positional source as immutable through a flag or version token.
+    /// while this reader and its derived plans retain a clone. Planning and
+    /// publication use that sealed provenance internally: a plan computes its
+    /// source and target digests once, over bytes that cannot change, and
+    /// does not recompute them to re-prove freshness. Callers cannot mark an
+    /// arbitrary positional source as immutable through a flag or version
+    /// token.
     ///
     /// # Errors
     ///
     /// Returns an error when the source exceeds the default limit or is not a
     /// valid CFB file.
     pub fn open_owned(source: Arc<[u8]>, version: SourceVersion) -> Result<Self, OleError> {
+        Self::open_sealed(SealedBytes::Slice(source), version)
+    }
+
+    /// Opens a shared vector whose immutable ownership is retained by the CFB
+    /// reader, without copying it into an `Arc<[u8]>`.
+    ///
+    /// This is [`Self::open_owned`] for callers that already hold their bytes
+    /// as an `Arc<Vec<u8>>`. The vector cannot change while this reader and
+    /// its derived plans retain a clone: `Vec<u8>` has no interior
+    /// mutability, `Arc::get_mut` requires a unique owner, and `Arc::make_mut`
+    /// copies a shared allocation instead of mutating it. The same sealed
+    /// planning and publication rules apply.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source exceeds the default limit or is not a
+    /// valid CFB file.
+    pub fn open_owned_vec(source: Arc<Vec<u8>>, version: SourceVersion) -> Result<Self, OleError> {
+        Self::open_sealed(SealedBytes::Vec(source), version)
+    }
+
+    fn open_sealed(bytes: SealedBytes, version: SourceVersion) -> Result<Self, OleError> {
         let source: Arc<dyn ReadAt> = Arc::new(OwnedArcSource {
-            source,
+            bytes,
             version,
             #[cfg(test)]
             read_count: None,
@@ -684,8 +709,24 @@ impl SharedOleFile {
         source: Arc<[u8]>,
         read_count: Arc<AtomicUsize>,
     ) -> Result<Self, OleError> {
+        Self::open_sealed_source_for_test(SealedBytes::Slice(source), read_count)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn open_owned_vec_source_for_test(
+        source: Arc<Vec<u8>>,
+        read_count: Arc<AtomicUsize>,
+    ) -> Result<Self, OleError> {
+        Self::open_sealed_source_for_test(SealedBytes::Vec(source), read_count)
+    }
+
+    #[cfg(test)]
+    fn open_sealed_source_for_test(
+        bytes: SealedBytes,
+        read_count: Arc<AtomicUsize>,
+    ) -> Result<Self, OleError> {
         let source: Arc<dyn ReadAt> = Arc::new(OwnedArcSource {
-            source,
+            bytes,
             version: SourceVersion::new(0xcafe_0181, 0),
             read_count: Some(read_count),
         });
@@ -2769,8 +2810,29 @@ impl SharedOleFile {
     }
 }
 
+/// Byte owners whose contents cannot change while a clone is retained.
+///
+/// Neither `[u8]` nor `Vec<u8>` has interior mutability, and a shared `Arc`
+/// hands out no `&mut` while this reader keeps its clone, so every read of a
+/// sealed source observes the bytes the reader validated. These two owners are
+/// the only way to reach the sealed planning and publication rules; the enum
+/// is private, so no other type can be added from outside the crate.
+enum SealedBytes {
+    Slice(Arc<[u8]>),
+    Vec(Arc<Vec<u8>>),
+}
+
+impl SealedBytes {
+    fn as_slice(&self) -> &[u8] {
+        match self {
+            Self::Slice(bytes) => bytes,
+            Self::Vec(bytes) => bytes.as_slice(),
+        }
+    }
+}
+
 struct OwnedArcSource {
-    source: Arc<[u8]>,
+    bytes: SealedBytes,
     version: SourceVersion,
     #[cfg(test)]
     read_count: Option<Arc<AtomicUsize>>,
@@ -2778,7 +2840,7 @@ struct OwnedArcSource {
 
 impl ReadAt for OwnedArcSource {
     fn len(&self) -> io::Result<u64> {
-        u64::try_from(self.source.len())
+        u64::try_from(self.bytes.as_slice().len())
             .map_err(|_error| io::Error::other("owned CFB source length exceeds u64"))
     }
 
@@ -2793,7 +2855,7 @@ impl ReadAt for OwnedArcSource {
         let Ok(start) = usize::try_from(offset) else {
             return Ok(0);
         };
-        let Some(available) = self.source.get(start..) else {
+        let Some(available) = self.bytes.as_slice().get(start..) else {
             return Ok(0);
         };
         let count = available.len().min(output.len());

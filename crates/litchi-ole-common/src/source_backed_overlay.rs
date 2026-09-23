@@ -43,12 +43,13 @@ impl SourceBackedOverlayPublisher {
     ///
     /// The common protected-container guard is identical to [`Self::open`].
     /// Only the low-level CFB owner may use the provenance to specialize a
-    /// later planning and publication. The planner may omit only the redundant
-    /// final validation fingerprint after reading the sealed composed view.
-    /// Checked composed views retain their complete preflight; atomic saves
-    /// may also omit the two redundant outer publication fences while keeping
-    /// the full source/target emission hashes and all flush, fsync, rename, and
-    /// parent-sync durability steps.
+    /// later planning and publication: a plan computes its source and target
+    /// fingerprints once, at planning, and never recomputes them to re-prove
+    /// bytes that cannot change. The planner omits the final validation
+    /// fingerprint after reading the sealed composed view, checked composed
+    /// views omit their preflight, and direct and atomic publication omit
+    /// their outer fences and the emission hash. Atomic saves keep every
+    /// flush, fsync, rename, and parent-sync durability step.
     pub fn open_owned(source: Arc<[u8]>, version: SourceVersion) -> Result<Self, OverlayError> {
         let cfb = SharedOleFile::open_owned(source, version)?;
         reject_protected_shared_container(&cfb, "source-backed stream overlay publication")?;

@@ -159,7 +159,8 @@ pub struct PublishReport {
 pub enum OverlaySourceMode {
     /// A caller-provided positional `ReadAt` source whose bytes may change.
     GenericReadAt,
-    /// An immutable `Arc<[u8]>` source sealed by [`SharedOleFile::open_owned`].
+    /// Immutable owned bytes sealed by [`SharedOleFile::open_owned`] or
+    /// [`SharedOleFile::open_owned_vec`].
     OwnedImmutableArc,
 }
 
@@ -185,6 +186,13 @@ impl OverlaySourceMode {
 /// length. A no-op plan composes the source, so one digest is both identities
 /// and the same pass hashes the source length once. Pass and chunk counts,
 /// and therefore complete source reads, are identical either way.
+///
+/// A generic positional source keeps every recheck, because its bytes may
+/// change under a stable version token. Sealed owned bytes
+/// ([`OverlaySourceMode::OwnedImmutableArc`]) cannot change, so their plan
+/// computes both digests exactly once, in its single planning pass: a checked
+/// composed view takes no preflight pass, and an emission pass reads and
+/// emits every chunk but hashes no byte (its hashed byte count is zero).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OverlayOperationShape {
     /// Stable explanation of the logical-counter boundary.
@@ -207,7 +215,8 @@ pub struct OverlayOperationShape {
     pub planning_fingerprint_bytes: u64,
     /// Chunks traversed by planning fingerprint passes.
     pub planning_fingerprint_chunks: u64,
-    /// Complete composed-source preflight pass count.
+    /// Complete composed-source preflight pass count (zero for sealed owned
+    /// bytes).
     pub composed_source_preflight_scans: u64,
     /// Logical bytes hashed by composed-source preflight passes.
     pub composed_source_preflight_bytes: u64,
@@ -221,7 +230,8 @@ pub struct OverlayOperationShape {
     pub target_materialization_write_pre_chunks: u64,
     /// Target-materialization emission pass count.
     pub target_materialization_emission_scans: u64,
-    /// Logical bytes hashed by target-materialization emissions.
+    /// Logical bytes hashed by target-materialization emissions (zero for
+    /// sealed owned bytes).
     pub target_materialization_emission_bytes: u64,
     /// Chunks traversed by target-materialization emissions.
     pub target_materialization_emission_chunks: u64,
@@ -239,7 +249,7 @@ pub struct OverlayOperationShape {
     pub direct_write_pre_chunks: u64,
     /// Direct emission pass count.
     pub direct_emission_scans: u64,
-    /// Logical bytes hashed by direct emissions.
+    /// Logical bytes hashed by direct emissions (zero for sealed owned bytes).
     pub direct_emission_bytes: u64,
     /// Chunks traversed by direct emissions.
     pub direct_emission_chunks: u64,
@@ -257,7 +267,8 @@ pub struct OverlayOperationShape {
     pub atomic_save_pre_temp_chunks: u64,
     /// Atomic-save emission pass count.
     pub atomic_save_emission_scans: u64,
-    /// Logical bytes hashed by atomic-save emission.
+    /// Logical bytes hashed by atomic-save emission (zero for sealed owned
+    /// bytes).
     pub atomic_save_emission_bytes: u64,
     /// Chunks traversed by atomic-save emission.
     pub atomic_save_emission_chunks: u64,
@@ -278,6 +289,9 @@ impl OverlayOperationShape {
             OverlaySourceMode::GenericReadAt => 2,
             OverlaySourceMode::OwnedImmutableArc => 1,
         };
+        // Every complete recheck of a plan's digests is a freshness proof, so
+        // only a source whose bytes may change takes one. Sealed owned bytes
+        // keep the planning pass that computes the digests and no other.
         let fenced_write_scans = match source_mode {
             OverlaySourceMode::GenericReadAt => 1,
             OverlaySourceMode::OwnedImmutableArc => 0,
@@ -287,6 +301,9 @@ impl OverlayOperationShape {
         let fingerprint_bytes = source_bytes.saturating_mul(if is_noop { 1 } else { 2 });
         let pass_bytes = |scans: u64| fingerprint_bytes.saturating_mul(scans);
         let pass_chunks = |scans: u64, chunks: u64| chunks.saturating_mul(scans);
+        // An emission always reads and emits every chunk; it hashes them only
+        // when the emitted bytes must be compared with the plan's digests.
+        let emission_bytes = pass_bytes(fenced_write_scans);
         Self {
             counter_scope: "validated overlay logical pass shape; no runtime, allocator, or syscall counters",
             source_mode,
@@ -301,9 +318,9 @@ impl OverlayOperationShape {
                 planning_fingerprint_scans,
                 fingerprint_chunks,
             ),
-            composed_source_preflight_scans: 1,
-            composed_source_preflight_bytes: fingerprint_bytes,
-            composed_source_preflight_chunks: fingerprint_chunks,
+            composed_source_preflight_scans: fenced_write_scans,
+            composed_source_preflight_bytes: pass_bytes(fenced_write_scans),
+            composed_source_preflight_chunks: pass_chunks(fenced_write_scans, fingerprint_chunks),
             target_materialization_write_pre_scans: fenced_write_scans,
             target_materialization_write_pre_bytes: pass_bytes(fenced_write_scans),
             target_materialization_write_pre_chunks: pass_chunks(
@@ -311,7 +328,7 @@ impl OverlayOperationShape {
                 fingerprint_chunks,
             ),
             target_materialization_emission_scans: 1,
-            target_materialization_emission_bytes: fingerprint_bytes,
+            target_materialization_emission_bytes: emission_bytes,
             target_materialization_emission_chunks: publication_chunks,
             target_materialization_write_post_scans: fenced_write_scans,
             target_materialization_write_post_bytes: pass_bytes(fenced_write_scans),
@@ -323,7 +340,7 @@ impl OverlayOperationShape {
             direct_write_pre_bytes: pass_bytes(fenced_write_scans),
             direct_write_pre_chunks: pass_chunks(fenced_write_scans, fingerprint_chunks),
             direct_emission_scans: 1,
-            direct_emission_bytes: fingerprint_bytes,
+            direct_emission_bytes: emission_bytes,
             direct_emission_chunks: publication_chunks,
             direct_write_post_scans: fenced_write_scans,
             direct_write_post_bytes: pass_bytes(fenced_write_scans),
@@ -332,7 +349,7 @@ impl OverlayOperationShape {
             atomic_save_pre_temp_bytes: pass_bytes(fenced_write_scans),
             atomic_save_pre_temp_chunks: pass_chunks(fenced_write_scans, fingerprint_chunks),
             atomic_save_emission_scans: 1,
-            atomic_save_emission_bytes: fingerprint_bytes,
+            atomic_save_emission_bytes: emission_bytes,
             atomic_save_emission_chunks: publication_chunks,
             atomic_save_pre_rename_scans: fenced_write_scans,
             atomic_save_pre_rename_bytes: pass_bytes(fenced_write_scans),
@@ -355,13 +372,17 @@ impl PublishReport {
         self.changed_spans
     }
 
-    /// Exact source identity checked before and during publication.
+    /// Exact source identity: rechecked before and during publication for a
+    /// generic positional source, computed once at planning for sealed owned
+    /// bytes.
     #[must_use]
     pub const fn source_fingerprint(self) -> ArtifactFingerprint {
         self.source_fingerprint
     }
 
-    /// Exact composed target identity checked before publication.
+    /// Exact composed target identity: rechecked before and during
+    /// publication for a generic positional source, computed once at planning
+    /// for sealed owned bytes.
     #[must_use]
     pub const fn target_fingerprint(self) -> ArtifactFingerprint {
         self.target_fingerprint
@@ -559,6 +580,20 @@ struct Selection {
     start_sector: u32,
     size: u64,
     is_minifat: bool,
+}
+
+/// How an emission pass relates the bytes it emits to the plan's digests.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum EmissionFence {
+    /// Sealed owned bytes: planning computed both digests over bytes that
+    /// cannot change, so the emission reads and emits without hashing.
+    Sealed,
+    /// Hash the source and target while emitting and compare both with the
+    /// plan before success (atomic save, which rechecks before rename).
+    Hashed,
+    /// [`Self::Hashed`], then a complete preflight after the last sink byte
+    /// (direct sequential publication).
+    HashedAndRechecked,
 }
 
 /// A fully validated, immutable streaming publication plan.
@@ -894,11 +929,18 @@ impl ValidatedOverlayPlan {
     /// Returns a checked, read-only positional view of the composed target.
     ///
     /// Planning has already reopened the complete candidate through the normal
-    /// CFB validator. This method additionally rechecks the complete source and
-    /// target fingerprints, so a stale or dishonest source adapter cannot hand
-    /// a caller an unvalidated view.
+    /// CFB validator. For a generic positional adapter this method
+    /// additionally rechecks the complete source and target fingerprints, so a
+    /// stale or dishonest source adapter cannot hand a caller an unvalidated
+    /// view. Sealed owned bytes ([`SharedOleFile::open_owned`],
+    /// [`SharedOleFile::open_owned_vec`]) cannot change after planning
+    /// computed both digests over them, so their view is returned without
+    /// re-reading the artifact; every positional read still checks the
+    /// source version and length.
     pub fn composed_source(&self) -> Result<ComposedOverlaySource, OverlayError> {
-        self.preflight_fingerprints()?;
+        if !self.source.source_is_owned_immutable {
+            self.preflight_fingerprints()?;
+        }
         Ok(composed_source(
             self.source.clone(),
             Arc::from(self.spans.clone()),
@@ -909,17 +951,19 @@ impl ValidatedOverlayPlan {
     /// Streams the complete composed artifact to a sequential sink.
     ///
     /// For a generic positional adapter, the full source and target
-    /// fingerprints are rechecked before the first sink byte and again after
-    /// emission. A plan created from explicitly owned immutable bytes relies
-    /// on that sealed ownership instead. Both paths read and hash the source
-    /// and target while emitting. Generic sinks are not called atomic:
-    /// failures after progress return [`OverlayError::IncompleteOutput`].
+    /// fingerprints are rechecked before the first sink byte, the source and
+    /// target are hashed while emitting, and both are rechecked again after
+    /// emission. A plan created from sealed owned bytes relies on that
+    /// ownership instead: its digests were computed once at planning over
+    /// bytes that cannot change, so it reads and emits every chunk without
+    /// hashing it again. Generic sinks are not called atomic: failures after
+    /// progress return [`OverlayError::IncompleteOutput`].
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport, OverlayError> {
         if self.source.source_is_owned_immutable {
-            return self.write_validated(writer, false);
+            return self.write_validated(writer, EmissionFence::Sealed);
         }
         self.preflight_fingerprints()?;
-        self.write_validated(writer, true)
+        self.write_validated(writer, EmissionFence::HashedAndRechecked)
     }
 
     /// Publishes through a synced sibling temporary file and atomic rename.
@@ -931,25 +975,30 @@ impl ValidatedOverlayPlan {
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<PublishReport, OverlayError> {
         let path = path.as_ref();
         let parent = parent_directory(path);
-        // Explicitly owned immutable bytes cannot change while this plan is
-        // alive. Skip only the two outer complete-artifact fences in that
-        // sealed case; `write_validated` still hashes every source and target
-        // byte while emitting, and publication keeps all flush/fsync/rename
-        // durability steps below.
+        // Sealed owned bytes cannot change while this plan is alive, and
+        // planning computed both digests over them. Such a plan takes none of
+        // the three complete-artifact checks below (pre-temporary-file,
+        // emission hash, pre-rename); publication keeps every read, write,
+        // flush, fsync, rename and parent-sync step.
         if !self.source.source_is_owned_immutable {
             // Complete the potentially expensive source/fingerprint
             // validation before creating even a temporary file.
             self.preflight_fingerprints()?;
         }
+        let emission = if self.source.source_is_owned_immutable {
+            EmissionFence::Sealed
+        } else {
+            // `save` has its own mandatory pre-rename preflight below. The
+            // direct sink path keeps the post-emission preflight inside
+            // `write_validated`; skipping only that duplicate scan here
+            // leaves source/target hashing during emission intact.
+            EmissionFence::Hashed
+        };
         let (temporary_path, file) = create_sibling_temp_file(path)?;
         let result = (|| {
             let mut buffered = BufWriter::new(file);
             let report = self
-                // `save` has its own mandatory pre-rename preflight below. The
-                // direct sink path keeps the post-emission preflight inside
-                // `write_validated`; skipping only that duplicate scan here
-                // leaves source/target hashing during emission intact.
-                .write_validated(&mut buffered, false)
+                .write_validated(&mut buffered, emission)
                 .map_err(strip_staging_progress)?;
             buffered.flush()?;
             buffered.get_ref().sync_all()?;
@@ -991,14 +1040,21 @@ impl ValidatedOverlayPlan {
     fn write_validated<W: Write>(
         &self,
         writer: &mut W,
-        post_emission_preflight: bool,
+        fence: EmissionFence,
     ) -> Result<PublishReport, OverlayError> {
+        // Only sealed owned bytes may skip the emission hash, and only
+        // because planning already computed both digests over those bytes.
+        debug_assert_eq!(
+            fence == EmissionFence::Sealed,
+            self.source.source_is_owned_immutable
+        );
         let mut buffer = publication_buffer()?;
-        let mut source_hasher = Sha256::new();
+        let hashed = fence != EmissionFence::Sealed;
+        let mut source_hasher = hashed.then(Sha256::new);
         // A no-op plan emits the source bytes unchanged, so the emitted-target
         // digest is the emitted-source digest. Hash the emission once and
         // check it against both retained identities, in the same order.
-        let mut target_hasher = (!self.spans.is_empty()).then(Sha256::new);
+        let mut target_hasher = (hashed && !self.spans.is_empty()).then(Sha256::new);
         let mut offset = 0_u64;
         let mut accepted = 0_u64;
 
@@ -1007,9 +1063,11 @@ impl ValidatedOverlayPlan {
             if let Err(error) = self.source.read_exact(offset, &mut buffer[..count]) {
                 return Err(with_progress(error, accepted, self.source.length, false));
             }
-            source_hasher.update(&buffer[..count]);
+            if let Some(source_hasher) = source_hasher.as_mut() {
+                source_hasher.update(&buffer[..count]);
+            }
+            apply_spans(&mut buffer[..count], offset, &self.spans)?;
             if let Some(target_hasher) = target_hasher.as_mut() {
-                apply_spans(&mut buffer[..count], offset, &self.spans)?;
                 target_hasher.update(&buffer[..count]);
             }
             if let Err(failure) = write_all_checked(writer, &buffer[..count], &mut accepted) {
@@ -1025,31 +1083,33 @@ impl ValidatedOverlayPlan {
                 .ok_or_else(|| unavailable("publication offset overflow"))?;
         }
 
-        let observed_source = ArtifactFingerprint(source_hasher.finalize().into());
-        if observed_source != self.source_fingerprint {
-            return Err(with_progress(
-                OverlayError::SourceFingerprintChanged {
-                    expected: self.source_fingerprint,
-                    observed: observed_source,
-                },
-                accepted,
-                self.source.length,
-                false,
-            ));
-        }
-        let observed_target = target_hasher.map_or(observed_source, |hasher| {
-            ArtifactFingerprint(hasher.finalize().into())
-        });
-        if observed_target != self.target_fingerprint {
-            return Err(with_progress(
-                OverlayError::TargetFingerprintChanged {
-                    expected: self.target_fingerprint,
-                    observed: observed_target,
-                },
-                accepted,
-                self.source.length,
-                false,
-            ));
+        if let Some(source_hasher) = source_hasher {
+            let observed_source = ArtifactFingerprint(source_hasher.finalize().into());
+            if observed_source != self.source_fingerprint {
+                return Err(with_progress(
+                    OverlayError::SourceFingerprintChanged {
+                        expected: self.source_fingerprint,
+                        observed: observed_source,
+                    },
+                    accepted,
+                    self.source.length,
+                    false,
+                ));
+            }
+            let observed_target = target_hasher.map_or(observed_source, |hasher| {
+                ArtifactFingerprint(hasher.finalize().into())
+            });
+            if observed_target != self.target_fingerprint {
+                return Err(with_progress(
+                    OverlayError::TargetFingerprintChanged {
+                        expected: self.target_fingerprint,
+                        observed: observed_target,
+                    },
+                    accepted,
+                    self.source.length,
+                    false,
+                ));
+            }
         }
         // Direct sequential publication must retain this post-emission check:
         // a dishonest adapter may keep a stable version token while mutating a
@@ -1057,7 +1117,7 @@ impl ValidatedOverlayPlan {
         // `save` skips only this duplicate because it performs the same full
         // check after flush/fsync and immediately before rename.
         drop(buffer);
-        if post_emission_preflight {
+        if fence == EmissionFence::HashedAndRechecked {
             if let Err(error) = self.preflight_fingerprints() {
                 return Err(with_progress(error, accepted, self.source.length, false));
             }

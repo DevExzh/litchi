@@ -707,11 +707,11 @@ impl Edit {
             ));
         }
 
-        // Preserve the snapshot's immutable Arc ownership through CFB. This
-        // permits planning, direct sequential publication, and atomic save to
-        // omit only their redundant outer mutation fences. Candidate reopen,
-        // owner validation, checked composed-view preflight, emission hashes,
-        // and atomic durability remain intact.
+        // Preserve the snapshot's immutable Arc ownership through CFB. The
+        // plan then computes its source and target digests once, at planning,
+        // and the checked composed view, direct sequential publication and
+        // atomic save do not re-hash bytes that cannot change. Candidate
+        // reopen, owner validation and atomic durability remain intact.
         let source = Arc::clone(&self.source.inner.bytes);
         let source_version =
             SourceVersion::new(source.as_ptr() as usize as u64, source.len() as u64);
@@ -1049,13 +1049,13 @@ impl SourceBackedCommit {
 
     /// Streams the complete source-backed candidate to a sequential sink.
     ///
-    /// The common overlay publisher hashes the exact source and target during
-    /// output. Immutable snapshot provenance makes additional outer mutation
-    /// preflights redundant for direct sequential and atomic publication; the
-    /// atomic path still retains the complete source/target emission hashes
-    /// and its flush, sync, rename, and parent-sync durability sequence. A sink
-    /// failure retains the typed [`litchi_cfb::OutputProgress`] inside
-    /// [`OverlayError`].
+    /// The plan computed the exact source and target fingerprints once, over
+    /// the snapshot's sealed immutable bytes, so publication does not re-hash
+    /// them: immutable provenance makes every outer mutation preflight and
+    /// the emission hash redundant for direct sequential and atomic
+    /// publication. The atomic path keeps its flush, sync, rename, and
+    /// parent-sync durability sequence. A sink failure retains the typed
+    /// [`litchi_cfb::OutputProgress`] inside [`OverlayError`].
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport, OverlayError> {
         self.plan.write_to(writer)
     }
