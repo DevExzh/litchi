@@ -226,30 +226,36 @@ fn build_slide_info_atom(slide: &WritableSlide) -> Result<Option<Vec<u8>>, Write
 
 impl Writer {
     /// Capacity for the `PowerPoint Document` stream, used only to allocate it
-    /// once instead of growing it by doubling.
+    /// once instead of growing it by doubling when its text is large.
     ///
     /// Plain text boxes carry the bulk of a presentation's text: one byte per
     /// character when it is ASCII (a `TextBytesAtom`), otherwise two per UTF-16
-    /// code unit and so never more than two per UTF-8 byte. Every shape and
-    /// every slide gets an allowance for its other records, and the document,
-    /// master and persist records a fixed one. A short estimate only means the
-    /// stream grows as it always did.
+    /// code unit and so never more than two per UTF-8 byte. A presentation with
+    /// less than 32 KiB of such text reserves nothing and grows as it always
+    /// did; a larger one also gets an allowance per shape and per slide for
+    /// their other records and a fixed one for the document, master and
+    /// persist records. A short estimate only means the stream grows as it
+    /// always did.
     fn document_stream_capacity_hint(&self) -> usize {
-        self.slides.iter().fold(64 * 1024usize, |bytes, slide| {
-            slide
-                .shapes
-                .iter()
-                .fold(bytes.saturating_add(2048), |bytes, shape| {
-                    let text = shape.properties.text.as_deref().map_or(0, |text| {
-                        if text.is_ascii() {
-                            text.len()
-                        } else {
-                            text.len().saturating_mul(2)
-                        }
-                    });
-                    bytes.saturating_add(512).saturating_add(text)
-                })
-        })
+        let (text, shapes) = self.slides.iter().flat_map(|slide| &slide.shapes).fold(
+            (0usize, 0usize),
+            |(text, shapes), shape| {
+                let bytes = shape.properties.text.as_deref().map_or(0, |text| {
+                    if text.is_ascii() {
+                        text.len()
+                    } else {
+                        text.len().saturating_mul(2)
+                    }
+                });
+                (text.saturating_add(bytes), shapes.saturating_add(1))
+            },
+        );
+        if text < 32 * 1024 {
+            return 0;
+        }
+        text.saturating_add(shapes.saturating_mul(256))
+            .saturating_add(self.slides.len().saturating_mul(1024))
+            .saturating_add(16 * 1024)
     }
 
     /// Save the presentation to a file

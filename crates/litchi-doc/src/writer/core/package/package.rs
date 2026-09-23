@@ -116,18 +116,20 @@ impl Writer {
 
     /// Capacity for the `WordDocument` stream, used only to allocate it once
     /// instead of growing it by doubling: the FIB placeholder of
-    /// `text_start` bytes, an upper bound of the text, and room for the FKP
-    /// pages, the SEPX and the final 4 KiB padding.
+    /// `text_start` bytes and an upper bound of the text, plus, when that text
+    /// is large, room for the FKP pages, the SEPX and the final 4 KiB padding.
     ///
     /// Every story writes its text as UTF-16 plus structural marks: paragraph,
     /// cell and row marks, reference and annotation markers, and text-box
     /// paragraph breaks. Text is counted in UTF-16 code units (a text box's
     /// line breaks are single characters of its text that each become one
     /// mark), and each paragraph, run, cell, row, note, comment and text box
-    /// is allowed four marks, more than any story writes for it. An FKP page
-    /// holds at most 101 CHPX or 29 PAPX entries and usually dozens, so one
-    /// page per eight such items, plus a few, covers ordinary formatting. A
-    /// short estimate only means the stream grows as it always did.
+    /// is allowed four marks, more than any story writes for it. A small
+    /// document then grows as it always did; a large one also reserves what
+    /// follows its text, so finishing the stream does not copy the text again.
+    /// An FKP page holds at most 29 PAPX or 101 CHPX entries, so one page per
+    /// sixteen such items, plus two, covers ordinary formatting. A short
+    /// estimate only means the stream grows as it always did.
     fn word_document_capacity_hint(&self, text_start: usize) -> usize {
         fn paragraphs_bound<'a>(
             paragraphs: impl IntoIterator<Item = &'a super::super::model::WritableParagraph>,
@@ -197,11 +199,14 @@ impl Writer {
             .saturating_add(items.saturating_mul(4))
             .saturating_add(64)
             .saturating_mul(2);
-        let fkp_pages = (items / 8).saturating_add(4);
+        if text < 32 * 1024 {
+            return text_start.saturating_add(text);
+        }
+        let fkp_pages = (items / 16).saturating_add(2);
         text_start
             .saturating_add(text)
             .saturating_add(fkp_pages.saturating_mul(512))
-            .saturating_add(8192)
+            .saturating_add(512 + 4096)
     }
 
     /// Build and validate the three core DOC streams.
