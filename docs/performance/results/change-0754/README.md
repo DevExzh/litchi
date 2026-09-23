@@ -7,7 +7,7 @@ Record: [`../../0754-docx-semantic-edit-and-text-path.md`](../../0754-docx-seman
 | | |
 | --- | --- |
 | base commit | `63ec6a5027` (branch tip with records 0742, 0744–0747 and 0750) |
-| branch | `perf/0754-docx-semantic-edit-and-text-path`; final code `2c467b3e66` |
+| branch | `perf/0754-docx-semantic-edit-and-text-path`; first-round code `2c467b3e66`, review-round code `7b6ae3cb5d` |
 | before leg | detached worktree `/home/zhuhe/code/litchi-worktrees/0754-before-src` at the base, root `Cargo.lock` copied in, target `targets/0754-before`; removed after use |
 | after leg | the branch worktree, target `targets/0754` (harness, tests, gates) |
 | host | AMD EPYC 9R45, 32 cores, `Linux 7.0.0-1012-aws x86_64`, shared with other agents |
@@ -32,6 +32,7 @@ Binary SHA-256s are in [`binaries.txt`](binaries.txt).
 | `probe/` | the probe's source |
 | `scripts/` | every script used: builds, ABBA runners, analysis, flags, differential inputs and comparison, witnesses, instruction loops, callgrind attribution, gate runner |
 | [`gates.txt`](gates.txt) | every gate's command, exit status, duration and test totals on the final commit, and the mutation checks of the new tests |
+| `review/` | the review round on `7b6ae3cb5d`: [`witness-timings.txt`](review/witness-timings.txt) (`Document::text` and the layout scan on the review's six adversarial documents, both legs), `witness-outputs.tar.gz` (their probe rows, identical on both legs), [`fixture-bindings.txt`](review/fixture-bindings.txt) (peak bindings in scope per DOCX fixture), `timing/` (six-round ABBA of the three large semantic cases and a control), [`instructions.txt`](review/instructions.txt) |
 | [`log-sections.md`](log-sections.md) | ready-to-paste sections for `HOTSPOTS.md`, `REPORT.md` and `GOAL_AUDIT.md` |
 | [`cleanup.json`](cleanup.json) | what was removed and what was kept |
 

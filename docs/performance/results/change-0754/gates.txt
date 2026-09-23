@@ -106,6 +106,96 @@ tests passed 7,830, failed 0, ignored 67 (the suites' own #[ignore] tests; this 
 
 ## mutation checks of the new tests (each mutation applied, the named tests run, the file restored)
 scanner: resolve body only at depth 2 -> 4 of 7 scan_differential tests fail; do not classify sectPr -> 5 of 7 fail
-tracker: no cache invalidation on pop -> 2 fail; none on a new declaration -> 2 fail; no prefix-index maintenance on scope close -> 2 fail; no default-stack pop -> 3 fail
+tracker: no cache invalidation on a new declaration -> 2 fail; no prefix-index maintenance on scope close -> 2 fail; no default-stack pop -> 3 fail
+  (corrected after review: 'no cache invalidation on pop -> 2 fail' was measured on the code before fde01f68e1,
+   where that invalidation also reset a cached default-namespace position; since the default stack replaced
+   that cache, the invalidation on scope close is redundant and kept only as defence in depth, so removing it
+   fails nothing)
 text: stop resolving start tags while the fragment prefix is unknown -> lazy_resolution_matches_oracle_on_name_shapes_and_shadowing fails
 writer: trust any Verified payload regardless of the slice -> a_custom_part_cannot_borrow_a_proof_for_other_bytes fails
+
+# ---------------------------------------------------------------------------
+# Review round, on 7b6ae3cb5d (CARGO_TARGET_DIR=targets/0754/review, TMPDIR under the scratch dir)
+# ---------------------------------------------------------------------------
+
+## fmt
+command: cargo fmt --all --check
+exit: 0  (19s)
+
+## clippy-lib
+command: cargo clippy -p xml-minifier -p litchi-opc -p litchi-ooxml-common -p litchi-docx --lib --no-deps --locked --offline -- -D warnings
+exit: 0  (16s)
+    Checking litchi-docx v0.0.1 (<worktree>/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 15.98s
+
+## clippy-all-targets
+command: cargo clippy -p xml-minifier -p litchi-opc -p litchi-ooxml-common -p litchi-docx --all-targets --no-deps --locked --offline -- -D warnings
+exit: 0  (18s)
+    Checking litchi-docx v0.0.1 (<worktree>/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.55s
+
+## rustdoc
+command: env RUSTDOCFLAGS=-D warnings cargo doc -p xml-minifier -p litchi-opc -p litchi-ooxml-common -p litchi-docx --no-deps --locked --offline
+exit: 0  (8s)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.09s
+   Generated /home/zhuhe/code/litchi-worktrees/targets/0754/review/doc/litchi_docx/index.html and 3 other files
+
+## test-lower
+command: cargo test -p xml-minifier -p litchi-ooxml-common -p litchi-opc --locked --offline
+exit: 0  (39s)
+tests: passed 1198 failed 0 ignored 2
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+## test-docx
+command: cargo test -p litchi-docx --locked --offline
+exit: 0  (45s)
+tests: passed 1542 failed 0 ignored 31
+
+all doctests ran in 0.78s; merged doctests compilation took 0.77s
+
+## test-pptx
+command: cargo test -p litchi-pptx --locked --offline
+exit: 0  (43s)
+tests: passed 966 failed 0 ignored 2
+
+all doctests ran in 0.45s; merged doctests compilation took 0.39s
+
+## test-xlsx
+command: cargo test -p litchi-xlsx --locked --offline
+exit: 0  (64s)
+tests: passed 1420 failed 0 ignored 0
+
+all doctests ran in 0.20s; merged doctests compilation took 0.20s
+
+## test-facade
+command: cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+exit: 0  (61s)
+tests: passed 382 failed 0 ignored 7
+
+all doctests ran in 0.66s; merged doctests compilation took 0.65s
+
+## non-iwork
+command: python3 tools/non_iwork_gate.py verify
+exit: 0  (4s)
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
+
+## perf-claims
+command: python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+exit: 0  (1s)
+OK: 10 performance claims validated (structural)
+
+## check-dependents
+command: cargo check -p litchi-drawingml -p litchi-spreadsheet-drawing -p litchi-ppt -p litchi-xlsb -p litchi-imgconv --all-targets --locked --offline
+exit: 0  (14s)
+    Checking litchi-xlsb v0.0.1 (<worktree>/crates/litchi-xlsb)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.92s
+
+## review-round totals
+tests passed 5,508 (xml-minifier + ooxml-common + opc 1,198; docx 1,542; pptx 966; xlsx 1,420; facade 382), failed 0
+
+## review-round mutation checks
+tracker: threshold counting only named bindings (the reviewer's bug) -> lookups_stay_bounded_whatever_kind_of_declaration_fills_the_scope fails
+tracker: never extend the map after it is built -> the same test fails
+opc: the route test every_route_audits_the_bytes_it_publishes fails on the code before 7b6ae3cb5d (publishes <document><x:undeclared/></document> on the owned-source route)

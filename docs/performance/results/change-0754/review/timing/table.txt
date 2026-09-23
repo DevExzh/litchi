@@ -1,0 +1,5 @@
+label                shape        A p50 ms  B p50 ms   ratio            95% CI    A p95    B p95 proc instr  proc cyc digest
+ctl_xlsx_cell        medium         0.1321    0.1335  1.0091 [0.9983, 1.0184]   0.1403   0.1414     1.0011    1.0005 same
+noop_large           large          3.8215    1.5061  0.3945 [0.3925, 0.3972]   3.8679   1.5351      0.787    0.8123 same
+one_large            large          8.8877    4.6421  0.5246 [0.5211, 0.5291]   9.1984   4.9276     0.7453      0.78 same
+text_large           large          3.1012    1.9583  0.6329 [0.6254, 0.6407]   3.2023   2.0068     0.8198    0.8549 same

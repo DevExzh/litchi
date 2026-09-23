@@ -1,0 +1,6 @@
+text before instructions/iter 75.54M cycles/iter 13.64M allocations/iter 28
+text after instructions/iter 51.12M cycles/iter 8.66M allocations/iter 28
+one before instructions/iter 196.47M cycles/iter 42.23M allocations/iter 90629
+one after instructions/iter 112.09M cycles/iter 20.69M allocations/iter 10600
+noop before instructions/iter 70.58M cycles/iter 18.98M allocations/iter 70166
+noop after instructions/iter 33.97M cycles/iter 6.65M allocations/iter 157

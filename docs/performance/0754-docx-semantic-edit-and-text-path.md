@@ -12,8 +12,11 @@ Base `63ec6a5027` (branch tip with records 0742, 0744–0747 and 0750); branch
 `perf/0754-docx-semantic-edit-and-text-path`; commits `5bb8bd1050` (the three
 changes and their tests), `3ab983e5cf` (clippy in the new tests), `fde01f68e1`
 (a bounded prefix index for the namespace tracker, see *The tracker's worst
-case*) and `2c467b3e66` (the publication proof is built only where the eager
-writer can use it). The coordinator's task: remove the three largest avoidable
+case*), `2c467b3e66` (the publication proof is built only where the eager
+writer can use it), and after an independent review `24c61402bd` (the prefix
+index's bound counts every binding and the index is built lazily) and
+`7b6ae3cb5d` (a pre-existing gap in the OPC writer's owned-source route; see
+*Review follow-up*). The coordinator's task: remove the three largest avoidable
 costs of the ordinary DOCX semantic read and edit paths that profile r2
 attributed — the eager layout scan in `edit_document` (98% of a no-op
 edit/save), the second complete source audit of a one-edit save's main part,
@@ -30,7 +33,9 @@ and the linear namespace-prefix search of full-text extraction.
 | `docx_semantic_full_text` | 3.126 | 1.950 | **−37.69%** |
 
 The layout scan executes 51.7% fewer instructions and allocates 31 times per
-scan instead of 70,040; full-text extraction executes 32.5% fewer instructions.
+scan instead of 70,040 on the synthetic large corpus (on the most
+namespace-heavy fixtures, 24–28 times instead of 65–2,340); full-text
+extraction executes 32.5% fewer instructions.
 A one-edit save audits its main part completely once instead of twice. Every
 refusal of the scan keeps its type, text and timing (the previous scanner is
 kept as a test oracle and compared over every DOCX fixture, mutated main
@@ -74,8 +79,10 @@ found no differing byte or error. The controls are flat.
 * `crates/litchi-ooxml-common/src/binding_tracker.rs` (hidden `private`
   plumbing): a four-slot cache of recently resolved prefix positions in front
   of the newest-first search, cleared by every change to the binding list; a
-  stack of default-namespace positions; past 32 bindings in scope, an ordered
-  map from each declared prefix to its positions; byte-level
+  stack of default-namespace positions; past 64 bindings of any kind in scope,
+  an ordered map from each declared prefix to its positions, built by the first
+  lookup that misses there and extended only by lookups (at most 64 bindings
+  outside it are searched first); byte-level
   `resolve_prefix_bytes` and `split_qualified_name`; a window scan for the
   `xmlns` prefilter instead of a `memmem` searcher per tag.
 * `crates/litchi-opc/src/payload.rs`, `part.rs`, `pkgwriter.rs`:
@@ -107,16 +114,23 @@ ADR 0003 (immutable snapshots, exact no-ops, fail-closed commits): the no-op
 path still shares its source allocation and publishes nothing; every commit
 still publishes all or nothing. ADR 0005 (bounded, measured): the tracker's new
 state is a fixed four-slot array, a stack no larger than the binding list, and
-an ordered map built only past 32 bindings, and a lookup is now logarithmic
-where it was linear. ADR 0006: publication audits every XML member it is about
-to write — a proven main part was audited by the same `verify_source`, under
-the writer's `Limits::default()`, on exactly the bytes the writer emits, before
-any byte is emitted; bytes without such a proof are audited by the writer, so
-ADR 0006's text does not move (0747's reading). Change 0652's trade-offs 2 and
-3: the safer path is kept (no refusal is removed or moved; the writer's audit
-remains the last line of defence), and the benign common case is the one made
-cheaper; a malicious document with tens of thousands of namespace declarations
-still pays more than an ordinary one, and now pays logarithmically. Owner
+an ordered map built only when a lookup misses with more than 64 bindings in
+scope; a lookup is now at most 64 list comparisons plus one ordered-map
+descent where it was linear in every declaration in scope. ADR 0006:
+publication audits every XML member it is about to write — a proven main part
+was audited by the same `verify_source`, under the writer's
+`Limits::default()`, on exactly the bytes the writer emits, before any byte is
+emitted; bytes without such a proof are audited by the writer, so ADR 0006's
+text does not move (0747's reading). For a proven part the writer's audit is
+not the last line of defence: its publication rests on the commit's pair audit
+— for a one-paragraph edit, 0747's window proof over the replaced element,
+which debug builds re-check with a complete audit — and on the proof's binding
+to the exact allocation the writer emits. For every byte no proof covers, the
+writer's audit remains the last line of defence. Change 0652's trade-offs 2
+and 3: no refusal is removed or moved, and the benign common case is the one
+made cheaper; a malicious document with tens of thousands of namespace
+declarations still pays more than an ordinary one, now a bounded amount per
+lookup. Owner
 decision 8's precedent for moving an error's timing is not needed: nothing
 moves. Change 0747 supplies the pair audit; change 0229 the tracker's
 byte-exactness contract with quick-xml's resolver.
@@ -212,7 +226,11 @@ was; a candidate the writer would refuse carries no proof and is refused by
 the writer at save, as before. `apply_document_patch` then publishes the
 candidate's own allocation with the proof (`set_blob_verified`) instead of a
 copy, and the writer skips its audit only for a slice the part's proof covers
-under `Limits::default()`. Only `Package::apply_document_patch` consumes a
+under `Limits::default()`. For such a slice the writer's own audit no longer
+runs, so what stands behind those bytes is the pair audit's verdict on the
+candidate — 0747's window proof when the edit replaced one element, a complete
+audit otherwise — and the proof's address-and-length binding; every other
+byte is audited by the writer as before. Only `Package::apply_document_patch` consumes a
 proof, and it publishes only patches whose source snapshot has no source
 identity; for a source-backed snapshot the commit keeps the historical gate
 alone (commit `2c467b3e66`), because the source-backed writer audits its own
@@ -288,30 +306,44 @@ searched every declaration in scope, and a document controls how many there
 are: up to the per-element limit (256) times the nesting depth, both enforced
 after the fact. On the base, a 1 MB DOCX main part with about 30,600
 declarations in scope (120 nested elements declaring 255 each) and 20,000
-resolved names takes 419–436 ms per `Document::text`
-(`scripts/make_dos.py`); an ordinary 1 MB part takes 3 ms. The cache alone did
-not bound this: with a distinct undeclared prefix per name every lookup missed,
-and an intermediate build with the cache only took 352 ms. Since commit
-`fde01f68e1`, once more than 32 bindings are in scope, an ordered map
-(`BTreeMap`, so nothing is hashed and no input can force collisions) from each
-declared prefix to its positions answers the miss, kept in step as
-declarations are added and scopes close:
+resolved names takes about 437 ms per `Document::text`; an ordinary 1 MB part
+takes 3 ms. The cache alone did not bound this: with a distinct undeclared
+prefix per name every lookup missed, and an intermediate build with the cache
+only took 352 ms.
 
-| witness, per `Document::text` (probe, 3 iterations) | base | branch |
-| --- | ---: | ---: |
-| 20,000 `q{i}:tab` names, each prefix undeclared | 436.0 ms | 14.4 ms |
-| 20,000 `p0x0:tab` names, the outermost declaration | 286.5 ms | 13.0 ms |
-| 20,000 `q{i}:e` names | 419.3 ms | 12.8 ms |
-| 20,000 `p0x0:e` names | 290.6 ms | 12.8 ms |
-| 20,000 unprefixed `e` names, no default namespace | 189.0 ms | 12.6 ms |
+The tracker therefore keeps an ordered map (`BTreeMap`, so nothing is hashed
+and no input can force collisions) from each declared prefix to its positions.
+As first committed (`fde01f68e1`) it was built when a *named* declaration took
+the list past 32 bindings and kept in step with every declaration and scope
+close; the review found both halves of that wrong (see *Review follow-up*).
+Since `24c61402bd`: up to 64 bindings of any kind — defaults, prefixes,
+`xmlns:=""` (which quick-xml stores as a default) and the two reserved ones —
+a miss searches the list; past that, the first miss builds the map, and a
+later miss searches only the bindings added since the map last caught up,
+first adding them to it when there are more than 64. A declaration costs no
+map work until a lookup needs it, and a map entry is removed when its scope
+closes. Per lookup that is at most four cache comparisons, 64 list comparisons
+and one ordered-map descent.
 
-(`instructions/worst-case-witnesses.txt`.) The `e` names are not ones the
-branch's text scan resolves, so those rows show the lazy resolution as much as
-the index; the `tab` rows are resolved on both legs. Building the index for
-30,600 declarations costs about 10 ms and two small allocations per distinct
-prefix (about 66,000 per extraction here); below 32 bindings — every fixture's
-ordinary case — it is never built. Every witness produces the same text on both
-legs.
+| witness, per iteration (probe, 5 iterations) | `Document::text` base | branch | layout scan base | branch |
+| --- | ---: | ---: | ---: | ---: |
+| 120 × 255 `xmlns:pLxK`, then 20,000 `<qN:tab/>` | 436.6 ms | 13.95 ms | 437.4 ms | 1.64 ms |
+| 120 × 255 `xmlns="urn:…"`, then 20,000 `<qN:tab/>` | 178.6 ms | 2.07 ms | 178.5 ms | 1.54 ms |
+| 120 × 255 `xmlns="urn:…"`, then 20,000 `<w:tab xmlns="u"/>` | 178.3 ms | 2.50 ms | 177.7 ms | 2.16 ms |
+| 120 × 255 `xmlns:="urn:…"`, then 20,000 `<qN:tab/>` | 176.9 ms | 2.08 ms | 176.5 ms | 1.58 ms |
+| 40 root declarations, then 200,000 `<w:tab xmlns:zN=…/>` | 17.70 ms | 17.22 ms | 18.92 ms | 11.38 ms |
+| 70 root declarations, then 200,000 `<w:tab xmlns:zN=…/>` | 20.81 ms | 18.09 ms | 21.99 ms | 11.42 ms |
+
+(`review/witness-timings.txt`, `scripts/make_review_witnesses.py`; the layout
+scan is `Snapshot::from_xml` on the part, the admission of `edit_document`.)
+Every witness produces identical text, edit, publication and snapshot rows on
+both legs. The layout scan resolves only its classified names, so it avoids
+most of these lookups altogether. The first row's text extraction builds the
+map for 30,600 named declarations: about 10 ms and two small allocations per
+distinct prefix (about 86,000 per extraction). No DOCX fixture comes near the
+bound: the most namespace-heavy main part has 37 bindings in scope at its peak
+(35 declarations on a modern Word root), so no fixture builds the map
+(`review/fixture-bindings.txt`).
 
 ## Measured
 
@@ -472,6 +504,51 @@ to three positions per input, 87 composite edits, 309 raw parts refused by the
 scanner and 410 admitted). The five worst-case witnesses produce identical rows
 too.
 
+## Review follow-up
+
+An independent review confirmed the correctness, refusal and proof-boundary
+evidence — forged, aliased and looser-limit proofs are re-audited, 5,431
+hostile publishes re-audit clean, the scanner matches the base on 5,480 parts,
+5,456 DOCX files and 288 managed scans, the tracker matches quick-xml's
+resolver on 20,000 hostile documents, and 993 PPTX and 180 XLSX inputs are
+identical — and asked for the following. Both code fixes are new commits; no
+history was rewritten.
+
+| # | finding | resolution |
+| --- | --- | --- |
+| 1 | Should-fix. The index was built only when a *named* declaration took the list past 32 bindings; default declarations (`xmlns="…"`, and `xmlns:="…"`, which binds the empty prefix and acts as a default) never built it, so named lookups stayed linear: `Document::text` on the reviewer's default-filled document went 178 → 273 ms. | `24c61402bd`: the bound counts every binding. The same document: 178.6 → 2.07 ms. |
+| 2 | Nit. Past the bound every named declaration paid a map insert and remove and two allocations: 40 root declarations and 200,000 short-lived declarations took text 16.2 → 35.6 ms and the layout scan 15.5 → 31.9 ms. | `24c61402bd`: the map is built by the first lookup that misses past 64 bindings and extended only by lookups, so a declaration costs no map work until a lookup needs it: 17.70 → 17.22 ms and 18.92 → 11.38 ms, with no allocation per declaration. |
+| 3 | Nit. "Below 32 bindings — every fixture's ordinary case — it is never built" was wrong: 7 of the 63 fixtures (31–35 root declarations) built the map on every scan, and `table-alignment.docx` allocated 109 times per scan (base 2,341). | With the bound at 64 no fixture builds it (the peak is 37 bindings in scope); `table-alignment.docx` now allocates 28 times per scan (base 2,340). "31 per scan" is the synthetic corpus's figure, and the record now says so. |
+| 4 | Nit. `gates.txt`'s "no cache invalidation on pop → 2 fail" did not reproduce. | That mutation ran on the code before `fde01f68e1`, where the same invalidation also reset a cached default-namespace position. Since the default stack replaced that cache, the invalidation on scope close is redundant: every push clears the cache, a cached position at or past the new length fails `bindings.get`, and one below it is still its prefix's innermost binding. It is kept as defence in depth with that comment, and `gates.txt` is corrected. |
+| 5 | Pre-existing security gap, on the base too. The publication plan audited a part's bytes through `decoded_blob`/`blob`, but the owned-source preservation route regenerated a changed member from `blob_arc`, so a custom `Part` whose accessors disagree published unaudited bytes through `OpcPackage::from_vec`. | Separate commit `7b6ae3cb5d`: the plan captures one `Arc` per decoded part and every route uses it — the audit, the proof check, the copy-or-regenerate decision, the sizes, both writers, appended members and the compressed-transfer identity check. The new test publishes `<document><x:undeclared/></document>` on the code before that commit and is refused with the audit's own error after it, on the owned-source and borrowed-source routes, with and without a borrowed proof. |
+| 6 | Record. "The writer's audit remains the last line of defence" is not literally true for proven parts. | Reworded in *Authority* and *Where it flows*: a proven part's publication rests on the commit's pair audit (0747's window proof for a one-element edit) and the proof's binding to the written allocation; the writer's audit is the last line of defence for every byte no proof covers. |
+
+New tests (`binding_tracker.rs`): an operation-count bound over the review's
+documents with the scope filled by defaults, by `xmlns:=`, by defaults with a
+default redeclared on every name, and by named declarations (a fault
+reintroducing the named-only threshold, and one that never extends the map,
+each fail it); the absence of map upkeep for 200,000 short-lived declarations
+under a 40- and a 70-declaration root; the crowded shapes against quick-xml's
+resolver; and the lazy build. (`verified_publication.rs`): the two route tests
+for finding 5.
+
+**Re-measured on `7b6ae3cb5d`.** Both legs rebuilt with the identical command
+(base `b0e208f4…`, branch `c192a9a2…`; builds here are not bit-reproducible,
+so the base hash differs from the first round's), six ABBA rounds, 12+12
+processes, core 12 (`review/timing/`):
+
+| case | before p50 ms | after p50 ms | paired p50 change | 95% CI | p95 ms, before → after |
+| --- | ---: | ---: | ---: | --- | --- |
+| `docx_semantic_noop_edit_save` large | 3.8215 | 1.5061 | **−60.55%** | [−60.75%, −60.28%] | 3.868 → 1.535 |
+| `docx_semantic_one_edit_save` large | 8.8877 | 4.6421 | **−47.54%** | [−47.89%, −47.09%] | 9.198 → 4.928 |
+| `docx_semantic_full_text` large | 3.1012 | 1.9583 | **−36.71%** | [−37.46%, −35.93%] | 3.202 → 2.007 |
+| `xlsx_first_cell` medium (control) | 0.1321 | 0.1335 | +0.91% | [−0.17%, +1.84%] | 0.1403 → 0.1414 |
+
+The control's three adverse flags are one pair in round 6 (+5.71% p50, +5.24%
+p95, +6.20% mean); it runs no changed code. The probe's per-iteration
+instructions on the large corpus are within 0.3% of the first round's: text
+51.12 M, one-edit 112.09 M, no-op 33.97 M (`review/instructions.txt`).
+
 ## What remains
 
 * **The one-edit save's remaining audit.** The commit still audits the source
@@ -516,6 +593,12 @@ too.
   probe's per-iteration counts isolate the timed work.
 * The equivalence of the new scanners with the old is established by the
   arguments above and by differential tests and campaigns, not by a proof.
+* The prefix map still costs a document that needs it: past 64 bindings in
+  scope a lookup builds or extends it, at about two small allocations per
+  indexed declaration and an insert and a remove per declaration that a
+  lookup indexes and whose scope then closes. The witnesses above show that
+  cost at its largest measured (about 10 ms for 30,600 declarations); it is
+  linear in the declarations a document carries, not per lookup.
 
 ## Verification
 
@@ -542,6 +625,16 @@ rerun. The new tests' sensitivity was checked by mutation (each fault applied,
 the named tests run, the file restored; listed in `gates.txt`): every fault
 failed at least one new test.
 
+**Review round, on `7b6ae3cb5d`** (a fresh `CARGO_TARGET_DIR` under
+`targets/0754`, `TMPDIR` on `/home`): `cargo fmt --all --check`, `cargo
+clippy` of the four touched crates (`--lib` and `--all-targets`, `-D
+warnings`) and `RUSTDOCFLAGS="-D warnings" cargo doc` exit 0; `cargo test` of
+`xml-minifier`, `litchi-ooxml-common` and `litchi-opc` (1,198 passed),
+`litchi-docx` (1,542), `litchi-pptx` (966), `litchi-xlsx` (1,420) and the facade
+(382): 5,508 passed, 0 failed; `cargo check` of the other in-scope dependents,
+`non_iwork_gate.py verify` and `check_perf_claims.py` exit 0. No manifest
+changed, so the crate-boundary check was not rerun.
+
 ## Cleanup
 
 The record and its packet were committed before any deletion. Then removed:
@@ -556,3 +649,8 @@ logs). Kept: the branch worktree and branch. The packet keeps summaries and
 compressed raw reports only — no binaries, no profiles, no corpora; binary
 SHA-256s are in `binaries.txt`. See
 [`cleanup.json`](results/change-0754/cleanup.json).
+
+The review round rebuilt the before-leg worktree and every binary under
+`targets/0754` (release harnesses, probes, debug tests, clippy and rustdoc
+output); after its commit these, the worktree and the scratch contents were
+removed again the same way.
