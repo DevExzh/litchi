@@ -60,8 +60,12 @@ table above. Nothing in the workspace may cite them as authority, and no code
 change is permitted on their basis, until a human accepts one and moves it into
 the table.
 
-No proposed record is outstanding. ADR 0030 and ADR 0031, proposed on
-2026-09-15, were accepted on 2026-09-16 by the owner's decision recorded in
+| ADR | Proposal | Raised by |
+|---|---|---|
+| [0032](0032-snapshot-derived-value-memos.md) | Snapshot memos of small derived values of payload bytes (widens ADR 0005's 2026-09-16 digest-memo amendment) | [change 0743](../performance/0743-pptx-semantic-text-and-edit-path.md), whose reverted commit `99ce9c5e34` implemented and measured such a memo |
+
+ADR 0030 and ADR 0031, proposed on 2026-09-15, were accepted on 2026-09-16 by
+the owner's decision recorded in
 [change 0652](../performance/0652-owner-decisions-for-the-third-wave.md) and
 now appear in the table above.
 

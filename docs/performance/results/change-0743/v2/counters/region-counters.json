@@ -1,0 +1,92 @@
+{
+ "fulltext-large": {
+  "before": {
+   "instructions": 935057666.75,
+   "cycles": 222956826.7
+  },
+  "after": {
+   "instructions": 507427913.35,
+   "cycles": 125011040.17500001
+  }
+ },
+ "fulltext-medium": {
+  "before": {
+   "instructions": 10413786.952,
+   "cycles": 2501716.39
+  },
+  "after": {
+   "instructions": 5903644.494,
+   "cycles": 1486514.335
+  }
+ },
+ "open-large": {
+  "before": {
+   "instructions": 32152153.575999998,
+   "cycles": 9008074.754
+  },
+  "after": {
+   "instructions": 32152269.15,
+   "cycles": 9034316.879999999
+  }
+ },
+ "open-medium": {
+  "before": {
+   "instructions": 6750005.319,
+   "cycles": 1733576.0195
+  },
+  "after": {
+   "instructions": 6747125.9085,
+   "cycles": 1741598.561
+  }
+ },
+ "noop-large": {
+  "before": {
+   "instructions": 496941019.28,
+   "cycles": 120136275.915
+  },
+  "after": {
+   "instructions": 412915991.2,
+   "cycles": 104018361.53
+  }
+ },
+ "noop-medium": {
+  "before": {
+   "instructions": 12093963.717500001,
+   "cycles": 3848640.924
+  },
+  "after": {
+   "instructions": 10956300.322,
+   "cycles": 3637484.922500001
+  }
+ },
+ "one-large": {
+  "before": {
+   "instructions": 1011241952.8299999,
+   "cycles": 238695880.315
+  },
+  "after": {
+   "instructions": 821229036.1500001,
+   "cycles": 198085088.28
+  }
+ },
+ "one-medium": {
+  "before": {
+   "instructions": 25682477.1975,
+   "cycles": 7635262.458999999
+  },
+  "after": {
+   "instructions": 21471803.9545,
+   "cycles": 6693337.727500001
+  }
+ },
+ "pct-large": {
+  "before": {
+   "instructions": 5134654882.129999,
+   "cycles": 1174348600.1149998
+  },
+  "after": {
+   "instructions": 2732073698.95,
+   "cycles": 644300425.58
+  }
+ }
+}

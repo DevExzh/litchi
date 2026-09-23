@@ -1,0 +1,633 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "none"
+  },
+  "binary_identity": {
+    "path": "/home/zhuhe/code/litchi-worktrees/scratch/0743/bin/a/litchi-perf-baseline",
+    "binary_sha256": "41278898d475e4809ce614fe1efb0452dd034ae83fcdedfbc595e5e301451f67",
+    "binary_bytes": 62979376,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "git_revision": "009d515befc1b56c07653258b5250139507a33f5",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "8",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 15,
+    "warmup_iterations_per_case": 3,
+    "filesystem_cache_states": [
+      "warm",
+      "cold-requested"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "pptx_semantic_opened_transaction_phases"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "xlsb_shapes": [
+      "tiny",
+      "medium",
+      "large",
+      "sparse"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "medium",
+      "large"
+    ],
+    "semantic_shapes": [
+      "large",
+      "medium"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ],
+    "opc_cache_lock_diagnostics": false
+  },
+  "parallel_metrics": {
+    "schema_version": 1,
+    "scope": "explicit_local_execution_only",
+    "claim": "descriptive",
+    "configured_worker_budget": {
+      "status": "measured",
+      "value": [
+        1
+      ],
+      "scope": "configuration.execution_workers"
+    },
+    "observed_process_thread_count": {
+      "status": "unavailable",
+      "scope": "process_thread_count",
+      "reason": "no process-global thread counter is collected; local worker boundaries only"
+    },
+    "cases": [
+      {
+        "case": "pptx_semantic_opened_transaction_phases",
+        "corpus_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "pptx_semantic_opened_transaction_phases",
+        "corpus_sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "case": "pptx_semantic_opened_transaction_phases",
+      "corpus": {
+        "name": "pptx-semantic-large",
+        "generator": "litchi-pptx-semantic-v1",
+        "package_format": "PPTX/OPC/ZIP",
+        "shape": "large",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 10000,
+        "archive_member_count": 237,
+        "entry_bytes": 52,
+        "uncompressed_payload_bytes": 520000,
+        "archive_bytes": 215220,
+        "archive_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+        "target_entry": "slide:0/shape:0",
+        "target_payload_bytes": 52,
+        "target_payload_sha256": "df3eb487ffb9797f6f4a8d93931ca0589029d5ae4f50468119c8959c4e87e5a5",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          53401555,
+          53575695,
+          53644816,
+          53690796,
+          53907817,
+          54031738,
+          54052097,
+          54054088,
+          54151668,
+          54407449,
+          54427839,
+          54564900,
+          54604540,
+          54663811,
+          54848742
+        ],
+        "sample_order": [
+          11,
+          13,
+          14,
+          9,
+          6,
+          12,
+          10,
+          7,
+          8,
+          4,
+          5,
+          1,
+          2,
+          3,
+          0
+        ],
+        "min": 53401555,
+        "p50": 54054088,
+        "p95": 54848742,
+        "p99": 54848742,
+        "max": 54848742,
+        "mean": 54135170.06666666,
+        "standard_deviation": 440670.5181229878,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 53891110.59703341,
+          "upper": 54379229.536299914
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [],
+        "read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "ordinary_payload_read_bytes": [],
+        "max_in_flight_reads": [],
+        "pptx_opened_transaction_phases": {
+          "implementation": "litchi-pptx::Package opened presentation transaction",
+          "timing_scope": "total_ns encloses opened_presentation, Snapshot::edit, set_shape_text, Transaction::commit, apply_opened_presentation_commit, and Package::to_bytes; package construction, semantic reopening, digesting, and all correctness checks are outside the clocks",
+          "performance_claim": "attribution-only phase evidence; no speedup, allocation, RSS, physical-I/O, cold-cache, or producer claim",
+          "source_archive_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+          "selected_edit_count": 1,
+          "opened_presentation_ns": [
+            26561767,
+            26786138,
+            26455076,
+            26761267,
+            26796778,
+            26761388,
+            26686997,
+            26710727,
+            26699167,
+            27170279,
+            27186669,
+            27240335,
+            27274225,
+            26947288,
+            27397136
+          ],
+          "snapshot_edit_ns": [
+            45690,
+            45000,
+            46471,
+            54811,
+            45880,
+            46060,
+            49260,
+            52391,
+            92991,
+            45410,
+            44330,
+            50260,
+            45310,
+            46131,
+            53010
+          ],
+          "set_shape_text_ns": [
+            1196716,
+            1192386,
+            1198565,
+            1178535,
+            1181276,
+            1213936,
+            1190846,
+            1195405,
+            1462977,
+            1177646,
+            1170886,
+            1189536,
+            1185226,
+            1178105,
+            1198686
+          ],
+          "transaction_commit_ns": [
+            25060319,
+            25018719,
+            25405161,
+            25154270,
+            25349141,
+            25457601,
+            25575961,
+            25507882,
+            25361911,
+            25495051,
+            25501741,
+            25498227,
+            25566636,
+            25962504,
+            25599427
+          ],
+          "apply_commit_ns": [
+            196301,
+            194361,
+            205081,
+            197651,
+            195651,
+            198611,
+            199671,
+            226111,
+            195631,
+            194331,
+            200501,
+            229711,
+            196651,
+            194141,
+            218541
+          ],
+          "publication_ns": [
+            340452,
+            338721,
+            333742,
+            343502,
+            338731,
+            353692,
+            349002,
+            361162,
+            338591,
+            324422,
+            323462,
+            356421,
+            336142,
+            335202,
+            381482
+          ],
+          "total_ns": [
+            53401555,
+            53575695,
+            53644816,
+            53690796,
+            53907817,
+            54031738,
+            54052097,
+            54054088,
+            54151668,
+            54407449,
+            54427839,
+            54564900,
+            54604540,
+            54663811,
+            54848742
+          ],
+          "output_sha256": [
+            "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e",
+            "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e",
+            "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e",
+            "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e",
+            "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e",
+            "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e",
+            "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e",
+            "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e",
+            "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e",
+            "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e",
+            "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e",
+            "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e",
+            "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e",
+            "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e",
+            "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e"
+          ],
+          "phase_sum_verified": true,
+          "semantic_reopen_verified": true,
+          "deterministic_output_verified": true
+        }
+      },
+      "output_sha256": "cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e"
+    },
+    {
+      "case": "pptx_semantic_opened_transaction_phases",
+      "corpus": {
+        "name": "pptx-semantic-medium",
+        "generator": "litchi-pptx-semantic-v1",
+        "package_format": "PPTX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 96,
+        "archive_member_count": 61,
+        "entry_bytes": 52,
+        "uncompressed_payload_bytes": 4992,
+        "archive_bytes": 40788,
+        "archive_sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e",
+        "target_entry": "slide:0/shape:0",
+        "target_payload_bytes": 52,
+        "target_payload_sha256": "df3eb487ffb9797f6f4a8d93931ca0589029d5ae4f50468119c8959c4e87e5a5",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          1689228,
+          1692428,
+          1692958,
+          1694178,
+          1694848,
+          1697448,
+          1698608,
+          1699758,
+          1700168,
+          1702038,
+          1705238,
+          1705678,
+          1708698,
+          1714398,
+          1717488
+        ],
+        "sample_order": [
+          5,
+          9,
+          4,
+          10,
+          0,
+          13,
+          7,
+          12,
+          14,
+          8,
+          6,
+          11,
+          1,
+          3,
+          2
+        ],
+        "min": 1689228,
+        "p50": 1699758,
+        "p95": 1717488,
+        "p99": 1717488,
+        "max": 1717488,
+        "mean": 1700877.3333333335,
+        "standard_deviation": 8163.545681579629,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 1696356.0627980146,
+          "upper": 1705398.6038686524
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [],
+        "read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "ordinary_payload_read_bytes": [],
+        "max_in_flight_reads": [],
+        "pptx_opened_transaction_phases": {
+          "implementation": "litchi-pptx::Package opened presentation transaction",
+          "timing_scope": "total_ns encloses opened_presentation, Snapshot::edit, set_shape_text, Transaction::commit, apply_opened_presentation_commit, and Package::to_bytes; package construction, semantic reopening, digesting, and all correctness checks are outside the clocks",
+          "performance_claim": "attribution-only phase evidence; no speedup, allocation, RSS, physical-I/O, cold-cache, or producer claim",
+          "source_archive_sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e",
+          "selected_edit_count": 1,
+          "opened_presentation_ns": [
+            751314,
+            748934,
+            751434,
+            750254,
+            752283,
+            758344,
+            760904,
+            757844,
+            755454,
+            760404,
+            762224,
+            758714,
+            764104,
+            765914,
+            767594
+          ],
+          "snapshot_edit_ns": [
+            21350,
+            13590,
+            13410,
+            14320,
+            12990,
+            13370,
+            13750,
+            13400,
+            13660,
+            13880,
+            13960,
+            13600,
+            12860,
+            12940,
+            13330
+          ],
+          "set_shape_text_ns": [
+            126560,
+            128100,
+            128310,
+            136790,
+            136951,
+            127780,
+            126800,
+            126890,
+            127400,
+            128080,
+            128010,
+            128620,
+            129830,
+            129360,
+            128780
+          ],
+          "transaction_commit_ns": [
+            643913,
+            653743,
+            652743,
+            646383,
+            645193,
+            652513,
+            650563,
+            656144,
+            654954,
+            651713,
+            645923,
+            644113,
+            645263,
+            655553,
+            656073
+          ],
+          "apply_commit_ns": [
+            57461,
+            59341,
+            58101,
+            58121,
+            57670,
+            56931,
+            57831,
+            57070,
+            58630,
+            58841,
+            65551,
+            66991,
+            66541,
+            58541,
+            58051
+          ],
+          "publication_ns": [
+            88300,
+            88520,
+            88680,
+            87960,
+            89511,
+            88270,
+            88520,
+            88150,
+            89860,
+            88920,
+            89300,
+            93410,
+            89900,
+            91670,
+            93480
+          ],
+          "total_ns": [
+            1689228,
+            1692428,
+            1692958,
+            1694178,
+            1694848,
+            1697448,
+            1698608,
+            1699758,
+            1700168,
+            1702038,
+            1705238,
+            1705678,
+            1708698,
+            1714398,
+            1717488
+          ],
+          "output_sha256": [
+            "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f",
+            "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f",
+            "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f",
+            "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f",
+            "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f",
+            "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f",
+            "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f",
+            "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f",
+            "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f",
+            "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f",
+            "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f",
+            "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f",
+            "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f",
+            "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f",
+            "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f"
+          ],
+          "phase_sum_verified": true,
+          "semantic_reopen_verified": true,
+          "deterministic_output_verified": true
+        }
+      },
+      "output_sha256": "dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f"
+    }
+  ]
+}

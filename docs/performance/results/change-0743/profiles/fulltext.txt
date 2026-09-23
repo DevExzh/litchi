@@ -1,0 +1,18 @@
+# To display the perf.data header info, please use --header/--header-only options.
+# Overhead  Command          Shared Object         Symbol
+    20.84%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::parts::slide::semantic_text_from_part
+    14.69%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event
+    10.57%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::parts::slide::validate_semantic_attributes
+     5.84%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::name::NamespaceResolver>::resolve_event
+     4.73%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+     4.34%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::events::attributes::IterState>::next
+     3.70%  pptx-semantic-p  libc.so.6             [.] __memcmp_evex_movbe
+     2.96%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::events::attributes::IterState>::check_for_duplicates
+     2.39%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::reader::state::ReaderState>::emit_start
+     2.23%  pptx-semantic-p  pptx-semantic-probe   [.] <memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2
+     2.01%  pptx-semantic-p  pptx-semantic-probe   [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+     1.98%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::name::NamespaceResolver>::resolve_prefix
+     1.91%  pptx-semantic-p  pptx-semantic-probe   [.] <memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2
+     1.66%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+     1.61%  pptx-semantic-p  pptx-semantic-probe   [.] memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+# (Cannot load tips.txt file, please install perf!)

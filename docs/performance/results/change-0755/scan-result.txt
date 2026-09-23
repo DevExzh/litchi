@@ -1,0 +1,1 @@
+fixtures=78 slide_like_parts=1079 with_nested_text=0

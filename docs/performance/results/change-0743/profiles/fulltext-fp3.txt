@@ -1,0 +1,38 @@
+# To display the perf.data header info, please use --header/--header-only options.
+# Children      Self  Command          Shared Object         Symbol
+    99.98%     0.00%  pptx-semantic-p  libc.so.6             [.] __libc_start_call_main
+    99.98%     0.00%  pptx-semantic-p  libc.so.6             [.] __libc_start_main@@GLIBC_2.34
+    99.98%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] _start
+    99.98%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] main
+    99.98%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] std::rt::lang_start_internal
+    99.97%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] pptx_semantic_probe::main
+    99.97%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] std::rt::lang_start::<()>::{closure#0}
+    99.97%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+    98.51%     0.01%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::presentation::package::text
+    97.01%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::parts::slide::text_from_part
+    95.76%    12.80%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::parts::slide::semantic_text_from_part
+    22.77%     1.18%  pptx-semantic-p  pptx-semantic-probe   [.] <litchi_pptx::parts::slide::RawTextScan>::observe
+    15.03%    13.38%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event
+    14.87%    13.23%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::name::NamespaceResolver>::resolve_event
+    13.40%     4.34%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+    12.81%     2.37%  pptx-semantic-p  pptx-semantic-probe   [.] <litchi_pptx::parts::slide::SemanticTextParser>::consume
+    10.55%     5.86%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::parts::slide::validate_semantic_attributes
+    10.55%     0.80%  pptx-semantic-p  pptx-semantic-probe   [.] <litchi_pptx::parts::slide::SemanticTextParser>::consume_event
+     7.81%     1.07%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::parts::slide::validate_semantic_attribute_names
+     7.36%     3.98%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::events::attributes::IterState>::next
+     7.29%     1.64%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+     6.50%     3.57%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::name::QName>::local_name
+     4.38%     2.36%  pptx-semantic-p  pptx-semantic-probe   [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+     3.82%     0.72%  pptx-semantic-p  pptx-semantic-probe   [.] <litchi_pptx::parts::slide::SemanticTextParser>::start_element
+     3.50%     2.04%  pptx-semantic-p  pptx-semantic-probe   [.] memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+     3.16%     2.13%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::events::attributes::IterState>::check_for_duplicates
+     2.95%     2.85%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::reader::state::ReaderState>::emit_start
+     2.82%     2.33%  pptx-semantic-p  pptx-semantic-probe   [.] <memchr::arch::x86_64::avx2::memchr::One>::find_raw
+     2.39%     0.69%  pptx-semantic-p  pptx-semantic-probe   [.] <litchi_pptx::parts::slide::SemanticTextParser>::empty_element
+     2.37%     2.37%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::parts::slide::validate_xml_characters
+     2.23%     0.74%  pptx-semantic-p  pptx-semantic-probe   [.] memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+     1.85%     1.85%  pptx-semantic-p  libc.so.6             [.] __memcmp_evex_movbe
+     1.85%     1.85%  pptx-semantic-p  pptx-semantic-probe   [.] <memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2
+     1.59%     0.74%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::name::NamespaceResolver>::push
+     1.50%     0.56%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::name::QName>::decompose
+# (Cannot load tips.txt file, please install perf!)

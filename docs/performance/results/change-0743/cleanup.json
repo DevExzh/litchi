@@ -1,0 +1,37 @@
+{
+  "change": "0743",
+  "recorded": "2026-09-23",
+  "binary_digests": "binaries.sha256 (both series: native harness, allocator harness and probe binaries, recorded before removal)",
+  "series_v1": {
+    "removed_by": "the implementer during the run, and the coordinator after the implementer stalled at the final deletion (recorded in commit dcbf62d252)",
+    "removed": [
+      {"path": "/home/zhuhe/code/litchi-worktrees/targets/0743", "size": "59G", "what": "after-leg target: debug check, clippy, test (default, all-features, facade) and rustdoc builds; release and allocator harness", "by": "coordinator"},
+      {"path": "/home/zhuhe/code/litchi-worktrees/targets/0743-before", "size": "1.8G", "what": "before-leg builds from the read-only base checkout", "by": "coordinator"},
+      {"path": "/home/zhuhe/code/litchi-worktrees/targets/0743-probe", "size": "995M", "what": "probe build against the worktree", "by": "coordinator"},
+      {"path": "/home/zhuhe/code/litchi-worktrees/targets/0743-probe-alloc", "size": "995M", "what": "counting-allocator probe build against the worktree", "by": "coordinator"},
+      {"path": "/home/zhuhe/code/litchi-worktrees/targets/0743-before-probe", "size": "994M", "what": "probe build against the base checkout", "by": "coordinator"},
+      {"path": "/home/zhuhe/code/litchi-worktrees/targets/0743-before-probe-alloc", "size": "994M", "what": "counting-allocator probe build against the base checkout", "by": "coordinator"},
+      {"path": "/home/zhuhe/code/litchi-worktrees/scratch/0743", "size": "3.2G", "what": "frozen binaries, probe crates, raw run outputs (copied into this packet), output dumps (digests kept), perf.data files (summarized in profiles/)", "by": "coordinator"},
+      {"path": "/home/zhuhe/code/litchi-worktrees/targets/0743-probe-fp", "size": "995M", "what": "frame-pointer probe build for profiling", "by": "implementer, during the run"},
+      {"path": "/home/zhuhe/code/litchi-worktrees/targets/0743-attr", "size": "~1G", "what": "per-commit probe builds", "by": "implementer, during the run"},
+      {"path": "/home/zhuhe/code/litchi-worktrees/0743-attr-src", "size": "detached worktree", "what": "per-commit attribution checkout, git worktree remove --force", "by": "implementer, during the run"},
+      {"path": "/home/zhuhe/.debug/home/zhuhe/code/litchi-worktrees/targets/0743-probe{,-fp}", "size": "1.3G", "what": "perf build-id cache copies of this change's probe binaries and their 7 .build-id links", "by": "implementer, during the run"}
+    ],
+    "transient_outside_scratch": "one stray copy of a probe manifest was written to /tmp/x.toml and deleted by the same command"
+  },
+  "series_v2": {
+    "removed_by": "the implementer, after this packet and the record were committed, each deletion run in the foreground",
+    "removed": [
+      {"path": "/home/zhuhe/code/litchi-worktrees/targets/0743", "size": "61G", "what": "a/, b/: the two harness legs; pa/, pb/: probe legs (pa rebuilt at b82c81ceef for change 0755's pre-fix probe); qa/, qb/: counting-allocator probes; dev/: debug check, clippy, test and rustdoc builds; base-clippy/: the base clippy comparison"},
+      {"path": "/home/zhuhe/code/litchi-worktrees/scratch/0743", "size": "1.1G", "what": "frozen binaries (digests kept), probe crates (source kept in probe/), raw runs (copied into v2/), output dumps (digests kept in v2/outputs/identity.txt), TMPDIR"},
+      {"path": "/home/zhuhe/code/litchi-worktrees/0743-src-a", "size": "9.8G", "what": "detached worktree at 009d515bef (later b82c81ceef) for the before legs, git worktree remove --force"},
+      {"path": "/home/zhuhe/code/litchi-worktrees/0743-src-b", "size": "9.8G", "what": "detached worktree at ad2c490ee3 for the after legs, git worktree remove --force"}
+    ],
+    "verified": "2026-09-23, after commit ab42c7cc21: listing targets/0743* and 0743-src-* reports no such file, git worktree list shows only the implementation worktree, and scratch/0743 was emptied and then removed",
+    "tmpdir": "TMPDIR pointed at scratch/0743/tmp for every build, test and measurement; nothing was written to /tmp"
+  },
+  "kept": [
+    "/home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path (worktree, including its untracked ignored root Cargo.lock)",
+    "branch perf/0743-pptx-semantic-text-and-edit-path"
+  ]
+}
