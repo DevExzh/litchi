@@ -19,6 +19,8 @@ use litchi_cfb::OleWriter;
 use std::io::{Cursor, Read, Seek};
 use std::path::{Path, PathBuf};
 
+mod multi_defect_cases;
+
 type Record = (u16, Vec<u8>);
 
 const BOF: u16 = 0x0809;
@@ -996,4 +998,267 @@ fn package_outcome_agrees_under_worksheet_mutation() {
         compared += 1;
     }
     assert!(compared >= 30);
+}
+
+// ---------------------------------------------------------------------------
+// Frozen worksheet-level first-error matrix, generated on the base
+// ---------------------------------------------------------------------------
+
+/// The first refusal of every multi-defect case, as the base commit
+/// (`009d515bef`) produced it: `multi_defect_cases.rs` was compiled into a
+/// temporary test on that commit and parsed through its only worksheet walk
+/// (the complete reader's), three runs with identical output. The package walk
+/// swallows these refusals (`parse_workbook` drops the sheet), so only a
+/// worksheet-level matrix can see which one comes first.
+const BASE_MULTI_DEFECT_MATRIX: &[(&str, &str)] = &[
+    (
+        "dup-then-bad-xf",
+        "Invalid record 0x00E0: cell references out-of-range XF 4095",
+    ),
+    (
+        "bad-xf-then-truncated",
+        "Invalid record 0x00E0: cell references out-of-range XF 4095",
+    ),
+    (
+        "truncated-then-bad-xf",
+        "Invalid length: expected 14, found 10",
+    ),
+    (
+        "reserved-xf-then-bad-xf",
+        "Invalid record 0x00E0: cell references reserved style-XF slot 3",
+    ),
+    (
+        "pending-string-formula-then-stray-string",
+        "Invalid record 0x0203: String-valued Formula must be followed by a String record",
+    ),
+    (
+        "stray-string-then-orphan",
+        "Invalid record 0x0207: String record has no pending string-valued Formula",
+    ),
+    (
+        "string-continuation-not-continue-then-bad-xf",
+        "Invalid record 0x0203: String result continuation must be a Continue record",
+    ),
+    (
+        "orphan-then-array-without-dimensions",
+        "Invalid record 0x0006: Formula at (2, 2) contains an orphan PtgExp",
+    ),
+    (
+        "array-without-dimensions-then-duplicate-member",
+        "Invalid record 0x0221: Array formulas require worksheet Dimensions",
+    ),
+    (
+        "array-duplicate-anchor-then-missing-member",
+        "Invalid record 0x0221: Array range cell (4, 0) is not exactly one Formula/PtgExp to its anchor",
+    ),
+    (
+        "array-duplicate-member-before-missing-member",
+        "Invalid record 0x0221: Array range cell (5, 0) is not exactly one Formula/PtgExp to its anchor",
+    ),
+    (
+        "second-array-duplicate-member",
+        "Invalid record 0x0221: Array range cell (5, 1) is not exactly one Formula/PtgExp to its anchor",
+    ),
+    (
+        "array-outside-dimensions-with-duplicates",
+        "Invalid record 0x0221: Array range is outside worksheet Dimensions",
+    ),
+    (
+        "shrfmla-without-formula-then-bad-xf",
+        "Invalid record 0x04BC: Shared must immediately follow its Formula record",
+    ),
+    (
+        "duplicate-anchor-claims-second-companion",
+        "Invalid record 0x0221: Formula at (1, 1) already owns a Shared companion",
+    ),
+    (
+        "mulblank-bad-xf-then-mulrk-bad-range",
+        "Invalid record 0x00E0: cell references out-of-range XF 4095",
+    ),
+    (
+        "mulrk-bad-range-then-bad-xf",
+        "Invalid data: MulRk column range 2..=9 does not match 2 cells",
+    ),
+    (
+        "mulrk-over-number-then-reserved-xf",
+        "Invalid record 0x00E0: cell references reserved style-XF slot 3",
+    ),
+    (
+        "unmaterialized-member-behind-orphan",
+        "Invalid record 0x0006: Formula at (3, 3) contains an orphan PtgExp",
+    ),
+    (
+        "unmaterialized-member",
+        "Invalid record 0x0221: Array Formula cell was not materialized",
+    ),
+    (
+        "non-formula-member-with-duplicates",
+        "Invalid record 0x0221: Array owner cannot attach to a non-Formula cell",
+    ),
+    (
+        "outside-grid-duplicates-then-bad-xf",
+        "Invalid record 0x00E0: cell references out-of-range XF 4095",
+    ),
+    (
+        "custom-view-end-without-begin-then-bad-xf",
+        "Invalid record 0x01AB: UserSViewEnd without a matching UserSViewBegin",
+    ),
+    (
+        "dval-cut-short-by-a-cell-then-bad-xf",
+        "Invalid record 0x0203: DVAL must be followed immediately by its declared DV records",
+    ),
+    (
+        "dval-cut-short-by-eof-after-duplicates",
+        "Invalid record 0x000A: DVAL must be followed immediately by its declared DV records",
+    ),
+    ("valid-duplicates-shared-and-array", "ok"),
+    ("no-eof-pending-string-formula-after-duplicates", "ok"),
+];
+
+/// Every multi-defect case refuses first with the base's exact refusal under
+/// the public reader's store and under the validation-only store, keeping no
+/// cell and keeping every cell the case names; accepted cases stay accepted.
+#[test]
+fn worksheet_first_error_matrix_matches_the_base_for_multi_defect_inputs() {
+    let bytes = {
+        let mut writer = crate::Writer::new();
+        let sheet = writer.add_worksheet("Sheet1").unwrap();
+        writer.write_number(sheet, 0, 0, 1.0).unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    };
+    let full = Workbook::new(Cursor::new(bytes.as_slice())).unwrap();
+    let ok = full
+        .xls_worksheet(0)
+        .unwrap()
+        .get_cell(0, 0)
+        .unwrap()
+        .xf_index();
+    assert_eq!(ok, 15, "the base matrix was generated with cell XF 15");
+    let inputs = inputs(&full);
+    let cases = multi_defect_cases::cases(ok);
+    assert_eq!(cases.len(), BASE_MULTI_DEFECT_MATRIX.len());
+    for ((name, records), (expected_name, expected)) in cases.iter().zip(BASE_MULTI_DEFECT_MATRIX) {
+        assert_eq!(name, expected_name);
+        let stream = encode(records);
+        let mut every_position = records
+            .iter()
+            .filter(|(kind, payload)| is_cell(*kind) && payload.len() >= 4)
+            .map(|(_, payload)| {
+                (
+                    u16::from_le_bytes([payload[0], payload[1]]),
+                    u16::from_le_bytes([payload[2], payload[3]]),
+                )
+            })
+            .collect::<Vec<_>>();
+        every_position.sort_unstable();
+        every_position.dedup();
+        let outcome = |result: crate::Result<Worksheet>| match result {
+            Ok(_) => "ok".to_string(),
+            Err(error) => error.to_string(),
+        };
+        let parse = |store: &mut dyn FnMut(&mut Records<'_>) -> crate::Result<Worksheet>| {
+            let mut framed = Records::new(&stream);
+            outcome(store(&mut framed))
+        };
+        let complete = parse(&mut |framed| {
+            Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records_with_compatibility(
+                framed,
+                stream.len() as u64,
+                0,
+                0,
+                &inputs.encoding,
+                "Matrix",
+                std::sync::Arc::clone(&inputs.shared_strings),
+                std::sync::Arc::clone(&inputs.properties),
+                Some(inputs.formula_context),
+                std::sync::Arc::clone(&inputs.formatting),
+                CompatibilityProfile::Strict,
+                &mut DecodeEveryCell,
+            )
+        });
+        for kept in [&[][..], every_position.as_slice()] {
+            let validated = parse(&mut |framed| {
+                Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records_with_compatibility(
+                    framed,
+                    stream.len() as u64,
+                    0,
+                    0,
+                    &inputs.encoding,
+                    "Matrix",
+                    std::sync::Arc::clone(&inputs.shared_strings),
+                    std::sync::Arc::clone(&inputs.properties),
+                    Some(inputs.formula_context),
+                    std::sync::Arc::clone(&inputs.formatting),
+                    CompatibilityProfile::Strict,
+                    &mut ValidateCells::new(kept),
+                )
+            });
+            assert_eq!(
+                validated, *expected,
+                "{name}: validation-only, kept {kept:?}"
+            );
+        }
+        assert_eq!(complete, *expected, "{name}: complete reader");
+    }
+}
+
+/// A position kept on one tab is not kept on another: the validation-only
+/// open refuses to answer it there instead of reporting it as vacant.
+#[test]
+fn kept_cell_refuses_a_position_kept_on_a_different_tab() {
+    let bytes = {
+        let mut writer = crate::Writer::new();
+        let first = writer.add_worksheet("First").unwrap();
+        writer.write_number(first, 1, 1, 10.0).unwrap();
+        let second = writer.add_worksheet("Second").unwrap();
+        writer.write_number(second, 1, 1, 20.0).unwrap();
+        writer.write_number(second, 2, 2, 30.0).unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    };
+    let full = Workbook::new(Cursor::new(bytes.as_slice())).unwrap();
+    let first = full.sheet(0).unwrap().parsed_worksheet_index().unwrap();
+    let second = full.sheet(1).unwrap().parsed_worksheet_index().unwrap();
+    let validated = Workbook::validation_only(
+        Cursor::new(bytes.as_slice()),
+        KeptCells::from_cells([(1, 1, 1)]).unwrap(),
+    )
+    .unwrap();
+    let kept = validated.kept_cell(second, 1, 1).unwrap().unwrap();
+    assert_eq!(
+        format!("{kept:?}"),
+        format!(
+            "{:?}",
+            full.xls_worksheet(second).unwrap().get_cell(1, 1).unwrap()
+        )
+    );
+    for (worksheet, row, column) in [(first, 1, 1), (first, 2, 2), (second, 2, 2)] {
+        assert!(
+            matches!(
+                validated.kept_cell(worksheet, row, column),
+                Err(crate::Error::UnsafeEdit(message)) if message.contains("not asked to keep")
+            ),
+            "worksheet {worksheet} ({row}, {column})"
+        );
+    }
+    // Neither tab decoded anything it was not asked to keep.
+    assert_eq!(
+        validated
+            .as_workbook_for_tests()
+            .xls_worksheet(first)
+            .unwrap()
+            .cell_count_for_tests(),
+        0
+    );
+    assert_eq!(
+        validated
+            .as_workbook_for_tests()
+            .xls_worksheet(second)
+            .unwrap()
+            .cell_count_for_tests(),
+        1
+    );
 }
