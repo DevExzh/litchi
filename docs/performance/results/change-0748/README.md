@@ -13,8 +13,8 @@ sheet-visibility source-backed commit open their immutable sources sealed.
 | --- | --- |
 | base | `ab29ac6291` (`feat/office-format-completeness` tip; includes 0745, not 0746) |
 | branch | `perf/0748-cfb-overlay-fingerprint-reuse` |
-| commits | `3cdcead75c` CFB sealed contract, `604132d280` sealed ingress adoption, `d663c504f4` harness evidence v2, `0a3476edd2` test extension |
-| after leg (measured) | the branch at `d663c504f4` (`0a3476edd2` changes one test only) |
+| commits | `3cdcead75c` CFB sealed contract, `604132d280` sealed ingress adoption, `d663c504f4` harness evidence v2, `0a3476edd2` test extension, `f45930efb5` review follow-up (emission hash derived from the seal, two doc fixes, multi-chunk test) |
+| after leg (measured) | the branch at `d663c504f4`; `0a3476edd2` changes one test, and `f45930efb5` moves the no-hash decision from a caller argument to the plan's seal without changing which passes run for either provenance |
 | before leg | detached worktree at `ab29ac6291` with the harness-only commit cherry-picked (`03cf32fbce`, the same change as `d663c504f4`) |
 | host | `environment.txt` |
 | pinning | `taskset -c 16` for every measured process |

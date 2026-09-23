@@ -11,8 +11,10 @@ that goal completes; iWork is excluded.
 Base `ab29ac6291` (the `feat/office-format-completeness` tip: it includes 0745,
 not 0746); branch `perf/0748-cfb-overlay-fingerprint-reuse`; commits
 `3cdcead75c` (the CFB contract), `604132d280` (sealed ingress for two immutable
-sources), `d663c504f4` (harness evidence schema v2) and `0a3476edd2` (one more
-test). Evidence: [`results/change-0748/`](results/change-0748/README.md).
+sources), `d663c504f4` (harness evidence schema v2), `0a3476edd2` (one more
+test) and, after review, `f45930efb5` (the emission hash derived from the seal,
+two documentation fixes and a multi-chunk test). Evidence:
+[`results/change-0748/`](results/change-0748/README.md).
 
 ## Result
 
@@ -92,12 +94,16 @@ either proves anything about sealed bytes.
 
 - `ValidatedOverlayPlan::composed_source` takes its complete two-digest
   preflight only for a generic positional source.
-- `write_to` and `save` pass a private `EmissionFence` to `write_validated`:
-  `Sealed` (read, overlay and write every chunk; hash nothing), `Hashed`
-  (atomic save of a generic source; its pre-rename preflight follows) or
-  `HashedAndRechecked` (direct write of a generic source; its post-emission
-  preflight follows). A debug assertion ties `Sealed` to the sealed provenance
-  and to nothing else.
+- `write_validated` derives whether an emission hashes from the plan's own
+  seal: a sealed plan reads, overlays and writes every chunk without hashing,
+  and a generic plan hashes its source and target on every route. Callers
+  (`write_to`, `save`) name only their `PublicationRoute` (direct sink or
+  atomic staging), which decides whether a generic source's own post-emission
+  preflight follows, as before. No internal caller can select the no-hash
+  mode for a generic source, in debug or release builds. (The first version,
+  `3cdcead75c`, passed the mode in and tied it to the seal with a
+  `debug_assert_eq!` only; review asked for this fail-closed form, which
+  `f45930efb5` implements.)
 - `SharedOleFile::open_owned_vec(Arc<Vec<u8>>, SourceVersion)` is new: the same
   sealed ingress as `open_owned(Arc<[u8]>, ..)` for callers that hold their
   bytes as a shared vector, without copying them. Both constructors wrap a
@@ -139,6 +145,12 @@ v2 values.
 
 **4. `0a3476edd2`** extends one test to atomic `save` (below).
 
+**5. `f45930efb5` (review follow-up).** The emission-hash derivation above;
+the `ComposedOverlaySource` documentation now states that a sealed plan's view
+skips the complete recheck (it said every view rechecks both digests), and the
+caller-bracketed identity documentation names `open_owned_vec` beside
+`open_owned`; and a multi-chunk equivalence test (below).
+
 ## The contract argument
 
 A plan records two digests, `H(source)` and `H(target)`, where the target is
@@ -178,19 +190,25 @@ crate-private and set only by `open_owned`/`open_owned_vec` through the private
 constructor, so the digests a sealed plan carries are always the ones its own
 planning pass computed over the exact allocation it retains. A caller cannot
 mark an arbitrary `ReadAt` sealed with a flag, a version token or a wrapper
-type.
+type, and inside the crate the no-hash emission is derived from that same seal
+in `write_validated`, not passed in by the caller.
 
 The emission hash also compared the 64 KiB-chunked output with the 1 MiB-
 chunked planning digest, which would expose a chunk-boundary bug in
 `apply_spans`. That is a property of the code, not of the source, so it is now
-tested instead of being re-proved on every publication: the new provenance test
-publishes five overlay sets (five mini and FAT streams at once including a 130
-KB stream whose spans cross 64 KiB boundaries, one mini stream, an exact no-op,
-an empty list, and a version-4 4,096-byte-sector file) through the generic,
-owned-`Arc<[u8]>` and owned-`Vec` provenances and requires the direct write, a
-second write, the atomic save and an end-to-end read of the composed view to
-equal the generic plan's output and to hash to the recorded target digest. The
-census checks the same equalities on 35 real XLS files.
+tested instead of being re-proved on every publication. The provenance tests
+publish each overlay set through the generic, owned-`Arc<[u8]>` and owned-`Vec`
+provenances and require the direct write, a second write, the atomic save and
+an end-to-end read of the composed view to equal the generic plan's output and
+to hash to the recorded target digest. The sets are five mini and FAT streams
+at once (including a 130 KB stream whose spans cross 64 KiB boundaries), one
+mini stream, an exact no-op, an empty list, a version-4 4,096-byte-sector file,
+and, since review, an artifact over 3 MiB (four 1 MiB fingerprint chunks, both
+asserted) whose 3 MiB stream carries hundreds of edits (at least 100 separate
+spans, asserted), including changed ranges that straddle every 1 MiB
+fingerprint-chunk boundary and every 64 KiB publication-chunk boundary inside
+it. The census checks the same
+equalities on 35 real XLS files.
 
 Why the target digest stays at planning rather than moving into the emission
 pass: the composed view's version is derived from the source version and the
@@ -488,6 +506,14 @@ No treatment regressed at p50, mean or p95.
   and target once at planning. Only the repeated passes are removed.
 - DOC and PPT source-backed snapshots, the generic CFB file source and every
   caller-provided `ReadAt` are unchanged by design.
+- **No `perf_abba_summary.py` summary.** That tool counts
+  `operation_evidence_schema` toward each leg's source identity, so it refuses
+  an ABBA whose legs carry v1 and v2 evidence. This packet's before leg is the
+  base with the harness commit cherry-picked, so its XLS numeric source-backed
+  and plan-only reports label the base library's v1 owned values as `v2`; they
+  would not validate as v2 either. The timings here come from `elapsed_ns`
+  only, through `scripts/abba.py`; the operation-shape values of each leg are
+  pinned by that leg's own unit tests, not by these reports.
 
 ## What is left
 
@@ -515,11 +541,11 @@ No treatment regressed at p50, mean or p95.
 
 ## Verification
 
-`results/change-0748/gates.txt`, at `0a3476edd2`:
-
-All commands and exit codes are in `gates.txt`, run with
-`CARGO_TARGET_DIR=targets/0748` and `TMPDIR` in the scratch directory so no
-test staged a file under `/tmp`:
+`results/change-0748/gates.txt`. The first round ran at `0a3476edd2`; the
+review round re-ran the touched crates at `f45930efb5` (end of this section).
+All commands and exit codes are in `gates.txt`, run with a
+`CARGO_TARGET_DIR` under `targets/0748` and `TMPDIR` off `/tmp`, so no test
+staged a file there:
 
 - `cargo fmt --all --check` and `cargo fmt --manifest-path
   tools/perf-baseline/Cargo.toml --check`: exit 0.
@@ -546,17 +572,35 @@ test staged a file under `/tmp`:
   tests passed and 1 ignored, plus its other targets), `python3 -m unittest
   tools.test_perf_abba_summary`, and the CRUD coverage validator: exit 0.
 - `check_crate_boundaries.py`, `non_iwork_gate.py verify` and
-  `check_perf_claims.py --mode structural` (which re-validates the registered
-  ABBA packages, including 0268's v1 XLS numeric rows): exit 0.
+  `check_perf_claims.py --mode structural`: exit 0. Structural mode validates
+  the registry without opening any retained package. The evidence gate is
+  strict mode, `check_perf_claims.py --registry
+  docs/performance/claim-registry-v1.json --repo-root . --evidence-root .
+  --mode strict`, which opens every registered package and re-validates its
+  ABBA reports through the changed `perf_abba_summary.py`, including 0268's v1
+  XLS numeric rows: "OK: 10 performance claims validated (strict)", exit 0
+  (review round, at `f45930efb5`; the reviewer also ran it on the tree
+  combined with the current tip).
+
+Review round, at `f45930efb5`, in a fresh target dir: `cargo fmt --all
+--check` exit 0; `cargo test -p litchi-cfb` exit 0 (376 library tests, one of
+them new, plus every integration target); `cargo test -p litchi-ole-common`
+exit 0 (166 tests); `cargo test -p litchi-xls` exit 0 (73 suites, 1,474
+passed, 1 ignored); clippy `-D warnings` on the three libraries and on
+`litchi-cfb`/`litchi-ole-common` all targets exit 0, and on `litchi-xls` all
+targets the same pre-existing lint only; `RUSTDOCFLAGS="-D warnings" cargo doc`
+on the three crates exit 0.
 
 ## Cleanup
 
 `results/change-0748/cleanup.json`. The census source, both manifests, every
 script, every raw timing report (gzipped), the isolation and allocation JSON,
 profile summaries and the after census output are retained in the packet. The
-binaries, `perf.data` files, target directories (`targets/0748`,
-`targets/0748-before`, `targets/0748-release`, `targets/0748-probe`,
-`targets/0748-before-probe`, `targets/0748-probe-fp`,
-`targets/0748-before-probe-fp`), the `0748-before-src` worktree and the scratch
-directory were deleted after the SHA-256s were recorded. The worktree and
-branch are kept.
+target directories of the first round (`targets/0748`, `targets/0748-before`,
+`targets/0748-release`, `targets/0748-probe`, `targets/0748-before-probe`,
+`targets/0748-probe-fp`, `targets/0748-before-probe-fp`) and the
+`0748-before-src` worktree were deleted after the binary SHA-256s were
+recorded. The coordinator deleted the scratch directory (`scratch/0748`: the
+staged binaries, `perf.data` files and working copies of what the packet holds)
+after the record commit. The review round's `targets/0748` is deleted right
+after the commit that adds `cleanup.json`. The worktree and branch are kept.

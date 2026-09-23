@@ -65,7 +65,9 @@ cannot change: a plan over an owned `Arc<[u8]>`/`Arc<Vec<u8>>` retained by the
 CFB reader (typed, crate-private provenance; no flag or wrapper can claim it)
 computes its digests once, while every generic `ReadAt` keeps planning's
 confirming scan, the view preflight, the write fences, the emission hash and
-the save fences, each still pinned by a mutating-source test. Recorded
+the save fences, each still pinned by a mutating-source test; the no-hash
+emission is derived from the plan's seal inside the publisher, so no internal
+caller can select it for a generic source. Recorded
 fingerprint values, composed-view versions and published bytes are unchanged
 (census, tests); the composed reopen, owner validation and read-back all run.
 Breaking changes, stated: sealed plans report zero preflight and zero hashed
