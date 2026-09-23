@@ -692,15 +692,21 @@ impl<'a> Scanner<'a> {
                 .get_mut(active_offset)
                 .ok_or_else(|| Error::Invalid("shape stack became inconsistent".into()))?;
             active.seen_paragraph = true;
-        } else if is_dml(namespace, local_name, b"t") && !empty {
+        } else if is_dml(namespace, local_name, b"t") {
             let active = self
                 .active
                 .get_mut(active_offset)
                 .ok_or_else(|| Error::Invalid("shape stack became inconsistent".into()))?;
+            // A text element inside an open one is refused whether it is a
+            // start tag or an empty one, as the semantic text reader refuses
+            // both: an accepted empty `a:t` inside `a:t` gave the text-run
+            // rewrite overlapping spans.
             if active.text_depth.is_some() {
                 return Err(Error::Invalid("nested DrawingML text elements".into()));
             }
-            active.text_depth = Some(event_depth);
+            if !empty {
+                active.text_depth = Some(event_depth);
+            }
         } else if is_dml(namespace, local_name, b"br") {
             self.append_text("\n")?;
         } else if is_dml(namespace, local_name, b"tab") {
