@@ -1,0 +1,48 @@
+{
+ "change": "0757",
+ "date": "2026-09-23",
+ "binary_identities_recorded_before_removal": "binaries.sha256",
+ "removed": [
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0757",
+   "bytes": 68958523164,
+   "contents": "after-leg release harness builds (921787e2c0 and 7309029a6d), and the debug, test, clippy and rustdoc builds of every gate run (litchi-xls, litchi-doc, litchi-ppt, the facade)"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0757-before",
+   "bytes": 2919276116,
+   "contents": "before-leg release harness build, and the base-side test, golden and clippy builds"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0757-final",
+   "bytes": 1055209504,
+   "contents": "release harness build of the final head a400341bdf, used only for the instruction check in gates.txt"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0757-probe-A",
+   "bytes": 597698899,
+   "contents": "timing/allocation/callgrind probe built against the base sources"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0757-probe-B",
+   "bytes": 598185322,
+   "contents": "timing/allocation/callgrind probe built against the branch sources"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/0757-before-src",
+   "bytes": 10198536667,
+   "contents": "detached checkout of 9ff78bbf1c used to build the before leg and to run the golden, clippy and string-field probe tests on the base (each temporary test file restored or removed); removed with git worktree remove --force"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/scratch/0757/*",
+   "bytes": 220131403,
+   "contents": "measurement binaries (bin/A, bin/B), probe projects, callgrind outputs, a debug-speed micro-benchmark crate, build and test logs, development measurements of intermediate builds (dev-not-retained/: harness window 1, counters and XLS-only probe runs of 7309029a6d, not cited), and raw results before copying; everything cited is copied into this packet"
+  }
+ ],
+ "kept": [
+  "the branch worktree /home/zhuhe/code/litchi-worktrees/0757-xls-fresh-writer-sst-determinism and branch perf/0757-xls-fresh-writer-sst-determinism"
+ ],
+ "not_touched": [
+  "the main checkout, the shared base checkout base-009d515bef and its target, other agents' worktrees, targets and scratch directories, perf's build-id cache (no 0757 entries: only perf stat and valgrind were run), and the untracked docs/performance/results/change-0741/ packet in the main checkout"
+ ]
+}

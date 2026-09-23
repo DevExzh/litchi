@@ -1,0 +1,12 @@
+test a_writer_written_twice_and_extended_restages_its_strings ... ok
+test the_sst_lists_strings_in_first_occurrence_order ... FAILED
+test many_distinct_and_repeated_strings_read_back_cell_by_cell ... ok
+test multi_string_worksheets_are_pinned_across_processes ... FAILED
+test fresh_xls_writer_shared_strings_match_the_pre_0753_goldens ... FAILED
+thread 'the_sst_lists_strings_in_first_occurrence_order' (2821066) panicked at crates/litchi-xls/tests/xls_writer_text_goldens.rs:331:5:
+thread 'multi_string_worksheets_are_pinned_across_processes' (2821065) panicked at crates/litchi-xls/tests/xls_writer_text_goldens.rs:295:13:
+assertion `left == right` failed: many_strings is not deterministic
+thread 'fresh_xls_writer_shared_strings_match_the_pre_0753_goldens' (2821063) panicked at crates/litchi-xls/tests/xls_writer_text_goldens.rs:180:5:
+digest mismatches:
+one_string_per_sheet: 420df55445de70ab66699a18d1de707a2f35b132319c7592794ce577fec3eab5 (395776 bytes)
+test result: FAILED. 2 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s

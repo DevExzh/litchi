@@ -1,0 +1,7 @@
+test a_writer_written_twice_and_extended_restages_its_strings ... ok
+test the_sst_lists_strings_in_first_occurrence_order ... FAILED
+test many_distinct_and_repeated_strings_read_back_cell_by_cell ... ok
+test multi_string_worksheets_are_pinned_across_processes ... FAILED
+test fresh_xls_writer_shared_strings_match_the_pre_0753_goldens ... ok
+assertion `left == right` failed: many_strings is not deterministic
+test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s

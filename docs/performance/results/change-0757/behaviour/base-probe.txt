@@ -1,0 +1,18 @@
+PROBE cell 65,535 x b: written; read back 65535 of 65535 UTF-16 units (whole)
+PROBE cell 65,536 x b: written; read back 65535 of 65536 UTF-16 units (TRUNCATED)
+PROBE cell 70,000 x e-acute: written; read back 65535 of 70000 UTF-16 units (TRUNCATED)
+PROBE cell 65,534 x a + emoji: written; reader refused the workbook: Encoding error: UTF-16 decoding error: invalid utf-16: lone surrogate found
+PROBE formula literal 255 x a: written; PtgStr cch 255 of 255 UTF-16 units (whole)
+PROBE formula literal 300 x a: written; PtgStr cch 255 of 300 UTF-16 units (TRUNCATED)
+PROBE formula literal 254 x a + emoji: written; PtgStr cch 254 of 256 UTF-16 units (TRUNCATED)
+PROBE number format 255 x 0: written; reader accepted it
+PROBE number format 256 x 0: written; reader refused the workbook: Invalid record 0x041E: format string has 256 UTF-16 code units; expected 1 through 255
+thread 'probe_string_fields_past_their_limits' (2831813) panicked at crates/litchi-xls/src/writer/biff/workbook.rs:508:24:
+PROBE number format 70,000 x 0: write_to PANICKED
+PROBE defined name Cafe (Latin-1): written; reader refused the workbook: Unexpected end of stream: record 0x6000 extends beyond the Workbook stream
+PROBE defined name with emoji: written; reader refused the workbook: Unexpected end of stream: record 0x0001 extends beyond the Workbook stream
+PROBE defined name 200 emoji (400 units): written; reader refused the workbook: Unexpected end of stream: record 0x0eea extends beyond the Workbook stream
+PROBE sheet name 16 x e-acute (32 bytes): add_worksheet refused: Invalid data: Worksheet name must be 1-31 characters
+PROBE sheet name 31 x e-acute: add_worksheet refused: Invalid data: Worksheet name must be 1-31 characters
+PROBE sheet name 32 x b: add_worksheet refused: Invalid data: Worksheet name must be 1-31 characters
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s

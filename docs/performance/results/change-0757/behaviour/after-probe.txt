@@ -1,0 +1,17 @@
+PROBE cell 65,535 x b: written; read back 65535 of 65535 UTF-16 units (whole)
+PROBE cell 65,536 x b: write_string refused: shared string has 65536 UTF-16 code units; BIFF8 stores at most 65535
+PROBE cell 70,000 x e-acute: write_string refused: shared string has 70000 UTF-16 code units; BIFF8 stores at most 65535
+PROBE cell 65,534 x a + emoji: write_string refused: shared string has 65536 UTF-16 code units; BIFF8 stores at most 65535
+PROBE formula literal 255 x a: written; PtgStr cch 255 of 255 UTF-16 units (whole)
+PROBE formula literal 300 x a: refused: formula string literal has 300 UTF-16 code units; BIFF8 stores at most 255
+PROBE formula literal 254 x a + emoji: refused: formula string literal has 256 UTF-16 code units; BIFF8 stores at most 255
+PROBE number format 255 x 0: written; reader accepted it
+PROBE number format 256 x 0: write_to refused: number format has 256 UTF-16 code units; BIFF8 stores at most 255
+PROBE number format 70,000 x 0: write_to refused: number format has 70000 UTF-16 code units; BIFF8 stores at most 255
+PROBE defined name Cafe (Latin-1): written; read back ["Café"] (whole)
+PROBE defined name with emoji: written; read back ["Rocket😀Launch"] (whole)
+PROBE defined name 200 emoji (400 units): define_name refused: defined name has 400 UTF-16 code units; BIFF8 stores at most 255
+PROBE sheet name 16 x e-acute (32 bytes): written; read back ["éééééééééééééééé"]
+PROBE sheet name 31 x e-acute: written; read back ["ééééééééééééééééééééééééééééééé"]
+PROBE sheet name 32 x b: add_worksheet refused: worksheet name has 32 UTF-16 code units; BIFF8 stores at most 31
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
