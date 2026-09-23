@@ -400,6 +400,12 @@ impl Number {
     /// form. This is used by streaming readers that must validate an
     /// unselected value while retaining ownership only for selected cells.
     pub(crate) fn validate_lexical(value: &str) -> Result<()> {
+        if is_short_integer(value) {
+            // Exactly the lexemes `f64::from_str` parses to a finite value
+            // without rounding into the infinities, so the full float parse
+            // below would accept them too.
+            return Ok(());
+        }
         let parsed = value
             .trim()
             .parse::<f64>()
@@ -437,6 +443,15 @@ impl Number {
         }
         Ok(())
     }
+}
+
+/// Whether `value` is an optionally signed run of at most 18 ASCII digits.
+///
+/// Every such lexeme is a finite binary64 number, so it passes the number
+/// validation without the general float parser.
+fn is_short_integer(value: &str) -> bool {
+    let digits = value.strip_prefix(['-', '+']).unwrap_or(value).as_bytes();
+    !digits.is_empty() && digits.len() <= 18 && digits.iter().all(u8::is_ascii_digit)
 }
 
 impl TryFrom<f64> for Number {
@@ -1177,6 +1192,56 @@ mod tests {
         for value in ["  -0.000  ", "6.02E+23"] {
             Number::validate_lexical(value).expect("valid borrowed number");
             Number::new(value).expect("valid owned number");
+        }
+    }
+
+    #[test]
+    fn short_integer_fast_path_matches_the_float_validation() {
+        fn reference(value: &str) -> bool {
+            value
+                .trim()
+                .parse::<f64>()
+                .is_ok_and(|parsed| parsed.is_finite())
+        }
+        let mut cases = vec![
+            "0".to_owned(),
+            "-1".to_owned(),
+            "+1".to_owned(),
+            "007".to_owned(),
+            "-0".to_owned(),
+            "123456789012345678".to_owned(),
+            "-123456789012345678".to_owned(),
+            "1234567890123456789".to_owned(),
+            "9".repeat(309),
+            String::new(),
+            "-".to_owned(),
+            "+".to_owned(),
+            "--1".to_owned(),
+            "+-1".to_owned(),
+            "1-".to_owned(),
+            " 1".to_owned(),
+            "1 ".to_owned(),
+            "1.".to_owned(),
+            "1e5".to_owned(),
+            "0x1".to_owned(),
+            "\u{663}".to_owned(),
+            "１".to_owned(),
+            "inf".to_owned(),
+            "NaN".to_owned(),
+        ];
+        for length in 1..=20 {
+            cases.push("7".repeat(length));
+            cases.push(format!("-{}", "3".repeat(length)));
+        }
+        for value in cases {
+            if is_short_integer(&value) {
+                assert!(reference(&value), "{value}");
+            }
+            assert_eq!(
+                Number::validate_lexical(&value).is_ok(),
+                reference(&value),
+                "{value}"
+            );
         }
     }
 

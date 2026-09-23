@@ -93,7 +93,7 @@ pub(super) struct PendingCell<'c> {
     pub(super) style: Option<u32>,
     pub(super) cell_metadata: Option<u32>,
     pub(super) value_metadata: Option<u32>,
-    pub(super) cell_type: Option<String>,
+    pub(super) cell_type: Option<Cow<'c, str>>,
     pub(super) value: Cow<'c, str>,
     pub(super) value_bytes: usize,
     pub(super) saw_value: bool,
@@ -106,6 +106,53 @@ pub(super) struct PendingCell<'c> {
     pub(super) saw_inline_simple: bool,
     pub(super) saw_inline_run: bool,
     pub(super) run_has_text: bool,
+}
+
+/// One cell the `<sheetData>` lane admitted, kept compact until the parse
+/// completes.
+///
+/// The lane admits no formula, inline string or rich-text run, so this is
+/// the whole of what [`RawCell`] would hold for such a cell. `inline` records
+/// that the cell's type is `inlineStr`, for which the ordinary parser keeps
+/// an empty inline string.
+#[derive(Debug)]
+pub(super) struct LaneCell<'c> {
+    pub(super) address: Address,
+    pub(super) style: Option<u32>,
+    pub(super) cell_metadata: Option<u32>,
+    pub(super) value_metadata: Option<u32>,
+    pub(super) cell_type: Option<Cow<'c, str>>,
+    pub(super) value: Option<&'c str>,
+    pub(super) inline: bool,
+}
+
+impl<'c> LaneCell<'c> {
+    /// The raw record the ordinary parser would have kept for this cell.
+    pub(super) fn into_raw(self) -> RawCell<'c> {
+        RawCell {
+            address: self.address,
+            style: self.style,
+            cell_metadata: self.cell_metadata,
+            value_metadata: self.value_metadata,
+            cell_type: self.cell_type,
+            value: self.value.map(Cow::Borrowed),
+            inline: self.inline.then(String::new),
+            inline_rich: false,
+            formula_range: None,
+            shared_formula: None,
+            formula: None,
+        }
+    }
+}
+
+/// The validated fields of one opening cell, in their check order.
+#[derive(Debug)]
+pub(super) struct CellFields<'v> {
+    pub(super) column: u32,
+    pub(super) style: Option<u32>,
+    pub(super) cell_metadata: Option<u32>,
+    pub(super) value_metadata: Option<u32>,
+    pub(super) cell_type: Option<Cow<'v, str>>,
 }
 
 #[derive(Debug)]
@@ -123,7 +170,7 @@ pub(super) struct RawCell<'c> {
     pub(super) style: Option<u32>,
     pub(super) cell_metadata: Option<u32>,
     pub(super) value_metadata: Option<u32>,
-    pub(super) cell_type: Option<String>,
+    pub(super) cell_type: Option<Cow<'c, str>>,
     pub(super) value: Option<Cow<'c, str>>,
     pub(super) inline: Option<String>,
     pub(super) inline_rich: bool,
@@ -164,6 +211,9 @@ pub(super) struct SharedMaster {
 #[derive(Debug)]
 pub(super) struct Parser<'c> {
     pub(super) cells: Vec<RawCell<'c>>,
+    /// Cells of an admitted `<sheetData>` body. The lane takes the whole
+    /// body or none of it, so these precede `cells` in document order.
+    pub(super) lane_cells: Vec<LaneCell<'c>>,
     pub(super) rows: Vec<row::Stored>,
     pub(super) columns: Option<Assignments<column::Properties>>,
     pub(super) defaults: Option<Defaults>,

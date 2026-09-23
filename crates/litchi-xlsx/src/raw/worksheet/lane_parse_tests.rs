@@ -264,3 +264,33 @@ fn inferred_coordinates_match_the_reader() {
     body.push_str("</row><row><c/><c r=\"D2\"/><c/></row>");
     assert!(assert_parity(&worksheet(&body), &strings));
 }
+
+#[test]
+fn compact_lane_cells_match_every_value_form() {
+    let strings = shared_strings();
+    for body in [
+        "<row r=\"1\"><c r=\"A1\" t=\"inlineStr\"/></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"inlineStr\"><v>1</v></c></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"inlineStr\"><v/></c></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"str\"><v/></c></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"str\"/></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"str\"><v>a_x0041_b</v></c></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"s\"/></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"s\"><v></v></c></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"s\"><v> 2 </v></c></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"e\"><v>#N/A</v></c></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"e\"><v>#VENDOR!</v></c></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"d\"><v>2026-01-02</v></c></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"b\"><v> 1 </v></c></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"x\"><v>raw</v></c></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"x\"/></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"n\"/></row>",
+        "<row r=\"1\"><c r=\"A1\" t=\"\"><v>1</v></c></row>",
+        "<row r=\"1\"><c r=\"A1\"><v>  </v></c></row>",
+        "<row r=\"1\"><c r=\"A1\"><v>-0.000</v></c></row>",
+        "<row r=\"1\"><c r=\"A1\" cm=\"3\" vm=\"4\"><v>1</v></c></row>",
+        "<row r=\"1\"><c r=\"A1\" s=\"0\"/><c r=\"B1\" s=\"65490\"/></row>",
+    ] {
+        assert!(assert_parity(&worksheet(body), &strings), "{body}");
+    }
+}

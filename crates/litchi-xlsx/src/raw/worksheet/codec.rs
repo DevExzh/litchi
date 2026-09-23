@@ -15,6 +15,7 @@ use super::super::formula::Range as FormulaRange;
 use super::super::namespace::is_spreadsheetml_name;
 use super::super::strings::decode_spreadsheet_text;
 use super::lane;
+use super::model::{CellFields, LaneCell};
 use super::model::{
     Context, MAX_CELL_CHARACTERS, MAX_CELL_STYLE, MAX_COLUMN_STYLE, MAX_ENCODED_CELL_BYTES,
     MAX_FORMULA_CHARACTERS, MAX_METADATA_INDEX, MAX_XML_DEPTH, MAX_XML_EVENTS, Parser, PendingCell,
@@ -192,6 +193,30 @@ enum CellField {
     Type,
 }
 
+/// One cell the lane has opened but not yet closed.
+#[derive(Debug)]
+struct OpenLaneCell<'c> {
+    row: u32,
+    fields: CellFields<'c>,
+    value: Option<&'c str>,
+}
+
+/// Borrow an admitted attribute value of the document as document text.
+///
+/// `value` is a subslice of `content`, delimited by ASCII bytes, so the same
+/// range of the `str` is on character boundaries.
+fn lane_slice<'c>(content: &'c str, value: &[u8]) -> Result<&'c str> {
+    let start = (value.as_ptr() as usize)
+        .checked_sub(content.as_ptr() as usize)
+        .ok_or_else(|| invalid("worksheet lane value lies outside its document"))?;
+    let end = start
+        .checked_add(value.len())
+        .ok_or_else(|| invalid("worksheet lane value lies outside its document"))?;
+    content
+        .get(start..end)
+        .ok_or_else(|| invalid("worksheet lane split a UTF-8 sequence"))
+}
+
 /// Borrow an admitted lane slice of a UTF-8 document as text.
 fn lane_text(value: &[u8]) -> Result<&str> {
     std::str::from_utf8(value).map_err(|_source| invalid("worksheet lane split a UTF-8 sequence"))
@@ -263,6 +288,7 @@ impl<'c> Parser<'c> {
     fn new(extensions: x14ac::Values) -> Self {
         Self {
             cells: Vec::new(),
+            lane_cells: Vec::new(),
             rows: Vec::new(),
             columns: None,
             defaults: None,
@@ -400,8 +426,8 @@ impl<'c> Parser<'c> {
         #[cfg(test)]
         lane::route::note_admitted(lane::route::Pass::Parse);
         // The admitted body fixes the record counts, so reserve them once.
-        self.cells
-            .try_reserve(summary.cells)
+        self.lane_cells
+            .try_reserve_exact(summary.cells)
             .map_err(|source| allocation("sparse worksheet cells", source))?;
         self.rows
             .try_reserve(summary.rows)
@@ -409,8 +435,9 @@ impl<'c> Parser<'c> {
         self.seen_rows
             .try_reserve(summary.rows)
             .map_err(|source| allocation("worksheet parser row index set", source))?;
+        let mut open = None;
         let walked = lane::walk(bytes, entry.position, name, &mut |event| {
-            self.lane_event(content, event, decoder)
+            self.lane_event(content, event, decoder, &mut open)
         })?;
         match walked {
             Some(walked) if walked == summary => Ok(Some(summary.end)),
@@ -420,11 +447,18 @@ impl<'c> Parser<'c> {
 
     /// Apply one lane event exactly as [`Self::transition`] applies the
     /// corresponding reader event inside `<sheetData>`.
+    ///
+    /// Rows take the ordinary methods. A cell is held in `open` rather than
+    /// in [`PendingCell`]: its opening checks are [`Self::cell_fields`], its
+    /// value keeps the bound [`Self::push_text`] applies, and its close keeps
+    /// the refusals [`Self::finish_cell`] can raise for the only shape the
+    /// lane admits, in the same order and at the same events.
     fn lane_event(
         &mut self,
         content: &'c str,
         event: lane::Event<'_>,
         decoder: Decoder,
+        open: &mut Option<OpenLaneCell<'c>>,
     ) -> Result<()> {
         match event {
             lane::Event::Start(lane::Name::Row, tag) => self.start_lane_row(tag, decoder),
@@ -432,19 +466,30 @@ impl<'c> Parser<'c> {
                 self.start_lane_row(tag, decoder)?;
                 self.finish(Context::Row)
             },
-            lane::Event::Start(lane::Name::Cell, tag) => self.start_lane_cell(tag),
-            lane::Event::Empty(lane::Name::Cell, tag) => {
-                self.start_lane_cell(tag)?;
-                self.finish(Context::Cell)
-            },
-            lane::Event::Start(lane::Name::Value, _) => self.start_value(),
-            lane::Event::Empty(lane::Name::Value, _) => {
-                self.start_value()?;
-                self.finish(Context::Value)
-            },
             lane::Event::End(lane::Name::Row, ..) => self.finish(Context::Row),
-            lane::Event::End(lane::Name::Cell, ..) => self.finish(Context::Cell),
-            lane::Event::End(lane::Name::Value, ..) => self.finish(Context::Value),
+            lane::Event::Start(lane::Name::Cell, tag) => {
+                *open = Some(self.open_lane_cell(content, tag)?);
+                Ok(())
+            },
+            lane::Event::Empty(lane::Name::Cell, tag) => {
+                let cell = self.open_lane_cell(content, tag)?;
+                self.close_lane_cell(cell)
+            },
+            lane::Event::End(lane::Name::Cell, ..) => {
+                let cell = open
+                    .take()
+                    .ok_or_else(|| invalid("missing worksheet cell"))?;
+                self.close_lane_cell(cell)
+            },
+            lane::Event::Start(lane::Name::Value, _) | lane::Event::Empty(lane::Name::Value, _) => {
+                // The lane admits at most one value, so `start_value`'s
+                // duplicate refusal cannot apply.
+                open.as_mut()
+                    .ok_or_else(|| invalid("worksheet value outside a cell"))?
+                    .value = Some("");
+                Ok(())
+            },
+            lane::Event::End(lane::Name::Value, ..) => Ok(()),
             lane::Event::Text {
                 start,
                 end,
@@ -453,20 +498,23 @@ impl<'c> Parser<'c> {
                 let text = content
                     .get(start..end)
                     .ok_or_else(|| invalid("worksheet lane split a UTF-8 sequence"))?;
-                self.push_lane_value(text)
+                let cell = open
+                    .as_mut()
+                    .ok_or_else(|| invalid("worksheet cell text outside a cell"))?;
+                // The bound `push_text` applies to the one value run.
+                if text.len() > MAX_ENCODED_CELL_BYTES {
+                    return Err(invalid("worksheet value text is too large"));
+                }
+                cell.value = Some(text);
+                Ok(())
             },
             // Whitespace between elements has no text target.
             lane::Event::Text { value: false, .. } => Ok(()),
         }
     }
 
-    fn start_lane_row(&mut self, tag: lane::Tag<'_>, decoder: Decoder) -> Result<()> {
-        // Rows are few; reuse the reader's own attribute handling verbatim.
-        let element = BytesStart::from_content(lane_text(tag.content)?, b"row".len());
-        self.start_row(&element, decoder)
-    }
-
-    fn start_lane_cell(&mut self, tag: lane::Tag<'_>) -> Result<()> {
+    /// Open one admitted cell: [`Self::start_cell`] without the reader.
+    fn open_lane_cell(&mut self, content: &'c str, tag: lane::Tag<'_>) -> Result<OpenLaneCell<'c>> {
         if self.cell.is_some() {
             return Err(invalid("nested worksheet cell"));
         }
@@ -491,9 +539,9 @@ impl<'c> Parser<'c> {
                 b"t" => &mut cell_type,
                 _ => continue,
             };
-            *slot = Some(lane_text(value)?);
+            *slot = Some(lane_slice(content, value)?);
         }
-        self.start_cell_fields(row, reference, |field| {
+        let fields = self.cell_fields(row, reference, |field| {
             Ok(match field {
                 CellField::Style => style,
                 CellField::CellMetadata => cell_metadata,
@@ -501,7 +549,44 @@ impl<'c> Parser<'c> {
                 CellField::Type => cell_type,
             }
             .map(Cow::Borrowed))
+        })?;
+        Ok(OpenLaneCell {
+            row,
+            fields,
+            value: None,
         })
+    }
+
+    /// Close one admitted cell with the refusals [`Self::finish_cell`] can
+    /// raise for a cell without formula, inline string or run.
+    fn close_lane_cell(&mut self, cell: OpenLaneCell<'c>) -> Result<()> {
+        let OpenLaneCell { row, fields, value } = cell;
+        let inline = fields.cell_type.as_deref() == Some("inlineStr");
+        if value.is_some_and(|value| value.chars().count() > MAX_CELL_CHARACTERS) {
+            return Err(invalid(format!(
+                "worksheet value exceeds {MAX_CELL_CHARACTERS} characters"
+            )));
+        }
+        let address = Address::at(row - 1, fields.column - 1)?;
+        self.lane_cells
+            .try_reserve(1)
+            .map_err(|source| allocation("sparse worksheet cells", source))?;
+        self.lane_cells.push(LaneCell {
+            address,
+            style: fields.style,
+            cell_metadata: fields.cell_metadata,
+            value_metadata: fields.value_metadata,
+            cell_type: fields.cell_type,
+            value,
+            inline,
+        });
+        Ok(())
+    }
+
+    fn start_lane_row(&mut self, tag: lane::Tag<'_>, decoder: Decoder) -> Result<()> {
+        // Rows are few; reuse the reader's own attribute handling verbatim.
+        let element = BytesStart::from_content(lane_text(tag.content)?, b"row".len());
+        self.start_row(&element, decoder)
     }
 
     fn finish_parse<'a, F>(mut self, strings: F) -> Result<Store>
@@ -510,19 +595,31 @@ impl<'c> Parser<'c> {
     {
         resolve_shared_formulas(&mut self.cells)?;
         let needs_strings = self
-            .cells
+            .lane_cells
             .iter()
-            .any(|cell| cell.cell_type.as_deref() == Some("s"));
+            .any(|cell| cell.cell_type.as_deref() == Some("s"))
+            || self
+                .cells
+                .iter()
+                .any(|cell| cell.cell_type.as_deref() == Some("s"));
         let strings = if needs_strings { strings()? } else { None };
         let mut cells = Vec::new();
         cells
-            .try_reserve(self.cells.len())
+            .try_reserve(
+                self.lane_cells
+                    .len()
+                    .checked_add(self.cells.len())
+                    .ok_or_else(|| invalid("worksheet cell count overflows usize"))?,
+            )
             .map_err(|source| allocation("sparse worksheet cells", source))?;
         let declared_extent = self.declared_extent;
         let rows = self.rows;
         let columns = column::resolve(self.columns)?;
         let defaults = self.defaults;
         let merges = self.merges;
+        for cell in self.lane_cells {
+            cells.push(materialize(cell.into_raw(), strings)?);
+        }
         for cell in self.cells {
             cells.push(materialize(cell, strings)?);
         }
@@ -992,7 +1089,7 @@ impl<'c> Parser<'c> {
             mut value_metadata,
             mut cell_type,
         } = scan_cell_attributes(element, decoder)?;
-        self.start_cell_fields(row, reference.as_deref(), |field| {
+        let fields = self.cell_fields(row, reference.as_deref(), |field| {
             let attribute = match field {
                 CellField::Style => style.take(),
                 CellField::CellMetadata => cell_metadata.take(),
@@ -1000,18 +1097,39 @@ impl<'c> Parser<'c> {
                 CellField::Type => cell_type.take(),
             };
             decode_cell_field(attribute, decoder)
-        })
+        })?;
+        self.cell = Some(PendingCell {
+            row,
+            column: fields.column,
+            style: fields.style,
+            cell_metadata: fields.cell_metadata,
+            value_metadata: fields.value_metadata,
+            cell_type: fields.cell_type,
+            value: Cow::Borrowed(""),
+            value_bytes: 0,
+            saw_value: false,
+            formula: String::new(),
+            formula_characters: 0,
+            formula_kind: None,
+            inline: String::new(),
+            inline_bytes: 0,
+            saw_inline: false,
+            saw_inline_simple: false,
+            saw_inline_run: false,
+            run_has_text: false,
+        });
+        Ok(())
     }
 
-    /// Validate and open one cell from its decoded coordinate and a source of
+    /// Validate one opening cell from its decoded coordinate and a source of
     /// the remaining fields, which are decoded in their historical check
     /// order so every refusal keeps its precedence.
-    fn start_cell_fields<'v>(
+    fn cell_fields<'v>(
         &mut self,
         row: u32,
         reference: Option<&str>,
         mut field: impl FnMut(CellField) -> Result<Option<Cow<'v, str>>>,
-    ) -> Result<()> {
+    ) -> Result<CellFields<'v>> {
         let column = match reference {
             Some(reference) => {
                 let (reference_row, column) = parse_a1(reference)?;
@@ -1049,27 +1167,13 @@ impl<'c> Parser<'c> {
         if value_metadata.is_some_and(|index| !(1..=MAX_METADATA_INDEX).contains(&index)) {
             return Err(invalid("value metadata index is outside Office limits"));
         }
-        self.cell = Some(PendingCell {
-            row,
+        Ok(CellFields {
             column,
             style,
             cell_metadata,
             value_metadata,
-            cell_type: field(CellField::Type)?.map(Cow::into_owned),
-            value: Cow::Borrowed(""),
-            value_bytes: 0,
-            saw_value: false,
-            formula: String::new(),
-            formula_characters: 0,
-            formula_kind: None,
-            inline: String::new(),
-            inline_bytes: 0,
-            saw_inline: false,
-            saw_inline_simple: false,
-            saw_inline_run: false,
-            run_has_text: false,
-        });
-        Ok(())
+            cell_type: field(CellField::Type)?,
+        })
     }
 
     fn start_formula(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
@@ -1204,27 +1308,6 @@ impl<'c> Parser<'c> {
                 cell.inline.push_str(value);
             },
         }
-        Ok(())
-    }
-
-    /// Record the one character-data run of an admitted `<v>` element.
-    ///
-    /// This is [`Self::push_text`] for a value that is still empty, as every
-    /// lane value is, with the document slice borrowed instead of copied.
-    fn push_lane_value(&mut self, value: &'c str) -> Result<()> {
-        let cell = self
-            .cell
-            .as_mut()
-            .ok_or_else(|| invalid("worksheet cell text outside a cell"))?;
-        if !cell.value.is_empty() {
-            return self.push_text(TextTarget::Value, value);
-        }
-        cell.value_bytes = cell
-            .value_bytes
-            .checked_add(value.len())
-            .filter(|length| *length <= MAX_ENCODED_CELL_BYTES)
-            .ok_or_else(|| invalid("worksheet value text is too large"))?;
-        cell.value = Cow::Borrowed(value);
         Ok(())
     }
 

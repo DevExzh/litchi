@@ -789,6 +789,8 @@ pub(crate) mod route {
         Parse,
         Scan,
         Compact,
+        /// A commit verified a changed worksheet through the reduced readback.
+        Readback,
     }
 
     impl Pass {
@@ -797,13 +799,14 @@ pub(crate) mod route {
                 Self::Parse => 0,
                 Self::Scan => 1,
                 Self::Compact => 2,
+                Self::Readback => 3,
             }
         }
     }
 
     thread_local! {
         static DISABLED: Cell<bool> = const { Cell::new(false) };
-        static ADMITTED: Cell<[usize; 3]> = const { Cell::new([0; 3]) };
+        static ADMITTED: Cell<[usize; 4]> = const { Cell::new([0; 4]) };
     }
 
     /// Whether passes on this thread may take the lane.
@@ -837,7 +840,7 @@ pub(crate) mod route {
     }
 
     pub(crate) fn reset() {
-        ADMITTED.with(|admitted| admitted.set([0; 3]));
+        ADMITTED.with(|admitted| admitted.set([0; 4]));
     }
 }
 
