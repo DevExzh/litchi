@@ -1427,3 +1427,49 @@ fn provenance_writer_matches_the_ordinary_writer_on_random_cells_only_plans() {
     assert!(recorded > 1_000, "provenance recorded {recorded} times");
     assert!(refused > 100, "only {refused} plans were refused");
 }
+
+#[test]
+fn shared_formula_refusals_name_the_first_group_in_document_order() {
+    let source = format!(
+        r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1"><f t="shared" ref="A1:A2" si="7">B1</f><v>1</v></c><c r="C1"><f t="shared" ref="C1:C2" si="3">D1</f><v>2</v></c></row><row r="2"><c r="A2"><f t="shared" si="7"/><v>1</v></c><c r="C2"><f t="shared" si="3"/><v>2</v></c></row></sheetData></worksheet>"#
+    );
+    // Each group gets a shared action on its origin only, so both fail the
+    // complete-coverage rule; the refusal must name si=7, which comes first.
+    let plan = || {
+        BTreeMap::from([
+            (
+                Address::from_a1("A1").expect("A1"),
+                Action::set_shared_formula(
+                    7,
+                    "A1:A2",
+                    Some(crate::Formula::new("B1*2").expect("formula")),
+                ),
+            ),
+            (
+                Address::from_a1("C1").expect("C1"),
+                Action::set_shared_formula(
+                    3,
+                    "C1:C2",
+                    Some(crate::Formula::new("D1*2").expect("formula")),
+                ),
+            ),
+        ])
+    };
+    let first = rewrite(source.as_bytes(), "Sheet1", plan())
+        .expect_err("incomplete shared groups")
+        .to_string();
+    assert!(first.contains("si=7"), "{first}");
+    for _ in 0..32 {
+        let again = rewrite(source.as_bytes(), "Sheet1", plan())
+            .expect_err("incomplete shared groups")
+            .to_string();
+        assert_eq!(again, first);
+    }
+    let layout = super::codec::scan(source.as_bytes()).expect("scan");
+    let indexes = layout
+        .shared_formulas
+        .iter()
+        .map(|group| group.index)
+        .collect::<Vec<_>>();
+    assert_eq!(indexes, [7, 3]);
+}
