@@ -1,0 +1,10 @@
+host: AMD EPYC 9R45, 32 CPUs, 123 GiB RAM
+kernel: 7.0.0-1012-aws
+rustc (workspace pin, harness and gates): rustc 1.95.0 (59807616e 2026-04-14)
+rustc (probe and census, pinned explicitly with +1.95.0): rustc 1.95.0 (59807616e 2026-04-14)
+perf: perf version 7.0.14
+pinning: taskset -c 16 for every measured process
+base: ab29ac6291 (feat/office-format-completeness tip, includes 0745, not 0746)
+before leg: detached worktree at ab29ac6291 + cherry-picked harness commit (03cf32fbce = d663c504f4)
+after leg: perf/0748-cfb-overlay-fingerprint-reuse at d663c504f4
+shared host: other implementers built and measured concurrently (load average 3-8 during runs)

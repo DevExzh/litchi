@@ -1,0 +1,200 @@
+[
+ {
+  "fixture": "54016",
+  "operation": "number-generic",
+  "before": {
+   "allocations": 118272,
+   "allocated_bytes": 71167056,
+   "peak_live_bytes": 23289770,
+   "open_allocations": 51823,
+   "open_allocated_bytes": 26077467,
+   "open_peak_live_bytes": 17787131
+  },
+  "before_deterministic": true,
+  "after": {
+   "allocations": 118264,
+   "allocated_bytes": 63290464,
+   "peak_live_bytes": 23289770,
+   "open_allocations": 51823,
+   "open_allocated_bytes": 26077467,
+   "open_peak_live_bytes": 17787131
+  },
+  "after_deterministic": true
+ },
+ {
+  "fixture": "54016",
+  "operation": "string-generic",
+  "before": {
+   "allocations": 127898,
+   "allocated_bytes": 74276715,
+   "peak_live_bytes": 23269070,
+   "open_allocations": 51823,
+   "open_allocated_bytes": 26077467,
+   "open_peak_live_bytes": 17787131
+  },
+  "before_deterministic": true,
+  "after": {
+   "allocations": 127890,
+   "allocated_bytes": 66400123,
+   "peak_live_bytes": 23269070,
+   "open_allocations": 51823,
+   "open_allocated_bytes": 26077467,
+   "open_peak_live_bytes": 17787131
+  },
+  "after_deterministic": true
+ },
+ {
+  "fixture": "54016",
+  "operation": "number-source-backed",
+  "before": {
+   "allocations": 121659,
+   "allocated_bytes": 59091760,
+   "peak_live_bytes": 25628658,
+   "open_allocations": 51823,
+   "open_allocated_bytes": 26077467,
+   "open_peak_live_bytes": 17787131
+  },
+  "before_deterministic": true,
+  "after": {
+   "allocations": 121658,
+   "allocated_bytes": 58107184,
+   "peak_live_bytes": 25628658,
+   "open_allocations": 51823,
+   "open_allocated_bytes": 26077467,
+   "open_peak_live_bytes": 17787131
+  },
+  "after_deterministic": true
+ },
+ {
+  "fixture": "54016",
+  "operation": "number-plan",
+  "before": {
+   "allocations": 99957,
+   "allocated_bytes": 44560408,
+   "peak_live_bytes": 18540525,
+   "open_allocations": 51823,
+   "open_allocated_bytes": 26077467,
+   "open_peak_live_bytes": 17787131
+  },
+  "before_deterministic": true,
+  "after": {
+   "allocations": 99957,
+   "allocated_bytes": 44560408,
+   "peak_live_bytes": 18540525,
+   "open_allocations": 51823,
+   "open_allocated_bytes": 26077467,
+   "open_peak_live_bytes": 17787131
+  },
+  "after_deterministic": true
+ },
+ {
+  "fixture": "54016",
+  "operation": "open",
+  "before": {
+   "allocations": 51823,
+   "allocated_bytes": 26077467,
+   "peak_live_bytes": 17787131,
+   "open_allocations": 51823,
+   "open_allocated_bytes": 26077467,
+   "open_peak_live_bytes": 17787131
+  },
+  "before_deterministic": true,
+  "after": {
+   "allocations": 51823,
+   "allocated_bytes": 26077467,
+   "peak_live_bytes": 17787131,
+   "open_allocations": 51823,
+   "open_allocated_bytes": 26077467,
+   "open_peak_live_bytes": 17787131
+  },
+  "after_deterministic": true
+ },
+ {
+  "fixture": "xls-large",
+  "operation": "number-generic",
+  "before": {
+   "allocations": 4476,
+   "allocated_bytes": 12090171,
+   "peak_live_bytes": 3995094,
+   "open_allocations": 2081,
+   "open_allocated_bytes": 4676245,
+   "open_peak_live_bytes": 3513931
+  },
+  "before_deterministic": true,
+  "after": {
+   "allocations": 4468,
+   "allocated_bytes": 10779467,
+   "peak_live_bytes": 3995094,
+   "open_allocations": 2081,
+   "open_allocated_bytes": 4676245,
+   "open_peak_live_bytes": 3513931
+  },
+  "after_deterministic": true
+ },
+ {
+  "fixture": "xls-large",
+  "operation": "number-source-backed",
+  "before": {
+   "allocations": 4394,
+   "allocated_bytes": 10320166,
+   "peak_live_bytes": 4605289,
+   "open_allocations": 2081,
+   "open_allocated_bytes": 4676245,
+   "open_peak_live_bytes": 3513931
+  },
+  "before_deterministic": true,
+  "after": {
+   "allocations": 4393,
+   "allocated_bytes": 10156326,
+   "peak_live_bytes": 4605289,
+   "open_allocations": 2081,
+   "open_allocated_bytes": 4676245,
+   "open_peak_live_bytes": 3513931
+  },
+  "after_deterministic": true
+ },
+ {
+  "fixture": "xls-large",
+  "operation": "number-plan",
+  "before": {
+   "allocations": 4092,
+   "allocated_bytes": 7755807,
+   "peak_live_bytes": 3521479,
+   "open_allocations": 2081,
+   "open_allocated_bytes": 4676245,
+   "open_peak_live_bytes": 3513931
+  },
+  "before_deterministic": true,
+  "after": {
+   "allocations": 4092,
+   "allocated_bytes": 7755807,
+   "peak_live_bytes": 3521479,
+   "open_allocations": 2081,
+   "open_allocated_bytes": 4676245,
+   "open_peak_live_bytes": 3513931
+  },
+  "after_deterministic": true
+ },
+ {
+  "fixture": "xls-large",
+  "operation": "open",
+  "before": {
+   "allocations": 2081,
+   "allocated_bytes": 4676245,
+   "peak_live_bytes": 3513931,
+   "open_allocations": 2081,
+   "open_allocated_bytes": 4676245,
+   "open_peak_live_bytes": 3513931
+  },
+  "before_deterministic": true,
+  "after": {
+   "allocations": 2081,
+   "allocated_bytes": 4676245,
+   "peak_live_bytes": 3513931,
+   "open_allocations": 2081,
+   "open_allocated_bytes": 4676245,
+   "open_peak_live_bytes": 3513931
+  },
+  "after_deterministic": true
+ }
+]

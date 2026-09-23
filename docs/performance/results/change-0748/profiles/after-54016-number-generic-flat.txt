@@ -1,0 +1,30 @@
+    21.12%  [.] __memmove_avx512_unaligned_erms                                                                                                                       -      -            
+    12.25%  [.] sha2::sha256::x86_sha::compress                                                                                                                       -      -            
+     9.84%  [.] alloc::collections::btree::map::BTreeMap<K,V,A>::insert                                                                                               -      -            
+     6.84%  [.] litchi_xls::workbook::codec::semantic::worksheet::add_cell                                                                                            -      -            
+     4.72%  [.] litchi_xls::cell::Cell::from_record_with_formula_context                                                                                              -      -            
+     4.14%  [.] litchi_xls::workbook::codec::semantic::worksheet::<impl litchi_xls::workbook::model::Workbook<R>>::parse_worksheet_records_with_compatibility         -      -            
+     3.64%  [.] litchi_xls::row_block_index::codec::RowBlockIndexCollector::feed_record                                                                               -      -            
+     3.02%  [.] _int_malloc                                                                                                                                           -      -            
+     2.63%  [.] _int_free_merge_chunk                                                                                                                                 -      -            
+     2.10%  [.] <alloc::vec::Vec<T,A> as core::clone::Clone>::clone                                                                                                   -      -            
+     2.02%  [.] alloc::collections::btree::map::IntoIter<K,V,A>::dying_next                                                                                           -      -            
+     1.46%  [.] litchi_xls::records::SstCursor::read_characters                                                                                                       -      -            
+     1.37%  [.] unlink_chunk.isra.0                                                                                                                                   -      -            
+     1.34%  [.] <alloc::vec::Vec<T,A> as core::clone::Clone>::clone                                                                                                   -      -            
+     1.20%  [.] <alloc::string::String>::from_utf16                                                                                                                   -      -            
+     1.10%  [.] core::ptr::drop_in_place<litchi_core::sheet::types::CellValue>                                                                                        -      -            
+     0.96%  [.] cfree@GLIBC_2.2.5                                                                                                                                     -      -            
+     0.88%  [.] litchi_xls::consolidation::ConsolidationCollector::feed_record                                                                                        -      -            
+     0.88%  [.] core::ptr::drop_in_place<litchi_xls::cell::Cell>                                                                                                      -      -            
+     0.88%  [.] __memcmp_evex_movbe                                                                                                                                   -      -            
+     0.80%  [.] litchi_xls::vba::WorksheetVbaCollector::feed_record                                                                                                   -      -            
+     0.69%  [.] litchi_xls::layout::Collector::feed_record                                                                                                            -      -            
+     0.63%  [.] litchi_xls::scenario::ScenarioCollector::finish_pending                                                                                               -      -            
+     0.61%  [.] alloc::collections::btree::map::BTreeMap<K,V,A>::insert                                                                                               -      -            
+     0.61%  [.] _int_free_maybe_trim                                                                                                                                  -      -            
+     0.51%  [.] alloc::collections::btree::map::entry::Entry<K,V,A>::or_insert                                                                                        -      -            
+     0.49%  [k] 0xffffffff9e800ef0                                                                                                                                    -      -            
+     0.49%  [.] litchi_xls::calculation::package::WorksheetCalculationCollector::feed_record                                                                          -      -            
+     0.47%  [.] litchi_xls::pivot_table::package::PivotTableCollector::feed_record                                                                                    -      -            
+     0.47%  [.] litchi_xls::records::CellRecord::parse                                                                                                                -      -            

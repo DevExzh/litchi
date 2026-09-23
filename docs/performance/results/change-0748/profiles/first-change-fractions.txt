@@ -1,0 +1,8 @@
+number-generic: n=32 median 0.493 p25 0.202 p75 0.767
+  54016.xls first changed byte 318449 of 984576 (0.323)
+number-plan: n=27 median 0.500 p25 0.197 p75 0.770
+  54016.xls first changed byte 318449 of 984576 (0.323)
+number-source-backed: n=27 median 0.500 p25 0.197 p75 0.770
+  54016.xls first changed byte 318449 of 984576 (0.323)
+string-generic: n=39 median 0.351 p25 0.194 p75 0.669
+  54016.xls first changed byte 318029 of 984576 (0.323)
