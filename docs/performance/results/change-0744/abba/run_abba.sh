@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Change 0744 native ABBA timing: A = base 009d515bef harness, B = branch harness.
 # Every process is pinned to CPU 12; order per group is A1 B1 B2 A2 A3 B3 B4 A4.
+# The primary run used A = targets/0744-before (sha256 ac48ed6b...), built by the
+# after leg's exact command from an equal-length base worktree; see README.md.
 set -euo pipefail
-A=${A:-/home/zhuhe/code/litchi-worktrees/targets/base-009d515bef/release/litchi-perf-baseline}
+A=${A:-/home/zhuhe/code/litchi-worktrees/targets/0744-before/release/litchi-perf-baseline}
 B=${B:-/home/zhuhe/code/litchi-worktrees/targets/0744/release/litchi-perf-baseline}
 OUT=${OUT:-raw}
 CORE=${CORE:-12}

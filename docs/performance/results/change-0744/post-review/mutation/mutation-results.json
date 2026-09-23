@@ -1,0 +1,88 @@
+[
+ {
+  "mutation": "item1-compaction-entry-local-name-only",
+  "file": "raw/compact.rs",
+  "tests": [
+   "a_foreign_sheet_data_before_the_body_keeps_the_complete_readback",
+   "lane_compaction_admits_only_the_worksheet_body"
+  ],
+  "exit": 101,
+  "caught": true,
+  "lines": [
+   "test raw::compact::tests::lane_compaction_admits_only_the_worksheet_body ... FAILED",
+   "test workbook::edit::tests::lane::a_foreign_sheet_data_before_the_body_keeps_the_complete_readback ... FAILED",
+   "test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 1091 filtered out; finished in 0.39s"
+  ],
+  "compile_error": false
+ },
+ {
+  "mutation": "item2a-no-web-size-bound",
+  "file": "workbook/edit/semantic/transaction.rs",
+  "tests": [
+   "worksheets_above_the_web_reader_limit_never_take_the_reduced_readback"
+  ],
+  "exit": 101,
+  "caught": true,
+  "lines": [
+   "test workbook::edit::tests::lane::worksheets_above_the_web_reader_limit_never_take_the_reduced_readback ... FAILED",
+   "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1092 filtered out; finished in 0.61s"
+  ],
+  "compile_error": false
+ },
+ {
+  "mutation": "item2b-no-collision-check",
+  "file": "workbook/edit/semantic/transaction.rs",
+  "tests": [
+   "a_changed_cell_reemitted_into_an_omitted_run_keeps_the_complete_readback"
+  ],
+  "exit": 101,
+  "caught": true,
+  "lines": [
+   "test workbook::edit::tests::lane::a_changed_cell_reemitted_into_an_omitted_run_keeps_the_complete_readback ... FAILED",
+   "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1092 filtered out; finished in 0.48s"
+  ],
+  "compile_error": false
+ },
+ {
+  "mutation": "item3-no-bom-decline",
+  "file": "raw/worksheet/lane.rs",
+  "tests": [
+   "byte_order_marked_parts_always_decline"
+  ],
+  "exit": 101,
+  "caught": true,
+  "lines": [
+   "test raw::worksheet::lane::tests::byte_order_marked_parts_always_decline ... FAILED",
+   "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1092 filtered out; finished in 0.00s"
+  ],
+  "compile_error": false
+ },
+ {
+  "mutation": "item3-no-name-comparison",
+  "file": "raw/worksheet/lane.rs",
+  "tests": [
+   "entries_require_the_named_tag_at_the_reader_positions"
+  ],
+  "exit": 101,
+  "caught": true,
+  "lines": [
+   "test raw::worksheet::lane::tests::entries_require_the_named_tag_at_the_reader_positions ... FAILED",
+   "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1092 filtered out; finished in 0.00s"
+  ],
+  "compile_error": false
+ },
+ {
+  "mutation": "item6-hash-order",
+  "file": "raw/worksheet/edit/codec/snapshot/scan.rs",
+  "tests": [
+   "shared_formula_refusals_name_the_first_group_in_document_order"
+  ],
+  "exit": 101,
+  "caught": true,
+  "lines": [
+   "test raw::worksheet::edit::tests::shared_formula_refusals_name_the_first_group_in_document_order ... FAILED",
+   "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1092 filtered out; finished in 0.00s"
+  ],
+  "compile_error": false
+ }
+]
