@@ -46,7 +46,9 @@ pub use bom::{
     BomKind, UTF8_BOM, UTF16_BE_BOM, UTF16_LE_BOM, UTF32_BE_BOM, UTF32_LE_BOM, strip_bom, write_bom,
 };
 pub use bounded::{BoundedU32, BoundsError};
-pub use budget::{Budget, Limits, Profile, Reservation, Resource, ResourceLimit};
+pub use budget::{
+    Budget, Limits, Profile, Reservation, Resource, ResourceLimit, ScopedReservation,
+};
 pub use detection::FileFormat;
 pub use error::{Error, Result};
 pub use execution::{

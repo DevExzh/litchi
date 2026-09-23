@@ -5,10 +5,7 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
-use smallvec::SmallVec;
 use thiserror::Error;
-
-type ChargedNodes = SmallVec<[Arc<Node>; 4]>;
 
 const RESOURCE_COUNT: usize = 9;
 
@@ -214,9 +211,39 @@ impl Budget {
     /// Returns `ResourceLimit` if charging `amount` would exceed the limit of
     /// this budget or any ancestor.
     pub fn reserve(&self, resource: Resource, amount: u64) -> Result<Reservation, ResourceLimit> {
-        let nodes = self.charge(resource, amount)?;
+        charge_chain(&self.node, resource, amount)?;
+        // One handle to the charged node is enough: it keeps every ancestor
+        // alive through its parent links, and the release walks that same
+        // immutable chain.
         Ok(Reservation {
-            nodes,
+            node: Arc::clone(&self.node),
+            resource,
+            amount,
+        })
+    }
+
+    /// Reserves outstanding capacity for as long as the returned token borrows
+    /// this budget.
+    ///
+    /// The charge, its refusal, its release on drop and
+    /// [`ScopedReservation::commit`] are exactly those of [`Self::reserve`]
+    /// and [`Reservation::commit`]. The token borrows this handle instead of
+    /// sharing it, so neither making nor dropping it touches a reference
+    /// count; prefer it when the reservation does not outlive the operation
+    /// that holds the budget, such as one sequential write.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ResourceLimit` if charging `amount` would exceed the limit of
+    /// this budget or any ancestor.
+    pub fn reserve_scoped(
+        &self,
+        resource: Resource,
+        amount: u64,
+    ) -> Result<ScopedReservation<'_>, ResourceLimit> {
+        charge_chain(&self.node, resource, amount)?;
+        Ok(ScopedReservation {
+            node: &self.node,
             resource,
             amount,
         })
@@ -229,29 +256,7 @@ impl Budget {
     /// Returns `ResourceLimit` if charging `amount` would exceed the limit of
     /// this budget or any ancestor.
     pub fn consume(&self, resource: Resource, amount: u64) -> Result<(), ResourceLimit> {
-        let mut charged = 0usize;
-        let mut current = Some(self.node.as_ref());
-        while let Some(node) = current {
-            let counter = &node.used[resource.index()];
-            let limit = node.limits.get(resource);
-            let result = counter.fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
-                used.checked_add(amount).filter(|next| *next <= limit)
-            });
-            match result {
-                Ok(_) => charged = charged.saturating_add(1),
-                Err(used) => {
-                    release_ancestor_prefix(self.node.as_ref(), charged, resource, amount);
-                    return Err(ResourceLimit {
-                        resource,
-                        observed: used.saturating_add(amount),
-                        limit,
-                        scope: node.scope.clone(),
-                    });
-                },
-            }
-            current = node.parent.as_deref();
-        }
-        Ok(())
+        charge_chain(&self.node, resource, amount)
     }
 
     /// Current local usage for one resource.
@@ -265,39 +270,48 @@ impl Budget {
     pub fn limit(&self, resource: Resource) -> u64 {
         self.node.limits.get(resource)
     }
+}
 
-    fn charge(&self, resource: Resource, amount: u64) -> Result<ChargedNodes, ResourceLimit> {
-        let mut charged = ChargedNodes::new();
-        let mut current = Some(self.node.clone());
-        while let Some(node) = current {
-            let counter = &node.used[resource.index()];
-            let limit = node.limits.get(resource);
-            let result = counter.fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
-                used.checked_add(amount).filter(|next| *next <= limit)
-            });
-            match result {
-                Ok(_) => charged.push(node.clone()),
-                Err(used) => {
-                    release_nodes(&charged, resource, amount);
-                    return Err(ResourceLimit {
-                        resource,
-                        observed: used.saturating_add(amount),
-                        limit,
-                        scope: node.scope.clone(),
-                    });
-                },
-            }
-            let parent = node.parent.clone();
-            current = parent;
+/// Charges `amount` against `leaf` and then each ancestor in turn.
+///
+/// Every level is one atomic check-and-add, so no level is ever observed above
+/// its limit. When a level refuses, the levels already charged are released
+/// before the refusal is returned, leaving the hierarchy as it was found. The
+/// walk borrows the immutable parent chain; it takes no reference counts.
+fn charge_chain(leaf: &Node, resource: Resource, amount: u64) -> Result<(), ResourceLimit> {
+    let mut charged = 0usize;
+    let mut current = Some(leaf);
+    while let Some(node) = current {
+        let counter = &node.used[resource.index()];
+        let limit = node.limits.get(resource);
+        let result = counter.fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
+            used.checked_add(amount).filter(|next| *next <= limit)
+        });
+        match result {
+            Ok(_) => charged = charged.saturating_add(1),
+            Err(used) => {
+                release_ancestor_prefix(leaf, charged, resource, amount);
+                return Err(ResourceLimit {
+                    resource,
+                    observed: used.saturating_add(amount),
+                    limit,
+                    scope: node.scope.clone(),
+                });
+            },
         }
-        Ok(charged)
+        current = node.parent.as_deref();
     }
+    Ok(())
 }
 
 /// RAII token for outstanding budget usage.
+///
+/// The token holds one handle to the budget node it charged. That node owns
+/// its ancestors through its parent links, so releasing walks the same chain
+/// the charge walked, whatever the depth, without per-level handles.
 #[derive(Debug)]
 pub struct Reservation {
-    nodes: ChargedNodes,
+    node: Arc<Node>,
     resource: Resource,
     amount: u64,
 }
@@ -329,9 +343,10 @@ impl Reservation {
             return false;
         }
         if amount < self.amount {
-            release_nodes(&self.nodes, self.resource, self.amount - amount);
+            release_chain(&self.node, self.resource, self.amount - amount);
         }
-        self.nodes.clear();
+        // Nothing remains outstanding: the committed amount stays charged as
+        // cumulative usage and `Drop` has nothing left to release.
         self.amount = 0;
         true
     }
@@ -339,7 +354,60 @@ impl Reservation {
 
 impl Drop for Reservation {
     fn drop(&mut self) {
-        release_nodes(&self.nodes, self.resource, self.amount);
+        if self.amount != 0 {
+            release_chain(&self.node, self.resource, self.amount);
+        }
+    }
+}
+
+/// RAII token for outstanding budget usage that borrows its budget.
+///
+/// Made by [`Budget::reserve_scoped`]. It charges, commits and releases
+/// exactly as a [`Reservation`] does; it differs only in borrowing the budget
+/// handle for its lifetime instead of holding a shared handle of its own.
+#[derive(Debug)]
+pub struct ScopedReservation<'budget> {
+    node: &'budget Node,
+    resource: Resource,
+    amount: u64,
+}
+
+impl ScopedReservation<'_> {
+    /// Reserved amount.
+    #[must_use]
+    pub const fn amount(&self) -> u64 {
+        self.amount
+    }
+
+    /// Reserved resource kind.
+    #[must_use]
+    pub const fn resource(&self) -> Resource {
+        self.resource
+    }
+
+    /// Commits at most the reserved amount as cumulative usage.
+    ///
+    /// Behaves exactly as [`Reservation::commit`]: the unused remainder is
+    /// released, and an `amount` larger than the reservation returns `false`
+    /// and releases the whole reservation without retaining any usage.
+    #[must_use = "check whether the requested amount was committed"]
+    pub fn commit(mut self, amount: u64) -> bool {
+        if amount > self.amount {
+            return false;
+        }
+        if amount < self.amount {
+            release_chain(self.node, self.resource, self.amount - amount);
+        }
+        self.amount = 0;
+        true
+    }
+}
+
+impl Drop for ScopedReservation<'_> {
+    fn drop(&mut self) {
+        if self.amount != 0 {
+            release_chain(self.node, self.resource, self.amount);
+        }
     }
 }
 
@@ -353,9 +421,12 @@ pub struct ResourceLimit {
     pub scope: Arc<str>,
 }
 
-fn release_nodes(nodes: &[Arc<Node>], resource: Resource, amount: u64) {
-    for node in nodes {
+/// Releases `amount` from `leaf` and every ancestor.
+fn release_chain(leaf: &Node, resource: Resource, amount: u64) {
+    let mut current = Some(leaf);
+    while let Some(node) = current {
         release_node(node, resource, amount);
+        current = node.parent.as_deref();
     }
 }
 
@@ -460,23 +531,44 @@ mod tests {
     }
 
     #[test]
-    fn common_hierarchies_keep_reservation_nodes_inline() {
+    fn a_reservation_holds_one_handle_whatever_the_depth() {
         let root = Budget::root("root", limits(100));
         let child = root.child("child", limits(100));
         let grandchild = child.child("grandchild", limits(100));
         let leaf = grandchild.child("leaf", limits(100));
+        let handles_before = Arc::strong_count(&leaf.node);
+        let ancestor_handles_before = Arc::strong_count(&root.node);
         let reservation = leaf
             .reserve(Resource::Memory, 1)
             .expect("four-level reservation");
 
-        assert_eq!(reservation.nodes.len(), 4);
-        assert!(!reservation.nodes.spilled());
+        // The charged node is shared once; no ancestor gains a handle.
+        assert_eq!(Arc::strong_count(&leaf.node), handles_before + 1);
+        assert_eq!(Arc::strong_count(&root.node), ancestor_handles_before);
+        for budget in [&root, &child, &grandchild, &leaf] {
+            assert_eq!(budget.used(Resource::Memory), 1);
+        }
         drop(reservation);
-        assert_eq!(root.used(Resource::Memory), 0);
+        assert_eq!(Arc::strong_count(&leaf.node), handles_before);
+        for budget in [&root, &child, &grandchild, &leaf] {
+            assert_eq!(budget.used(Resource::Memory), 0);
+        }
     }
 
     #[test]
-    fn deep_hierarchies_spill_and_still_roll_back_exactly() {
+    fn a_reservation_outlives_the_budget_handles_that_made_it() {
+        let root = Budget::root("root", limits(100));
+        let leaf = root.child("leaf", limits(100));
+        let reservation = leaf.reserve(Resource::Memory, 7).expect("reserve");
+        drop(leaf);
+        assert_eq!(root.used(Resource::Memory), 7);
+        // The reservation still releases the ancestor it charged.
+        assert!(reservation.commit(3));
+        assert_eq!(root.used(Resource::Memory), 3);
+    }
+
+    #[test]
+    fn deep_hierarchies_roll_back_exactly() {
         let root = Budget::root("root", limits(1));
         let first = root.child("first", limits(100));
         let second = first.child("second", limits(100));
@@ -487,8 +579,9 @@ mod tests {
         let reservation = leaf
             .reserve(Resource::Memory, 1)
             .expect("six-level reservation");
-        assert_eq!(reservation.nodes.len(), 6);
-        assert!(reservation.nodes.spilled());
+        for budget in [&root, &first, &second, &third, &fourth, &leaf] {
+            assert_eq!(budget.used(Resource::Memory), 1);
+        }
         assert!(reservation.commit(1));
 
         let error = leaf
@@ -505,6 +598,108 @@ mod tests {
         leaf.consume(Resource::Work, 0)
             .expect("zero consumption must preserve the hierarchy");
         assert_eq!(root.used(Resource::Work), 0);
+    }
+
+    fn three_levels(tight: u64) -> [Budget; 3] {
+        // The middle level is the tightest; the leaf and the root are looser.
+        let root = Budget::root("root", limits(20));
+        let middle = root.child("middle", limits(tight));
+        let leaf = middle.child("leaf", limits(15));
+        [root, middle, leaf]
+    }
+
+    #[test]
+    fn limits_refuse_at_exactly_one_over_at_the_innermost_refusing_level() {
+        for (charge, refused) in [(8, false), (9, false), (10, true)] {
+            let consumed_levels = three_levels(9);
+            let reserved_levels = three_levels(9);
+            let consumed = consumed_levels[2].consume(Resource::Memory, charge);
+            let reserved = reserved_levels[2].reserve(Resource::Memory, charge);
+            if refused {
+                for error in [
+                    consumed.expect_err("consume one over"),
+                    reserved.expect_err("reserve one over"),
+                ] {
+                    assert_eq!(error.resource, Resource::Memory);
+                    assert_eq!(error.observed, charge);
+                    assert_eq!(error.limit, 9);
+                    assert_eq!(error.scope.as_ref(), "middle");
+                }
+                for budget in consumed_levels.iter().chain(&reserved_levels) {
+                    assert_eq!(budget.used(Resource::Memory), 0);
+                }
+            } else {
+                consumed.expect("consume within limit");
+                assert!(reserved.expect("reserve within limit").commit(charge));
+                for budget in consumed_levels.iter().chain(&reserved_levels) {
+                    assert_eq!(budget.used(Resource::Memory), charge);
+                }
+                // The next unit is refused exactly when the tight level is full.
+                for levels in [&consumed_levels, &reserved_levels] {
+                    let next = levels[2].consume(Resource::Memory, 1);
+                    assert_eq!(next.is_err(), charge == 9);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn scoped_reservations_charge_commit_and_release_exactly_as_owned_ones() {
+        for (charge, commit) in [(8, 8), (9, 9), (9, 4), (9, 0), (9, 10), (10, 10)] {
+            let owned_levels = three_levels(9);
+            let scoped_levels = three_levels(9);
+            let owned = owned_levels[2].reserve(Resource::Memory, charge);
+            let scoped = scoped_levels[2].reserve_scoped(Resource::Memory, charge);
+            match (owned, scoped) {
+                (Ok(owned), Ok(scoped)) => {
+                    assert_eq!(
+                        (owned.amount(), owned.resource()),
+                        (charge, Resource::Memory)
+                    );
+                    assert_eq!(
+                        (scoped.amount(), scoped.resource()),
+                        (charge, Resource::Memory)
+                    );
+                    for (owned, scoped) in owned_levels.iter().zip(&scoped_levels) {
+                        assert_eq!(owned.used(Resource::Memory), scoped.used(Resource::Memory));
+                    }
+                    assert_eq!(owned.commit(commit), scoped.commit(commit));
+                },
+                (Err(owned), Err(scoped)) => assert_eq!(owned, scoped),
+                (owned, scoped) => panic!("reserve {owned:?} but reserve_scoped {scoped:?}"),
+            }
+            for (owned, scoped) in owned_levels.iter().zip(&scoped_levels) {
+                assert_eq!(owned.used(Resource::Memory), scoped.used(Resource::Memory));
+            }
+        }
+
+        // Dropping an uncommitted scoped reservation releases every level.
+        let [root, middle, leaf] = three_levels(9);
+        let scoped = leaf.reserve_scoped(Resource::Memory, 6).expect("reserve");
+        assert_eq!(root.used(Resource::Memory), 6);
+        assert!(leaf.reserve_scoped(Resource::Memory, 4).is_err());
+        drop(scoped);
+        for budget in [&root, &middle, &leaf] {
+            assert_eq!(budget.used(Resource::Memory), 0);
+        }
+    }
+
+    #[test]
+    fn partial_and_zero_commits_release_every_level() {
+        let root = Budget::root("root", limits(100));
+        let middle = root.child("middle", limits(100));
+        let leaf = middle.child("leaf", limits(100));
+        let reservation = leaf.reserve(Resource::Memory, 10).expect("reserve");
+        assert!(reservation.commit(4));
+        let empty = leaf.reserve(Resource::Memory, 10).expect("reserve");
+        assert!(empty.commit(0));
+        let zero = leaf.reserve(Resource::Memory, 0).expect("zero reserve");
+        drop(zero);
+        let refused = leaf.reserve(Resource::Memory, 10).expect("reserve");
+        assert!(!refused.commit(11));
+        for budget in [&root, &middle, &leaf] {
+            assert_eq!(budget.used(Resource::Memory), 4);
+        }
     }
 
     #[test]
