@@ -1,0 +1,16 @@
+[package]
+name = "probe0754"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-docx = { path = "<CHECKOUT>/crates/litchi-docx" }
+litchi-core = { path = "<CHECKOUT>/crates/litchi-core" }
+litchi-pptx = { path = "<CHECKOUT>/crates/litchi-pptx" }
+sha2 = "0.11"
+
+[profile.release]
+debug = 1
+
+[workspace]

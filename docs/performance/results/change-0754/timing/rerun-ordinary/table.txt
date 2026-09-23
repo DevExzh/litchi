@@ -1,0 +1,2 @@
+label                shape        A p50 ms  B p50 ms   ratio            95% CI    A p95    B p95 proc instr  proc cyc digest
+ordinary_lifecycle   medium         5.7220    5.7105  0.9995 [0.9913, 1.0009]   5.8282   5.8077     0.9971    0.9944 same

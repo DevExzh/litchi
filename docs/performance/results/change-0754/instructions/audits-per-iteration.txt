@@ -1,0 +1,7 @@
+leg    entry point                               calls/iter         Ir/iter
+before verify_source                                    4.0     100,710,194
+before verify_with_policy                               4.0     100,710,166
+after  VerifiedSource::verify_replacement               1.0      52,260,028
+after  verify_source                                    2.0          56,236
+after  verify_source_replacement                        1.0      52,259,986
+after  verify_with_policy                               2.0          56,222

@@ -1,0 +1,11 @@
+[
+  {
+    "case": "ordinary_lifecycle",
+    "round": 3,
+    "pair": "4-3",
+    "metric": "p95",
+    "before_ms": 5.9236,
+    "after_ms": 7.4749,
+    "change_pct": 26.19
+  }
+]
