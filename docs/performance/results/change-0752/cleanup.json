@@ -59,5 +59,12 @@
     "/home/zhuhe/code/litchi-worktrees/0752-streaming-writer-small-write-batching (worktree) and branch perf/0752-streaming-writer-small-write-batching",
     "the coordinator's shared read-only base checkout, prebuilt base binary and profile-r2 scratch, untouched"
   ],
-  "not_created": "TMPDIR pointed into scratch/0752; no build, measurement or evidence artifact was written to /tmp or to the main checkout, apart from the session tool's own command-output capture and the git metadata of the two detached worktrees, which their removal prunes"
+  "not_created": "TMPDIR pointed into scratch/0752; no build, measurement or evidence artifact was written to /tmp or to the main checkout, apart from the session tool's own command-output capture and the git metadata of the two detached worktrees, which their removal prunes",
+  "verified_after_removal": {
+    "targets/0752, targets/0752-before, targets/0752-layout, targets/0752-probe, targets/0752-probe-base, targets/0752-probe-after, targets/0752-exp": "absent",
+    "0752-before-src and 0752-layout-src": "absent and not listed by git worktree list (after git worktree prune)",
+    "scratch/0752": "0 entries",
+    "git worktree list": "only the branch worktree 0752-streaming-writer-small-write-batching remains for this record"
+  },
+  "order": "record and packet committed (d21042022d) before any of the removals above; this verification committed afterwards"
 }
