@@ -52,19 +52,24 @@ impl<'a> SharedStringTable<'a> {
             total: 0,
             cell_indices: Vec::with_capacity(worksheets.len()),
         };
-        // One worksheet's string cells at a time, reused across worksheets.
-        let mut string_cells: Vec<((u32, u16), &'a str)> = Vec::new();
+        // One worksheet's string cells at a time, reused across worksheets,
+        // each keyed by `row << 16 | column`: a column is below 2^16, so the
+        // packed keys order exactly as `(row, column)` pairs do, and one
+        // integer comparison orders two cells.
+        let mut string_cells: Vec<(u64, &'a str)> = Vec::new();
         for worksheet in worksheets {
             string_cells.clear();
-            string_cells.extend(worksheet.cells.iter().filter_map(
-                |(key, cell)| match &cell.value {
-                    CellValue::String(text) => Some((*key, text.as_str())),
+            string_cells.extend(worksheet.cells.iter().filter_map(|(&(row, column), cell)| {
+                match &cell.value {
+                    CellValue::String(text) => {
+                        Some(((u64::from(row) << 16) | u64::from(column), text.as_str()))
+                    },
                     _ => None,
-                },
-            ));
+                }
+            }));
             // Keys are distinct, so an unstable sort gives the one row-major
             // order whatever order the cell map iterated in.
-            string_cells.sort_unstable_by_key(|(key, _)| *key);
+            string_cells.sort_unstable_by_key(|&(key, _)| key);
 
             let mut sheet_indices = Vec::with_capacity(string_cells.len());
             for &(_, text) in &string_cells {
