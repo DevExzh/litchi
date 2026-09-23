@@ -1,0 +1,23 @@
+HEAD 6ac6b92d8aeca3c7689fb183b10dcf46d6351377
+fmt	exit=0	cargo fmt --all --check
+check-xlsx	exit=0	cargo check -p litchi-xlsx --all-targets --locked --offline
+check-xlsx-all-features	exit=0	cargo check -p litchi-xlsx --all-features --all-targets --locked --offline
+check-facade	exit=0	cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked --offline
+clippy-lib	exit=0	cargo clippy -p litchi-xlsx --lib --no-deps --locked --offline -- -D warnings
+clippy-all-targets	exit=0	cargo clippy -p litchi-xlsx --all-targets --no-deps --locked --offline -- -D warnings
+test-xlsx	exit=0	cargo test -p litchi-xlsx --locked --offline
+test-xlsx-all-features	exit=0	cargo test -p litchi-xlsx --all-features --locked --offline
+test-facade	exit=0	cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+doc	exit=0	env RUSTDOCFLAGS=-D warnings cargo doc -p litchi-xlsx --no-deps --locked --offline
+crate-boundaries	exit=0	python3 tools/check_crate_boundaries.py
+non-iwork	exit=0	python3 tools/non_iwork_gate.py verify
+perf-claims	exit=0	python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+done
+
+# environment: CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0744 CARGO_BUILD_JOBS=6, rust toolchain 1.95.0 (rust-toolchain.toml)
+# test-xlsx: 1401 passed, 0 failed, 0 ignored across 61 test binaries
+# test-xlsx-all-features: 1420 passed, 0 failed, 0 ignored across 61 test binaries
+# test-facade: 382 passed, 0 failed, 7 ignored across 29 test binaries
+# crate-boundaries: crate boundaries valid for 64 workspace packages and 241 internal dependency declarations (11 explicit debt items) ordered migration debt:
+# non-iwork: verified_bulk_tree_roots=45 verified_facade_safe_trees=35 verified_facade_combined_tree=1
+# perf-claims: OK: 10 performance claims validated (structural)

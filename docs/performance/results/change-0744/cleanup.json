@@ -1,0 +1,23 @@
+{
+  "change": "0744",
+  "recorded_before_removal": {
+    "binary_digests": "binaries.sha256 and profile/binaries.sha256",
+    "evidence_copied": [
+      "abba/raw", "abba/confirm", "abba/prelim-prebuilt-base", "alloc/raw",
+      "profile summaries", "output-identity digests and probe source", "gates.txt"
+    ]
+  },
+  "removed": [
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0744", "size": "68G", "what": "after-leg release, allocator, profiling (debuginfo and frame-pointer) and test builds"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0744-before", "size": "4.0G", "what": "before-leg release, allocator and frame-pointer profiling builds"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0744-probe-base", "size": "353M", "what": "output-identity probe build against the base litchi-xlsx"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0744-probe-after", "size": "354M", "what": "output-identity probe build against the branch litchi-xlsx"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp", "size": "9.8G", "what": "detached base worktree with the branch worktree's path length, removed with git worktree remove --force"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/scratch/0744/*", "size": "1.3G", "what": "scratch: perf.data, callgrind outputs, a debuginfo binary copy, probe outputs and corpus copies, build and test logs, analysis working copies"}
+  ],
+  "kept": [
+    {"path": "/home/zhuhe/code/litchi-worktrees/0744-xlsx-eager-workbook-cell-path", "what": "branch worktree (perf/0744-xlsx-eager-workbook-cell-path)"}
+  ],
+  "not_used": ["/tmp (no files written there by this change)"],
+  "prebuilt_base_binary": "left untouched: /home/zhuhe/code/litchi-worktrees/targets/base-009d515bef is shared"
+}

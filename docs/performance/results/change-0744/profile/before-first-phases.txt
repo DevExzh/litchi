@@ -1,0 +1,67 @@
+total samples 16906, inside root 12614
+other                            7377  58.48%
+namespaces                       2277  18.05%
+resolve                          1354  10.73%
+reader                           1069   8.47%
+materialize                       325   2.58%
+from_unsorted                     212   1.68%
+
+== other top leaves
+     2136  16.93%  litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+      734   5.82%  __memmove_avx512_unaligned_erms
+      730   5.79%  litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+      724   5.74%  litchi_xlsx::raw::worksheet::codec::scan_cell_attributes
+      405   3.21%  litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::finish
+      362   2.87%  quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+      352   2.79%  [unknown]
+      287   2.28%  litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::transition
+      173   1.37%  quick_xml::encoding::Decoder::decode_cow
+      171   1.36%  quick_xml::events::attributes::IterState::check_for_duplicates
+      144   1.14%  litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+      112   0.89%  alloc::raw_vec::RawVec<T,A>::grow_one
+
+== namespaces top leaves
+     2183  17.31%  quick_xml::reader::ns_reader::NsReader<R>::process_event
+       57   0.45%  [unknown]
+       18   0.14%  quick_xml::name::NamespaceResolver::push
+       18   0.14%  quick_xml::events::attributes::IterState::next
+        1   0.01%  quick_xml::events::attributes::IterState::check_for_duplicates
+
+== resolve top leaves
+     1307  10.36%  quick_xml::name::NamespaceResolver::resolve_event
+       37   0.29%  [unknown]
+        6   0.05%  quick_xml::name::NamespaceResolver::resolve_prefix
+        3   0.02%  memchr::arch::x86_64::avx2::memchr::One::find_raw
+        1   0.01%  memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+
+== reader top leaves
+      326   2.58%  quick_xml::reader::Reader<R>::read_event_impl
+      136   1.08%  quick_xml::reader::state::ReaderState::emit_start
+       98   0.78%  memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+       91   0.72%  memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+       79   0.63%  __memcmp_evex_movbe
+       76   0.60%  quick_xml::reader::state::ReaderState::emit_end
+       75   0.59%  memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+       55   0.44%  memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+       55   0.44%  [unknown]
+       33   0.26%  __memmove_avx512_unaligned_erms
+       27   0.21%  memchr::arch::x86_64::avx2::memchr::Two::find_raw
+       18   0.14%  memchr::arch::x86_64::avx2::memchr::Three::find_raw
+
+== materialize top leaves
+      228   1.81%  litchi_xlsx::raw::worksheet::semantic::materialize
+       21   0.17%  <f64 as core::str::traits::FromStr>::from_str
+       20   0.16%  [unknown]
+       18   0.14%  core::ptr::drop_in_place<litchi_xlsx::cell::Cell>
+       12   0.10%  litchi_xlsx::cell::Number::new
+        9   0.07%  litchi_xlsx::raw::worksheet::semantic::parse_value
+        8   0.06%  core::num::dec2flt::parse::parse_number
+        7   0.06%  litchi_xlsx::cell::Number::validate_lexical
+        1   0.01%  malloc
+        1   0.01%  core::str::<impl str>::trim_matches
+
+== from_unsorted top leaves
+      111   0.88%  litchi_xlsx::cell::Store::from_unsorted
+       87   0.69%  core::slice::sort::unstable::ipnsort
+       12   0.10%  [unknown]
+        2   0.02%  malloc

@@ -1,0 +1,134 @@
+total samples 16948, inside root 8459
+deflate                          5075  60.00%
+store_parse                      1079  12.76%
+audit                            1067  12.61%
+rewrite_scan                      960  11.35%
+compact                           146   1.73%
+rewrite_write                      53   0.63%
+preserve_copy                      27   0.32%
+commit_other                       22   0.26%
+verify_parse                       20   0.24%
+write_other                         5   0.06%
+reduced_readback                    3   0.04%
+other                               2   0.02%
+
+== deflate top leaves
+     4178  49.39%  zlib_rs::deflate::longest_match::longest_match
+      503   5.95%  zlib_rs::deflate::algorithm::medium::deflate_medium
+      239   2.83%  [unknown]
+       48   0.57%  zlib_rs::deflate::compare256::avx2::compare256
+       45   0.53%  zlib_rs::deflate::flush_block_only
+       32   0.38%  zlib_rs::deflate::compare256::compare256_slice
+       12   0.14%  zlib_rs::deflate::slide_hash::avx2::slide_hash_chain
+       11   0.13%  __memmove_avx512_unaligned_erms
+        4   0.05%  zlib_rs::deflate::BitWriter::send_bits_overflow
+        2   0.02%  zlib_rs::deflate::BitWriter::send_tree
+        1   0.01%  __memset_avx512_unaligned_erms
+
+== store_parse top leaves
+      329   3.89%  litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::lane_event
+      117   1.38%  litchi_xlsx::raw::worksheet::lane::walk
+      102   1.21%  litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+      101   1.19%  litchi_xlsx::raw::worksheet::semantic::materialize
+       97   1.15%  litchi_xlsx::raw::worksheet::lane::recognize
+       36   0.43%  litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::close_lane_cell
+       36   0.43%  [unknown]
+       35   0.41%  litchi_xlsx::raw::worksheet::lane::start_tag
+       33   0.39%  litchi_xlsx::cell::Store::from_unsorted
+       32   0.38%  __memmove_avx512_unaligned_erms
+       30   0.35%  litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::open_lane_cell
+       18   0.21%  litchi_xlsx::raw::worksheet::validation::parse_a1
+
+== audit top leaves
+      727   8.59%  xml_minifier::audit::verify_with_policy
+       51   0.60%  quick_xml::reader::Reader<R>::read_event_impl
+       46   0.54%  [unknown]
+       44   0.52%  memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+       29   0.34%  quick_xml::events::attributes::IterState::next
+       24   0.28%  quick_xml::reader::state::ReaderState::emit_start
+       20   0.24%  xml_minifier::audit::inspect_attributes
+       17   0.20%  memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+       13   0.15%  memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+       12   0.14%  memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+       12   0.14%  quick_xml::events::attributes::IterState::check_for_duplicates
+       11   0.13%  quick_xml::reader::state::ReaderState::emit_end
+
+== rewrite_scan top leaves
+      465   5.50%  litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::lane_event
+      192   2.27%  litchi_xlsx::raw::worksheet::lane::walk
+       93   1.10%  litchi_xlsx::raw::worksheet::lane::recognize
+       44   0.52%  [unknown]
+       39   0.46%  litchi_xlsx::raw::worksheet::validation::parse_a1
+       29   0.34%  litchi_xlsx::raw::worksheet::lane::start_tag
+       24   0.28%  litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::lane_cell
+       18   0.21%  memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+       12   0.14%  core::str::converts::from_utf8
+        8   0.09%  __memcmp_evex_movbe
+        6   0.07%  memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+        6   0.07%  _int_malloc
+
+== compact top leaves
+       99   1.17%  litchi_xlsx::raw::worksheet::lane::recognize
+       25   0.30%  litchi_xlsx::raw::worksheet::lane::start_tag
+        8   0.09%  __memcmp_evex_movbe
+        6   0.07%  [unknown]
+        4   0.05%  memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+        2   0.02%  memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+        2   0.02%  litchi_xlsx::raw::compact::AdmittedBody::value_text_is_utf8
+
+== rewrite_write top leaves
+       20   0.24%  litchi_xlsx::raw::worksheet::edit::validation::expanded_dimension
+       13   0.15%  __memmove_avx512_unaligned_erms
+        6   0.07%  core::ptr::drop_in_place<litchi_xlsx::raw::worksheet::edit::codec::snapshot::model::RowSlot>
+        4   0.05%  core::str::converts::from_utf8
+        3   0.04%  _int_free_merge_chunk
+        2   0.02%  litchi_xlsx::column::Assignments<T>::new
+        1   0.01%  litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data_with_provenance
+        1   0.01%  cfree@GLIBC_2.2.5
+        1   0.01%  [unknown]
+        1   0.01%  _int_free_chunk
+        1   0.01%  core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingRow>>
+
+== preserve_copy top leaves
+       18   0.21%  crc32fast::specialized::pclmulqdq::calculate
+        4   0.05%  __memmove_avx512_unaligned_erms
+        2   0.02%  __memset_avx512_unaligned_erms
+        1   0.01%  soapberry_zip::reader_at::ReaderAt::read_exact_at
+        1   0.01%  alloc::sync::Arc<T,A>::drop_slow
+        1   0.01%  litchi_perf_baseline::SinkSummary::prepare_write
+
+== commit_other top leaves
+        9   0.11%  __memmove_avx512_unaligned_erms
+        4   0.05%  __memcmp_evex_movbe
+        1   0.01%  litchi_xlsx::calculation_properties::rewriter::inspect_layout
+        1   0.01%  litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit
+        1   0.01%  [unknown]
+        1   0.01%  core::hash::BuildHasher::hash_one
+        1   0.01%  <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+        1   0.01%  alloc::collections::btree::map::IntoIter<K,V,A>::dying_next
+        1   0.01%  <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+        1   0.01%  litchi_xlsx::calculation_properties::codec::inspect_with_policy
+        1   0.01%  core::slice::ascii::<impl [u8]>::eq_ignore_ascii_case_chunks
+
+== verify_parse top leaves
+        7   0.08%  litchi_ooxml_common::xml::unqualified_attribute_value
+        5   0.06%  litchi_xlsx::raw::worksheet::validation::optional_bool
+        2   0.02%  quick_xml::events::attributes::IterState::check_for_duplicates
+        1   0.01%  alloc::raw_vec::RawVecInner<A>::finish_grow
+        1   0.01%  litchi_xlsx::raw::worksheet::validation::optional_u32
+        1   0.01%  quick_xml::events::attributes::IterState::next
+        1   0.01%  litchi_xlsx::raw::worksheet::validation::parse_a1
+        1   0.01%  litchi_xlsx::raw::worksheet::lane::start_tag
+        1   0.01%  malloc
+
+== write_other top leaves
+        3   0.04%  litchi_opc::pkgwriter::PackageWriter::write_to_stream
+        1   0.01%  __memset_avx512_unaligned_erms
+        1   0.01%  xml_minifier::audit::package::is_xml_part
+
+== reduced_readback top leaves
+        3   0.04%  memchr::arch::x86_64::avx2::packedpair::Finder::find_prefilter_impl
+
+== other top leaves
+        1   0.01%  litchi_opc::package::OpcPackage::get_part_mut
+        1   0.01%  [unknown]

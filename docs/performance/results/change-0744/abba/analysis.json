@@ -1,0 +1,1525 @@
+{
+ "method": "Change 0744 ABBA analysis.\n\nFor every (group, case, shape): per-process p50/p95/mean, the median of the\nprocess p50s per arm, paired after/before ratios over the adjacent ABBA pairs\n(A1,B1) (A2,B2) (A3,B3) (A4,B4), a percentile bootstrap 95% CI of the mean\npaired p50 ratio over those pairs, same-arm drift, and >5% regression flags.",
+ "groups": {
+  "controls": {
+   "environment": {
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "git_revision": "009d515befc1b56c07653258b5250139507a33f5",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "12",
+    "storage_identifier": null
+   },
+   "entries": [
+    {
+     "case": "xlsx_eager_cell_values_one_edit_save",
+     "shape": "medium",
+     "processes": {
+      "A1": {
+       "p50": 6148858,
+       "p95": 6238019,
+       "mean": 6159776.480000001,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "A2": {
+       "p50": 6117087,
+       "p95": 6187677,
+       "mean": 6121203.5,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "A3": {
+       "p50": 6194717,
+       "p95": 6412468,
+       "mean": 6210914.88,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "A4": {
+       "p50": 6136287,
+       "p95": 6221668,
+       "mean": 6140933.42,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "B1": {
+       "p50": 2712598,
+       "p95": 2779533,
+       "mean": 2719408.059999999,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "B2": {
+       "p50": 2815918,
+       "p95": 2878294,
+       "mean": 2817550.3000000003,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "B3": {
+       "p50": 3310329,
+       "p95": 3372085,
+       "mean": 3311991.5000000005,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "B4": {
+       "p50": 2762832,
+       "p95": 2796093,
+       "mean": 2765136.1199999996,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      }
+     },
+     "before_median_p50_ns": 6142572.5,
+     "after_median_p50_ns": 2789375.0,
+     "paired_p50_ratios": [
+      0.4411547640228478,
+      0.4603364313765686,
+      0.5343793751998679,
+      0.450244911947567
+     ],
+     "paired_mean_ratios": [
+      0.44147836676047675,
+      0.4602935190767633,
+      0.5332534037239938,
+      0.4502794495368425
+     ],
+     "mean_paired_p50_ratio": 0.47152887063671284,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.4456998379852074,
+      0.5133457593867927
+     ],
+     "before_p50_drift": 0.012690681038213025,
+     "after_p50_drift": 0.22035369782031844,
+     "outputs_identical": true,
+     "corpus_identical": true
+    },
+    {
+     "case": "xlsx_source_backed_cell_values_one_edit_save",
+     "shape": "medium",
+     "processes": {
+      "A1": {
+       "p50": 4404540,
+       "p95": 4439271,
+       "mean": 4406723.299999999,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "A2": {
+       "p50": 4435644,
+       "p95": 4487600,
+       "mean": 4440925.06,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "A3": {
+       "p50": 4389999,
+       "p95": 4436780,
+       "mean": 4394046.4399999995,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "A4": {
+       "p50": 4394829,
+       "p95": 4440390,
+       "mean": 4395031.619999999,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "B1": {
+       "p50": 4385160,
+       "p95": 4427291,
+       "mean": 4384844.399999999,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "B2": {
+       "p50": 4386281,
+       "p95": 4428261,
+       "mean": 4388345.020000001,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "B3": {
+       "p50": 4395489,
+       "p95": 4450410,
+       "mean": 4398488.919999999,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "B4": {
+       "p50": 4410845,
+       "p95": 4465040,
+       "mean": 4417276.92,
+       "samples": 50,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      }
+     },
+     "before_median_p50_ns": 4399684.5,
+     "after_median_p50_ns": 4390885.0,
+     "paired_p50_ratios": [
+      0.9955999945510768,
+      0.988871289039427,
+      1.0012505697609497,
+      1.0036442828606074
+     ],
+     "paired_mean_ratios": [
+      0.995035109193264,
+      0.9881601154512618,
+      1.0010110225416733,
+      1.0050614652915741
+     ],
+     "mean_paired_p50_ratio": 0.9973415340530152,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.9919661092198077,
+      1.0024474263107785
+     ],
+     "before_p50_drift": 0.0103974966736895,
+     "after_p50_drift": 0.005857254923423483,
+     "outputs_identical": true,
+     "corpus_identical": true
+    }
+   ]
+  },
+  "dense": {
+   "environment": {
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "git_revision": "009d515befc1b56c07653258b5250139507a33f5",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "12",
+    "storage_identifier": null
+   },
+   "entries": [
+    {
+     "case": "xlsx_first_cell",
+     "shape": "dense-wide",
+     "processes": {
+      "A1": {
+       "p50": 27570319,
+       "p95": 27918996,
+       "mean": 27622699.699999996,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A2": {
+       "p50": 28598538,
+       "p95": 29053900,
+       "mean": 28665573.9,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A3": {
+       "p50": 27444908,
+       "p95": 27590299,
+       "mean": 27472427.95,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A4": {
+       "p50": 28168250,
+       "p95": 29474237,
+       "mean": 28331301.500000004,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B1": {
+       "p50": 7787927,
+       "p95": 7817603,
+       "mean": 7802885.15,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B2": {
+       "p50": 7963775,
+       "p95": 8014866,
+       "mean": 7962501.649999999,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B3": {
+       "p50": 7826246,
+       "p95": 7900416,
+       "mean": 7847737.350000001,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B4": {
+       "p50": 7819161,
+       "p95": 7844067,
+       "mean": 7816663.149999999,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      }
+     },
+     "before_median_p50_ns": 27869284.5,
+     "after_median_p50_ns": 7822703.5,
+     "paired_p50_ratios": [
+      0.28247504136604296,
+      0.2784679062964687,
+      0.28516204171644516,
+      0.27758774506758493
+     ],
+     "paired_mean_ratios": [
+      0.2824809028351418,
+      0.277772274079606,
+      0.285658674372827,
+      0.2759020142438567
+     ],
+     "mean_paired_p50_ratio": 0.28092318361163543,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.27802782568202683,
+      0.2838185415412441
+     ],
+     "before_p50_drift": 0.04203439122477648,
+     "after_p50_drift": 0.022579564497715587,
+     "outputs_identical": true,
+     "corpus_identical": true
+    },
+    {
+     "case": "xlsx_full_cell_scan",
+     "shape": "dense-wide",
+     "processes": {
+      "A1": {
+       "p50": 28098837,
+       "p95": 28306308,
+       "mean": 28111176.900000006,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A2": {
+       "p50": 28923169,
+       "p95": 29162290,
+       "mean": 28723252.199999996,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A3": {
+       "p50": 27611759,
+       "p95": 27965511,
+       "mean": 27644363.599999998,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A4": {
+       "p50": 27505057,
+       "p95": 27931089,
+       "mean": 27571248.05,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B1": {
+       "p50": 7799433,
+       "p95": 7840263,
+       "mean": 7804627.250000001,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B2": {
+       "p50": 8048391,
+       "p95": 8360498,
+       "mean": 8087354.200000001,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B3": {
+       "p50": 7810836,
+       "p95": 8084478,
+       "mean": 7846303.85,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B4": {
+       "p50": 7946446,
+       "p95": 7973417,
+       "mean": 7959127.749999999,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      }
+     },
+     "before_median_p50_ns": 27855298.0,
+     "after_median_p50_ns": 7878641.0,
+     "paired_p50_ratios": [
+      0.2775713813351065,
+      0.2782679518969723,
+      0.2828807827853343,
+      0.28890854507227526
+     ],
+     "paired_mean_ratios": [
+      0.2776343117103717,
+      0.28156122933739386,
+      0.2838301493762729,
+      0.2886749172749182
+     ],
+     "mean_paired_p50_ratio": 0.2819071652724221,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.2779196666160394,
+      0.2862483967784495
+     ],
+     "before_p50_drift": 0.05155822800149079,
+     "after_p50_drift": 0.031920012647073115,
+     "outputs_identical": true,
+     "corpus_identical": true
+    },
+    {
+     "case": "xlsx_one_cell_commit_save",
+     "shape": "dense-wide",
+     "processes": {
+      "A1": {
+       "p50": 149327040,
+       "p95": 150160164,
+       "mean": 149446893.25000003,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 384518,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A2": {
+       "p50": 151971620,
+       "p95": 152708294,
+       "mean": 151763203.95,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 384518,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A3": {
+       "p50": 148605781,
+       "p95": 149944335,
+       "mean": 148780734.5,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 384518,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A4": {
+       "p50": 149130943,
+       "p95": 150539924,
+       "mean": 149273196.74999994,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 384518,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B1": {
+       "p50": 60762224,
+       "p95": 61388107,
+       "mean": 60746855.25,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 384518,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B2": {
+       "p50": 61221199,
+       "p95": 62120939,
+       "mean": 61175419.9,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 384518,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B3": {
+       "p50": 60154878,
+       "p95": 60686291,
+       "mean": 60261891.150000006,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 384518,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B4": {
+       "p50": 60275484,
+       "p95": 61093643,
+       "mean": 60387943.74999999,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 384518,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      }
+     },
+     "before_median_p50_ns": 149228991.5,
+     "after_median_p50_ns": 60518854.0,
+     "paired_p50_ratios": [
+      0.40690704108244563,
+      0.4028462616901761,
+      0.4047950059224143,
+      0.40417825293306164
+     ],
+     "paired_mean_ratios": [
+      0.4064778727007762,
+      0.40309784129330123,
+      0.40503826891646383,
+      0.40454646289337953
+     ],
+     "mean_paired_p50_ratio": 0.4046816404070244,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.40333344774823565,
+      0.4062248440450996
+     ],
+     "before_p50_drift": 0.02264944861061635,
+     "after_p50_drift": 0.01772625987205889,
+     "outputs_identical": true,
+     "corpus_identical": true
+    },
+    {
+     "case": "xlsx_one_percent_commit_save",
+     "shape": "dense-wide",
+     "processes": {
+      "A1": {
+       "p50": 299255387,
+       "p95": 301543282,
+       "mean": 299578174.7,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 388095,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A2": {
+       "p50": 304409273,
+       "p95": 306293651,
+       "mean": 304341892.59999996,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 388095,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A3": {
+       "p50": 299165720,
+       "p95": 301066575,
+       "mean": 299468957.90000004,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 388095,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A4": {
+       "p50": 299395706,
+       "p95": 300324566,
+       "mean": 299355618.25,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 388095,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B1": {
+       "p50": 122871127,
+       "p95": 124778731,
+       "mean": 123195678.39999999,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 388095,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B2": {
+       "p50": 123853809,
+       "p95": 125076839,
+       "mean": 123940383.25000001,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 388095,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B3": {
+       "p50": 122621937,
+       "p95": 124760327,
+       "mean": 122603678.35,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 388095,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B4": {
+       "p50": 123156504,
+       "p95": 124446206,
+       "mean": 123206374.45,
+       "samples": 20,
+       "output_sha256": null,
+       "accepted_bytes": 388095,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      }
+     },
+     "before_median_p50_ns": 299325546.5,
+     "after_median_p50_ns": 123013815.5,
+     "paired_p50_ratios": [
+      0.4105895243249205,
+      0.4068660845295603,
+      0.4098796379478237,
+      0.4113502683301677
+     ],
+     "paired_mean_ratios": [
+      0.41123048607719553,
+      0.4072406272799791,
+      0.4094036297108976,
+      0.4115719463367713
+     ],
+     "mean_paired_p50_ratio": 0.40967137878311805,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.40779694447840037,
+      0.4109826107345817
+     ],
+     "before_p50_drift": 0.01752725211966122,
+     "after_p50_drift": 0.010046098032197914,
+     "outputs_identical": true,
+     "corpus_identical": true
+    }
+   ]
+  },
+  "light": {
+   "environment": {
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "git_revision": "009d515befc1b56c07653258b5250139507a33f5",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "12",
+    "storage_identifier": null
+   },
+   "entries": [
+    {
+     "case": "xlsx_noop_commit_save",
+     "shape": "dense-wide",
+     "processes": {
+      "A1": {
+       "p50": 16050,
+       "p95": 18060,
+       "mean": 16281.240000000002,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A2": {
+       "p50": 16750,
+       "p95": 18190,
+       "mean": 16941.824999999997,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A3": {
+       "p50": 16350,
+       "p95": 17811,
+       "mean": 16362.075000000004,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A4": {
+       "p50": 16915,
+       "p95": 19020,
+       "mean": 17208.259999999987,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B1": {
+       "p50": 16615,
+       "p95": 19700,
+       "mean": 17085.369999999988,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B2": {
+       "p50": 16030,
+       "p95": 18540,
+       "mean": 16521.450000000004,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B3": {
+       "p50": 16030,
+       "p95": 17970,
+       "mean": 16188.29499999999,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B4": {
+       "p50": 18230,
+       "p95": 20280,
+       "mean": 18254.745,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      }
+     },
+     "before_median_p50_ns": 16550.0,
+     "after_median_p50_ns": 16322.5,
+     "paired_p50_ratios": [
+      1.035202492211838,
+      0.9570149253731344,
+      0.980428134556575,
+      1.0777416494235885
+     ],
+     "paired_mean_ratios": [
+      1.049389972753917,
+      0.975187147783666,
+      0.9893790977000158,
+      1.060812946805779
+     ],
+     "mean_paired_p50_ratio": 1.012596800391284,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.9687215299648546,
+      1.0564720708177133
+     ],
+     "before_p50_drift": 0.05389408099688464,
+     "after_p50_drift": 0.13724266999376167,
+     "outputs_identical": true,
+     "corpus_identical": true
+    },
+    {
+     "case": "xlsx_noop_commit_save",
+     "shape": "medium",
+     "processes": {
+      "A1": {
+       "p50": 570,
+       "p95": 690,
+       "mean": 583.7500000000001,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A2": {
+       "p50": 600,
+       "p95": 700,
+       "mean": 613.75,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A3": {
+       "p50": 570,
+       "p95": 670,
+       "mean": 589.1049999999999,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A4": {
+       "p50": 570,
+       "p95": 650,
+       "mean": 581.1,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B1": {
+       "p50": 660,
+       "p95": 740,
+       "mean": 642.8500000000005,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B2": {
+       "p50": 570,
+       "p95": 630,
+       "mean": 575.0999999999996,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B3": {
+       "p50": 560,
+       "p95": 650,
+       "mean": 568.4499999999998,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B4": {
+       "p50": 590,
+       "p95": 700,
+       "mean": 604.055,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      }
+     },
+     "before_median_p50_ns": 570.0,
+     "after_median_p50_ns": 580.0,
+     "paired_p50_ratios": [
+      1.1578947368421053,
+      0.95,
+      0.9824561403508771,
+      1.0350877192982457
+     ],
+     "paired_mean_ratios": [
+      1.1012419700214138,
+      0.9370264765784106,
+      0.9649383386662818,
+      1.0395026673550163
+     ],
+     "mean_paired_p50_ratio": 1.031359649122807,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.9662280701754385,
+      1.1140350877192984
+     ],
+     "before_p50_drift": 0.05263157894736836,
+     "after_p50_drift": 0.1785714285714286,
+     "outputs_identical": true,
+     "corpus_identical": true
+    },
+    {
+     "case": "xlsx_open_owned",
+     "shape": "dense-wide",
+     "processes": {
+      "A1": {
+       "p50": 1332796,
+       "p95": 1340836,
+       "mean": 1333454.9849999999,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A2": {
+       "p50": 1339756,
+       "p95": 1349316,
+       "mean": 1340745.345000001,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A3": {
+       "p50": 1340770,
+       "p95": 1349365,
+       "mean": 1341567.2799999996,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A4": {
+       "p50": 1344270,
+       "p95": 1353275,
+       "mean": 1344504.9599999997,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B1": {
+       "p50": 1358661,
+       "p95": 1368986,
+       "mean": 1359673.7599999998,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B2": {
+       "p50": 1334491,
+       "p95": 1344806,
+       "mean": 1335322.8800000001,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B3": {
+       "p50": 1396921,
+       "p95": 1405216,
+       "mean": 1397398.3699999996,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B4": {
+       "p50": 1338260,
+       "p95": 1349155,
+       "mean": 1339476.905000001,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      }
+     },
+     "before_median_p50_ns": 1340263.0,
+     "after_median_p50_ns": 1348460.5,
+     "paired_p50_ratios": [
+      1.0194065708480518,
+      0.9960701799432136,
+      1.0418796661619816,
+      0.9955291719669411
+     ],
+     "paired_mean_ratios": [
+      1.0196622872874856,
+      0.9959556339164461,
+      1.0416163175953428,
+      0.9962602927102636
+     ],
+     "mean_paired_p50_ratio": 1.013221397230047,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.9957996759550773,
+      1.0306431185050167
+     ],
+     "before_p50_drift": 0.00860896941467404,
+     "after_p50_drift": 0.046781881631273725,
+     "outputs_identical": true,
+     "corpus_identical": true
+    },
+    {
+     "case": "xlsx_open_owned",
+     "shape": "medium",
+     "processes": {
+      "A1": {
+       "p50": 105390,
+       "p95": 112600,
+       "mean": 106288.65000000007,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A2": {
+       "p50": 105435,
+       "p95": 112141,
+       "mean": 106259.8,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A3": {
+       "p50": 105490,
+       "p95": 112400,
+       "mean": 106318.22500000003,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A4": {
+       "p50": 105575,
+       "p95": 112360,
+       "mean": 106364.03,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B1": {
+       "p50": 104790,
+       "p95": 112130,
+       "mean": 105747.7399999999,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B2": {
+       "p50": 104610,
+       "p95": 111121,
+       "mean": 105385.33000000003,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B3": {
+       "p50": 104830,
+       "p95": 111411,
+       "mean": 105635.22499999998,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B4": {
+       "p50": 105495,
+       "p95": 112420,
+       "mean": 106397.76000000001,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      }
+     },
+     "before_median_p50_ns": 105462.5,
+     "after_median_p50_ns": 104810.0,
+     "paired_p50_ratios": [
+      0.9943068602334187,
+      0.9921752738654147,
+      0.9937434827945777,
+      0.999242244849633
+     ],
+     "paired_mean_ratios": [
+      0.9949109335756907,
+      0.9917704531723194,
+      0.9935758897404461,
+      1.0003171184845103
+     ],
+     "mean_paired_p50_ratio": 0.994866965435761,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.9927081704574157,
+      0.9978675543358692
+     ],
+     "before_p50_drift": 0.0017553847613624995,
+     "after_p50_drift": 0.008459994264410575,
+     "outputs_identical": true,
+     "corpus_identical": true
+    }
+   ]
+  },
+  "medium": {
+   "environment": {
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "git_revision": "009d515befc1b56c07653258b5250139507a33f5",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "12",
+    "storage_identifier": null
+   },
+   "entries": [
+    {
+     "case": "xlsx_first_cell",
+     "shape": "medium",
+     "processes": {
+      "A1": {
+       "p50": 443752,
+       "p95": 463632,
+       "mean": 447173.315,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A2": {
+       "p50": 432292,
+       "p95": 441602,
+       "mean": 433987.7599999997,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A3": {
+       "p50": 435837,
+       "p95": 445722,
+       "mean": 437532.2099999997,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A4": {
+       "p50": 440207,
+       "p95": 450252,
+       "mean": 442281.4500000004,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B1": {
+       "p50": 134600,
+       "p95": 142051,
+       "mean": 135641.90500000012,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B2": {
+       "p50": 134370,
+       "p95": 142281,
+       "mean": 135450.28999999992,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B3": {
+       "p50": 131801,
+       "p95": 138451,
+       "mean": 132686.74500000005,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B4": {
+       "p50": 133751,
+       "p95": 140201,
+       "mean": 134582.52000000002,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      }
+     },
+     "before_median_p50_ns": 438022.0,
+     "after_median_p50_ns": 134060.5,
+     "paired_p50_ratios": [
+      0.3033225765743028,
+      0.3108315675515624,
+      0.3024089281084442,
+      0.30383660414305086
+     ],
+     "paired_mean_ratios": [
+      0.30333184125712,
+      0.31210624465537923,
+      0.3032616615814414,
+      0.30429157722983835
+     ],
+     "mean_paired_p50_ratio": 0.3050999190943401,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.30276584711709587,
+      0.30895431980724747
+     ],
+     "before_p50_drift": 0.026509859076735198,
+     "after_p50_drift": 0.021236561179353686,
+     "outputs_identical": true,
+     "corpus_identical": true
+    },
+    {
+     "case": "xlsx_full_cell_scan",
+     "shape": "medium",
+     "processes": {
+      "A1": {
+       "p50": 441117,
+       "p95": 450232,
+       "mean": 442916.2399999999,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A2": {
+       "p50": 437407,
+       "p95": 447002,
+       "mean": 439658.7700000002,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A3": {
+       "p50": 445937,
+       "p95": 455302,
+       "mean": 448291.8950000001,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A4": {
+       "p50": 430072,
+       "p95": 440532,
+       "mean": 432576.57000000007,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B1": {
+       "p50": 135121,
+       "p95": 142130,
+       "mean": 136109.85499999998,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B2": {
+       "p50": 134930,
+       "p95": 141701,
+       "mean": 135912.64500000002,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B3": {
+       "p50": 134895,
+       "p95": 141421,
+       "mean": 135761.24999999997,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B4": {
+       "p50": 134580,
+       "p95": 142081,
+       "mean": 135642.91999999995,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      }
+     },
+     "before_median_p50_ns": 439262.0,
+     "after_median_p50_ns": 134912.5,
+     "paired_p50_ratios": [
+      0.3063155580038856,
+      0.30847700196841843,
+      0.3024978864727529,
+      0.3129243475511077
+     ],
+     "paired_mean_ratios": [
+      0.3073038256623871,
+      0.30913211398012136,
+      0.30284118788272973,
+      0.31356973402419813
+     ],
+     "mean_paired_p50_ratio": 0.30755369849904113,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.30399266534666924,
+      0.3112721501643022
+     ],
+     "before_p50_drift": 0.03688917204561104,
+     "after_p50_drift": 0.00401991380591471,
+     "outputs_identical": true,
+     "corpus_identical": true
+    },
+    {
+     "case": "xlsx_one_cell_commit_save",
+     "shape": "medium",
+     "processes": {
+      "A1": {
+       "p50": 2150745,
+       "p95": 2161610,
+       "mean": 2150861.245000001,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15253,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A2": {
+       "p50": 2142239,
+       "p95": 2158650,
+       "mean": 2143559.8050000006,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15253,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A3": {
+       "p50": 2173140,
+       "p95": 2190960,
+       "mean": 2176357.6399999983,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15253,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A4": {
+       "p50": 2132800,
+       "p95": 2168160,
+       "mean": 2142060.125000001,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15253,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B1": {
+       "p50": 871504,
+       "p95": 880344,
+       "mean": 871693.2999999998,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15253,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B2": {
+       "p50": 874654,
+       "p95": 882984,
+       "mean": 874595.585,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15253,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B3": {
+       "p50": 868854,
+       "p95": 880384,
+       "mean": 870075.3900000001,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15253,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B4": {
+       "p50": 866808,
+       "p95": 876164,
+       "mean": 867497.86,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15253,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      }
+     },
+     "before_median_p50_ns": 2146492.0,
+     "after_median_p50_ns": 870179.0,
+     "paired_p50_ratios": [
+      0.40521028759801836,
+      0.4082896446194846,
+      0.3998150142190563,
+      0.4064178544636159
+     ],
+     "paired_mean_ratios": [
+      0.40527639894315887,
+      0.4080108159146974,
+      0.3997851152809613,
+      0.4049829647055307
+     ],
+     "mean_paired_p50_ratio": 0.40493320022504375,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.4014657242801962,
+      0.407519805364118
+     ],
+     "before_p50_drift": 0.01891410352588152,
+     "after_p50_drift": 0.009051600815866978,
+     "outputs_identical": true,
+     "corpus_identical": true
+    },
+    {
+     "case": "xlsx_one_percent_commit_save",
+     "shape": "medium",
+     "processes": {
+      "A1": {
+       "p50": 8749614,
+       "p95": 8811260,
+       "mean": 8732150.835,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15398,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A2": {
+       "p50": 8531148,
+       "p95": 8670229,
+       "mean": 8553078.084999992,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15398,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A3": {
+       "p50": 8787784,
+       "p95": 8857240,
+       "mean": 8753549.795000002,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15398,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A4": {
+       "p50": 8680565,
+       "p95": 8734561,
+       "mean": 8660283.505,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15398,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B1": {
+       "p50": 3660416,
+       "p95": 3685147,
+       "mean": 3662324.09,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15398,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B2": {
+       "p50": 3634201,
+       "p95": 3688936,
+       "mean": 3617317.085000001,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15398,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B3": {
+       "p50": 3644701,
+       "p95": 3703807,
+       "mean": 3634824.344999999,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15398,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B4": {
+       "p50": 3622506,
+       "p95": 3657996,
+       "mean": 3597035.920000001,
+       "samples": 200,
+       "output_sha256": null,
+       "accepted_bytes": 15398,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      }
+     },
+     "before_median_p50_ns": 8715089.5,
+     "after_median_p50_ns": 3639451.0,
+     "paired_p50_ratios": [
+      0.4183517124298283,
+      0.42599202358228927,
+      0.41474631147055957,
+      0.41731223716428595
+     ],
+     "paired_mean_ratios": [
+      0.4194068745721568,
+      0.4229257641578055,
+      0.4152400374847012,
+      0.41534851808526335
+     ],
+     "mean_paired_p50_ratio": 0.41910057116174076,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.41564766171037676,
+      0.42382207697778845
+     ],
+     "before_p50_drift": 0.030082235122400824,
+     "after_p50_drift": 0.010465131044641529,
+     "outputs_identical": true,
+     "corpus_identical": true
+    }
+   ]
+  }
+ },
+ "regression_flags_over_5pct": [
+  {
+   "group": "light",
+   "case": "xlsx_noop_commit_save",
+   "shape": "dense-wide",
+   "max_paired_p50_ratio": 1.0777416494235885
+  },
+  {
+   "group": "light",
+   "case": "xlsx_noop_commit_save",
+   "shape": "medium",
+   "max_paired_p50_ratio": 1.1578947368421053
+  }
+ ]
+}

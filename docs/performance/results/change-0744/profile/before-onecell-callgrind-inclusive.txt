@@ -1,0 +1,120 @@
+--------------------------------------------------------------------------------
+Profile data file 'before-onecell.callgrind' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache:
+D1 cache:
+LL cache:
+Timerange: Basic block 0 - 3992238179
+Trigger: Program termination
+Profiled target:  /home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline --case xlsx_one_cell_commit_save --xlsx-shape dense-wide --samples 2 --warmup 1 --json /dev/null (PID 3847714, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:
+User annotated:
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir
+--------------------------------------------------------------------------------
+7,205,638,296 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                      file:function
+--------------------------------------------------------------------------------
+7,205,638,296 (100.0%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+7,205,638,296 (100.0%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+7,205,638,296 (100.0%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/tools/perf-baseline/src/lib.rs:litchi_perf_baseline::run [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+7,205,638,296 (100.0%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/tools/perf-baseline/src/lib.rs:litchi_perf_baseline::run_case_with_config [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+7,205,638,296 (100.0%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/tools/perf-baseline/src/lib.rs:litchi_perf_baseline::run_xlsx_update_commit_save [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+7,205,638,296 (100.0%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/tools/perf-baseline/src/lib.rs:litchi_perf_baseline::xlsx_commit_save_operation [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+7,205,638,296 (100.0%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/tools/perf-baseline/src/main.rs:litchi_perf_baseline::main [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+7,205,638,296 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:std::rt::lang_start::{{closure}}
+7,205,638,296 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:std::rt::lang_start_internal
+7,205,638,296 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:std::sys::backtrace::__rust_begin_short_backtrace
+7,205,638,296 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:std::rt::lang_start::{{closure}} [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+7,205,638,296 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:std::rt::lang_start_internal [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+7,205,638,296 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:std::sys::backtrace::__rust_begin_short_backtrace [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+7,205,638,296 (100.0%)  ???:(below main) [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+7,205,638,296 (100.0%)  ???:0x0000000000023cc0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+7,205,638,296 (100.0%)  ???:main [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+5,866,976,585 (81.42%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs:litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+2,958,012,099 (41.05%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/worksheet/mod.rs:litchi_xlsx::raw::worksheet::parse [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+2,946,530,080 (40.89%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/worksheet/codec.rs:litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+1,606,611,171 (22.30%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs:litchi_xlsx::raw::worksheet::edit::package::rewrite [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+1,556,466,729 (21.60%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs:litchi_xlsx::raw::worksheet::edit::package::rewrite
+1,556,466,723 (21.60%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs:litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+1,480,272,925 (20.54%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/workbook/model.rs:litchi_xlsx::workbook::model::Worksheet::store [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+1,476,949,163 (20.50%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/mod.rs:quick_xml::reader::Reader<R>::read_event_impl [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+1,398,651,429 (19.41%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/worksheet/codec.rs:litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::transition [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+1,338,661,075 (18.58%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/writer.rs:litchi_perf_baseline::xlsx_commit_save_operation
+1,338,661,069 (18.58%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-opc/src/pkgwriter.rs:litchi_opc::pkgwriter::PackageWriter::write_to_stream [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+1,253,939,236 (17.40%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/compact.rs:litchi_xlsx::raw::compact::changed_worksheet [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  992,544,016 (13.77%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/worksheet/codec.rs:litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  841,780,666 (11.68%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+  779,672,115 (10.82%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/soapberry-zip/src/preserve.rs:soapberry_zip::preserve::PreservationIndex<R>::write_to [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  777,714,957 (10.79%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/soapberry-zip/src/preserve.rs:soapberry_zip::preserve::PreservationIndex<R>::prepare_with [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  777,709,737 (10.79%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/soapberry-zip/src/preserve.rs:soapberry_zip::preserve::take_prepared_entry [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  777,709,674 (10.79%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/soapberry-zip/src/preserve.rs:soapberry_zip::preserve::generated_entry [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  775,294,292 (10.76%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/io/mod.rs:std::io::Write::write_all [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  773,090,686 (10.73%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/flate2-1.1.9/src/mem.rs:flate2::mem::Compress::compress [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  773,090,146 (10.73%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/flate2-1.1.9/src/ffi/zlib_rs.rs:flate2::mem::Compress::compress
+  773,089,714 (10.73%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/stable.rs:zlib_rs::stable::Deflate::compress [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  773,088,367 (10.73%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate.rs:zlib_rs::deflate::deflate [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  772,962,530 (10.73%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/algorithm/mod.rs:zlib_rs::deflate::algorithm::run [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  772,962,170 (10.73%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/algorithm/medium.rs:zlib_rs::deflate::algorithm::medium::deflate_medium [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  772,689,599 (10.72%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/soapberry-zip/src/writer.rs:std::io::Write::write_all
+  747,020,496 (10.37%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:quick_xml::events::attributes::IterState::next [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  678,645,663 ( 9.42%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/worksheet/codec.rs:litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  620,844,202 ( 8.62%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:quick_xml::reader::Reader<R>::read_event_impl
+  595,162,596 ( 8.26%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  558,653,136 ( 7.75%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-opc/src/pkgwriter.rs:litchi_opc::pkgwriter::PublicationPlan::from_package [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  558,622,447 ( 7.75%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-opc/src/pkgwriter.rs:litchi_opc::pkgwriter::PackageWriter::audit_published_xml [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  558,622,339 ( 7.75%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/xml-minifier/src/audit.rs:xml_minifier::audit::verify_source [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  558,622,300 ( 7.75%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/xml-minifier/src/audit.rs:xml_minifier::audit::verify_with_policy [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  526,316,739 ( 7.30%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zlib-rs-0.6.7/src/deflate/longest_match.rs:zlib_rs::deflate::longest_match::longest_match [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  493,110,476 ( 6.84%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs:litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  463,328,763 ( 6.43%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/worksheet/codec.rs:litchi_xlsx::raw::worksheet::codec::scan_cell_attributes [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  461,183,076 ( 6.40%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:quick_xml::reader::ns_reader::NsReader<R>::process_event [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  436,224,613 ( 6.05%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:memchr::arch::x86_64::memchr::memchr_raw::find_avx2 [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  420,892,517 ( 5.84%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:litchi_xlsx::raw::compact::changed_worksheet
+  419,905,674 ( 5.83%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs:litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit
+  402,859,878 ( 5.59%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:quick_xml::name::QName::local_name [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  360,772,770 ( 5.01%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:memchr::arch::x86_64::memchr::memchr3_raw::find_avx2 [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  354,028,689 ( 4.91%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:quick_xml::name::NamespaceResolver::resolve_event [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  317,083,629 ( 4.40%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:quick_xml::events::attributes::IterState::check_for_duplicates [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  315,517,433 ( 4.38%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs:litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  312,418,469 ( 4.34%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/compact.rs:litchi_xlsx::raw::compact::write_start [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  299,312,501 ( 4.15%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/slice_reader.rs:xml_minifier::audit::verify_with_policy
+  292,600,659 ( 4.06%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:quick_xml::name::NamespaceResolver::push [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  288,746,475 ( 4.01%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:quick_xml::name::QName::local_name
+  269,182,790 ( 3.74%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-ooxml-common/src/xml.rs:litchi_ooxml_common::xml::unqualified_attribute_value [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  262,347,973 ( 3.64%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs:memchr::arch::x86_64::avx2::memchr::One::find_raw [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  252,756,645 ( 3.51%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/worksheet/semantic.rs:litchi_xlsx::raw::worksheet::semantic::materialize [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  250,016,494 ( 3.47%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:alloc::raw_vec::RawVec<T,A>::grow_one [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  246,461,797 ( 3.42%)  ???:__rustc::__rust_alloc [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  246,452,106 ( 3.42%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/web/check.rs:litchi_xlsx::raw::web::check::Probe::observe [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  243,632,750 ( 3.38%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:alloc::raw_vec::RawVecInner<A>::finish_grow [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  233,758,429 ( 3.24%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:__rustc::__rdl_alloc [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  232,653,888 ( 3.23%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:quick_xml::name::NamespaceResolver::push
+  232,597,335 ( 3.23%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:quick_xml::events::attributes::IterState::check_for_duplicates
+  230,582,563 ( 3.20%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:__rustc::__rdl_alloc
+  205,173,921 ( 2.85%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  204,883,260 ( 2.84%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/memchr.rs:memchr::arch::x86_64::memchr::memchr2_raw::find_avx2 [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  198,627,684 ( 2.76%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/str/converts.rs:core::str::converts::from_utf8 [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  194,995,888 ( 2.71%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/namespace.rs:litchi_xlsx::raw::namespace::is_spreadsheetml_name [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  194,137,905 ( 2.69%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs:quick_xml::reader::state::ReaderState::emit_start [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  187,186,996 ( 2.60%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/state.rs:quick_xml::reader::state::ReaderState::emit_end [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  183,345,870 ( 2.54%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/arch/x86_64/avx2/memchr.rs:memchr::arch::x86_64::avx2::memchr::Three::find_raw [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  180,980,606 ( 2.51%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:alloc::raw_vec::RawVecInner<A>::finish_grow
+  176,729,595 ( 2.45%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/worksheet/codec.rs:litchi_xlsx::raw::worksheet::codec::decode_cell_attribute [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  170,550,236 ( 2.37%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/worksheet/semantic.rs:litchi_xlsx::raw::worksheet::semantic::parse_value [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  169,539,206 ( 2.35%)  ???:__rustc::__rust_dealloc [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  169,420,800 ( 2.35%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:litchi_xlsx::raw::worksheet::codec::scan_cell_attributes
+  166,386,387 ( 2.31%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/worksheet/edit/codec/wire.rs:litchi_xlsx::raw::worksheet::edit::codec::wire::cell_tag [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  164,698,347 ( 2.29%)  /home/zhuhe/code/litchi-worktrees/0744-before-src-pppppppppppppppppp/crates/litchi-xlsx/src/raw/web/check.rs:litchi_xlsx::raw::web::check::classify_name [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  158,262,303 ( 2.20%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs:quick_xml::events::attributes::Attribute::decoded_and_normalized_value [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  157,630,272 ( 2.19%)  /home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs:quick_xml::name::NamespaceResolver::resolve_prefix [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  157,623,218 ( 2.19%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:__rustc::__rdl_dealloc [/home/zhuhe/code/litchi-worktrees/targets/0744-before/profiling/litchi-perf-baseline]
+  156,993,818 ( 2.18%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
