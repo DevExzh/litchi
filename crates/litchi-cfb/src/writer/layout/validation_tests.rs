@@ -804,6 +804,69 @@ fn real_fixture_plans_reach_the_readback_verdict() {
     }
 }
 
+/// The reviewer's pre-existing case: the last directory sector's FAT entry
+/// links on into a payload sector. The reader's version 3 directory walk then
+/// runs past the planned directory image, which is the writer-derived
+/// directory limit, and reports `LimitExceeded`. That is a plan defect, so the
+/// writer now declines it to the from-scratch serialization instead of
+/// failing the save.
+#[test]
+fn a_directory_chain_run_past_its_image_declines() {
+    let (source, model) = synthetic();
+    let layout = SourceLayout::parse(&source).unwrap();
+    let streams = inputs(&model);
+    let base = plan(&layout, &streams);
+    let last_directory = base
+        .sectors
+        .iter()
+        .enumerate()
+        .filter_map(|(sector, planned)| match planned {
+            PlannedSector::Directory(position) => Some((*position, sector)),
+            _ => None,
+        })
+        .max()
+        .map(|(_, sector)| u32::try_from(sector).unwrap())
+        .unwrap();
+    assert_eq!(fat_entry(&base, last_directory), ENDOFCHAIN);
+    let payload = stream_sectors(&base, index_of(&model, BIG))[0];
+    let mut extended = base.clone();
+    set_fat_entry(&mut extended, last_directory, payload);
+    for (which, result) in [
+        ("in-place", extended.validate(&streams)),
+        ("readback", extended.validate_by_readback(&streams)),
+    ] {
+        let error = result.unwrap_err();
+        assert!(
+            matches!(error, OleError::LimitExceeded { .. }),
+            "{which}: {error}"
+        );
+    }
+    assert_verdict(
+        &extended,
+        &streams,
+        Verdict::Declined,
+        "directory chain runs past its image",
+    );
+}
+
+#[test]
+fn plan_derived_limit_failures_decline_and_resource_failures_do_not() {
+    assert!(plan_validation_declines(&OleError::LimitExceeded {
+        resource: "directory bytes",
+        observed: 1_024,
+        maximum: 512,
+    }));
+    let exhausted = Vec::<u8>::new().try_reserve(usize::MAX).unwrap_err();
+    assert!(!plan_validation_declines(&OleError::allocation(
+        "test", exhausted
+    )));
+    assert!(!plan_validation_declines(&OleError::InvalidLimit {
+        resource: "test",
+        value: 0,
+        maximum: 1,
+    }));
+}
+
 /// Hundreds of mini streams, in both geometries: mini growth that appends,
 /// a shrink that reclaims, and a mini-to-regular migration, then random
 /// faults, all with identical verdicts.

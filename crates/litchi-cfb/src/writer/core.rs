@@ -1825,6 +1825,12 @@ pub(super) fn plan_validation_declines(error: &OleError) -> bool {
             // an invalid positional view. Keep allocation and other typed
             // resource failures on the error path above.
             | OleError::Io(_)
+            // The validation reader's only limits are the plan's own output
+            // and directory lengths (`OleFileLimits::for_writer`). Exceeding
+            // one means the planned view describes more than the plan built,
+            // such as a directory chain its FAT runs past the planned
+            // directory image: a plan defect, not a caller's resource limit.
+            | OleError::LimitExceeded { .. }
     )
 }
 
