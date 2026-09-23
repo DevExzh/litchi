@@ -3939,6 +3939,80 @@ class PerfAbbaSummaryTests(unittest.TestCase):
         ):
             perf_abba_summary.summarize_reports(malformed)
 
+    def test_xls_numeric_v2_owned_rows_take_the_sealed_contract(self):
+        def sealed(legs, schema=perf_abba_summary.XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA_V2):
+            for leg in legs:
+                numeric = leg["results"][0]["source"]["xls_numeric"]
+                numeric["operation_evidence_schema"] = schema
+                for item in numeric["operation_evidence"]:
+                    if item["source_mode"] != "owned_immutable_arc":
+                        continue
+                    for key in ("scans", "bytes", "chunks"):
+                        item[f"composed_source_preflight_{key}"] = 0
+                    for prefix in (
+                        "target_materialization_emission",
+                        "direct_emission",
+                        "atomic_save_emission",
+                    ):
+                        item[f"{prefix}_bytes"] = 0
+            return legs
+
+        # Change 0748: a version-2 owned row takes no composed-view preflight
+        # and hashes no emitted byte; generic rows keep every recheck.
+        for case, implementation in (
+            ("xls_numeric_source_backed_number_edit_save", "source_backed"),
+            ("xls_numeric_plan_only_number_edit_save", "plan_only"),
+        ):
+            legs = sealed(xls_numeric_legs(case=case, implementation=implementation))
+            perf_abba_summary.summarize_reports(legs)
+
+        # Version 1 keeps its original owned contract.
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "source-mode contract"
+        ):
+            perf_abba_summary.summarize_reports(
+                sealed(
+                    xls_numeric_legs(),
+                    schema=perf_abba_summary.XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA,
+                )
+            )
+
+        # A version-2 owned row cannot claim either retired recheck.
+        for field, value in (
+            ("composed_source_preflight_scans", 1),
+            ("direct_emission_bytes", 2 * 131072),
+            ("atomic_save_emission_bytes", 1),
+        ):
+            malformed = sealed(xls_numeric_legs())
+            malformed[1]["results"][0]["source"]["xls_numeric"]["operation_evidence"][0][
+                field
+            ] = value
+            with self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, "source-mode contract"
+            ):
+                perf_abba_summary.summarize_reports(malformed)
+
+        # A version-2 generic row keeps its composed preflight and emission hash.
+        for field in ("composed_source_preflight_scans", "direct_emission_bytes"):
+            malformed = sealed(xls_numeric_legs())
+            malformed[0]["results"][0]["source"]["xls_numeric"]["operation_evidence"][0][
+                field
+            ] = 0
+            with self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, "source-mode contract"
+            ):
+                perf_abba_summary.summarize_reports(malformed)
+
+        # An unknown schema label is still refused.
+        malformed = xls_numeric_legs()
+        malformed[0]["results"][0]["source"]["xls_numeric"][
+            "operation_evidence_schema"
+        ] = "xls_numeric.operation_evidence.v3"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "operation_evidence_schema is invalid"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
     def test_xls_numeric_current_evidence_discriminator_is_fail_closed(self):
         missing_current = xls_numeric_legs()
         numeric = missing_current[0]["results"][0]["source"]["xls_numeric"]
