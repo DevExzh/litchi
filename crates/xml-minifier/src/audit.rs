@@ -10,12 +10,17 @@
     reason = "semantic API types precede their streaming implementation and package submodule"
 )]
 
-use core::{fmt, mem::size_of};
+use core::{fmt, mem::size_of, ops::Range};
 use quick_xml::Reader;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use std::io::{self, BufRead, Read};
+
+use namespaces::{Namespaces, Prefixed};
+
+mod namespaces;
+mod wellformed;
 
 /// Finite resource budgets for one XML document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -234,7 +239,7 @@ impl Limits {
             .max(8 * size_of::<Space>());
         let per_event_attributes = self.attributes.min(token);
         let attribute_entries = per_event_attributes.checked_add(1)?;
-        let attribute_range_size = size_of::<std::ops::Range<usize>>();
+        let attribute_range_size = size_of::<Range<usize>>();
         let attribute_ranges = attribute_entries
             .checked_mul(attribute_range_size)?
             .checked_mul(2)?
@@ -641,10 +646,22 @@ enum Space {
 /// `require_compact` selects whether provable compactness defects are
 /// refused; every structural, encoding, DOCTYPE and finite-budget check runs
 /// under every policy.
+///
+/// `well_formed` selects the complete well-formedness checks of XML 1.0
+/// (Fifth Edition) and Namespaces in XML 1.0 (Third Edition) that quick-xml's
+/// tokenizer does not make: legal characters, names, references, attribute
+/// values, `]]>`, the XML declaration's place and grammar, processing
+/// instruction targets, comments and namespace constraints. Only the source
+/// policy makes them. The authored and default policies keep the historical
+/// tokenizer-level checks, because their callers also audit fragments: markup
+/// wrapped in a synthetic element before it is spliced into a document whose
+/// declarations it relies on, whole documents wrapped the same way, and
+/// streamed pieces of a generated document (see [`verify_authored`]).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Policy {
     reject_ambiguous_space: bool,
     require_compact: bool,
+    well_formed: bool,
 }
 
 impl Policy {
@@ -652,26 +669,32 @@ impl Policy {
     const AUTHORED: Self = Self {
         reject_ambiguous_space: true,
         require_compact: true,
+        well_formed: false,
     };
     /// The historical default: compact, ambiguous space runs admitted.
     const COMPACT: Self = Self {
         reject_ambiguous_space: false,
         require_compact: true,
+        well_formed: false,
     };
-    /// Producer bytes: structure and budgets only, no compactness contract.
+    /// Producer bytes: complete well-formedness and budgets, no compactness
+    /// contract.
     ///
     /// [`verify_source_replacement`] proves a replacement from a scan of one
-    /// window, and that proof relies on every check under this policy being
-    /// local to a token, as the invariant at [`scan`] states: a check may
-    /// read the token's own bytes, the element depth, the aggregate counters
-    /// and the listed uses of `spaces` and `roots`, and nothing else. A new
-    /// check that reads more (a token's offset or ordinal, whether another
-    /// token was seen, the `xml:space` scope) must be replayed into
-    /// [`State::within`] and `Window::prove`, or must make
-    /// `verify_source_replacement` fall back to the complete scan.
+    /// window, and that proof relies on every check under this policy reading
+    /// only what the invariant at [`scan`] lists: the token's own bytes, the
+    /// element depth, the aggregate counters, the listed uses of `spaces` and
+    /// `roots`, and two pieces of position state that a window replays
+    /// exactly — whether the token is the document's first (never, in a
+    /// window) and the namespace bindings in scope (copied from the original's
+    /// audit where the window starts). A new check that reads more (a token's
+    /// offset or ordinal, whether another token was seen, the `xml:space`
+    /// scope) must be replayed into [`State::within`] and `Window::prove`, or
+    /// must make `verify_source_replacement` fall back to the complete scan.
     const SOURCE: Self = Self {
         reject_ambiguous_space: false,
         require_compact: false,
+        well_formed: true,
     };
 }
 
@@ -679,8 +702,17 @@ struct State {
     ambiguous_space_offset: Option<usize>,
     attributes: usize,
     depth: usize,
+    /// No token has been read yet: the only place an XML declaration may
+    /// stand. Read only under the source policy.
+    document_start: bool,
     events: usize,
     max_depth: usize,
+    /// The namespace prefix bindings in scope, created by the first start
+    /// tag under the source policy and never under the others.
+    namespaces: Option<Namespaces>,
+    /// The prefixed attributes of the start tag being checked; emptied for
+    /// each tag and kept only to reuse its allocation.
+    prefixed: Vec<Prefixed>,
     roots: usize,
     spaces: Vec<Space>,
     text_bytes: usize,
@@ -693,8 +725,11 @@ impl State {
             ambiguous_space_offset: None,
             attributes: 0,
             depth: 0,
+            document_start: true,
             events: 0,
             max_depth: 0,
+            namespaces: None,
+            prefixed: Vec::new(),
             roots: 0,
             spaces: Vec::new(),
             text_bytes: 0,
@@ -703,15 +738,27 @@ impl State {
     }
 
     /// The state in which a window is scanned under the source policy: inside
-    /// `depth` open elements of a document whose element has been seen.
+    /// `depth` open elements of a document whose element has been seen, with
+    /// `namespaces` in scope.
     ///
     /// Every field is set explicitly, so that a new field forces a decision
     /// about how a window replays it; the invariant at [`scan`] says which
     /// state a source-policy check may read.
-    fn within(depth: usize) -> Self {
+    fn within(depth: usize, namespaces: Namespaces) -> Self {
         Self {
             // Replayed exactly: the window starts at this depth.
             depth,
+            // Replayed exactly: a window starts inside the document element,
+            // never at the start of the document, so a declaration in it is
+            // refused as the complete scan refuses it.
+            document_start: false,
+            // Replayed exactly: the bindings in scope where the window starts,
+            // copied from the original's audit there. The window's ancestors
+            // declared them in start tags that precede the window, which the
+            // replacement repeats byte for byte.
+            namespaces: Some(namespaces),
+            // Per-tag scratch, emptied before every start tag.
+            prefixed: Vec::new(),
             // Reported, never checked.
             max_depth: depth,
             // Read only at depth zero, which a window never reaches.
@@ -742,6 +789,12 @@ impl State {
 /// This function is an auditor, not a postprocessor: it never changes input
 /// and therefore cannot silently rewrite opaque or mixed-content XML.
 ///
+/// Its structural checks are quick-xml's tokenizer, matched end tags, one
+/// document element, character data only inside it, the attribute grammar
+/// and a valid `xml:space`. It does not make the complete well-formedness
+/// checks of [`verify_source`], so that fragments, whose namespace
+/// declarations belong to an enclosing document, can be audited too.
+///
 /// # Errors
 ///
 /// Returns [`Error`] for invalid UTF-8, malformed XML, a finite resource-limit
@@ -758,6 +811,15 @@ pub fn verify(input: &[u8], limits: Limits) -> Result<Report, Error> {
 /// from formatting indentation. Authors that require those spaces must make
 /// the preservation intent explicit with `xml:space="preserve"`.
 ///
+/// Like [`verify`], it makes the tokenizer-level structural checks and not
+/// the complete well-formedness checks of [`verify_source`]. Its callers also
+/// audit fragments: markup wrapped in a synthetic element before it is
+/// spliced into a document that declares its namespace prefixes, whole
+/// documents wrapped the same way, and the streamed pieces of a generated
+/// document. None of those is a complete document on its own, so an
+/// undeclared prefix or a nested declaration there is not a defect of the
+/// audited bytes.
+///
 /// # Errors
 ///
 /// Returns [`Error`] for every failure reported by [`verify`], or
@@ -773,7 +835,26 @@ pub fn verify_authored(input: &[u8], limits: Limits) -> Result<Report, Error> {
 /// structural and finite-budget check [`verify`] performs — UTF-8, well-formed
 /// XML, exactly one document element, character data only inside it, no DTD or
 /// DOCTYPE, and each [`Limits`] budget — and does **not** assert this
-/// repository's compact output contract. Indentation and line endings between
+/// repository's compact output contract.
+///
+/// Well-formed here means well-formed under XML 1.0 (Fifth Edition) and
+/// namespace-well-formed under Namespaces in XML 1.0 (Third Edition), for a
+/// complete document without a DTD, which the tokenizer-level checks of
+/// [`verify`] do not establish on their own: every character is an XML
+/// `Char`; element and attribute names are qualified names, and
+/// processing-instruction targets are names without a colon other than
+/// `xml`; every reference names one of the five predefined entities or a
+/// legal character, and none stands outside the document element; attribute
+/// values hold no `<`; character data holds no `]]>`; comments hold no `--`
+/// and do not end with `-`; an XML declaration stands only at the start of
+/// the document and declares version `1.x`, then optionally the UTF-8
+/// encoding this audit reads and `standalone`, in that order; every prefix is
+/// declared, no prefix is undeclared, the `xml` and `xmlns` prefixes and
+/// namespace names are used only as reserved, and no element carries two
+/// attributes with the same namespace name and local name. Each defect is an
+/// [`Error::Malformed`] at its offset.
+///
+/// Indentation and line endings between
 /// elements, a line ending after the XML declaration, attribute separators of
 /// any length or kind, and whitespace before a tag close are accepted as the
 /// producer spelled them, so no [`Error::NotCompact`] is ever returned.
@@ -810,9 +891,9 @@ pub enum ReplacementProof {
     /// parser state the original's audit had reached at the element.
     Window {
         /// The replaced element's span in the original.
-        original: core::ops::Range<usize>,
+        original: Range<usize>,
         /// The replacement bytes that took its place.
-        replacement: core::ops::Range<usize>,
+        replacement: Range<usize>,
     },
     /// The replacement was scanned completely, as [`verify_source`] scans it.
     Complete,
@@ -996,6 +1077,7 @@ fn verify_reader_with_policy<R: BufRead>(
     let policy = Policy {
         reject_ambiguous_space,
         require_compact: true,
+        well_formed: false,
     };
     let token_window = limits
         .token_bytes
@@ -1069,8 +1151,7 @@ fn verify_reader_with_policy<R: BufRead>(
             Event::Start(tag) => {
                 finish_text_run(&mut state, policy.reject_ambiguous_space)
                     .map_err(StreamError::Audit)?;
-                check_start(raw, false, start, policy.require_compact)
-                    .map_err(StreamError::Audit)?;
+                check_start(raw, false, start, policy, &mut state).map_err(StreamError::Audit)?;
                 let space = inspect_attributes(
                     &tag,
                     reader.decoder(),
@@ -1090,8 +1171,7 @@ fn verify_reader_with_policy<R: BufRead>(
             Event::Empty(tag) => {
                 finish_text_run(&mut state, policy.reject_ambiguous_space)
                     .map_err(StreamError::Audit)?;
-                check_start(raw, true, start, policy.require_compact)
-                    .map_err(StreamError::Audit)?;
+                check_start(raw, true, start, policy, &mut state).map_err(StreamError::Audit)?;
                 inspect_attributes(
                     &tag,
                     reader.decoder(),
@@ -1161,8 +1241,7 @@ fn verify_reader_with_policy<R: BufRead>(
             Event::Decl(_) => {
                 finish_text_run(&mut state, policy.reject_ambiguous_space)
                     .map_err(StreamError::Audit)?;
-                check_declaration(raw, start, policy.require_compact)
-                    .map_err(StreamError::Audit)?;
+                check_declaration(raw, start, policy, false).map_err(StreamError::Audit)?;
             },
             Event::Comment(_) | Event::PI(_) => {
                 finish_text_run(&mut state, policy.reject_ambiguous_space)
@@ -1543,8 +1622,24 @@ fn verify_observed<O: Observer>(
     } else {
         0
     };
+    // Found in one pass over the whole input, and reported in source order,
+    // at the token that holds it.
+    let characters = if policy.well_formed {
+        wellformed::scan_characters(input)
+    } else {
+        wellformed::Characters {
+            illegal: None,
+            cdata_close: input.len(),
+        }
+    };
+    let source = Source {
+        input,
+        xml,
+        bom_bytes,
+        characters,
+    };
     let mut state = State::new();
-    scan(input, xml, bom_bytes, limits, policy, &mut state, observer)?;
+    scan(source, limits, policy, &mut state, observer)?;
 
     if state.depth != 0 {
         return Err(Error::malformed(input.len(), "unclosed document element"));
@@ -1565,12 +1660,24 @@ fn verify_observed<O: Observer>(
     })
 }
 
-/// The slice auditor's token loop: every token from the start of `xml` to
-/// its EOF, checked from `state` onward.
-///
-/// `input` is the same text as `xml` plus a leading byte-order mark of
-/// `bom_bytes` bytes, which quick-xml consumes without counting it; raw spans
-/// and diagnostics address `input`.
+/// The text one slice scan reads.
+#[derive(Clone, Copy)]
+struct Source<'a> {
+    /// The bytes, including any leading byte-order mark; raw spans and
+    /// diagnostics address them.
+    input: &'a [u8],
+    /// `input` without the byte-order mark, which quick-xml consumes without
+    /// counting it.
+    xml: &'a str,
+    /// Length of the byte-order mark: 3 or 0.
+    bom_bytes: usize,
+    /// Where `input`'s first character XML does not allow and first `]]>`
+    /// stand, when the policy checks characters.
+    characters: wellformed::Characters,
+}
+
+/// The slice auditor's token loop: every token from the start of
+/// `source.xml` to its EOF, checked from `state` onward.
 ///
 /// # The invariant window proofs rely on
 ///
@@ -1581,8 +1688,8 @@ fn verify_observed<O: Observer>(
 /// only because, under [`Policy::SOURCE`], the checks of a token read nothing
 /// but:
 ///
-/// * the token's own bytes: its lexical layout, attributes, `xml:space` value
-///   and length;
+/// * the token's own bytes: its lexical layout, characters, names,
+///   references, attributes, `xml:space` value and length;
 /// * `state.depth`, for character data, CDATA and references outside the
 ///   document element, the depth budget and an end tag at depth zero; the
 ///   window starts at the depth the original had there;
@@ -1591,7 +1698,17 @@ fn verify_observed<O: Observer>(
 ///   the whole replacement;
 /// * `state.spaces` only as the end-tag balance guard; a window starts with it
 ///   empty, so no enclosing element can be closed from inside the window;
-/// * `state.roots` only at depth zero, which a window never reaches.
+/// * `state.roots` only at depth zero, which a window never reaches;
+/// * `state.document_start`, for the place of the XML declaration; a window
+///   starts inside the document element, so [`State::within`] sets it false
+///   and a declaration in a window is refused, as the complete scan refuses a
+///   declaration anywhere but the start of the document;
+/// * `state.namespaces`, the prefix bindings in scope, for the namespace
+///   constraints; a window starts with the bindings the original's audit had
+///   in scope there, which the window's ancestors declared in start tags that
+///   precede the window and so are identical in the replacement, and a
+///   balanced window closes every binding it opens, so the bindings after it
+///   are the original's too.
 ///
 /// The quick-xml reader over a window likewise starts with no open names, so
 /// it refuses an end tag for an enclosing element. Offsets inside a window
@@ -1599,24 +1716,36 @@ fn verify_observed<O: Observer>(
 /// window path never reports; the `xml:space` scope and the whitespace-run
 /// state serve only compactness checks, which the source policy does not make.
 ///
+/// Characters XML does not allow are found in one pass over the input before
+/// the scan and reported at the token that holds the first; `audit_window`
+/// checks a window's own characters, and the rest of the replacement repeats
+/// bytes the original's audit checked.
+///
 /// **Obligation.** A new check under the source policy that reads anything
-/// else, such as a token's offset or ordinal ("a declaration must come
-/// first"), whether some other token has been seen, the inherited `xml:space`
-/// scope, the root count away from depth zero, or other state of the
-/// enclosing elements, breaks window proofs. It must be replayed into
-/// [`State::within`] and checked by `Window::prove`, or it must make
-/// [`verify_source_replacement`] fall back to the complete scan. Debug builds
-/// re-derive every window proof from a complete audit of the replacement, so a
-/// violation fails any debug test that reaches one.
+/// else, such as a token's offset or ordinal, whether some other token has
+/// been seen, the inherited `xml:space` scope, the root count away from depth
+/// zero, or other state of the enclosing elements, breaks window proofs. It
+/// must be replayed into [`State::within`] and checked by `Window::prove`, or
+/// it must make [`verify_source_replacement`] fall back to the complete scan.
+/// Debug builds re-derive every window proof from a complete audit of the
+/// replacement, so a violation fails any debug test that reaches one.
 fn scan<O: Observer>(
-    input: &[u8],
-    xml: &str,
-    bom_bytes: usize,
+    source: Source<'_>,
     limits: Limits,
     policy: Policy,
     state: &mut State,
     observer: &mut O,
 ) -> Result<(), Error> {
+    let Source {
+        input,
+        xml,
+        bom_bytes,
+        characters,
+    } = source;
+    let illegal = characters.illegal;
+    // Where the next `]]>` at or after the latest text token starts: found
+    // with the characters, and searched for again only past it.
+    let mut cdata_close = characters.cdata_close;
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(false);
 
@@ -1638,14 +1767,23 @@ fn scan<O: Observer>(
         } else {
             Counters::default()
         };
+        let document_start = core::mem::replace(&mut state.document_start, false);
 
         state.events = checked_add(state.events, 1, Resource::Events, limits.events, start)?;
         check_limit(Resource::TokenBytes, limits.token_bytes, raw.len(), start)?;
+        if let Some(at) = illegal
+            && at < end
+        {
+            return Err(Error::malformed(
+                at,
+                wellformed::illegal_character_detail(input, at),
+            ));
+        }
 
         let token = match event {
             Event::Start(tag) => {
                 finish_text_run(state, policy.reject_ambiguous_space)?;
-                check_start(raw, false, start, policy.require_compact)?;
+                check_start(raw, false, start, policy, state)?;
                 let space = inspect_attributes(
                     &tag,
                     reader.decoder(),
@@ -1664,7 +1802,7 @@ fn scan<O: Observer>(
             },
             Event::Empty(tag) => {
                 finish_text_run(state, policy.reject_ambiguous_space)?;
-                check_start(raw, true, start, policy.require_compact)?;
+                check_start(raw, true, start, policy, state)?;
                 inspect_attributes(
                     &tag,
                     reader.decoder(),
@@ -1674,6 +1812,9 @@ fn scan<O: Observer>(
                     start,
                 )?;
                 enter_empty(state, limits, start)?;
+                if let Some(namespaces) = state.namespaces.as_mut() {
+                    namespaces.close(state.depth.saturating_add(1));
+                }
                 Token::Empty
             },
             Event::End(_) => {
@@ -1682,12 +1823,21 @@ fn scan<O: Observer>(
                 if state.depth == 0 || state.spaces.pop().is_none() {
                     return Err(Error::malformed(start, "unexpected end element"));
                 }
+                if let Some(namespaces) = state.namespaces.as_mut() {
+                    namespaces.close(state.depth);
+                }
                 state.depth -= 1;
                 Token::End
             },
             Event::Text(text) => {
                 let bytes = text.as_ref();
                 check_character_context(state.depth, bytes, start)?;
+                if policy.well_formed {
+                    if cdata_close < start {
+                        cdata_close = wellformed::next_cdata_close(input, start);
+                    }
+                    check_character_data(cdata_close, end)?;
+                }
                 charge_text(state, limits, bytes.len(), start)?;
                 let whitespace = is_xml_whitespace(bytes);
                 if policy.require_compact
@@ -1723,7 +1873,11 @@ fn scan<O: Observer>(
                 Token::Markup
             },
             Event::GeneralRef(reference) => {
-                check_character_context(state.depth, reference.as_ref(), start)?;
+                if policy.well_formed {
+                    check_reference_token(state.depth, reference.as_ref(), start)?;
+                } else {
+                    check_character_context(state.depth, reference.as_ref(), start)?;
+                }
                 charge_text(state, limits, raw.len(), start)?;
                 state.ambiguous_space_offset = None;
                 state.text_run_has_explicit_content = true;
@@ -1731,11 +1885,21 @@ fn scan<O: Observer>(
             },
             Event::Decl(_) => {
                 finish_text_run(state, policy.reject_ambiguous_space)?;
-                check_declaration(raw, start, policy.require_compact)?;
+                check_declaration(raw, start, policy, document_start)?;
                 Token::Markup
             },
-            Event::Comment(_) | Event::PI(_) => {
+            Event::Comment(_) => {
                 finish_text_run(state, policy.reject_ambiguous_space)?;
+                if policy.well_formed {
+                    check_comment(raw, start)?;
+                }
+                Token::Markup
+            },
+            Event::PI(_) => {
+                finish_text_run(state, policy.reject_ambiguous_space)?;
+                if policy.well_formed {
+                    check_processing_instruction(raw, start)?;
+                }
                 Token::Markup
             },
             Event::DocType(_) => {
@@ -1915,11 +2079,20 @@ impl<'r> WindowSearch<'r> {
             return;
         }
         self.stopped = true;
-        self.found = Counters::of(state).since(before).map(|removed| Window {
-            original: start..end,
-            replacement: start..window_end,
-            depth: state.depth,
-            removed,
+        // The element has closed, so the bindings in scope are its
+        // ancestors': the ones in scope where the window starts. A window
+        // whose copy of them cannot be allocated is not used.
+        self.found = Counters::of(state).since(before).and_then(|removed| {
+            Some(Window {
+                original: start..end,
+                replacement: start..window_end,
+                depth: state.depth,
+                removed,
+                namespaces: match &state.namespaces {
+                    Some(namespaces) => namespaces.try_clone()?,
+                    None => Namespaces::new(),
+                },
+            })
         });
     }
 }
@@ -1963,12 +2136,14 @@ impl Observer for WindowSearch<'_> {
 /// its place.
 #[derive(Debug)]
 struct Window {
-    original: core::ops::Range<usize>,
-    replacement: core::ops::Range<usize>,
+    original: Range<usize>,
+    replacement: Range<usize>,
     /// Elements open around the window; at least one, the document element.
     depth: usize,
     /// Counters the original element was charged.
     removed: Counters,
+    /// The namespace bindings in scope where the window starts.
+    namespaces: Namespaces,
 }
 
 impl Window {
@@ -1991,7 +2166,7 @@ impl Window {
             return None;
         }
         let bytes = replacement.get(self.replacement.clone())?;
-        let added = audit_window(bytes, limits, self.depth)?;
+        let added = audit_window(bytes, limits, self.depth, self.namespaces)?;
         let totals = Counters {
             attributes: original.attributes,
             events: original.events,
@@ -2009,20 +2184,36 @@ impl Window {
 }
 
 /// Audit `bytes` under the source policy as the content that replaced one
-/// element with `depth` elements open around it: the document element is
-/// open, and no element opened outside the window may be closed inside it.
+/// element with `depth` elements open around it and `namespaces` in scope:
+/// the document element is open, and no element opened outside the window
+/// may be closed inside it.
 ///
 /// Returns the counters the window is charged, excluding its own EOF event,
-/// or `None` when the window fails a check, is not balanced, or does not begin
-/// and end with markup.
-fn audit_window(bytes: &[u8], limits: Limits, depth: usize) -> Option<Counters> {
+/// or `None` when the window fails a check, holds a character XML does not
+/// allow, is not balanced, or does not begin and end with markup.
+fn audit_window(
+    bytes: &[u8],
+    limits: Limits,
+    depth: usize,
+    namespaces: Namespaces,
+) -> Option<Counters> {
     if depth == 0 || bytes.first() != Some(&b'<') {
         return None;
     }
     let xml = std::str::from_utf8(bytes).ok()?;
-    let mut state = State::within(depth);
+    let characters = wellformed::scan_characters(bytes);
+    if characters.illegal.is_some() {
+        return None;
+    }
+    let source = Source {
+        input: bytes,
+        xml,
+        bom_bytes: 0,
+        characters,
+    };
+    let mut state = State::within(depth, namespaces);
     let mut last = LastToken::default();
-    scan(bytes, xml, 0, limits, Policy::SOURCE, &mut state, &mut last).ok()?;
+    scan(source, limits, Policy::SOURCE, &mut state, &mut last).ok()?;
     if state.depth != depth || !last.is_markup_ending_at(bytes.len()) {
         return None;
     }
@@ -2144,6 +2335,41 @@ fn check_character_context(depth: usize, bytes: &[u8], offset: usize) -> Result<
     Ok(())
 }
 
+/// Character data holds no `]]>`: `close` is where the first `]]>` at or
+/// after the start of a text token that ends at `end` begins.
+fn check_character_data(close: usize, end: usize) -> Result<(), Error> {
+    if close.saturating_add(3) <= end {
+        return Err(Error::malformed(
+            close,
+            "']]>' is not allowed in character data",
+        ));
+    }
+    Ok(())
+}
+
+/// A reference, whose text is between `&` and `;`, stands inside the
+/// document element and names a predefined entity or a legal character.
+fn check_reference_token(depth: usize, content: &[u8], offset: usize) -> Result<(), Error> {
+    if depth == 0 {
+        // Only comments, processing instructions and whitespace may stand
+        // outside the document element, and a reference is character data.
+        return Err(Error::malformed(
+            offset,
+            "character data outside the document element",
+        ));
+    }
+    wellformed::check_reference(content).map_err(|detail| Error::malformed(offset, detail))
+}
+
+fn check_comment(raw: &[u8], offset: usize) -> Result<(), Error> {
+    wellformed::check_comment(raw).map_err(|(at, detail)| Error::malformed(offset + at, detail))
+}
+
+fn check_processing_instruction(raw: &[u8], offset: usize) -> Result<(), Error> {
+    wellformed::check_processing_instruction(raw)
+        .map_err(|(at, detail)| Error::malformed(offset + at, detail))
+}
+
 fn enter_element(state: &mut State, limits: Limits, offset: usize) -> Result<(), Error> {
     if state.depth == 0 {
         if state.roots != 0 {
@@ -2206,14 +2432,36 @@ fn inspect_attributes(
     Ok(space)
 }
 
-fn check_declaration(raw: &[u8], offset: usize, compact: bool) -> Result<(), Error> {
+/// Checks an XML declaration token. Under a well-formed policy it must be
+/// the document's first token and follow the declaration grammar.
+fn check_declaration(
+    raw: &[u8],
+    offset: usize,
+    policy: Policy,
+    document_start: bool,
+) -> Result<(), Error> {
+    if policy.well_formed && !document_start {
+        return Err(Error::malformed(
+            offset,
+            "an XML declaration is allowed only at the start of the document",
+        ));
+    }
     let Some(inner) = raw
         .strip_prefix(b"<?")
         .and_then(|value| value.strip_suffix(b"?>"))
     else {
         return Err(Error::malformed(offset, "invalid XML declaration boundary"));
     };
-    check_attribute_layout(inner, offset + 2, compact)
+    let names_end = inner
+        .iter()
+        .position(|byte| is_space(*byte))
+        .unwrap_or(inner.len());
+    check_attribute_layout(inner, names_end, offset + 2, policy, |_attribute| Ok(()))?;
+    if policy.well_formed {
+        wellformed::check_declaration_grammar(raw)
+            .map_err(|(at, detail)| Error::malformed(offset + at, detail))?;
+    }
+    Ok(())
 }
 
 fn check_end(raw: &[u8], offset: usize, compact: bool) -> Result<(), Error> {
@@ -2249,7 +2497,17 @@ fn check_end(raw: &[u8], offset: usize, compact: bool) -> Result<(), Error> {
     Ok(())
 }
 
-fn check_start(raw: &[u8], empty: bool, offset: usize, compact: bool) -> Result<(), Error> {
+/// Checks one start or empty-element tag: its layout, and under a
+/// well-formed policy its element and attribute names, its attribute values,
+/// and its namespace declarations and prefixes, which it binds for the
+/// element at `state.depth + 1`.
+fn check_start(
+    raw: &[u8],
+    empty: bool,
+    offset: usize,
+    policy: Policy,
+    state: &mut State,
+) -> Result<(), Error> {
     let Some(without_open) = raw.strip_prefix(b"<") else {
         return Err(Error::malformed(offset, "invalid start-tag boundary"));
     };
@@ -2259,13 +2517,99 @@ fn check_start(raw: &[u8], empty: bool, offset: usize, compact: bool) -> Result<
         without_open.strip_suffix(b">")
     }
     .ok_or_else(|| Error::malformed(offset, "invalid start-tag close"))?;
-    check_attribute_layout(inner, offset + 1, compact)
+    let inner_offset = offset + 1;
+    if !policy.well_formed {
+        let name_end = inner
+            .iter()
+            .position(|byte| is_space(*byte))
+            .unwrap_or(inner.len());
+        return check_attribute_layout(inner, name_end, inner_offset, policy, |_attribute| Ok(()));
+    }
+
+    let (name_end, colon) = wellformed::scan_qname(inner, 0, false);
+    let colon = colon.map_err(|detail| Error::malformed(inner_offset, detail))?;
+    let depth = state.depth.saturating_add(1);
+    let State {
+        namespaces,
+        prefixed,
+        ..
+    } = state;
+    let namespaces = namespaces.get_or_insert_with(Namespaces::new);
+    prefixed.clear();
+    check_attribute_layout(inner, name_end, inner_offset, policy, |attribute| {
+        let name = &inner[attribute.name.clone()];
+        let value = &inner[attribute.value];
+        let at = inner_offset + attribute.name.start;
+        match attribute.colon {
+            None if name == b"xmlns" => namespaces.declare(None, value, depth, at),
+            None => Ok(()),
+            Some(colon) => match &inner[attribute.name.start..colon] {
+                b"xmlns" => namespaces.declare(
+                    Some(&inner[colon + 1..attribute.name.end]),
+                    value,
+                    depth,
+                    at,
+                ),
+                // `xml` is bound by definition and no other prefix may share
+                // its namespace name, so an `xml:` attribute needs neither
+                // resolution nor an expanded-name comparison.
+                b"xml" => Ok(()),
+                _ => {
+                    prefixed
+                        .try_reserve(1)
+                        .map_err(|_allocation| Error::Allocation)?;
+                    prefixed.push(Prefixed::new(
+                        attribute.name.start,
+                        colon,
+                        attribute.name.end,
+                    ));
+                    Ok(())
+                },
+            },
+        }
+    })?;
+    namespaces.check_tag(inner, colon, prefixed, inner_offset)
 }
 
-fn check_attribute_layout(inner: &[u8], offset: usize, compact: bool) -> Result<(), Error> {
-    let Some(mut cursor) = inner.iter().position(|byte| is_space(*byte)) else {
+/// The bytes an attribute value scan stops at: both quotes, `<` and `&`.
+static VALUE_STOP: [bool; 256] = {
+    let mut stop = [false; 256];
+    stop[b'"' as usize] = true;
+    stop[b'\'' as usize] = true;
+    stop[b'<' as usize] = true;
+    stop[b'&' as usize] = true;
+    stop
+};
+
+/// One attribute [`check_attribute_layout`] found. Offsets are within the
+/// text it was given.
+struct AttributeSpan {
+    name: Range<usize>,
+    /// The name's colon, if it has one; found only under a well-formed
+    /// policy.
+    colon: Option<usize>,
+    value: Range<usize>,
+}
+
+/// Checks the attributes of a tag or declaration, `inner`, whose name ends at
+/// `names_end`: their separation and layout, and under a well-formed policy
+/// that each name is a qualified name and each value is well-formed; then
+/// passes each to `visit`, in order.
+fn check_attribute_layout<F>(
+    inner: &[u8],
+    names_end: usize,
+    offset: usize,
+    policy: Policy,
+    mut visit: F,
+) -> Result<(), Error>
+where
+    F: FnMut(AttributeSpan) -> Result<(), Error>,
+{
+    let compact = policy.require_compact;
+    if names_end >= inner.len() {
         return Ok(());
-    };
+    }
+    let mut cursor = names_end;
 
     loop {
         let separator = cursor;
@@ -2290,12 +2634,18 @@ fn check_attribute_layout(inner: &[u8], offset: usize, compact: bool) -> Result<
         }
 
         let name_start = cursor;
-        while cursor < inner.len() && !is_space(inner[cursor]) && inner[cursor] != b'=' {
-            cursor += 1;
+        let mut name = Ok(None);
+        if policy.well_formed {
+            (cursor, name) = wellformed::scan_qname(inner, name_start, true);
+        } else {
+            while cursor < inner.len() && !is_space(inner[cursor]) && inner[cursor] != b'=' {
+                cursor += 1;
+            }
         }
         if cursor == name_start {
             return Err(Error::malformed(offset + cursor, "missing attribute name"));
         }
+        let name_end = cursor;
         if cursor == inner.len() || is_space(inner[cursor]) {
             if compact {
                 return Err(Error::NotCompact(Violation {
@@ -2342,8 +2692,23 @@ fn check_attribute_layout(inner: &[u8], offset: usize, compact: bool) -> Result<
             ));
         }
         cursor += 1;
-        while cursor < inner.len() && inner[cursor] != quote {
-            cursor += 1;
+        let value_start = cursor;
+        // One pass over the value, stopping only at quotes, `<` and `&`: the
+        // last two are rare, and only a value that holds one is checked
+        // further.
+        let mut markup = false;
+        loop {
+            while cursor < inner.len() && !VALUE_STOP[usize::from(inner[cursor])] {
+                cursor += 1;
+            }
+            match inner.get(cursor) {
+                None => break,
+                Some(&byte) if byte == quote => break,
+                Some(&byte) => {
+                    markup |= byte != b'"' && byte != b'\'';
+                    cursor += 1;
+                },
+            }
         }
         if cursor == inner.len() {
             return Err(Error::malformed(
@@ -2351,6 +2716,21 @@ fn check_attribute_layout(inner: &[u8], offset: usize, compact: bool) -> Result<
                 "unterminated attribute value",
             ));
         }
+        let mut colon = None;
+        if policy.well_formed {
+            colon = name
+                .map_err(|detail| Error::malformed(offset + name_start, detail))?
+                .map(|colon| name_start + colon);
+            if markup {
+                wellformed::check_attribute_value(&inner[value_start..cursor])
+                    .map_err(|(at, detail)| Error::malformed(offset + value_start + at, detail))?;
+            }
+        }
+        visit(AttributeSpan {
+            name: name_start..name_end,
+            colon,
+            value: value_start..cursor,
+        })?;
         cursor += 1;
         if cursor == inner.len() {
             return Ok(());
