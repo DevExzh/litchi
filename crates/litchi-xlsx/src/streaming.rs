@@ -205,6 +205,21 @@ pub struct StreamingWorkbookWriter<W: Write> {
     poison_message: Option<String>,
 }
 
+/// Borrows the fields of a [`StreamingWorkbookWriter`] that a failure
+/// poisons, and nothing else. A closure or statement using it leaves the
+/// writer's execution context free to back an open scoped reservation.
+macro_rules! poison_target {
+    ($writer:expr) => {
+        PoisonTarget {
+            part: &mut $writer.part,
+            poisoned: &mut $writer.poisoned,
+            poison_message: &mut $writer.poison_message,
+            output_counter: &$writer.output_counter,
+            execution_state: &$writer.execution_state,
+        }
+    };
+}
+
 impl<W: Write> StreamingWorkbookWriter<W> {
     /// Create a writer and publish the five static package members.
     ///
@@ -415,10 +430,12 @@ impl<W: Write> StreamingWorkbookWriter<W> {
             self.last_row = Some(row);
             return Ok(());
         }
+        // The reservation borrows the context for the row's one write, so it
+        // costs one budget charge and no handle of its own.
         let object_reservation = self
             .context
-            .reserve(Resource::Objects, row_cells.saturating_add(1))
-            .map_err(|error| self.poison_execution(error))?;
+            .reserve_scoped(Resource::Objects, row_cells.saturating_add(1))
+            .map_err(|error| poison_target!(self).execution(error))?;
         {
             let next_sheet_bytes = self
                 .sheet_xml_bytes
@@ -432,7 +449,7 @@ impl<W: Write> StreamingWorkbookWriter<W> {
                 .as_mut()
                 .ok_or_else(|| invalid("streaming XLSX part is unavailable"))?;
             if let Err(error) = part.write_all(&self.row_scratch) {
-                return Err(self.poison_io(error));
+                return Err(poison_target!(self).io(error));
             }
             if !object_reservation.commit(row_cells.saturating_add(1)) {
                 return Err(invalid("streaming XLSX row object reservation underflow"));
@@ -518,32 +535,7 @@ impl<W: Write> StreamingWorkbookWriter<W> {
     }
 
     fn poison_execution(&mut self, error: litchi_core::ExecutionError) -> Error {
-        self.poisoned = true;
-        self.poison_message = Some(error.to_string());
-        execution_failure(error, self.output_bytes())
-    }
-
-    fn poison_io(&mut self, error: io::Error) -> Error {
-        self.poisoned = true;
-        let output = self.output_bytes();
-        if let Some(execution) = execution_from_io_error(&error) {
-            self.part.take();
-            let mapped = execution_failure(execution, output);
-            self.poison_message = Some(mapped.to_string());
-            return mapped;
-        }
-        let mapped = if let Some(part) = self.part.take() {
-            match part.finish() {
-                Err(error) => {
-                    package_error_with_progress_or_execution(error, output, &self.execution_state)
-                },
-                Ok(_) => incomplete_io_error_or_execution(error, output, &self.execution_state),
-            }
-        } else {
-            incomplete_io_error_or_execution(error, output, &self.execution_state)
-        };
-        self.poison_message = Some(format!("{mapped}; accepted output bytes: {output}"));
-        mapped
+        poison_target!(self).execution(error)
     }
 
     fn poison_error(&self) -> Error {
@@ -552,6 +544,47 @@ impl<W: Write> StreamingWorkbookWriter<W> {
                 .as_deref()
                 .unwrap_or("streaming XLSX writer is poisoned"),
         )
+    }
+}
+
+/// The writer fields a failure poisons, borrowed apart from the execution
+/// context so a row's scoped reservation can stay open meanwhile.
+struct PoisonTarget<'writer, W: Write> {
+    part: &'writer mut Option<PartWriter<BudgetedOutput<W>>>,
+    poisoned: &'writer mut bool,
+    poison_message: &'writer mut Option<String>,
+    output_counter: &'writer AtomicU64,
+    execution_state: &'writer ExecutionFailureState,
+}
+
+impl<W: Write> PoisonTarget<'_, W> {
+    fn execution(self, error: litchi_core::ExecutionError) -> Error {
+        *self.poisoned = true;
+        *self.poison_message = Some(error.to_string());
+        execution_failure(error, self.output_counter.load(Ordering::Acquire))
+    }
+
+    fn io(self, error: io::Error) -> Error {
+        *self.poisoned = true;
+        let output = self.output_counter.load(Ordering::Acquire);
+        if let Some(execution) = execution_from_io_error(&error) {
+            self.part.take();
+            let mapped = execution_failure(execution, output);
+            *self.poison_message = Some(mapped.to_string());
+            return mapped;
+        }
+        let mapped = if let Some(part) = self.part.take() {
+            match part.finish() {
+                Err(error) => {
+                    package_error_with_progress_or_execution(error, output, self.execution_state)
+                },
+                Ok(_) => incomplete_io_error_or_execution(error, output, self.execution_state),
+            }
+        } else {
+            incomplete_io_error_or_execution(error, output, self.execution_state)
+        };
+        *self.poison_message = Some(format!("{mapped}; accepted output bytes: {output}"));
+        mapped
     }
 }
 

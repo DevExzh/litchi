@@ -424,8 +424,19 @@ enum Phase {
 /// underlying ZIP/Deflate implementation retain transport state outside this
 /// writer's accounting surface.
 pub struct StreamingDocumentWriter<W: Write> {
-    part: Option<PartWriter<BudgetedOutput<W>>>,
+    state: DocumentState<W>,
     context: ExecutionContext,
+    _scratch: Reservation,
+}
+
+/// Everything a [`StreamingDocumentWriter`] mutates while it emits XML.
+///
+/// It is kept apart from the writer's [`ExecutionContext`] so that a budget
+/// reservation borrowed from the context can stay open while this state
+/// emits. The owned sink is declared first, so it is still the first thing
+/// the writer drops.
+struct DocumentState<W: Write> {
+    part: Option<PartWriter<BudgetedOutput<W>>>,
     limits: StreamingDocumentLimits,
     phase: Phase,
     paragraphs: u64,
@@ -434,7 +445,6 @@ pub struct StreamingDocumentWriter<W: Write> {
     document_xml_bytes: u64,
     output_counter: Arc<AtomicU64>,
     execution_state: Arc<ExecutionFailureState>,
-    _scratch: Reservation,
     poison: Option<PoisonReason>,
 }
 
@@ -526,82 +536,90 @@ impl<W: Write> StreamingDocumentWriter<W> {
             ));
         }
         Ok(Self {
-            part: Some(part),
+            state: DocumentState {
+                part: Some(part),
+                limits,
+                phase: Phase::Ready,
+                paragraphs: 0,
+                runs: 0,
+                input_bytes: 0,
+                document_xml_bytes: document_prefix_bytes,
+                output_counter,
+                execution_state,
+                poison: None,
+            },
             context,
-            limits,
-            phase: Phase::Ready,
-            paragraphs: 0,
-            runs: 0,
-            input_bytes: 0,
-            document_xml_bytes: document_prefix_bytes,
-            output_counter,
-            execution_state,
             _scratch: scratch,
-            poison: None,
         })
     }
 
     /// Number of paragraphs successfully started.
     #[must_use]
     pub const fn paragraph_count(&self) -> u64 {
-        self.paragraphs
+        self.state.paragraphs
     }
 
     /// Number of runs successfully started.
     #[must_use]
     pub const fn run_count(&self) -> u64 {
-        self.runs
+        self.state.runs
     }
 
     /// UTF-8 input bytes successfully committed to completed text calls.
     #[must_use]
     pub const fn input_bytes(&self) -> u64 {
-        self.input_bytes
+        self.state.input_bytes
     }
 
     /// Uncompressed `/word/document.xml` bytes accepted so far.
     #[must_use]
     pub const fn document_xml_bytes(&self) -> u64 {
-        self.document_xml_bytes
+        self.state.document_xml_bytes
     }
 
     /// Number of bytes accepted by the caller's sink.
     #[must_use]
     pub fn output_bytes(&self) -> u64 {
-        self.output_counter.load(Ordering::Acquire)
+        self.state.output_counter.load(Ordering::Acquire)
     }
 
     /// Whether a sink, cancellation, limit, or finalization failure poisoned
     /// this writer.
     #[must_use]
     pub const fn is_poisoned(&self) -> bool {
-        self.poison.is_some()
+        self.state.poison.is_some()
     }
 
     /// Start the next logical paragraph.
     pub fn start_paragraph(&mut self) -> Result<(), StreamingDocumentError> {
-        self.ensure_usable()?;
-        if !matches!(self.phase, Phase::Ready) {
-            return Err(self.state_error("a paragraph is already open"));
+        self.state.ensure_usable()?;
+        if !matches!(self.state.phase, Phase::Ready) {
+            return Err(self.state.state_error("a paragraph is already open"));
         }
         self.context
             .check()
-            .map_err(|error| self.fail_execution(error))?;
-        let observed = checked_increment(self.paragraphs, "paragraphs")
-            .map_err(|resource| self.fail_overflow(resource))?;
-        if observed > self.limits.max_paragraphs {
-            return Err(self.fail_limit("paragraphs", observed, self.limits.max_paragraphs));
+            .map_err(|error| self.state.fail_execution(error))?;
+        let observed = checked_increment(self.state.paragraphs, "paragraphs")
+            .map_err(|resource| self.state.fail_overflow(resource))?;
+        if observed > self.state.limits.max_paragraphs {
+            return Err(self.state.fail_limit(
+                "paragraphs",
+                observed,
+                self.state.limits.max_paragraphs,
+            ));
         }
         let paragraph_bytes = usize_to_u64(PARAGRAPH_PREFIX.len(), "paragraph XML bytes")
-            .map_err(|resource| self.fail_overflow(resource))?;
-        self.preflight_document_and_paragraph(paragraph_bytes, paragraph_bytes)?;
+            .map_err(|resource| self.state.fail_overflow(resource))?;
+        self.state
+            .preflight_document_and_paragraph(paragraph_bytes, paragraph_bytes)?;
         self.context
             .consume(Resource::Objects, 1)
             .and_then(|_| self.context.consume(Resource::Work, 1))
-            .map_err(|error| self.fail_execution(error))?;
-        self.emit_document(PARAGRAPH_PREFIX, paragraph_bytes, Some(paragraph_bytes))?;
-        self.paragraphs = observed;
-        self.phase = Phase::Paragraph {
+            .map_err(|error| self.state.fail_execution(error))?;
+        self.state
+            .emit_document(PARAGRAPH_PREFIX, paragraph_bytes, Some(paragraph_bytes))?;
+        self.state.paragraphs = observed;
+        self.state.phase = Phase::Paragraph {
             run_open: false,
             run_count: 0,
             run_text_bytes: 0,
@@ -612,49 +630,55 @@ impl<W: Write> StreamingDocumentWriter<W> {
 
     /// Start a plain text run in the current paragraph.
     pub fn start_run(&mut self) -> Result<(), StreamingDocumentError> {
-        self.ensure_usable()?;
+        self.state.ensure_usable()?;
         let Phase::Paragraph {
             run_open,
             run_count,
             paragraph_xml_bytes,
             ..
-        } = self.phase
+        } = self.state.phase
         else {
-            return Err(self.state_error("a paragraph must be open before a run"));
+            return Err(self
+                .state
+                .state_error("a paragraph must be open before a run"));
         };
         if run_open {
-            return Err(self.state_error("a run is already open"));
+            return Err(self.state.state_error("a run is already open"));
         }
         self.context
             .check()
-            .map_err(|error| self.fail_execution(error))?;
-        let observed_runs = checked_increment(self.runs, "runs")
-            .map_err(|resource| self.fail_overflow(resource))?;
-        if observed_runs > self.limits.max_runs {
-            return Err(self.fail_limit("runs", observed_runs, self.limits.max_runs));
+            .map_err(|error| self.state.fail_execution(error))?;
+        let observed_runs = checked_increment(self.state.runs, "runs")
+            .map_err(|resource| self.state.fail_overflow(resource))?;
+        if observed_runs > self.state.limits.max_runs {
+            return Err(self
+                .state
+                .fail_limit("runs", observed_runs, self.state.limits.max_runs));
         }
         let observed_paragraph_runs = checked_increment(run_count, "runs per paragraph")
-            .map_err(|resource| self.fail_overflow(resource))?;
-        if observed_paragraph_runs > self.limits.max_runs_per_paragraph {
-            return Err(self.fail_limit(
+            .map_err(|resource| self.state.fail_overflow(resource))?;
+        if observed_paragraph_runs > self.state.limits.max_runs_per_paragraph {
+            return Err(self.state.fail_limit(
                 "runs per paragraph",
                 observed_paragraph_runs,
-                self.limits.max_runs_per_paragraph,
+                self.state.limits.max_runs_per_paragraph,
             ));
         }
         let run_bytes = usize_to_u64(RUN_PREFIX.len(), "paragraph XML bytes")
-            .map_err(|resource| self.fail_overflow(resource))?;
+            .map_err(|resource| self.state.fail_overflow(resource))?;
         let next_paragraph_bytes =
             checked_add(paragraph_xml_bytes, run_bytes, "paragraph XML bytes")
-                .map_err(|resource| self.fail_overflow(resource))?;
-        self.preflight_document_and_paragraph(run_bytes, next_paragraph_bytes)?;
+                .map_err(|resource| self.state.fail_overflow(resource))?;
+        self.state
+            .preflight_document_and_paragraph(run_bytes, next_paragraph_bytes)?;
         self.context
             .consume(Resource::Objects, 1)
             .and_then(|_| self.context.consume(Resource::Work, 1))
-            .map_err(|error| self.fail_execution(error))?;
-        self.emit_document(RUN_PREFIX, run_bytes, Some(run_bytes))?;
-        self.runs = observed_runs;
-        self.phase = Phase::Paragraph {
+            .map_err(|error| self.state.fail_execution(error))?;
+        self.state
+            .emit_document(RUN_PREFIX, run_bytes, Some(run_bytes))?;
+        self.state.runs = observed_runs;
+        self.state.phase = Phase::Paragraph {
             run_open: true,
             run_count: observed_paragraph_runs,
             run_text_bytes: 0,
@@ -669,50 +693,61 @@ impl<W: Write> StreamingDocumentWriter<W> {
     /// emitted.  Tabs, line feeds, and carriage returns are rejected because
     /// they require structural `w:tab`, `w:br`, or `w:cr` elements.
     pub fn write_text(&mut self, text: &str) -> Result<(), StreamingDocumentError> {
-        self.ensure_usable()?;
+        self.state.ensure_usable()?;
         let Phase::Paragraph {
             run_open: true,
             run_text_bytes,
             paragraph_xml_bytes,
             ..
-        } = self.phase
+        } = self.state.phase
         else {
-            return Err(self.state_error("text may only be written while a run is open"));
+            return Err(self
+                .state
+                .state_error("text may only be written while a run is open"));
         };
         self.context
             .check()
-            .map_err(|error| self.fail_execution(error))?;
+            .map_err(|error| self.state.fail_execution(error))?;
         let input_bytes = usize_to_u64(text.len(), "input bytes")
-            .map_err(|resource| self.fail_overflow(resource))?;
+            .map_err(|resource| self.state.fail_overflow(resource))?;
         let next_run_bytes = checked_add(run_text_bytes, input_bytes, "run text bytes")
-            .map_err(|resource| self.fail_overflow(resource))?;
-        if next_run_bytes > self.limits.max_run_text_bytes {
-            return Err(self.fail_limit(
+            .map_err(|resource| self.state.fail_overflow(resource))?;
+        if next_run_bytes > self.state.limits.max_run_text_bytes {
+            return Err(self.state.fail_limit(
                 "run text bytes",
                 next_run_bytes,
-                self.limits.max_run_text_bytes,
+                self.state.limits.max_run_text_bytes,
             ));
         }
-        let next_input = checked_add(self.input_bytes, input_bytes, "input bytes")
-            .map_err(|resource| self.fail_overflow(resource))?;
-        if next_input > self.limits.max_input_bytes {
-            return Err(self.fail_limit("input bytes", next_input, self.limits.max_input_bytes));
+        let next_input = checked_add(self.state.input_bytes, input_bytes, "input bytes")
+            .map_err(|resource| self.state.fail_overflow(resource))?;
+        if next_input > self.state.limits.max_input_bytes {
+            return Err(self.state.fail_limit(
+                "input bytes",
+                next_input,
+                self.state.limits.max_input_bytes,
+            ));
         }
-        let (encoded_bytes, _text_chars) = self.encoded_text_size(text)?;
+        let (encoded_bytes, _text_chars) = self.state.encoded_text_size(&self.context, text)?;
         let next_paragraph_bytes =
             checked_add(paragraph_xml_bytes, encoded_bytes, "paragraph XML bytes")
-                .map_err(|resource| self.fail_overflow(resource))?;
-        self.preflight_document_and_paragraph(encoded_bytes, next_paragraph_bytes)?;
+                .map_err(|resource| self.state.fail_overflow(resource))?;
+        self.state
+            .preflight_document_and_paragraph(encoded_bytes, next_paragraph_bytes)?;
+        // The reservation borrows the context while the state emits, so it
+        // costs one budget charge and no handle of its own.
         let input_reservation = self
             .context
-            .reserve(Resource::InputBytes, input_bytes)
-            .map_err(|error| self.fail_execution(error))?;
-        self.emit_escaped_text(text)?;
+            .reserve_scoped(Resource::InputBytes, input_bytes)
+            .map_err(|error| self.state.fail_execution(error))?;
+        self.state.emit_escaped_text(&self.context, text)?;
         if !input_reservation.commit(input_bytes) {
-            return Err(self.fail_invalid("input reservation committed more bytes than reserved"));
+            return Err(self
+                .state
+                .fail_invalid("input reservation committed more bytes than reserved"));
         }
-        self.input_bytes = next_input;
-        self.phase = match self.phase {
+        self.state.input_bytes = next_input;
+        self.state.phase = match self.state.phase {
             Phase::Paragraph {
                 run_open,
                 run_count,
@@ -734,30 +769,32 @@ impl<W: Write> StreamingDocumentWriter<W> {
 
     /// Finish the current run.
     pub fn finish_run(&mut self) -> Result<(), StreamingDocumentError> {
-        self.ensure_usable()?;
+        self.state.ensure_usable()?;
         let Phase::Paragraph {
             run_open: true,
             run_count,
             run_text_bytes,
             paragraph_xml_bytes,
-        } = self.phase
+        } = self.state.phase
         else {
-            return Err(self.state_error("no run is open"));
+            return Err(self.state.state_error("no run is open"));
         };
         let suffix_bytes = usize_to_u64(RUN_SUFFIX.len(), "paragraph XML bytes")
-            .map_err(|resource| self.fail_overflow(resource))?;
+            .map_err(|resource| self.state.fail_overflow(resource))?;
         let next_paragraph_bytes =
             checked_add(paragraph_xml_bytes, suffix_bytes, "paragraph XML bytes")
-                .map_err(|resource| self.fail_overflow(resource))?;
+                .map_err(|resource| self.state.fail_overflow(resource))?;
         self.context
             .check()
-            .map_err(|error| self.fail_execution(error))?;
-        self.preflight_document_and_paragraph(suffix_bytes, next_paragraph_bytes)?;
+            .map_err(|error| self.state.fail_execution(error))?;
+        self.state
+            .preflight_document_and_paragraph(suffix_bytes, next_paragraph_bytes)?;
         self.context
             .consume(Resource::Work, 1)
-            .map_err(|error| self.fail_execution(error))?;
-        self.emit_document(RUN_SUFFIX, suffix_bytes, Some(suffix_bytes))?;
-        self.phase = Phase::Paragraph {
+            .map_err(|error| self.state.fail_execution(error))?;
+        self.state
+            .emit_document(RUN_SUFFIX, suffix_bytes, Some(suffix_bytes))?;
+        self.state.phase = Phase::Paragraph {
             run_open: false,
             run_count,
             run_text_bytes,
@@ -768,86 +805,115 @@ impl<W: Write> StreamingDocumentWriter<W> {
 
     /// Finish the current paragraph.
     pub fn finish_paragraph(&mut self) -> Result<(), StreamingDocumentError> {
-        self.ensure_usable()?;
+        self.state.ensure_usable()?;
         let Phase::Paragraph {
             run_open: false,
             paragraph_xml_bytes,
             ..
-        } = self.phase
+        } = self.state.phase
         else {
-            return Err(self.state_error("finish the open run before the paragraph"));
+            return Err(self
+                .state
+                .state_error("finish the open run before the paragraph"));
         };
         let suffix_bytes = usize_to_u64(PARAGRAPH_SUFFIX.len(), "paragraph XML bytes")
-            .map_err(|resource| self.fail_overflow(resource))?;
+            .map_err(|resource| self.state.fail_overflow(resource))?;
         let next_paragraph_bytes =
             checked_add(paragraph_xml_bytes, suffix_bytes, "paragraph XML bytes")
-                .map_err(|resource| self.fail_overflow(resource))?;
+                .map_err(|resource| self.state.fail_overflow(resource))?;
         self.context
             .check()
-            .map_err(|error| self.fail_execution(error))?;
-        self.preflight_document_and_paragraph(suffix_bytes, next_paragraph_bytes)?;
+            .map_err(|error| self.state.fail_execution(error))?;
+        self.state
+            .preflight_document_and_paragraph(suffix_bytes, next_paragraph_bytes)?;
         self.context
             .consume(Resource::Work, 1)
-            .map_err(|error| self.fail_execution(error))?;
-        self.emit_document(PARAGRAPH_SUFFIX, suffix_bytes, Some(suffix_bytes))?;
-        self.phase = Phase::Ready;
+            .map_err(|error| self.state.fail_execution(error))?;
+        self.state
+            .emit_document(PARAGRAPH_SUFFIX, suffix_bytes, Some(suffix_bytes))?;
+        self.state.phase = Phase::Ready;
         Ok(())
     }
 
     /// Finalize the document XML, ZIP central directory, and caller-owned sink.
     pub fn finish(mut self) -> Result<W, StreamingDocumentError> {
-        self.ensure_usable()?;
-        if !matches!(self.phase, Phase::Ready) {
-            return Err(self.state_error("finish the current paragraph first"));
+        self.state.ensure_usable()?;
+        if !matches!(self.state.phase, Phase::Ready) {
+            return Err(self.state.state_error("finish the current paragraph first"));
         }
         self.context
             .check()
-            .map_err(|error| self.fail_execution(error))?;
+            .map_err(|error| self.state.fail_execution(error))?;
         let suffix_bytes = usize_to_u64(DOCUMENT_SUFFIX.len(), "document XML bytes")
-            .map_err(|resource| self.fail_overflow(resource))?;
-        let Some(observed) = self.document_xml_bytes.checked_add(suffix_bytes) else {
-            return Err(self.fail_overflow("document XML bytes"));
+            .map_err(|resource| self.state.fail_overflow(resource))?;
+        let Some(observed) = self.state.document_xml_bytes.checked_add(suffix_bytes) else {
+            return Err(self.state.fail_overflow("document XML bytes"));
         };
-        if observed > self.limits.max_document_xml_bytes {
-            return Err(self.fail_limit(
+        if observed > self.state.limits.max_document_xml_bytes {
+            return Err(self.state.fail_limit(
                 "document XML bytes",
                 observed,
-                self.limits.max_document_xml_bytes,
+                self.state.limits.max_document_xml_bytes,
             ));
         }
-        self.emit_document(DOCUMENT_SUFFIX, suffix_bytes, None)?;
-        let Some(part) = self.part.take() else {
-            return Err(self.fail_invalid("streaming DOCX document part is unavailable"));
+        self.state
+            .emit_document(DOCUMENT_SUFFIX, suffix_bytes, None)?;
+        let Some(part) = self.state.part.take() else {
+            return Err(self
+                .state
+                .fail_invalid("streaming DOCX document part is unavailable"));
         };
         let physical = match part.finish() {
             Ok(physical) => physical,
             Err(error) => {
-                let mapped = map_opc_with_state(error, self.output_bytes(), &self.execution_state);
-                self.poison = Some(poison_from_error(&mapped));
+                let mapped = map_opc_with_state(
+                    error,
+                    self.state.output_bytes(),
+                    &self.state.execution_state,
+                );
+                self.state.poison = Some(poison_from_error(&mapped));
                 return Err(mapped);
             },
         };
         let output = match physical.finish_into_inner() {
             Ok(output) => output,
             Err(error) => {
-                let mapped = map_opc_with_state(error, self.output_bytes(), &self.execution_state);
-                self.poison = Some(poison_from_error(&mapped));
+                let mapped = map_opc_with_state(
+                    error,
+                    self.state.output_bytes(),
+                    &self.state.execution_state,
+                );
+                self.state.poison = Some(poison_from_error(&mapped));
                 return Err(mapped);
             },
         };
         let mut output = output;
         if let Err(error) = output.flush() {
-            let mapped =
-                map_member_write_error(error, None, self.output_bytes(), &self.execution_state);
-            self.poison = Some(poison_from_error(&mapped));
+            let mapped = map_member_write_error(
+                error,
+                None,
+                self.state.output_bytes(),
+                &self.state.execution_state,
+            );
+            self.state.poison = Some(poison_from_error(&mapped));
             return Err(mapped);
         }
         output.into_inner().map_err(|error| {
-            let mapped =
-                map_member_write_error(error, None, self.output_bytes(), &self.execution_state);
-            self.poison = Some(poison_from_error(&mapped));
+            let mapped = map_member_write_error(
+                error,
+                None,
+                self.state.output_bytes(),
+                &self.state.execution_state,
+            );
+            self.state.poison = Some(poison_from_error(&mapped));
             mapped
         })
+    }
+}
+
+impl<W: Write> DocumentState<W> {
+    fn output_bytes(&self) -> u64 {
+        self.output_counter.load(Ordering::Acquire)
     }
 
     fn ensure_usable(&self) -> Result<(), StreamingDocumentError> {
@@ -1002,79 +1068,47 @@ impl<W: Write> StreamingDocumentWriter<W> {
         Ok(())
     }
 
-    fn emit_escaped_text(&mut self, text: &str) -> Result<(), StreamingDocumentError> {
-        let mut scratch = [0_u8; TEXT_SCRATCH_BYTES];
-        let mut length = 0_usize;
-        for character in text.chars() {
-            let needed = escaped_character_len(character);
-            let end = match length.checked_add(needed) {
-                Some(value) => value,
-                None => return Err(self.fail_overflow("escaped text bytes")),
-            };
-            if end > scratch.len() {
-                let chunk_bytes = usize_to_u64(length, "escaped text bytes")
-                    .map_err(|resource| self.fail_overflow(resource))?;
-                self.context
-                    .check()
-                    .map_err(|error| self.fail_execution(error))?;
-                self.emit_document(&scratch[..length], chunk_bytes, Some(chunk_bytes))?;
-                length = 0;
-            }
-            let end = match length.checked_add(needed) {
-                Some(value) => value,
-                None => return Err(self.fail_overflow("escaped text bytes")),
-            };
-            let Some(destination) = scratch.get_mut(length..end) else {
-                return Err(self.fail_invalid("escaped text exceeds fixed scratch"));
-            };
-            if append_character(character, destination) != needed {
-                return Err(self.fail_invalid("escaped text did not fit fixed scratch"));
-            }
-            length = end;
-        }
-        if length != 0 {
-            let chunk_bytes = usize_to_u64(length, "escaped text bytes")
+    fn emit_escaped_text(
+        &mut self,
+        context: &ExecutionContext,
+        text: &str,
+    ) -> Result<(), StreamingDocumentError> {
+        let result = for_each_escaped_chunk(text, |chunk: &[u8]| {
+            let chunk_bytes = usize_to_u64(chunk.len(), "escaped text bytes")
                 .map_err(|resource| self.fail_overflow(resource))?;
-            self.context
+            context
                 .check()
                 .map_err(|error| self.fail_execution(error))?;
-            self.emit_document(&scratch[..length], chunk_bytes, Some(chunk_bytes))?;
+            self.emit_document(chunk, chunk_bytes, Some(chunk_bytes))
+        });
+        match result {
+            Ok(()) => Ok(()),
+            Err(EscapeStop::Emit(error)) => Err(error),
+            Err(EscapeStop::Scratch) => {
+                Err(self.fail_invalid("escaped text exceeds fixed scratch"))
+            },
         }
-        Ok(())
     }
 
-    fn encoded_text_size(&mut self, text: &str) -> Result<(u64, u64), StreamingDocumentError> {
-        let mut encoded = 0_u64;
-        let mut characters = 0_u64;
-        let mut pending_work = 0_u64;
-        for character in text.chars() {
-            if !is_plain_text_character(character) {
-                return Err(self.fail_invalid(format!(
-                    "character U+{:04X} requires structural WordprocessingML content",
-                    u32::from(character)
-                )));
-            }
-            let needed = usize_to_u64(escaped_character_len(character), "escaped text bytes")
-                .map_err(|resource| self.fail_overflow(resource))?;
-            encoded = checked_add(encoded, needed, "escaped text bytes")
-                .map_err(|resource| self.fail_overflow(resource))?;
-            characters = checked_add(characters, 1, "text characters")
-                .map_err(|resource| self.fail_overflow(resource))?;
-            pending_work = checked_add(pending_work, 1, "work")
-                .map_err(|resource| self.fail_overflow(resource))?;
-            if pending_work == TEXT_SCAN_CHECK_INTERVAL {
-                self.context
-                    .consume(Resource::Work, pending_work)
-                    .map_err(|error| self.fail_execution(error))?;
-                pending_work = 0;
-            }
+    fn encoded_text_size(
+        &mut self,
+        context: &ExecutionContext,
+        text: &str,
+    ) -> Result<(u64, u64), StreamingDocumentError> {
+        let result = scan_plain_text(text, |work| {
+            context
+                .consume(Resource::Work, work)
+                .map_err(|error| self.fail_execution(error))
+        });
+        match result {
+            Ok(sizes) => Ok(sizes),
+            Err(ScanStop::Work(error)) => Err(error),
+            Err(ScanStop::Invalid(character)) => Err(self.fail_invalid(format!(
+                "character U+{:04X} requires structural WordprocessingML content",
+                u32::from(character)
+            ))),
+            Err(ScanStop::Overflow(resource)) => Err(self.fail_overflow(resource)),
         }
-        if pending_work != 0 {
-            self.context
-                .consume(Resource::Work, pending_work)
-                .map_err(|error| self.fail_execution(error))?;
-        }
-        Ok((encoded, characters))
     }
 
     fn fail_io(&mut self, error: io::Error) -> StreamingDocumentError {
@@ -1504,6 +1538,218 @@ fn encoded_text_size(text: &str) -> Result<(u64, u64), String> {
         characters = characters
             .checked_add(1)
             .ok_or_else(|| "text character count overflowed".to_owned())?;
+    }
+    Ok((encoded, characters))
+}
+
+/// Why [`for_each_escaped_chunk`] stopped early.
+enum EscapeStop<E> {
+    /// The chunk callback failed; its error is returned unchanged.
+    Emit(E),
+    /// Escaped bytes did not fit the fixed scratch. The chunking never does
+    /// this; the variant keeps the writer failing closed, rather than
+    /// truncating or panicking, should that ever change.
+    Scratch,
+}
+
+/// The fixed escaping scratch and the number of bytes it holds.
+struct EscapeScratch {
+    bytes: [u8; TEXT_SCRATCH_BYTES],
+    length: usize,
+}
+
+impl EscapeScratch {
+    const fn room(&self) -> usize {
+        TEXT_SCRATCH_BYTES.saturating_sub(self.length)
+    }
+
+    fn push<E>(&mut self, bytes: &[u8]) -> Result<(), EscapeStop<E>> {
+        let end = self
+            .length
+            .checked_add(bytes.len())
+            .ok_or(EscapeStop::Scratch)?;
+        self.bytes
+            .get_mut(self.length..end)
+            .ok_or(EscapeStop::Scratch)?
+            .copy_from_slice(bytes);
+        self.length = end;
+        Ok(())
+    }
+
+    fn emit<E>(
+        &mut self,
+        emit: &mut impl FnMut(&[u8]) -> Result<(), E>,
+    ) -> Result<(), EscapeStop<E>> {
+        let chunk = self.bytes.get(..self.length).ok_or(EscapeStop::Scratch)?;
+        emit(chunk).map_err(EscapeStop::Emit)?;
+        self.length = 0;
+        Ok(())
+    }
+}
+
+/// The entity reference that replaces `byte` in `w:t` content, if any.
+const fn text_entity(byte: u8) -> Option<&'static [u8]> {
+    match byte {
+        b'&' => Some(b"&amp;"),
+        b'<' => Some(b"&lt;"),
+        b'>' => Some(b"&gt;"),
+        _ => None,
+    }
+}
+
+/// Escapes `text` for `w:t` content and hands the escaped bytes to `emit`, in
+/// order, in chunks of at most [`TEXT_SCRATCH_BYTES`] bytes.
+///
+/// A chunk is emitted exactly when the next character's escape does not fit
+/// the fixed scratch, so every chunk is the longest escaped prefix that fits
+/// and no chunk splits a UTF-8 character or an entity reference. Those are the
+/// boundaries the character-at-a-time loop this replaces produced, and they
+/// are part of the output: the bytes of the Deflate stream depend on how its
+/// input is split into writes. A run of bytes that needs no escape is copied
+/// in one piece.
+fn for_each_escaped_chunk<E>(
+    text: &str,
+    mut emit: impl FnMut(&[u8]) -> Result<(), E>,
+) -> Result<(), EscapeStop<E>> {
+    let mut scratch = EscapeScratch {
+        bytes: [0_u8; TEXT_SCRATCH_BYTES],
+        length: 0,
+    };
+    let mut rest = text;
+    while let Some(&first) = rest.as_bytes().first() {
+        let room = scratch.room();
+        if let Some(entity) = text_entity(first) {
+            if entity.len() > room {
+                scratch.emit(&mut emit)?;
+            }
+            scratch.push(entity)?;
+            rest = rest.get(1..).ok_or(EscapeStop::Scratch)?;
+            continue;
+        }
+        // Inspecting `room + 1` bytes decides whether the unescaped run fits,
+        // which keeps the scan linear in the text however long the run is.
+        let window = rest
+            .as_bytes()
+            .get(..rest.len().min(room.saturating_add(1)))
+            .ok_or(EscapeStop::Scratch)?;
+        let run = window
+            .iter()
+            .position(|&byte| text_entity(byte).is_some())
+            .unwrap_or(window.len());
+        if run <= room {
+            // The run ends at an escaped character or at the end of the text,
+            // both character boundaries.
+            let (head, tail) = rest.split_at_checked(run).ok_or(EscapeStop::Scratch)?;
+            scratch.push(head.as_bytes())?;
+            rest = tail;
+            continue;
+        }
+        // The run is longer than the room left: copy its longest prefix of
+        // whole characters that fits, then emit the scratch, because the next
+        // character does not fit.
+        let mut take = room;
+        while !rest.is_char_boundary(take) {
+            take = take.saturating_sub(1);
+        }
+        let (head, tail) = rest.split_at_checked(take).ok_or(EscapeStop::Scratch)?;
+        scratch.push(head.as_bytes())?;
+        rest = tail;
+        scratch.emit(&mut emit)?;
+    }
+    if scratch.length != 0 {
+        scratch.emit(&mut emit)?;
+    }
+    Ok(())
+}
+
+/// Why [`scan_plain_text`] stopped early.
+enum ScanStop<E> {
+    /// A Work charge failed; its error is returned unchanged.
+    Work(E),
+    /// The first character that needs structural WordprocessingML content.
+    Invalid(char),
+    /// A progress counter could not represent its next value.
+    Overflow(&'static str),
+}
+
+/// Bytes measured together by [`scan_plain_text`]'s word step.
+const PLAIN_WORD_BYTES: u64 = 8;
+
+/// Whether all eight bytes of `word` are ASCII that `w:t` content carries
+/// unescaped: `0x20..=0x7F` other than `&`, `<` and `>`.
+const fn is_plain_ascii_word(word: u64) -> bool {
+    const ONES: u64 = u64::from_ne_bytes([0x01; 8]);
+    const HIGH_BITS: u64 = u64::from_ne_bytes([0x80; 8]);
+    // For a word whose bytes are all below 0x80, `has_byte_below(x, n)` is
+    // exactly "some byte of x is below n" for every n <= 0x80: the lowest such
+    // byte borrows into its own high bit, and no borrow happens without one.
+    const fn has_byte_below(word: u64, bound: u8) -> bool {
+        (word.wrapping_sub(ONES.wrapping_mul(bound as u64)) & !word & HIGH_BITS) != 0
+    }
+    const fn has_byte(word: u64, byte: u8) -> bool {
+        has_byte_below(word ^ ONES.wrapping_mul(byte as u64), 1)
+    }
+    (word & HIGH_BITS) == 0
+        && !has_byte_below(word, 0x20)
+        && !has_byte(word, b'&')
+        && !has_byte(word, b'<')
+        && !has_byte(word, b'>')
+}
+
+/// Validates `text` as plain `w:t` content and returns its escaped byte length
+/// and character count.
+///
+/// Work is charged through `charge_work` for every
+/// [`TEXT_SCAN_CHECK_INTERVAL`] characters and once for the remainder. A
+/// refusal is therefore reported after exactly the characters the
+/// character-at-a-time loop this replaces had examined: an invalid character
+/// before any later checkpoint, a refused checkpoint before any later
+/// character. Eight plain ASCII bytes are measured together only when that
+/// cannot cross a checkpoint.
+fn scan_plain_text<E>(
+    text: &str,
+    mut charge_work: impl FnMut(u64) -> Result<(), E>,
+) -> Result<(u64, u64), ScanStop<E>> {
+    let mut encoded = 0_u64;
+    let mut characters = 0_u64;
+    let mut pending_work = 0_u64;
+    let mut rest = text;
+    while !rest.is_empty() {
+        let word = if pending_work <= TEXT_SCAN_CHECK_INTERVAL - PLAIN_WORD_BYTES {
+            rest.as_bytes()
+                .first_chunk::<8>()
+                .filter(|word| is_plain_ascii_word(u64::from_le_bytes(**word)))
+                .and_then(|_| rest.get(8..))
+        } else {
+            None
+        };
+        let (count, needed) = if let Some(tail) = word {
+            rest = tail;
+            (PLAIN_WORD_BYTES, PLAIN_WORD_BYTES)
+        } else {
+            let mut chars = rest.chars();
+            let Some(character) = chars.next() else {
+                break;
+            };
+            if !is_plain_text_character(character) {
+                return Err(ScanStop::Invalid(character));
+            }
+            rest = chars.as_str();
+            let needed = usize_to_u64(escaped_character_len(character), "escaped text bytes")
+                .map_err(ScanStop::Overflow)?;
+            (1, needed)
+        };
+        encoded = checked_add(encoded, needed, "escaped text bytes").map_err(ScanStop::Overflow)?;
+        characters =
+            checked_add(characters, count, "text characters").map_err(ScanStop::Overflow)?;
+        pending_work = checked_add(pending_work, count, "work").map_err(ScanStop::Overflow)?;
+        if pending_work == TEXT_SCAN_CHECK_INTERVAL {
+            charge_work(pending_work).map_err(ScanStop::Work)?;
+            pending_work = 0;
+        }
+    }
+    if pending_work != 0 {
+        charge_work(pending_work).map_err(ScanStop::Work)?;
     }
     Ok((encoded, characters))
 }
@@ -2263,7 +2509,7 @@ mod tests {
             .expect("input overflow writer");
         input_overflow.start_paragraph().expect("paragraph");
         input_overflow.start_run().expect("run");
-        input_overflow.input_bytes = u64::MAX;
+        input_overflow.state.input_bytes = u64::MAX;
         let error = input_overflow
             .write_text("x")
             .expect_err("input counter overflow");
@@ -2278,7 +2524,7 @@ mod tests {
         let (_budget, _source, context) = test_context();
         let mut document_overflow = StreamingDocumentWriter::new(Vec::new(), context, limits())
             .expect("document overflow writer");
-        document_overflow.document_xml_bytes = u64::MAX;
+        document_overflow.state.document_xml_bytes = u64::MAX;
         let error = match document_overflow.finish() {
             Ok(_) => panic!("document counter overflow unexpectedly finished"),
             Err(error) => error,
@@ -2638,7 +2884,7 @@ mod tests {
         let error = loop {
             attempts += 1;
             let before = writer.document_xml_bytes();
-            let result = writer.emit_document(&chunk, chunk_bytes, None);
+            let result = writer.state.emit_document(&chunk, chunk_bytes, None);
             let after = writer.document_xml_bytes();
             if result.is_ok() {
                 assert_eq!(after, before + chunk_bytes);
@@ -2800,5 +3046,279 @@ mod tests {
         };
         assert!(matches!(error, StreamingDocumentError::Cancelled { .. }));
         assert_eq!(error.written(), accepted.load(Ordering::Acquire));
+    }
+
+    /// The character-at-a-time escaping loop that [`for_each_escaped_chunk`]
+    /// replaced, kept as the oracle for its chunk boundaries.
+    fn reference_escaped_chunks(text: &str) -> Vec<Vec<u8>> {
+        let mut chunks = Vec::new();
+        let mut scratch = [0_u8; TEXT_SCRATCH_BYTES];
+        let mut length = 0_usize;
+        for character in text.chars() {
+            let needed = escaped_character_len(character);
+            if length + needed > scratch.len() {
+                chunks.push(scratch[..length].to_vec());
+                length = 0;
+            }
+            assert_eq!(
+                append_character(character, &mut scratch[length..length + needed]),
+                needed
+            );
+            length += needed;
+        }
+        if length != 0 {
+            chunks.push(scratch[..length].to_vec());
+        }
+        chunks
+    }
+
+    /// The outcome of a text scan: sizes, the first invalid character, or the
+    /// index of the refused Work charge.
+    #[derive(Debug, PartialEq, Eq)]
+    enum ScanOutcome {
+        Sizes(u64, u64),
+        Invalid(char),
+        WorkRefused(usize),
+    }
+
+    /// The character-at-a-time scan that [`scan_plain_text`] replaced, kept as
+    /// the oracle for its Work checkpoints and refusal order.
+    fn reference_scan(text: &str, work_limit: u64) -> (ScanOutcome, Vec<u64>) {
+        let mut charges = Vec::new();
+        let mut charged = 0_u64;
+        let mut charge = |work: u64, charges: &mut Vec<u64>| {
+            charges.push(work);
+            charged += work;
+            charged <= work_limit
+        };
+        let mut encoded = 0_u64;
+        let mut characters = 0_u64;
+        let mut pending_work = 0_u64;
+        for character in text.chars() {
+            if !is_plain_text_character(character) {
+                return (ScanOutcome::Invalid(character), charges);
+            }
+            encoded += u64::try_from(escaped_character_len(character)).expect("length");
+            characters += 1;
+            pending_work += 1;
+            if pending_work == TEXT_SCAN_CHECK_INTERVAL {
+                if !charge(pending_work, &mut charges) {
+                    return (ScanOutcome::WorkRefused(charges.len() - 1), charges);
+                }
+                pending_work = 0;
+            }
+        }
+        if pending_work != 0 && !charge(pending_work, &mut charges) {
+            return (ScanOutcome::WorkRefused(charges.len() - 1), charges);
+        }
+        (ScanOutcome::Sizes(encoded, characters), charges)
+    }
+
+    fn fast_scan(text: &str, work_limit: u64) -> (ScanOutcome, Vec<u64>) {
+        let mut charges = Vec::new();
+        let mut charged = 0_u64;
+        let result = scan_plain_text(text, |work| {
+            charges.push(work);
+            charged += work;
+            if charged <= work_limit {
+                Ok(())
+            } else {
+                Err(charges.len() - 1)
+            }
+        });
+        let outcome = match result {
+            Ok((encoded, characters)) => ScanOutcome::Sizes(encoded, characters),
+            Err(ScanStop::Invalid(character)) => ScanOutcome::Invalid(character),
+            Err(ScanStop::Work(index)) => ScanOutcome::WorkRefused(index),
+            Err(ScanStop::Overflow(resource)) => panic!("unexpected overflow of {resource}"),
+        };
+        (outcome, charges)
+    }
+
+    fn fast_escaped_chunks(text: &str) -> Vec<Vec<u8>> {
+        let mut chunks = Vec::new();
+        let result = for_each_escaped_chunk(text, |chunk: &[u8]| {
+            assert!(!chunk.is_empty() && chunk.len() <= TEXT_SCRATCH_BYTES);
+            chunks.push(chunk.to_vec());
+            Ok::<(), ()>(())
+        });
+        assert!(result.is_ok(), "escaping must not stop");
+        chunks
+    }
+
+    /// Characters of every width and class the writer distinguishes,
+    /// including the ones it refuses.
+    const TEXT_ALPHABET: &[char] = &[
+        'a',
+        'Z',
+        '0',
+        ' ',
+        '-',
+        '"',
+        '\'',
+        '\u{7F}',
+        '&',
+        '<',
+        '>',
+        '\u{E9}',
+        '\u{DF}',
+        '\u{20AC}',
+        '\u{4E2D}',
+        '\u{FFFD}',
+        '\u{E000}',
+        '\u{D7FF}',
+        '\u{1F600}',
+        '\u{10000}',
+        '\u{10FFFF}',
+        '\t',
+        '\n',
+        '\r',
+        '\u{1}',
+        '\u{1F}',
+        '\u{FFFE}',
+        '\u{FFFF}',
+    ];
+    /// Index of the first refused character in [`TEXT_ALPHABET`].
+    const FIRST_REFUSED: usize = 21;
+
+    fn generated_text(seed: u64, characters: usize, refuse_one_in: u64) -> String {
+        let mut state = seed | 1;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        let mut text = String::new();
+        for _ in 0..characters {
+            let value = next();
+            let plain_run = value % 5 < 3;
+            if plain_run {
+                // Long plain ASCII runs exercise the eight-byte step and the
+                // copy of whole runs.
+                text.push(char::from(b'a' + (value % 26) as u8));
+            } else if refuse_one_in != 0 && value % refuse_one_in == 0 {
+                let refused = TEXT_ALPHABET.len() - FIRST_REFUSED;
+                text.push(TEXT_ALPHABET[FIRST_REFUSED + (value >> 8) as usize % refused]);
+            } else {
+                text.push(TEXT_ALPHABET[(value >> 8) as usize % FIRST_REFUSED]);
+            }
+        }
+        text
+    }
+
+    #[test]
+    fn escaped_chunks_match_the_character_loop() {
+        let mut texts: Vec<String> = vec![
+            String::new(),
+            "a".repeat(63),
+            "a".repeat(64),
+            "a".repeat(65),
+            "a".repeat(64 * 5 + 3),
+            format!("{}&", "a".repeat(59)),
+            format!("{}&", "a".repeat(60)),
+            format!("{}<", "a".repeat(60)),
+            format!("{}<", "a".repeat(61)),
+            format!("{}\u{E9}", "a".repeat(62)),
+            format!("{}\u{E9}", "a".repeat(63)),
+            format!("{}\u{20AC}", "a".repeat(61)),
+            format!("{}\u{20AC}", "a".repeat(62)),
+            format!("{}\u{1F600}", "a".repeat(60)),
+            format!("{}\u{1F600}", "a".repeat(61)),
+            "&".repeat(40),
+            "\u{1F600}".repeat(40),
+            format!("{}&\u{E9}<>{}", "a".repeat(58), "b".repeat(5)),
+            "litchi-perf-docx-streaming-v1-000123-caf\u{E9}-<&>".to_owned(),
+        ];
+        for seed in 1..=400_u64 {
+            texts.push(generated_text(seed, (seed as usize * 7) % 300, 0));
+        }
+        for text in &texts {
+            let expected = reference_escaped_chunks(text);
+            assert_eq!(fast_escaped_chunks(text), expected, "text {text:?}");
+            assert_eq!(
+                expected.concat().len() as u64,
+                encoded_text_size(text).expect("plain").0
+            );
+        }
+    }
+
+    #[test]
+    fn text_scan_matches_the_character_loop_at_every_work_limit() {
+        let mut texts: Vec<String> = vec![
+            String::new(),
+            "a".repeat(8),
+            "a".repeat(56),
+            "a".repeat(63),
+            "a".repeat(64),
+            "a".repeat(65),
+            "a".repeat(64 * 3),
+            format!("{}\t", "a".repeat(64)),
+            format!("{}\t", "a".repeat(63)),
+            format!("{}\u{FFFE}{}", "a".repeat(70), "b".repeat(70)),
+            format!("{}\u{E9}{}", "a".repeat(57), "a".repeat(70)),
+            "\u{FFFF}".to_owned(),
+            "\u{7F}\u{7F}\u{7F}\u{7F}\u{7F}\u{7F}\u{7F}\u{7F}\u{7F}".to_owned(),
+        ];
+        for seed in 1..=300_u64 {
+            texts.push(generated_text(seed, (seed as usize * 11) % 400, 0));
+            texts.push(generated_text(
+                seed ^ 0xABCD,
+                (seed as usize * 13) % 400,
+                61,
+            ));
+        }
+        for text in &texts {
+            let characters = text.chars().count() as u64;
+            for work_limit in [
+                0,
+                1,
+                TEXT_SCAN_CHECK_INTERVAL - 1,
+                TEXT_SCAN_CHECK_INTERVAL,
+                TEXT_SCAN_CHECK_INTERVAL + 1,
+                2 * TEXT_SCAN_CHECK_INTERVAL,
+                characters.saturating_sub(1),
+                characters,
+                characters + 1,
+                u64::MAX,
+            ] {
+                assert_eq!(
+                    fast_scan(text, work_limit),
+                    reference_scan(text, work_limit),
+                    "text {text:?}, work limit {work_limit}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn plain_ascii_word_matches_a_byte_by_byte_test() {
+        let plain = |byte: u8| (0x20..=0x7F).contains(&byte) && text_entity(byte).is_none();
+        for position in 0..8 {
+            for value in 0..=u8::MAX {
+                let mut bytes = *b"abcdefgh";
+                bytes[position] = value;
+                assert_eq!(
+                    is_plain_ascii_word(u64::from_le_bytes(bytes)),
+                    bytes.iter().all(|&byte| plain(byte)),
+                    "{bytes:?}"
+                );
+            }
+        }
+        let mut state = 0x2545_F491_4F6C_DD1D_u64;
+        for _ in 0..200_000 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            // Bias bytes toward the boundaries of the plain range.
+            let bytes = state.to_le_bytes().map(|byte| {
+                [0x1F, 0x20, 0x26, 0x3C, 0x3E, 0x7F, 0x80, byte][usize::from(byte % 8)]
+            });
+            assert_eq!(
+                is_plain_ascii_word(u64::from_le_bytes(bytes)),
+                bytes.iter().all(|&byte| plain(byte)),
+                "{bytes:?}"
+            );
+        }
     }
 }
