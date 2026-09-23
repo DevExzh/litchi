@@ -288,20 +288,23 @@ impl OpcPackage {
                 )
             },
             None => {
+                let Some(cell) = self.transfer_index.as_ref() else {
+                    return Ok(None);
+                };
                 let limits = self.source_limits;
-                let index = self
-                    .transfer_index
+                let index = cell
                     .get_or_init(|| {
                         IndexedArchive::from_reader_with_limits(
                             Arc::clone(source_archive),
                             source_archive.len() as u64,
                             limits.zip_limits(),
                         )
+                        .map(Box::new)
                         .map_err(OpcError::from)
                     })
                     .as_ref()
                     .map_err(replicate_deferred_error)?;
-                (index, part.partname().membername(), limits)
+                (&**index, part.partname().membername(), limits)
             },
         };
         Ok(index.entry_id(member).map(|entry_id| TransferMember {
