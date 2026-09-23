@@ -1,0 +1,29 @@
+# Hardware counters: the reviewed banded build against the first review fix alone
+# Transcribed from the session output of 2026-09-23T03:09:47Z and 03:10:03Z (the
+# raw perf stat files were not kept). CPU 20, xls-large open, isolation pairs
+# (4 and 24 timed iterations, no warmup), differenced and divided by 20.
+#   prefix = the banded build (b85d3e534c), bin/probe-prefix
+#   after  = the first review fix alone (8fa1d4b54a), bin/probe-after-8fa1d4b54a
+#            (binaries.sha256: probe-review-banded, probe-review-first-fix)
+
+## Run 1: five events, no multiplexing
+$ perf stat -x , -e cycles:u,instructions:u,ls_bad_status2.stli_other:u,ls_stlf:u,ex_ret_brn_misp:u \
+    taskset -c 20 ./bin/probe-$leg --input fixtures/xls-large.xls --operation open --warmups 0 --samples {4,24}
+prefix cycles=3,026,700 instructions=13,474,479 ls_bad_status2.stli_other=195,664 ls_stlf=1,986,579 ex_ret_brn_misp=6,696
+after  cycles=4,350,150 instructions=13,604,953 ls_bad_status2.stli_other=134,358 ls_stlf=2,072,348 ex_ret_brn_misp=19,140
+
+## Run 2: eight events over six counters (multiplexed, so every count is a
+## scaled estimate; the negative differences show how noisy the scaling is)
+$ perf stat -x , -e cycles:u,instructions:u,de_no_dispatch_per_slot.no_ops_from_frontend:u,de_no_dispatch_per_slot.backend_stalls:u,ex_ret_brn_misp:u,ic_tag_hit_miss.instruction_cache_miss:u,bp_l1_tlb_miss_l2_tlb_miss.if4k:u,op_cache_hit_miss.op_cache_miss:u \
+    taskset -c 20 ./bin/probe-$leg --input fixtures/xls-large.xls --operation open --warmups 0 --samples {4,24}
+prefix cycles=3,289,881 instructions=14,326,704 no_ops_from_frontend=3,943,379 backend_stalls=8,271,664 ex_ret_brn_misp=7,474 instruction_cache_miss=-142,404 if4k=-470 op_cache_miss=-244,906
+after  cycles=4,398,280 instructions=13,658,793 no_ops_from_frontend=12,268,080 backend_stalls=8,736,543 ex_ret_brn_misp=23,885 instruction_cache_miss=749,352 if4k=242 op_cache_miss=479,342
+
+## Reading
+The first fix executed 1.0% more instructions than the banded build and took
+44% more cycles on this open; store-to-load conflicts did not rise, branch
+mispredictions roughly tripled (6.7k -> 19.1k) and dispatch slots starved by
+the front end roughly tripled (3.9M -> 12.3M, scaled). Commit 3d49e03044 moved
+the occupancy map's non-current-row paths out of line; review-fix/isolation.json
+then measures the final build at 12.77 M instructions and 2.93 M cycles on this
+open against the banded build's 13.47 M and 3.06 M.

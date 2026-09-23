@@ -298,6 +298,122 @@ fn generate_xls_large() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     Ok(output.into_inner())
 }
 
+/// The review of change 0746's crafted sparse-band package: 1,000 worksheets,
+/// each with 256 `Number` cells, one per 256-row band (rows 0, 256, 512, …,
+/// 65,280) in column 0. Valid BIFF8; the shape a banded occupancy bitmap pays
+/// 16 KiB per cell for.
+fn generate_sparse_bands() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let mut writer = litchi_xls::writer::Writer::new();
+    for sheet in 0..1_000_usize {
+        let worksheet = writer.add_worksheet(&format!("S{sheet:04}"))?;
+        for band in 0..256_u32 {
+            writer.write_number(worksheet, band * 256, 0, f64::from(band) + 0.5)?;
+        }
+    }
+    let mut output = std::io::Cursor::new(Vec::new());
+    writer.write_to(&mut output)?;
+    Ok(output.into_inner())
+}
+
+/// The same 1,000 x 256 sparse-band cells with nothing else in each worksheet
+/// substream: `BOF`, `DIMENSIONS`, 256 `Number` records and `EOF` (the writer
+/// above also emits an `INDEX` and one `DBCELL` per 32-row block, 2,041 per
+/// sheet, which then dominate the parse). The globals, including the 1,000
+/// `BoundSheet8` records and the XF table, are the writer's own; every
+/// `BoundSheet8` is repointed at its rebuilt substream and the stream is
+/// packaged as the only CFB stream.
+fn generate_sparse_bands_minimal() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    const BOF: u16 = 0x0809;
+    const EOF: u16 = 0x000a;
+    const BOUND_SHEET: u16 = 0x0085;
+    const NUMBER: u16 = 0x0203;
+    const DIMENSIONS: u16 = 0x0200;
+    let mut writer = litchi_xls::writer::Writer::new();
+    for sheet in 0..1_000_usize {
+        let worksheet = writer.add_worksheet(&format!("S{sheet:04}"))?;
+        writer.write_number(worksheet, 0, 0, 0.5)?;
+    }
+    let mut output = std::io::Cursor::new(Vec::new());
+    writer.write_to(&mut output)?;
+    let mut ole = litchi_cfb::OleFile::open(std::io::Cursor::new(output.into_inner()))?;
+    let stream = ole.open_stream(&["Workbook"])?;
+    let mut records = Vec::new();
+    for record in litchi_biff::Records::new(&stream) {
+        let record = record?;
+        records.push((record.kind().get(), record.payload().to_vec()));
+    }
+    let globals_end = records
+        .iter()
+        .position(|(kind, _)| *kind == EOF)
+        .ok_or("writer globals have no EOF")?;
+    let mut sheets = Vec::new();
+    let mut index = globals_end + 1;
+    while index < records.len() {
+        let end = index
+            + records[index..]
+                .iter()
+                .position(|(kind, _)| *kind == EOF)
+                .ok_or("writer worksheet has no EOF")?;
+        let bof = records[index].clone();
+        let xf = records[index..end]
+            .iter()
+            .find(|(kind, _)| *kind == NUMBER)
+            .map(|(_, payload)| u16::from_le_bytes([payload[4], payload[5]]))
+            .ok_or("writer worksheet has no Number")?;
+        let mut sheet = vec![bof];
+        let mut dimensions = Vec::new();
+        dimensions.extend_from_slice(&0_u32.to_le_bytes());
+        dimensions.extend_from_slice(&(255_u32 * 256 + 1).to_le_bytes());
+        dimensions.extend_from_slice(&0_u16.to_le_bytes());
+        dimensions.extend_from_slice(&1_u16.to_le_bytes());
+        dimensions.extend_from_slice(&0_u16.to_le_bytes());
+        sheet.push((DIMENSIONS, dimensions));
+        for band in 0..256_u16 {
+            let mut number = Vec::new();
+            number.extend_from_slice(&(band * 256).to_le_bytes());
+            number.extend_from_slice(&0_u16.to_le_bytes());
+            number.extend_from_slice(&xf.to_le_bytes());
+            number.extend_from_slice(&(f64::from(band) + 0.5).to_le_bytes());
+            sheet.push((NUMBER, number));
+        }
+        sheet.push((EOF, Vec::new()));
+        sheets.push(sheet);
+        index = end + 1;
+    }
+    let mut rebuilt = records[..=globals_end].to_vec();
+    let globals_bytes: usize = rebuilt.iter().map(|(_, payload)| 4 + payload.len()).sum();
+    let mut offset = globals_bytes;
+    let mut starts = Vec::new();
+    for sheet in &sheets {
+        starts.push(offset);
+        offset += sheet.iter().map(|(_, payload)| 4 + payload.len()).sum::<usize>();
+    }
+    let mut next = 0;
+    for (kind, payload) in rebuilt.iter_mut() {
+        if *kind == BOUND_SHEET {
+            payload[0..4].copy_from_slice(&u32::try_from(starts[next])?.to_le_bytes());
+            next += 1;
+        }
+    }
+    if next != sheets.len() {
+        return Err("BoundSheet8 count differs from worksheet count".into());
+    }
+    for sheet in sheets {
+        rebuilt.extend(sheet);
+    }
+    let mut workbook = Vec::new();
+    for (kind, payload) in &rebuilt {
+        workbook.extend_from_slice(&kind.to_le_bytes());
+        workbook.extend_from_slice(&u16::try_from(payload.len())?.to_le_bytes());
+        workbook.extend_from_slice(payload);
+    }
+    let mut package = litchi_cfb::OleWriter::new();
+    package.create_stream(&["Workbook"], &workbook)?;
+    let mut output = std::io::Cursor::new(Vec::new());
+    package.write_to(&mut output)?;
+    Ok(output.into_inner())
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut input = String::new();
     let mut operation = Operation::Open;
@@ -323,6 +439,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // run only the staged edit and commit in the loop, so a
             // whole-process profile is dominated by the commit phase.
             "--reuse-source" => reuse_source = true,
+            "--generate-sparse-bands" => {
+                let path = arguments.next().ok_or("--generate-sparse-bands needs a path")?;
+                std::fs::write(&path, generate_sparse_bands()?)?;
+                return Ok(());
+            },
+            "--generate-sparse-bands-minimal" => {
+                let path = arguments
+                    .next()
+                    .ok_or("--generate-sparse-bands-minimal needs a path")?;
+                std::fs::write(&path, generate_sparse_bands_minimal()?)?;
+                return Ok(());
+            },
             "--generate-xls-large" => {
                 let path = arguments.next().ok_or("--generate-xls-large needs a path")?;
                 std::fs::write(&path, generate_xls_large()?)?;

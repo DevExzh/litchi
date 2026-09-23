@@ -1,0 +1,44 @@
+start 2026-09-23T03:13:36Z  23:13:36 up 11 days, 20:41,  2 users,  load average: 7.68, 15.90, 18.26
+54016.xls:open                           A    10.462 ms  B     4.866 ms  ratio 0.465 range [0.452, 0.478]
+54016.xls:comments-open                  A    10.240 ms  B     4.315 ms  ratio 0.421 range [0.405, 0.433]
+54016.xls:visibility-open                A     9.937 ms  B     4.128 ms  ratio 0.415 range [0.410, 0.427]
+54016.xls:number-generic                 A    23.242 ms  B    10.118 ms  ratio 0.436 range [0.434, 0.439]
+54016.xls:number-source-backed           A    15.890 ms  B     8.704 ms  ratio 0.550 range [0.539, 0.564]
+54016.xls:reader-open                    A    10.430 ms  B     9.910 ms  ratio 0.946 range [0.860, 1.061]
+sparse-bands-minimal.xls:open            A    60.284 ms  B    27.343 ms  ratio 0.453 range [0.446, 0.463]
+sparse-bands-minimal.xls:comments-open   A    59.496 ms  B    26.587 ms  ratio 0.447 range [0.434, 0.462]
+sparse-bands-minimal.xls:visibility-open A    56.659 ms  B    24.587 ms  ratio 0.433 range [0.429, 0.444]
+sparse-bands-minimal.xls:reader-open     A    54.750 ms  B    50.363 ms  ratio 0.919 range [0.883, 0.920]
+xls-large.xls:open                       A     1.528 ms  B     0.680 ms  ratio 0.444 range [0.439, 0.449]
+xls-large.xls:number-generic             A     3.442 ms  B     1.566 ms  ratio 0.456 range [0.446, 0.462]
+xls-large.xls:reader-open                A     1.452 ms  B     1.361 ms  ratio 0.933 range [0.896, 0.947]
+mid 2026-09-23T03:14:13Z  23:14:13 up 11 days, 20:41,  2 users,  load average: 9.56, 15.33, 17.97
+54016.xls:open                           A     4.998 ms  B     4.889 ms  ratio 0.981 range [0.971, 0.990]
+54016.xls:comments-open                  A     4.408 ms  B     4.313 ms  ratio 0.979 range [0.968, 0.983]
+54016.xls:visibility-open                A     4.254 ms  B     4.135 ms  ratio 0.973 range [0.970, 0.974]
+54016.xls:number-generic                 A    10.225 ms  B    10.093 ms  ratio 0.988 range [0.980, 0.990]
+54016.xls:number-source-backed           A     8.505 ms  B     8.445 ms  ratio 0.993 range [0.993, 0.994]
+54016.xls:reader-open                    A     9.179 ms  B     9.089 ms  ratio 0.990 range [0.878, 1.077]
+sparse-bands-minimal.xls:open            A    75.581 ms  B    26.358 ms  ratio 0.350 range [0.346, 0.357]
+sparse-bands-minimal.xls:comments-open   A    75.545 ms  B    25.661 ms  ratio 0.339 range [0.336, 0.341]
+sparse-bands-minimal.xls:visibility-open A    73.915 ms  B    23.882 ms  ratio 0.323 range [0.317, 0.332]
+sparse-bands-minimal.xls:reader-open     A    49.925 ms  B    49.757 ms  ratio 0.992 range [0.963, 1.063]
+xls-large.xls:open                       A     0.685 ms  B     0.673 ms  ratio 0.981 range [0.977, 0.992]
+xls-large.xls:number-generic             A     1.566 ms  B     1.557 ms  ratio 0.990 range [0.975, 0.998]
+xls-large.xls:reader-open                A     1.350 ms  B     1.331 ms  ratio 0.989 range [0.968, 0.991]
+isolation 2026-09-23T03:14:46Z  23:14:46 up 11 days, 20:42,  2 users,  load average: 7.41, 14.26, 17.53
+sparse-bands-minimal.xls   open                  | base   766.46 Mi  267.28 Mc | banded  1124.76 Mi  333.85 Mc | final   468.53 Mi  117.33 Mc
+sparse-bands-minimal.xls   comments-open         | base   749.40 Mi  245.32 Mc | banded  1156.69 Mi  327.03 Mc | final   452.36 Mi  108.15 Mc
+sparse-bands-minimal.xls   visibility-open       | base   701.98 Mi  259.97 Mc | banded  1108.91 Mi  319.36 Mc | final   404.77 Mi   99.79 Mc
+sparse-bands-minimal.xls   reader-open           | base   700.22 Mi  243.84 Mc | banded   689.35 Mi  220.15 Mc | final   690.14 Mi  220.00 Mc
+54016.xls                  open                  | base   154.14 Mi   50.94 Mc | banded    85.43 Mi   21.49 Mc | final    82.39 Mi   21.28 Mc
+54016.xls                  comments-open         | base   146.27 Mi   44.98 Mc | banded    77.85 Mi   18.74 Mc | final    74.80 Mi   18.31 Mc
+54016.xls                  visibility-open       | base   140.62 Mi   48.08 Mc | banded    72.20 Mi   17.91 Mc | final    69.15 Mi   17.26 Mc
+54016.xls                  number-generic        | base   219.52 Mi  107.35 Mc | banded   118.84 Mi   47.94 Mc | final   115.79 Mi   46.48 Mc
+54016.xls                  number-source-backed  | base   185.04 Mi   74.25 Mc | banded   116.60 Mi   41.29 Mc | final   113.59 Mi   42.04 Mc
+54016.xls                  reader-open           | base   139.96 Mi   46.14 Mc | banded   139.74 Mi   43.19 Mc | final   139.82 Mi   45.08 Mc
+xls-large.xls              open                  | base    25.47 Mi    7.02 Mc | banded    13.47 Mi    3.06 Mc | final    12.77 Mi    2.93 Mc
+xls-large.xls              number-generic        | base    34.77 Mi   14.92 Mc | banded    17.36 Mi    6.80 Mc | final    16.66 Mi    6.76 Mc
+xls-large.xls              reader-open           | base    23.41 Mi    6.21 Mc | banded    23.37 Mi    5.94 Mc | final    23.38 Mi    5.95 Mc
+end 2026-09-23T03:15:04Z  23:15:04 up 11 days, 20:42,  2 users,  load average: 9.88, 14.39, 17.50
+fix final run done

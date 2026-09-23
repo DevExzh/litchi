@@ -1,0 +1,28 @@
+start 2026-09-23T02:49:03Z  22:49:03 up 11 days, 20:16,  2 users,  load average: 20.37, 20.04, 13.54
+54016.xls:open                           A    11.828 ms  B     6.869 ms  ratio 0.575 range [0.563, 0.594]
+54016.xls:comments-open                  A    11.538 ms  B     6.256 ms  ratio 0.542 range [0.495, 0.569]
+54016.xls:visibility-open                A    11.407 ms  B     6.130 ms  ratio 0.541 range [0.510, 0.569]
+54016.xls:number-generic                 A    24.298 ms  B    12.278 ms  ratio 0.504 range [0.502, 0.507]
+54016.xls:number-source-backed           A    15.924 ms  B    10.768 ms  ratio 0.673 range [0.671, 0.684]
+54016.xls:reader-open                    A    10.886 ms  B     9.817 ms  ratio 0.907 range [0.812, 0.923]
+sparse-bands-minimal.xls:open            A    60.016 ms  B    45.935 ms  ratio 0.771 range [0.739, 0.773]
+sparse-bands-minimal.xls:comments-open   A    58.260 ms  B    46.590 ms  ratio 0.801 range [0.754, 0.805]
+sparse-bands-minimal.xls:visibility-open A    55.883 ms  B    43.212 ms  ratio 0.773 range [0.701, 0.852]
+sparse-bands-minimal.xls:reader-open     A    55.009 ms  B    50.518 ms  ratio 0.912 range [0.880, 0.924]
+xls-large.xls:open                       A     1.585 ms  B     0.986 ms  ratio 0.617 range [0.590, 0.675]
+xls-large.xls:number-generic             A     3.484 ms  B     1.909 ms  ratio 0.547 range [0.539, 0.556]
+mid 2026-09-23T02:49:44Z  22:49:44 up 11 days, 20:17,  2 users,  load average: 20.47, 20.11, 13.84
+54016.xls:open                           A     6.537 ms  B     6.849 ms  ratio 1.048 range [0.990, 1.096]
+54016.xls:comments-open                  A     6.038 ms  B     6.224 ms  ratio 1.029 range [1.001, 1.049]
+54016.xls:visibility-open                A     5.898 ms  B     6.135 ms  ratio 1.040 range [1.027, 1.057]
+54016.xls:number-generic                 A    11.957 ms  B    12.203 ms  ratio 1.012 range [0.996, 1.026]
+54016.xls:number-source-backed           A    10.613 ms  B    10.819 ms  ratio 1.025 range [1.001, 1.037]
+54016.xls:reader-open                    A     9.555 ms  B     9.750 ms  ratio 1.021 range [0.952, 1.047]
+sparse-bands-minimal.xls:open            A    97.905 ms  B    45.407 ms  ratio 0.463 range [0.455, 0.471]
+sparse-bands-minimal.xls:comments-open   A   100.471 ms  B    45.908 ms  ratio 0.455 range [0.433, 0.471]
+sparse-bands-minimal.xls:visibility-open A    99.167 ms  B    43.144 ms  ratio 0.436 range [0.418, 0.479]
+sparse-bands-minimal.xls:reader-open     A    50.672 ms  B    50.607 ms  ratio 1.001 range [0.947, 1.026]
+xls-large.xls:open                       A     0.796 ms  B     1.036 ms  ratio 1.294 range [1.260, 1.337]
+xls-large.xls:number-generic             A     1.659 ms  B     1.924 ms  ratio 1.160 range [1.142, 1.191]
+end 2026-09-23T02:50:26Z  22:50:26 up 11 days, 20:18,  2 users,  load average: 20.38, 20.13, 14.12
+done

@@ -1,0 +1,56 @@
+diff --git a/crates/litchi-xls/src/workbook/tests.rs b/crates/litchi-xls/src/workbook/tests.rs
+index 52fdafd625..e9381fe8f2 100644
+--- a/crates/litchi-xls/src/workbook/tests.rs
++++ b/crates/litchi-xls/src/workbook/tests.rs
+@@ -924,3 +924,51 @@ fn worksheet_indexes_many_array_ranges_and_rejects_indexed_overlap() {
+         .is_err()
+     );
+ }
++
++// Temporary generator for change 0746's frozen worksheet-level matrix; run on
++// the base commit only, never committed.
++#[path = "validation_only_tests/multi_defect_cases.rs"]
++mod multi_defect_cases;
++
++#[test]
++fn generate_multi_defect_matrix_on_base() {
++    let bytes = {
++        let mut writer = crate::Writer::new();
++        let sheet = writer.add_worksheet("Sheet1").unwrap();
++        writer.write_number(sheet, 0, 0, 1.0).unwrap();
++        let mut output = Cursor::new(Vec::new());
++        writer.write_to(&mut output).unwrap();
++        output.into_inner()
++    };
++    let full = Workbook::new(Cursor::new(bytes.as_slice())).unwrap();
++    let ok = full.xls_worksheet(0).unwrap().get_cell(0, 0).unwrap().xf_index();
++    let strings = full.shared_strings_shared();
++    let properties = full.shared_string_properties_shared().unwrap_or_default();
++    println!("MATRIX-XF\t{ok}");
++    for (name, records) in multi_defect_cases::cases(ok) {
++        let mut stream = Vec::new();
++        for (kind, payload) in &records {
++            stream.extend_from_slice(&kind.to_le_bytes());
++            stream.extend_from_slice(&u16::try_from(payload.len()).unwrap().to_le_bytes());
++            stream.extend_from_slice(payload);
++        }
++        let mut framed = Records::new(&stream);
++        let result = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
++            &mut framed,
++            stream.len() as u64,
++            0,
++            0,
++            &Encoding::from_codepage(1252).unwrap(),
++            "Matrix",
++            Arc::clone(&strings),
++            Arc::clone(&properties),
++            Some(&full.formula_context),
++            Arc::clone(&full.formatting),
++        );
++        let outcome = match result {
++            Ok(_) => "ok".to_string(),
++            Err(error) => error.to_string(),
++        };
++        println!("MATRIX\t{name}\t{outcome}");
++    }
++}

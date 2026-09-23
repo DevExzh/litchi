@@ -1,0 +1,1 @@
+{"input":"fixtures/sparse-bands-minimal.xls","operation":"visibility-open","alloc_counting":true,"source_bytes":4708352,"worksheets":1000,"samples":1,"allocations":92235,"allocated_bytes":110282893,"peak_live_bytes":89916189,"open_ns":[58270851],"stage_ns":[],"commit_ns":[],"publish_ns":[]}
