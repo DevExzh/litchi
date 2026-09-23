@@ -1830,7 +1830,13 @@ pub(super) fn plan_validation_declines(error: &OleError) -> bool {
             // one means the planned view describes more than the plan built,
             // such as a directory chain its FAT runs past the planned
             // directory image: a plan defect, not a caller's resource limit.
-            | OleError::LimitExceeded { .. }
+            // Only those two plan-derived resources decline; any other limit
+            // stays on the error path, so a future caller-set limit cannot be
+            // mistaken for a plan defect.
+            | OleError::LimitExceeded {
+                resource: "input bytes" | "directory bytes",
+                ..
+            }
     )
 }
 
