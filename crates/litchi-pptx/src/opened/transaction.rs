@@ -439,11 +439,12 @@ impl Transaction {
         let scene = crate::shape::Scene::read(owner.blob())?;
         let _shape = scene.shape(key)?;
         let span = crate::tag::shape::selected_raw_span(owner.blob(), key)?;
+        let blob = owner.blob();
         let removed_relationships =
-            shape_relationship_ids(&owner.blob()[span.clone()], owner.rels())?;
-        let mut xml = Vec::with_capacity(owner.blob().len().saturating_sub(span.len()));
-        xml.extend_from_slice(&owner.blob()[..span.start]);
-        xml.extend_from_slice(&owner.blob()[span.end..]);
+            shape_relationship_ids(super::xml::span_bytes(blob, span.clone())?, owner.rels())?;
+        let mut xml = Vec::with_capacity(blob.len().saturating_sub(span.len()));
+        xml.extend_from_slice(super::xml::span_bytes(blob, 0..span.start)?);
+        xml.extend_from_slice(super::xml::span_bytes(blob, span.end..blob.len())?);
         let retained_relationships = shape_relationship_ids(&xml, owner.rels())?;
         let mut candidate = self.working.clone();
         let mut dependency_roots = Vec::new();
@@ -540,7 +541,7 @@ impl Transaction {
                 source_owner.blob(),
                 crate::shape::Key::Index(root.common().index()),
             )?;
-            let fragment = &source_owner.blob()[span.clone()];
+            let fragment = super::xml::span_bytes(source_owner.blob(), span.clone())?;
             relationship_ids.extend(shape_relationship_ids(fragment, source_owner.rels())?);
             for connected_id in super::xml::connector_connection_ids(fragment)? {
                 let endpoint_root = root_by_shape_id.get(&connected_id).copied().ok_or_else(|| {
@@ -623,7 +624,7 @@ impl Transaction {
                 root.name().unwrap_or("Shape")
             );
             let fragment = super::xml::remap_shape_fragment(
-                &source_owner.blob()[span],
+                super::xml::span_bytes(source_owner.blob(), span)?,
                 root_source_id,
                 &name,
                 &shape_id_mapping,

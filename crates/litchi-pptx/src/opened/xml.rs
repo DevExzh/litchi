@@ -368,18 +368,20 @@ pub(crate) fn reorder_slide_bindings(
             resource: "opened-presentation reordered XML",
             source,
         })?;
-    output.extend_from_slice(&xml[..first.span.start]);
+    output.extend_from_slice(span_bytes(xml, 0..first.span.start)?);
     for (position, source_index) in selected.into_iter().enumerate() {
         if position % 256 == 0 {
             check_execution_context(context)?;
         }
-        let source = &elements[source_index];
-        output.extend_from_slice(&xml[source.span.clone()]);
-        if let Some(next) = elements.get(position + 1) {
-            output.extend_from_slice(&xml[elements[position].span.end..next.span.start]);
+        let source = elements
+            .get(source_index)
+            .ok_or_else(|| invalid("opened-presentation slide order lost a binding"))?;
+        output.extend_from_slice(span_bytes(xml, source.span.clone())?);
+        if let (Some(current), Some(next)) = (elements.get(position), elements.get(position + 1)) {
+            output.extend_from_slice(span_bytes(xml, current.span.end..next.span.start)?);
         }
     }
-    output.extend_from_slice(&xml[last.span.end..]);
+    output.extend_from_slice(span_bytes(xml, last.span.end..xml.len())?);
     Ok(output)
 }
 
@@ -462,8 +464,8 @@ pub(crate) fn remove_slide(xml: &[u8], current: &[Slide], id: u32) -> Result<Vec
             resource: "opened-presentation slide removal XML",
             source,
         })?;
-    output.extend_from_slice(&xml[..target.span.start]);
-    output.extend_from_slice(&xml[target.span.end..]);
+    output.extend_from_slice(span_bytes(xml, 0..target.span.start)?);
+    output.extend_from_slice(span_bytes(xml, target.span.end..xml.len())?);
     Ok(output)
 }
 
@@ -602,9 +604,9 @@ where
             resource: "opened-presentation inserted slide XML",
             source,
         })?;
-    output.extend_from_slice(&xml[..insertion]);
+    output.extend_from_slice(span_bytes(xml, 0..insertion)?);
     output.extend_from_slice(&fragment);
-    output.extend_from_slice(&xml[insertion..]);
+    output.extend_from_slice(span_bytes(xml, insertion..xml.len())?);
     Ok(output)
 }
 
@@ -795,11 +797,25 @@ fn rewrite_shape_texts(
     );
     let mut removed = 0usize;
     let mut emitted = 0usize;
+    // The emission below copies the bytes between consecutive spans, so the
+    // spans it writes must be in bounds, in document order and disjoint. The
+    // locator produces them that way; a violation is refused here rather
+    // than reaching a slice.
+    let mut planned_end = 0usize;
     for ((edit, spans), replacement) in edits.iter().zip(&elements).zip(&escaped) {
         if !edit.changed {
             continue;
         }
         for (position, span) in spans.iter().enumerate() {
+            if span.span.start < planned_end
+                || span.span.start > span.span.end
+                || span.span.end > xml.len()
+            {
+                return Err(invalid(
+                    "opened-presentation shape text spans are out of order",
+                ));
+            }
+            planned_end = span.span.end;
             removed = removed
                 .checked_add(span.span.len())
                 .ok_or_else(|| invalid("opened-presentation shape text size overflow"))?;
@@ -837,12 +853,12 @@ fn rewrite_shape_texts(
             continue;
         }
         for (position, span) in spans.iter().enumerate() {
-            output.extend_from_slice(&xml[cursor..span.span.start]);
+            output.extend_from_slice(text_span_bytes(xml, cursor..span.span.start)?);
             write_text_element(&mut output, xml, span, position, replacement.as_bytes())?;
             cursor = span.span.end;
         }
     }
-    output.extend_from_slice(&xml[cursor..]);
+    output.extend_from_slice(text_span_bytes(xml, cursor..xml.len())?);
     if output.len() != output_len {
         return Err(invalid(
             "opened-presentation shape text output length changed during emission",
@@ -866,7 +882,7 @@ fn text_element_output_len(
     let Some(name) = &element.empty_name else {
         return Ok(escaped_len);
     };
-    let open_end = empty_text_open_end(&xml[element.span.clone()])?;
+    let open_end = empty_text_open_end(text_span_bytes(xml, element.span.clone())?)?;
     open_end
         .checked_add(escaped_len)
         .and_then(|length| length.checked_add(name.len()))
@@ -883,7 +899,7 @@ fn write_text_element(
 ) -> Result<()> {
     if position != 0 {
         if element.empty_name.is_some() {
-            output.extend_from_slice(&xml[element.span.clone()]);
+            output.extend_from_slice(text_span_bytes(xml, element.span.clone())?);
         }
         return Ok(());
     }
@@ -891,7 +907,7 @@ fn write_text_element(
         output.extend_from_slice(escaped);
         return Ok(());
     };
-    let raw = &xml[element.span.clone()];
+    let raw = text_span_bytes(xml, element.span.clone())?;
     let open_end = empty_text_open_end(raw)?;
     output.extend_from_slice(&raw[..open_end]);
     output.push(b'>');
@@ -900,6 +916,22 @@ fn write_text_element(
     output.extend_from_slice(name);
     output.push(b'>');
     Ok(())
+}
+
+/// The bytes of one planned text span, or a typed refusal for a range that is
+/// reversed or out of bounds, so no span can turn into a slicing panic.
+fn text_span_bytes(xml: &[u8], range: Range<usize>) -> Result<&[u8]> {
+    xml.get(range)
+        .ok_or_else(|| invalid("opened-presentation shape text spans are out of order"))
+}
+
+/// The bytes of `range` in `xml`, or a typed refusal for a range that is
+/// reversed or out of bounds. Every span an edit copies around comes from a
+/// reader pass over the same bytes and is ordered by construction; this keeps
+/// a violation of that invariant a refusal rather than a slicing panic.
+pub(crate) fn span_bytes(xml: &[u8], range: Range<usize>) -> Result<&[u8]> {
+    xml.get(range)
+        .ok_or_else(|| invalid("opened-presentation XML span is out of order or out of bounds"))
 }
 
 fn empty_text_open_end(raw: &[u8]) -> Result<usize> {
@@ -995,9 +1027,9 @@ pub(crate) fn append_shape(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
             resource: "opened-presentation appended shape XML",
             source,
         })?;
-    output.extend_from_slice(&xml[..insertion]);
+    output.extend_from_slice(span_bytes(xml, 0..insertion)?);
     output.extend_from_slice(fragment);
-    output.extend_from_slice(&xml[insertion..]);
+    output.extend_from_slice(span_bytes(xml, insertion..xml.len())?);
     Ok(output)
 }
 
@@ -1660,7 +1692,19 @@ fn drawing_text_elements_for_owners(
                 let owner = owners
                     .get(owner_position)
                     .filter(|owner| owner.contains(&start));
-                if owner.is_some() && drawing_namespace && element.local_name().as_ref() == b"t" {
+                let text_element =
+                    owner.is_some() && drawing_namespace && element.local_name().as_ref() == b"t";
+                // Nothing may sit inside an open text element, an empty `a:t`
+                // included: recording one would give the rewrite a span that
+                // starts inside the enclosing element's span.
+                if active.is_some() {
+                    return Err(invalid(if text_element {
+                        "opened-presentation DrawingML text elements overlap"
+                    } else {
+                        "opened-presentation DrawingML text contains child markup"
+                    }));
+                }
+                if text_element {
                     let group = spans.get_mut(owner_position).ok_or_else(|| {
                         invalid("opened-presentation shape text span owner disappeared")
                     })?;
@@ -1672,10 +1716,6 @@ fn drawing_text_elements_for_owners(
                         span: start..end,
                         empty_name: Some(element.name().as_ref().to_vec()),
                     });
-                } else if active.is_some() {
-                    return Err(invalid(
-                        "opened-presentation DrawingML text contains child markup",
-                    ));
                 }
             },
             Event::End(element) => {

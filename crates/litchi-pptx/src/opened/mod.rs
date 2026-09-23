@@ -19,6 +19,8 @@ mod xml;
 mod mce_retention_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod text_run_tests;
 
 pub use copy_plan::{SlideCopyPart, SlideCopyPlan};
 pub use cross_copy_plan::{CrossSlideCopyPatch, CrossSlideCopyPlan};
