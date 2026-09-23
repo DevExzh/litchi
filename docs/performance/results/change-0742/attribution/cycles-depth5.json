@@ -1,0 +1,103 @@
+{
+  "lifecycle_period": 16299496906,
+  "phases": {
+    "other-lifecycle": {
+      "share_of_lifecycle": 0.406,
+      "leaf_shares": {
+        "sha256": 0.4272,
+        "kernel-or-unknown": 0.2288,
+        "memcpy": 0.143,
+        "crc32": 0.1027,
+        "other": 0.0333,
+        "memset": 0.0274,
+        "memcmp": 0.0156,
+        "inflate": 0.014,
+        "allocator": 0.0078
+      },
+      "path_shares": {}
+    },
+    "commit": {
+      "share_of_lifecycle": 0.3431,
+      "leaf_shares": {
+        "sha256": 0.8,
+        "kernel-or-unknown": 0.0815,
+        "memcmp": 0.0314,
+        "memcpy": 0.0302,
+        "other": 0.024,
+        "crc32": 0.0159,
+        "memset": 0.0089,
+        "allocator": 0.0058,
+        "inflate": 0.0023
+      },
+      "path_shares": {
+        "prepare_cross_slide_copy_for_slides > build_candidate": 0.161,
+        "physical_package_fingerprint > write_to_stream > write": 0.1607,
+        "package_fingerprint_with_memo > feed": 0.1606,
+        "prepare_cross_slide_copy_for_slides > build_candidate > capture_internal > package_fingerprint_with_memo > feed": 0.1601,
+        "validate_application_candidate > capture_internal > package_fingerprint_with_memo > feed": 0.1599,
+        "prepare_cross_slide_copy_for_slides": 0.0869,
+        "prepare_cross_slide_copy_for_slides > build_candidate > from_vec_reusing_payloads > from_phys_reader > load_parts_eager": 0.0538,
+        "prepare_cross_slide_copy_for_slides > prove_package_dialect": 0.0155,
+        "prepare_cross_slide_copy_for_slides > build_candidate > from_vec_reusing_payloads": 0.0151,
+        "prepare_cross_slide_copy_for_slides > prove_layout_inheritance > prove_inherited_part > prove_inherited_part > prove_inherited_part": 0.0039,
+        "prepare_cross_slide_copy_for_slides > build_candidate > capture_internal > load_snapshot_with_slide_root_proofs > load_index_with_slide_root_proofs": 0.0027,
+        "capture_with_revision > capture_internal > load_snapshot_with_slide_root_proofs > load_index_with_slide_root_proofs > validate_resource_xml": 0.0023,
+        "prepare_cross_slide_copy_for_slides > prove_layout_inheritance > prove_inherited_part > prove_inherited_part > reject_mce": 0.0016,
+        "prepare_cross_slide_copy_for_slides > validate_registered_layout > slide_layouts > layouts": 0.0016,
+        "prepare_cross_slide_copy_for_slides > build_candidate > from_vec_reusing_payloads > from_phys_reader > from_xml": 0.0012,
+        "validate_application_candidate > capture_internal > load_snapshot_with_slide_root_proofs > load_index_with_slide_root_proofs > validate_resource_xml": 0.0012,
+        "prepare_cross_slide_copy_for_slides > validate_xml_surface": 0.0012,
+        "(root)": 0.0008,
+        "capture_with_revision > capture_internal > capture_slides_with_mce > catalog > slide_references": 0.0008,
+        "capture_with_revision > capture_internal > from_part": 0.0008,
+        "validate_application_candidate > capture_internal > load_snapshot_with_slide_root_proofs > snapshot_from_index > from_parts": 0.0008,
+        "prepare_cross_slide_copy_for_slides > prove_package_dialect > dialect_namespace_flags": 0.0008,
+        "prepare_cross_slide_copy_for_slides > build_candidate > capture_internal > capture_slides_with_mce > finish_from_processed": 0.0008,
+        "capture_with_revision > capture_internal > clone > clone > clone": 0.0004,
+        "prepare_cross_slide_copy_for_slides > capture > new > encoded_len > optional_state_len": 0.0004
+      }
+    },
+    "plan": {
+      "share_of_lifecycle": 0.2508,
+      "leaf_shares": {
+        "sha256": 0.6567,
+        "kernel-or-unknown": 0.1018,
+        "memcpy": 0.1004,
+        "memcmp": 0.0471,
+        "crc32": 0.0423,
+        "other": 0.0328,
+        "memset": 0.009,
+        "allocator": 0.0053,
+        "inflate": 0.0026,
+        "deflate": 0.0021
+      },
+      "path_shares": {
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate > bounded_package_bytes > write_to_stream": 0.3342,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > snapshot_physical_revision > physical_package_fingerprint > write_to_stream": 0.22,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate > capture_internal > package_fingerprint_with_memo": 0.218,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate > from_vec_reusing_payloads > from_phys_reader": 0.075,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate > authorize_compressed_transfer > verified_capture": 0.0418,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate > bounded_package_bytes": 0.0243,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate > from_vec_reusing_payloads": 0.02,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate": 0.019,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > prove_package_dialect": 0.0175,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > prove_layout_inheritance > prove_inherited_part > prove_inherited_part": 0.0069,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > prove_package_dialect > dialect_namespace_flags": 0.0042,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate > capture_internal > load_snapshot_with_slide_root_proofs": 0.0037,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > validate_registered_layout > slide_layouts > layouts": 0.0032,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate > insert_slide > slide_id_elements": 0.0011,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate > from_vec_reusing_payloads > unmarshal_with_payload_donor": 0.0011,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate > capture_internal > capture_slides_with_mce": 0.0011,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate > capture_internal": 0.0005,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > prove_layout_inheritance > single_inheritance_target > target_partname": 0.0005,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate > try_add_part > is_signed": 0.0005,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > reject_protected > parse_xml": 0.0005,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > prove_package_dialect > get_part": 0.0005,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate > try_add_part > conflict_with": 0.0005,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > reject_mce": 0.0005,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > validate_xml_surface": 0.0005,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > prove_layout_inheritance > prove_inherited_part > get_part": 0.0005
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+[package]
+name = "change0742-route-compare"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Packet-only probe outside every workspace: publishes the same owned
+# cross-slide copy through the owned and the source-backed routes and lists
+# every archive member whose raw bytes or framing differ.
+[workspace]
+
+[dependencies]
+litchi-core = { path = "BRANCH/crates/litchi-core" }
+litchi-pptx = { path = "BRANCH/crates/litchi-pptx" }
+soapberry-zip = { path = "BRANCH/crates/soapberry-zip" }

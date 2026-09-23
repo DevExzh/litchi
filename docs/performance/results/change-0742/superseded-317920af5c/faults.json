@@ -1,0 +1,99 @@
+{
+  "pptx_cross_copy_media_rich_lifecycle": {
+    "after": {
+      "processes_by_median_fresh_regions": {
+        "1": 1,
+        "2": 2,
+        "3": 4,
+        "4": 1
+      },
+      "samples_by_fresh_regions": {
+        "1": {
+          "median_commit_ms": 89.544,
+          "median_lifecycle_ms": 182.585,
+          "median_plan_ms": 64.316,
+          "median_publication_ms": 6.423,
+          "samples": 20
+        },
+        "2": {
+          "median_commit_ms": 89.061,
+          "median_lifecycle_ms": 188.134,
+          "median_plan_ms": 70.564,
+          "median_publication_ms": 6.484,
+          "samples": 56
+        },
+        "3": {
+          "median_commit_ms": 96.057,
+          "median_lifecycle_ms": 196.02,
+          "median_plan_ms": 70.908,
+          "median_publication_ms": 6.438,
+          "samples": 64
+        },
+        "4": {
+          "median_commit_ms": 95.849,
+          "median_lifecycle_ms": 201.947,
+          "median_plan_ms": 77.523,
+          "median_publication_ms": 6.562,
+          "samples": 20
+        }
+      }
+    },
+    "before": {
+      "processes_by_median_fresh_regions": {
+        "1": 7,
+        "2": 1
+      },
+      "samples_by_fresh_regions": {
+        "1": {
+          "median_commit_ms": 88.925,
+          "median_lifecycle_ms": 407.277,
+          "median_plan_ms": 289.863,
+          "median_publication_ms": 6.368,
+          "samples": 139
+        },
+        "2": {
+          "median_commit_ms": 88.825,
+          "median_lifecycle_ms": 413.094,
+          "median_plan_ms": 295.579,
+          "median_publication_ms": 6.402,
+          "samples": 21
+        }
+      }
+    }
+  },
+  "pptx_source_backed_cross_copy_media_rich_lifecycle": {
+    "after": {
+      "processes_by_median_fresh_regions": {
+        "0": 3,
+        "1": 5
+      },
+      "samples_by_fresh_regions": {
+        "0": {
+          "median_lifecycle_ms": 12.413,
+          "median_plan_ms": 4.277,
+          "median_publication_ms": 7.476,
+          "samples": 120
+        },
+        "1": {
+          "median_lifecycle_ms": 17.338,
+          "median_plan_ms": 4.222,
+          "median_publication_ms": 12.446,
+          "samples": 200
+        }
+      }
+    },
+    "before": {
+      "processes_by_median_fresh_regions": {
+        "1": 8
+      },
+      "samples_by_fresh_regions": {
+        "1": {
+          "median_lifecycle_ms": 17.38,
+          "median_plan_ms": 4.219,
+          "median_publication_ms": 12.497,
+          "samples": 320
+        }
+      }
+    }
+  }
+}

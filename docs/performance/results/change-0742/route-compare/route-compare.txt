@@ -1,0 +1,12 @@
+transfers_source_compressed_media	true
+owned_bytes	4230201
+source_backed_bytes	4230171
+byte_identical	false
+media_members_identical	16/16
+differs	[Content_Types].xml	owned(method=8,flags=0x0008,compressed=451)	source_backed(method=8,flags=0x0008,compressed=449)	compressed_equal=false
+differs	ppt/_rels/presentation.xml.rels	owned(method=8,flags=0x0008,compressed=286)	source_backed(method=8,flags=0x0008,compressed=282)	compressed_equal=false
+only-owned	ppt/slides/_rels/slide3-copy1.xml.rels
+only-owned	ppt/slides/slide3-copy1.xml
+only-source-backed	ppt/slides/_rels/slide3.xml.rels
+only-source-backed	ppt/slides/slide3.xml
+central_order_equal	false
