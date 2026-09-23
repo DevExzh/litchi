@@ -16,7 +16,10 @@ use std::io::Cursor;
 
 use litchi_core::sheet::{Cell as _, CellValue, WorkbookTrait as _};
 use litchi_xls::Error;
-use litchi_xls::writer::{PageSetupOptions, Writer};
+use litchi_xls::writer::{
+    DataValidation, DataValidationOperator, DataValidationRange, DataValidationType,
+    PageSetupOptions, Writer,
+};
 
 type Workbook = litchi_xls::Workbook<Cursor<Vec<u8>>>;
 
@@ -408,4 +411,39 @@ fn headers_and_footers_keep_their_limits() {
         assert!(even.set_even(text.clone(), String::new()).is_err());
         assert!(even.set_first(String::new(), text.clone()).is_err());
     }
+}
+
+/// Data-validation prompt and error strings in U+0080..=U+00FF were written as
+/// UTF-8 bytes under a compressed-string flag, and the crate's reader then
+/// dropped the whole worksheet.
+#[test]
+fn latin1_data_validation_strings_round_trip() {
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Data").unwrap();
+    let mut validation = DataValidation::new(
+        DataValidationRange::new(0, 3, 0, 1).unwrap(),
+        DataValidationType::Whole {
+            operator: DataValidationOperator::Between,
+            value1: 1,
+            value2: Some(9),
+        },
+    );
+    validation.show_input_message = true;
+    validation.input_title = Some("Café".to_string());
+    validation.input_message = Some("Größe ½ ñ".to_string());
+    validation.show_error_alert = true;
+    validation.error_title = Some("Erreur é".to_string());
+    validation.error_message = Some("日本語 and ü".to_string());
+    writer.add_data_validation(sheet, validation).unwrap();
+    writer.write_number(sheet, 5, 0, 1.0).unwrap();
+
+    let workbook = read(written(&mut writer));
+    let worksheet = workbook.xls_worksheet(0).unwrap();
+    let rules = worksheet.data_validations();
+    assert_eq!(rules.len(), 1);
+    assert_eq!(rules[0].prompt_title(), Some("Café"));
+    assert_eq!(rules[0].prompt(), Some("Größe ½ ñ"));
+    assert_eq!(rules[0].error_title(), Some("Erreur é"));
+    assert_eq!(rules[0].error(), Some("日本語 and ü"));
+    assert!(worksheet.get_cell(5, 0).is_some());
 }
