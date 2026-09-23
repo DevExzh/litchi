@@ -692,6 +692,18 @@ impl State {
         }
     }
 
+    /// The state inside `depth` open elements of a document whose element
+    /// has been seen, with none of the open elements' spaces on the stack:
+    /// an end tag that would close one of them is refused as unexpected.
+    fn within(depth: usize) -> Self {
+        Self {
+            depth,
+            max_depth: depth,
+            roots: 1,
+            ..Self::new()
+        }
+    }
+
     fn current_space(&self) -> Space {
         self.spaces.last().copied().unwrap_or(Space::Default)
     }
@@ -750,6 +762,134 @@ pub fn verify_authored(input: &[u8], limits: Limits) -> Result<Report, Error> {
 /// [`Error::NotCompact`].
 pub fn verify_source(input: &[u8], limits: Limits) -> Result<Report, Error> {
     verify_with_policy(input, limits, Policy::SOURCE)
+}
+
+/// How [`verify_source_replacement`] established the replacement's verdict.
+///
+/// Every variant means the same thing about the replacement: it passed every
+/// check [`verify_source`] makes, under the same limits. They differ only in
+/// which of its bytes had to be scanned again to prove it, and are reported
+/// for diagnostics and tests. They carry byte offsets, never content.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum ReplacementProof {
+    /// The replacement is byte-identical to the original, so it has the
+    /// original's verdict.
+    Identical,
+    /// Outside one element of the original, which is not the document
+    /// element, the replacement is byte-identical to the original. Only the
+    /// replacement bytes that took that element's place were scanned, in the
+    /// parser state the original's audit had reached at the element.
+    Window {
+        /// The replaced element's span in the original.
+        original: core::ops::Range<usize>,
+        /// The replacement bytes that took its place.
+        replacement: core::ops::Range<usize>,
+    },
+    /// The replacement was scanned completely, as [`verify_source`] scans it.
+    Complete,
+}
+
+/// The first failure [`verify_source_replacement`] found, and on which side.
+#[derive(Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum ReplacementError {
+    /// The original failed with the error [`verify_source`] reports for it;
+    /// the replacement was not examined.
+    Original(Error),
+    /// The original passed and the replacement failed, with the error
+    /// [`verify_source`] reports for it.
+    Replacement(Error),
+}
+
+impl ReplacementError {
+    /// The audit failure, from whichever side it came.
+    #[must_use]
+    pub fn into_error(self) -> Error {
+        match self {
+            Self::Original(error) | Self::Replacement(error) => error,
+        }
+    }
+}
+
+impl fmt::Display for ReplacementError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Original(error) => write!(formatter, "original XML: {error}"),
+            Self::Replacement(error) => write!(formatter, "replacement XML: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for ReplacementError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Original(error) | Self::Replacement(error) => Some(error),
+        }
+    }
+}
+
+/// Verifies the original bytes of a Part a package already holds and the
+/// replacement that will be published in their place, under the source
+/// policy.
+///
+/// The verdict is exactly that of the two audits it replaces, in their order:
+/// [`ReplacementError::Original`] carrying the error of
+/// `verify_source(original, limits)` when that fails, otherwise
+/// [`ReplacementError::Replacement`] carrying the error of
+/// `verify_source(replacement, limits)` when that fails, otherwise `Ok`.
+///
+/// The original is always scanned completely. The replacement usually differs
+/// from it only locally, and is then not scanned again where it repeats the
+/// original byte for byte: the audit of the original also locates the
+/// innermost element, other than the document element, that covers every
+/// byte in which the two differ. Outside that element the replacement is the
+/// original's own bytes, so they tokenize as the original's did and were
+/// checked, in the same parser state, moments earlier. Only the replacement
+/// bytes that took the element's place are scanned, starting in the state the
+/// original reached there: the same open-element depth, inside the document
+/// element, with no enclosing element closable from inside. They must be
+/// balanced and must begin and end with markup, so the parse outside them is
+/// unchanged; each aggregate budget is then re-totalled for the whole
+/// replacement, and the replacement's length is checked against
+/// [`Limits::max_bytes`]. UTF-8 validity composes, because the window starts
+/// and ends at an ASCII delimiter.
+///
+/// The shortcut only ever decides that the replacement passes. When the
+/// difference is not covered by such an element, the window is larger than
+/// half the replacement, or any window check fails, the replacement is scanned
+/// completely, so every error is the one [`verify_source`] reports, with its
+/// offset. [`ReplacementProof`] says which path was taken.
+///
+/// # Errors
+///
+/// Returns [`ReplacementError`] naming the failing side, carrying the
+/// [`Error`] that side's [`verify_source`] call returns.
+pub fn verify_source_replacement(
+    original: &[u8],
+    replacement: &[u8],
+    limits: Limits,
+) -> Result<ReplacementProof, ReplacementError> {
+    if original == replacement {
+        return verify_source(original, limits)
+            .map(|_report| ReplacementProof::Identical)
+            .map_err(ReplacementError::Original);
+    }
+    let prefix = common_prefix_len(original, replacement);
+    let suffix = common_suffix_len(&original[prefix..], &replacement[prefix..]);
+    let mut search =
+        WindowSearch::new(replacement, original.len(), prefix, original.len() - suffix);
+    let report = verify_observed(original, limits, Policy::SOURCE, &mut search)
+        .map_err(ReplacementError::Original)?;
+    if let Some(proof) = search
+        .found
+        .and_then(|window| window.prove(report, replacement, limits))
+    {
+        return Ok(proof);
+    }
+    verify_source(replacement, limits)
+        .map(|_report| ReplacementProof::Complete)
+        .map_err(ReplacementError::Replacement)
 }
 
 /// Verifies one XML document from a caller-owned buffered source.
@@ -1322,6 +1462,20 @@ impl WindowError {
 }
 
 fn verify_with_policy(input: &[u8], limits: Limits, policy: Policy) -> Result<Report, Error> {
+    verify_observed(input, limits, policy, &mut ())
+}
+
+/// The slice auditor, with an observer of the tokens it accepts.
+///
+/// The observer only reads the auditor's state, so every entry point reaches
+/// the verdict [`verify_with_policy`] reaches; the unit observer compiles
+/// away.
+fn verify_observed<O: Observer>(
+    input: &[u8],
+    limits: Limits,
+    policy: Policy,
+    observer: &mut O,
+) -> Result<Report, Error> {
     check_limit(Resource::Bytes, limits.bytes, input.len(), 0)?;
     let xml = std::str::from_utf8(input).map_err(|error| Error::Encoding {
         valid_up_to: error.valid_up_to(),
@@ -1333,9 +1487,45 @@ fn verify_with_policy(input: &[u8], limits: Limits, policy: Policy) -> Result<Re
     } else {
         0
     };
+    let mut state = State::new();
+    scan(input, xml, bom_bytes, limits, policy, &mut state, observer)?;
+
+    if state.depth != 0 {
+        return Err(Error::malformed(input.len(), "unclosed document element"));
+    }
+    if state.roots != 1 {
+        return Err(Error::malformed(
+            input.len(),
+            "XML must contain exactly one document element",
+        ));
+    }
+
+    Ok(Report {
+        attributes: state.attributes,
+        bytes: input.len(),
+        events: state.events,
+        max_depth: state.max_depth,
+        text_bytes: state.text_bytes,
+    })
+}
+
+/// The slice auditor's token loop: every token from the start of `xml` to
+/// its EOF, checked from `state` onward.
+///
+/// `input` is the same text as `xml` plus a leading byte-order mark of
+/// `bom_bytes` bytes, which quick-xml consumes without counting it; raw spans
+/// and diagnostics address `input`.
+fn scan<O: Observer>(
+    input: &[u8],
+    xml: &str,
+    bom_bytes: usize,
+    limits: Limits,
+    policy: Policy,
+    state: &mut State,
+    observer: &mut O,
+) -> Result<(), Error> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(false);
-    let mut state = State::new();
 
     loop {
         let start = position(&reader).saturating_add(bom_bytes);
@@ -1349,54 +1539,58 @@ fn verify_with_policy(input: &[u8], limits: Limits, policy: Policy) -> Result<Re
         let raw = input
             .get(start..end)
             .ok_or_else(|| Error::malformed(start, "parser position escaped input"))?;
+        let before = Counters::of(state);
 
         state.events = checked_add(state.events, 1, Resource::Events, limits.events, start)?;
         check_limit(Resource::TokenBytes, limits.token_bytes, raw.len(), start)?;
 
-        match event {
+        let token = match event {
             Event::Start(tag) => {
-                finish_text_run(&mut state, policy.reject_ambiguous_space)?;
+                finish_text_run(state, policy.reject_ambiguous_space)?;
                 check_start(raw, false, start, policy.require_compact)?;
                 let space = inspect_attributes(
                     &tag,
                     reader.decoder(),
                     state.current_space(),
-                    &mut state,
+                    state,
                     limits,
                     start,
                 )?;
-                enter_element(&mut state, limits, start)?;
+                enter_element(state, limits, start)?;
                 state
                     .spaces
                     .try_reserve(1)
                     .map_err(|_allocation| Error::Allocation)?;
                 state.spaces.push(space);
+                Token::Start
             },
             Event::Empty(tag) => {
-                finish_text_run(&mut state, policy.reject_ambiguous_space)?;
+                finish_text_run(state, policy.reject_ambiguous_space)?;
                 check_start(raw, true, start, policy.require_compact)?;
                 inspect_attributes(
                     &tag,
                     reader.decoder(),
                     state.current_space(),
-                    &mut state,
+                    state,
                     limits,
                     start,
                 )?;
-                enter_empty(&mut state, limits, start)?;
+                enter_empty(state, limits, start)?;
+                Token::Empty
             },
             Event::End(_) => {
-                finish_text_run(&mut state, policy.reject_ambiguous_space)?;
+                finish_text_run(state, policy.reject_ambiguous_space)?;
                 check_end(raw, start, policy.require_compact)?;
                 if state.depth == 0 || state.spaces.pop().is_none() {
                     return Err(Error::malformed(start, "unexpected end element"));
                 }
                 state.depth -= 1;
+                Token::End
             },
             Event::Text(text) => {
                 let bytes = text.as_ref();
                 check_character_context(state.depth, bytes, start)?;
-                charge_text(&mut state, limits, bytes.len(), start)?;
+                charge_text(state, limits, bytes.len(), start)?;
                 let whitespace = is_xml_whitespace(bytes);
                 if policy.require_compact
                     && ((state.depth == 0 && whitespace)
@@ -1416,6 +1610,7 @@ fn verify_with_policy(input: &[u8], limits: Limits, policy: Policy) -> Result<Re
                         state.text_run_has_explicit_content = true;
                     }
                 }
+                Token::Character
             },
             Event::CData(data) => {
                 if state.depth == 0 {
@@ -1424,51 +1619,377 @@ fn verify_with_policy(input: &[u8], limits: Limits, policy: Policy) -> Result<Re
                         "CDATA outside the document element",
                     ));
                 }
-                charge_text(&mut state, limits, data.as_ref().len(), start)?;
+                charge_text(state, limits, data.as_ref().len(), start)?;
                 state.ambiguous_space_offset = None;
                 state.text_run_has_explicit_content = true;
+                Token::Markup
             },
             Event::GeneralRef(reference) => {
                 check_character_context(state.depth, reference.as_ref(), start)?;
-                charge_text(&mut state, limits, raw.len(), start)?;
+                charge_text(state, limits, raw.len(), start)?;
                 state.ambiguous_space_offset = None;
                 state.text_run_has_explicit_content = true;
+                Token::Character
             },
             Event::Decl(_) => {
-                finish_text_run(&mut state, policy.reject_ambiguous_space)?;
+                finish_text_run(state, policy.reject_ambiguous_space)?;
                 check_declaration(raw, start, policy.require_compact)?;
+                Token::Markup
             },
             Event::Comment(_) | Event::PI(_) => {
-                finish_text_run(&mut state, policy.reject_ambiguous_space)?;
+                finish_text_run(state, policy.reject_ambiguous_space)?;
+                Token::Markup
             },
             Event::DocType(_) => {
-                finish_text_run(&mut state, policy.reject_ambiguous_space)?;
+                finish_text_run(state, policy.reject_ambiguous_space)?;
                 return Err(Error::Doctype { offset: start });
             },
             Event::Eof => {
-                finish_text_run(&mut state, policy.reject_ambiguous_space)?;
+                finish_text_run(state, policy.reject_ambiguous_space)?;
                 break;
             },
+        };
+        observer.accepted(token, start, end, before, state);
+    }
+    Ok(())
+}
+
+/// Aggregate budgets the slice auditor has charged, as it counts them.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct Counters {
+    attributes: usize,
+    events: usize,
+    text_bytes: usize,
+}
+
+impl Counters {
+    const fn of(state: &State) -> Self {
+        Self {
+            attributes: state.attributes,
+            events: state.events,
+            text_bytes: state.text_bytes,
         }
     }
 
-    if state.depth != 0 {
-        return Err(Error::malformed(input.len(), "unclosed document element"));
-    }
-    if state.roots != 1 {
-        return Err(Error::malformed(
-            input.len(),
-            "XML must contain exactly one document element",
-        ));
+    /// What was charged between `earlier` and `self`.
+    fn since(self, earlier: Self) -> Option<Self> {
+        Some(Self {
+            attributes: self.attributes.checked_sub(earlier.attributes)?,
+            events: self.events.checked_sub(earlier.events)?,
+            text_bytes: self.text_bytes.checked_sub(earlier.text_bytes)?,
+        })
     }
 
-    Ok(Report {
-        attributes: state.attributes,
-        bytes: input.len(),
-        events: state.events,
-        max_depth: state.max_depth,
-        text_bytes: state.text_bytes,
+    /// These totals with `removed` taken out and `added` put in.
+    fn replaced(self, removed: Self, added: Self) -> Option<Self> {
+        Some(Self {
+            attributes: self
+                .attributes
+                .checked_sub(removed.attributes)?
+                .checked_add(added.attributes)?,
+            events: self
+                .events
+                .checked_sub(removed.events)?
+                .checked_add(added.events)?,
+            text_bytes: self
+                .text_bytes
+                .checked_sub(removed.text_bytes)?
+                .checked_add(added.text_bytes)?,
+        })
+    }
+
+    const fn within(self, limits: Limits) -> bool {
+        self.attributes <= limits.attributes
+            && self.events <= limits.events
+            && self.text_bytes <= limits.text_bytes
+    }
+}
+
+/// The lexical class of one token the slice auditor accepted.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Token {
+    /// A start tag; its element is now open.
+    Start,
+    /// An end tag; its element is now closed.
+    End,
+    /// An empty-element tag.
+    Empty,
+    /// Other markup delimited by `<` and `>`: an XML declaration, a comment,
+    /// a processing instruction or a CDATA section.
+    Markup,
+    /// Character data or a general reference.
+    Character,
+}
+
+/// A reader of the tokens the slice auditor accepts.
+///
+/// An observer sees each token after it passed every check and updated the
+/// state, and only reads that state, so it cannot change a verdict.
+trait Observer {
+    /// `before` holds the counters as they stood before `token` was charged;
+    /// `state` is the auditor's state after it.
+    fn accepted(&mut self, token: Token, start: usize, end: usize, before: Counters, state: &State);
+}
+
+impl Observer for () {
+    #[inline(always)]
+    fn accepted(
+        &mut self,
+        _token: Token,
+        _start: usize,
+        _end: usize,
+        _before: Counters,
+        _state: &State,
+    ) {
+    }
+}
+
+/// Watches the audit of an original payload for the innermost element that
+/// covers every byte in which a replacement differs from it.
+///
+/// Elements are considered as they close, innermost first. The first one that
+/// is not the document element, starts at or before the first differing byte,
+/// ends at or after the start of the common tail, and whose replacement bytes
+/// begin with `<` and end with `>`, is the window.
+struct WindowSearch<'r> {
+    replacement: &'r [u8],
+    original_len: usize,
+    /// `original[..prefix] == replacement[..prefix]`.
+    prefix: usize,
+    /// `original[tail..]` equals the same number of trailing replacement bytes.
+    tail: usize,
+    /// Open elements that started at or before `prefix`: their start offsets
+    /// and the counters before their start tags.
+    open: Vec<(usize, Counters)>,
+    /// Open elements that started after `prefix`. None of them can cover the
+    /// first differing byte.
+    untracked: usize,
+    found: Option<Window>,
+    stopped: bool,
+}
+
+impl<'r> WindowSearch<'r> {
+    const fn new(replacement: &'r [u8], original_len: usize, prefix: usize, tail: usize) -> Self {
+        Self {
+            replacement,
+            original_len,
+            prefix,
+            tail,
+            open: Vec::new(),
+            untracked: 0,
+            found: None,
+            stopped: false,
+        }
+    }
+
+    /// Consider the element `original[start..end]`, which has just closed,
+    /// leaving `state.depth` elements open around it.
+    fn consider(&mut self, start: usize, end: usize, before: Counters, state: &State) {
+        // Depth zero is the document element, whose window would be the
+        // whole document; an element ending before the common tail does not
+        // cover every difference.
+        if state.depth == 0 || end < self.tail {
+            return;
+        }
+        let Some(window_end) = end
+            .checked_add(self.replacement.len())
+            .and_then(|total| total.checked_sub(self.original_len))
+        else {
+            return;
+        };
+        if window_end <= start
+            || self.replacement.get(start) != Some(&b'<')
+            || self.replacement.get(window_end - 1) != Some(&b'>')
+        {
+            return;
+        }
+        self.stopped = true;
+        self.found = Counters::of(state).since(before).map(|removed| Window {
+            original: start..end,
+            replacement: start..window_end,
+            depth: state.depth,
+            removed,
+        });
+    }
+}
+
+impl Observer for WindowSearch<'_> {
+    fn accepted(
+        &mut self,
+        token: Token,
+        start: usize,
+        end: usize,
+        before: Counters,
+        state: &State,
+    ) {
+        if self.stopped {
+            return;
+        }
+        match token {
+            Token::Start if start <= self.prefix => {
+                if self.open.try_reserve(1).is_err() {
+                    self.stopped = true;
+                    return;
+                }
+                self.open.push((start, before));
+            },
+            Token::Start => self.untracked += 1,
+            Token::End if self.untracked > 0 => self.untracked -= 1,
+            Token::End => match self.open.pop() {
+                Some((opened, counters)) => self.consider(opened, end, counters, state),
+                None => self.stopped = true,
+            },
+            Token::Empty if start <= self.prefix => self.consider(start, end, before, state),
+            Token::Empty | Token::Markup | Token::Character => {},
+        }
+    }
+}
+
+/// One element of an original payload and the replacement bytes that took
+/// its place.
+#[derive(Debug)]
+struct Window {
+    original: core::ops::Range<usize>,
+    replacement: core::ops::Range<usize>,
+    /// Elements open around the window; at least one, the document element.
+    depth: usize,
+    /// Counters the original element was charged.
+    removed: Counters,
+}
+
+impl Window {
+    /// Prove the replacement's source-policy verdict from the original's, or
+    /// return `None` so the caller audits the replacement completely.
+    ///
+    /// Only success is decided here. Every failure, and every doubt, is left
+    /// to the complete audit, which reports the canonical error and offset.
+    fn prove(
+        self,
+        original: Report,
+        replacement: &[u8],
+        limits: Limits,
+    ) -> Option<ReplacementProof> {
+        // A window of more than half the payload saves nothing, and a failure
+        // inside it would then be scanned twice.
+        if replacement.len() > limits.bytes
+            || self.replacement.len().checked_mul(2)? > replacement.len()
+        {
+            return None;
+        }
+        let bytes = replacement.get(self.replacement.clone())?;
+        let added = audit_window(bytes, limits, self.depth)?;
+        let totals = Counters {
+            attributes: original.attributes,
+            events: original.events,
+            text_bytes: original.text_bytes,
+        }
+        .replaced(self.removed, added)?;
+        if !totals.within(limits) {
+            return None;
+        }
+        Some(ReplacementProof::Window {
+            original: self.original,
+            replacement: self.replacement,
+        })
+    }
+}
+
+/// Audit `bytes` under the source policy as the content that replaced one
+/// element with `depth` elements open around it: the document element is
+/// open, and no element opened outside the window may be closed inside it.
+///
+/// Returns the counters the window is charged, excluding its own EOF event,
+/// or `None` when the window fails a check, is not balanced, or does not begin
+/// and end with markup.
+fn audit_window(bytes: &[u8], limits: Limits, depth: usize) -> Option<Counters> {
+    if depth == 0 || bytes.first() != Some(&b'<') {
+        return None;
+    }
+    let xml = std::str::from_utf8(bytes).ok()?;
+    let mut state = State::within(depth);
+    let mut last = LastToken::default();
+    scan(bytes, xml, 0, limits, Policy::SOURCE, &mut state, &mut last).ok()?;
+    if state.depth != depth || !last.is_markup_ending_at(bytes.len()) {
+        return None;
+    }
+    let charged = Counters::of(&state);
+    Some(Counters {
+        events: charged.events.checked_sub(1)?,
+        ..charged
     })
+}
+
+/// Remembers the last token a scan accepted.
+#[derive(Default)]
+struct LastToken {
+    token: Option<Token>,
+    end: usize,
+}
+
+impl LastToken {
+    fn is_markup_ending_at(&self, end: usize) -> bool {
+        self.end == end && matches!(self.token, Some(Token::End | Token::Empty | Token::Markup))
+    }
+}
+
+impl Observer for LastToken {
+    fn accepted(
+        &mut self,
+        token: Token,
+        _start: usize,
+        end: usize,
+        _before: Counters,
+        _state: &State,
+    ) {
+        self.token = Some(token);
+        self.end = end;
+    }
+}
+
+/// Bytes compared per slice comparison before the scan narrows down.
+const COMPARE_BLOCK: usize = 4096;
+/// Bytes compared per slice comparison inside the first unequal block.
+const COMPARE_LINE: usize = 64;
+
+/// Length of the longest common prefix of `left` and `right`.
+fn common_prefix_len(left: &[u8], right: &[u8]) -> usize {
+    let limit = left.len().min(right.len());
+    let mut matched = 0;
+    for step in [COMPARE_BLOCK, COMPARE_LINE] {
+        while matched + step <= limit
+            && left[matched..matched + step] == right[matched..matched + step]
+        {
+            matched += step;
+        }
+    }
+    matched
+        + left[matched..limit]
+            .iter()
+            .zip(&right[matched..limit])
+            .take_while(|(left, right)| left == right)
+            .count()
+}
+
+/// Length of the longest common suffix of `left` and `right`.
+fn common_suffix_len(left: &[u8], right: &[u8]) -> usize {
+    let limit = left.len().min(right.len());
+    let mut matched = 0;
+    for step in [COMPARE_BLOCK, COMPARE_LINE] {
+        while matched + step <= limit
+            && left[left.len() - matched - step..left.len() - matched]
+                == right[right.len() - matched - step..right.len() - matched]
+        {
+            matched += step;
+        }
+    }
+    matched
+        + left[..left.len() - matched]
+            .iter()
+            .rev()
+            .zip(right[..right.len() - matched].iter().rev())
+            .take(limit - matched)
+            .take_while(|(left, right)| left == right)
+            .count()
 }
 
 fn finish_text_run(state: &mut State, reject_ambiguous_space: bool) -> Result<(), Error> {

@@ -8,7 +8,10 @@
 //! [`audit::verify_source`] is the policy for bytes it did not author: it
 //! keeps every structural, encoding, DOCTYPE and budget check and asserts no
 //! compactness, so a producer's whitespace, XML declaration, line endings and
-//! attribute spelling are accepted as written.
+//! attribute spelling are accepted as written. [`audit::verify_source_replacement`]
+//! gives the verdict of that audit on a replaced payload's original bytes and
+//! then its replacement, without scanning again the replacement bytes that
+//! repeat the original's outside the one element an edit replaced.
 
 #![forbid(unsafe_code)]
 
