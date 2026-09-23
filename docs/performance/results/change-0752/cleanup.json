@@ -66,5 +66,25 @@
     "scratch/0752": "0 entries",
     "git worktree list": "only the branch worktree 0752-streaming-writer-small-write-batching remains for this record"
   },
-  "order": "record and packet committed (d21042022d) before any of the removals above; this verification committed afterwards"
+  "order": "record and packet committed (d21042022d) before any of the removals above; this verification committed afterwards",
+  "review_follow_up": {
+    "performed": "2026-09-23, after the review follow-up commit a0a64bbe8c",
+    "removed": [
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/targets/0752 (review subdirectory)",
+        "bytes": 25677623254,
+        "what": "fresh target directory for the follow-up: debug test, clippy and rustdoc builds of litchi-core, soapberry-zip, litchi-docx and litchi-xlsx"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/scratch/0752/*",
+        "bytes": 411064,
+        "what": "scratch: follow-up gate and test logs (results appended to gates.txt), the saved copy used to restore budget.rs after the mutation check, TMPDIR"
+      }
+    ],
+    "verified_after_removal": {
+      "targets/0752": "absent",
+      "scratch/0752": "0 entries",
+      "git worktree list": "only the branch worktree remains for this record"
+    }
+  }
 }
