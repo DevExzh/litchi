@@ -999,14 +999,17 @@ fn regenerated_part_entry(name: &str, part: &dyn Part) -> Result<soapberry_zip::
 /// CRC and sizes; the writer frames them with fresh known-size headers. Every
 /// other payload is deflated from its decoded bytes, as before. The payload
 /// and its compressed representation are one value, so a part whose payload
-/// was replaced no longer carries one.
+/// was replaced no longer carries one; the capture is still used only when
+/// the part's visible allocation is the one it was verified against, so a
+/// custom part that forwards its payload handle cannot publish stale bytes.
 fn part_entry(name: String, part: &dyn Part) -> soapberry_zip::RegeneratedEntry {
+    let blob = part.blob_arc();
     let handle = part.payload_handle();
     match handle.payload().compressed_transfer() {
-        Some(compressed) => {
+        Some((decoded, compressed)) if std::sync::Arc::ptr_eq(decoded, &blob) => {
             soapberry_zip::RegeneratedEntry::new_precompressed_shared(name, compressed.clone())
         },
-        None => soapberry_zip::RegeneratedEntry::new_shared(name, part.blob_arc())
+        _ => soapberry_zip::RegeneratedEntry::new_shared(name, blob)
             .compression_method(soapberry_zip::CompressionMethod::Deflate),
     }
 }

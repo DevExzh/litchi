@@ -263,8 +263,8 @@ impl Package {
     ///
     /// A plan whose candidate transfers source-compressed media
     /// ([`crate::opened::CrossSlideCopyPlan::transfers_source_compressed_media`])
-    /// publishes only into an unmodified owned destination; plan the copy
-    /// against a destination that has been edited since it was opened.
+    /// publishes only into an unmodified owned destination; a destination
+    /// edited since it was opened needs the copy planned against it afresh.
     ///
     /// # Errors
     ///
@@ -319,8 +319,8 @@ impl Package {
     /// Both packages must retain source-preserving physical provenance.
     /// A forward patch that transfers source-compressed media
     /// ([`crate::opened::CrossSlideCopyPatch::transfers_source_compressed_media`])
-    /// publishes only into an unmodified owned destination; its inverse has no
-    /// such requirement.
+    /// publishes only into an unmodified owned destination; its inverse also
+    /// publishes into a modified one.
     ///
     /// # Errors
     ///

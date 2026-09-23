@@ -23,8 +23,8 @@ use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 use super::{CrossSlideCopyPatch, CrossSlideCopyPlan};
 use crate::media_parts::Resource;
 use crate::{DurablePatchFormat, Error, Package, Result};
+use litchi_opc::PackURI;
 use litchi_opc::constants::content_type as ct;
-use litchi_opc::{OpcError, PackURI};
 
 const PHOTO: &str = "/ppt/media/transfer-photo.png";
 const FLAT: &str = "/ppt/media/transfer-flat.png";
@@ -440,6 +440,7 @@ fn a_modified_destination_refuses_a_transferring_copy_until_it_is_replanned() ->
         .apply_cross_slide_copy_patch(&source, &durable)
         .expect_err("a transferring durable patch needs an unmodified owned destination");
     assert_unsafe_edit(&error);
+    assert!(error.to_string().contains("unmodified owned destination"));
     assert_eq!(modified.to_bytes()?, before);
 
     // Planning against the modified destination records the recompressed
@@ -579,7 +580,7 @@ fn stale_foreign_and_reprovenanced_sources_are_refused() -> Result<()> {
 }
 
 #[test]
-fn a_source_member_whose_local_header_disagrees_refuses_the_transferring_copy() -> Result<()> {
+fn a_source_member_whose_local_header_disagrees_keeps_the_recompressing_route() -> Result<()> {
     let (mut source_bytes, destination_bytes) = media_fixture()?;
     // Rename the photo's local header only; the central record, which the
     // ordinary reader trusts, still names it.
@@ -595,21 +596,84 @@ fn a_source_member_whose_local_header_disagrees_refuses_the_transferring_copy() 
     assert_eq!(source_bytes[position], b'o');
     source_bytes[position] = b'0';
 
-    let source = Package::from_vec(source_bytes)?;
-    let error = plan_copy(&source, &Package::from_vec(destination_bytes.clone())?)
-        .expect_err("a transfer needs a provable strict local layout");
-    assert!(
-        matches!(&error, Error::Opc(OpcError::ZipError(message)) if message.contains("names differ")),
-        "{error:?}"
+    // The photo's strict layout is disproven by its headers alone, so it is
+    // not eligible and keeps the recompressing route, decoded through the
+    // central record as before; the untouched flat image still transfers.
+    let source = Package::from_vec(source_bytes.clone())?;
+    let mut destination = Package::from_vec(destination_bytes.clone())?;
+    let plan = plan_copy(&source, &destination)?;
+    assert!(plan.transfers_source_compressed_media());
+    destination.apply_cross_slide_copy_plan(&source, &plan)?;
+    let output = destination.to_bytes()?;
+    let photo = raw_member(&output, images_target(&plan, PHOTO).membername());
+    assert_eq!(photo.method, 8, "the photo is recompressed");
+    assert_ne!(photo.flags & 0x08, 0, "generated Deflate framing");
+    let flat = raw_member(&output, images_target(&plan, FLAT).membername());
+    assert_eq!(
+        flat.compressed,
+        raw_member(&source_bytes, &FLAT[1..]).compressed,
+        "the flat image is transferred"
+    );
+    assert_fresh_sized_framing(&flat);
+    let reopened = Package::from_vec(output)?;
+    assert_eq!(
+        reopened.opc.get_part(images_target(&plan, PHOTO))?.blob(),
+        photo_bytes().as_slice()
     );
 
-    // The recompressing route decodes through the central record and still
-    // copies the slide.
+    // The verdict does not depend on the destination: a modified destination
+    // records the recompressed encoding and copies the same slide.
     let mut modified = Package::from_vec(destination_bytes)?;
     modified.opc.get_part_mut(&presentation_uri())?;
-    let plan = plan_copy(&source, &modified)?;
-    assert!(!plan.transfers_source_compressed_media());
-    modified.apply_cross_slide_copy_plan(&source, &plan)?;
+    let replanned = plan_copy(&source, &modified)?;
+    assert!(!replanned.transfers_source_compressed_media());
+    modified.apply_cross_slide_copy_plan(&source, &replanned)?;
+    Ok(())
+}
+
+/// The format half of the eligibility rule, including the XML guard the
+/// cross-copy's own SVG refusal otherwise leaves unexercised.
+#[test]
+fn only_relationship_free_non_xml_images_are_transferable_media() -> Result<()> {
+    let part = |name: &str, content_type: &str| -> Result<litchi_opc::BlobPart> {
+        Ok(litchi_opc::BlobPart::new(
+            PackURI::new(name).map_err(Error::Invalid)?,
+            content_type.to_owned(),
+            b"payload".to_vec(),
+        ))
+    };
+    assert!(super::is_transferable_media(&part(
+        "/ppt/media/a.png",
+        "image/png"
+    )?));
+    assert!(super::is_transferable_media(&part(
+        "/ppt/media/a.jpeg",
+        "IMAGE/JPEG"
+    )?));
+    assert!(!super::is_transferable_media(&part(
+        "/ppt/media/a.svg",
+        "image/svg+xml"
+    )?));
+    assert!(!super::is_transferable_media(&part(
+        "/ppt/media/a.xml",
+        "image/png"
+    )?));
+    assert!(!super::is_transferable_media(&part(
+        "/ppt/media/a.bin",
+        "application/octet-stream"
+    )?));
+    assert!(!super::is_transferable_media(&part(
+        "/ppt/media/a.wmf",
+        "imagex/wmf"
+    )?));
+    let mut linked = part("/ppt/media/b.png", "image/png")?;
+    litchi_opc::Part::rels_mut(&mut linked).try_add_relationship(
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink".to_owned(),
+        "https://example.invalid/".to_owned(),
+        "rId1".to_owned(),
+        litchi_opc::TargetMode::External,
+    )?;
+    assert!(!super::is_transferable_media(&linked));
     Ok(())
 }
 
@@ -634,10 +698,11 @@ fn hex(bytes: &[u8]) -> String {
 /// Genuine `LPCP0003` patches, written by the unchanged base tree (009d515bef)
 /// for a copy whose closure carries one PNG, are refused by name in both
 /// directions. The test also rebuilds the inputs the base tree planned over,
-/// proves they are the same bytes, and shows why the refusal is needed: the
-/// semantic and input physical revisions are unchanged, but the copy's
-/// target physical revision is not, so no current application could
-/// reproduce the legacy proof.
+/// proves they are the same bytes, and shows what the format change is about:
+/// the semantic and input physical revisions are unchanged, but the same copy
+/// planned today transfers the PNG and carries a different target physical
+/// revision, so a legacy header — which does not record its encoding — cannot
+/// be compared with a fresh plan.
 #[test]
 fn legacy_lpcp0003_patches_are_refused_by_name() -> Result<()> {
     const FORWARD: &[u8] = include_bytes!(
