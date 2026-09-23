@@ -1,0 +1,498 @@
+[
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "large",
+   "--samples",
+   "15",
+   "--warmup",
+   "3",
+   "--json",
+   "runs/aa-samecmd/r0-large-p0-before.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "9.38",
+   "8.24",
+   "9.36"
+  ],
+  "wall_seconds": 20.859,
+  "json": "r0-large-p0-before.json",
+  "round": 0,
+  "group": "large",
+  "position": 0,
+  "arm": "before"
+ },
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd-copy",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "large",
+   "--samples",
+   "15",
+   "--warmup",
+   "3",
+   "--json",
+   "runs/aa-samecmd/r0-large-p1-after.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "9.27",
+   "8.29",
+   "9.35"
+  ],
+  "wall_seconds": 20.763,
+  "json": "r0-large-p1-after.json",
+  "round": 0,
+  "group": "large",
+  "position": 1,
+  "arm": "after"
+ },
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd-copy",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "large",
+   "--samples",
+   "15",
+   "--warmup",
+   "3",
+   "--json",
+   "runs/aa-samecmd/r0-large-p2-after.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "9.28",
+   "8.36",
+   "9.35"
+  ],
+  "wall_seconds": 20.719,
+  "json": "r0-large-p2-after.json",
+  "round": 0,
+  "group": "large",
+  "position": 2,
+  "arm": "after"
+ },
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "large",
+   "--samples",
+   "15",
+   "--warmup",
+   "3",
+   "--json",
+   "runs/aa-samecmd/r0-large-p3-before.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "9.26",
+   "8.42",
+   "9.35"
+  ],
+  "wall_seconds": 20.848,
+  "json": "r0-large-p3-before.json",
+  "round": 0,
+  "group": "large",
+  "position": 3,
+  "arm": "before"
+ },
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "medium",
+   "--samples",
+   "60",
+   "--warmup",
+   "10",
+   "--json",
+   "runs/aa-samecmd/r0-medium-p0-before.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "9.25",
+   "8.47",
+   "9.34"
+  ],
+  "wall_seconds": 1.485,
+  "json": "r0-medium-p0-before.json",
+  "round": 0,
+  "group": "medium",
+  "position": 0,
+  "arm": "before"
+ },
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd-copy",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "medium",
+   "--samples",
+   "60",
+   "--warmup",
+   "10",
+   "--json",
+   "runs/aa-samecmd/r0-medium-p1-after.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "9.23",
+   "8.48",
+   "9.34"
+  ],
+  "wall_seconds": 1.476,
+  "json": "r0-medium-p1-after.json",
+  "round": 0,
+  "group": "medium",
+  "position": 1,
+  "arm": "after"
+ },
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd-copy",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "medium",
+   "--samples",
+   "60",
+   "--warmup",
+   "10",
+   "--json",
+   "runs/aa-samecmd/r0-medium-p2-after.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "9.23",
+   "8.48",
+   "9.34"
+  ],
+  "wall_seconds": 1.476,
+  "json": "r0-medium-p2-after.json",
+  "round": 0,
+  "group": "medium",
+  "position": 2,
+  "arm": "after"
+ },
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "medium",
+   "--samples",
+   "60",
+   "--warmup",
+   "10",
+   "--json",
+   "runs/aa-samecmd/r0-medium-p3-before.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "9.23",
+   "8.48",
+   "9.34"
+  ],
+  "wall_seconds": 1.486,
+  "json": "r0-medium-p3-before.json",
+  "round": 0,
+  "group": "medium",
+  "position": 3,
+  "arm": "before"
+ },
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "large",
+   "--samples",
+   "15",
+   "--warmup",
+   "3",
+   "--json",
+   "runs/aa-samecmd/r1-large-p0-before.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "9.23",
+   "8.48",
+   "9.34"
+  ],
+  "wall_seconds": 20.935,
+  "json": "r1-large-p0-before.json",
+  "round": 1,
+  "group": "large",
+  "position": 0,
+  "arm": "before"
+ },
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd-copy",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "large",
+   "--samples",
+   "15",
+   "--warmup",
+   "3",
+   "--json",
+   "runs/aa-samecmd/r1-large-p1-after.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "9.29",
+   "8.56",
+   "9.34"
+  ],
+  "wall_seconds": 20.891,
+  "json": "r1-large-p1-after.json",
+  "round": 1,
+  "group": "large",
+  "position": 1,
+  "arm": "after"
+ },
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd-copy",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "large",
+   "--samples",
+   "15",
+   "--warmup",
+   "3",
+   "--json",
+   "runs/aa-samecmd/r1-large-p2-after.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "9.84",
+   "8.72",
+   "9.38"
+  ],
+  "wall_seconds": 21.023,
+  "json": "r1-large-p2-after.json",
+  "round": 1,
+  "group": "large",
+  "position": 2,
+  "arm": "after"
+ },
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "large",
+   "--samples",
+   "15",
+   "--warmup",
+   "3",
+   "--json",
+   "runs/aa-samecmd/r1-large-p3-before.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "10.30",
+   "8.90",
+   "9.43"
+  ],
+  "wall_seconds": 21.013,
+  "json": "r1-large-p3-before.json",
+  "round": 1,
+  "group": "large",
+  "position": 3,
+  "arm": "before"
+ },
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "medium",
+   "--samples",
+   "60",
+   "--warmup",
+   "10",
+   "--json",
+   "runs/aa-samecmd/r1-medium-p0-before.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "10.37",
+   "9.00",
+   "9.45"
+  ],
+  "wall_seconds": 1.477,
+  "json": "r1-medium-p0-before.json",
+  "round": 1,
+  "group": "medium",
+  "position": 0,
+  "arm": "before"
+ },
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd-copy",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "medium",
+   "--samples",
+   "60",
+   "--warmup",
+   "10",
+   "--json",
+   "runs/aa-samecmd/r1-medium-p1-after.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "10.34",
+   "9.02",
+   "9.45"
+  ],
+  "wall_seconds": 1.482,
+  "json": "r1-medium-p1-after.json",
+  "round": 1,
+  "group": "medium",
+  "position": 1,
+  "arm": "after"
+ },
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd-copy",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "medium",
+   "--samples",
+   "60",
+   "--warmup",
+   "10",
+   "--json",
+   "runs/aa-samecmd/r1-medium-p2-after.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "10.34",
+   "9.02",
+   "9.45"
+  ],
+  "wall_seconds": 1.477,
+  "json": "r1-medium-p2-after.json",
+  "round": 1,
+  "group": "medium",
+  "position": 2,
+  "arm": "after"
+ },
+ {
+  "command": [
+   "taskset",
+   "-c",
+   "8",
+   "bin/before-native-samecmd",
+   "--case",
+   "pptx_semantic_open,pptx_semantic_full_text,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,docx_semantic_full_text",
+   "--semantic-shape",
+   "medium",
+   "--samples",
+   "60",
+   "--warmup",
+   "10",
+   "--json",
+   "runs/aa-samecmd/r1-medium-p3-before.json"
+  ],
+  "exit_code": 0,
+  "stderr_tail": "",
+  "load_average_before": [
+   "10.34",
+   "9.02",
+   "9.45"
+  ],
+  "wall_seconds": 1.482,
+  "json": "r1-medium-p3-before.json",
+  "round": 1,
+  "group": "medium",
+  "position": 3,
+  "arm": "before"
+ }
+]

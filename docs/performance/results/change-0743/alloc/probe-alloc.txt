@@ -1,0 +1,40 @@
+== before medium rep1
+fulltext calls 3498 bytes 289239
+noop calls 11643 bytes 3333159
+one calls 26350 bytes 4920214
+pct calls 26350 bytes 4920214
+== before medium rep2
+fulltext calls 3498 bytes 289239
+noop calls 11643 bytes 3333159
+one calls 26350 bytes 4920214
+pct calls 26350 bytes 4920214
+== before large rep1
+fulltext calls 250209 bytes 18948429
+noop calls 538176 bytes 30654398
+one calls 1116597 bytes 53743376
+pct calls 5550213 bytes 639899620
+== before large rep2
+fulltext calls 250209 bytes 18948429
+noop calls 538176 bytes 30654398
+one calls 1116597 bytes 53743376
+pct calls 5550213 bytes 639899620
+== after medium rep1
+fulltext calls 2118 bytes 196587
+noop calls 5367 bytes 3181936
+one calls 9562 bytes 4129211
+pct calls 9562 bytes 4129211
+== after medium rep2
+fulltext calls 2118 bytes 196587
+noop calls 5367 bytes 3181936
+one calls 9562 bytes 4129211
+pct calls 9562 bytes 4129211
+== after large rep1
+fulltext calls 128309 bytes 11110729
+noop calls 83140 bytes 19546751
+one calls 105374 bytes 22522069
+pct calls 623545 bytes 111268990
+== after large rep2
+fulltext calls 128309 bytes 11110729
+noop calls 83140 bytes 19546751
+one calls 105374 bytes 22522069
+pct calls 623545 bytes 111268990

@@ -1,0 +1,2606 @@
+{
+ "records": [
+  {
+   "round": 0,
+   "binary": "0-009d515bef",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 51019201
+   }
+  },
+  {
+   "round": 0,
+   "binary": "1-588cc6a317",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 50175267
+   }
+  },
+  {
+   "round": 0,
+   "binary": "2-8039963c33",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 50372778
+   }
+  },
+  {
+   "round": 0,
+   "binary": "3-99ce9c5e34",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 48681429
+   }
+  },
+  {
+   "round": 0,
+   "binary": "4-00234742d8",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 27309774
+   }
+  },
+  {
+   "round": 0,
+   "binary": "5-aff8de9c61",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 28200559
+   }
+  },
+  {
+   "round": 0,
+   "binary": "6-d10f050c89",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 27204604
+   }
+  },
+  {
+   "round": 0,
+   "binary": "7-e0e8f35d07",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 28691821
+   }
+  },
+  {
+   "round": 0,
+   "binary": "8-aaed57e900",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 28309870
+   }
+  },
+  {
+   "round": 0,
+   "binary": "9-e74faad918",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 27457445
+   }
+  },
+  {
+   "round": 0,
+   "binary": "0-009d515bef",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 574733
+   }
+  },
+  {
+   "round": 0,
+   "binary": "1-588cc6a317",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 571053
+   }
+  },
+  {
+   "round": 0,
+   "binary": "2-8039963c33",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 569922
+   }
+  },
+  {
+   "round": 0,
+   "binary": "3-99ce9c5e34",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 568443
+   }
+  },
+  {
+   "round": 0,
+   "binary": "4-00234742d8",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 330542
+   }
+  },
+  {
+   "round": 0,
+   "binary": "5-aff8de9c61",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 325502
+   }
+  },
+  {
+   "round": 0,
+   "binary": "6-d10f050c89",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 323622
+   }
+  },
+  {
+   "round": 0,
+   "binary": "7-e0e8f35d07",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 334772
+   }
+  },
+  {
+   "round": 0,
+   "binary": "8-aaed57e900",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 329131
+   }
+  },
+  {
+   "round": 0,
+   "binary": "9-e74faad918",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 328602
+   }
+  },
+  {
+   "round": 0,
+   "binary": "0-009d515bef",
+   "mode": "noop",
+   "values": {
+    "capture": 28865892,
+    "edit": 64410,
+    "set_text": 140,
+    "commit": 245681,
+    "apply": 148211,
+    "to_bytes": 14281,
+    "total": 29353395
+   }
+  },
+  {
+   "round": 0,
+   "binary": "1-588cc6a317",
+   "mode": "noop",
+   "values": {
+    "capture": 27088835,
+    "edit": 67330,
+    "set_text": 160,
+    "commit": 252151,
+    "apply": 155061,
+    "to_bytes": 15830,
+    "total": 27598327
+   }
+  },
+  {
+   "round": 0,
+   "binary": "2-8039963c33",
+   "mode": "noop",
+   "values": {
+    "capture": 23917539,
+    "edit": 66161,
+    "set_text": 40,
+    "commit": 255321,
+    "apply": 156390,
+    "to_bytes": 13790,
+    "total": 24411682
+   }
+  },
+  {
+   "round": 0,
+   "binary": "3-99ce9c5e34",
+   "mode": "noop",
+   "values": {
+    "capture": 23602088,
+    "edit": 64341,
+    "set_text": 120,
+    "commit": 256941,
+    "apply": 154041,
+    "to_bytes": 15410,
+    "total": 24090160
+   }
+  },
+  {
+   "round": 0,
+   "binary": "4-00234742d8",
+   "mode": "noop",
+   "values": {
+    "capture": 24175780,
+    "edit": 62101,
+    "set_text": 100,
+    "commit": 241961,
+    "apply": 144671,
+    "to_bytes": 13680,
+    "total": 24627743
+   }
+  },
+  {
+   "round": 0,
+   "binary": "5-aff8de9c61",
+   "mode": "noop",
+   "values": {
+    "capture": 23940169,
+    "edit": 59220,
+    "set_text": 60,
+    "commit": 246371,
+    "apply": 144931,
+    "to_bytes": 13070,
+    "total": 24381941
+   }
+  },
+  {
+   "round": 0,
+   "binary": "6-d10f050c89",
+   "mode": "noop",
+   "values": {
+    "capture": 24053770,
+    "edit": 57300,
+    "set_text": 120,
+    "commit": 170080,
+    "apply": 134210,
+    "to_bytes": 14370,
+    "total": 24433091
+   }
+  },
+  {
+   "round": 0,
+   "binary": "7-e0e8f35d07",
+   "mode": "noop",
+   "values": {
+    "capture": 23884589,
+    "edit": 54440,
+    "set_text": 30,
+    "commit": 168291,
+    "apply": 127491,
+    "to_bytes": 13030,
+    "total": 24259401
+   }
+  },
+  {
+   "round": 0,
+   "binary": "8-aaed57e900",
+   "mode": "noop",
+   "values": {
+    "capture": 23331416,
+    "edit": 57720,
+    "set_text": 30,
+    "commit": 172971,
+    "apply": 131441,
+    "to_bytes": 11700,
+    "total": 23725168
+   }
+  },
+  {
+   "round": 0,
+   "binary": "9-e74faad918",
+   "mode": "noop",
+   "values": {
+    "capture": 23423147,
+    "edit": 56830,
+    "set_text": 30,
+    "commit": 172861,
+    "apply": 136220,
+    "to_bytes": 12660,
+    "total": 23818809
+   }
+  },
+  {
+   "round": 0,
+   "binary": "0-009d515bef",
+   "mode": "one",
+   "values": {
+    "capture": 27419866,
+    "edit": 62200,
+    "set_text": 1205326,
+    "commit": 25722148,
+    "apply": 323171,
+    "to_bytes": 436292,
+    "total": 55214905
+   }
+  },
+  {
+   "round": 0,
+   "binary": "1-588cc6a317",
+   "mode": "one",
+   "values": {
+    "capture": 26923684,
+    "edit": 57371,
+    "set_text": 1085086,
+    "commit": 25370326,
+    "apply": 318622,
+    "to_bytes": 447162,
+    "total": 54302810
+   }
+  },
+  {
+   "round": 0,
+   "binary": "2-8039963c33",
+   "mode": "one",
+   "values": {
+    "capture": 24000610,
+    "edit": 57730,
+    "set_text": 1080216,
+    "commit": 21898479,
+    "apply": 329782,
+    "to_bytes": 443193,
+    "total": 47823399
+   }
+  },
+  {
+   "round": 0,
+   "binary": "3-99ce9c5e34",
+   "mode": "one",
+   "values": {
+    "capture": 23765288,
+    "edit": 59580,
+    "set_text": 1082886,
+    "commit": 2252981,
+    "apply": 292642,
+    "to_bytes": 442602,
+    "total": 27893739
+   }
+  },
+  {
+   "round": 0,
+   "binary": "4-00234742d8",
+   "mode": "one",
+   "values": {
+    "capture": 23955399,
+    "edit": 57321,
+    "set_text": 1077415,
+    "commit": 2243271,
+    "apply": 279972,
+    "to_bytes": 424922,
+    "total": 28041489
+   }
+  },
+  {
+   "round": 0,
+   "binary": "5-aff8de9c61",
+   "mode": "one",
+   "values": {
+    "capture": 23764348,
+    "edit": 57230,
+    "set_text": 933814,
+    "commit": 2128571,
+    "apply": 272291,
+    "to_bytes": 427512,
+    "total": 27574127
+   }
+  },
+  {
+   "round": 0,
+   "binary": "6-d10f050c89",
+   "mode": "one",
+   "values": {
+    "capture": 23923169,
+    "edit": 58800,
+    "set_text": 916134,
+    "commit": 1812849,
+    "apply": 275572,
+    "to_bytes": 425822,
+    "total": 27407547
+   }
+  },
+  {
+   "round": 0,
+   "binary": "7-e0e8f35d07",
+   "mode": "one",
+   "values": {
+    "capture": 25213065,
+    "edit": 57540,
+    "set_text": 906634,
+    "commit": 1819059,
+    "apply": 262011,
+    "to_bytes": 435593,
+    "total": 28685293
+   }
+  },
+  {
+   "round": 0,
+   "binary": "8-aaed57e900",
+   "mode": "one",
+   "values": {
+    "capture": 23243865,
+    "edit": 58001,
+    "set_text": 755904,
+    "commit": 1813309,
+    "apply": 272062,
+    "to_bytes": 435352,
+    "total": 26649053
+   }
+  },
+  {
+   "round": 0,
+   "binary": "9-e74faad918",
+   "mode": "one",
+   "values": {
+    "capture": 23348297,
+    "edit": 56411,
+    "set_text": 751534,
+    "commit": 1604768,
+    "apply": 258791,
+    "to_bytes": 422712,
+    "total": 26438272
+   }
+  },
+  {
+   "round": 0,
+   "binary": "0-009d515bef",
+   "mode": "pct",
+   "values": {
+    "capture": 27104095,
+    "edit": 53481,
+    "set_text": 114242659,
+    "commit": 111355675,
+    "apply": 1014625,
+    "to_bytes": 14440842,
+    "total": 268703719
+   }
+  },
+  {
+   "round": 0,
+   "binary": "1-588cc6a317",
+   "mode": "pct",
+   "values": {
+    "capture": 27131215,
+    "edit": 53891,
+    "set_text": 106371651,
+    "commit": 100877652,
+    "apply": 1039625,
+    "to_bytes": 14645953,
+    "total": 250421228
+   }
+  },
+  {
+   "round": 0,
+   "binary": "2-8039963c33",
+   "mode": "pct",
+   "values": {
+    "capture": 23614498,
+    "edit": 48310,
+    "set_text": 103227545,
+    "commit": 94445311,
+    "apply": 1017505,
+    "to_bytes": 14422002,
+    "total": 236824490
+   }
+  },
+  {
+   "round": 0,
+   "binary": "3-99ce9c5e34",
+   "mode": "pct",
+   "values": {
+    "capture": 23566797,
+    "edit": 50301,
+    "set_text": 103431145,
+    "commit": 94775712,
+    "apply": 1017315,
+    "to_bytes": 14744784,
+    "total": 237673015
+   }
+  },
+  {
+   "round": 0,
+   "binary": "4-00234742d8",
+   "mode": "pct",
+   "values": {
+    "capture": 23862149,
+    "edit": 52410,
+    "set_text": 102745912,
+    "commit": 95526296,
+    "apply": 1016936,
+    "to_bytes": 14862984,
+    "total": 237841696
+   }
+  },
+  {
+   "round": 0,
+   "binary": "5-aff8de9c61",
+   "mode": "pct",
+   "values": {
+    "capture": 23653808,
+    "edit": 60550,
+    "set_text": 88903073,
+    "commit": 80611162,
+    "apply": 1011715,
+    "to_bytes": 14744973,
+    "total": 208925471
+   }
+  },
+  {
+   "round": 0,
+   "binary": "6-d10f050c89",
+   "mode": "pct",
+   "values": {
+    "capture": 23624077,
+    "edit": 62231,
+    "set_text": 87628167,
+    "commit": 57712477,
+    "apply": 1043825,
+    "to_bytes": 14971095,
+    "total": 185578395
+   }
+  },
+  {
+   "round": 0,
+   "binary": "7-e0e8f35d07",
+   "mode": "pct",
+   "values": {
+    "capture": 23763498,
+    "edit": 59011,
+    "set_text": 85409576,
+    "commit": 58923133,
+    "apply": 1026955,
+    "to_bytes": 15396507,
+    "total": 184866442
+   }
+  },
+  {
+   "round": 0,
+   "binary": "8-aaed57e900",
+   "mode": "pct",
+   "values": {
+    "capture": 23331636,
+    "edit": 69090,
+    "set_text": 70984214,
+    "commit": 57312445,
+    "apply": 1035256,
+    "to_bytes": 14752713,
+    "total": 167685206
+   }
+  },
+  {
+   "round": 0,
+   "binary": "9-e74faad918",
+   "mode": "pct",
+   "values": {
+    "capture": 23035585,
+    "edit": 55270,
+    "set_text": 74032859,
+    "commit": 35532107,
+    "apply": 1004005,
+    "to_bytes": 14931675,
+    "total": 148923813
+   }
+  },
+  {
+   "round": 0,
+   "binary": "0-009d515bef",
+   "mode": "one-medium",
+   "values": {
+    "capture": 746993,
+    "edit": 12540,
+    "set_text": 124980,
+    "commit": 635763,
+    "apply": 55551,
+    "to_bytes": 83931,
+    "total": 1661338
+   }
+  },
+  {
+   "round": 0,
+   "binary": "1-588cc6a317",
+   "mode": "one-medium",
+   "values": {
+    "capture": 749353,
+    "edit": 12420,
+    "set_text": 115411,
+    "commit": 626804,
+    "apply": 55561,
+    "to_bytes": 84640,
+    "total": 1646968
+   }
+  },
+  {
+   "round": 0,
+   "binary": "2-8039963c33",
+   "mode": "one-medium",
+   "values": {
+    "capture": 694903,
+    "edit": 12530,
+    "set_text": 115221,
+    "commit": 578243,
+    "apply": 56540,
+    "to_bytes": 85141,
+    "total": 1543627
+   }
+  },
+  {
+   "round": 0,
+   "binary": "3-99ce9c5e34",
+   "mode": "one-medium",
+   "values": {
+    "capture": 692673,
+    "edit": 12600,
+    "set_text": 113271,
+    "commit": 383722,
+    "apply": 55981,
+    "to_bytes": 83630,
+    "total": 1345646
+   }
+  },
+  {
+   "round": 0,
+   "binary": "4-00234742d8",
+   "mode": "one-medium",
+   "values": {
+    "capture": 705343,
+    "edit": 12540,
+    "set_text": 114001,
+    "commit": 387832,
+    "apply": 56181,
+    "to_bytes": 83591,
+    "total": 1362887
+   }
+  },
+  {
+   "round": 0,
+   "binary": "5-aff8de9c61",
+   "mode": "one-medium",
+   "values": {
+    "capture": 696783,
+    "edit": 12450,
+    "set_text": 102410,
+    "commit": 376282,
+    "apply": 56321,
+    "to_bytes": 83330,
+    "total": 1330196
+   }
+  },
+  {
+   "round": 0,
+   "binary": "6-d10f050c89",
+   "mode": "one-medium",
+   "values": {
+    "capture": 694363,
+    "edit": 12580,
+    "set_text": 100731,
+    "commit": 352862,
+    "apply": 55980,
+    "to_bytes": 84720,
+    "total": 1303557
+   }
+  },
+  {
+   "round": 0,
+   "binary": "7-e0e8f35d07",
+   "mode": "one-medium",
+   "values": {
+    "capture": 692104,
+    "edit": 12460,
+    "set_text": 97500,
+    "commit": 349372,
+    "apply": 55570,
+    "to_bytes": 83220,
+    "total": 1293797
+   }
+  },
+  {
+   "round": 0,
+   "binary": "8-aaed57e900",
+   "mode": "one-medium",
+   "values": {
+    "capture": 686554,
+    "edit": 12371,
+    "set_text": 81450,
+    "commit": 344802,
+    "apply": 55420,
+    "to_bytes": 83280,
+    "total": 1265996
+   }
+  },
+  {
+   "round": 0,
+   "binary": "9-e74faad918",
+   "mode": "one-medium",
+   "values": {
+    "capture": 699504,
+    "edit": 12360,
+    "set_text": 81610,
+    "commit": 331971,
+    "apply": 55890,
+    "to_bytes": 83170,
+    "total": 1269206
+   }
+  },
+  {
+   "round": 1,
+   "binary": "9-e74faad918",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 27625798
+   }
+  },
+  {
+   "round": 1,
+   "binary": "8-aaed57e900",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 27765878
+   }
+  },
+  {
+   "round": 1,
+   "binary": "7-e0e8f35d07",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 28445071
+   }
+  },
+  {
+   "round": 1,
+   "binary": "6-d10f050c89",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 27511917
+   }
+  },
+  {
+   "round": 1,
+   "binary": "5-aff8de9c61",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 27280556
+   }
+  },
+  {
+   "round": 1,
+   "binary": "4-00234742d8",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 27730268
+   }
+  },
+  {
+   "round": 1,
+   "binary": "3-99ce9c5e34",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 48861614
+   }
+  },
+  {
+   "round": 1,
+   "binary": "2-8039963c33",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 50899624
+   }
+  },
+  {
+   "round": 1,
+   "binary": "1-588cc6a317",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 51054314
+   }
+  },
+  {
+   "round": 1,
+   "binary": "0-009d515bef",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 51010214
+   }
+  },
+  {
+   "round": 1,
+   "binary": "9-e74faad918",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 332862
+   }
+  },
+  {
+   "round": 1,
+   "binary": "8-aaed57e900",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 332482
+   }
+  },
+  {
+   "round": 1,
+   "binary": "7-e0e8f35d07",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 333732
+   }
+  },
+  {
+   "round": 1,
+   "binary": "6-d10f050c89",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 333071
+   }
+  },
+  {
+   "round": 1,
+   "binary": "5-aff8de9c61",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 333942
+   }
+  },
+  {
+   "round": 1,
+   "binary": "4-00234742d8",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 329792
+   }
+  },
+  {
+   "round": 1,
+   "binary": "3-99ce9c5e34",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 562483
+   }
+  },
+  {
+   "round": 1,
+   "binary": "2-8039963c33",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 574413
+   }
+  },
+  {
+   "round": 1,
+   "binary": "1-588cc6a317",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 572713
+   }
+  },
+  {
+   "round": 1,
+   "binary": "0-009d515bef",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 574493
+   }
+  },
+  {
+   "round": 1,
+   "binary": "9-e74faad918",
+   "mode": "noop",
+   "values": {
+    "capture": 23216446,
+    "edit": 49291,
+    "set_text": 140,
+    "commit": 169821,
+    "apply": 115861,
+    "to_bytes": 8500,
+    "total": 23563858
+   }
+  },
+  {
+   "round": 1,
+   "binary": "8-aaed57e900",
+   "mode": "noop",
+   "values": {
+    "capture": 23237445,
+    "edit": 54461,
+    "set_text": 120,
+    "commit": 167770,
+    "apply": 105910,
+    "to_bytes": 9130,
+    "total": 23571727
+   }
+  },
+  {
+   "round": 1,
+   "binary": "7-e0e8f35d07",
+   "mode": "noop",
+   "values": {
+    "capture": 23524327,
+    "edit": 45650,
+    "set_text": 20,
+    "commit": 156621,
+    "apply": 104540,
+    "to_bytes": 5600,
+    "total": 23840729
+   }
+  },
+  {
+   "round": 1,
+   "binary": "6-d10f050c89",
+   "mode": "noop",
+   "values": {
+    "capture": 23245506,
+    "edit": 45550,
+    "set_text": 30,
+    "commit": 160981,
+    "apply": 98951,
+    "to_bytes": 6200,
+    "total": 23563188
+   }
+  },
+  {
+   "round": 1,
+   "binary": "5-aff8de9c61",
+   "mode": "noop",
+   "values": {
+    "capture": 23537137,
+    "edit": 45870,
+    "set_text": 40,
+    "commit": 207581,
+    "apply": 106311,
+    "to_bytes": 5920,
+    "total": 23889799
+   }
+  },
+  {
+   "round": 1,
+   "binary": "4-00234742d8",
+   "mode": "noop",
+   "values": {
+    "capture": 24131270,
+    "edit": 46410,
+    "set_text": 120,
+    "commit": 208331,
+    "apply": 102171,
+    "to_bytes": 5430,
+    "total": 24505272
+   }
+  },
+  {
+   "round": 1,
+   "binary": "3-99ce9c5e34",
+   "mode": "noop",
+   "values": {
+    "capture": 23334516,
+    "edit": 44691,
+    "set_text": 30,
+    "commit": 199792,
+    "apply": 99870,
+    "to_bytes": 6130,
+    "total": 23682138
+   }
+  },
+  {
+   "round": 1,
+   "binary": "2-8039963c33",
+   "mode": "noop",
+   "values": {
+    "capture": 23448077,
+    "edit": 46091,
+    "set_text": 30,
+    "commit": 206621,
+    "apply": 101111,
+    "to_bytes": 5620,
+    "total": 23801399
+   }
+  },
+  {
+   "round": 1,
+   "binary": "1-588cc6a317",
+   "mode": "noop",
+   "values": {
+    "capture": 26960375,
+    "edit": 45670,
+    "set_text": 30,
+    "commit": 199051,
+    "apply": 96741,
+    "to_bytes": 5270,
+    "total": 27316816
+   }
+  },
+  {
+   "round": 1,
+   "binary": "0-009d515bef",
+   "mode": "noop",
+   "values": {
+    "capture": 26447112,
+    "edit": 48290,
+    "set_text": 30,
+    "commit": 204691,
+    "apply": 98680,
+    "to_bytes": 5760,
+    "total": 26799424
+   }
+  },
+  {
+   "round": 1,
+   "binary": "9-e74faad918",
+   "mode": "one",
+   "values": {
+    "capture": 22800584,
+    "edit": 44950,
+    "set_text": 742304,
+    "commit": 1506007,
+    "apply": 204921,
+    "to_bytes": 351892,
+    "total": 25633668
+   }
+  },
+  {
+   "round": 1,
+   "binary": "8-aaed57e900",
+   "mode": "one",
+   "values": {
+    "capture": 23094956,
+    "edit": 45370,
+    "set_text": 736664,
+    "commit": 1705868,
+    "apply": 205801,
+    "to_bytes": 351582,
+    "total": 26149171
+   }
+  },
+  {
+   "round": 1,
+   "binary": "7-e0e8f35d07",
+   "mode": "one",
+   "values": {
+    "capture": 23510247,
+    "edit": 47990,
+    "set_text": 895744,
+    "commit": 1718889,
+    "apply": 201601,
+    "to_bytes": 367031,
+    "total": 26707133
+   }
+  },
+  {
+   "round": 1,
+   "binary": "6-d10f050c89",
+   "mode": "one",
+   "values": {
+    "capture": 23801689,
+    "edit": 48730,
+    "set_text": 896594,
+    "commit": 1745598,
+    "apply": 200871,
+    "to_bytes": 358772,
+    "total": 27033215
+   }
+  },
+  {
+   "round": 1,
+   "binary": "5-aff8de9c61",
+   "mode": "one",
+   "values": {
+    "capture": 23481337,
+    "edit": 44800,
+    "set_text": 923684,
+    "commit": 2016450,
+    "apply": 203821,
+    "to_bytes": 341492,
+    "total": 27014175
+   }
+  },
+  {
+   "round": 1,
+   "binary": "4-00234742d8",
+   "mode": "one",
+   "values": {
+    "capture": 24236631,
+    "edit": 47040,
+    "set_text": 1071245,
+    "commit": 2160951,
+    "apply": 216311,
+    "to_bytes": 370382,
+    "total": 28116770
+   }
+  },
+  {
+   "round": 1,
+   "binary": "3-99ce9c5e34",
+   "mode": "one",
+   "values": {
+    "capture": 23249585,
+    "edit": 47791,
+    "set_text": 1074545,
+    "commit": 2133701,
+    "apply": 207551,
+    "to_bytes": 379302,
+    "total": 27109875
+   }
+  },
+  {
+   "round": 1,
+   "binary": "2-8039963c33",
+   "mode": "one",
+   "values": {
+    "capture": 23303647,
+    "edit": 45600,
+    "set_text": 1078835,
+    "commit": 21403286,
+    "apply": 230471,
+    "to_bytes": 394132,
+    "total": 46437842
+   }
+  },
+  {
+   "round": 1,
+   "binary": "1-588cc6a317",
+   "mode": "one",
+   "values": {
+    "capture": 26459392,
+    "edit": 50441,
+    "set_text": 1076585,
+    "commit": 24787374,
+    "apply": 246501,
+    "to_bytes": 393042,
+    "total": 52866434
+   }
+  },
+  {
+   "round": 1,
+   "binary": "0-009d515bef",
+   "mode": "one",
+   "values": {
+    "capture": 26771014,
+    "edit": 47870,
+    "set_text": 1188715,
+    "commit": 25204595,
+    "apply": 241591,
+    "to_bytes": 395142,
+    "total": 53772978
+   }
+  },
+  {
+   "round": 1,
+   "binary": "9-e74faad918",
+   "mode": "pct",
+   "values": {
+    "capture": 23177635,
+    "edit": 48381,
+    "set_text": 71864269,
+    "commit": 35496607,
+    "apply": 954055,
+    "to_bytes": 14824624,
+    "total": 146497700
+   }
+  },
+  {
+   "round": 1,
+   "binary": "8-aaed57e900",
+   "mode": "pct",
+   "values": {
+    "capture": 23065155,
+    "edit": 48160,
+    "set_text": 70567382,
+    "commit": 57053885,
+    "apply": 996235,
+    "to_bytes": 14529042,
+    "total": 166466160
+   }
+  },
+  {
+   "round": 1,
+   "binary": "7-e0e8f35d07",
+   "mode": "pct",
+   "values": {
+    "capture": 23640897,
+    "edit": 57140,
+    "set_text": 86059889,
+    "commit": 58286521,
+    "apply": 1005705,
+    "to_bytes": 15349317,
+    "total": 184388279
+   }
+  },
+  {
+   "round": 1,
+   "binary": "6-d10f050c89",
+   "mode": "pct",
+   "values": {
+    "capture": 23826959,
+    "edit": 51791,
+    "set_text": 86479531,
+    "commit": 57025464,
+    "apply": 964985,
+    "to_bytes": 14993215,
+    "total": 183310033
+   }
+  },
+  {
+   "round": 1,
+   "binary": "5-aff8de9c61",
+   "mode": "pct",
+   "values": {
+    "capture": 23462567,
+    "edit": 46400,
+    "set_text": 88811333,
+    "commit": 80412111,
+    "apply": 980725,
+    "to_bytes": 14886074,
+    "total": 208616530
+   }
+  },
+  {
+   "round": 1,
+   "binary": "4-00234742d8",
+   "mode": "pct",
+   "values": {
+    "capture": 24237441,
+    "edit": 57930,
+    "set_text": 103494315,
+    "commit": 96091049,
+    "apply": 1004395,
+    "to_bytes": 14902204,
+    "total": 240585689
+   }
+  },
+  {
+   "round": 1,
+   "binary": "3-99ce9c5e34",
+   "mode": "pct",
+   "values": {
+    "capture": 23509647,
+    "edit": 47070,
+    "set_text": 102592750,
+    "commit": 94713360,
+    "apply": 968555,
+    "to_bytes": 14673793,
+    "total": 236393368
+   }
+  },
+  {
+   "round": 1,
+   "binary": "2-8039963c33",
+   "mode": "pct",
+   "values": {
+    "capture": 23313756,
+    "edit": 44640,
+    "set_text": 103494164,
+    "commit": 94991881,
+    "apply": 955624,
+    "to_bytes": 14182701,
+    "total": 237593950
+   }
+  },
+  {
+   "round": 1,
+   "binary": "1-588cc6a317",
+   "mode": "pct",
+   "values": {
+    "capture": 26918024,
+    "edit": 48270,
+    "set_text": 103431143,
+    "commit": 98372229,
+    "apply": 974334,
+    "to_bytes": 14138631,
+    "total": 244175002
+   }
+  },
+  {
+   "round": 1,
+   "binary": "0-009d515bef",
+   "mode": "pct",
+   "values": {
+    "capture": 26884723,
+    "edit": 44450,
+    "set_text": 114179447,
+    "commit": 109295102,
+    "apply": 915965,
+    "to_bytes": 14082670,
+    "total": 265466388
+   }
+  },
+  {
+   "round": 1,
+   "binary": "9-e74faad918",
+   "mode": "one-medium",
+   "values": {
+    "capture": 689294,
+    "edit": 12200,
+    "set_text": 81251,
+    "commit": 327331,
+    "apply": 55340,
+    "to_bytes": 83170,
+    "total": 1251757
+   }
+  },
+  {
+   "round": 1,
+   "binary": "8-aaed57e900",
+   "mode": "one-medium",
+   "values": {
+    "capture": 693474,
+    "edit": 12310,
+    "set_text": 80931,
+    "commit": 347561,
+    "apply": 55350,
+    "to_bytes": 83890,
+    "total": 1276477
+   }
+  },
+  {
+   "round": 1,
+   "binary": "7-e0e8f35d07",
+   "mode": "one-medium",
+   "values": {
+    "capture": 700964,
+    "edit": 12550,
+    "set_text": 98481,
+    "commit": 352722,
+    "apply": 55810,
+    "to_bytes": 83830,
+    "total": 1308016
+   }
+  },
+  {
+   "round": 1,
+   "binary": "6-d10f050c89",
+   "mode": "one-medium",
+   "values": {
+    "capture": 705763,
+    "edit": 12850,
+    "set_text": 100631,
+    "commit": 355862,
+    "apply": 56120,
+    "to_bytes": 83920,
+    "total": 1318517
+   }
+  },
+  {
+   "round": 1,
+   "binary": "5-aff8de9c61",
+   "mode": "one-medium",
+   "values": {
+    "capture": 706493,
+    "edit": 12550,
+    "set_text": 101881,
+    "commit": 379112,
+    "apply": 55581,
+    "to_bytes": 83161,
+    "total": 1341427
+   }
+  },
+  {
+   "round": 1,
+   "binary": "4-00234742d8",
+   "mode": "one-medium",
+   "values": {
+    "capture": 704394,
+    "edit": 12670,
+    "set_text": 113781,
+    "commit": 387402,
+    "apply": 55910,
+    "to_bytes": 84370,
+    "total": 1361207
+   }
+  },
+  {
+   "round": 1,
+   "binary": "3-99ce9c5e34",
+   "mode": "one-medium",
+   "values": {
+    "capture": 691923,
+    "edit": 12590,
+    "set_text": 114771,
+    "commit": 381942,
+    "apply": 56200,
+    "to_bytes": 83901,
+    "total": 1344167
+   }
+  },
+  {
+   "round": 1,
+   "binary": "2-8039963c33",
+   "mode": "one-medium",
+   "values": {
+    "capture": 699334,
+    "edit": 12610,
+    "set_text": 115920,
+    "commit": 580053,
+    "apply": 56401,
+    "to_bytes": 84931,
+    "total": 1550437
+   }
+  },
+  {
+   "round": 1,
+   "binary": "1-588cc6a317",
+   "mode": "one-medium",
+   "values": {
+    "capture": 744914,
+    "edit": 12510,
+    "set_text": 115081,
+    "commit": 625203,
+    "apply": 55740,
+    "to_bytes": 84181,
+    "total": 1639748
+   }
+  },
+  {
+   "round": 1,
+   "binary": "0-009d515bef",
+   "mode": "one-medium",
+   "values": {
+    "capture": 743844,
+    "edit": 12650,
+    "set_text": 124840,
+    "commit": 633973,
+    "apply": 55740,
+    "to_bytes": 84201,
+    "total": 1656808
+   }
+  },
+  {
+   "round": 2,
+   "binary": "0-009d515bef",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 50378310
+   }
+  },
+  {
+   "round": 2,
+   "binary": "1-588cc6a317",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 49854987
+   }
+  },
+  {
+   "round": 2,
+   "binary": "2-8039963c33",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 50589001
+   }
+  },
+  {
+   "round": 2,
+   "binary": "3-99ce9c5e34",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 49603087
+   }
+  },
+  {
+   "round": 2,
+   "binary": "4-00234742d8",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 27748918
+   }
+  },
+  {
+   "round": 2,
+   "binary": "5-aff8de9c61",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 27588627
+   }
+  },
+  {
+   "round": 2,
+   "binary": "6-d10f050c89",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 27613827
+   }
+  },
+  {
+   "round": 2,
+   "binary": "7-e0e8f35d07",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 28551342
+   }
+  },
+  {
+   "round": 2,
+   "binary": "8-aaed57e900",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 27936978
+   }
+  },
+  {
+   "round": 2,
+   "binary": "9-e74faad918",
+   "mode": "fulltext",
+   "values": {
+    "fulltext": 27036124
+   }
+  },
+  {
+   "round": 2,
+   "binary": "0-009d515bef",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 571133
+   }
+  },
+  {
+   "round": 2,
+   "binary": "1-588cc6a317",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 571623
+   }
+  },
+  {
+   "round": 2,
+   "binary": "2-8039963c33",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 567173
+   }
+  },
+  {
+   "round": 2,
+   "binary": "3-99ce9c5e34",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 560723
+   }
+  },
+  {
+   "round": 2,
+   "binary": "4-00234742d8",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 328752
+   }
+  },
+  {
+   "round": 2,
+   "binary": "5-aff8de9c61",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 326911
+   }
+  },
+  {
+   "round": 2,
+   "binary": "6-d10f050c89",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 329192
+   }
+  },
+  {
+   "round": 2,
+   "binary": "7-e0e8f35d07",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 334582
+   }
+  },
+  {
+   "round": 2,
+   "binary": "8-aaed57e900",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 330262
+   }
+  },
+  {
+   "round": 2,
+   "binary": "9-e74faad918",
+   "mode": "fulltext-medium",
+   "values": {
+    "fulltext": 330452
+   }
+  },
+  {
+   "round": 2,
+   "binary": "0-009d515bef",
+   "mode": "noop",
+   "values": {
+    "capture": 28106219,
+    "edit": 45530,
+    "set_text": 20,
+    "commit": 205501,
+    "apply": 97161,
+    "to_bytes": 6030,
+    "total": 28457271
+   }
+  },
+  {
+   "round": 2,
+   "binary": "1-588cc6a317",
+   "mode": "noop",
+   "values": {
+    "capture": 26972274,
+    "edit": 48030,
+    "set_text": 20,
+    "commit": 202701,
+    "apply": 101231,
+    "to_bytes": 5660,
+    "total": 27329096
+   }
+  },
+  {
+   "round": 2,
+   "binary": "2-8039963c33",
+   "mode": "noop",
+   "values": {
+    "capture": 23500536,
+    "edit": 42930,
+    "set_text": 40,
+    "commit": 194041,
+    "apply": 93320,
+    "to_bytes": 3880,
+    "total": 23833658
+   }
+  },
+  {
+   "round": 2,
+   "binary": "3-99ce9c5e34",
+   "mode": "noop",
+   "values": {
+    "capture": 23111874,
+    "edit": 43390,
+    "set_text": 30,
+    "commit": 196200,
+    "apply": 96311,
+    "to_bytes": 4050,
+    "total": 23449207
+   }
+  },
+  {
+   "round": 2,
+   "binary": "4-00234742d8",
+   "mode": "noop",
+   "values": {
+    "capture": 23919958,
+    "edit": 43690,
+    "set_text": 20,
+    "commit": 192521,
+    "apply": 95831,
+    "to_bytes": 3920,
+    "total": 24258200
+   }
+  },
+  {
+   "round": 2,
+   "binary": "5-aff8de9c61",
+   "mode": "noop",
+   "values": {
+    "capture": 23166585,
+    "edit": 42831,
+    "set_text": 30,
+    "commit": 195381,
+    "apply": 96350,
+    "to_bytes": 3940,
+    "total": 23514116
+   }
+  },
+  {
+   "round": 2,
+   "binary": "6-d10f050c89",
+   "mode": "noop",
+   "values": {
+    "capture": 23615817,
+    "edit": 43860,
+    "set_text": 40,
+    "commit": 150561,
+    "apply": 95601,
+    "to_bytes": 4060,
+    "total": 23909578
+   }
+  },
+  {
+   "round": 2,
+   "binary": "7-e0e8f35d07",
+   "mode": "noop",
+   "values": {
+    "capture": 23288565,
+    "edit": 43520,
+    "set_text": 20,
+    "commit": 150121,
+    "apply": 96401,
+    "to_bytes": 4040,
+    "total": 23592007
+   }
+  },
+  {
+   "round": 2,
+   "binary": "8-aaed57e900",
+   "mode": "noop",
+   "values": {
+    "capture": 22643743,
+    "edit": 41620,
+    "set_text": 20,
+    "commit": 149821,
+    "apply": 93751,
+    "to_bytes": 3990,
+    "total": 22930624
+   }
+  },
+  {
+   "round": 2,
+   "binary": "9-e74faad918",
+   "mode": "noop",
+   "values": {
+    "capture": 22915524,
+    "edit": 42130,
+    "set_text": 20,
+    "commit": 148481,
+    "apply": 94510,
+    "to_bytes": 3960,
+    "total": 23207665
+   }
+  },
+  {
+   "round": 2,
+   "binary": "0-009d515bef",
+   "mode": "one",
+   "values": {
+    "capture": 26969104,
+    "edit": 43510,
+    "set_text": 1164855,
+    "commit": 25098145,
+    "apply": 189921,
+    "to_bytes": 324152,
+    "total": 53782417
+   }
+  },
+  {
+   "round": 2,
+   "binary": "1-588cc6a317",
+   "mode": "one",
+   "values": {
+    "capture": 26674263,
+    "edit": 43550,
+    "set_text": 1066316,
+    "commit": 25145485,
+    "apply": 188461,
+    "to_bytes": 321671,
+    "total": 53332205
+   }
+  },
+  {
+   "round": 2,
+   "binary": "2-8039963c33",
+   "mode": "one",
+   "values": {
+    "capture": 23347176,
+    "edit": 43170,
+    "set_text": 1051575,
+    "commit": 21448727,
+    "apply": 190881,
+    "to_bytes": 313302,
+    "total": 46440141
+   }
+  },
+  {
+   "round": 2,
+   "binary": "3-99ce9c5e34",
+   "mode": "one",
+   "values": {
+    "capture": 23157496,
+    "edit": 43471,
+    "set_text": 1064225,
+    "commit": 2114541,
+    "apply": 191191,
+    "to_bytes": 324842,
+    "total": 26907954
+   }
+  },
+  {
+   "round": 2,
+   "binary": "4-00234742d8",
+   "mode": "one",
+   "values": {
+    "capture": 23669618,
+    "edit": 43020,
+    "set_text": 1058396,
+    "commit": 2127310,
+    "apply": 190861,
+    "to_bytes": 318922,
+    "total": 27424987
+   }
+  },
+  {
+   "round": 2,
+   "binary": "5-aff8de9c61",
+   "mode": "one",
+   "values": {
+    "capture": 23164476,
+    "edit": 43610,
+    "set_text": 915915,
+    "commit": 1994720,
+    "apply": 192141,
+    "to_bytes": 321272,
+    "total": 26643683
+   }
+  },
+  {
+   "round": 2,
+   "binary": "6-d10f050c89",
+   "mode": "one",
+   "values": {
+    "capture": 23138215,
+    "edit": 44210,
+    "set_text": 894185,
+    "commit": 1739518,
+    "apply": 199311,
+    "to_bytes": 333142,
+    "total": 26355942
+   }
+  },
+  {
+   "round": 2,
+   "binary": "7-e0e8f35d07",
+   "mode": "one",
+   "values": {
+    "capture": 23517337,
+    "edit": 49610,
+    "set_text": 881515,
+    "commit": 1705098,
+    "apply": 189821,
+    "to_bytes": 327182,
+    "total": 26677093
+   }
+  },
+  {
+   "round": 2,
+   "binary": "8-aaed57e900",
+   "mode": "one",
+   "values": {
+    "capture": 22837874,
+    "edit": 45101,
+    "set_text": 731933,
+    "commit": 1697329,
+    "apply": 200261,
+    "to_bytes": 324532,
+    "total": 25843619
+   }
+  },
+  {
+   "round": 2,
+   "binary": "9-e74faad918",
+   "mode": "one",
+   "values": {
+    "capture": 22927744,
+    "edit": 43130,
+    "set_text": 735184,
+    "commit": 1487247,
+    "apply": 190351,
+    "to_bytes": 323342,
+    "total": 25754408
+   }
+  },
+  {
+   "round": 2,
+   "binary": "0-009d515bef",
+   "mode": "pct",
+   "values": {
+    "capture": 26752963,
+    "edit": 44240,
+    "set_text": 114892842,
+    "commit": 110414480,
+    "apply": 915734,
+    "to_bytes": 14371872,
+    "total": 267750582
+   }
+  },
+  {
+   "round": 2,
+   "binary": "1-588cc6a317",
+   "mode": "pct",
+   "values": {
+    "capture": 27115384,
+    "edit": 58991,
+    "set_text": 103800546,
+    "commit": 97823057,
+    "apply": 1008065,
+    "to_bytes": 14812844,
+    "total": 244618887
+   }
+  },
+  {
+   "round": 2,
+   "binary": "2-8039963c33",
+   "mode": "pct",
+   "values": {
+    "capture": 23919009,
+    "edit": 58950,
+    "set_text": 104277979,
+    "commit": 94857632,
+    "apply": 1021165,
+    "to_bytes": 14422312,
+    "total": 238657727
+   }
+  },
+  {
+   "round": 2,
+   "binary": "3-99ce9c5e34",
+   "mode": "pct",
+   "values": {
+    "capture": 23577738,
+    "edit": 52710,
+    "set_text": 102521070,
+    "commit": 93170064,
+    "apply": 1032905,
+    "to_bytes": 14460952,
+    "total": 235477882
+   }
+  },
+  {
+   "round": 2,
+   "binary": "4-00234742d8",
+   "mode": "pct",
+   "values": {
+    "capture": 24296451,
+    "edit": 64200,
+    "set_text": 103883517,
+    "commit": 95433285,
+    "apply": 1021895,
+    "to_bytes": 15595188,
+    "total": 240293336
+   }
+  },
+  {
+   "round": 2,
+   "binary": "5-aff8de9c61",
+   "mode": "pct",
+   "values": {
+    "capture": 23711168,
+    "edit": 74580,
+    "set_text": 89240544,
+    "commit": 81038234,
+    "apply": 1026655,
+    "to_bytes": 15784058,
+    "total": 210955150
+   }
+  },
+  {
+   "round": 2,
+   "binary": "6-d10f050c89",
+   "mode": "pct",
+   "values": {
+    "capture": 23641388,
+    "edit": 73160,
+    "set_text": 87159573,
+    "commit": 57299895,
+    "apply": 1055436,
+    "to_bytes": 15089286,
+    "total": 184522219
+   }
+  },
+  {
+   "round": 2,
+   "binary": "7-e0e8f35d07",
+   "mode": "pct",
+   "values": {
+    "capture": 24100460,
+    "edit": 69370,
+    "set_text": 85754947,
+    "commit": 58850653,
+    "apply": 1048716,
+    "to_bytes": 15542988,
+    "total": 185311872
+   }
+  },
+  {
+   "round": 2,
+   "binary": "8-aaed57e900",
+   "mode": "pct",
+   "values": {
+    "capture": 23498017,
+    "edit": 76230,
+    "set_text": 70917373,
+    "commit": 57344945,
+    "apply": 1032475,
+    "to_bytes": 14897084,
+    "total": 167880016
+   }
+  },
+  {
+   "round": 2,
+   "binary": "9-e74faad918",
+   "mode": "pct",
+   "values": {
+    "capture": 23386376,
+    "edit": 54380,
+    "set_text": 72027279,
+    "commit": 35569547,
+    "apply": 1004445,
+    "to_bytes": 15001294,
+    "total": 147372624
+   }
+  },
+  {
+   "round": 2,
+   "binary": "0-009d515bef",
+   "mode": "one-medium",
+   "values": {
+    "capture": 750464,
+    "edit": 12640,
+    "set_text": 126341,
+    "commit": 638903,
+    "apply": 56060,
+    "to_bytes": 84720,
+    "total": 1670859
+   }
+  },
+  {
+   "round": 2,
+   "binary": "1-588cc6a317",
+   "mode": "one-medium",
+   "values": {
+    "capture": 750644,
+    "edit": 12690,
+    "set_text": 115070,
+    "commit": 627093,
+    "apply": 55630,
+    "to_bytes": 84741,
+    "total": 1646679
+   }
+  },
+  {
+   "round": 2,
+   "binary": "2-8039963c33",
+   "mode": "one-medium",
+   "values": {
+    "capture": 703173,
+    "edit": 12380,
+    "set_text": 115390,
+    "commit": 586183,
+    "apply": 57410,
+    "to_bytes": 85260,
+    "total": 1561197
+   }
+  },
+  {
+   "round": 2,
+   "binary": "3-99ce9c5e34",
+   "mode": "one-medium",
+   "values": {
+    "capture": 694064,
+    "edit": 12460,
+    "set_text": 114381,
+    "commit": 383942,
+    "apply": 55980,
+    "to_bytes": 83541,
+    "total": 1347606
+   }
+  },
+  {
+   "round": 2,
+   "binary": "4-00234742d8",
+   "mode": "one-medium",
+   "values": {
+    "capture": 703003,
+    "edit": 12510,
+    "set_text": 114040,
+    "commit": 387652,
+    "apply": 56640,
+    "to_bytes": 84560,
+    "total": 1362016
+   }
+  },
+  {
+   "round": 2,
+   "binary": "5-aff8de9c61",
+   "mode": "one-medium",
+   "values": {
+    "capture": 702643,
+    "edit": 12600,
+    "set_text": 103190,
+    "commit": 379452,
+    "apply": 55980,
+    "to_bytes": 83650,
+    "total": 1340547
+   }
+  },
+  {
+   "round": 2,
+   "binary": "6-d10f050c89",
+   "mode": "one-medium",
+   "values": {
+    "capture": 698264,
+    "edit": 12700,
+    "set_text": 101291,
+    "commit": 354232,
+    "apply": 55820,
+    "to_bytes": 84341,
+    "total": 1310006
+   }
+  },
+  {
+   "round": 2,
+   "binary": "7-e0e8f35d07",
+   "mode": "one-medium",
+   "values": {
+    "capture": 696694,
+    "edit": 12510,
+    "set_text": 98690,
+    "commit": 350852,
+    "apply": 55760,
+    "to_bytes": 83910,
+    "total": 1302217
+   }
+  },
+  {
+   "round": 2,
+   "binary": "8-aaed57e900",
+   "mode": "one-medium",
+   "values": {
+    "capture": 693233,
+    "edit": 12320,
+    "set_text": 80551,
+    "commit": 345582,
+    "apply": 55231,
+    "to_bytes": 83920,
+    "total": 1272966
+   }
+  },
+  {
+   "round": 2,
+   "binary": "9-e74faad918",
+   "mode": "one-medium",
+   "values": {
+    "capture": 689313,
+    "edit": 12190,
+    "set_text": 82460,
+    "commit": 328412,
+    "apply": 55550,
+    "to_bytes": 83101,
+    "total": 1253996
+   }
+  }
+ ],
+ "summary": {
+  "0-009d515bef": {
+   "fulltext": {
+    "fulltext": 51010214
+   },
+   "fulltext-medium": {
+    "fulltext": 574493
+   },
+   "noop": {
+    "apply": 98680,
+    "capture": 28106219,
+    "commit": 205501,
+    "edit": 48290,
+    "set_text": 30,
+    "to_bytes": 6030,
+    "total": 28457271
+   },
+   "one": {
+    "apply": 241591,
+    "capture": 26969104,
+    "commit": 25204595,
+    "edit": 47870,
+    "set_text": 1188715,
+    "to_bytes": 395142,
+    "total": 53782417
+   },
+   "pct": {
+    "apply": 915965,
+    "capture": 26884723,
+    "commit": 110414480,
+    "edit": 44450,
+    "set_text": 114242659,
+    "to_bytes": 14371872,
+    "total": 267750582
+   },
+   "one-medium": {
+    "apply": 55740,
+    "capture": 746993,
+    "commit": 635763,
+    "edit": 12640,
+    "set_text": 124980,
+    "to_bytes": 84201,
+    "total": 1661338
+   }
+  },
+  "1-588cc6a317": {
+   "fulltext": {
+    "fulltext": 50175267
+   },
+   "fulltext-medium": {
+    "fulltext": 571623
+   },
+   "noop": {
+    "apply": 101231,
+    "capture": 26972274,
+    "commit": 202701,
+    "edit": 48030,
+    "set_text": 30,
+    "to_bytes": 5660,
+    "total": 27329096
+   },
+   "one": {
+    "apply": 246501,
+    "capture": 26674263,
+    "commit": 25145485,
+    "edit": 50441,
+    "set_text": 1076585,
+    "to_bytes": 393042,
+    "total": 53332205
+   },
+   "pct": {
+    "apply": 1008065,
+    "capture": 27115384,
+    "commit": 98372229,
+    "edit": 53891,
+    "set_text": 103800546,
+    "to_bytes": 14645953,
+    "total": 244618887
+   },
+   "one-medium": {
+    "apply": 55630,
+    "capture": 749353,
+    "commit": 626804,
+    "edit": 12510,
+    "set_text": 115081,
+    "to_bytes": 84640,
+    "total": 1646679
+   }
+  },
+  "2-8039963c33": {
+   "fulltext": {
+    "fulltext": 50589001
+   },
+   "fulltext-medium": {
+    "fulltext": 569922
+   },
+   "noop": {
+    "apply": 101111,
+    "capture": 23500536,
+    "commit": 206621,
+    "edit": 46091,
+    "set_text": 40,
+    "to_bytes": 5620,
+    "total": 23833658
+   },
+   "one": {
+    "apply": 230471,
+    "capture": 23347176,
+    "commit": 21448727,
+    "edit": 45600,
+    "set_text": 1078835,
+    "to_bytes": 394132,
+    "total": 46440141
+   },
+   "pct": {
+    "apply": 1017505,
+    "capture": 23614498,
+    "commit": 94857632,
+    "edit": 48310,
+    "set_text": 103494164,
+    "to_bytes": 14422002,
+    "total": 237593950
+   },
+   "one-medium": {
+    "apply": 56540,
+    "capture": 699334,
+    "commit": 580053,
+    "edit": 12530,
+    "set_text": 115390,
+    "to_bytes": 85141,
+    "total": 1550437
+   }
+  },
+  "3-99ce9c5e34": {
+   "fulltext": {
+    "fulltext": 48861614
+   },
+   "fulltext-medium": {
+    "fulltext": 562483
+   },
+   "noop": {
+    "apply": 99870,
+    "capture": 23334516,
+    "commit": 199792,
+    "edit": 44691,
+    "set_text": 30,
+    "to_bytes": 6130,
+    "total": 23682138
+   },
+   "one": {
+    "apply": 207551,
+    "capture": 23249585,
+    "commit": 2133701,
+    "edit": 47791,
+    "set_text": 1074545,
+    "to_bytes": 379302,
+    "total": 27109875
+   },
+   "pct": {
+    "apply": 1017315,
+    "capture": 23566797,
+    "commit": 94713360,
+    "edit": 50301,
+    "set_text": 102592750,
+    "to_bytes": 14673793,
+    "total": 236393368
+   },
+   "one-medium": {
+    "apply": 55981,
+    "capture": 692673,
+    "commit": 383722,
+    "edit": 12590,
+    "set_text": 114381,
+    "to_bytes": 83630,
+    "total": 1345646
+   }
+  },
+  "4-00234742d8": {
+   "fulltext": {
+    "fulltext": 27730268
+   },
+   "fulltext-medium": {
+    "fulltext": 329792
+   },
+   "noop": {
+    "apply": 102171,
+    "capture": 24131270,
+    "commit": 208331,
+    "edit": 46410,
+    "set_text": 100,
+    "to_bytes": 5430,
+    "total": 24505272
+   },
+   "one": {
+    "apply": 216311,
+    "capture": 23955399,
+    "commit": 2160951,
+    "edit": 47040,
+    "set_text": 1071245,
+    "to_bytes": 370382,
+    "total": 28041489
+   },
+   "pct": {
+    "apply": 1016936,
+    "capture": 24237441,
+    "commit": 95526296,
+    "edit": 57930,
+    "set_text": 103494315,
+    "to_bytes": 14902204,
+    "total": 240293336
+   },
+   "one-medium": {
+    "apply": 56181,
+    "capture": 704394,
+    "commit": 387652,
+    "edit": 12540,
+    "set_text": 114001,
+    "to_bytes": 84370,
+    "total": 1362016
+   }
+  },
+  "5-aff8de9c61": {
+   "fulltext": {
+    "fulltext": 27588627
+   },
+   "fulltext-medium": {
+    "fulltext": 326911
+   },
+   "noop": {
+    "apply": 106311,
+    "capture": 23537137,
+    "commit": 207581,
+    "edit": 45870,
+    "set_text": 40,
+    "to_bytes": 5920,
+    "total": 23889799
+   },
+   "one": {
+    "apply": 203821,
+    "capture": 23481337,
+    "commit": 2016450,
+    "edit": 44800,
+    "set_text": 923684,
+    "to_bytes": 341492,
+    "total": 27014175
+   },
+   "pct": {
+    "apply": 1011715,
+    "capture": 23653808,
+    "commit": 80611162,
+    "edit": 60550,
+    "set_text": 88903073,
+    "to_bytes": 14886074,
+    "total": 208925471
+   },
+   "one-medium": {
+    "apply": 55980,
+    "capture": 702643,
+    "commit": 379112,
+    "edit": 12550,
+    "set_text": 102410,
+    "to_bytes": 83330,
+    "total": 1340547
+   }
+  },
+  "6-d10f050c89": {
+   "fulltext": {
+    "fulltext": 27511917
+   },
+   "fulltext-medium": {
+    "fulltext": 329192
+   },
+   "noop": {
+    "apply": 98951,
+    "capture": 23615817,
+    "commit": 160981,
+    "edit": 45550,
+    "set_text": 40,
+    "to_bytes": 6200,
+    "total": 23909578
+   },
+   "one": {
+    "apply": 200871,
+    "capture": 23801689,
+    "commit": 1745598,
+    "edit": 48730,
+    "set_text": 896594,
+    "to_bytes": 358772,
+    "total": 27033215
+   },
+   "pct": {
+    "apply": 1043825,
+    "capture": 23641388,
+    "commit": 57299895,
+    "edit": 62231,
+    "set_text": 87159573,
+    "to_bytes": 14993215,
+    "total": 184522219
+   },
+   "one-medium": {
+    "apply": 55980,
+    "capture": 698264,
+    "commit": 354232,
+    "edit": 12700,
+    "set_text": 100731,
+    "to_bytes": 84341,
+    "total": 1310006
+   }
+  },
+  "7-e0e8f35d07": {
+   "fulltext": {
+    "fulltext": 28551342
+   },
+   "fulltext-medium": {
+    "fulltext": 334582
+   },
+   "noop": {
+    "apply": 104540,
+    "capture": 23524327,
+    "commit": 156621,
+    "edit": 45650,
+    "set_text": 20,
+    "to_bytes": 5600,
+    "total": 23840729
+   },
+   "one": {
+    "apply": 201601,
+    "capture": 23517337,
+    "commit": 1718889,
+    "edit": 49610,
+    "set_text": 895744,
+    "to_bytes": 367031,
+    "total": 26707133
+   },
+   "pct": {
+    "apply": 1026955,
+    "capture": 23763498,
+    "commit": 58850653,
+    "edit": 59011,
+    "set_text": 85754947,
+    "to_bytes": 15396507,
+    "total": 184866442
+   },
+   "one-medium": {
+    "apply": 55760,
+    "capture": 696694,
+    "commit": 350852,
+    "edit": 12510,
+    "set_text": 98481,
+    "to_bytes": 83830,
+    "total": 1302217
+   }
+  },
+  "8-aaed57e900": {
+   "fulltext": {
+    "fulltext": 27936978
+   },
+   "fulltext-medium": {
+    "fulltext": 330262
+   },
+   "noop": {
+    "apply": 105910,
+    "capture": 23237445,
+    "commit": 167770,
+    "edit": 54461,
+    "set_text": 30,
+    "to_bytes": 9130,
+    "total": 23571727
+   },
+   "one": {
+    "apply": 205801,
+    "capture": 23094956,
+    "commit": 1705868,
+    "edit": 45370,
+    "set_text": 736664,
+    "to_bytes": 351582,
+    "total": 26149171
+   },
+   "pct": {
+    "apply": 1032475,
+    "capture": 23331636,
+    "commit": 57312445,
+    "edit": 69090,
+    "set_text": 70917373,
+    "to_bytes": 14752713,
+    "total": 167685206
+   },
+   "one-medium": {
+    "apply": 55350,
+    "capture": 693233,
+    "commit": 345582,
+    "edit": 12320,
+    "set_text": 80931,
+    "to_bytes": 83890,
+    "total": 1272966
+   }
+  },
+  "9-e74faad918": {
+   "fulltext": {
+    "fulltext": 27457445
+   },
+   "fulltext-medium": {
+    "fulltext": 330452
+   },
+   "noop": {
+    "apply": 115861,
+    "capture": 23216446,
+    "commit": 169821,
+    "edit": 49291,
+    "set_text": 30,
+    "to_bytes": 8500,
+    "total": 23563858
+   },
+   "one": {
+    "apply": 204921,
+    "capture": 22927744,
+    "commit": 1506007,
+    "edit": 44950,
+    "set_text": 742304,
+    "to_bytes": 351892,
+    "total": 25754408
+   },
+   "pct": {
+    "apply": 1004005,
+    "capture": 23177635,
+    "commit": 35532107,
+    "edit": 54380,
+    "set_text": 72027279,
+    "to_bytes": 14931675,
+    "total": 147372624
+   },
+   "one-medium": {
+    "apply": 55550,
+    "capture": 689313,
+    "commit": 328412,
+    "edit": 12200,
+    "set_text": 81610,
+    "to_bytes": 83170,
+    "total": 1253996
+   }
+  }
+ }
+}

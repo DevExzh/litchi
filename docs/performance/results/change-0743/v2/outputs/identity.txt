@@ -1,0 +1,23 @@
+# Published artifacts written by the probe's dump mode for base 009d515bef (before) and head ad2c490ee3 (after).
+# name | identical | sha256 | bytes
+large-fulltext.txt | identical | 69ed4233250ccabc3c699ff35cee54e9c8e2502751bfe0e46ec91451e69d70f3 | 529999
+large-noop.pptx | identical | 9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9 | 215220
+large-noop.revision | identical | 7f050c3740c1d2f5cd33b049f865f3f8d3dfeded36f786b104508ad12c91ba42 | 145
+large-one.pptx | identical | cb34b4992f44e92d852f5597f5e3e38818077ec54784669eaafdda581731633e | 215228
+large-one.revision | identical | 6df357d10e376f84bcb3acb9d01a8a7642b42787bbba99c5aa872a1f90667a72 | 157
+large-pct.pptx | identical | 8bcebb863b81022592415c5c15fc6fb540bc1a01fe259f61f31599deefc76adf | 215933
+large-pct.revision | identical | c8b26c796d389090adfb1e743e99af636b8861408ca04fb39d03bd1ae2f90e10 | 151
+medium-fulltext.txt | identical | 069b4411475a83a1de5251e356af22aa3cc68e1998b35707dcafcf3c76b6e771 | 5087
+medium-noop.pptx | identical | 50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e | 40788
+medium-noop.revision | identical | c00b89aba262e626d9735d2464a2f63b3a0ea7e41673a20489ae32e25480cbc8 | 150
+medium-one.pptx | identical | dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f | 40794
+medium-one.revision | identical | 0e537a68d46205ae636fb4efd6e6ed926554e1f1ab2ef17a78aad899cccbe182 | 156
+medium-pct.pptx | identical | dc2308043cf6d84fe5c1fbeba33e63ca64d5540c5024d5c1ed239b02922ed91f | 40794
+medium-pct.revision | identical | 0e537a68d46205ae636fb4efd6e6ed926554e1f1ab2ef17a78aad899cccbe182 | 156
+tiny-fulltext.txt | identical | 6aedd71fcadb7fc1f6c9668ebad4c0edecba456b16251ebd32dff382980d0de1 | 635
+tiny-noop.pptx | identical | 26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49 | 31530
+tiny-noop.revision | identical | 75afbe39d3890f58726295d351ff2f9009a5e343c6d14d6e19e89781112d9333 | 154
+tiny-one.pptx | identical | 595f2458108d7766b8ac2dadccc3354c0300392e42395406b73ba88f8351ee0e | 31536
+tiny-one.revision | identical | cfb21edaffee5a7d7d268a22fbee1480db14975fc8bcc5a6d152e41e595035aa | 158
+tiny-pct.pptx | identical | 595f2458108d7766b8ac2dadccc3354c0300392e42395406b73ba88f8351ee0e | 31536
+tiny-pct.revision | identical | cfb21edaffee5a7d7d268a22fbee1480db14975fc8bcc5a6d152e41e595035aa | 158

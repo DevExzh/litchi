@@ -1,0 +1,115 @@
+### ad2c490ee3 :: cargo fmt --all --check
+cwd: /home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path
+exit: 0
+
+### ad2c490ee3 :: cargo check -p litchi-pptx --all-targets --locked --offline
+cwd: /home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path
+exit: 0
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path/crates/litchi-drawingml)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.48s
+
+### ad2c490ee3 :: cargo check -p litchi-pptx --all-targets --all-features --locked --offline
+cwd: /home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path
+exit: 0
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path/crates/litchi-drawingml)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.25s
+
+### ad2c490ee3 :: cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked --offline
+cwd: /home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path
+exit: 0
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path/crates/litchi-xlsx)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path/crates/litchi-pptx)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path/crates/litchi)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 19.97s
+
+### ad2c490ee3 :: cargo clippy -p litchi-pptx --lib --no-deps --locked --offline -- -D warnings
+cwd: /home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path
+exit: 0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
+
+### ad2c490ee3 :: cargo clippy -p litchi-pptx --all-targets --no-deps --locked --offline -- -D warnings
+cwd: /home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path
+exit: 101
+error: called `.err().expect()` on a `Result` value
+error: called `.err().expect()` on a `Result` value
+error: called `.err().expect()` on a `Result` value
+error: could not compile `litchi-pptx` (lib test) due to 3 previous errors
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#err_expect
+
+error: could not compile `litchi-pptx` (lib test) due to 3 previous errors
+
+### 009d515bef :: cargo clippy -p litchi-pptx --all-targets --no-deps --locked --offline -- -D warnings
+cwd: /home/zhuhe/code/litchi-worktrees/base-009d515bef
+exit: 101
+error: called `.err().expect()` on a `Result` value
+error: called `.err().expect()` on a `Result` value
+error: called `.err().expect()` on a `Result` value
+error: could not compile `litchi-pptx` (lib test) due to 3 previous errors
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#err_expect
+
+error: could not compile `litchi-pptx` (lib test) due to 3 previous errors
+
+### ad2c490ee3 :: cargo test -p litchi-pptx --locked --offline -- --test-threads=8
+cwd: /home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path
+exit: 0
+test result lines: 79
+totals: passed=961 failed=0 ignored=2
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+all doctests ran in 0.51s; merged doctests compilation took 0.43s
+
+### ad2c490ee3 :: cargo test -p litchi-pptx --all-features --locked --offline -- --test-threads=8
+cwd: /home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path
+exit: 0
+test result lines: 79
+totals: passed=975 failed=0 ignored=2
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+all doctests ran in 0.48s; merged doctests compilation took 0.43s
+
+### ad2c490ee3 :: cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+cwd: /home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path
+exit: 0
+test result lines: 29
+totals: passed=382 failed=0 ignored=7
+
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.63s; merged doctests compilation took 0.63s
+
+### ad2c490ee3 :: env RUSTDOCFLAGS=-D warnings cargo doc -p litchi-pptx --no-deps --locked --offline
+cwd: /home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path
+exit: 0
+ Documenting litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.92s
+   Generated /home/zhuhe/code/litchi-worktrees/targets/0743/dev/doc/litchi_pptx/index.html
+
+### ad2c490ee3 :: python3 tools/check_crate_boundaries.py
+cwd: /home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path
+exit: 0
+  [014] litchi-iwa -> litchi-keynote
+  [015] litchi-iwa -> litchi-numbers
+  [016] litchi-iwa -> litchi-numbers-wire
+  [017] litchi-iwa -> litchi-pages
+
+### ad2c490ee3 :: python3 tools/non_iwork_gate.py verify
+cwd: /home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path
+exit: 0
+facade-safe-feature-argument=automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml
+verified_bulk_tree_roots=45
+verified_facade_safe_trees=35
+verified_facade_combined_tree=1
+
+### ad2c490ee3 :: python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+cwd: /home/zhuhe/code/litchi-worktrees/0743-pptx-semantic-text-and-edit-path
+exit: 0
+OK: 10 performance claims validated (structural)
+OK: 10 performance claims validated (structural)

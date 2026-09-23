@@ -1,0 +1,37 @@
+# To display the perf.data header info, please use --header/--header-only options.
+# Children      Self  Command          Shared Object         Symbol
+    99.73%     0.00%  pptx-semantic-p  libc.so.6             [.] __libc_start_call_main
+    99.73%     0.00%  pptx-semantic-p  libc.so.6             [.] __libc_start_main@@GLIBC_2.34
+    99.73%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] _start
+    99.73%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] main
+    99.73%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] pptx_semantic_probe::main
+    99.73%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] std::rt::lang_start::<()>::{closure#0}
+    99.73%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] std::rt::lang_start_internal
+    99.73%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+    98.53%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] <litchi_pptx::package::model::Package>::opened_presentation
+    98.53%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::opened::model::capture_internal
+    88.03%     0.02%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::presentation::package::capture_slides_with_mce
+    86.41%     0.01%  pptx-semantic-p  pptx-semantic-probe   [.] <litchi_pptx::parts::slide::SlidePart>::finish_from_processed
+    85.99%    14.25%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::notes::codec::scan_processed_xml
+    85.98%     0.01%  pptx-semantic-p  pptx-semantic-probe   [.] <litchi_pptx::parts::slide::SlidePart>::finish_from_processed::{closure#0}
+    30.05%     3.63%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::notes::codec::inspect_element
+    22.97%    20.63%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event
+    14.03%     4.42%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+    13.15%    13.04%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::notes::resolved
+     8.48%     0.01%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::opened::model::package_fingerprint_with_memo
+     8.34%     8.21%  pptx-semantic-p  pptx-semantic-probe   [.] sha2::sha256::x86_sha::compress
+     8.28%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::opened::model::feed
+     8.24%     0.00%  pptx-semantic-p  pptx-semantic-probe   [.] litchi_pptx::opened::model::payload_digest
+     7.08%     3.72%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::events::attributes::IterState>::next
+     6.58%     1.48%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+     3.98%     0.89%  pptx-semantic-p  pptx-semantic-probe   [.] memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+     3.83%     3.73%  pptx-semantic-p  pptx-semantic-probe   [.] core::str::converts::from_utf8
+     3.78%     1.36%  pptx-semantic-p  pptx-semantic-probe   [.] memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+     2.99%     1.84%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::events::attributes::IterState>::check_for_duplicates
+     2.44%     2.40%  pptx-semantic-p  pptx-semantic-probe   [.] <memchr::arch::x86_64::avx2::memchr::Two>::find_raw_avx2
+     2.35%     1.65%  pptx-semantic-p  pptx-semantic-probe   [.] quick_xml::escape::unescape
+     2.18%     2.10%  pptx-semantic-p  pptx-semantic-probe   [.] <memchr::arch::x86_64::avx2::memchr::Three>::find_raw_avx2
+     2.05%     1.88%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::reader::state::ReaderState>::emit_start
+     2.00%     0.60%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::name::NamespaceResolver>::push
+     1.76%     0.98%  pptx-semantic-p  pptx-semantic-probe   [.] <quick_xml::name::QName>::decompose
+# (Cannot load tips.txt file, please install perf!)
