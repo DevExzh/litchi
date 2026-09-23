@@ -974,6 +974,16 @@ fn owned_vec_source_is_sealed_and_publishes_the_generic_bytes() {
 /// Publishes one overlay set through every provenance and every publication
 /// route, asserting that all of them agree on every byte and digest.
 fn assert_provenances_agree(bytes: &[u8], overlays: &dyn Fn() -> Vec<SameLengthStreamOverlay>) {
+    assert_provenances_agree_with(bytes, overlays, limits());
+}
+
+/// [`assert_provenances_agree`] under explicit limits; returns the published
+/// target and the plan's changed-span count.
+fn assert_provenances_agree_with(
+    bytes: &[u8],
+    overlays: &dyn Fn() -> Vec<SameLengthStreamOverlay>,
+    limits: OverlayLimits,
+) -> (Vec<u8>, usize) {
     static NEXT: AtomicU64 = AtomicU64::new(0);
     let directory = std::env::temp_dir().join(format!(
         "litchi-cfb-overlay-provenances-{}-{}",
@@ -982,19 +992,19 @@ fn assert_provenances_agree(bytes: &[u8], overlays: &dyn Fn() -> Vec<SameLengthS
     ));
     std::fs::create_dir(&directory).unwrap();
     let generic = shared(bytes.to_vec())
-        .plan_same_length_stream_overlays(overlays(), limits())
+        .plan_same_length_stream_overlays(overlays(), limits)
         .unwrap();
     let owned_arc = SharedOleFile::open_owned(
         Arc::from(bytes.to_vec()),
         SourceVersion::new(0xcafe_0748, 3),
     )
     .unwrap()
-    .plan_same_length_stream_overlays(overlays(), limits())
+    .plan_same_length_stream_overlays(overlays(), limits)
     .unwrap();
     let owned_vec =
         SharedOleFile::open_owned_vec(Arc::new(bytes.to_vec()), SourceVersion::new(0xcafe_0748, 4))
             .unwrap()
-            .plan_same_length_stream_overlays(overlays(), limits())
+            .plan_same_length_stream_overlays(overlays(), limits)
             .unwrap();
 
     let mut expected = Vec::new();
@@ -1035,6 +1045,7 @@ fn assert_provenances_agree(bytes: &[u8], overlays: &dyn Fn() -> Vec<SameLengthS
         assert_eq!(viewed, expected);
     }
     std::fs::remove_dir(directory).unwrap();
+    (expected, generic.changed_spans())
 }
 
 #[test]
@@ -1058,6 +1069,86 @@ fn sealed_and_generic_plans_publish_identical_bytes_and_digests() {
             replacement("Fat", 0xd2, 5_003),
         ]
     });
+}
+
+/// A version-3 CFB whose `Big` stream (3 MiB + 12,345 bytes of a
+/// deterministic pseudo-random sequence) is laid out contiguously, plus one
+/// mini stream. Returns the file and the `Big` payload.
+fn big_bytes() -> (Vec<u8>, Vec<u8>) {
+    let mut state = 0x0748_0748_u32;
+    let payload = (0..3 * 1024 * 1024 + 12_345)
+        .map(|_| {
+            state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (state >> 24) as u8
+        })
+        .collect::<Vec<u8>>();
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Big"], &payload).unwrap();
+    writer.create_stream(&["Small"], &[0x5a; 1_000]).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    (output.into_inner(), payload)
+}
+
+#[test]
+fn sealed_and_generic_plans_agree_across_fingerprint_and_publication_chunks() {
+    let (bytes, payload) = big_bytes();
+    // Locate the payload and require it to be contiguous, so a logical
+    // offset maps to exactly one physical offset.
+    let base = bytes
+        .windows(64)
+        .position(|window| window == &payload[..64])
+        .expect("the Big payload is present");
+    assert_eq!(&bytes[base..base + payload.len()], payload.as_slice());
+    assert!(
+        bytes.len() > 3 * 1024 * 1024,
+        "four 1 MiB fingerprint chunks"
+    );
+
+    // Straddle every 1 MiB fingerprint-chunk boundary and every 64 KiB
+    // publication-chunk boundary inside the payload with a changed range of
+    // 700 bytes before and 900 after it, and change one byte in every 16th
+    // sector elsewhere, so the plan carries hundreds of separate spans.
+    let mut edited = payload.clone();
+    let mut straddled = Vec::new();
+    let mut boundary = 64 * 1024;
+    while boundary + 900 <= base + payload.len() {
+        if boundary >= base + 700 {
+            for byte in &mut edited[boundary - base - 700..boundary - base + 900] {
+                *byte ^= 0xff;
+            }
+            straddled.push(boundary);
+        }
+        boundary += 64 * 1024;
+    }
+    for logical in (0..payload.len()).step_by(16 * 512) {
+        edited[logical] ^= 0x5a;
+    }
+    for mebibytes in [1_usize, 2, 3] {
+        let boundary = mebibytes * 1024 * 1024;
+        assert!(straddled.contains(&boundary), "{boundary} is straddled");
+    }
+    let edited: Arc<[u8]> = Arc::from(edited);
+
+    let (published, spans) = assert_provenances_agree_with(
+        &bytes,
+        &|| {
+            vec![
+                SameLengthStreamOverlay::new(vec!["Big".to_string()], Arc::clone(&edited)),
+                replacement("Small", 0x6b, 1_000),
+            ]
+        },
+        OverlayLimits::default(),
+    );
+    assert!(spans >= 100, "{spans} spans");
+    for boundary in straddled {
+        assert_ne!(published[boundary - 1], bytes[boundary - 1]);
+        assert_ne!(published[boundary], bytes[boundary]);
+    }
+    assert_eq!(&published[base..base + payload.len()], &edited[..]);
+    let mut reopened = OleFile::open(Cursor::new(published)).unwrap();
+    assert_eq!(reopened.open_stream(&["Big"]).unwrap(), edited.to_vec());
+    assert_eq!(reopened.open_stream(&["Small"]).unwrap(), vec![0x6b; 1_000]);
 }
 
 #[test]

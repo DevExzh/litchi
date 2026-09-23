@@ -582,18 +582,20 @@ struct Selection {
     is_minifat: bool,
 }
 
-/// How an emission pass relates the bytes it emits to the plan's digests.
+/// The publication route an emission pass serves.
+///
+/// The route decides only whether a generic source's emission is followed by
+/// its own complete preflight. Whether the emission hashes at all is not a
+/// caller's choice: `write_validated` derives it from the plan's seal, so no
+/// route can publish a generic positional source without the emission hash.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum EmissionFence {
-    /// Sealed owned bytes: planning computed both digests over bytes that
-    /// cannot change, so the emission reads and emits without hashing.
-    Sealed,
-    /// Hash the source and target while emitting and compare both with the
-    /// plan before success (atomic save, which rechecks before rename).
-    Hashed,
-    /// [`Self::Hashed`], then a complete preflight after the last sink byte
-    /// (direct sequential publication).
-    HashedAndRechecked,
+enum PublicationRoute {
+    /// Direct sequential publication (`write_to`): a generic source is
+    /// rechecked by a complete preflight after the last sink byte.
+    DirectSink,
+    /// Atomic save (`save`): the caller's own pre-rename preflight follows
+    /// flush and fsync, so the emission does not repeat it.
+    AtomicStaging,
 }
 
 /// A fully validated, immutable streaming publication plan.
@@ -613,7 +615,12 @@ pub struct ValidatedOverlayPlan {
 /// The view keeps the source snapshot and replacement spans alive, performs no
 /// whole-artifact copy, and supports concurrent positional reads. Creating it
 /// through [`ValidatedOverlayPlan::composed_source`] rechecks both complete
-/// artifact fingerprints before returning it.
+/// artifact fingerprints before returning it when the plan's source is a
+/// generic positional adapter. A plan over sealed owned bytes
+/// ([`SharedOleFile::open_owned`], [`SharedOleFile::open_owned_vec`]) returns
+/// its view without that recheck: planning computed both digests over bytes
+/// that cannot change. Every positional read of either view still checks the
+/// source version and length.
 #[derive(Clone)]
 pub struct ComposedOverlaySource {
     source: SourceSnapshot,
@@ -693,8 +700,9 @@ impl SharedOleFile {
     /// bytes change, so a digest read once and never compared proves nothing.
     /// [`Self::plan_same_length_stream_splices`] closes that gap itself by
     /// scanning a second time and comparing — for a source it does not own;
-    /// bytes opened through [`Self::open_owned`] cannot change, so it elides
-    /// that scan and this entry point is not a reduction over them. This
+    /// bytes opened through [`Self::open_owned`] or [`Self::open_owned_vec`]
+    /// cannot change, so it elides that scan and this entry point is not a
+    /// reduction over them. This
     /// entry point never scans a second time, and is
     /// therefore admissible **only** where the caller's own next complete scan
     /// compares against the value returned here — for example a snapshot open
@@ -959,11 +967,10 @@ impl ValidatedOverlayPlan {
     /// hashing it again. Generic sinks are not called atomic: failures after
     /// progress return [`OverlayError::IncompleteOutput`].
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport, OverlayError> {
-        if self.source.source_is_owned_immutable {
-            return self.write_validated(writer, EmissionFence::Sealed);
+        if !self.source.source_is_owned_immutable {
+            self.preflight_fingerprints()?;
         }
-        self.preflight_fingerprints()?;
-        self.write_validated(writer, EmissionFence::HashedAndRechecked)
+        self.write_validated(writer, PublicationRoute::DirectSink)
     }
 
     /// Publishes through a synced sibling temporary file and atomic rename.
@@ -985,20 +992,16 @@ impl ValidatedOverlayPlan {
             // validation before creating even a temporary file.
             self.preflight_fingerprints()?;
         }
-        let emission = if self.source.source_is_owned_immutable {
-            EmissionFence::Sealed
-        } else {
-            // `save` has its own mandatory pre-rename preflight below. The
-            // direct sink path keeps the post-emission preflight inside
-            // `write_validated`; skipping only that duplicate scan here
-            // leaves source/target hashing during emission intact.
-            EmissionFence::Hashed
-        };
         let (temporary_path, file) = create_sibling_temp_file(path)?;
         let result = (|| {
             let mut buffered = BufWriter::new(file);
             let report = self
-                .write_validated(&mut buffered, emission)
+                // `save` has its own mandatory pre-rename preflight below. The
+                // direct sink path keeps the post-emission preflight inside
+                // `write_validated`; the staging route skips only that
+                // duplicate scan, and a generic source's emission still
+                // hashes every source and target byte.
+                .write_validated(&mut buffered, PublicationRoute::AtomicStaging)
                 .map_err(strip_staging_progress)?;
             buffered.flush()?;
             buffered.get_ref().sync_all()?;
@@ -1040,16 +1043,15 @@ impl ValidatedOverlayPlan {
     fn write_validated<W: Write>(
         &self,
         writer: &mut W,
-        fence: EmissionFence,
+        route: PublicationRoute,
     ) -> Result<PublishReport, OverlayError> {
-        // Only sealed owned bytes may skip the emission hash, and only
-        // because planning already computed both digests over those bytes.
-        debug_assert_eq!(
-            fence == EmissionFence::Sealed,
-            self.source.source_is_owned_immutable
-        );
+        // The emission hash is derived from the plan's seal and never from the
+        // caller: only sealed owned bytes, whose digests planning computed
+        // over bytes that cannot change, emit without hashing. Every generic
+        // positional source hashes its complete source and target here on
+        // every route, so an internal caller cannot publish one unchecked.
+        let hashed = !self.source.source_is_owned_immutable;
         let mut buffer = publication_buffer()?;
-        let hashed = fence != EmissionFence::Sealed;
         let mut source_hasher = hashed.then(Sha256::new);
         // A no-op plan emits the source bytes unchanged, so the emitted-target
         // digest is the emitted-source digest. Hash the emission once and
@@ -1117,7 +1119,7 @@ impl ValidatedOverlayPlan {
         // `save` skips only this duplicate because it performs the same full
         // check after flush/fsync and immediately before rename.
         drop(buffer);
-        if fence == EmissionFence::HashedAndRechecked {
+        if hashed && route == PublicationRoute::DirectSink {
             if let Err(error) = self.preflight_fingerprints() {
                 return Err(with_progress(error, accepted, self.source.length, false));
             }
