@@ -1,0 +1,7 @@
+FINDING 229 custom number formats (last index 392): written; reader refused the workbook: Invalid record 0x041E: more than 218 Format records
+FINDING 230 custom number formats (last index 393): written; reader refused the workbook: Invalid record 0x041E: more than 218 Format records
+FINDING formula "SUM(" accepted by write_formula; then write_to refused: Invalid data: Mismatched parentheses
+FINDING after overwriting that cell: written; reader accepted it
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+FINDING 210 custom number formats: reader accepted it
+FINDING 211 custom number formats: reader refused the workbook: Invalid record 0x041E: more than 218 Format records

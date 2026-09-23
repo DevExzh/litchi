@@ -43,3 +43,22 @@ xls_fresh_write_to/large user instructions per iteration: measured build 921787e
 cargo fmt --all --check -> exit 0
 cargo clippy -p litchi-xls --all-targets --no-deps --locked -- -D warnings -A clippy::unusual_byte_groupings -> exit 0
 cargo test -p litchi-xls --locked --no-fail-fast -> exit 0 (passed 1536, failed 0, ignored 1)
+
+# Gates after the 0757 review fixes at 6cebd664e6e856e2aee014ed63c0dad88e52ebb8 (2026-09-23T14:33:21Z); CARGO_TARGET_DIR=targets/0757 (fresh), TMPDIR=scratch/0757/tmp
+cargo fmt --all --check -> exit 0
+cargo check -p litchi-xls -p litchi-doc -p litchi-ppt --all-targets --locked -> exit 0
+cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked -> exit 0
+cargo check --manifest-path tools/perf-baseline/Cargo.toml --all-targets --locked -> exit 0
+cargo clippy -p litchi-xls -p litchi-doc -p litchi-ppt --lib --no-deps --locked -- -D warnings -> exit 0
+cargo clippy -p litchi-doc -p litchi-ppt --all-targets --no-deps --locked -- -D warnings -> exit 0
+cargo clippy -p litchi-xls --all-targets --no-deps --locked -- -D warnings -A clippy::unusual_byte_groupings (the lint fails identically on the base at tests/xls_query_index_cache.rs:546) -> exit 0
+RUSTDOCFLAGS='-D warnings' cargo doc -p litchi-xls -p litchi-doc -p litchi-ppt --no-deps --locked -> exit 0
+cargo clippy -p litchi-xls --all-targets --no-deps --locked -- -D warnings -> exit 101 (2 error lines; only at -->crates/litchi-xls/tests/xls_query_index_cache.rs:546:32, unusual_byte_groupings, pre-existing)
+cargo test -p litchi-xls --locked --no-fail-fast -> exit 0 (passed 1539, failed 0, ignored 1; run at the same commit before the static gates)
+cargo test -p litchi-doc --locked --no-fail-fast -> exit 0 (passed 1206, failed 0, ignored 13)
+cargo test -p litchi-ppt --locked --no-fail-fast -> exit 0 (passed 1235, failed 0, ignored 11)
+cargo test -p litchi-ppt --features encryption --locked --no-fail-fast -> exit 0 (passed 1246, failed 0, ignored 11)
+cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --no-fail-fast -> exit 0 (passed 382, failed 0, ignored 7)
+python3 tools/check_crate_boundaries.py -> exit 0
+python3 tools/non_iwork_gate.py verify -> exit 0
+python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural -> exit 0
