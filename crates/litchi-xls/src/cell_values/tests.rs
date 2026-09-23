@@ -2620,3 +2620,100 @@ fn source_backed_numeric_target_verification_agrees_with_an_independent_parse() 
         Err(Error::UnsafeEdit(message)) if message.contains("not asked to keep")
     ));
 }
+
+/// Renders `workbook_stream` into `source` the way the generic commit did
+/// before it adopted the validated rendering: publish the stream through a
+/// fresh package editor, then finish (render) the editor a second time.
+fn rerendered_artifact(source: &Snapshot, workbook_stream: &[u8]) -> Vec<u8> {
+    let mut package = PackageEditor::open(
+        source.bytes().to_vec(),
+        Targets::default(),
+        Limits::default(),
+    )
+    .unwrap();
+    package
+        .put_stream_shared(&source.inner.workbook_path, Arc::from(workbook_stream))
+        .unwrap();
+    package.finish().unwrap()
+}
+
+/// The generic commit publishes the rendering its package publication
+/// already validated instead of rendering the editor again. That artifact must
+/// be byte-identical to the second render the commit used to publish, for the
+/// fixed-numeric route and the structural/resource route alike; this test
+/// holds in release builds, where the commit's own debug re-derivation is
+/// compiled out.
+#[test]
+fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
+    let fixture = |relative: &str| {
+        std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data")
+                .join(relative),
+        )
+        .unwrap()
+    };
+    let mut checked = 0;
+    for bytes in [
+        package(),
+        formula_free_package(),
+        two_sheet_matrix_package(),
+        fixture("poi/test-data/spreadsheet/54016.xls"),
+        fixture("ole/xls/WithCustomViews.xls"),
+    ] {
+        let source = Snapshot::from_bytes(bytes).unwrap();
+        let (sheet, reference, value) = source
+            .worksheets()
+            .find_map(|worksheet| {
+                worksheet.cells().find_map(|cell| match cell.value() {
+                    Value::Number(value)
+                        if matches!(
+                            cell.storage(),
+                            Storage::Number | Storage::Rk | Storage::MulRk
+                        ) =>
+                    {
+                        Some((worksheet.position(), cell.reference(), *value))
+                    },
+                    _ => None,
+                })
+            })
+            .unwrap();
+
+        // Fixed-numeric route.
+        let mut numeric = source.edit();
+        numeric
+            .set_numeric(Selector::Position(sheet), reference, value + 1.0)
+            .unwrap();
+        let numeric = numeric.commit().unwrap();
+        assert_eq!(
+            numeric.snapshot().bytes(),
+            rerendered_artifact(&source, numeric.snapshot().workbook_stream()).as_slice()
+        );
+        checked += 1;
+
+        // Structural route: a new cell regenerates the row-block closure.
+        let free = (0..=255_u32)
+            .map(|column| Reference::new(1_000, column).unwrap())
+            .find(|candidate| {
+                source
+                    .worksheet(Selector::Position(sheet))
+                    .unwrap()
+                    .unwrap()
+                    .cell(*candidate)
+                    .unwrap()
+                    .is_none()
+            })
+            .unwrap();
+        let mut structural = source.edit();
+        structural
+            .insert_cell(Selector::Position(sheet), free, Value::Number(42.0))
+            .unwrap();
+        let structural = structural.commit().unwrap();
+        assert_eq!(
+            structural.snapshot().bytes(),
+            rerendered_artifact(&source, structural.snapshot().workbook_stream()).as_slice()
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, 10);
+}
