@@ -15,11 +15,12 @@
 use std::io::Cursor;
 
 use litchi_core::sheet::{Cell as _, CellValue, WorkbookTrait as _};
-use litchi_xls::Error;
 use litchi_xls::writer::{
     DataValidation, DataValidationOperator, DataValidationRange, DataValidationType,
     PageSetupOptions, Writer,
 };
+use litchi_xls::writer::{DefinedNameFutureRecords, DefinedNameRecordOptions, NamePublish};
+use litchi_xls::{DefinedNameKind, Error, NameScope};
 
 type Workbook = litchi_xls::Workbook<Cursor<Vec<u8>>>;
 
@@ -446,4 +447,73 @@ fn latin1_data_validation_strings_round_trip() {
     assert_eq!(rules[0].error_title(), Some("Erreur é"));
     assert_eq!(rules[0].error(), Some("日本語 and ü"));
     assert!(worksheet.get_cell(5, 0).is_some());
+}
+
+fn record_options(name: &str) -> DefinedNameRecordOptions {
+    DefinedNameRecordOptions {
+        name: name.to_string(),
+        kind: DefinedNameKind::User,
+        scope: NameScope::Workbook,
+        hidden: false,
+        function: false,
+        vba_procedure: false,
+        procedure: false,
+        calculated_expression: false,
+        function_group: 0,
+        published: true,
+        workbook_parameter: false,
+        shortcut_key: None,
+        formula_tokens: vec![],
+        formula_extra: vec![],
+        custom_menu: String::new(),
+        description: String::new(),
+        help_topic: String::new(),
+        status_bar: String::new(),
+        comment: None,
+    }
+}
+
+/// `add_defined_name_record` and its `NamePublish` future record keep their
+/// 255-unit refusal; their encoders now narrow the counts with checks.
+#[test]
+fn defined_name_records_up_to_255_units_are_written_whole_and_one_more_is_refused() {
+    for units in [254, 255] {
+        for name in strings_of(units) {
+            let mut writer = Writer::new();
+            writer.add_worksheet("Data").unwrap();
+            writer
+                .add_defined_name_record_with_future_records(
+                    record_options(&name),
+                    DefinedNameFutureRecords {
+                        function_group: None,
+                        publication: Some(NamePublish {
+                            published: true,
+                            workbook_parameter: false,
+                            name: name.clone(),
+                        }),
+                    },
+                )
+                .unwrap();
+            let workbook = read(written(&mut writer));
+            let records = workbook.defined_name_records();
+            assert_eq!(records.len(), 1);
+            assert_eq!(records[0].name, name);
+            assert_eq!(
+                records[0]
+                    .future_records
+                    .publication
+                    .as_ref()
+                    .map(|value| value.name.as_str()),
+                Some(name.as_str())
+            );
+        }
+    }
+    for name in strings_of(256) {
+        let mut writer = Writer::new();
+        writer.add_worksheet("Data").unwrap();
+        assert!(matches!(
+            writer.add_defined_name_record(record_options(&name)),
+            Err(Error::InvalidData(message)) if message.contains("1..=255")
+        ));
+    }
 }
