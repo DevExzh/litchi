@@ -1,4 +1,4 @@
-# 0757: The fresh XLS writer lists shared strings in first-occurrence order and refuses every string BIFF8 cannot hold: the same workbook is now written byte for byte in every process, no string is cut, and string-heavy writes execute 11–15% more instructions
+# 0757: The fresh XLS writer lists shared strings in first-occurrence order and refuses, when they are given, strings its shared-string, formula, number-format, sheet-name and defined-name fields cannot hold: the same workbook is written byte for byte in every process, those strings are never cut, and string-heavy writes execute 11–15% more instructions
 
 Status: retained, implemented. `performance_claim: none` — this is a
 correctness change (ADR 0006 determinism; GOAL.md rule 3, "never trade a typed
@@ -18,12 +18,16 @@ branch `perf/0757-xls-fresh-writer-sst-determinism`. Commits:
 | `921787e2c0` | `perf(xls)`: the order's sort keyed by one packed integer (same order, same bytes) |
 | `a400341bdf` | `fix(xls)`: data-validation strings with Latin-1 characters written as Latin-1 bytes |
 | `8a2693a83e` | `test(xls)`: defined-name records and `NamePublish` names at N − 1, N and N + 1 |
+| `6cebd664e6` | `fix(xls)`: after the 0757 review, number formats, cell styles and defined names are refused when registered, not when written (section "Refused at registration") |
 
 Every timing and counter below is of `921787e2c0` against an identically built
 base. `a400341bdf` only changes the data-validation string encoder, which no
 measured case reaches; the harness at `a400341bdf` executes 17,060,215 user
 instructions per `xls_fresh_write_to/large` iteration against 17,033,997 for the
-measured build (+0.15%, `gates.txt`). Evidence:
+measured build (+0.15%, `gates.txt`). `6cebd664e6` (after the review) changes
+only registration calls none of the measured cases make, plus one `is_empty`
+test per `Format` record written (eight per measured workbook); it was not
+re-measured. Evidence:
 [results/change-0757](results/change-0757/README.md).
 
 ## Result
@@ -37,16 +41,20 @@ columns below). The multi-string golden test added here fails on the base with
 "many_strings is not deterministic" (`behaviour/base-goldens-final.txt`) and
 passes in twelve separate processes on the branch, each with fresh hash seeds.
 
-**No string is cut.** Every string field the fresh writer bounds now either
-fits or is refused with the typed `Error::StringTooLong { field, utf16_units,
-limit }` before anything is written. What the base did with the same inputs
-(`behaviour/base-probe.txt`, the probe `probe-src/string_fields_probe.rs`):
+**No string is cut in the fields this record owns.** Each string field in the
+table below now either fits or is refused with the typed `Error::StringTooLong
+{ field, utf16_units, limit }` (or `InvalidData` for an empty number format)
+before anything is written. Other string writers still cut, miscount or
+misencode (font names, AutoFilter strings, internal hyperlinks, PivotTable
+names; section "Findings outside this change"). What the base did with the
+same inputs (`behaviour/base-probe.txt`, the probe
+`probe-src/string_fields_probe.rs`):
 
 | field (record) | BIFF8 limit | the base, one unit or more past it | this branch |
 | --- | --- | --- | --- |
 | shared string (`SST`, `XLUnicodeRichExtendedString.cch`) | 65,535 UTF-16 units | 65,536 × `b` read back as 65,535; 70,000 × `é` as 65,535; 65,534 × `a` + one emoji cut through the surrogate pair, and litchi's reader then refused the **whole workbook** ("lone surrogate found") | refused at `write_string`, and for any other string cell while staging the table |
 | formula string constant (`PtgStr`) | 255 | 300 × `a` written as 255; 254 × `a` + emoji as the 254 `a`s | refused (`FormulaTokenizer::tokenize`, `encode_ptg_tokens`) |
-| number format (`Format.stFormat`) | 255 | 256 units written, then refused by litchi's reader on open; 70,000 units panicked on a `u16` overflow (debug build; wraps in release) | refused by `write_to` / `save` |
+| number format (`Format.stFormat`) | 1–255 | 256 units written, then refused by litchi's reader on open; 70,000 units panicked on a `u16` overflow (debug build; wraps in release); an empty format was written and refused on open | refused by `register_number_format` / `add_cell_style` (since `6cebd664e6`; the writer stays able to write), and again by the encoder |
 | defined name (`Lbl`) | 255 | `Café` and `Rocket😀Launch` written with the wrong length, reader refused the workbook; 200 emoji (400 units) accepted and corrupt | written correctly; 400 units refused |
 | worksheet name (`BoundSheet8`) | 31 | 16 × `é` (32 bytes, 16 units) refused as "1-31 characters"; the encoder sliced names at byte 31 | 31 units accepted; 32 refused |
 
@@ -164,6 +172,11 @@ writers. No `unsafe`, no dependency, no limit relaxed, no ambient behaviour.
   strings they used to cut or corrupt; `add_worksheet` now accepts 16–31-unit
   non-ASCII names it used to refuse, and its and `define_name*`'s length
   refusals are `StringTooLong` instead of `InvalidData`.
+- Since `6cebd664e6`: `Writer::register_number_format`, `Writer::add_cell_style`,
+  `FormattingManager::register_number_format` and
+  `FormattingManager::register_cell_style` return `Result<u16>`, and
+  `define_name*` refuse an unsupported reference or an over-long comment when
+  called instead of at write time.
 
 ### The threshold for cell text
 
@@ -178,6 +191,36 @@ limit and is not enforced by any `litchi-xls` path; MS-XLS's own 32,767 bounds
 apply to records this writer does not emit (the formula-result `String` record,
 phonetic `ExtRst` text, some PivotTable strings). Whether Excel opens a
 40,000-character cell is not verified here; litchi writes and reads it whole.
+
+### Refused at registration (`6cebd664e6`, after the 0757 review)
+
+The review found that the first version refused a string only when the
+workbook was written, which left the writer permanently unable to write:
+`register_number_format` and `add_cell_style` could not fail, no API removes a
+format, and after `register_number_format(&"0".repeat(256))` every later
+`write_to` failed; `define_name_with_comment`'s comment was likewise refused
+only by the `NameCmt` encoder. Now:
+
+- A number format must hold 1 through 255 UTF-16 code units when it is
+  registered (`formatting::validate_number_format`): an empty pattern is
+  `InvalidData`, a longer one `StringTooLong`. This also stops the writer
+  emitting an empty custom format, which litchi's reader refused (the finding
+  the first version recorded). `register_cell_style` registers the style's
+  number format first — the only fallible step; the font and XF tables are
+  separate and keep their indices — so a refused style adds no font, format or
+  XF.
+- `define_name`, `define_name_local` and `define_name_with_comment` store a name
+  only after its reference encodes (`DefinedName::to_biff_formula`, the call the
+  write makes) and its comment fits `NameCmt` (255 units, MS-XLS 2.4.176).
+  `remove_name` could already take a bad name back out; now none gets in.
+- `write_format_record` keeps its own length check and also refuses an empty
+  string, as defence in depth behind registration.
+- Tests: refused registrations (empty and 256-unit formats in four encodings,
+  cell styles carrying them, an over-long comment, four unsupported references
+  through all three `define_name*` calls) leave the writer writing, byte for
+  byte, what a writer that never saw the calls writes; the manager's format,
+  font and XF tables are unchanged after each refusal; the encoder refuses what
+  registration refuses when a format is placed behind it.
 
 ## 0753 review follow-ups (`7309029a6d`)
 
@@ -233,9 +276,12 @@ phonetic `ExtRst` text, some PivotTable strings). Whether Excel opens a
   is hit (callgrind: one `hash_one::<&str>` per string cell per write, 320,000
   calls over four writes of 80,000 cells).
 - **Refusals precede output and never mutate.** API refusals happen before the
-  cell, worksheet or name is touched (tests check the previous value and the
-  collection sizes); save-time refusals leave the destination empty (tests
-  check `Cursor` length 0); `write_sst` validates all strings before writing.
+  cell, worksheet, name, format or style is stored (tests check the previous
+  value, the collection sizes, and since `6cebd664e6` that the writer still
+  writes the bytes of a writer that never saw the refused calls); save-time
+  refusals, now only for strings that bypass the API (such as pivot labels),
+  leave the destination empty (tests check `Cursor` length 0); `write_sst`
+  validates all strings before writing.
   Limits are tested at N − 1, N and N + 1 for ASCII, Latin-1, CJK and a
   surrogate pair at the end, including the pair that straddles the limit, with
   the written strings read back whole.
@@ -414,30 +460,64 @@ thresholds and with `trim_threshold` and `mmap_threshold` pinned at 256 MiB
 
 ## Findings outside this change
 
-Found while auditing the fresh writer's string encoders, not fixed here (each
-is outside the fields this record owns; code inspection unless stated):
+Found while auditing the fresh writer's string encoders, by this record and by
+its review; not fixed here (the coordinator queues them). "Reproduced" means a
+litchi round trip showed it; the rest are from reading the code.
 
+- **Internal hyperlinks** (`writer/biff/worksheet.rs:910,916`, review,
+  reproduced): the length is `chars().count()` while the text is written as
+  UTF-16, so a sheet named `R😀` with `set_hyperlink(…, "internal:'R😀'!A1")`
+  makes litchi's reader drop the link and that worksheet's cells. The record
+  length is also computed from a wrapped `truncate_usize_to_u16(wide.len())`
+  before the "exceeds BIFF8 length limit" check.
+- **AutoFilter strings** (`writer/biff/worksheet.rs:678`, review, reproduced):
+  the length is the UTF-8 byte count capped at 255 while the whole string is
+  written, as UTF-16 when non-ASCII; `café` gets length 5 with 4 units written,
+  and the reader drops the filter (`autofilter.rs:303`).
+- **Font names** (`writer/formatting.rs:300–317`, review): cut to 31 UTF-16
+  units without a refusal.
+- **Font index 4** (review, reproduced): a font added through `add_cell_style`
+  gets logical index 4, which litchi's reader refuses ("Font logical index 4 is
+  invalid", `font.rs:362`).
+- **Worksheet-name characters** (review, reproduced): `add_worksheet` accepts
+  `[]:*?/\`, NUL, U+0003 and leading or trailing apostrophes; `"a/b:c"`, NUL
+  and U+0003 make the reader refuse the whole workbook. The fix could reuse
+  `validate_sheet_name` (`cell_values/structural.rs:127`).
+- **XFEXT, STYLEEXT and CRN** (review, not verified): record lengths may wrap
+  at 65,536 bytes or more, and the XF index wraps at 65,536 styles.
+- **Custom number-format count** (this record, reproduced): the writer
+  registers any number of custom formats; litchi's reader refuses more than
+  218 `Format` records, of which the writer always emits 8, so a workbook with
+  211 custom formats is written and then refused on open (210 open). The index
+  space itself ends at 392 (229 formats).
+- **Formulas are tokenized only when written** (this record, reproduced):
+  `write_formula(…, "SUM(")` succeeds and every `write_to` then fails
+  ("Mismatched parentheses") until the cell is overwritten. Unlike a number
+  format, the cell can be replaced, so the writer is not stuck.
 - **PivotTable records** (`writer/biff/pivot/codec.rs`): `SXVIEW`, `SXVD`,
   `SXVI`, `SXDI` and the cache strings set `cch` from `chars().count()` while
-  writing UTF-16 for non-ASCII names, so a name with a supplementary-plane
-  character gets a count one short per such character; the counts and several
-  record lengths use wrapping `truncate_usize_to_u16`, and
-  `validate_pivot_table_config` checks no name length (MS-XLS bounds these
-  names to 255 characters).
-- **Hyperlinks** (`writer/biff/worksheet.rs`, internal links): the record
-  length is computed from `truncate_usize_to_u16(wide.len())` before the
-  "exceeds BIFF8 length limit" check, which the wrap can defeat for targets over
-  32,767 characters.
-- **An empty custom number format** (`register_number_format("")`) is written
-  with `cch` 0, and litchi's reader refuses the workbook ("format string has 0
-  UTF-16 code units; expected 1 through 255", `behaviour/findings-probe.txt`).
-  0757 refuses over-long formats only.
-- **Worksheet-name characters**: `add_worksheet` does not refuse the characters
-  BoundSheet8 forbids (`[]:*?/\`, or a leading or trailing apostrophe).
+  writing UTF-16 for non-ASCII names, so a supplementary-plane character leaves
+  the count one short; counts and record lengths use wrapping
+  `truncate_usize_to_u16`, and `validate_pivot_table_config` checks no name
+  length (MS-XLS bounds these names to 255 characters).
 - **The harness corpus comment** in `write_fresh_xls` ("`WritableWorksheet`
   stores cells in a hash map, so use one string cell per worksheet") no longer
   holds; a multi-string XLS selector would measure the path this record changes.
   The harness is unchanged here so the two legs run identical workloads.
+
+## What is left
+
+- **One sort per string worksheet instead of two.** The table sorts each
+  worksheet's string cells, and the emission sorts all of its cells again
+  (`writer/core/stream/codec.rs`). Sharing one sort — the table sorting every
+  cell of a worksheet that has strings, keeping that list, and the emission
+  reusing it — removes the 20.0M-instruction string sort of the 80,000-string
+  probe, but every worksheet with strings then holds its 16-byte-per-cell list
+  from staging until its records are written, instead of one worksheet's list
+  at a time: about +0.96 MB (+7.5%) peak on the probe's four worksheets. An
+  alternative without that memory — ordering distinct strings by their first
+  cell, `sheet << 48 | row << 16 | column`, and renumbering — saves most of the
+  cost only when strings repeat. Either is its own measured change.
 
 ## What is not claimed
 
@@ -476,8 +556,17 @@ fmt, clippy and the litchi-xls tests were run again):
   pin and the order test fail ("many_strings is not deterministic")
 - the release harness builds at `a400341bdf` (instruction check above)
 
-The harness did not change, so its tests and the coverage validator were not
-required.
+After the review fixes (`6cebd664e6`), with a fresh
+`CARGO_TARGET_DIR=…/targets/0757` (`gates.txt`, last section): fmt, `cargo
+check` of the three crates, the facade and `tools/perf-baseline` (all
+targets), clippy `--lib` and `--all-targets` (the same pre-existing
+`unusual_byte_groupings` failure only) and rustdoc — 0; tests: `litchi-xls`
+1,539, `litchi-doc` 1,206, `litchi-ppt` 1,235, `litchi-ppt --features
+encryption` 1,246, the facade 382 — all passed; the boundary, non-iWork and
+claims scripts — 0.
+
+The harness did not change and calls none of the APIs made fallible, so its
+tests and the coverage validator were not required.
 
 ## Cleanup
 
