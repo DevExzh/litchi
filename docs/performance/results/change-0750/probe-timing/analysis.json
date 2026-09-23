@@ -1,0 +1,2048 @@
+{
+  "authored/tiny-fragment": {
+    "median_of_process_medians_ns": {
+      "A": 186.95,
+      "B": 186.5
+    },
+    "paired_ratio_bootstrap_95": [
+      0.9830956154252508,
+      1.0021367521367521
+    ],
+    "paired_ratio_median": 0.9983918325264479,
+    "paired_ratios": [
+      0.9830956154252508,
+      0.998397435897436,
+      0.9983862291554598,
+      1.0021367521367521,
+      1.019924609585353,
+      0.9387450199203187,
+      0.9914301017675415,
+      0.9989183342347214
+    ],
+    "per_process": [
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 189.2170731707317,
+        "median": 189.3,
+        "p95": 189.9,
+        "round": 1,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 186.49268292682927,
+        "median": 186.1,
+        "p95": 186.8,
+        "round": 1,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 186.9512195121951,
+        "median": 186.9,
+        "p95": 187.6,
+        "round": 1,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 187.66829268292682,
+        "median": 187.2,
+        "p95": 190.9,
+        "round": 1,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 186.1219512195122,
+        "median": 185.9,
+        "p95": 186.4,
+        "round": 2,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 186.06341463414634,
+        "median": 185.6,
+        "p95": 189.3,
+        "round": 2,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 187.71463414634147,
+        "median": 187.6,
+        "p95": 188.4,
+        "round": 2,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 187.4,
+        "median": 187.2,
+        "p95": 187.7,
+        "round": 2,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 186.37317073170732,
+        "median": 185.7,
+        "p95": 188.8,
+        "round": 3,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 189.47073170731707,
+        "median": 189.4,
+        "p95": 190.4,
+        "round": 3,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 188.66829268292682,
+        "median": 188.5,
+        "p95": 189.3,
+        "round": 3,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 201.19024390243902,
+        "median": 200.8,
+        "p95": 204.1,
+        "round": 3,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 187.27560975609757,
+        "median": 186.7,
+        "p95": 190.0,
+        "round": 4,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 185.34878048780487,
+        "median": 185.1,
+        "p95": 185.5,
+        "round": 4,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 184.82926829268294,
+        "median": 184.7,
+        "p95": 185.0,
+        "round": 4,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 185.00487804878048,
+        "median": 184.9,
+        "p95": 185.6,
+        "round": 4,
+        "slot": 4,
+        "verdict": true
+      }
+    ],
+    "verdicts": [
+      "True"
+    ]
+  },
+  "authored/ws-patriarch-3.4MB.xml": {
+    "median_of_process_medians_ns": {
+      "A": 12779778.75,
+      "B": 12572072.0
+    },
+    "paired_ratio_bootstrap_95": [
+      0.966605717677235,
+      1.0040337585067158
+    ],
+    "paired_ratio_median": 0.987569089282689,
+    "paired_ratios": [
+      0.9883852638982886,
+      0.9618101997917885,
+      1.0090312107779535,
+      0.9979002860339593,
+      1.0040337585067158,
+      0.966605717677235,
+      0.9867529146670895,
+      0.9826358652716096
+    ],
+    "per_process": [
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 12639660.56097561,
+        "median": 12636232.0,
+        "p95": 12670847.5,
+        "round": 1,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 12493928.75609756,
+        "median": 12489465.5,
+        "p95": 12635096.0,
+        "round": 1,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 12575035.890243903,
+        "median": 12561045.0,
+        "p95": 12630915.0,
+        "round": 1,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 13094652.18292683,
+        "median": 13059796.0,
+        "p95": 13279346.5,
+        "round": 1,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 12584621.93902439,
+        "median": 12561494.0,
+        "p95": 12768870.0,
+        "round": 2,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 12638767.195121951,
+        "median": 12674939.5,
+        "p95": 12786685.0,
+        "round": 2,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 12795706.219512194,
+        "median": 12936450.5,
+        "p95": 12968095.5,
+        "round": 2,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 12975483.597560976,
+        "median": 12963670.5,
+        "p95": 13012531.0,
+        "round": 2,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 12519036.42682927,
+        "median": 12481535.5,
+        "p95": 12711272.0,
+        "round": 3,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 12554106.597560976,
+        "median": 12531883.0,
+        "p95": 12762834.5,
+        "round": 3,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 12607508.07317073,
+        "median": 12566347.0,
+        "p95": 12757552.5,
+        "round": 3,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 13012504.0,
+        "median": 13000489.0,
+        "p95": 13176715.0,
+        "round": 3,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 12747569.74390244,
+        "median": 12746653.0,
+        "p95": 12907499.0,
+        "round": 4,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 12571765.609756097,
+        "median": 12577797.0,
+        "p95": 12632627.5,
+        "round": 4,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 12612139.804878049,
+        "median": 12590419.5,
+        "p95": 12797886.0,
+        "round": 4,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 12818800.085365854,
+        "median": 12812904.5,
+        "p95": 12843159.5,
+        "round": 4,
+        "slot": 4,
+        "verdict": true
+      }
+    ],
+    "verdicts": [
+      "True"
+    ]
+  },
+  "pair/docx-drawing-288KB.xml": {
+    "median_of_process_medians_ns": {
+      "A": 614114.9,
+      "B": 722750.2
+    },
+    "paired_ratio_bootstrap_95": [
+      1.1596058042036888,
+      1.1885914564090192
+    ],
+    "paired_ratio_median": 1.17767936998169,
+    "paired_ratios": [
+      1.1885914564090192,
+      1.2037580487707447,
+      1.1596058042036888,
+      1.1735387645465565,
+      1.1776143483954444,
+      1.1857884375607708,
+      1.177744391567936,
+      1.155657531791905
+    ],
+    "per_process": [
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 611618.4707317073,
+        "median": 610921.1,
+        "p95": 615292.1,
+        "round": 1,
+        "slot": 1,
+        "verdict": false
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 726087.7487804878,
+        "median": 726135.6,
+        "p95": 727750.3,
+        "round": 1,
+        "slot": 2,
+        "verdict": false
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 726056.0439024391,
+        "median": 723206.4,
+        "p95": 735352.1,
+        "round": 1,
+        "slot": 3,
+        "verdict": false
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 600839.7487804878,
+        "median": 600790.5,
+        "p95": 609900.8,
+        "round": 1,
+        "slot": 4,
+        "verdict": false
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 623089.2951219513,
+        "median": 622624.6,
+        "p95": 624626.4,
+        "round": 2,
+        "slot": 1,
+        "verdict": false
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 722422.5780487804,
+        "median": 721999.1,
+        "p95": 723999.1,
+        "round": 2,
+        "slot": 2,
+        "verdict": false
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 721319.8585365854,
+        "median": 721443.4,
+        "p95": 722643.4,
+        "round": 2,
+        "slot": 3,
+        "verdict": false
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 614725.9756097561,
+        "median": 614758.9,
+        "p95": 616152.6,
+        "round": 2,
+        "slot": 4,
+        "verdict": false
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 609002.2853658537,
+        "median": 613353.6,
+        "p95": 616191.2,
+        "round": 3,
+        "slot": 1,
+        "verdict": false
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 721835.1902439024,
+        "median": 722294.0,
+        "p95": 726804.3,
+        "round": 3,
+        "slot": 2,
+        "verdict": false
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 728200.512195122,
+        "median": 727446.7,
+        "p95": 732819.3,
+        "round": 3,
+        "slot": 3,
+        "verdict": false
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 613994.2536585366,
+        "median": 613470.9,
+        "p95": 619590.9,
+        "round": 3,
+        "slot": 4,
+        "verdict": false
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 615402.7634146342,
+        "median": 616888.1,
+        "p95": 627309.8,
+        "round": 4,
+        "slot": 1,
+        "verdict": false
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 727869.3780487805,
+        "median": 726536.5,
+        "p95": 739949.5,
+        "round": 4,
+        "slot": 2,
+        "verdict": false
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 719040.6658536586,
+        "median": 717807.9,
+        "p95": 723436.9,
+        "round": 4,
+        "slot": 3,
+        "verdict": false
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 620677.1756097561,
+        "median": 621125.1,
+        "p95": 624913.5,
+        "round": 4,
+        "slot": 4,
+        "verdict": false
+      }
+    ],
+    "verdicts": [
+      "False"
+    ]
+  },
+  "pair/ws-structured-1.5MB.xml": {
+    "median_of_process_medians_ns": {
+      "A": 4584946.6,
+      "B": 5075390.85
+    },
+    "paired_ratio_bootstrap_95": [
+      1.097675110332051,
+      1.115308488443272
+    ],
+    "paired_ratio_median": 1.1039428505776288,
+    "paired_ratios": [
+      1.1055542869071073,
+      1.10148784699198,
+      1.1043458454889814,
+      1.097675110332051,
+      1.115308488443272,
+      1.1303823663766626,
+      1.1035398556662763,
+      1.0968350676541712
+    ],
+    "per_process": [
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4629647.487804878,
+        "median": 4629598.8,
+        "p95": 4641869.0,
+        "round": 1,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 5114280.853658536,
+        "median": 5118272.8,
+        "p95": 5124954.8,
+        "round": 1,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 5063250.119512195,
+        "median": 5049819.5,
+        "p95": 5154302.5,
+        "round": 1,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4576808.770731707,
+        "median": 4584544.0,
+        "p95": 4628872.0,
+        "round": 1,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4599635.1707317075,
+        "median": 4594572.0,
+        "p95": 4606576.2,
+        "round": 2,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 5085763.3512195125,
+        "median": 5073996.5,
+        "p95": 5175334.2,
+        "round": 2,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 5012948.680487805,
+        "median": 5002671.0,
+        "p95": 5039803.5,
+        "round": 2,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4558873.297560976,
+        "median": 4557515.2,
+        "p95": 4577583.0,
+        "round": 2,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4550713.478048781,
+        "median": 4551911.2,
+        "p95": 4561314.4,
+        "round": 3,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 5077999.765853658,
+        "median": 5076785.2,
+        "p95": 5104800.2,
+        "round": 3,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 5215129.8975609755,
+        "median": 5173751.5,
+        "p95": 5223526.8,
+        "round": 3,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4658895.346341464,
+        "median": 4576992.4,
+        "p95": 4805939.4,
+        "round": 3,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4608743.565853658,
+        "median": 4606685.0,
+        "p95": 4647727.2,
+        "round": 4,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 5088000.326829269,
+        "median": 5083660.5,
+        "p95": 5087965.8,
+        "round": 4,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 5037026.507317073,
+        "median": 5029371.8,
+        "p95": 5038117.0,
+        "round": 4,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4596306.478048781,
+        "median": 4585349.2,
+        "p95": 4666863.6,
+        "round": 4,
+        "slot": 4,
+        "verdict": true
+      }
+    ],
+    "verdicts": [
+      "True"
+    ]
+  },
+  "source/corpus-accepted": {
+    "median_of_process_medians_ns": {
+      "A": 95622023.0,
+      "B": 108344071.0
+    },
+    "paired_ratio_bootstrap_95": [
+      1.1278103945024247,
+      1.1364143055420197
+    ],
+    "paired_ratio_median": 1.1337897677127968,
+    "paired_ratios": [
+      1.1249971678779707,
+      1.1287745632332395,
+      1.1356144640408372,
+      1.1323243124553988,
+      1.1481228288232426,
+      1.1278103945024247,
+      1.1352552229701949,
+      1.1364143055420197
+    ],
+    "per_process": [
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 96235420.87804878,
+        "median": 96350015.0,
+        "p95": 96564455.0,
+        "round": 1,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 108703862.41463415,
+        "median": 108393494.0,
+        "p95": 109762421.0,
+        "round": 1,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 108749209.3902439,
+        "median": 108695850.0,
+        "p95": 109559749.0,
+        "round": 1,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 96191239.04878049,
+        "median": 96295446.0,
+        "p95": 96906143.0,
+        "round": 1,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 95192619.04878049,
+        "median": 95197906.0,
+        "p95": 95882309.0,
+        "round": 2,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 108103370.7804878,
+        "median": 108108119.0,
+        "p95": 108784192.0,
+        "round": 2,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 108431163.31707317,
+        "median": 108294648.0,
+        "p95": 108969721.0,
+        "round": 2,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 95655746.6097561,
+        "median": 95639250.0,
+        "p95": 96220612.0,
+        "round": 2,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 95267413.73170732,
+        "median": 95295385.0,
+        "p95": 95668606.0,
+        "round": 3,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 109343881.70731707,
+        "median": 109410807.0,
+        "p95": 109885009.0,
+        "round": 3,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 108155965.95121951,
+        "median": 108217931.0,
+        "p95": 108904965.0,
+        "round": 3,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 95574309.58536585,
+        "median": 95954011.0,
+        "p95": 96326057.0,
+        "round": 3,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 95601503.97560975,
+        "median": 95604796.0,
+        "p95": 95991398.0,
+        "round": 4,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 108535154.46341464,
+        "median": 108535844.0,
+        "p95": 109084056.0,
+        "round": 4,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 108053715.0,
+        "median": 108209552.0,
+        "p95": 108798314.0,
+        "round": 4,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 94954631.36585365,
+        "median": 95220160.0,
+        "p95": 95542062.0,
+        "round": 4,
+        "slot": 4,
+        "verdict": true
+      }
+    ],
+    "verdicts": [
+      "True"
+    ]
+  },
+  "source/docx-drawing-288KB.xml": {
+    "median_of_process_medians_ns": {
+      "A": 564988.3500000001,
+      "B": 636799.3
+    },
+    "paired_ratio_bootstrap_95": [
+      1.1193206733793515,
+      1.1375747318869627
+    ],
+    "paired_ratio_median": 1.1302029935785973,
+    "paired_ratios": [
+      1.1215882600302542,
+      1.1115037182405223,
+      1.1280917442956855,
+      1.1193206733793515,
+      1.1375747318869627,
+      1.1509513414624937,
+      1.1323142428615094,
+      1.1344142387061915
+    ],
+    "per_process": [
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 568502.3975609756,
+        "median": 566924.8,
+        "p95": 577154.0,
+        "round": 1,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 636568.7829268293,
+        "median": 635856.2,
+        "p95": 638122.8,
+        "round": 1,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 633874.7731707317,
+        "median": 633722.4,
+        "p95": 635219.0,
+        "round": 1,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 570208.0219512195,
+        "median": 570148.7,
+        "p95": 571665.3,
+        "round": 1,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 564759.7219512195,
+        "median": 563051.9,
+        "p95": 575906.5,
+        "round": 2,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 635770.5,
+        "median": 635174.2,
+        "p95": 636415.2,
+        "round": 2,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 643216.8926829268,
+        "median": 639152.7,
+        "p95": 663588.1,
+        "round": 2,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 571681.0585365853,
+        "median": 571018.4,
+        "p95": 574476.7,
+        "round": 2,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 560098.7,
+        "median": 559801.2,
+        "p95": 564280.1,
+        "round": 3,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 636931.3390243902,
+        "median": 636815.7,
+        "p95": 638381.3,
+        "round": 3,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 656409.1024390244,
+        "median": 655425.7,
+        "p95": 659657.4,
+        "round": 3,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 571291.4707317073,
+        "median": 569464.3,
+        "p95": 574856.6,
+        "round": 3,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 564025.0487804879,
+        "median": 562724.0,
+        "p95": 572843.2,
+        "round": 4,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 638537.443902439,
+        "median": 637180.4,
+        "p95": 649523.9,
+        "round": 4,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 637664.4926829268,
+        "median": 636782.9,
+        "p95": 639136.5,
+        "round": 4,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 563319.2268292683,
+        "median": 561331.9,
+        "p95": 569940.1,
+        "round": 4,
+        "slot": 4,
+        "verdict": true
+      }
+    ],
+    "verdicts": [
+      "True"
+    ]
+  },
+  "source/docx-table-alignment-40KB.xml": {
+    "median_of_process_medians_ns": {
+      "A": 71722.75,
+      "B": 82481.3
+    },
+    "paired_ratio_bootstrap_95": [
+      1.1439100879230926,
+      1.162493302078675
+    ],
+    "paired_ratio_median": 1.152696281997215,
+    "paired_ratios": [
+      1.14796965652759,
+      1.1422048752774474,
+      1.1555142321454248,
+      1.1576075689062963,
+      1.1650621641098384,
+      1.162493302078675,
+      1.1498783318490051,
+      1.1439100879230926
+    ],
+    "per_process": [
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 71871.48292682927,
+        "median": 71857.3,
+        "p95": 72038.9,
+        "round": 1,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 82276.23414634146,
+        "median": 82490.0,
+        "p95": 82779.8,
+        "round": 1,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 82129.47804878048,
+        "median": 82027.9,
+        "p95": 82455.1,
+        "round": 1,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 71886.91951219512,
+        "median": 71815.4,
+        "p95": 72073.4,
+        "round": 1,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 71716.32682926829,
+        "median": 71630.1,
+        "p95": 71986.0,
+        "round": 2,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 82304.23902439025,
+        "median": 82769.6,
+        "p95": 83263.0,
+        "round": 2,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 82787.90487804878,
+        "median": 82637.9,
+        "p95": 83977.4,
+        "round": 2,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 71447.95365853659,
+        "median": 71386.8,
+        "p95": 71649.9,
+        "round": 2,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 70343.83414634147,
+        "median": 70354.1,
+        "p95": 70539.4,
+        "round": 3,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 82208.4243902439,
+        "median": 81966.9,
+        "p95": 82836.6,
+        "round": 3,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 84051.9243902439,
+        "median": 83959.8,
+        "p95": 84598.5,
+        "round": 3,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 72335.76585365854,
+        "median": 72223.9,
+        "p95": 72465.8,
+        "round": 3,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 71381.01707317073,
+        "median": 71300.5,
+        "p95": 71484.5,
+        "round": 4,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 82153.93658536585,
+        "median": 81986.9,
+        "p95": 83467.4,
+        "round": 4,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 82802.07073170731,
+        "median": 82472.6,
+        "p95": 83608.9,
+        "round": 4,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 72225.8731707317,
+        "median": 72097.1,
+        "p95": 73411.9,
+        "round": 4,
+        "slot": 4,
+        "verdict": true
+      }
+    ],
+    "verdicts": [
+      "True"
+    ]
+  },
+  "source/pptx-slide11-121KB.xml": {
+    "median_of_process_medians_ns": {
+      "A": 307828.9,
+      "B": 332920.1
+    },
+    "paired_ratio_bootstrap_95": [
+      1.0729164812395198,
+      1.0853804988804017
+    ],
+    "paired_ratio_median": 1.082518802900265,
+    "paired_ratios": [
+      1.1036057761536864,
+      1.070195568647873,
+      1.0729164812395198,
+      1.0840559504342218,
+      1.0853804988804017,
+      1.081187202718227,
+      1.083850403082303,
+      1.0802629783981559
+    ],
+    "per_process": [
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 302059.73658536584,
+        "median": 302090.3,
+        "p95": 302567.1,
+        "round": 1,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 333316.15853658534,
+        "median": 333388.6,
+        "p95": 334240.1,
+        "round": 1,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 330954.4609756098,
+        "median": 330456.7,
+        "p95": 331618.3,
+        "round": 1,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 308467.80731707317,
+        "median": 308781.6,
+        "p95": 309452.7,
+        "round": 1,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 308255.7463414634,
+        "median": 308971.3,
+        "p95": 309777.7,
+        "round": 2,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 331677.11219512194,
+        "median": 331500.4,
+        "p95": 332113.5,
+        "round": 2,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 332105.94390243903,
+        "median": 332790.0,
+        "p95": 336576.0,
+        "round": 2,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 305089.94146341464,
+        "median": 306986.0,
+        "p95": 307633.9,
+        "round": 2,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 306335.46341463417,
+        "median": 306851.1,
+        "p95": 307473.2,
+        "round": 3,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 333414.6512195122,
+        "median": 333050.2,
+        "p95": 335032.5,
+        "round": 3,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 333845.6951219512,
+        "median": 333732.0,
+        "p95": 335553.2,
+        "round": 3,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 307814.3268292683,
+        "median": 308671.8,
+        "p95": 316022.5,
+        "round": 3,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 310524.9536585366,
+        "median": 310209.6,
+        "p95": 316477.5,
+        "round": 4,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 336432.7512195122,
+        "median": 336220.8,
+        "p95": 336932.4,
+        "round": 4,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 327829.10243902437,
+        "median": 327046.7,
+        "p95": 334113.3,
+        "round": 4,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 302989.96585365856,
+        "median": 302747.3,
+        "p95": 303417.6,
+        "round": 4,
+        "slot": 4,
+        "verdict": true
+      }
+    ],
+    "verdicts": [
+      "True"
+    ]
+  },
+  "source/tiny-document": {
+    "median_of_process_medians_ns": {
+      "A": 229.25,
+      "B": 430.6
+    },
+    "paired_ratio_bootstrap_95": [
+      1.828270042194093,
+      1.968692449355433
+    ],
+    "paired_ratio_median": 1.8781377250066598,
+    "paired_ratios": [
+      1.857944732297064,
+      1.8676789587852494,
+      1.9931002759889604,
+      1.828270042194093,
+      1.968692449355433,
+      1.7788738183312782,
+      1.9370220422852003,
+      1.8885964912280704
+    ],
+    "per_process": [
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 227.11219512195123,
+        "median": 231.6,
+        "p95": 233.6,
+        "round": 1,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 430.7439024390244,
+        "median": 430.3,
+        "p95": 432.1,
+        "round": 1,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 430.39756097560974,
+        "median": 430.5,
+        "p95": 431.8,
+        "round": 1,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 230.5219512195122,
+        "median": 230.5,
+        "p95": 231.3,
+        "round": 1,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 221.91463414634146,
+        "median": 217.4,
+        "p95": 230.0,
+        "round": 2,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 434.03170731707314,
+        "median": 433.3,
+        "p95": 440.0,
+        "round": 2,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 433.2926829268293,
+        "median": 433.3,
+        "p95": 434.2,
+        "round": 2,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 235.7951219512195,
+        "median": 237.0,
+        "p95": 238.3,
+        "round": 2,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 220.74146341463415,
+        "median": 217.2,
+        "p95": 231.7,
+        "round": 3,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 427.29756097560977,
+        "median": 427.6,
+        "p95": 436.0,
+        "round": 3,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 433.63658536585365,
+        "median": 432.8,
+        "p95": 440.2,
+        "round": 3,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 243.72682926829268,
+        "median": 243.3,
+        "p95": 247.6,
+        "round": 3,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 222.8219512195122,
+        "median": 222.3,
+        "p95": 223.8,
+        "round": 4,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 431.18536585365854,
+        "median": 430.6,
+        "p95": 432.7,
+        "round": 4,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 431.00975609756097,
+        "median": 430.6,
+        "p95": 432.0,
+        "round": 4,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 228.04390243902438,
+        "median": 228.0,
+        "p95": 228.7,
+        "round": 4,
+        "slot": 4,
+        "verdict": true
+      }
+    ],
+    "verdicts": [
+      "True"
+    ]
+  },
+  "source/ws-patriarch-3.4MB.xml": {
+    "median_of_process_medians_ns": {
+      "A": 12429666.5,
+      "B": 13653360.0
+    },
+    "paired_ratio_bootstrap_95": [
+      1.0913017208629048,
+      1.1170933699545078
+    ],
+    "paired_ratio_median": 1.0985712552681601,
+    "paired_ratios": [
+      1.065702450281944,
+      1.0939843518872012,
+      1.1170933699545078,
+      1.098555304266889,
+      1.0985872062694313,
+      1.1618382484657648,
+      1.109624403641233,
+      1.0913017208629048
+    ],
+    "per_process": [
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 12742552.658536585,
+        "median": 12770612.0,
+        "p95": 12827327.5,
+        "round": 1,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 13610921.07317073,
+        "median": 13609672.5,
+        "p95": 13649107.5,
+        "round": 1,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 13597694.585365854,
+        "median": 13584030.5,
+        "p95": 13604861.0,
+        "round": 1,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 12423250.646341464,
+        "median": 12417024.5,
+        "p95": 12432169.5,
+        "round": 1,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 12323903.43902439,
+        "median": 12286152.5,
+        "p95": 12513129.0,
+        "round": 2,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 13764103.841463415,
+        "median": 13724779.5,
+        "p95": 13951905.5,
+        "round": 2,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 13700091.18292683,
+        "median": 13668564.0,
+        "p95": 13895765.0,
+        "round": 2,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 12447625.92682927,
+        "median": 12442308.5,
+        "p95": 12457153.5,
+        "round": 2,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 12375318.963414634,
+        "median": 12414268.0,
+        "p95": 12453513.0,
+        "round": 3,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 13653217.695121951,
+        "median": 13638156.0,
+        "p95": 13665201.0,
+        "round": 3,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 14469854.134146342,
+        "median": 14456952.0,
+        "p95": 14590902.5,
+        "round": 3,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 12482810.512195121,
+        "median": 12443171.0,
+        "p95": 12667072.0,
+        "round": 3,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 12315827.280487806,
+        "median": 12361581.5,
+        "p95": 12404876.5,
+        "round": 4,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 13731891.914634146,
+        "median": 13716712.5,
+        "p95": 13745552.5,
+        "round": 4,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 13626021.987804879,
+        "median": 13598791.5,
+        "p95": 13808073.0,
+        "round": 4,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 12488156.207317073,
+        "median": 12461074.0,
+        "p95": 12636525.0,
+        "round": 4,
+        "slot": 4,
+        "verdict": true
+      }
+    ],
+    "verdicts": [
+      "True"
+    ]
+  },
+  "source/ws-structured-1.5MB.xml": {
+    "median_of_process_medians_ns": {
+      "A": 4321518.8,
+      "B": 4740795.800000001
+    },
+    "paired_ratio_bootstrap_95": [
+      1.0906381504381881,
+      1.104388756542081
+    ],
+    "paired_ratio_median": 1.0964388989740836,
+    "paired_ratios": [
+      1.0801817095675776,
+      1.0951113125668424,
+      1.097766485381325,
+      1.104388756542081,
+      1.0906381504381881,
+      1.1755179735975678,
+      1.1014644795802933,
+      1.0937834538636906
+    ],
+    "per_process": [
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4388494.507317074,
+        "median": 4384491.2,
+        "p95": 4412849.4,
+        "round": 1,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 4736701.770731708,
+        "median": 4736047.2,
+        "p95": 4749457.4,
+        "round": 1,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 4719369.96097561,
+        "median": 4719888.8,
+        "p95": 4725456.8,
+        "round": 1,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4307493.629268292,
+        "median": 4309962.6,
+        "p95": 4321986.6,
+        "round": 1,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4330883.67804878,
+        "median": 4322908.8,
+        "p95": 4410495.2,
+        "round": 2,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 4757831.234146342,
+        "median": 4745544.4,
+        "p95": 4832940.8,
+        "round": 2,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 4773480.058536585,
+        "median": 4764706.6,
+        "p95": 4843062.8,
+        "round": 2,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4314515.546341464,
+        "median": 4314338.2,
+        "p95": 4327536.2,
+        "round": 2,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4337309.458536586,
+        "median": 4336880.2,
+        "p95": 4345334.2,
+        "round": 3,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 4741318.112195122,
+        "median": 4729967.0,
+        "p95": 4820289.6,
+        "round": 3,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 5023067.47804878,
+        "median": 5082649.6,
+        "p95": 5107761.6,
+        "round": 3,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4328876.068292683,
+        "median": 4323753.2,
+        "p95": 4338511.2,
+        "round": 3,
+        "slot": 4,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4318931.995121951,
+        "median": 4317451.8,
+        "p95": 4332685.6,
+        "round": 4,
+        "slot": 1,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 4764078.907317073,
+        "median": 4755519.8,
+        "p95": 4832658.0,
+        "round": 4,
+        "slot": 2,
+        "verdict": true
+      },
+      {
+        "arm": "B",
+        "batches": 41,
+        "mean": 4723466.219512195,
+        "median": 4725285.4,
+        "p95": 4732929.6,
+        "round": 4,
+        "slot": 3,
+        "verdict": true
+      },
+      {
+        "arm": "A",
+        "batches": 41,
+        "mean": 4322843.995121951,
+        "median": 4320128.8,
+        "p95": 4331808.8,
+        "round": 4,
+        "slot": 4,
+        "verdict": true
+      }
+    ],
+    "verdicts": [
+      "True"
+    ]
+  }
+}

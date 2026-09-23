@@ -1,0 +1,2402 @@
+[
+ {
+  "label": "gap: ref outside root",
+  "input": "<r/>& ;",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 4: character data outside the document element",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "gap: empty ref",
+  "input": "<r>&;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: malformed reference",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "gap: ref with space",
+  "input": "<r>&a b;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: malformed reference",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "gap: bad hex charref + NUL",
+  "input": "<r>&#xZZ;&#0;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: malformed character reference",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "gap: bad hex charref",
+  "input": "<r>&#xZZ;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: malformed character reference",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "gap: NUL charref",
+  "input": "<r>&#0;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: character reference to a character XML does not allow",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "gap: decl inside root",
+  "input": "<r><?xml version=\"1.0\"?></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: an XML declaration is allowed only at the start of the document",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "gap: ]]> in text",
+  "input": "<r>]]></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: ']]>' is not allowed in character data",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "gap: undeclared element prefix",
+  "input": "<p:r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 1: undeclared namespace prefix",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "gap: undeclared attribute prefix",
+  "input": "<r p:a=\"1\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: undeclared namespace prefix",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "C0 in text",
+  "input": "<r>\\u{1}</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: character U+0001 is not allowed in XML",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "NUL in text",
+  "input": "<r>\\u{0}</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: character U+0000 is not allowed in XML",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "VT in text",
+  "input": "<r>\\u{b}</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: character U+000B is not allowed in XML",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "C0 in attr",
+  "input": "<r a=\"\\u{1}\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 6: character U+0001 is not allowed in XML",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "C0 in comment",
+  "input": "<r><!--\\u{1}--></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 7: character U+0001 is not allowed in XML",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "C0 in PI",
+  "input": "<r><?p \\u{1}?></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 7: character U+0001 is not allowed in XML",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "C0 in CDATA",
+  "input": "<r><![CDATA[\\u{1}]]></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 12: character U+0001 is not allowed in XML",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "C0 outside root",
+  "input": "<r/>\\u{1}",
+  "before": {
+   "source": "malformed XML at byte 4: character data outside the document element",
+   "authored": "malformed XML at byte 4: character data outside the document element",
+   "compact": "malformed XML at byte 4: character data outside the document element",
+   "reader": "malformed XML at byte 4: character data outside the document element"
+  },
+  "after": {
+   "source": "malformed XML at byte 4: character U+0001 is not allowed in XML",
+   "authored": "malformed XML at byte 4: character data outside the document element",
+   "compact": "malformed XML at byte 4: character data outside the document element",
+   "reader": "malformed XML at byte 4: character data outside the document element"
+  }
+ },
+ {
+  "label": "U+FFFE text",
+  "input": "<r>\\u{fffe}</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: character U+FFFE is not allowed in XML",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "U+FFFF text",
+  "input": "<r>\\u{ffff}</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: character U+FFFF is not allowed in XML",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "U+FFFF attr",
+  "input": "<r a=\"\\u{ffff}\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 6: character U+FFFF is not allowed in XML",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "surrogate utf8",
+  "input": "<r>\\xed\\xa0\\x80</r>",
+  "before": {
+   "source": "XML is not UTF-8 at byte 3",
+   "authored": "XML is not UTF-8 at byte 3",
+   "compact": "XML is not UTF-8 at byte 3",
+   "reader": "XML is not UTF-8 at byte 3"
+  },
+  "after": {
+   "source": "XML is not UTF-8 at byte 3",
+   "authored": "XML is not UTF-8 at byte 3",
+   "compact": "XML is not UTF-8 at byte 3",
+   "reader": "XML is not UTF-8 at byte 3"
+  }
+ },
+ {
+  "label": "lt in attr",
+  "input": "<r a=\"<\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 6: '<' is not allowed in an attribute value",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "lt in attr 2",
+  "input": "<r a='x<y'/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 7: '<' is not allowed in an attribute value",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "amp alone in attr",
+  "input": "<r a=\"&\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 6: unterminated reference in an attribute value",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "amp in attr",
+  "input": "<r a=\"a&b\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 7: unterminated reference in an attribute value",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "undeclared entity in attr",
+  "input": "<r a=\"&bogus;\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 6: reference to an undeclared entity",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "NUL charref in attr",
+  "input": "<r a=\"&#0;\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 6: character reference to a character XML does not allow",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "surrogate charref in attr",
+  "input": "<r a=\"&#xD800;\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 6: character reference to a character XML does not allow",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "dup attr after ns",
+  "input": "<r xmlns:a=\"u\" xmlns:b=\"u\" a:x=\"1\" b:x=\"2\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 35: two attributes have the same namespace name and local name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "dup attr exact",
+  "input": "<r a=\"1\" a=\"2\"/>",
+  "before": {
+   "source": "malformed XML at byte 0: position 8: duplicated attribute, previous declaration at position 2",
+   "authored": "malformed XML at byte 0: position 8: duplicated attribute, previous declaration at position 2",
+   "compact": "malformed XML at byte 0: position 8: duplicated attribute, previous declaration at position 2",
+   "reader": "malformed XML at byte 0: position 8: duplicated attribute, previous declaration at position 2"
+  },
+  "after": {
+   "source": "malformed XML at byte 0: position 8: duplicated attribute, previous declaration at position 2",
+   "authored": "malformed XML at byte 0: position 8: duplicated attribute, previous declaration at position 2",
+   "compact": "malformed XML at byte 0: position 8: duplicated attribute, previous declaration at position 2",
+   "reader": "malformed XML at byte 0: position 8: duplicated attribute, previous declaration at position 2"
+  }
+ },
+ {
+  "label": "xmlns:xml other",
+  "input": "<r xmlns:xml=\"urn:other\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: the xml prefix must not be bound to another namespace name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "xmlns:xml correct",
+  "input": "<r xmlns:xml=\"http://www.w3.org/XML/1998/namespace\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "xmlns:xmlns",
+  "input": "<r xmlns:xmlns=\"http://www.w3.org/2000/xmlns/\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: the xmlns prefix must not be declared",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "xmlns:xmlns other",
+  "input": "<r xmlns:xmlns=\"urn:x\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: the xmlns prefix must not be declared",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "p bound to xml ns",
+  "input": "<r xmlns:p=\"http://www.w3.org/XML/1998/namespace\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: only a reserved prefix may be bound to a reserved namespace name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "p bound to xmlns ns",
+  "input": "<r xmlns:p=\"http://www.w3.org/2000/xmlns/\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: only a reserved prefix may be bound to a reserved namespace name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "default bound to xml ns",
+  "input": "<r xmlns=\"http://www.w3.org/XML/1998/namespace\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: the default namespace must not be a reserved namespace name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "default bound to xmlns ns",
+  "input": "<r xmlns=\"http://www.w3.org/2000/xmlns/\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: the default namespace must not be a reserved namespace name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "prefix bound to empty",
+  "input": "<r xmlns:p=\"\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: a namespace prefix must not be undeclared",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "default undeclared (legal)",
+  "input": "<r xmlns=\"\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "element prefix xmlns",
+  "input": "<xmlns:r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 1: an element name must not use the xmlns prefix",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "mismatched end",
+  "input": "<r><a></b></r>",
+  "before": {
+   "source": "malformed XML at byte 10: ill-formed document: expected `</a>`, but `</b>` was found",
+   "authored": "malformed XML at byte 10: ill-formed document: expected `</a>`, but `</b>` was found",
+   "compact": "malformed XML at byte 10: ill-formed document: expected `</a>`, but `</b>` was found",
+   "reader": "malformed XML at byte 6: ill-formed document: expected `</a>`, but `</b>` was found"
+  },
+  "after": {
+   "source": "malformed XML at byte 10: ill-formed document: expected `</a>`, but `</b>` was found",
+   "authored": "malformed XML at byte 10: ill-formed document: expected `</a>`, but `</b>` was found",
+   "compact": "malformed XML at byte 10: ill-formed document: expected `</a>`, but `</b>` was found",
+   "reader": "malformed XML at byte 6: ill-formed document: expected `</a>`, but `</b>` was found"
+  }
+ },
+ {
+  "label": "mismatched case end",
+  "input": "<r></R>",
+  "before": {
+   "source": "malformed XML at byte 7: ill-formed document: expected `</r>`, but `</R>` was found",
+   "authored": "malformed XML at byte 7: ill-formed document: expected `</r>`, but `</R>` was found",
+   "compact": "malformed XML at byte 7: ill-formed document: expected `</r>`, but `</R>` was found",
+   "reader": "malformed XML at byte 3: ill-formed document: expected `</r>`, but `</R>` was found"
+  },
+  "after": {
+   "source": "malformed XML at byte 7: ill-formed document: expected `</r>`, but `</R>` was found",
+   "authored": "malformed XML at byte 7: ill-formed document: expected `</r>`, but `</R>` was found",
+   "compact": "malformed XML at byte 7: ill-formed document: expected `</r>`, but `</R>` was found",
+   "reader": "malformed XML at byte 3: ill-formed document: expected `</r>`, but `</R>` was found"
+  }
+ },
+ {
+  "label": "comment --",
+  "input": "<r><!-- a -- b --></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 10: '--' is not allowed in a comment",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "comment ending -",
+  "input": "<r><!-- a ---></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 10: a comment must not end with '-'",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "name digit start",
+  "input": "<1r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 1: invalid XML name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "attr name digit start",
+  "input": "<r 1a=\"1\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: invalid XML name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "name hyphen start",
+  "input": "<-r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 1: invalid XML name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "name with lt",
+  "input": "<r><a<b/></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 4: invalid XML name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "name with quote",
+  "input": "<r><a\"b\"/></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 4: invalid XML name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "space before name",
+  "input": "<r>< a/></r>",
+  "before": {
+   "source": "malformed XML at byte 6: attribute name must be followed by '='",
+   "authored": "noncompact XML AttributeSeparation at byte 6",
+   "compact": "noncompact XML AttributeSeparation at byte 6",
+   "reader": "noncompact XML AttributeSeparation at byte 6"
+  },
+  "after": {
+   "source": "malformed XML at byte 4: invalid XML name",
+   "authored": "noncompact XML AttributeSeparation at byte 6",
+   "compact": "noncompact XML AttributeSeparation at byte 6",
+   "reader": "noncompact XML AttributeSeparation at byte 6"
+  }
+ },
+ {
+  "label": "empty name with attr",
+  "input": "<r>< a=\"1\"/></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 4: invalid XML name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "name trailing colon",
+  "input": "<r:/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 1: name is not namespace-well-formed: a qualified name has one colon between two names",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "name leading colon",
+  "input": "<:r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 1: name is not namespace-well-formed: a qualified name has one colon between two names",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "name two colons",
+  "input": "<a:b:c xmlns:a=\"u\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 1: name is not namespace-well-formed: a qualified name has one colon between two names",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "attr trailing colon",
+  "input": "<r a:=\"1\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: name is not namespace-well-formed: a qualified name has one colon between two names",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "attr leading colon",
+  "input": "<r :a=\"1\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: name is not namespace-well-formed: a qualified name has one colon between two names",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "attr two colons",
+  "input": "<r xmlns:a=\"u\" a:b:c=\"1\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 15: name is not namespace-well-formed: a qualified name has one colon between two names",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "PI xml-stylesheet (legal)",
+  "input": "<r><?xml-stylesheet href=\"x\"?></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "PI XML reserved",
+  "input": "<r><?XML x?></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 5: processing-instruction target 'xml' is reserved",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "PI xMl reserved",
+  "input": "<r><?xMl?></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 5: processing-instruction target 'xml' is reserved",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "PI empty target",
+  "input": "<r><? x?></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 5: invalid processing-instruction target",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "PI digit target",
+  "input": "<r><?1x?></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 5: invalid processing-instruction target",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "PI colon target",
+  "input": "<r><?a:b x?></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 5: invalid processing-instruction target",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "PI empty <??>",
+  "input": "<??><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 2: invalid processing-instruction target",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl bare",
+  "input": "<?xml?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 2: XML declaration must declare a version",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl no version",
+  "input": "<?xml encoding=\"UTF-8\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 6: XML declaration must declare its version first",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl version 2.0",
+  "input": "<?xml version=\"2.0\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 6: XML declaration version must be 1.x",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl standalone maybe",
+  "input": "<?xml version=\"1.0\" standalone=\"maybe\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 20: XML declaration standalone must be 'yes' or 'no'",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl wrong order",
+  "input": "<?xml standalone=\"yes\" version=\"1.0\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 6: XML declaration must declare its version first",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl unknown attr",
+  "input": "<?xml version=\"1.0\" foo=\"bar\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 20: unexpected attribute in the XML declaration",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl latin1",
+  "input": "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 20: XML declaration names an encoding other than UTF-8",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl utf16",
+  "input": "<?xml version=\"1.0\" encoding=\"UTF-16\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 20: XML declaration names an encoding other than UTF-8",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl utf-8 lower single (legal)",
+  "input": "<?xml version='1.0' encoding='utf-8'?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl 1.1",
+  "input": "<?xml version=\"1.1\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl after newline",
+  "input": "\\u{a}<?xml version=\"1.0\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "noncompact XML FormattingWhitespace at byte 0",
+   "compact": "noncompact XML FormattingWhitespace at byte 0",
+   "reader": "noncompact XML FormattingWhitespace at byte 0"
+  },
+  "after": {
+   "source": "malformed XML at byte 1: an XML declaration is allowed only at the start of the document",
+   "authored": "noncompact XML FormattingWhitespace at byte 0",
+   "compact": "noncompact XML FormattingWhitespace at byte 0",
+   "reader": "noncompact XML FormattingWhitespace at byte 0"
+  }
+ },
+ {
+  "label": "decl after space",
+  "input": " <?xml version=\"1.0\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "noncompact XML FormattingWhitespace at byte 0",
+   "compact": "noncompact XML FormattingWhitespace at byte 0",
+   "reader": "noncompact XML FormattingWhitespace at byte 0"
+  },
+  "after": {
+   "source": "malformed XML at byte 1: an XML declaration is allowed only at the start of the document",
+   "authored": "noncompact XML FormattingWhitespace at byte 0",
+   "compact": "noncompact XML FormattingWhitespace at byte 0",
+   "reader": "noncompact XML FormattingWhitespace at byte 0"
+  }
+ },
+ {
+  "label": "decl after comment",
+  "input": "<!--c--><?xml version=\"1.0\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 8: an XML declaration is allowed only at the start of the document",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl after root",
+  "input": "<r/><?xml version=\"1.0\"?>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 4: an XML declaration is allowed only at the start of the document",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl twice",
+  "input": "<?xml version=\"1.0\"?><?xml version=\"1.0\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 21: an XML declaration is allowed only at the start of the document",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl after BOM (legal)",
+  "input": "\\u{feff}<?xml version=\"1.0\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "charref > max",
+  "input": "<r>&#x110000;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: character reference to a character XML does not allow",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "charref surrogate",
+  "input": "<r>&#xD800;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: character reference to a character XML does not allow",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "charref FFFE",
+  "input": "<r>&#xFFFE;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: character reference to a character XML does not allow",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "charrefs legal ws",
+  "input": "<r>&#9;&#10;&#13;&#x20;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "charref overflow",
+  "input": "<r>&#99999999999999999999;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: character reference to a character XML does not allow",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "charref empty hex",
+  "input": "<r>&#x;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: malformed character reference",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "charref empty",
+  "input": "<r>&#;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: malformed character reference",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "charref negative",
+  "input": "<r>&#-1;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: malformed character reference",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "charref uppercase X",
+  "input": "<r>&#X41;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: malformed character reference",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "entity nbsp",
+  "input": "<r>&nbsp;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: reference to an undeclared entity",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "entity predefined (legal)",
+  "input": "<r>&amp;&lt;&gt;&apos;&quot;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "entity AMP",
+  "input": "<r>&AMP;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: reference to an undeclared entity",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "ref amp outside root",
+  "input": "<r/>&amp;",
+  "before": {
+   "source": "malformed XML at byte 4: character data outside the document element",
+   "authored": "malformed XML at byte 4: character data outside the document element",
+   "compact": "malformed XML at byte 4: character data outside the document element",
+   "reader": "malformed XML at byte 4: character data outside the document element"
+  },
+  "after": {
+   "source": "malformed XML at byte 4: character data outside the document element",
+   "authored": "malformed XML at byte 4: character data outside the document element",
+   "compact": "malformed XML at byte 4: character data outside the document element",
+   "reader": "malformed XML at byte 4: character data outside the document element"
+  }
+ },
+ {
+  "label": "charref space before root",
+  "input": "&#32;<r/>",
+  "before": {
+   "source": "malformed XML at byte 0: character data outside the document element",
+   "authored": "malformed XML at byte 0: character data outside the document element",
+   "compact": "malformed XML at byte 0: character data outside the document element",
+   "reader": "malformed XML at byte 0: character data outside the document element"
+  },
+  "after": {
+   "source": "malformed XML at byte 0: character data outside the document element",
+   "authored": "malformed XML at byte 0: character data outside the document element",
+   "compact": "malformed XML at byte 0: character data outside the document element",
+   "reader": "malformed XML at byte 0: character data outside the document element"
+  }
+ },
+ {
+  "label": "charref space after root",
+  "input": "<r/>&#32;",
+  "before": {
+   "source": "malformed XML at byte 4: character data outside the document element",
+   "authored": "malformed XML at byte 4: character data outside the document element",
+   "compact": "malformed XML at byte 4: character data outside the document element",
+   "reader": "malformed XML at byte 4: character data outside the document element"
+  },
+  "after": {
+   "source": "malformed XML at byte 4: character data outside the document element",
+   "authored": "malformed XML at byte 4: character data outside the document element",
+   "compact": "malformed XML at byte 4: character data outside the document element",
+   "reader": "malformed XML at byte 4: character data outside the document element"
+  }
+ },
+ {
+  "label": "lt in text",
+  "input": "<r>a < b</r>",
+  "before": {
+   "source": "malformed XML at byte 11: attribute name must be followed by '='",
+   "authored": "noncompact XML AttributeSeparation at byte 11",
+   "compact": "noncompact XML AttributeSeparation at byte 11",
+   "reader": "noncompact XML AttributeSeparation at byte 11"
+  },
+  "after": {
+   "source": "malformed XML at byte 6: invalid XML name",
+   "authored": "noncompact XML AttributeSeparation at byte 11",
+   "compact": "noncompact XML AttributeSeparation at byte 11",
+   "reader": "noncompact XML AttributeSeparation at byte 11"
+  }
+ },
+ {
+  "label": "empty element",
+  "input": "<r><></></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 4: invalid XML name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "empty end",
+  "input": "<r><a></></r>",
+  "before": {
+   "source": "malformed XML at byte 9: ill-formed document: expected `</a>`, but `</>` was found",
+   "authored": "malformed XML at byte 9: ill-formed document: expected `</a>`, but `</>` was found",
+   "compact": "malformed XML at byte 9: ill-formed document: expected `</a>`, but `</>` was found",
+   "reader": "malformed XML at byte 6: ill-formed document: expected `</a>`, but `</>` was found"
+  },
+  "after": {
+   "source": "malformed XML at byte 9: ill-formed document: expected `</a>`, but `</>` was found",
+   "authored": "malformed XML at byte 9: ill-formed document: expected `</a>`, but `</>` was found",
+   "compact": "malformed XML at byte 9: ill-formed document: expected `</a>`, but `</>` was found",
+   "reader": "malformed XML at byte 6: ill-formed document: expected `</a>`, but `</>` was found"
+  }
+ },
+ {
+  "label": "doctype lower",
+  "input": "<!doctype r><r/>",
+  "before": {
+   "source": "DTD and DOCTYPE are not allowed at byte 0",
+   "authored": "DTD and DOCTYPE are not allowed at byte 0",
+   "compact": "DTD and DOCTYPE are not allowed at byte 0",
+   "reader": "DTD and DOCTYPE are not allowed at byte 0"
+  },
+  "after": {
+   "source": "DTD and DOCTYPE are not allowed at byte 0",
+   "authored": "DTD and DOCTYPE are not allowed at byte 0",
+   "compact": "DTD and DOCTYPE are not allowed at byte 0",
+   "reader": "DTD and DOCTYPE are not allowed at byte 0"
+  }
+ },
+ {
+  "label": "ELEMENT decl",
+  "input": "<r><!ELEMENT x ANY></r>",
+  "before": {
+   "source": "malformed XML at byte 3: syntax error: unknown or missed symbol in markup",
+   "authored": "malformed XML at byte 3: syntax error: unknown or missed symbol in markup",
+   "compact": "malformed XML at byte 3: syntax error: unknown or missed symbol in markup",
+   "reader": "malformed XML at byte 3: syntax error: unknown or missed symbol in markup"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: syntax error: unknown or missed symbol in markup",
+   "authored": "malformed XML at byte 3: syntax error: unknown or missed symbol in markup",
+   "compact": "malformed XML at byte 3: syntax error: unknown or missed symbol in markup",
+   "reader": "malformed XML at byte 3: syntax error: unknown or missed symbol in markup"
+  }
+ },
+ {
+  "label": "]]&gt; (legal)",
+  "input": "<r>]]&gt;</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "attr ws values (legal)",
+  "input": "<r a=\"\\u{9}\\u{a}\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "non-ascii names (legal)",
+  "input": "<\u00e9 \u00e9=\"1\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "name start times",
+  "input": "<\u00d7/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 1: invalid XML name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "name middle dot (legal)",
+  "input": "<a\u00b7/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "name combining start",
+  "input": "<\u0300a/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 1: invalid XML name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "unbound in sibling scope",
+  "input": "<r><a xmlns:p=\"u\"/><p:b/></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 20: undeclared namespace prefix",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "self-declared prefix (legal)",
+  "input": "<p:r xmlns:p=\"u\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "attr prefix declared later (legal)",
+  "input": "<r p:a=\"1\" xmlns:p=\"u\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "xml:lang (legal)",
+  "input": "<r xml:lang=\"en\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "xml:foo (legal)",
+  "input": "<r xml:foo=\"1\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "xmlns attr prefix on element",
+  "input": "<r xmlns:=\"u\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: name is not namespace-well-formed: a qualified name has one colon between two names",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "tab before root decl ok?",
+  "input": "<?xml version=\"1.0\"?>\\u{9}<r/>",
+  "before": {
+   "source": "OK",
+   "authored": "noncompact XML FormattingWhitespace at byte 21",
+   "compact": "noncompact XML FormattingWhitespace at byte 21",
+   "reader": "noncompact XML FormattingWhitespace at byte 21"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "noncompact XML FormattingWhitespace at byte 21",
+   "compact": "noncompact XML FormattingWhitespace at byte 21",
+   "reader": "noncompact XML FormattingWhitespace at byte 21"
+  }
+ },
+ {
+  "label": "decl ws before ?> (legal)",
+  "input": "<?xml version=\"1.0\" ?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "noncompact XML WhitespaceBeforeClose at byte 19",
+   "compact": "noncompact XML WhitespaceBeforeClose at byte 19",
+   "reader": "noncompact XML WhitespaceBeforeClose at byte 19"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "noncompact XML WhitespaceBeforeClose at byte 19",
+   "compact": "noncompact XML WhitespaceBeforeClose at byte 19",
+   "reader": "noncompact XML WhitespaceBeforeClose at byte 19"
+  }
+ },
+ {
+  "label": "decl no space before version",
+  "input": "<?xmlversion=\"1.0\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 2: invalid processing-instruction target",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl encoding bad name",
+  "input": "<?xml version=\"1.0\" encoding=\"8bit\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 20: invalid encoding name in the XML declaration",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "comment <!--> ",
+  "input": "<r><!--></r>",
+  "before": {
+   "source": "malformed XML at byte 12: syntax error: comment not closed: `-->` not found before end of input",
+   "authored": "malformed XML at byte 12: syntax error: comment not closed: `-->` not found before end of input",
+   "compact": "malformed XML at byte 12: syntax error: comment not closed: `-->` not found before end of input",
+   "reader": "malformed XML at byte 3: syntax error: comment not closed: `-->` not found before end of input"
+  },
+  "after": {
+   "source": "malformed XML at byte 12: syntax error: comment not closed: `-->` not found before end of input",
+   "authored": "malformed XML at byte 12: syntax error: comment not closed: `-->` not found before end of input",
+   "compact": "malformed XML at byte 12: syntax error: comment not closed: `-->` not found before end of input",
+   "reader": "malformed XML at byte 3: syntax error: comment not closed: `-->` not found before end of input"
+  }
+ },
+ {
+  "label": "comment <!---> ",
+  "input": "<r><!---></r>",
+  "before": {
+   "source": "malformed XML at byte 13: syntax error: comment not closed: `-->` not found before end of input",
+   "authored": "malformed XML at byte 13: syntax error: comment not closed: `-->` not found before end of input",
+   "compact": "malformed XML at byte 13: syntax error: comment not closed: `-->` not found before end of input",
+   "reader": "malformed XML at byte 3: syntax error: comment not closed: `-->` not found before end of input"
+  },
+  "after": {
+   "source": "malformed XML at byte 13: syntax error: comment not closed: `-->` not found before end of input",
+   "authored": "malformed XML at byte 13: syntax error: comment not closed: `-->` not found before end of input",
+   "compact": "malformed XML at byte 13: syntax error: comment not closed: `-->` not found before end of input",
+   "reader": "malformed XML at byte 3: syntax error: comment not closed: `-->` not found before end of input"
+  }
+ },
+ {
+  "label": "comment empty (legal)",
+  "input": "<r><!----></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "comment <!-----> ",
+  "input": "<r><!-----></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 7: a comment must not end with '-'",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "comment single dash (legal)",
+  "input": "<r><!-- a-b - c --></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "PI no content (legal)",
+  "input": "<r><?pi?></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "PI empty content (legal)",
+  "input": "<r><?pi ?></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "PI xmlfoo target (legal)",
+  "input": "<r><?xmlfoo x?></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "shadowing (legal)",
+  "input": "<r xmlns:p=\"u\"><p:a xmlns:p=\"v\"><p:b/></p:a><p:c/></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "scope popped",
+  "input": "<r><a xmlns:p=\"u\"><p:b/></a><p:c/></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 29: undeclared namespace prefix",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "empty element scope popped",
+  "input": "<r><a xmlns:p=\"u\"/><p:c/></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 20: undeclared namespace prefix",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "alias distinct locals (legal)",
+  "input": "<r xmlns:a=\"u\" xmlns:b=\"u\" a:x=\"1\" b:y=\"2\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "alias three prefixes dup",
+  "input": "<r xmlns:a=\"u\" xmlns:b=\"v\" xmlns:c=\"u\" a:x=\"1\" b:x=\"2\" c:x=\"3\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 55: two attributes have the same namespace name and local name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "xml attr vs other (legal)",
+  "input": "<r xmlns:p=\"u\" xml:lang=\"en\" p:lang=\"x\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "uri via charref to xml ns",
+  "input": "<r xmlns:p=\"http://www.w3.org/XML/1998/&#110;amespace\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 3: only a reserved prefix may be bound to a reserved namespace name",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "uri whitespace (legal)",
+  "input": "<r xmlns:p=\" \"><p:a/></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "xmlns as local name (legal)",
+  "input": "<r xmlns:p=\"u\" p:xmlns=\"1\"/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "xml element prefix (legal)",
+  "input": "<xml:r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "CDATA ]] edge (legal)",
+  "input": "<r><![CDATA[]]]]><![CDATA[>]]></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "text ]] then > via ref (legal)",
+  "input": "<r>]]&gt;]]</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "text ] > (legal)",
+  "input": "<r>] ]> ]]x></r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "attr gt and apos (legal)",
+  "input": "<r a=\"'>\" b='\">'/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl encoding UTF8 no dash",
+  "input": "<?xml version=\"1.0\" encoding=\"UTF8\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 20: XML declaration names an encoding other than UTF-8",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl version 1.",
+  "input": "<?xml version=\"1.\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 6: XML declaration version must be 1.x",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl version 1.0 sp",
+  "input": "<?xml version=\"1.0 \"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 6: XML declaration version must be 1.x",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl empty encoding",
+  "input": "<?xml version=\"1.0\" encoding=\"\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "malformed XML at byte 20: invalid encoding name in the XML declaration",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl tab separators (legal)",
+  "input": "<?xml\\u{9}version=\"1.0\"\\u{9}encoding=\"UTF-8\"\\u{9}?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "noncompact XML AttributeSeparation at byte 5",
+   "compact": "noncompact XML AttributeSeparation at byte 5",
+   "reader": "noncompact XML AttributeSeparation at byte 5"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "noncompact XML AttributeSeparation at byte 5",
+   "compact": "noncompact XML AttributeSeparation at byte 5",
+   "reader": "noncompact XML AttributeSeparation at byte 5"
+  }
+ },
+ {
+  "label": "decl eq spaces (legal)",
+  "input": "<?xml version = \"1.0\" ?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "noncompact XML AttributeSeparation at byte 13",
+   "compact": "noncompact XML AttributeSeparation at byte 13",
+   "reader": "noncompact XML AttributeSeparation at byte 13"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "noncompact XML AttributeSeparation at byte 13",
+   "compact": "noncompact XML AttributeSeparation at byte 13",
+   "reader": "noncompact XML AttributeSeparation at byte 13"
+  }
+ },
+ {
+  "label": "nel and lsep (legal)",
+  "input": "<r>\\u{85}\\u{2028}</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "DEL (legal)",
+  "input": "<r>\\u{7f}</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "private use FFFD (legal)",
+  "input": "<r>\uf8ff\ufffd</r>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ },
+ {
+  "label": "decl standalone no (legal)",
+  "input": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?><r/>",
+  "before": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  },
+  "after": {
+   "source": "OK",
+   "authored": "OK",
+   "compact": "OK",
+   "reader": "OK"
+  }
+ }
+]

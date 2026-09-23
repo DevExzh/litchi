@@ -1,0 +1,33 @@
+Change 0750 census: every XML member publication would audit (is_xml_part by name or content type),
+in every OPC package (a ZIP with [Content_Types].xml) under test-data/, docs/performance/ and crates/*/tests/,
+plus every loose .xml/.rels under test-data/ooxml/, audited by the base (3174242282) and final auditors.
+
+OPC packages found by content: {'test-data': 338, 'evidence packets (docs/performance/results)': 1658} (0 under crates/*/tests/)
+loose OOXML XML parts under test-data/ooxml: 81
+members Python zipfile could not read (bad CRC, mutated headers; deliberate corruption): {'evidence packets (docs/performance/results)': 1397}
+
+== test-data: 419 files with XML members, 7222 XML members, 36,875,853 bytes
+  verify_source    accepted->accepted  7213  accepted->refused     3  refused->refused     6  refused->accepted     0  verdict text changed 3
+  verify_authored  accepted->accepted   140  accepted->refused     0  refused->refused  7082  refused->accepted     0  verdict text changed 0
+  verify           accepted->accepted   140  accepted->refused     0  refused->refused  7082  refused->accepted     0  verdict text changed 0
+  verify_reader    accepted->accepted   140  accepted->refused     0  refused->refused  7082  refused->accepted     0  verdict text changed 0
+
+== evidence: 1491 files with XML members, 5504 XML members, 131,261,580 bytes
+  verify_source    accepted->accepted  5470  accepted->refused     0  refused->refused    34  refused->accepted     0  verdict text changed 0
+  verify_authored  accepted->accepted  3820  accepted->refused     0  refused->refused  1684  refused->accepted     0  verdict text changed 0
+  verify           accepted->accepted  3820  accepted->refused     0  refused->refused  1684  refused->accepted     0  verdict text changed 0
+  verify_reader    accepted->accepted  3820  accepted->refused     0  refused->refused  1684  refused->accepted     0  verdict text changed 0
+
+Newly refused by verify_source:
+   test-data/ooxml/pptx/backgrounds/solid.xml (loose part) | malformed XML at byte 1: undeclared namespace prefix
+   test-data/ooxml/pptx/placeholders/invalid-placeholder.xml (loose part) | malformed XML at byte 221: reference to an undeclared entity
+   test-data/ooxml/pptx/transitions/p14_ripple.xml (loose part) | malformed XML at byte 196: undeclared namespace prefix
+Refused by verify_source on both legs (test-data):
+   test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx customXml/item3.xml | XML is not UTF-8 at byte 0 | identical
+   test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx word/afchunk2.docx | XML is not UTF-8 at byte 14 | identical
+   test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx word/afchunk2.docx | XML is not UTF-8 at byte 16 | identical
+   test-data/poi/test-data/openxml4j/CorePropertiesHasEntities.ooxml docProps/core.xml | DTD and DOCTYPE are not allowed at byte 57 | identical
+   test-data/poi/test-data/openxml4j/PackageRelsHasEntities.ooxml _rels/.rels | DTD and DOCTYPE are not allowed at byte 57 | identical
+   test-data/ooxml/pptx/hyperlinks/malformed-slide.xml (loose part) | malformed XML at byte 268: ill-formed document: expected `</a:hlinkClick>`, but `</p:sld>` was found | identical
+
+Prefix declarations in scope at once (expat, accepted test-data members): max 39, members measured 7213, over 20: 39

@@ -1,0 +1,10 @@
+Change 0750: the audit probe's inputs (not kept: scripts/extract_parts.py rebuilds them byte-identically from the repository and census/census.jsonl.gz)
+
+part | bytes | SHA-256 | source
+--- | ---: | --- | ---
+ws-structured-1.5MB.xml | 1558391 | cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce | test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx, xl/worksheets/sheet3.xml (the same member is in test-data/poi/test-data/spreadsheet/)
+ws-patriarch-3.4MB.xml | 3382556 | 41725c20c792bcc019c127f3c7620269efc9ab4899649721b6dbf550366e1ee1 | test-data/poi/test-data/spreadsheet/no_drawing_patriarch.xlsx, xl/worksheets/sheet1.xml
+docx-drawing-288KB.xml | 288070 | 985e1525b822b31db56cb3f957a13a2eebc7301365f29a7330521a6aec13e9ee | test-data/ooxml/docx/drawing.docx, word/document.xml
+docx-table-alignment-40KB.xml | 40151 | 7ccda5d73f5a75721f15e0217251840bcbf8b9056a533681b7b1d4cc60195680 | test-data/ooxml/docx/table-alignment.docx, word/document.xml
+pptx-slide11-121KB.xml | 121498 | 1f4e9568f6e3f2dbb177bed9fe51b43e1038e9ce5e5943d07f4ba4f56f3ba04a | test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx, ppt/slides/slide11.xml
+corpus-accepted.bin | 36845060 | e33550ee2435a9f1209b21bb66d2172fa8ec43e42a84a3f400fdeb91442a8b59 | every test-data XML member (packages and loose parts) that both legs' verify_source accept: 7,213 of the census's 7,222, each as a little-endian u32 length and its bytes, in census order

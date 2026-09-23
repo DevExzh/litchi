@@ -1,0 +1,1 @@
+seeds passed 8 {'cases': 24000000, 'original': 9454154, 'replacement': 7239727, 'identical': 565278, 'window': 3765562, 'complete': 2975279, 'two_sites': 3798976, 'two_site_windows': 145828}

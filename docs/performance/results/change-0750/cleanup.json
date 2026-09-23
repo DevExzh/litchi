@@ -1,0 +1,43 @@
+{
+  "record": "0750",
+  "performed": "2026-09-23, after every cited artifact was copied into this packet, the gates passed and commits a07d680852 and de69fb407d were made",
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0750",
+      "bytes": 115064274250,
+      "what": "candidate Cargo target directory: debug test and gate builds of xml-minifier and every dependent OOXML, facade, ODF and OLE2 crate, the release harness, and the release differential-test builds"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0750-before",
+      "bytes": 1103869590,
+      "what": "release builds of base 3174242282: the harness and the before-leg audit and census probes"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0750-census-after",
+      "bytes": 59142972,
+      "what": "release builds of the after-leg audit and census probes"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0750-before-src",
+      "bytes": 10155519678,
+      "what": "detached worktree of base 3174242282 (removed with git worktree remove --force, then git worktree prune)"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/scratch/0750/*",
+      "bytes": 211271739,
+      "what": "scratch: harness binary copies (hashes in binaries.txt), the probe's input parts and corpus (rebuilt by scripts/extract_parts.py; hashes in probe/parts.txt), raw callgrind profiles (summaries in callgrind/), perf data, timing and probe reports (kept here gzip-compressed), census working files (kept compressed in census/), build and test logs (totals in gates.txt), record drafts, and superseded drafts of the all-policy implementation"
+    }
+  ],
+  "verified_after_removal": {
+    "targets/0750": "absent",
+    "targets/0750-before": "absent",
+    "targets/0750-census-after": "absent",
+    "0750-before-src": "absent and not listed by git worktree list",
+    "scratch/0750": "0 entries"
+  },
+  "kept": [
+    "/home/zhuhe/code/litchi-worktrees/0750-xml-audit-well-formedness-gaps (worktree) and branch perf/0750-xml-audit-well-formedness-gaps",
+    "the empty directory /home/zhuhe/code/litchi-worktrees/scratch/0750"
+  ],
+  "not_created": "no build, measurement or evidence artifact was written to /tmp or to the main checkout"
+}

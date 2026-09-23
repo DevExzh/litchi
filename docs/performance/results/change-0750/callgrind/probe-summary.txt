@@ -1,0 +1,12 @@
+Instructions per audit (callgrind, the audit probe at N iterations minus 0 iterations, divided by N)
+case                                bytes      before Ir       after Ir   change after Ir/byte
+source/ws-structured            1,558,391     99,994,825    114,551,990  +14.56%         73.51
+source/ws-patriarch             3,382,556    300,237,054    343,249,874  +14.33%        101.48
+source/docx-drawing               288,070     11,753,300     13,996,126  +19.08%         48.59
+source/docx-table-alignment        40,151      1,627,164      2,023,220  +24.34%         50.39
+source/pptx-slide11               121,498      7,082,244      8,162,344  +15.25%         67.18
+pair/ws-structured              1,558,391    105,385,698    120,272,179  +14.13%         77.18
+source/corpus-accepted         36,816,208  2,022,238,166  2,415,654,489  +19.45%         65.61
+authored/ws-patriarch           3,382,556    303,870,864    308,823,796   +1.63%         91.30
+authored/tiny                          38          4,319          4,397   +1.79%        115.70
+source/tiny                            55          5,107          9,356  +83.20%        170.11
