@@ -6,6 +6,10 @@ size and file count, and for every retained-identity binary its SHA-256,
 taken before removal. The worktree, the branch and the shared base build
 (`targets/base-009d515bef`) are kept.
 
+This is the second review's cleanup (its commits `172501ac89` and
+`d2b2aa3d75`); the first review's run of the earlier version of this script
+wrote what is now `cleanup-b2132486af.json`.
+
 Usage: cleanup.py [--dry-run]
 """
 
@@ -23,22 +27,18 @@ ROOT = Path("/home/zhuhe/code/litchi-worktrees")
 TREES = [
     ROOT / "targets" / "0742",
     ROOT / "targets" / "0742-before",
-    ROOT / "targets" / "0742-fp",
-    ROOT / "targets" / "0742-probe",
+    ROOT / "targets" / "0742-after",
 ]
 SCRATCH = ROOT / "scratch" / "0742"
 PACKET = Path(__file__).resolve().parent
 SUPERSEDED_RAW = [
-    PACKET / "superseded-317920af5c" / "raw",
-    PACKET / "superseded-52db88c24c" / "raw",
+    PACKET / "superseded-b2132486af" / "raw",
 ]
 BINARIES = [
-    ROOT / "targets" / "0742" / "release" / "litchi-perf-baseline",
-    ROOT / "targets" / "0742" / "release" / "litchi-perf-baseline-alloc",
     ROOT / "targets" / "0742-before" / "release" / "litchi-perf-baseline",
     ROOT / "targets" / "0742-before" / "release" / "litchi-perf-baseline-alloc",
-    ROOT / "targets" / "0742-fp" / "release" / "litchi-perf-baseline",
-    ROOT / "targets" / "0742-probe" / "release" / "change0742-route-compare",
+    ROOT / "targets" / "0742-after" / "release" / "litchi-perf-baseline",
+    ROOT / "targets" / "0742-after" / "release" / "litchi-perf-baseline-alloc",
 ]
 
 

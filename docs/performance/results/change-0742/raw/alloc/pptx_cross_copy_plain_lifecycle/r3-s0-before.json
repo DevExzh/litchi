@@ -12,7 +12,7 @@
   },
   "binary_identity": {
     "path": "/home/zhuhe/code/litchi-worktrees/targets/0742-before/release/litchi-perf-baseline-alloc",
-    "binary_sha256": "3e304e2d0b1d364fe25b0857d65dd35f20a9ddc70e986c476200d6c5910c6b09",
+    "binary_sha256": "75c5ee1707d0f45ee2366af3e77f26b9748cb34474e14550cea44e566eeddab2",
     "binary_bytes": 62851544,
     "mode_bits": 509,
     "executable": true,
@@ -175,26 +175,26 @@
       "elapsed_ns": {
         "unit": "ns",
         "samples": [
-          8962512,
-          9000553,
-          9173584
+          8946341,
+          9019811,
+          9114492
         ],
         "sample_order": [
-          0,
+          1,
           2,
-          1
+          0
         ],
-        "min": 8962512,
-        "p50": 9000553,
-        "p95": 9173584,
-        "p99": 9173584,
-        "max": 9173584,
-        "mean": 9045549.666666666,
-        "standard_deviation": 112500.54357350187,
+        "min": 8946341,
+        "p50": 9019811,
+        "p95": 9114492,
+        "p99": 9114492,
+        "max": 9114492,
+        "mean": 9026881.333333334,
+        "standard_deviation": 84298.17263934785,
         "confidence_interval_95": {
           "method": "two-sided Student's t interval for the mean",
-          "lower": 8766060.267809913,
-          "upper": 9325039.06552342
+          "lower": 8817456.162153596,
+          "upper": 9236306.504513072
         }
       },
       "sink": {
@@ -247,24 +247,24 @@
             "foreign_source_refusal_verified": true
           },
           "plan_ns": [
-            3496137,
-            3482226,
-            3520677
+            3481966,
+            3509526,
+            3564507
           ],
           "commit_ns": [
-            4073999,
-            4130540,
-            4234870
+            4077908,
+            4106419,
+            4126379
           ],
           "publication_ns": [
-            1250,
-            1180,
-            1450
+            830,
+            830,
+            1830
           ],
           "reopen_ns": [
-            668043,
-            678003,
-            678133
+            681163,
+            675504,
+            684943
           ],
           "output_sha256": [
             "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
@@ -272,9 +272,9 @@
             "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22"
           ],
           "lifecycle_ns": [
-            8962512,
-            9000553,
-            9173584
+            8946341,
+            9019811,
+            9114492
           ]
         }
       },
@@ -282,9 +282,9 @@
       "operation_metrics": {
         "sample_count": 3,
         "sample_indices": [
-          0,
+          1,
           2,
-          1
+          0
         ],
         "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
         "latency_claim": "comparable_timed_operation",
@@ -363,9 +363,9 @@
           },
           "minor_faults": {
             "values": [
-              2,
               0,
-              1
+              0,
+              3
             ],
             "status": "measured",
             "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
@@ -392,34 +392,34 @@
             "values": [
               0,
               0,
-              1
+              0
             ],
             "status": "measured",
             "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
           },
           "rss_delta_bytes": {
             "values": [
-              8192,
               0,
-              4096
+              0,
+              12288
             ],
             "status": "measured",
             "scope": "procfs_in_process_rss_delta_including_procfs_probe_overhead"
           },
           "peak_rss_bytes": {
             "values": [
-              19759104,
-              19763200,
-              19763200
+              23068672,
+              23068672,
+              23068672
             ],
             "status": "measured",
             "scope": "process_lifetime_high_water_after_not_operation_peak"
           },
           "rchar": {
             "values": [
-              1973,
-              1974,
-              1974
+              1963,
+              1963,
+              1962
             ],
             "status": "measured",
             "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
@@ -705,18 +705,18 @@
           },
           "live_bytes_before": {
             "values": [
-              348809,
+              348873,
               348937,
-              348873
+              348809
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
           },
           "live_bytes_after": {
             "values": [
-              862476,
+              862540,
               862604,
-              862540
+              862476
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
@@ -741,9 +741,9 @@
           },
           "region_peak_live_bytes": {
             "values": [
-              1312960,
+              1313024,
               1313088,
-              1313024
+              1312960
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"

@@ -11,16 +11,16 @@
     "allocator_counter_revision": "serialized_region_peak_v3"
   },
   "binary_identity": {
-    "path": "/home/zhuhe/code/litchi-worktrees/targets/0742/release/litchi-perf-baseline-alloc",
-    "binary_sha256": "191dfeeb042ced08aec52959ec8adf092bbaf5fbf76089693905b90d10f30bf1",
-    "binary_bytes": 62906960,
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0742-after/release/litchi-perf-baseline-alloc",
+    "binary_sha256": "d8ff3f80738cf97aa27ba0fc27d6e7a51d7bc2a2f2b207df2ab90d4a34391434",
+    "binary_bytes": 62902056,
     "mode_bits": 509,
     "executable": true,
     "profile": "release"
   },
   "environment": {
     "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
-    "git_revision": "b2132486af91ae9cfd0cdb7746cce8829509f0e2",
+    "git_revision": "d2b2aa3d756ea4917d4ca70e23eeb8fdd3291314",
     "git_worktree_dirty": true,
     "logical_cpus_available": 1,
     "allocator": "CountingSystemAllocator(std::alloc::System)",
@@ -175,26 +175,26 @@
       "elapsed_ns": {
         "unit": "ns",
         "samples": [
-          8899903,
-          8939182,
-          9022113
+          8915821,
+          8965581,
+          9090992
         ],
         "sample_order": [
-          0,
           1,
-          2
+          2,
+          0
         ],
-        "min": 8899903,
-        "p50": 8939182,
-        "p95": 9022113,
-        "p99": 9022113,
-        "max": 9022113,
-        "mean": 8953732.666666666,
-        "standard_deviation": 62390.80421290757,
+        "min": 8915821,
+        "p50": 8965581,
+        "p95": 9090992,
+        "p99": 9090992,
+        "max": 9090992,
+        "mean": 8990798.0,
+        "standard_deviation": 90267.06280255274,
         "confidence_interval_95": {
           "method": "two-sided Student's t interval for the mean",
-          "lower": 8798732.807912543,
-          "upper": 9108732.525420789
+          "lower": 8766544.08692653,
+          "upper": 9215051.91307347
         }
       },
       "sink": {
@@ -247,24 +247,24 @@
             "foreign_source_refusal_verified": true
           },
           "plan_ns": [
-            3474576,
-            3416897,
-            3490097
+            3456996,
+            3474816,
+            3513526
           ],
           "commit_ns": [
-            4019420,
-            4101109,
-            4122069
+            4058679,
+            4065208,
+            4173219
           ],
           "publication_ns": [
-            830,
-            780,
-            730
+            2110,
+            2200,
+            2070
           ],
           "reopen_ns": [
-            670723,
-            684194,
-            675064
+            670083,
+            684323,
+            685413
           ],
           "output_sha256": [
             "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
@@ -272,9 +272,9 @@
             "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22"
           ],
           "lifecycle_ns": [
-            8899903,
-            8939182,
-            9022113
+            8915821,
+            8965581,
+            9090992
           ]
         }
       },
@@ -282,9 +282,9 @@
       "operation_metrics": {
         "sample_count": 3,
         "sample_indices": [
-          0,
           1,
-          2
+          2,
+          0
         ],
         "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
         "latency_claim": "comparable_timed_operation",
@@ -338,7 +338,7 @@
             "values": [
               1,
               1,
-              0
+              1
             ],
             "status": "measured",
             "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
@@ -363,9 +363,9 @@
           },
           "minor_faults": {
             "values": [
-              3,
               0,
-              0
+              0,
+              2
             ],
             "status": "measured",
             "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
@@ -390,8 +390,8 @@
           },
           "nonvoluntary_context_switches": {
             "values": [
+              5,
               1,
-              0,
               0
             ],
             "status": "measured",
@@ -399,27 +399,27 @@
           },
           "rss_delta_bytes": {
             "values": [
-              12288,
               0,
-              0
+              0,
+              8192
             ],
             "status": "measured",
             "scope": "procfs_in_process_rss_delta_including_procfs_probe_overhead"
           },
           "peak_rss_bytes": {
             "values": [
-              17481728,
-              17481728,
-              17481728
+              18116608,
+              18116608,
+              18116608
             ],
             "status": "measured",
             "scope": "process_lifetime_high_water_after_not_operation_peak"
           },
           "rchar": {
             "values": [
-              1973,
-              1974,
-              1974
+              1964,
+              1964,
+              1963
             ],
             "status": "measured",
             "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
@@ -651,18 +651,18 @@
           "scope": "operation_global_system_allocator",
           "allocation_calls": {
             "values": [
-              46619,
-              46619,
-              46619
+              46618,
+              46618,
+              46618
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
           },
           "deallocation_calls": {
             "values": [
-              38276,
-              38276,
-              38276
+              38275,
+              38275,
+              38275
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
@@ -687,63 +687,63 @@
           },
           "allocated_bytes": {
             "values": [
-              16615405,
-              16615405,
-              16615405
+              16615187,
+              16615187,
+              16615187
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
           },
           "deallocated_bytes": {
             "values": [
-              16100898,
-              16100898,
-              16100898
+              16100848,
+              16100848,
+              16100848
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
           },
           "live_bytes_before": {
             "values": [
-              348800,
-              348864,
-              348928
+              348870,
+              348934,
+              348806
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
           },
           "live_bytes_after": {
             "values": [
-              863307,
-              863371,
-              863435
+              863209,
+              863273,
+              863145
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
           },
           "peak_live_bytes_before": {
             "values": [
-              3690887,
-              3690887,
-              3690887
+              3690053,
+              3690053,
+              3690053
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
           },
           "peak_live_bytes_after": {
             "values": [
-              3690887,
-              3690887,
-              3690887
+              3690053,
+              3690053,
+              3690053
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
           },
           "region_peak_live_bytes": {
             "values": [
-              1313512,
-              1313576,
-              1313640
+              1313469,
+              1313533,
+              1313405
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"

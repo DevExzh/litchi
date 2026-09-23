@@ -11,16 +11,16 @@
     "allocator_counter_revision": "serialized_region_peak_v3"
   },
   "binary_identity": {
-    "path": "/home/zhuhe/code/litchi-worktrees/targets/0742/release/litchi-perf-baseline-alloc",
-    "binary_sha256": "191dfeeb042ced08aec52959ec8adf092bbaf5fbf76089693905b90d10f30bf1",
-    "binary_bytes": 62906960,
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0742-after/release/litchi-perf-baseline-alloc",
+    "binary_sha256": "d8ff3f80738cf97aa27ba0fc27d6e7a51d7bc2a2f2b207df2ab90d4a34391434",
+    "binary_bytes": 62902056,
     "mode_bits": 509,
     "executable": true,
     "profile": "release"
   },
   "environment": {
     "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
-    "git_revision": "b2132486af91ae9cfd0cdb7746cce8829509f0e2",
+    "git_revision": "d2b2aa3d756ea4917d4ca70e23eeb8fdd3291314",
     "git_worktree_dirty": true,
     "logical_cpus_available": 1,
     "allocator": "CountingSystemAllocator(std::alloc::System)",
@@ -175,26 +175,26 @@
       "elapsed_ns": {
         "unit": "ns",
         "samples": [
-          8888623,
-          8963973,
-          9113733
+          9083602,
+          9158502,
+          9182392
         ],
         "sample_order": [
-          2,
           1,
+          2,
           0
         ],
-        "min": 8888623,
-        "p50": 8963973,
-        "p95": 9113733,
-        "p99": 9113733,
-        "max": 9113733,
-        "mean": 8988776.333333334,
-        "standard_deviation": 114586.35186327067,
+        "min": 9083602,
+        "p50": 9158502,
+        "p95": 9182392,
+        "p99": 9182392,
+        "max": 9182392,
+        "mean": 9141498.666666666,
+        "standard_deviation": 51543.19580054531,
         "confidence_interval_95": {
           "method": "two-sided Student's t interval for the mean",
-          "lower": 8704105.081247073,
-          "upper": 9273447.585419595
+          "lower": 9013447.9359603,
+          "upper": 9269549.397373032
         }
       },
       "sink": {
@@ -247,24 +247,24 @@
             "foreign_source_refusal_verified": true
           },
           "plan_ns": [
-            3430887,
-            3485786,
-            3519487
+            3558457,
+            3591716,
+            3599367
           ],
           "commit_ns": [
-            4057759,
-            4065900,
-            4195690
+            4110409,
+            4134759,
+            4147119
           ],
           "publication_ns": [
-            760,
-            710,
-            920
+            1680,
+            2310,
+            2000
           ],
           "reopen_ns": [
-            673213,
-            683693,
-            681863
+            667883,
+            679943,
+            684143
           ],
           "output_sha256": [
             "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
@@ -272,9 +272,9 @@
             "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22"
           ],
           "lifecycle_ns": [
-            8888623,
-            8963973,
-            9113733
+            9083602,
+            9158502,
+            9182392
           ]
         }
       },
@@ -282,8 +282,8 @@
       "operation_metrics": {
         "sample_count": 3,
         "sample_indices": [
-          2,
           1,
+          2,
           0
         ],
         "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
@@ -336,8 +336,8 @@
           "status": "measured",
           "user_cpu_ticks": {
             "values": [
-              0,
               1,
+              0,
               1
             ],
             "status": "measured",
@@ -363,9 +363,9 @@
           },
           "minor_faults": {
             "values": [
-              0,
-              0,
-              11
+              3,
+              8,
+              1
             ],
             "status": "measured",
             "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
@@ -390,8 +390,8 @@
           },
           "nonvoluntary_context_switches": {
             "values": [
-              1,
               0,
+              3,
               0
             ],
             "status": "measured",
@@ -399,27 +399,27 @@
           },
           "rss_delta_bytes": {
             "values": [
-              0,
-              0,
-              45056
+              12288,
+              32768,
+              4096
             ],
             "status": "measured",
             "scope": "procfs_in_process_rss_delta_including_procfs_probe_overhead"
           },
           "peak_rss_bytes": {
             "values": [
-              17858560,
-              17858560,
-              17858560
+              17997824,
+              18030592,
+              17981440
             ],
             "status": "measured",
             "scope": "process_lifetime_high_water_after_not_operation_peak"
           },
           "rchar": {
             "values": [
-              1969,
-              1969,
-              1968
+              1963,
+              1963,
+              1962
             ],
             "status": "measured",
             "scope": "procfs_in_process_operation_delta_including_procfs_probe_overhead"
@@ -651,18 +651,18 @@
           "scope": "operation_global_system_allocator",
           "allocation_calls": {
             "values": [
-              46619,
-              46619,
-              46619
+              46618,
+              46618,
+              46618
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
           },
           "deallocation_calls": {
             "values": [
-              38276,
-              38276,
-              38276
+              38275,
+              38275,
+              38275
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
@@ -687,63 +687,63 @@
           },
           "allocated_bytes": {
             "values": [
-              16615405,
-              16615405,
-              16615405
+              16615187,
+              16615187,
+              16615187
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
           },
           "deallocated_bytes": {
             "values": [
-              16100898,
-              16100898,
-              16100898
+              16100848,
+              16100848,
+              16100848
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
           },
           "live_bytes_before": {
             "values": [
-              348928,
-              348864,
-              348800
+              348870,
+              348934,
+              348806
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
           },
           "live_bytes_after": {
             "values": [
-              863435,
-              863371,
-              863307
+              863209,
+              863273,
+              863145
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
           },
           "peak_live_bytes_before": {
             "values": [
-              3690887,
-              3690887,
-              3690887
+              3690053,
+              3690053,
+              3690053
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
           },
           "peak_live_bytes_after": {
             "values": [
-              3690887,
-              3690887,
-              3690887
+              3690053,
+              3690053,
+              3690053
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"
           },
           "region_peak_live_bytes": {
             "values": [
-              1313640,
-              1313576,
-              1313512
+              1313469,
+              1313533,
+              1313405
             ],
             "status": "measured",
             "scope": "operation_global_system_allocator"

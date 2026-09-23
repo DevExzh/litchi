@@ -2,8 +2,8 @@
 
 Record: [0742](../../0742-pptx-owned-cross-copy-media-transfer.md).
 
-Base `009d515bef`; production commits `317920af5c`, `52db88c24c` (review
-follow-ups) and `b2132486af` (transfer-index allocation) on
+Base `009d515bef`; production commits `317920af5c`, `52db88c24c` and
+`b2132486af` (first review), `172501ac89` and `d2b2aa3d75` (second review) on
 `perf/0742-pptx-owned-cross-copy-media-transfer`. Host: AMD EPYC 9R45, Linux
 7.0.0-1012-aws, 32 logical CPUs shared with other agents; every measured
 process pinned with `taskset -c 4`. Toolchain from `rust-toolchain.toml`
@@ -16,33 +16,44 @@ block; that is not the build toolchain.
 Both legs were built with the identical command,
 `cargo build --release --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline`
 (and `--features allocator-metrics --bin litchi-perf-baseline-alloc` for the
-allocator lane), the before leg from the read-only base checkout, the after
-leg from `b2132486af`.
+allocator lane), the before leg from the read-only base checkout into
+`targets/0742-before`, the after leg from `d2b2aa3d75` into
+`targets/0742-after`.
 
 | arm | lane | SHA-256 |
 |---|---|---|
-| before | native | `0f20b4d07456ebb6493c8f70a11876cf2b88c93f6068dee5f33272f6c6004bf3` |
-| before | alloc | `3e304e2d0b1d364fe25b0857d65dd35f20a9ddc70e986c476200d6c5910c6b09` |
-| after | native | `6237d2950fb324821e0e51e5d496b71b882f8b6fbaa1f7ac619ee859e6cdacf1` |
-| after | alloc | `191dfeeb042ced08aec52959ec8adf092bbaf5fbf76089693905b90d10f30bf1` |
+| before | native | `b375de3695473a3f0bf870ae25d9c2e7a8f9b8124aa43370698f6557a75f3385` |
+| before | alloc | `75c5ee1707d0f45ee2366af3e77f26b9748cb34474e14550cea44e566eeddab2` |
+| after | native | `9d714e54b1f34a13d1778ab34a0f7ae41711ffab41760f7864e796db12521d2e` |
+| after | alloc | `d8ff3f80738cf97aa27ba0fc27d6e7a51d7bc2a2f2b207df2ab90d4a34391434` |
+
+The before binaries were rebuilt for this matrix with the same command from
+the same base tree as the superseded `b2132486af` matrix's, and their hashes
+differ from that matrix's (`0f20b4d0…`/`3e304e2d…`); the reason was not
+investigated. Each matrix's pair was built in one session with one command.
 
 The harness is unchanged by this change. The after reports say
 `git_worktree_dirty: true` because the harness runs `git status --porcelain`
-in its source tree at run time and this untracked packet was being written
-there; the measured binaries were built from clean committed trees.
+in its source tree at run time and this packet was being written there; the
+measured binaries were built from clean committed trees.
 
 ## Superseded matrices
 
-Two earlier matrices measured `317920af5c` and `52db88c24c` against the
-coordinator's prebuilt base binary (`fb535ebb…`), which a later coordinator
-note showed can shift untouched paths by 2.7–3.4% relative to a before leg
-built with the after leg's exact command. Their summaries are kept in
-`superseded-317920af5c/` and `superseded-52db88c24c/` (`analysis.json`,
-`tables.md`, `faults.json`, `receipts-native.jsonl`, `receipts-alloc.jsonl`);
-their raw reports were removed
-to keep the packet small ([`cleanup.json`](cleanup.json)). After binaries:
-`3aef4c7f…`/`661034af…` (native/alloc, `317920af5c`) and `90840243…`/`2cd0153c…`
-(`52db88c24c`).
+Three earlier matrices are kept as summaries (`analysis.json`, `tables.md`,
+`faults.json`, `receipts-native.jsonl`, `receipts-alloc.jsonl`); their raw
+reports were removed to keep the packet small ([`cleanup.json`](cleanup.json)):
+
+- `superseded-317920af5c/` and `superseded-52db88c24c/` measured those commits
+  against the coordinator's prebuilt base binary (`fb535ebb…`), which a later
+  coordinator note showed can shift untouched paths by 2.7–3.4% relative to a
+  before leg built with the after leg's exact command. After binaries:
+  `3aef4c7f…`/`661034af…` (native/alloc, `317920af5c`) and
+  `90840243…`/`2cd0153c…` (`52db88c24c`).
+- `superseded-b2132486af/` is the first identical-command matrix, of the
+  commit the second review examined: before `0f20b4d0…`/`3e304e2d…`, after
+  `6237d295…`/`191dfeeb…` (native/alloc). The second review's fixes change
+  the measured path (classification and capture now run before the candidate
+  is built), so the matrix was repeated on `d2b2aa3d75`.
 
 ## Contents
 
@@ -63,20 +74,27 @@ to keep the packet small ([`cleanup.json`](cleanup.json)). After binaries:
 - `faults.py` → `faults.json` — per-sample regrouping of the owned lifecycle
   and the source-backed control by the lifecycle's minor-fault count, which
   explains the spread of both arms (see the record).
+- `size-guard/` — `zlib_framing.py` and its output `zlib-framing.txt`: the
+  Deflate framing zlib 1.3.1 adds to 2 MiB of incompressible bytes at levels
+  1/6/9 and memory levels 1–9, against what the review's prescribed guard
+  unit and the chosen one allow.
 - `legacy-fixture/` — the generator (built against the base tree with
   `BASE` replaced by a checkout of `009d515bef`) that wrote the committed
   `test-data/ooxml/pptx/cross-copy-legacy/lpcp0003-{forward,inverse}.patch`,
   and its `MANIFEST.tsv` of input, target and patch hashes.
 - `route-compare/` — the informational probe that publishes one copy through
   the owned and the source-backed routes and diffs the archives member by
-  member (`BRANCH` = this worktree), with its output `route-compare.txt`.
-- `attribution/` — the optional phase attribution of a frame-pointer build:
-  `attribute.py`, its summaries `cycles-depth3.json` and `cycles-depth5.json`,
-  the page-fault site summary `faults-by-site.txt`, and the two harness
-  reports of the profiled runs (no `perf.data`).
-- `gates.txt` — every gate command with its exit code and counts.
-- `cleanup.py` → `cleanup.json` — binary identities taken before removal and
-  every removed tree.
+  member (`BRANCH` = this worktree), with its output `route-compare.txt`, run
+  on `b2132486af`.
+- `attribution/` — the optional phase attribution of a frame-pointer build of
+  `b2132486af`: `attribute.py`, its summaries `cycles-depth3.json` and
+  `cycles-depth5.json`, the page-fault site summary `faults-by-site.txt`, and
+  the two harness reports of the profiled runs (no `perf.data`).
+- `gates.txt` — every gate command with its exit code and counts, on
+  `d2b2aa3d75` and, below it, on the first review's commits.
+- `cleanup.py` → `cleanup.json` (second review) and
+  `cleanup-b2132486af.json` (first review) — binary identities taken before
+  removal and every removed tree.
 - `log-sections.md` — paragraphs for `HOTSPOTS.md`, `REPORT.md` and
   `GOAL_AUDIT.md`, for the coordinator to merge.
 
@@ -89,6 +107,7 @@ python3 -B docs/performance/results/change-0742/analyze.py \
   docs/performance/results/change-0742/raw
 python3 -B docs/performance/results/change-0742/faults.py \
   docs/performance/results/change-0742/raw
+python3 -B docs/performance/results/change-0742/size-guard/zlib_framing.py
 ```
 
 A new capture needs its own binaries and directory; the receipts show the
