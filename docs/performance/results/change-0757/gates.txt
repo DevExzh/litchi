@@ -38,3 +38,8 @@ the same test file copied onto the base 9ff78bbf1c (then restored):
   assertion `left == right` failed: many_strings is not deterministic
   test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
 xls_fresh_write_to/large user instructions per iteration: measured build 921787e2c0 17,033,997, final head a400341bdf 17,060,215 (+0.15%)
+
+# After the test-only commit 8a2693a83e (no production change since a400341bdf):
+cargo fmt --all --check -> exit 0
+cargo clippy -p litchi-xls --all-targets --no-deps --locked -- -D warnings -A clippy::unusual_byte_groupings -> exit 0
+cargo test -p litchi-xls --locked --no-fail-fast -> exit 0 (passed 1536, failed 0, ignored 1)
