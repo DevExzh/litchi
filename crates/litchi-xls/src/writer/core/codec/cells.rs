@@ -194,7 +194,14 @@ impl Writer {
     /// and mirrors Apache POI's `HSSFDataFormat.getFormat` API. The
     /// returned index can be stored in `ExtendedFormat.format_index`
     /// to apply number formats to cells.
-    pub fn register_number_format(&mut self, pattern: &str) -> u16 {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidData`] for an empty pattern and
+    /// [`Error::StringTooLong`] for one longer than the 255 UTF-16 code units
+    /// a BIFF8 `Format` record holds. A refused pattern leaves the writer
+    /// unchanged, so it still writes.
+    pub fn register_number_format(&mut self, pattern: &str) -> Result<u16> {
         self.fmt.register_number_format(pattern)
     }
 
@@ -202,7 +209,13 @@ impl Writer {
     ///
     /// The returned identifier can be passed to the `write_*_with_format`
     /// methods to apply this style to individual cells.
-    pub fn add_cell_style(&mut self, style: CellStyle) -> u16 {
+    ///
+    /// # Errors
+    ///
+    /// Refuses the style's number format as [`Self::register_number_format`]
+    /// does, before registering anything, so a refused style leaves the writer
+    /// unchanged.
+    pub fn add_cell_style(&mut self, style: CellStyle) -> Result<u16> {
         self.fmt.register_cell_style(style)
     }
 

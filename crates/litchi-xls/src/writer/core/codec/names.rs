@@ -1,7 +1,9 @@
 use super::super::named_range;
 use super::super::{DefinedName, DefinedNameRecordOptions, Writer};
 use crate::error::{Error, Result};
-use crate::writer::string_limits::{DEFINED_NAME_UNITS, ensure_utf16_len_within};
+use crate::writer::string_limits::{
+    DEFINED_NAME_UNITS, NAME_COMMENT_UNITS, ensure_utf16_len_within,
+};
 
 impl Writer {
     /// Validate a defined name according to basic Excel constraints.
@@ -24,11 +26,14 @@ impl Writer {
     /// Define a workbook-scoped named range.
     ///
     /// The reference must currently be a simple A1 or A1:B10 style range
-    /// without sheet qualifiers. More complex formulas will be rejected
-    /// at serialization time to avoid emitting invalid BIFF payloads.
+    /// without sheet qualifiers; anything else is refused here, before the
+    /// name is stored, so the writer never holds a name it cannot write.
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// Returns [`Error::StringTooLong`] for a name longer than 255 UTF-16 code
+    /// units, the reference's parse error for an unsupported reference, and an
+    /// error if any other validation fails; a refused name leaves the writer
+    /// unchanged.
     pub fn define_name(&mut self, name: &str, reference: &str) -> Result<()> {
         Self::validate_defined_name(name)?;
 
@@ -43,7 +48,7 @@ impl Writer {
         // sheet scoping can use `define_name_local`.
         let target_sheet = 0u16;
 
-        self.defined_names.push(DefinedName {
+        self.push_defined_name(DefinedName {
             name: name.to_string(),
             reference: reference.to_string(),
             comment: None,
@@ -53,9 +58,7 @@ impl Writer {
             is_function: false,
             is_built_in: false,
             built_in_code: None,
-        });
-
-        Ok(())
+        })
     }
 
     /// Define a sheet-scoped named range.
@@ -63,7 +66,8 @@ impl Writer {
     /// `sheet` is a 0-based worksheet index.
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// Refuses a name as [`Self::define_name`] does, and an unknown sheet;
+    /// a refused name leaves the writer unchanged.
     pub fn define_name_local(&mut self, name: &str, reference: &str, sheet: usize) -> Result<()> {
         Self::validate_defined_name(name)?;
 
@@ -78,7 +82,7 @@ impl Writer {
             )
         })?;
 
-        self.defined_names.push(DefinedName {
+        self.push_defined_name(DefinedName {
             name: name.to_string(),
             reference: reference.to_string(),
             comment: None,
@@ -88,15 +92,16 @@ impl Writer {
             is_function: false,
             is_built_in: false,
             built_in_code: None,
-        });
-
-        Ok(())
+        })
     }
 
     /// Define a workbook-scoped named range with a user-visible comment.
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// Refuses a name as [`Self::define_name`] does, and returns
+    /// [`Error::StringTooLong`] for a comment longer than the 255 UTF-16 code
+    /// units a `NameCmt` record holds; a refused name leaves the writer
+    /// unchanged.
     pub fn define_name_with_comment(
         &mut self,
         name: &str,
@@ -113,7 +118,7 @@ impl Writer {
 
         let target_sheet = 0u16;
 
-        self.defined_names.push(DefinedName {
+        self.push_defined_name(DefinedName {
             name: name.to_string(),
             reference: reference.to_string(),
             comment: Some(comment.to_string()),
@@ -123,8 +128,18 @@ impl Writer {
             is_function: false,
             is_built_in: false,
             built_in_code: None,
-        });
+        })
+    }
 
+    /// Stores `name` once everything the write would check about it has been
+    /// checked: its reference encodes and its comment fits `NameCmt`. A
+    /// refused name is not stored, so the writer stays able to write.
+    fn push_defined_name(&mut self, name: DefinedName) -> Result<()> {
+        name.to_biff_formula()?;
+        if let Some(comment) = &name.comment {
+            ensure_utf16_len_within(comment, NAME_COMMENT_UNITS, "defined-name comment")?;
+        }
+        self.defined_names.push(name);
         Ok(())
     }
 

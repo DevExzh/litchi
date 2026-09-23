@@ -503,14 +503,21 @@ pub(super) fn write_force_full_calculation<W: Write>(writer: &mut W, force: bool
 ///
 /// # Errors
 ///
-/// Returns [`Error::StringTooLong`] for a format string longer than the 255
-/// UTF-16 code units `Format.stFormat` allows, before writing anything; the
-/// string is never truncated.
+/// `Format.stFormat` holds 1 through 255 UTF-16 code units: an empty format
+/// string is refused with [`Error::InvalidData`] and a longer one with
+/// [`Error::StringTooLong`], before writing anything; the string is never
+/// truncated. Registration refuses both already; this is the encoder's own
+/// check.
 pub(super) fn write_format_record<W: Write>(
     writer: &mut W,
     index_code: u16,
     format_str: &str,
 ) -> Result<()> {
+    if format_str.is_empty() {
+        return Err(Error::InvalidData(
+            "number format must not be empty".to_string(),
+        ));
+    }
     let units = checked_utf16_len(format_str, NUMBER_FORMAT_UNITS, "number format")?;
     let cch = u16_len(units, "number format")?;
     if format_str.is_ascii() {

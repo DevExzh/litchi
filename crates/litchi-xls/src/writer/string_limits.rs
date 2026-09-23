@@ -16,6 +16,10 @@ pub(crate) const WORKSHEET_NAME_UNITS: usize = 31;
 /// `Lbl.cch`, the length of a defined name, is one byte ([MS-XLS] 2.4.150).
 pub(crate) const DEFINED_NAME_UNITS: usize = 255;
 
+/// `NameCmt.cchComment`, the length of a defined name's comment, is at most
+/// 0xFF ([MS-XLS] 2.4.176).
+pub(crate) const NAME_COMMENT_UNITS: usize = 255;
+
 /// `PtgStr.string` is a `ShortXLUnicodeString` with a one-byte `cch`
 /// ([MS-XLS] 2.5.198.89, 2.5.240).
 pub(crate) const FORMULA_STRING_UNITS: usize = 255;

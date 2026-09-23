@@ -16,7 +16,7 @@ use std::io::Cursor;
 
 use litchi_core::sheet::{Cell as _, CellValue, WorkbookTrait as _};
 use litchi_xls::writer::{
-    DataValidation, DataValidationOperator, DataValidationRange, DataValidationType,
+    CellStyle, DataValidation, DataValidationOperator, DataValidationRange, DataValidationType,
     PageSetupOptions, Writer,
 };
 use litchi_xls::writer::{DefinedNameFutureRecords, DefinedNameRecordOptions, NamePublish};
@@ -247,16 +247,13 @@ fn defined_name_comments_up_to_255_units_are_written_and_one_more_is_refused() {
     for comment in strings_of(256) {
         let mut writer = Writer::new();
         writer.add_worksheet("Data").unwrap();
-        writer
-            .define_name_with_comment("Noted", "A1", &comment)
-            .unwrap();
-        let mut output = Cursor::new(Vec::new());
-        let result = writer.write_to(&mut output);
-        assert!(
-            matches!(result, Err(Error::InvalidData(ref message)) if message.contains("NameCmt")),
-            "{result:?}"
+        // Refused when the name is defined, not when the workbook is written.
+        assert_eq!(
+            too_long(writer.define_name_with_comment("Noted", "A1", &comment)),
+            ("defined-name comment", 256, 255)
         );
-        assert!(output.get_ref().is_empty());
+        assert!(writer.named_ranges().is_empty());
+        written(&mut writer);
     }
 }
 
@@ -318,7 +315,7 @@ fn number_formats_up_to_255_units_are_written_whole_and_one_more_is_refused() {
         for pattern in strings_of(units) {
             let mut writer = Writer::new();
             writer.add_worksheet("Formats").unwrap();
-            let id = writer.register_number_format(&pattern);
+            let id = writer.register_number_format(&pattern).unwrap();
             let workbook = read(written(&mut writer));
             assert!(
                 workbook
@@ -332,9 +329,95 @@ fn number_formats_up_to_255_units_are_written_whole_and_one_more_is_refused() {
     for pattern in strings_of(256) {
         let mut writer = Writer::new();
         writer.add_worksheet("Formats").unwrap();
-        writer.register_number_format(&pattern);
-        assert_eq!(refused_write(&mut writer), ("number format", 256, 255));
+        // Refused when registered, not when the workbook is written.
+        assert_eq!(
+            too_long(writer.register_number_format(&pattern)),
+            ("number format", 256, 255)
+        );
+        written(&mut writer);
     }
+    let mut writer = Writer::new();
+    writer.add_worksheet("Formats").unwrap();
+    assert!(matches!(
+        writer.register_number_format(""),
+        Err(Error::InvalidData(_))
+    ));
+    written(&mut writer);
+}
+
+/// A workbook with some of everything the refused calls below would add to.
+fn registration_workbook() -> Writer {
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Data").unwrap();
+    writer.write_string(sheet, 0, 0, "label").unwrap();
+    writer.write_string(sheet, 0, 1, "other ✓").unwrap();
+    writer.write_number(sheet, 1, 0, 2.5).unwrap();
+    let format = writer.register_number_format("0.00\"kg\"").unwrap();
+    let style = writer
+        .add_cell_style(CellStyle {
+            number_format: Some("0.0%".to_string()),
+            ..CellStyle::default()
+        })
+        .unwrap();
+    writer
+        .write_number_with_format(sheet, 2, 0, 0.25, style)
+        .unwrap();
+    assert_eq!(format, 164);
+    writer
+        .define_name_with_comment("Rate", "A1:B2", "the rate")
+        .unwrap();
+    writer
+}
+
+/// Each refused registration leaves the writer as it was: it still writes,
+/// byte for byte what a writer that never saw the calls writes.
+#[test]
+fn refused_registrations_leave_the_writer_able_to_write_the_same_bytes() {
+    let expected = written(&mut registration_workbook());
+
+    let mut writer = registration_workbook();
+    let sheet = 0;
+    assert!(matches!(
+        writer.register_number_format(""),
+        Err(Error::InvalidData(_))
+    ));
+    for pattern in strings_of(256) {
+        assert_eq!(
+            too_long(writer.register_number_format(&pattern)),
+            ("number format", 256, 255)
+        );
+        assert_eq!(
+            too_long(writer.add_cell_style(CellStyle {
+                number_format: Some(pattern),
+                ..CellStyle::default()
+            })),
+            ("number format", 256, 255)
+        );
+    }
+    assert!(
+        writer
+            .add_cell_style(CellStyle {
+                number_format: Some(String::new()),
+                ..CellStyle::default()
+            })
+            .is_err()
+    );
+    assert_eq!(
+        too_long(writer.define_name_with_comment("Other", "A1", &"c".repeat(256))),
+        ("defined-name comment", 256, 255)
+    );
+    for reference in ["not a reference", "ZZZZ1", "A0", "A1:"] {
+        assert!(writer.define_name("Bad", reference).is_err(), "{reference}");
+        assert!(writer.define_name_local("Bad", reference, sheet).is_err());
+        assert!(
+            writer
+                .define_name_with_comment("Bad", reference, "note")
+                .is_err()
+        );
+    }
+    assert_eq!(writer.named_ranges().len(), 1);
+
+    assert_eq!(written(&mut writer), expected);
 }
 
 #[test]

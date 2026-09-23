@@ -235,31 +235,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Styles")?;
 
-    let header_style_id = writer.add_cell_style(make_header_style());
+    let header_style_id = writer.add_cell_style(make_header_style())?;
     writer.write_string_with_format(sheet, 0, 0, "Feature", header_style_id)?;
     writer.write_string_with_format(sheet, 0, 1, "Sample", header_style_id)?;
 
-    let currency_id = writer.add_cell_style(make_currency_style());
+    let currency_id = writer.add_cell_style(make_currency_style())?;
     writer.write_string_with_format(sheet, 1, 0, "Currency", currency_id)?;
     writer.write_number_with_format(sheet, 1, 1, 1234.56, currency_id)?;
 
-    let percent_id = writer.add_cell_style(make_percent_style());
+    let percent_id = writer.add_cell_style(make_percent_style())?;
     writer.write_string_with_format(sheet, 2, 0, "Percent", percent_id)?;
     writer.write_number_with_format(sheet, 2, 1, 0.1234, percent_id)?;
 
-    let date_id = writer.add_cell_style(make_date_style());
+    let date_id = writer.add_cell_style(make_date_style())?;
     writer.write_string_with_format(sheet, 3, 0, "Date", date_id)?;
     writer.write_number_with_format(sheet, 3, 1, 45123.0, date_id)?;
 
-    let border_id = writer.add_cell_style(make_border_demo_style());
+    let border_id = writer.add_cell_style(make_border_demo_style())?;
     writer.write_string_with_format(sheet, 4, 0, "Borders", border_id)?;
     writer.write_string_with_format(sheet, 4, 1, "Thick red box", border_id)?;
 
-    let fill_id = writer.add_cell_style(make_fill_demo_style());
+    let fill_id = writer.add_cell_style(make_fill_demo_style())?;
     writer.write_string_with_format(sheet, 5, 0, "Fill", fill_id)?;
     writer.write_string_with_format(sheet, 5, 1, "Red background", fill_id)?;
 
-    let align_id = writer.add_cell_style(make_alignment_demo_style());
+    let align_id = writer.add_cell_style(make_alignment_demo_style())?;
     writer.write_string_with_format(sheet, 6, 0, "Alignment", align_id)?;
     writer.write_string_with_format(sheet, 6, 1, "Centered and wrapped", align_id)?;
 
