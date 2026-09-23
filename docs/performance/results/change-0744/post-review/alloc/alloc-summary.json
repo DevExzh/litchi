@@ -1,0 +1,218 @@
+[
+ {
+  "case": "xlsx_one_cell_commit_save",
+  "shape": "dense-wide",
+  "allocation_calls": {
+   "before": [
+    1257432
+   ],
+   "after": [
+    142247
+   ],
+   "deterministic": true,
+   "change": -0.8868749960236418
+  },
+  "deallocation_calls": {
+   "before": [
+    992999
+   ],
+   "after": [
+    74737
+   ],
+   "deterministic": true,
+   "change": -0.9247360772770163
+  },
+  "reallocation_calls": {
+   "before": [
+    198817
+   ],
+   "after": [
+    1894
+   ],
+   "deterministic": true,
+   "change": -0.9904736516495068
+  },
+  "allocated_bytes": {
+   "before": [
+    141889103
+   ],
+   "after": [
+    43001682
+   ],
+   "deterministic": true,
+   "change": -0.6969345700916862
+  },
+  "region_peak_live_bytes": {
+   "before": [
+    49806295
+   ],
+   "after": [
+    27482683
+   ],
+   "deterministic": true,
+   "change": -0.4482086451120285
+  }
+ },
+ {
+  "case": "xlsx_one_cell_commit_save",
+  "shape": "medium",
+  "allocation_calls": {
+   "before": [
+    21384
+   ],
+   "after": [
+    5072
+   ],
+   "deterministic": true,
+   "change": -0.7628133183688739
+  },
+  "deallocation_calls": {
+   "before": [
+    16069
+   ],
+   "after": [
+    2674
+   ],
+   "deterministic": true,
+   "change": -0.8335926317754683
+  },
+  "reallocation_calls": {
+   "before": [
+    3148
+   ],
+   "after": [
+    231
+   ],
+   "deterministic": true,
+   "change": -0.9266200762388819
+  },
+  "allocated_bytes": {
+   "before": [
+    3323076
+   ],
+   "after": [
+    2059024
+   ],
+   "deterministic": true,
+   "change": -0.3803861241813308
+  },
+  "region_peak_live_bytes": {
+   "before": [
+    1266339
+   ],
+   "after": [
+    1266332
+   ],
+   "deterministic": true,
+   "change": -5.527745730038447e-06
+  }
+ },
+ {
+  "case": "xlsx_one_percent_commit_save",
+  "shape": "dense-wide",
+  "allocation_calls": {
+   "before": [
+    2532231
+   ],
+   "after": [
+    303184
+   ],
+   "deterministic": true,
+   "change": -0.88027000696224
+  },
+  "deallocation_calls": {
+   "before": [
+    1999763
+   ],
+   "after": [
+    164548
+   ],
+   "deterministic": true,
+   "change": -0.917716249375551
+  },
+  "reallocation_calls": {
+   "before": [
+    398907
+   ],
+   "after": [
+    5075
+   ],
+   "deterministic": true,
+   "change": -0.9872777364147534
+  },
+  "allocated_bytes": {
+   "before": [
+    286855356
+   ],
+   "after": [
+    89570935
+   ],
+   "deterministic": true,
+   "change": -0.6877487795626169
+  },
+  "region_peak_live_bytes": {
+   "before": [
+    65065609
+   ],
+   "after": [
+    43006102
+   ],
+   "deterministic": true,
+   "change": -0.33903481945431413
+  }
+ },
+ {
+  "case": "xlsx_one_percent_commit_save",
+  "shape": "medium",
+  "allocation_calls": {
+   "before": [
+    84317
+   ],
+   "after": [
+    19077
+   ],
+   "deterministic": true,
+   "change": -0.7737466940237437
+  },
+  "deallocation_calls": {
+   "before": [
+    63420
+   ],
+   "after": [
+    9840
+   ],
+   "deterministic": true,
+   "change": -0.8448438978240302
+  },
+  "reallocation_calls": {
+   "before": [
+    12479
+   ],
+   "after": [
+    819
+   ],
+   "deterministic": true,
+   "change": -0.9343697411651575
+  },
+  "allocated_bytes": {
+   "before": [
+    13041962
+   ],
+   "after": [
+    7999258
+   ],
+   "deterministic": true,
+   "change": -0.3866522537023187
+  },
+  "region_peak_live_bytes": {
+   "before": [
+    2671463
+   ],
+   "after": [
+    2671456
+   ],
+   "deterministic": true,
+   "change": -2.6202870860858596e-06
+  }
+ }
+]

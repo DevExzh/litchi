@@ -8,7 +8,8 @@ legs (`results/change-0744/output-identity/`).
 
 OLE2 and OOXML remain the active priority; ODF stays deferred and iWork is
 excluded. Base `009d515bef`; branch `perf/0744-xlsx-eager-workbook-cell-path`,
-commits `3166549994`, `5fb12908f0`, `6ac6b92d8a`.
+commits `3166549994`, `5fb12908f0`, `6ac6b92d8a`, and after adversarial review
+`3108e4dd40`, `b8367df8ca`, `a755ff8c26` (see [Review fixes](#review-fixes)).
 
 ## The redundant work
 
@@ -71,7 +72,10 @@ formulas, inline strings, prefixed or namespace-declaring elements,
 `xml:space`, irregular spacing or quoting, a second value, any other child and
 truncated input all *decline*. A decline is not an error; the ordinary reader
 keeps the whole body. Every pass runs `recognize` before replaying events, so a
-decline never leaves partial state.
+decline never leaves partial state. `Entry::locate` takes the reader's
+positions only after finding `<`, the start tag's exact name bytes and a
+delimiter at them, and declines parts that begin with a UTF-8 byte-order mark,
+whose reader positions exclude the mark.
 
 **2. The worksheet parser takes the lane** (`src/raw/worksheet/codec.rs`).
 `Parser::parse` drives the reader up to the root's `<sheetData>` start tag.
@@ -101,7 +105,10 @@ so the `MAX_XML_EVENTS` refusal is untouched. A scanned cell's single payload
 span is now stored inline (`PrimarySpans`), removing one boxed slice per cell
 on both scanner routes.
 
-**4. Compaction takes the lane** (`src/raw/compact.rs`). Every admitted tag is
+**4. Compaction takes the lane** (`src/raw/compact.rs`) at the element the parser
+and scanner treat as the body: the first `SpreadsheetML` `sheetData` child of a
+`SpreadsheetML` `worksheet` root whose unprefixed children resolve to
+`SpreadsheetML`, decided once there. Every admitted tag is
 already in the exact form `write_start` and the writer emit, so the compact body
 is the source body with its formatting whitespace removed unless an ancestor
 preserves it. The web-binding proof is told what per-event observation would
@@ -111,16 +118,23 @@ non-UTF-8 value text can end it (`Probe::decline`).
 **5. Reduced readback for dense value edits**
 (`src/workbook/edit/semantic/transaction.rs`). A cells-only eager commit whose
 cell rewrite is the sheet's only byte change writes through the existing
-`rewrite_value_only_with_provenance` (byte-identical to `rewrite`; existing
-tests plus the new end-to-end differential) and verifies with change
+`rewrite_value_only_with_provenance`, which emits exactly `rewrite`'s bytes
+(existing tests and a direct randomized differential of the two writers: 3,000
+generated worksheets and random cells-only plans, 1,123 through the provenance
+writer, 920 refused identically). It verifies with change
 [0525](changes/0525-xlsx-unchanged-cell-readback.md)'s `reduced_readback` when,
 and only when: compaction left the rewrite unchanged, so the provenance spans
-index the published bytes; the published body was admitted by the lane; the
-part does not mention the markup-compatibility namespace; and the complete
-store would exceed the validated-store handoff bounds of change
+index the published bytes; compaction admitted the worksheet's own body — the
+first `SpreadsheetML` `sheetData` child of a `SpreadsheetML` `worksheet` root
+whose unprefixed children resolve to `SpreadsheetML` — to the lane; the part
+does not mention the markup-compatibility namespace; the part is at most
+16 MiB, the web-extension reader's limit, which every larger changed worksheet
+fails at a later step anyway; and the complete store would exceed the
+validated-store handoff bounds of change
 [0025](changes/0025-xlsx-validated-store-handoff.md), so the reduced store never
-reaches a snapshot. A refused reduced parse falls back to the complete parse,
-whose result and error stay authoritative.
+reaches a snapshot. The reduced store is then refused, as 0525's merge refuses
+it, when one of its cells falls inside an omitted range. Any refusal falls back
+to the complete parse, whose result and error stay authoritative.
 
 **6. Smaller per-cell work.** Number validation skips the `f64` parse for an
 optionally signed run of at most 18 ASCII digits, which is always a finite
@@ -153,21 +167,26 @@ resumed reader's prefix-and-suffix copy is one new fallibly reserved buffer
 with its own typed error (`worksheet lane resume`).
 
 **Reduced readback.** For the admitted case every omitted span is a verbatim
-source cell record. The complete source parse (`Worksheet::store`, which also
-validates styles) already accepted it with the same row number, namespace
-bindings, style catalog and shared-string table. In the lane grammar a record's
-parse depends only on its own bytes, its row number and, for an inferred
-address, the preceding record's column; a replacement keeps that column, the
-provenance writer emits explicit addresses for changed cells, and rows whose
-membership changes are kept complete (change 0525). The reduced document keeps
-the whole envelope, every row shell and every changed cell, so the dimension,
-defaults, columns, merges, row ordering and each changed cell are parsed and
-checked as before, and every recorded change is verified against the reduced
-store. ADR 0003's commit-time validation of the changed dependency closure is
-therefore unchanged; what is no longer repeated is a second full parse of
-records that were not written.
+source cell record inside the worksheet's own body, which compaction has just
+recognized as lane-benign. The complete source parse (`Worksheet::store`, which
+also validates styles) already accepted each such record with the same row
+number, namespace bindings, style catalog and shared-string table. In the lane
+grammar a record's parse depends only on its own bytes, its row number and, for
+an inferred address, the preceding record's column; a replacement keeps that
+column, the provenance writer emits explicit addresses for changed cells, and
+rows whose membership changes are kept complete (change 0525). The reduced
+document keeps the whole envelope, every row shell and every changed cell, so
+the dimension, defaults, columns, merges, row ordering and each changed cell are
+parsed and checked as before, and every recorded change is verified against the
+reduced store. The two checks the complete parse makes on the whole document
+are kept: a second record at an omitted address is refused by the collision
+check, and the input-size limits cannot apply below the 16 MiB bound. ADR
+0003's commit-time validation of the changed dependency closure is therefore
+unchanged; what is no longer repeated is a second full parse of records that
+were not written.
 
-**Tests.** 33 new tests. `lane.rs` pins the grammar, event stream and every
+**Tests.** 46 new tests (33 in the original commits, 13 after review). `lane.rs`
+pins the grammar, event stream, entry location and every
 decline class. Differential suites run each pass twice, the second time with
 the lane disabled, and compare complete `Store`/`Layout` `Debug`, compacted
 bytes, web-proof eligibility and final bindings, or refusal `Debug` and
@@ -182,10 +201,68 @@ bytes, reopened cells and refusals, including merge-follower refusals; it also
 checks that inline-string, markup-compatibility, non-compact and formatted
 sources keep the complete readback.
 
+## Review fixes
+
+An adversarial review — 33.1M mutated worksheets without a divergence between
+the lane and the reader, 30M bodies matching `quick_xml` exactly, and 120,785
+end-to-end commits identical — found the lane and its three replaying passes
+sound and the reduced-readback admission weaker than its argument. Three commits
+address every finding; each fix was reverted in turn and its new test failed
+(`results/change-0744/post-review/mutation/mutation-results.json`).
+
+1. **Admission on the worksheet's own body** (`3108e4dd40`). Compaction entered
+   its lane at the first root child whose *local* name was `sheetData`, in any
+   namespace. `<x:sheetData xmlns:x="urn:foreign"><row r="1"/></x:sheetData>`
+   (or `<sheetData xmlns="urn:foreign">…`) placed before the real body therefore
+   let a body with `<f>` formulas and `<is>` strings take the reduced readback.
+   The lane now enters only where the parser and scanner do, and decides once
+   there. Tests: the counterexample takes the complete parse; a benign body
+   behind the same foreign element still takes the reduced readback; non-worksheet
+   roots, nested, foreign-child and second-root cases decline.
+2. **Whole-document checks** (`3108e4dd40`). (a) Markup-compatibility
+   preprocessing in the complete parse refuses parts over 256 MiB. A
+   268,435,452-byte compact source plus an 8-byte edit was refused on the base
+   with `MarkupCompatibility(LimitExceeded("input bytes"))` but on the branch
+   with the later web-extension limit error. The reduced route is now admitted
+   only up to that web-extension reader's 16 MiB limit (`raw::web::MAX_XML_BYTES`),
+   which every larger changed worksheet fails at the later step anyway, so the
+   first error cannot move. Test: a part padded just past the limit never takes
+   the reduced readback and fails identically on both routes (the 256 MiB
+   counterexample itself is too large for the unit suite). (b) Change 0525's
+   collision refusal is restored: a reduced store with a cell inside an omitted
+   range is refused (`Store::avoids_omitted_cells`). Test: a fault-injected
+   provenance writer copies the replaced cell's old record into the preceding
+   omitted run and writes the new one after it; both routes report the complete
+   parse's duplicate-cell refusal. With the check removed, the same faulty
+   commit succeeded through the reduced readback.
+3. **Entry location** (`3108e4dd40`). `lane::Entry::locate` now compares the
+   start tag's name bytes, requires a delimiter after them, and declines any part
+   beginning with a UTF-8 byte-order mark: `quick_xml`'s slice reader drops the
+   mark without counting it, so its positions are three bytes short of document
+   offsets there. All three lanes keep the reader for such parts. Tests: entry
+   location, and byte-order-mark parity on every pass and end to end.
+4. **Writer equivalence** (`b8367df8ca`). The end-to-end differential could not
+   show that the provenance writer matches `rewrite`, because both of its routes
+   use the provenance writer; a direct randomized differential now compares the
+   two writers (see change 5 above).
+5. **Packet.** The raw reports' `rustc 1.98.1` is explained under Measurements;
+   `abba/run_abba.sh` now defaults to the `0744-before` binary the primary run
+   used (it was always invoked with explicit `A` and `B`).
+6. **Deterministic shared-formula groups** (`a755ff8c26`, pre-existing). The edit
+   scanner ordered `Layout.shared_formulas` by `HashMap` iteration, which decided
+   the reported group when several shared-formula refusals applied, and the
+   layout's `Debug` form. Groups are now visited in document order of their first
+   formula. Test: a two-group refusal names `si=7` on each of 33 scans.
+
 ## Measurements
 
-Host AMD EPYC 9R45 (32 cores), Linux 7.0.0-1012-aws, Rust 1.95.0, CPU 12
-pinned, other agents active. Harness unchanged. Following the coordinator's
+Host AMD EPYC 9R45 (32 cores), Linux 7.0.0-1012-aws, CPU 12 pinned, other
+agents active. Every binary was built by the repository's pinned Rust 1.95.0
+(`rust-toolchain.toml`; each binary's `.comment` section reads `rustc version
+1.95.0`). The raw reports' `rustc 1.98.1` is the ambient compiler outside the
+repository, which the harness queries at run time from the process's working
+directory; it did not build anything measured here. Harness unchanged.
+Following the coordinator's
 note on link-layout effects, the before leg is **not** the prebuilt base binary:
 it is built with the identical command, features and target profile as the
 after leg, from a detached base worktree whose path has the same length as the
@@ -257,6 +334,33 @@ layout note arrived and is retained, labelled superseded, in
 larger apparent gains (for example first-cell −72.92%, one-cell −60.16%)
 because that binary is about 3% slower on untouched paths (first-cell before
 median 28.80 ms against 27.87 ms); none of its numbers are used above.
+
+### Post-review re-measurement
+
+The review fixes add work to the measured commit path (the admission's element
+checks and the collision check), so the dense-wide cases were measured again at
+`a755ff8c26`. Both legs were rebuilt by the identical command, the before leg
+again from an equal-length base worktree; builds of this workspace are not
+bit-reproducible, so the rebuilt base digest differs from the first build's
+(`results/change-0744/post-review/binaries.sha256`: before
+`edb6f6ba4371bad7ab9410bd779fc85d9de4816c84eceecd503603073d0e93a4`, after
+`7a718712e695be838a54691a1bad3297c50279343e482d76955d881898476f55`). Same design,
+eight processes, 20 samples after three warm-ups:
+
+| case | shape | samples/process | before median p50 | after median p50 | mean paired p50 change | bootstrap 95% | pair range |
+| --- | --- | ---: | ---: | ---: | ---: | --- | --- |
+| `xlsx_first_cell` | dense-wide | 20 | 27.928 ms | 7.892 ms | **−71.75%** | [−72.05%, −71.47%] | −72.20…−71.36% |
+| `xlsx_full_cell_scan` | dense-wide | 20 | 28.271 ms | 8.071 ms | **−71.47%** | [−71.59%, −71.36%] | −71.64…−71.33% |
+| `xlsx_one_cell_commit_save` | dense-wide | 20 | 151.133 ms | 60.688 ms | **−59.79%** | [−60.02%, −59.48%] | −60.08…−59.35% |
+| `xlsx_one_percent_commit_save` | dense-wide | 20 | 303.553 ms | 123.169 ms | **−59.35%** | [−59.55%, −59.15%] | −59.60…−59.06% |
+
+The paired changes match the primary run within 0.3 percentage points and no
+pair is flagged. The allocator lane moves by exactly the collision check's one
+range vector per worksheet verified through the reduced readback: dense-wide
+one-cell 142,246 → 142,247 calls and 42,997,586 → 43,001,682 bytes, one-percent
+303,182 → 303,184 calls and 89,541,943 → 89,570,935 bytes; medium, which keeps
+the complete readback, and every region peak are unchanged
+(`results/change-0744/post-review/alloc/alloc-summary.json`).
 
 ### Instruction counts
 
@@ -338,6 +442,11 @@ source-backed publication audits; ADR 0031 covers parallel deflate).
   `walk` (about 13% of a parse), and shrink the 184-byte `Stored` record.
 * The lane for the x14ac capture and MCE preprocessing passes that Excel files
   still take.
+* Pre-existing, found in review: eager cell edits on worksheets that begin with a
+  UTF-8 byte-order mark fail on both routes, because the edit scanner records
+  `quick_xml` reader positions, which exclude the mark, as byte offsets; its
+  spans are three bytes short. The lanes decline such parts, so the behavior is
+  unchanged by this change.
 
 ## Authority
 
@@ -354,20 +463,23 @@ reuses change 0525's accepted mechanism and change 0025's handoff bounds.
 
 ## Verification
 
-Thirteen gates pass at `6ac6b92d8a` (`results/change-0744/gates.txt`):
-`cargo fmt --all --check`; `cargo check` of `litchi-xlsx` (all targets, default
-and all features) and of the facade with `doc,docx,ppt,pptx,xls,xlsx,xlsb,odt`;
-warning-denied Clippy on the library and all targets; `cargo test -p
-litchi-xlsx` (1,401 passed), with all features (1,420 passed) and the facade
-(382 passed, 7 ignored); warning-denied rustdoc; crate boundaries (64 packages,
-241 declarations, 11 explicit debts); the non-iWork gate; and the structural
-claims check (10 claims). The harness is unchanged, so its own tests and the
-coverage validator were not rerun.
+Thirteen gates pass at `a755ff8c26`, run after the review fixes from an empty
+target directory (`results/change-0744/gates.txt`): `cargo fmt --all --check`;
+`cargo check` of `litchi-xlsx` (all targets, default and all features) and of
+the facade with `doc,docx,ppt,pptx,xls,xlsx,xlsb,odt`; warning-denied Clippy on
+the library and all targets; `cargo test -p litchi-xlsx` (1,414 passed), with
+all features (1,433 passed) and the facade (382 passed, 7 ignored);
+warning-denied rustdoc; crate boundaries (64 packages, 241 declarations, 11
+explicit debts); the non-iWork gate; and the structural claims check (10
+claims). The same gates passed at `6ac6b92d8a` before review (1,401, 1,420 and
+382 tests). The harness is unchanged, so its own tests and the coverage
+validator were not rerun.
 
 ## Cleanup
 
-Binary digests are recorded above. The target directories
-(`targets/0744`, `targets/0744-before`, the two probe targets), the detached
+Binary digests are recorded above. After each round — the original change and
+the review fixes — the target directories (`targets/0744`, including its
+`gates` directory, `targets/0744-before`, the two probe targets), the detached
 before worktree and the scratch directory, including every `perf.data`,
 callgrind output and corpus copy, are removed after the evidence was copied;
 the branch worktree is kept (`results/change-0744/cleanup.json`).

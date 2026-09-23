@@ -17,7 +17,9 @@ everything else; dense value edits above the handoff bound verify through
 first cell falls 71.91% (27.87 → 7.82 ms) and one-cell commit+save 59.53%
 (149.2 → 60.5 ms); outputs are byte-identical. Deflate (60%) and the publication
 audit (12.6%) now dominate; inline strings, Excel MCE/x14ac pre-passes and
-per-row scanner slots remain. `performance_claim: none`;
+per-row scanner slots remain. Review fixes make the reduced-readback admission
+exact (worksheet's own SpreadsheetML body, 16 MiB bound, 0525's collision
+refusal); re-measured one-cell −59.79%. `performance_claim: none`;
 [evidence](results/change-0744/README.md).
 
 ## For `REPORT.md`
@@ -33,8 +35,13 @@ commits. ABBA against a same-command before leg (eight processes per case, CPU
 source-backed control and open unchanged. Allocation calls fall 88.69% and
 region peak 44.82% on dense one-cell. Two no-op pair flags (+7.77%, +15.79% on
 16 µs and 0.6 µs operations that run no changed code) do not repeat in a
-2,000-sample confirmation. All 18 probe outputs are byte-identical; 13 gates
-pass. `performance_claim: none`; [evidence](results/change-0744/README.md).
+2,000-sample confirmation. All 18 probe outputs are byte-identical. After
+adversarial review, three commits bind the reduced readback's admission to the
+worksheet's own SpreadsheetML body, bound it by the 16 MiB web limit, restore
+0525's collision refusal, decline byte-order-marked parts, test the two writers
+directly and order shared-formula groups deterministically; a rebuilt dense
+re-measurement gives one-cell −59.79% and one-percent −59.35%. All gates pass.
+`performance_claim: none`; [evidence](results/change-0744/README.md).
 
 ## For `GOAL_AUDIT.md`
 
@@ -48,5 +55,8 @@ MCE path and output byte is kept; anything outside the benign subset takes the
 unchanged reader route. Measured scope: synthetic dense-wide and medium corpora
 and the cell-CRUD controls on one host. Not established: RSS, cold cache,
 Excel-produced sheets' MCE and x14ac pre-passes, inline-string bodies, and the
-publication audit and deflate that now dominate. The program goal remains open.
+publication audit and deflate that now dominate. A pre-existing defect found in
+review remains open: eager edits of byte-order-marked worksheets fail on both
+routes because the edit scanner's spans exclude the mark. The program goal
+remains open.
 [Evidence](results/change-0744/README.md).
