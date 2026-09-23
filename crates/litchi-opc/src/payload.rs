@@ -12,6 +12,13 @@
 //! — or [`PartPayload::Deferred`], a handle to one member of the retained
 //! source archive that inflates on first access and at most once.
 //!
+//! A third representation, [`PartPayload::Transferred`], is a materialized
+//! allocation that also carries a verified compressed representation of the
+//! same bytes, captured from another owned-source package's archive (change
+//! 0742). The targeted writer frames that representation instead of deflating
+//! the decoded bytes again; every mutation of the part replaces the payload,
+//! and with it the compressed representation.
+//!
 //! See [ADR 0030](../../../../docs/adr/0030-lazy-opc-part-decode.md) for the
 //! contract this implements, in particular which refusals stay at `open()` and
 //! which become first-access refusals.
@@ -20,7 +27,7 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use soapberry_zip::office::IndexedArchive;
+use soapberry_zip::office::{IndexedArchive, VerifiedPrecompressedEntry};
 
 use crate::error::{OpcError, Result, replicate_deferred_error};
 use crate::limits::{ReadLimits, ReadResource};
@@ -69,8 +76,18 @@ impl DeferredPartSource {
         )
     }
 
+    /// The read limits the retained archive was opened under.
+    pub(crate) const fn limits(&self) -> ReadLimits {
+        self.limits
+    }
+
+    /// The retained archive this source decodes from.
+    pub(crate) const fn bytes(&self) -> &Arc<Vec<u8>> {
+        &self.bytes
+    }
+
     /// The ZIP index over the retained archive, built at most once.
-    fn index(&self) -> Result<&IndexedArchive<Arc<Vec<u8>>>> {
+    pub(crate) fn index(&self) -> Result<&IndexedArchive<Arc<Vec<u8>>>> {
         let end_offset = self.bytes.len() as u64;
         let limits = self.limits;
         let bytes = &self.bytes;
@@ -139,6 +156,16 @@ pub(crate) struct DeferredPayload {
 }
 
 impl DeferredPayload {
+    /// The retained source archive this payload decodes from.
+    pub(crate) fn source(&self) -> &Arc<DeferredPartSource> {
+        &self.source
+    }
+
+    /// The exact ZIP member name this payload decodes from.
+    pub(crate) fn member(&self) -> &str {
+        &self.member
+    }
+
     fn decode(&self) -> std::result::Result<Arc<Vec<u8>>, OpcError> {
         let archive = self.source.index()?;
         let blob = archive.read(&self.member).map_err(OpcError::from)?;
@@ -157,11 +184,57 @@ impl DeferredPayload {
     }
 }
 
+/// A materialized payload that also carries a verified compressed
+/// representation of exactly the same bytes.
+///
+/// The compressed representation was issued by the ZIP reader of an
+/// owned-source package's retained archive: it captured the member's exact
+/// compressed span, decoded that capture, compared every decoded byte with
+/// `decoded`, and recorded the actual CRC. The two fields therefore describe
+/// one payload, and neither can be replaced without the other: every mutation
+/// of a part installs a different [`PartPayload`].
+pub(crate) struct TransferredPayload {
+    decoded: Arc<Vec<u8>>,
+    compressed: VerifiedPrecompressedEntry,
+}
+
+impl TransferredPayload {
+    pub(crate) const fn new(decoded: Arc<Vec<u8>>, compressed: VerifiedPrecompressedEntry) -> Self {
+        Self {
+            decoded,
+            compressed,
+        }
+    }
+
+    pub(crate) const fn decoded(&self) -> &Arc<Vec<u8>> {
+        &self.decoded
+    }
+
+    pub(crate) const fn compressed(&self) -> &VerifiedPrecompressedEntry {
+        &self.compressed
+    }
+}
+
+impl std::fmt::Debug for TransferredPayload {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Neither payload is printed: a derived implementation would format
+        // both complete byte vectors.
+        formatter
+            .debug_struct("TransferredPayload")
+            .field("decoded_bytes", &self.decoded.len())
+            .field("compressed_bytes", &self.compressed.compressed_size())
+            .field("compression", &self.compressed.compression_method())
+            .field("crc32", &self.compressed.crc32())
+            .finish()
+    }
+}
+
 /// A part's payload storage.
 ///
 /// `Ready` is today's representation and is what every ingress except an
 /// owned-source open produces. `Deferred` is a payload that is still in the
-/// retained source archive.
+/// retained source archive. `Transferred` is a materialized payload that also
+/// carries a verified compressed representation of the same bytes.
 #[derive(Debug, Clone)]
 pub(crate) enum PartPayload {
     Ready(Arc<Vec<u8>>),
@@ -169,6 +242,8 @@ pub(crate) enum PartPayload {
     /// clones decode a part at most once between them and charge the
     /// aggregate budget once.
     Deferred(Arc<DeferredPayload>),
+    /// Cloning shares the decoded allocation and the verified capture.
+    Transferred(Arc<TransferredPayload>),
 }
 
 /// The empty payload a failed decode presents to the infallible accessors.
@@ -207,6 +282,7 @@ impl PartPayload {
         match self {
             Self::Ready(bytes) => Ok(bytes),
             Self::Deferred(deferred) => deferred.force(),
+            Self::Transferred(transferred) => Ok(transferred.decoded()),
         }
     }
 
@@ -245,14 +321,40 @@ impl PartPayload {
                 .cell
                 .get()
                 .and_then(|outcome| outcome.as_ref().ok()),
+            Self::Transferred(transferred) => Some(transferred.decoded()),
         }
     }
 
     /// The source this deferred payload decodes from, for counter reporting.
     pub(crate) fn deferred_source(&self) -> Option<&Arc<DeferredPartSource>> {
+        self.as_deferred().map(DeferredPayload::source)
+    }
+
+    /// The deferred payload, when this payload is still backed by a retained
+    /// source archive member.
+    pub(crate) fn as_deferred(&self) -> Option<&DeferredPayload> {
         match self {
-            Self::Ready(_) => None,
-            Self::Deferred(deferred) => Some(&deferred.source),
+            Self::Deferred(deferred) => Some(deferred),
+            Self::Ready(_) | Self::Transferred(_) => None,
+        }
+    }
+
+    /// The verified compressed representation this payload carries, if any.
+    pub(crate) fn compressed_transfer(&self) -> Option<&VerifiedPrecompressedEntry> {
+        match self {
+            Self::Transferred(transferred) => Some(transferred.compressed()),
+            Self::Ready(_) | Self::Deferred(_) => None,
+        }
+    }
+
+    /// Drop a carried compressed representation, keeping the decoded bytes.
+    ///
+    /// Used when a part changes something the capture was issued for, such as
+    /// its content type, so the capture can never outlive the facts it was
+    /// verified against.
+    pub(crate) fn forget_compressed_transfer(&mut self) {
+        if let Self::Transferred(transferred) = self {
+            *self = Self::Ready(Arc::clone(transferred.decoded()));
         }
     }
 }

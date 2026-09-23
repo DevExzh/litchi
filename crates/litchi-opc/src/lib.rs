@@ -66,7 +66,7 @@ pub use error::{OpcError, Result, SpliceResource};
 pub use execution::OpenSession;
 pub use limits::{ReadLimits, ReadLimitsBuilder, ReadResource};
 pub use members::{NonPartMember, NonPartReason};
-pub use package::{FontEmbedding, OpcPackage, SaveOptions};
+pub use package::{CompressedPartTransfer, FontEmbedding, OpcPackage, SaveOptions};
 pub use packuri::PackURI;
 pub use part::{BlobPart, Part, PartMetadata, XmlPart};
 pub use pkgreader::{

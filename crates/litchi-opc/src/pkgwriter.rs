@@ -782,10 +782,10 @@ fn try_write_preserved<W: Write>(
                     if source_blob_retained(source_part, part) {
                         soapberry_zip::PreservationAction::Copy(indexed_entry.id())
                     } else {
-                        regenerated_shared_action(
+                        regenerated_part_action(
                             indexed_entry.id(),
                             preservation_member_name(source_member, indexed_entry),
-                            package.get_part(partname)?.blob_arc(),
+                            package.get_part(partname)?,
                         )?
                     }
                 },
@@ -825,9 +825,9 @@ fn try_write_preserved<W: Write>(
     }
     for append in &appended {
         let entry = match append {
-            PlannedAppend::Part(part) => regenerated_shared_entry(
+            PlannedAppend::Part(part) => regenerated_part_entry(
                 part.partname.membername(),
-                package.get_part(part.partname)?.blob_arc(),
+                package.get_part(part.partname)?,
             )?,
             PlannedAppend::Relationships(part) => {
                 let Some(relationships) = part.relationships.as_ref() else {
@@ -960,16 +960,15 @@ fn regenerated_action(
     })
 }
 
-fn regenerated_shared_action(
+/// Regenerate one existing member from a part's current payload.
+fn regenerated_part_action(
     id: soapberry_zip::PreservationEntryId,
     name: Option<&str>,
-    data: std::sync::Arc<Vec<u8>>,
+    part: &dyn Part,
 ) -> Result<soapberry_zip::PreservationAction> {
-    let owned_name = regenerated_name(name)?;
     Ok(soapberry_zip::PreservationAction::Regenerate {
         id,
-        entry: soapberry_zip::RegeneratedEntry::new_shared(owned_name, data)
-            .compression_method(soapberry_zip::CompressionMethod::Deflate),
+        entry: part_entry(regenerated_name(name)?, part),
     })
 }
 
@@ -988,14 +987,28 @@ fn regenerated_entry(
     )
 }
 
-fn regenerated_shared_entry(
-    name: &str,
-    data: std::sync::Arc<Vec<u8>>,
-) -> Result<soapberry_zip::RegeneratedEntry> {
-    Ok(
-        soapberry_zip::RegeneratedEntry::new_shared(regenerated_name(Some(name))?, data)
+/// Generate one appended member from a part's current payload.
+fn regenerated_part_entry(name: &str, part: &dyn Part) -> Result<soapberry_zip::RegeneratedEntry> {
+    Ok(part_entry(regenerated_name(Some(name))?, part))
+}
+
+/// The generated entry for a part's current payload.
+///
+/// A part built from a verified compressed transfer (change 0742) carries the
+/// exact compressed bytes its payload decodes from, with their method, actual
+/// CRC and sizes; the writer frames them with fresh known-size headers. Every
+/// other payload is deflated from its decoded bytes, as before. The payload
+/// and its compressed representation are one value, so a part whose payload
+/// was replaced no longer carries one.
+fn part_entry(name: String, part: &dyn Part) -> soapberry_zip::RegeneratedEntry {
+    let handle = part.payload_handle();
+    match handle.payload().compressed_transfer() {
+        Some(compressed) => {
+            soapberry_zip::RegeneratedEntry::new_precompressed_shared(name, compressed.clone())
+        },
+        None => soapberry_zip::RegeneratedEntry::new_shared(name, part.blob_arc())
             .compression_method(soapberry_zip::CompressionMethod::Deflate),
-    )
+    }
 }
 
 fn normalized_member_name(name: &str, resource: &'static str) -> Result<String> {

@@ -100,6 +100,11 @@ pub struct OpcPackage {
     /// Owned source archive retained for exact and targeted publication.
     source_archive: Option<Arc<Vec<u8>>>,
 
+    /// Read limits the owned source archive was admitted under. Meaningful
+    /// only while `source_archive` is `Some`; a compressed transfer out of the
+    /// archive re-checks the member against the same policy (change 0742).
+    source_limits: ReadLimits,
+
     /// Clone-local authorization for exact whole-source publication.
     exact_source_authorized: bool,
 
@@ -173,6 +178,7 @@ impl OpcPackage {
             parts: HashMap::new(),
             source_xml_parts: HashMap::new(),
             source_archive: None,
+            source_limits: ReadLimits::default(),
             exact_source_authorized: false,
             source_ingress: false,
             signature_graph_tracked: false,
@@ -341,7 +347,7 @@ impl OpcPackage {
             let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
             Self::unmarshal_with_payload_donor(pkg_reader, Some(donor))?
         };
-        package.authorize_owned_source(data);
+        package.authorize_owned_source(data, limits);
         Ok(package)
     }
 
@@ -1302,7 +1308,7 @@ impl OpcPackage {
             let pkg_reader = PackageReader::from_phys_reader_deferred(&phys_reader, &data)?;
             Self::unmarshal(pkg_reader)?
         };
-        package.authorize_shared_owned_source(data);
+        package.authorize_shared_owned_source(data, limits);
         Ok(package)
     }
 
@@ -1331,22 +1337,23 @@ impl OpcPackage {
             let pkg_reader = PackageReader::from_phys_reader_with_session(&phys_reader, session)?;
             Self::unmarshal(pkg_reader)?
         };
-        package.authorize_owned_source(data);
+        package.authorize_owned_source(data, limits);
         Ok(package)
     }
 
-    fn authorize_owned_source(&mut self, source: Vec<u8>) {
-        self.authorize_shared_owned_source(Arc::new(source));
+    fn authorize_owned_source(&mut self, source: Vec<u8>, limits: ReadLimits) {
+        self.authorize_shared_owned_source(Arc::new(source), limits);
     }
 
     /// Retain an owned source archive that deferred payloads already share.
-    fn authorize_shared_owned_source(&mut self, source: Arc<Vec<u8>>) {
+    fn authorize_shared_owned_source(&mut self, source: Arc<Vec<u8>>, limits: ReadLimits) {
         let preservation = PreservationProvenance::from_package(source.as_slice(), self);
         if let Some(preservation) = preservation.as_ref() {
             self.bind_relationship_captures(preservation);
         }
         self.preservation = preservation.map(Arc::new);
         self.source_archive = Some(source);
+        self.source_limits = limits;
         self.exact_source_authorized = true;
     }
 
@@ -1372,6 +1379,9 @@ impl OpcPackage {
             .set_source_capture(Arc::clone(&preservation.package_relationships_xml));
     }
 }
+
+mod compressed_transfer;
+pub use compressed_transfer::CompressedPartTransfer;
 
 #[cfg(test)]
 mod payload_reuse_tests;

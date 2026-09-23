@@ -54,14 +54,17 @@ pub enum SlideCopyRefusal {
     UnknownPhysicalMember,
 }
 
-/// Durable `PresentationML` patch families, each naming the complete-package
-/// revision proof its serialized header carries.
+/// Durable `PresentationML` patch families, each naming the revision proof its
+/// serialized header carries.
 ///
 /// A durable patch embeds complete-package revisions computed by one exact
 /// algorithm. Change 0655 redefined that algorithm (`litchi-pptx-opened-v1` →
 /// `litchi-pptx-opened-v2`), so the two durable families carry a new magic and
 /// a patch serialized under the superseded magic is refused by name rather
-/// than compared across algebras. See
+/// than compared across algebras. Change 0742 changed how a cross-presentation
+/// copy's candidate archive encodes copied image members, which changes the
+/// serialized-archive (physical) revisions that family embeds, so
+/// `LPCP0003` is superseded by `LPCP0004` the same way. See
 /// [`Error::DurablePatchRevisionFormat`].
 ///
 /// This enum never carries attacker-supplied bytes: an unrecognized magic is
@@ -76,8 +79,13 @@ pub enum DurablePatchFormat {
     SlideRemovalV2,
     /// `LPCP0002`: cross-presentation slide copy, superseded semantic proof.
     CrossSlideCopyV2,
-    /// `LPCP0003`: cross-presentation slide copy, current semantic proof.
+    /// `LPCP0003`: cross-presentation slide copy, superseded physical proof:
+    /// its serialized-archive revisions describe a candidate that re-deflated
+    /// every copied member.
     CrossSlideCopyV3,
+    /// `LPCP0004`: cross-presentation slide copy, current semantic and
+    /// physical proofs, with the candidate's copied-media encoding recorded.
+    CrossSlideCopyV4,
 }
 
 impl DurablePatchFormat {
@@ -89,6 +97,7 @@ impl DurablePatchFormat {
             Self::SlideRemovalV2 => b"LPRM0002",
             Self::CrossSlideCopyV2 => b"LPCP0002",
             Self::CrossSlideCopyV3 => b"LPCP0003",
+            Self::CrossSlideCopyV4 => b"LPCP0004",
         }
     }
 }
@@ -100,6 +109,7 @@ impl std::fmt::Display for DurablePatchFormat {
             Self::SlideRemovalV2 => "LPRM0002",
             Self::CrossSlideCopyV2 => "LPCP0002",
             Self::CrossSlideCopyV3 => "LPCP0003",
+            Self::CrossSlideCopyV4 => "LPCP0004",
         })
     }
 }
@@ -456,11 +466,13 @@ pub enum Error {
     #[error("source-backed PPTX slide patch source is stale")]
     StaleSource,
 
-    /// A durable patch carries a superseded complete-package revision proof.
+    /// A durable patch carries a superseded revision proof: a complete-package
+    /// revision from a superseded algebra, or serialized-archive revisions of
+    /// a superseded candidate encoding.
     ///
     /// Refused while parsing the durable header, before any package is read or
     /// mutated, so no caller ever holds a patch whose public revision
-    /// accessors return values from a superseded algebra.
+    /// accessors return values no current application can reproduce.
     #[error(
         "PresentationML durable patch carries the superseded revision proof of format {found}; \
          this build reads {expected}. Re-plan the edit against the source package."

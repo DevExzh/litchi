@@ -241,6 +241,25 @@ impl BlobPart {
         Self::with_payload(partname, content_type, PartPayload::ready(blob))
     }
 
+    /// Create a `BlobPart` that carries a verified compressed representation
+    /// of its payload, issued by
+    /// [`OpcPackage::authorize_compressed_transfer`](crate::OpcPackage::authorize_compressed_transfer).
+    ///
+    /// The part's bytes and content type are the ones the transfer was issued
+    /// for. When a package holding this part is published through the
+    /// targeted (source-preserving) writer, the member is framed from the
+    /// verified compressed bytes instead of being deflated again. Replacing
+    /// the payload or the content type discards the compressed
+    /// representation, so the part then publishes like any other.
+    #[must_use]
+    pub fn with_compressed_transfer(
+        partname: PackURI,
+        transfer: crate::CompressedPartTransfer,
+    ) -> Self {
+        let (content_type, payload) = transfer.into_content_type_and_payload();
+        Self::with_payload(partname, content_type, payload)
+    }
+
     /// Create a `BlobPart` over payload storage that may still be deferred.
     pub(crate) fn with_payload(partname: PackURI, content_type: String, blob: PartPayload) -> Self {
         let rels = Relationships::for_source(&partname);
@@ -269,6 +288,9 @@ impl Part for BlobPart {
     }
 
     fn set_content_type(&mut self, content_type: String) -> Result<()> {
+        // A compressed transfer was issued for one content type; it never
+        // survives a change to it.
+        self.blob.forget_compressed_transfer();
         self.content_type = content_type;
         Ok(())
     }
