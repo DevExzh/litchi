@@ -1747,11 +1747,20 @@ fn shared_formula_groups(
             by_index.entry(index).or_default().push(formula_index);
         }
     }
-    let mut groups = Vec::new();
-    groups
+    // Visit the groups in document order of their first formula, so the
+    // layout, and the first refusal when several groups fail, never depend on
+    // hash iteration order.
+    let mut ordered = Vec::new();
+    ordered
         .try_reserve_exact(by_index.len())
         .map_err(|source| allocation("shared formula groups", source))?;
-    'group: for (index, member_indices) in by_index {
+    ordered.extend(by_index);
+    ordered.sort_unstable_by_key(|(_, member_indices)| member_indices.first().copied());
+    let mut groups = Vec::new();
+    groups
+        .try_reserve_exact(ordered.len())
+        .map_err(|source| allocation("shared formula groups", source))?;
+    'group: for (index, member_indices) in ordered {
         if member_indices
             .iter()
             .any(|&formula_index| !formulas[formula_index].supported_attributes)
