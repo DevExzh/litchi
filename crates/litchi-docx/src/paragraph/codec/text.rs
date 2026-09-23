@@ -16,7 +16,7 @@ use crate::error::{Error, Result};
 use litchi_core::{
     SequentialTextWriter, TextObjectKind, TextOutputError, TextOutputOptions, TextOutputReport,
 };
-use litchi_ooxml_common::private::BindingTracker;
+use litchi_ooxml_common::private::{BindingTracker, split_qualified_name};
 use litchi_ooxml_common::xml::decode_xml_reference;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
@@ -26,6 +26,8 @@ use quick_xml::reader::Reader;
 use std::io::Write;
 
 use super::super::model::Paragraph;
+use super::xml::is_fragment_word_local_name;
+#[cfg(test)]
 use super::xml::is_fragment_word_name;
 
 /// Maximum nesting depth accepted when extracting paragraph text.
@@ -67,6 +69,12 @@ where
     // is namespace maintenance, not an event-buffer copy.
     // `NsReader::from_reader` is `Reader::from_reader` with default
     // configuration, so the tokenization and error stream are unchanged.
+    //
+    // Change 0754 splits each element name once, at the same first colon
+    // `QName::prefix` and `QName::local_name` split at, and resolves it only
+    // where a verdict below reads its namespace; resolution has no effect but
+    // its result. `extract_word_text_base_oracle`, the production loop before
+    // the change with quick-xml's own resolver, pins the output.
     let mut reader = Reader::from_reader(xml_bytes);
     let mut tracker = BindingTracker::new();
     let mut pending_pop = false;
@@ -91,19 +99,12 @@ where
         // `NamespaceError`, whose `Display` is what
         // `quick_xml::Error::Namespace` forwards to, so the `Error::Xml`
         // message is byte-identical to the historical failure.
-        //
-        // `resolve_event` maps `Start`/`Empty`/`End` to
-        // `resolve(name, use_default = true)` and every other event to
-        // `Unbound`; the `End` name resolves in its own scope because the
-        // pop is deferred to the next read. This path consumes the `End`
-        // resolution (the `text_depth` closing match below), unlike the
-        // litchi-odt text path.
-        let namespace = match &event {
+        let (prefix, local) = match &event {
             Event::Start(element) => {
                 tracker
                     .push(element)
                     .map_err(|error| E::from(Error::Xml(error.to_string())))?;
-                tracker.resolve_element(element.name()).0
+                split_qualified_name(element.name().into_inner())
             },
             Event::Empty(element) => {
                 tracker
@@ -112,20 +113,36 @@ where
                 // The scope an `Empty` element opens closes immediately:
                 // defer its pop to the top of the next iteration.
                 pending_pop = true;
-                tracker.resolve_element(element.name()).0
+                split_qualified_name(element.name().into_inner())
             },
             Event::End(element) => {
                 pending_pop = true;
-                tracker.resolve_element(element.name()).0
+                split_qualified_name(element.name().into_inner())
             },
-            _ => ResolveResult::Unbound,
+            _ => (None, &[][..]),
         };
 
+        // `resolve_event` maps `Start`/`Empty`/`End` to
+        // `resolve(name, use_default = true)`; the `End` name resolves in its
+        // own scope because the pop is deferred to the next read. A name is
+        // resolved when a verdict below reads its namespace: the fragment
+        // prefix, until it is known, reads every start tag's; the `w:t`
+        // match reads it only for the local name `t`, and the special
+        // characters only for their five local names.
+        let resolves = match &event {
+            Event::Start(_) => {
+                fragment_prefix.is_none() || local == b"t" || is_word_special_character_name(local)
+            },
+            Event::Empty(_) => is_word_special_character_name(local),
+            Event::End(_) => text_depth == Some(depth) && local == b"t",
+            _ => false,
+        };
+        let namespace = resolves.then(|| tracker.resolve_prefix_bytes(prefix));
+
         if fragment_prefix.is_none()
-            && let Event::Start(element) = &event
-            && !matches!(namespace, ResolveResult::Bound(_))
+            && matches!(event, Event::Start(_))
+            && !matches!(namespace, Some(ResolveResult::Bound(_)))
         {
-            let prefix = element.name().prefix().map(|prefix| prefix.into_inner());
             fragment_prefix = Some(match prefix {
                 Some(prefix) => Some(checked_text_vec_clone(
                     prefix,
@@ -135,8 +152,8 @@ where
             });
         }
 
-        match event {
-            Event::Start(element) => {
+        match &event {
+            Event::Start(_) => {
                 nodes = nodes.checked_add(1).ok_or_else(|| {
                     E::from(Error::InvalidFormat(
                         "Word XML element counter overflow".to_string(),
@@ -158,17 +175,19 @@ where
                     ))));
                 }
                 if text_depth.is_none()
-                    && is_fragment_word_name(&namespace, element.name(), b"t", &fragment_prefix)
+                    && namespace.as_ref().is_some_and(|namespace| {
+                        is_fragment_word_local_name(namespace, local, b"t", &fragment_prefix)
+                    })
                 {
                     text_depth = Some(depth);
-                } else if let Some(character) =
-                    word_special_character(&namespace, element.name(), &fragment_prefix)
-                {
+                } else if let Some(character) = namespace.as_ref().and_then(|namespace| {
+                    word_special_character_local(namespace, local, &fragment_prefix)
+                }) {
                     let mut encoded = [0_u8; 4];
                     append(character.encode_utf8(&mut encoded))?;
                 }
             },
-            Event::Empty(element) => {
+            Event::Empty(_) => {
                 nodes = nodes.checked_add(1).ok_or_else(|| {
                     E::from(Error::InvalidFormat(
                         "Word XML element counter overflow".to_string(),
@@ -179,9 +198,9 @@ where
                         "Word XML exceeds {MAX_TEXT_SCAN_NODES} elements"
                     ))));
                 }
-                if let Some(character) =
-                    word_special_character(&namespace, element.name(), &fragment_prefix)
-                {
+                if let Some(character) = namespace.as_ref().and_then(|namespace| {
+                    word_special_character_local(namespace, local, &fragment_prefix)
+                }) {
                     let mut encoded = [0_u8; 4];
                     append(character.encode_utf8(&mut encoded))?;
                 }
@@ -193,14 +212,16 @@ where
                 append_xml_text_chunks_without_entities(text.as_ref(), &mut append)?;
             },
             Event::GeneralRef(reference) => {
-                let decoded = decode_word_xml_reference(&reference).map_err(E::from)?;
+                let decoded = decode_word_xml_reference(reference).map_err(E::from)?;
                 if text_depth.is_some() {
                     append_utf8_str_chunks(&decoded, &mut append)?;
                 }
             },
-            Event::End(element) => {
+            Event::End(_) => {
                 if text_depth == Some(depth)
-                    && is_fragment_word_name(&namespace, element.name(), b"t", &fragment_prefix)
+                    && namespace.as_ref().is_some_and(|namespace| {
+                        is_fragment_word_local_name(namespace, local, b"t", &fragment_prefix)
+                    })
                 {
                     text_depth = None;
                 }
@@ -1248,6 +1269,35 @@ impl SemanticTextParser {
     }
 }
 
+/// Whether `local` is the local name of one of the five run elements
+/// [`word_special_character`] maps to a character.
+fn is_word_special_character_name(local: &[u8]) -> bool {
+    matches!(
+        local,
+        b"tab" | b"br" | b"cr" | b"noBreakHyphen" | b"softHyphen"
+    )
+}
+
+/// [`word_special_character`] for a name already split into its local part.
+///
+/// Checks the local name first and the namespace at most once, for the one
+/// candidate the local name selects.
+fn word_special_character_local(
+    namespace: &ResolveResult<'_>,
+    local: &[u8],
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+) -> Option<char> {
+    let character = match local {
+        b"tab" => '\t',
+        b"br" | b"cr" => '\n',
+        b"noBreakHyphen" => '\u{2011}',
+        b"softHyphen" => '\u{00ad}',
+        _ => return None,
+    };
+    is_fragment_word_local_name(namespace, local, local, fragment_prefix).then_some(character)
+}
+
+#[cfg(test)]
 fn word_special_character(
     namespace: &ResolveResult<'_>,
     name: QName<'_>,
@@ -1284,6 +1334,135 @@ impl Paragraph {
         let _parser_admission = self.parser_admission()?;
         extract_word_text(self.xml_bytes())
     }
+}
+
+/// Change-0754 differential oracle: base production `for_each_word_text_chunk`
+/// before change 0754 (eager resolution of every element name, per-candidate
+/// `QName` splitting), with the namespace machinery swapped for quick-xml's own
+/// `NsReader` resolver so the oracle does not share the binding tracker it is
+/// checking. [`extract_word_text_nsreader_oracle`] predates the production
+/// path's decoding of every general reference, so it is the wrong oracle for
+/// a reference outside `w:t`; this one is not.
+#[cfg(test)]
+fn extract_word_text_base_oracle(xml_bytes: &[u8]) -> Result<String> {
+    let mut result = String::new();
+    let mut append = |chunk: &str| -> Result<()> {
+        result.push_str(chunk);
+        Ok(())
+    };
+    let mut reader = NsReader::from_reader(xml_bytes);
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    let mut text_depth = None;
+
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let namespace = match &event {
+            Event::Start(element) | Event::Empty(element) => {
+                reader.resolver().resolve_element(element.name()).0
+            },
+            Event::End(element) => reader.resolver().resolve_element(element.name()).0,
+            _ => ResolveResult::Unbound,
+        };
+
+        if fragment_prefix.is_none()
+            && let Event::Start(element) = &event
+            && !matches!(namespace, ResolveResult::Bound(_))
+        {
+            let prefix = element.name().prefix().map(|prefix| prefix.into_inner());
+            fragment_prefix = Some(match prefix {
+                Some(prefix) => Some(checked_text_vec_clone(
+                    prefix,
+                    "Word text namespace prefix",
+                )?),
+                None => None,
+            });
+        }
+
+        match event {
+            Event::Start(element) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("Word XML element counter overflow".to_string())
+                })?;
+                if nodes > MAX_TEXT_SCAN_NODES {
+                    return Err(Error::InvalidFormat(format!(
+                        "Word XML exceeds {MAX_TEXT_SCAN_NODES} elements"
+                    )));
+                }
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("Word XML nesting is too deep".to_string())
+                })?;
+                if depth > MAX_TEXT_SCAN_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "Word XML nesting exceeds the {MAX_TEXT_SCAN_DEPTH} depth limit"
+                    )));
+                }
+                if text_depth.is_none()
+                    && is_fragment_word_name(&namespace, element.name(), b"t", &fragment_prefix)
+                {
+                    text_depth = Some(depth);
+                } else if let Some(character) =
+                    word_special_character(&namespace, element.name(), &fragment_prefix)
+                {
+                    let mut encoded = [0_u8; 4];
+                    append(character.encode_utf8(&mut encoded))?;
+                }
+            },
+            Event::Empty(element) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("Word XML element counter overflow".to_string())
+                })?;
+                if nodes > MAX_TEXT_SCAN_NODES {
+                    return Err(Error::InvalidFormat(format!(
+                        "Word XML exceeds {MAX_TEXT_SCAN_NODES} elements"
+                    )));
+                }
+                if let Some(character) =
+                    word_special_character(&namespace, element.name(), &fragment_prefix)
+                {
+                    let mut encoded = [0_u8; 4];
+                    append(character.encode_utf8(&mut encoded))?;
+                }
+            },
+            Event::Text(text) if text_depth.is_some() => {
+                append_xml_text_chunks(text.as_ref(), &mut append)?;
+            },
+            Event::CData(text) if text_depth.is_some() => {
+                append_xml_text_chunks_without_entities(text.as_ref(), &mut append)?;
+            },
+            Event::GeneralRef(reference) => {
+                let decoded = decode_word_xml_reference(&reference)?;
+                if text_depth.is_some() {
+                    append_utf8_str_chunks(&decoded, &mut append)?;
+                }
+            },
+            Event::End(element) => {
+                if text_depth == Some(depth)
+                    && is_fragment_word_name(&namespace, element.name(), b"t", &fragment_prefix)
+                {
+                    text_depth = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::InvalidFormat("invalid Word XML nesting".to_string()))?;
+            },
+            Event::Eof if depth != 0 || text_depth.is_some() => {
+                return Err(Error::InvalidFormat("unterminated Word XML".to_string()));
+            },
+            Event::Eof => break,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_) => {},
+        }
+    }
+    drop(append);
+    Ok(result)
 }
 
 /// Change-0229 differential oracle: the pre-0229 `NsReader` implementation
@@ -1630,6 +1809,173 @@ mod tests {
             "no .docx corpus fixtures yielded word/document.xml"
         );
         eprintln!("corpus parity compared over {compared} document parts");
+    }
+
+    /// Change 0754: the complete outcome, error variant included.
+    fn strict_outcome(result: Result<String>) -> String {
+        match result {
+            Ok(text) => format!("ok {text:?}"),
+            Err(error) => format!("err {error} | {error:?}"),
+        }
+    }
+
+    fn assert_strict_parity(xml: &[u8]) {
+        assert_eq!(
+            strict_outcome(extract_word_text(xml)),
+            strict_outcome(extract_word_text_base_oracle(xml)),
+            "text scan diverged from the base production oracle on {}",
+            String::from_utf8_lossy(&xml[..xml.len().min(200)])
+        );
+    }
+
+    /// A small deterministic generator for reproducible mutations.
+    struct Mutator(u64);
+
+    impl Mutator {
+        fn below(&mut self, bound: usize) -> usize {
+            // xorshift64*
+            self.0 ^= self.0 >> 12;
+            self.0 ^= self.0 << 25;
+            self.0 ^= self.0 >> 27;
+            let value = self.0.wrapping_mul(0x2545_F491_4F6C_DD1D);
+            usize::try_from(value % u64::try_from(bound.max(1)).unwrap()).unwrap()
+        }
+
+        fn mutate(&mut self, xml: &[u8]) -> Vec<u8> {
+            const BYTES: &[u8] = b"<>/=\"':x \0&;tw";
+            const SNIPPETS: &[&str] = &[
+                "<w:t>",
+                "</w:t>",
+                "<w:t/>",
+                "<w:tab/>",
+                "<w:br></w:br>",
+                "<w:softHyphen/>",
+                "<t>",
+                "</t>",
+                " xmlns:w=\"urn:foreign\"",
+                " xmlns=\"\"",
+                " xmlns=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"",
+                " xmlns:w=\"\"",
+                " xmlns:w=\"http://purl.oclc.org/ooxml/wordprocessingml/main\"",
+                " xmlns:xmlns=\"urn:x\"",
+                "<![CDATA[c]]>",
+                "&amp;",
+                "&#x41;",
+                "&bogus;",
+                "\r\n",
+            ];
+            let mut out = xml.to_vec();
+            if out.is_empty() {
+                return out;
+            }
+            match self.below(5) {
+                0 | 1 => {
+                    let at = self.below(out.len());
+                    out[at] = BYTES[self.below(BYTES.len())];
+                },
+                2 => {
+                    let at = self.below(out.len());
+                    let end = (at + 1 + self.below(16)).min(out.len());
+                    out.drain(at..end);
+                },
+                3 => {
+                    let at = self.below(out.len() + 1);
+                    let snippet = SNIPPETS[self.below(SNIPPETS.len())].as_bytes();
+                    out.splice(at..at, snippet.iter().copied());
+                },
+                _ => out.truncate(self.below(out.len())),
+            }
+            out
+        }
+    }
+
+    #[test]
+    fn lazy_resolution_matches_oracle_on_name_shapes_and_shadowing() {
+        let fixtures: Vec<String> = vec![
+            // Two colons, an empty prefix and a trailing colon split at the
+            // first colon, as `QName` splits them.
+            format!(
+                r#"<w:p xmlns:w="{W}"><w:r><w:t:x>A</w:t:x><:t>B</:t><w:>C</w:><w:t>D</w:t></w:r></w:p>"#
+            ),
+            r#"<w:p><w:r><w:t:x>A</w:t:x><:t>B</:t><w:t>D</w:t></w:r></w:p>"#.to_string(),
+            r#"<:p><:t>A</:t><t>B</t></:p>"#.to_string(),
+            // The text element's own declaration shadows it, so its end tag
+            // resolves in that scope.
+            format!(
+                r#"<w:p xmlns:w="{W}"><w:r><w:t xmlns:w="urn:x">A</w:t><w:t>B</w:t></w:r></w:p>"#
+            ),
+            format!(
+                r#"<w:p xmlns:w="urn:x"><w:r><w:t xmlns:w="{W}">A</w:t><w:t>B</w:t></w:r></w:p>"#
+            ),
+            // Special characters as start, end and empty tags, bound, shadowed
+            // and unbound.
+            format!(
+                r#"<w:p xmlns:w="{W}"><w:tab></w:tab><w:br xmlns:w="urn:x"/><w:cr/><q:tab xmlns:q="{W}"/></w:p>"#
+            ),
+            r#"<w:p><w:tab/><w:noBreakHyphen></w:noBreakHyphen><x:tab/></w:p>"#.to_string(),
+            // The fragment prefix is fixed by the first start tag that is not
+            // bound, wherever it is.
+            format!(r#"<w:p xmlns:w="{W}"><w:r><x:r><x:t>A</x:t><w:t>B</w:t></x:r></w:r></w:p>"#),
+            format!(r#"<w:p xmlns:w="{W}"><w:r><r xmlns=""><t>A</t></r><w:t>B</w:t></w:r></w:p>"#),
+            format!(r#"<p xmlns="{W}"><r><t>A</t></r><r xmlns=""><t>B</t><tab/></r></p>"#),
+            // More prefixes than the tracker's resolution cache holds.
+            format!(
+                r#"<a:p xmlns:a="{W}" xmlns:b="{W}" xmlns:c="{W}" xmlns:d="{W}" xmlns:e="{W}"><a:t>1</a:t><b:t>2</b:t><c:tab/><d:t>3</d:t><e:t>4</e:t><a:t>5</a:t><e:br/></a:p>"#
+            ),
+            // A prefix redeclared and restored around text.
+            format!(
+                r#"<w:p xmlns:w="{W}"><w:t>1</w:t><w:r xmlns:w="urn:x"><w:t>2</w:t><w:s xmlns:w="{W}"><w:t>3</w:t></w:s><w:t>4</w:t></w:r><w:t>5</w:t></w:p>"#
+            ),
+        ];
+        for xml in &fixtures {
+            assert_strict_parity(xml.as_bytes());
+        }
+    }
+
+    #[test]
+    fn lazy_resolution_matches_oracle_on_mutated_documents_and_fragments() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
+        let mut files = Vec::new();
+        collect_docx_corpus(&root, &mut files);
+        files.sort();
+        let mut mutator = Mutator(0x0754_7E57_0000_0001);
+        let mut compared = 0usize;
+        for path in &files {
+            let Some(document_xml) = docx_document_xml(path) else {
+                continue;
+            };
+            if document_xml.len() > 256 * 1024 {
+                continue;
+            }
+            // Paragraph fragments, as `Paragraph::text` scans them.
+            let mut fragments = Vec::new();
+            let _ = crate::namespace::scan_word_element_ranges(
+                &document_xml,
+                &[b"p".as_slice()],
+                |_, start, length| {
+                    let start = usize::try_from(start).unwrap();
+                    let end = start + usize::try_from(length).unwrap();
+                    if fragments.len() < 12 {
+                        fragments.push(document_xml[start..end].to_vec());
+                    }
+                    Ok(())
+                },
+            );
+            for fragment in &fragments {
+                assert_strict_parity(fragment);
+                for _ in 0..4 {
+                    assert_strict_parity(&mutator.mutate(fragment));
+                    compared += 1;
+                }
+            }
+            for _ in 0..12 {
+                let mut mutated = mutator.mutate(&document_xml);
+                mutated = mutator.mutate(&mutated);
+                assert_strict_parity(&mutated);
+                compared += 1;
+            }
+        }
+        assert!(compared > 1_000, "{compared}");
     }
 
     fn collect_docx_corpus(directory: &Path, files: &mut Vec<PathBuf>) {

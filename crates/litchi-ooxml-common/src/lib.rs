@@ -59,7 +59,8 @@ pub mod xml_name;
 #[doc(hidden)]
 pub mod private {
     pub use super::binding_tracker::{
-        BindingTracker, BindingTrackerError, in_scope_declarations, with_in_scope_namespaces,
+        BindingTracker, BindingTrackerError, in_scope_declarations, split_qualified_name,
+        with_in_scope_namespaces,
     };
 }
 

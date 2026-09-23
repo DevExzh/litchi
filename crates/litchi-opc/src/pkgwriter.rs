@@ -225,7 +225,18 @@ impl<'package> PublicationPlan<'package> {
             if part.audit_payload {
                 let blob = part.materialized_blob()?;
                 part.blob = Some(blob);
-                PackageWriter::audit_published_xml(part.partname.as_str(), blob)?;
+                // A payload whose exact allocation already passed this audit
+                // under these limits carries the proof (change 0754); any
+                // other bytes, including a copy or a substitute of proven
+                // ones, are audited here.
+                if !part
+                    .part
+                    .payload_handle()
+                    .payload()
+                    .publication_audit_covers(blob)
+                {
+                    PackageWriter::audit_published_xml(part.partname.as_str(), blob)?;
+                }
             }
             if part.relationships_pristine {
                 continue;

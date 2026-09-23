@@ -29,7 +29,23 @@ pub(crate) fn is_fragment_word_name(
     local_name: &[u8],
     fragment_prefix: &Option<Option<Vec<u8>>>,
 ) -> bool {
-    if name.local_name().as_ref() != local_name {
+    is_fragment_word_local_name(
+        namespace,
+        name.local_name().as_ref(),
+        local_name,
+        fragment_prefix,
+    )
+}
+
+/// [`is_fragment_word_name`] for a name whose local part the caller has
+/// already split off, at the first colon as `QName::local_name` does.
+pub(crate) fn is_fragment_word_local_name(
+    namespace: &ResolveResult<'_>,
+    local: &[u8],
+    local_name: &[u8],
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+) -> bool {
+    if local != local_name {
         return false;
     }
     if is_wordprocessing_namespace(namespace) {

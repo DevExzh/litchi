@@ -6,6 +6,15 @@ use super::transfer::{
 };
 use litchi_opc::OpcError;
 
+/// The main-document bytes `apply_document_patch` publishes.
+enum MainReplacement {
+    /// The candidate's own allocation, with the proof that it passed the
+    /// writer's source publication audit.
+    Proven(xml_minifier::audit::VerifiedSource),
+    /// A copy of the candidate's bytes, audited at publication.
+    Copied(Vec<u8>),
+}
+
 /// How `apply_document_patch` obtained the snapshot it publishes.
 enum DocumentPatchSource {
     /// The opened package still retains the patch's exact source bytes, so the
@@ -101,7 +110,15 @@ impl Package {
         if !patch.changed() {
             return Ok(candidate);
         }
-        let replacement = candidate.xml_bytes().to_vec();
+        // A commit that proved its candidate's exact allocation to the
+        // writer's source audit publishes that allocation with the proof
+        // (change 0754): the writer then does not audit those bytes again,
+        // and the part shares the snapshot's bytes instead of copying them.
+        // Any other candidate is copied and audited at publication as before.
+        let replacement = match candidate.publication_proof() {
+            Some(proof) => MainReplacement::Proven(proof.clone()),
+            None => MainReplacement::Copied(candidate.xml_bytes().to_vec()),
+        };
         self.edit_semantic_opc("apply_document_patch", move |opc| {
             if let Some((graph, insert, expected_digest)) = graph_transition {
                 apply_transfer_graph(opc, &graph, insert)
@@ -115,7 +132,11 @@ impl Package {
                 }
             }
             let main_name = opc.main_document_part()?.partname().clone();
-            opc.get_part_mut(&main_name)?.set_blob(replacement);
+            let part = opc.get_part_mut(&main_name)?;
+            match replacement {
+                MainReplacement::Proven(proof) => part.set_blob_verified(proof),
+                MainReplacement::Copied(bytes) => part.set_blob(bytes),
+            }
             Ok(())
         })?;
         Ok(candidate)

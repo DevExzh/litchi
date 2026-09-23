@@ -245,6 +245,8 @@ impl std::fmt::Debug for TransferredPayload {
 /// owned-source open produces. `Deferred` is a payload that is still in the
 /// retained source archive. `Transferred` is a materialized payload that also
 /// carries a verified compressed representation of the same bytes.
+/// `Verified` is a materialized payload whose exact allocation already passed
+/// the source publication audit (change 0754).
 #[derive(Debug, Clone)]
 pub(crate) enum PartPayload {
     Ready(Arc<Vec<u8>>),
@@ -254,6 +256,8 @@ pub(crate) enum PartPayload {
     Deferred(Arc<DeferredPayload>),
     /// Cloning shares the decoded allocation and the verified capture.
     Transferred(Arc<TransferredPayload>),
+    /// The payload is the proof's own allocation. Cloning shares it.
+    Verified(xml_minifier::audit::VerifiedSource),
 }
 
 /// The empty payload a failed decode presents to the infallible accessors.
@@ -293,6 +297,7 @@ impl PartPayload {
             Self::Ready(bytes) => Ok(bytes),
             Self::Deferred(deferred) => deferred.force(),
             Self::Transferred(transferred) => Ok(transferred.decoded()),
+            Self::Verified(verified) => Ok(verified.bytes()),
         }
     }
 
@@ -332,6 +337,22 @@ impl PartPayload {
                 .get()
                 .and_then(|outcome| outcome.as_ref().ok()),
             Self::Transferred(transferred) => Some(transferred.decoded()),
+            Self::Verified(verified) => Some(verified.bytes()),
+        }
+    }
+
+    /// Whether `bytes` are exactly the allocation this payload's source
+    /// publication audit proof covers, audited under the writer's limits.
+    ///
+    /// Only a `Verified` payload carries a proof, and the proof decides by
+    /// address and length, so bytes that merely equal the audited ones — a
+    /// copy, or a payload replaced since — are not covered and are audited.
+    pub(crate) fn publication_audit_covers(&self, bytes: &[u8]) -> bool {
+        match self {
+            Self::Verified(verified) => {
+                verified.covers(bytes, xml_minifier::audit::Limits::default())
+            },
+            Self::Ready(_) | Self::Deferred(_) | Self::Transferred(_) => false,
         }
     }
 
@@ -345,7 +366,7 @@ impl PartPayload {
     pub(crate) fn as_deferred(&self) -> Option<&DeferredPayload> {
         match self {
             Self::Deferred(deferred) => Some(deferred),
-            Self::Ready(_) | Self::Transferred(_) => None,
+            Self::Ready(_) | Self::Transferred(_) | Self::Verified(_) => None,
         }
     }
 
@@ -358,7 +379,7 @@ impl PartPayload {
             Self::Transferred(transferred) => {
                 Some((transferred.decoded(), transferred.compressed()))
             },
-            Self::Ready(_) | Self::Deferred(_) => None,
+            Self::Ready(_) | Self::Deferred(_) | Self::Verified(_) => None,
         }
     }
 
