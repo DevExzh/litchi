@@ -2,7 +2,11 @@ use std::io::Write;
 
 use crate::writer::CommentTextRunWrite;
 use crate::writer::shape::Anchor;
+use crate::writer::string_limits::u16_len;
 use crate::{Error, Result};
+
+/// `NoteSh.stAuthor`: 1 through 54 characters ([MS-XLS] 2.5.186).
+const COMMENT_AUTHOR_UNITS: usize = 54;
 
 use super::write_record_header;
 
@@ -100,6 +104,9 @@ fn write_continue<W: Write>(writer: &mut W, data: &[u8]) -> Result<()> {
 
 pub(super) fn write_txo<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> Result<()> {
     let units: Vec<u16> = config.text.encode_utf16().collect();
+    // `TxO.cchText` is 16 bits; insertion refuses longer text, and so does
+    // this encoder rather than wrap the count.
+    let cch_text = u16_len(units.len(), "comment text")?;
     let runs: Vec<CommentTextRunWrite> = if units.is_empty() {
         Vec::new()
     } else if config.text_runs.is_empty() {
@@ -119,7 +126,7 @@ pub(super) fn write_txo<W: Write>(writer: &mut W, config: &CommentConfig<'_>) ->
     writer.write_all(&0x0212u16.to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?;
     writer.write_all(&[0; 6])?;
-    writer.write_all(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes())?;
+    writer.write_all(&cch_text.to_le_bytes())?;
     writer.write_all(&crate::utils::truncate_usize_to_u16(run_bytes).to_le_bytes())?;
     writer.write_all(&config.font_when_empty.to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?;
@@ -146,7 +153,7 @@ pub(super) fn write_txo<W: Write>(writer: &mut W, config: &CommentConfig<'_>) ->
             bytes.extend_from_slice(&run.font_index.to_le_bytes());
             bytes.extend_from_slice(&[0; 4]);
         }
-        bytes.extend_from_slice(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes());
+        bytes.extend_from_slice(&cch_text.to_le_bytes());
         bytes.extend_from_slice(&[0; 6]);
         for chunk in bytes.chunks(8224) {
             write_continue(writer, chunk)?;
@@ -157,6 +164,16 @@ pub(super) fn write_txo<W: Write>(writer: &mut W, config: &CommentConfig<'_>) ->
 
 pub(super) fn write_note<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -> Result<()> {
     let author: Vec<u16> = config.author.encode_utf16().collect();
+    // Insertion refuses an author longer than `NoteSh.stAuthor` holds, and
+    // so does this encoder rather than wrap the count.
+    if author.len() > COMMENT_AUTHOR_UNITS {
+        return Err(Error::StringTooLong {
+            field: "comment author",
+            utf16_units: author.len(),
+            limit: COMMENT_AUTHOR_UNITS,
+        });
+    }
+    let cch_author = u16_len(author.len(), "comment author")?;
     let compressed = author.iter().all(|unit| *unit <= 0x00FF);
     let byte_count = author.len() * if compressed { 1 } else { 2 };
     write_record_header(
@@ -168,7 +185,7 @@ pub(super) fn write_note<W: Write>(writer: &mut W, config: &CommentConfig<'_>) -
     writer.write_all(&u16::from(config.column).to_le_bytes())?;
     writer.write_all(&(if config.visible { 2u16 } else { 0 }).to_le_bytes())?;
     writer.write_all(&config.object_id.to_le_bytes())?;
-    writer.write_all(&crate::utils::truncate_usize_to_u16(author.len()).to_le_bytes())?;
+    writer.write_all(&cch_author.to_le_bytes())?;
     writer.write_all(&[u8::from(!compressed)])?;
     if compressed {
         for unit in author {

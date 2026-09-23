@@ -66,12 +66,13 @@ impl ConditionalFormatType {
                 let condition_type = 0x02u8;
                 let comparison_op = 0x00u8;
 
-                let tokens = tokenizer.tokenize(formula).map_err(|e| {
-                    Error::InvalidData(format!(
+                let tokens = tokenizer.tokenize(formula).map_err(|e| match e {
+                    too_long @ Error::StringTooLong { .. } => too_long,
+                    e => Error::InvalidData(format!(
                         "Invalid conditional formatting formula '{formula}': {e}"
-                    ))
+                    )),
                 })?;
-                let formula1 = encode_ptg_tokens(&tokens);
+                let formula1 = encode_ptg_tokens(&tokens)?;
 
                 // Second formula is unused for simple expression-based rules.
                 Ok((condition_type, comparison_op, formula1, Vec::new()))
@@ -89,12 +90,13 @@ impl ConditionalFormatType {
                     return Err(Error::InvalidData("between/not-between conditional format requires two formulas; other comparisons require one".to_string()));
                 }
                 let encode = |formula: &str| -> Result<Vec<u8>> {
-                    let tokens = tokenizer.tokenize(formula).map_err(|error| {
-                        Error::InvalidData(format!(
+                    let tokens = tokenizer.tokenize(formula).map_err(|error| match error {
+                        too_long @ Error::StringTooLong { .. } => too_long,
+                        error => Error::InvalidData(format!(
                             "Invalid conditional formatting formula '{formula}': {error}"
-                        ))
+                        )),
                     })?;
-                    Ok(encode_ptg_tokens(&tokens))
+                    encode_ptg_tokens(&tokens)
                 };
                 Ok((
                     1,

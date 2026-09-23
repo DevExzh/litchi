@@ -6,15 +6,23 @@
 
 //! Byte-exact goldens for the fresh XLS writer's shared-string path.
 //!
-//! Every fixture below was written by the writer at `6d989cad63`, before
-//! change 0753 staged the shared-string table by borrowing and hashing each
-//! string once, and its SHA-256 recorded here. Each worksheet holds at most one
-//! distinct string: the SST lists strings in the order a worksheet's cell map
-//! iterates them, which for several distinct strings in one worksheet depends
-//! on that map's per-process hash seed, so only these shapes are reproducible
-//! across processes. The table's order and indices for many distinct strings
-//! are pinned against the previous algorithm in-process by the table's own
-//! unit tests.
+//! The fixtures of `fresh_xls_writer_shared_strings_match_the_pre_0753_goldens`
+//! were written by the writer at `6d989cad63`, before change 0753 staged the
+//! shared-string table by borrowing and hashing each string once, and their
+//! SHA-256 recorded here. Each of their worksheets holds at most one distinct
+//! string: until change 0757 the SST listed strings in the order a worksheet's
+//! cell map iterated them, which for several distinct strings depended on that
+//! map's per-process hash seed, so only these shapes were reproducible across
+//! processes. Change 0757 replaced the two strings of `one_string_per_sheet`
+//! that were longer than an SST entry, which the writer now refuses, with
+//! strings exactly at the limit, and pinned that fixture's digest from the
+//! writer at `9ff78bbf1c` (0753's head), which writes it identically.
+//!
+//! Since change 0757 the SST lists each string at its first occurrence in
+//! worksheet, row and column order, whatever the cell maps' seeds, so
+//! `multi_string_worksheets_are_pinned_across_processes` pins worksheets with
+//! many distinct strings too. Those digests were recorded from 0757's writer;
+//! no earlier writer produced them reproducibly.
 
 use litchi_core::validation::EvidenceDigest;
 use litchi_xls::writer::Writer;
@@ -44,9 +52,12 @@ fn one_string_per_sheet() -> Vec<u8> {
         "\u{80}\u{7ff}\u{800}\u{ffff}\u{10000}\u{10ffff}".to_string(),
         repeat_to("spans CONTINUE records ", 20_000),
         repeat_to("混合 mixed ✓ 😀 ", 30_000),
-        // More than 0xFFFF UTF-16 code units: the SST keeps the first 0xFFFF.
-        repeat_to("😀", 140_000),
-        repeat_to("b", 70_000),
+        // Exactly 0xFFFF UTF-16 code units, the most an SST entry holds, in
+        // each encoding; the last ends with a surrogate pair. One unit more
+        // is refused (see `xls_writer_string_limits.rs`).
+        "b".repeat(0xFFFF),
+        "é".repeat(0xFFFF),
+        format!("{}😀", "a".repeat(0xFFFD)),
     ];
     let mut writer = Writer::new();
     for (index, value) in values.iter().enumerate() {
@@ -129,7 +140,7 @@ fn fresh_xls_writer_shared_strings_match_the_pre_0753_goldens() {
         (
             "one_string_per_sheet",
             one_string_per_sheet,
-            "552b720e5656a88df6d8d63ebaf50327a0d89c24320ef8a4847994116f376b85",
+            "420df55445de70ab66699a18d1de707a2f35b132319c7592794ce577fec3eab5",
         ),
         (
             "repeated_string",
@@ -173,13 +184,10 @@ fn fresh_xls_writer_shared_strings_match_the_pre_0753_goldens() {
     );
 }
 
-/// Many distinct and repeated strings per worksheet cannot be pinned by digest
-/// (see the module comment), so every cell is read back instead: a wrong
-/// `LabelSst` index would name another string.
-#[test]
-fn many_distinct_and_repeated_strings_read_back_cell_by_cell() {
-    use litchi_core::sheet::{Cell as _, CellValue};
-
+/// Four worksheets of 900 string cells each, with repeated, empty, non-ASCII,
+/// supplementary-plane and CONTINUE-spanning strings, and a numeric worksheet
+/// between them; also returns every string cell's expected value.
+fn many_strings() -> (Writer, Vec<(usize, u32, u16, String)>) {
     let mut writer = Writer::new();
     let mut expected = Vec::new();
     for sheet in 0..4usize {
@@ -207,7 +215,129 @@ fn many_distinct_and_repeated_strings_read_back_cell_by_cell() {
             writer.write_number(numbers, 0, 0, 1.5).unwrap();
         }
     }
+    (writer, expected)
+}
 
+/// Strings written in reverse row and column order, repeated across and within
+/// worksheets, so neither insertion order nor a cell map's order is the
+/// row-major order the SST follows.
+fn scrambled_strings() -> Writer {
+    let labels = [
+        "zeta",
+        "alpha",
+        "",
+        "Latin-1 àéîõüçñ",
+        "CJK 漢字かなカナ",
+        "astral 😀𝄞🦀",
+        "alpha",
+    ];
+    let mut writer = Writer::new();
+    for sheet in 0..3usize {
+        let worksheet = writer.add_worksheet(&format!("Scrambled{sheet}")).unwrap();
+        for row in (0..40u32).rev() {
+            for column in (0..5u16).rev() {
+                let index = (usize::try_from(row).unwrap() * 5 + usize::from(column) + sheet)
+                    % labels.len();
+                if (row + u32::from(column)) % 4 == 3 {
+                    writer
+                        .write_number(worksheet, row, column, f64::from(row))
+                        .unwrap();
+                } else if column == 4 && row % 10 == 0 {
+                    writer
+                        .write_string(
+                            worksheet,
+                            row,
+                            column,
+                            &repeat_to(&format!("{sheet}:{row} spans CONTINUE ✓ "), 9_000),
+                        )
+                        .unwrap();
+                } else {
+                    writer
+                        .write_string(worksheet, row, column, labels[index])
+                        .unwrap();
+                }
+            }
+        }
+    }
+    writer
+}
+
+fn many_strings_workbook() -> Vec<u8> {
+    written(many_strings().0)
+}
+
+fn scrambled_strings_workbook() -> Vec<u8> {
+    written(scrambled_strings())
+}
+
+/// Worksheets with many distinct strings, pinned since change 0757 made the
+/// SST order independent of the cell maps' hash seeds. Each test process seeds
+/// its maps afresh, and each fixture is also built four times in-process, each
+/// time with new maps, so a seed-dependent order would fail here.
+#[test]
+fn multi_string_worksheets_are_pinned_across_processes() {
+    let fixtures: [(&str, fn() -> Vec<u8>, &str); 2] = [
+        (
+            "many_strings",
+            many_strings_workbook,
+            "c66770be6fb44ebaf6b5b4dab23c67acf8dbc90eb19851611d520442d46384f9",
+        ),
+        (
+            "scrambled_strings",
+            scrambled_strings_workbook,
+            "ecb5af1fe8c2857a30fd0bdec01c28dbe681d5a0cd9180688319599e188bcd1a",
+        ),
+    ];
+    let mut mismatches = Vec::new();
+    for (name, build, expected) in fixtures {
+        let first = build();
+        for _ in 0..3 {
+            assert_eq!(first, build(), "{name} is not deterministic");
+        }
+        let actual = EvidenceDigest::of(&first).to_string();
+        if actual != expected {
+            mismatches.push(format!("{name}: {actual} ({} bytes)", first.len()));
+        }
+    }
+    assert!(
+        mismatches.is_empty(),
+        "digest mismatches:\n{}",
+        mismatches.join("\n")
+    );
+}
+
+/// The SST lists each string once, at its first occurrence in worksheet, row
+/// and column order.
+#[test]
+fn the_sst_lists_strings_in_first_occurrence_order() {
+    use litchi_core::sheet::{Cell as _, CellValue};
+
+    let workbook = litchi_xls::Workbook::new(Cursor::new(scrambled_strings_workbook())).unwrap();
+    let mut expected: Vec<String> = Vec::new();
+    for sheet in 0..3usize {
+        let worksheet = workbook.xls_worksheet(sheet).unwrap();
+        for row in 0..40u32 {
+            for column in 0..5u32 {
+                if let Some(cell) = worksheet.get_cell(row, column)
+                    && let CellValue::String(value) = cell.value()
+                    && !expected.contains(value)
+                {
+                    expected.push(value.clone());
+                }
+            }
+        }
+    }
+    let table = workbook.xls_worksheet(0).unwrap().shared_strings().unwrap();
+    assert_eq!(table, expected.as_slice());
+}
+
+/// Every cell is read back as well as pinned: a wrong `LabelSst` index would
+/// name another string.
+#[test]
+fn many_distinct_and_repeated_strings_read_back_cell_by_cell() {
+    use litchi_core::sheet::{Cell as _, CellValue};
+
+    let (writer, expected) = many_strings();
     let workbook = litchi_xls::Workbook::new(Cursor::new(written(writer))).unwrap();
     for (sheet, row, column, value) in expected {
         let sheet_index = if sheet >= 2 { sheet + 1 } else { sheet };

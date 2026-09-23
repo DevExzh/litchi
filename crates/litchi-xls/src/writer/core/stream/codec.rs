@@ -794,37 +794,32 @@ pub(crate) fn generate_workbook_stream(
             }
         }
 
-        // Cell records (sorted by row, then column). A string cell also
-        // carries its ordinal among the worksheet's string cells in cell-map
-        // iteration order, the order the shared string table recorded their
-        // indices in.
+        // Cell records, sorted by row and then column. The shared string
+        // table recorded each string cell's index in the same order, so the
+        // n-th string cell met here takes the n-th recorded index.
         let has_string_cells = shared_strings.has_string_cells(worksheet_index);
         let mut string_cells = 0usize;
-        let mut sorted_cells: Vec<_> = worksheet
-            .cells
-            .iter()
-            .map(|(key, cell)| {
-                let string_ordinal = string_cells;
-                if has_string_cells && matches!(cell.value, CellValue::String(_)) {
-                    string_cells += 1;
-                }
-                (key, cell, string_ordinal)
-            })
-            .collect();
+        let mut sorted_cells: Vec<_> = worksheet.cells.iter().collect();
         // Keys are the distinct keys of the cell map, so an unstable sort
         // yields exactly the order a stable one would.
-        sorted_cells.sort_unstable_by_key(|(k, _, _)| *k);
+        sorted_cells.sort_unstable_by_key(|(k, _)| **k);
 
         let pivot_xf_indices = fmt.pivot_xf_indices();
 
         let mut cell_index = 0usize;
         while cell_index < sorted_cells.len() {
-            let ((row, col), cell, string_ordinal) =
-                sorted_cells.get(cell_index).copied().ok_or_else(|| {
-                    Error::InvalidData(format!(
-                        "worksheet cell index {cell_index} is outside the sorted cell list"
-                    ))
-                })?;
+            let ((row, col), cell) = sorted_cells.get(cell_index).copied().ok_or_else(|| {
+                Error::InvalidData(format!(
+                    "worksheet cell index {cell_index} is outside the sorted cell list"
+                ))
+            })?;
+            // Counted before any branch below can skip the cell, so a string
+            // cell written some other way (a data-table anchor) keeps the
+            // ordinals of the string cells after it aligned.
+            let string_ordinal = string_cells;
+            if has_string_cells && matches!(cell.value, CellValue::String(_)) {
+                string_cells += 1;
+            }
             let xf_index = match cell.pivot_xf_role {
                 Some(super::super::worksheet::PivotCellXfRole::HeaderAccent) => {
                     pivot_xf_indices.header_accent
@@ -851,7 +846,7 @@ pub(crate) fn generate_workbook_stream(
                 let mut expected_col = *col;
 
                 while next_index < sorted_cells.len() {
-                    let ((next_row, next_col), next_cell, _) =
+                    let ((next_row, next_col), next_cell) =
                         sorted_cells.get(next_index).copied().ok_or_else(|| {
                             Error::InvalidData(format!(
                                 "worksheet cell index {next_index} is outside the sorted cell list"
@@ -910,7 +905,7 @@ pub(crate) fn generate_workbook_stream(
                 CellValue::Formula(formula) => {
                     let expression = formula.strip_prefix('=').unwrap_or(formula);
                     let tokens = FormulaTokenizer::new().tokenize(expression)?;
-                    let encoded = encode_ptg_tokens(&tokens);
+                    let encoded = encode_ptg_tokens(&tokens)?;
                     let metadata = cell.formula_metadata.clone().unwrap_or_else(|| {
                         crate::FormulaMetadata::new().with_always_calculate(true)
                     });

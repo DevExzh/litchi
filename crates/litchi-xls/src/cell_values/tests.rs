@@ -1666,6 +1666,52 @@ fn canonical_formula_resource_matching_refuses_rgb_extra_atomically() {
     assert_eq!(source.bytes(), before.as_slice());
 }
 
+/// The editor shares the writer's formula encoder, which cut a string
+/// constant to 255 UTF-16 code units until change 0757; one unit more is now
+/// refused before anything is staged.
+#[test]
+fn authored_formula_string_constants_are_refused_past_255_units_not_truncated() {
+    let source = Snapshot::from_bytes(formula_free_package()).unwrap();
+    let reference = Reference::new(1, 1).unwrap();
+    let mut transaction = source.transaction();
+    for literal in ["a".repeat(256), format!("{}😀", "a".repeat(254))] {
+        let error = transaction
+            .insert_formula("Plain".into(), reference, &format!("\"{literal}\""))
+            .expect_err("a 256-unit string constant must be refused");
+        assert!(
+            matches!(
+                error,
+                Error::StringTooLong {
+                    field: "formula string literal",
+                    utf16_units: 256,
+                    limit: 255,
+                }
+            ),
+            "{error:?}"
+        );
+    }
+    // Nothing was staged: the cell is still free, and 255 units fit whole.
+    let literal = format!("{}😀", "a".repeat(253));
+    transaction
+        .insert_formula("Plain".into(), reference, &format!("\"{literal}\""))
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    let workbook = Workbook::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let tokens = workbook
+        .xls_worksheet(0)
+        .unwrap()
+        .get_cell(1, 1)
+        .unwrap()
+        .formula_bytes()
+        .unwrap()
+        .to_vec();
+    let expected: Vec<u8> = [0x17, 255, 1]
+        .into_iter()
+        .chain(literal.encode_utf16().flat_map(u16::to_le_bytes))
+        .collect();
+    assert_eq!(tokens, expected);
+}
+
 #[test]
 fn authored_formulas_join_reopen_and_durably_invert() {
     let source = Snapshot::from_bytes(formula_free_package()).unwrap();

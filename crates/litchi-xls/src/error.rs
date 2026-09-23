@@ -73,6 +73,18 @@ pub enum Error {
     InvalidData(String),
     /// A requested edit cannot preserve unsupported source records safely.
     UnsafeEdit(String),
+    /// A string is longer than the BIFF8 field that would store it.
+    ///
+    /// The writer returns this before it produces any output; it never
+    /// truncates a string to make it fit.
+    StringTooLong {
+        /// The field that would store the string, such as `"shared string"`.
+        field: &'static str,
+        /// The string's length in UTF-16 code units.
+        utf16_units: usize,
+        /// The most UTF-16 code units the field can store.
+        limit: usize,
+    },
     /// A decoded worksheet cannot be edited through the create-only worksheet API.
     ///
     /// Use a source-checked transaction when one exists for the selected XLS
@@ -152,6 +164,14 @@ impl fmt::Display for Error {
                 write!(f, "Invalid data: {msg}")
             },
             Error::UnsafeEdit(msg) => write!(f, "Unsafe edit refused: {msg}"),
+            Error::StringTooLong {
+                field,
+                utf16_units,
+                limit,
+            } => write!(
+                f,
+                "{field} has {utf16_units} UTF-16 code units; BIFF8 stores at most {limit}"
+            ),
             Error::SourceBoundWorksheetMutation { operation } => write!(
                 f,
                 "source-bound worksheet mutation refused: {operation}; use a source-checked transaction or author a new worksheet"
@@ -346,6 +366,20 @@ mod tests {
         let display = format!("{}", err);
         assert!(display.contains("Invalid data"));
         assert!(display.contains("Corrupted header"));
+    }
+
+    #[test]
+    fn test_xls_error_string_too_long() {
+        let err = Error::StringTooLong {
+            field: "shared string",
+            utf16_units: 65_536,
+            limit: 65_535,
+        };
+        assert_eq!(
+            err.to_string(),
+            "shared string has 65536 UTF-16 code units; BIFF8 stores at most 65535"
+        );
+        assert!(err.source().is_none());
     }
 
     #[test]

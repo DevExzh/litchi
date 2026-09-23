@@ -1,5 +1,8 @@
 //! Workbook-level BIFF8 record writers.
 
+use crate::writer::string_limits::{
+    NUMBER_FORMAT_UNITS, WORKSHEET_NAME_UNITS, checked_utf16_len, u8_len, u16_len,
+};
 use crate::{Error, Result};
 use std::io::Write;
 
@@ -497,31 +500,35 @@ pub(super) fn write_force_full_calculation<W: Write>(writer: &mut W, force: bool
 /// Write FORMAT record (number format string)
 ///
 /// Record type: 0x041E
+///
+/// # Errors
+///
+/// Returns [`Error::StringTooLong`] for a format string longer than the 255
+/// UTF-16 code units `Format.stFormat` allows, before writing anything; the
+/// string is never truncated.
 pub(super) fn write_format_record<W: Write>(
     writer: &mut W,
     index_code: u16,
     format_str: &str,
 ) -> Result<()> {
+    let units = checked_utf16_len(format_str, NUMBER_FORMAT_UNITS, "number format")?;
+    let cch = u16_len(units, "number format")?;
     if format_str.is_ascii() {
-        let bytes = format_str.as_bytes();
-        let cch = crate::utils::truncate_usize_to_u16(bytes.len().min(u16::MAX as usize));
         let data_len = 2u16 + 2 + 1 + cch; // index_code + cch + flags + chars
 
         write_record_header(writer, 0x041E, data_len)?;
         writer.write_all(&index_code.to_le_bytes())?;
         writer.write_all(&cch.to_le_bytes())?;
         writer.write_all(&[0x00])?; // compressed 8-bit
-        writer.write_all(&bytes[..cch as usize])?;
+        writer.write_all(format_str.as_bytes())?;
     } else {
-        let utf16: Vec<u16> = format_str.encode_utf16().collect();
-        let cch = crate::utils::truncate_usize_to_u16(utf16.len().min(u16::MAX as usize));
-        let data_len = 2u16 + 2 + 1 + cch.saturating_mul(2); // index_code + cch + flags + UTF-16LE
+        let data_len = 2u16 + 2 + 1 + cch * 2; // index_code + cch + flags + UTF-16LE
 
         write_record_header(writer, 0x041E, data_len)?;
         writer.write_all(&index_code.to_le_bytes())?;
         writer.write_all(&cch.to_le_bytes())?;
         writer.write_all(&[0x01])?; // UTF-16LE
-        for code_unit in utf16.iter().take(cch as usize) {
+        for code_unit in format_str.encode_utf16() {
             writer.write_all(&code_unit.to_le_bytes())?;
         }
     }
@@ -1063,30 +1070,30 @@ pub(super) fn write_external_link_table<W: Write>(
 ///
 /// * `writer` - Output writer
 /// * `position` - Absolute stream position of BOF record for this sheet
-/// * `name` - Sheet name (max 31 characters)
+/// * `name` - Sheet name (at most 31 UTF-16 code units)
 ///
 /// The sheet name is encoded as `ShortXLUnicodeString` per BIFF8: 1-byte character count,
 /// 1-byte flags (0x00 = compressed 8-bit, 0x01 = uncompressed UTF-16LE), followed by characters.
+///
+/// # Errors
+///
+/// Returns [`Error::StringTooLong`] for a name longer than 31 UTF-16 code
+/// units, before writing anything; the name is never truncated.
 pub(super) fn write_boundsheet<W: Write>(writer: &mut W, position: u32, name: &str) -> Result<()> {
-    let truncated = if name.len() > 31 { &name[..31] } else { name };
+    let units = checked_utf16_len(name, WORKSHEET_NAME_UNITS, "worksheet name")?;
+    let cch = u8_len(units, "worksheet name")?;
 
     // Determine encoding: use compressed 8-bit if all ASCII; otherwise UTF-16LE
-    let is_ascii = truncated.is_ascii();
-    let (cch, flags, name_bytes_vec): (u8, u8, Vec<u8>) = if is_ascii {
-        let bytes = truncated.as_bytes();
-        (
-            crate::utils::truncate_usize_to_u8(bytes.len()),
-            0x00,
-            bytes.to_vec(),
-        )
+    let is_ascii = name.is_ascii();
+    let (flags, name_bytes_vec): (u8, Vec<u8>) = if is_ascii {
+        (0x00, name.as_bytes().to_vec())
     } else {
         // UTF-16LE encoding
-        let utf16: Vec<u16> = truncated.encode_utf16().collect();
-        let mut buf = Vec::with_capacity(utf16.len() * 2);
-        for ch in &utf16 {
+        let mut buf = Vec::with_capacity(units * 2);
+        for ch in name.encode_utf16() {
             buf.extend_from_slice(&ch.to_le_bytes());
         }
-        (crate::utils::truncate_usize_to_u8(utf16.len()), 0x01, buf)
+        (0x01, buf)
     };
 
     // position(4) + options(2) + cch(1) + flags(1) + name bytes
@@ -1107,7 +1114,7 @@ pub(super) fn write_boundsheet<W: Write>(writer: &mut W, position: u32, name: &s
     // ShortXLUnicodeString: cch, flags, chars
     writer.write_all(&[cch])?;
     writer.write_all(&[flags])?;
-    writer.write_all(&name_bytes_vec[..(cch as usize) * if is_ascii { 1 } else { 2 }])?;
+    writer.write_all(&name_bytes_vec)?;
 
     Ok(())
 }

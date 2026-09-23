@@ -5,6 +5,7 @@ use super::super::{
 };
 use crate::encryption::{WriterEncryption, validate_writer_encryption};
 use crate::error::{Error, Result};
+use crate::writer::string_limits::{WORKSHEET_NAME_UNITS, ensure_utf16_len_within};
 use crate::{EncryptionProfile, WeakEncryptionPolicy};
 use zeroize::Zeroizing;
 
@@ -127,21 +128,24 @@ impl Writer {
     ///
     /// # Arguments
     ///
-    /// * `name` - Worksheet name (max 31 characters)
+    /// * `name` - Worksheet name: 1 through 31 UTF-16 code units, the
+    ///   characters BIFF8 counts
     ///
     /// # Returns
     ///
     /// * `Result<usize, Error>` - Worksheet index or error
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// Returns [`Error::StringTooLong`] for a name longer than 31 UTF-16 code
+    /// units, and an error for an empty or duplicate name.
     pub fn add_worksheet(&mut self, name: &str) -> Result<usize> {
         // Validate worksheet name
-        if name.is_empty() || name.len() > 31 {
+        if name.is_empty() {
             return Err(Error::InvalidData(
-                "Worksheet name must be 1-31 characters".to_string(),
+                "Worksheet name must not be empty".to_string(),
             ));
         }
+        ensure_utf16_len_within(name, WORKSHEET_NAME_UNITS, "worksheet name")?;
 
         // Check for duplicate names
         let normalized_name = name.to_lowercase();
