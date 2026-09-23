@@ -372,10 +372,11 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum DiagnosticPhase {
     /// Commits the staged live-document transaction.
     DocumentCommit,
-    /// Captures the persisted slide payloads before package publication.
-    BeforePayloadCapture,
     /// Opens the append-only package editor over the working source.
     EmbeddedOpen,
+    /// Reads the persisted slide payloads through the opened package editor
+    /// before any record is staged.
+    BeforePayloadCapture,
     /// Reads the live document record and checks source consistency before
     /// replacement.
     LiveDocumentRead,
@@ -2083,11 +2084,13 @@ impl Transaction {
             });
         }
 
-        let before_slides = persisted_slides(&working.bytes, &working.document)?;
         let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
             working.bytes.clone(),
             source.limits.max_package_bytes,
         )?;
+        // Nothing is staged yet, so the publishing editor reads exactly the
+        // working artifact's persisted slide payloads.
+        let before_slides = editor_persisted_slides(&editor, &working.document)?;
         let live = editor.persisted_record(source.document_persist_id)?;
         if live.as_slice() != working.document.bytes() {
             return Err(PackageError::Corrupted(
@@ -2214,10 +2217,6 @@ impl Transaction {
             });
         }
 
-        let before_slides =
-            observe_phase(&mut observer, DiagnosticPhase::BeforePayloadCapture, || {
-                persisted_slides(&working.bytes, &working.document)
-            })?;
         let mut editor = observe_phase(&mut observer, DiagnosticPhase::EmbeddedOpen, || {
             Ok(
                 crate::embedded::object::Editor::open_records_arc_with_limit(
@@ -2226,6 +2225,10 @@ impl Transaction {
                 )?,
             )
         })?;
+        let before_slides =
+            observe_phase(&mut observer, DiagnosticPhase::BeforePayloadCapture, || {
+                editor_persisted_slides(&editor, &working.document)
+            })?;
         let _live = observe_phase(&mut observer, DiagnosticPhase::LiveDocumentRead, || {
             let live = editor.persisted_record(source.document_persist_id)?;
             if live.as_slice() != working.document.bytes() {
@@ -3908,6 +3911,13 @@ fn persisted_slides(
         bytes.clone(),
         bytes.len().saturating_mul(4),
     )?;
+    editor_persisted_slides(&editor, document)
+}
+
+fn editor_persisted_slides(
+    editor: &crate::embedded::object::Editor,
+    document: &document_structure::Snapshot,
+) -> Result<BTreeMap<u32, Vec<u8>>> {
     document
         .slides()
         .iter()
@@ -8660,8 +8670,8 @@ mod tests {
             started_phases(&events),
             [
                 DiagnosticPhase::DocumentCommit,
-                DiagnosticPhase::BeforePayloadCapture,
                 DiagnosticPhase::EmbeddedOpen,
+                DiagnosticPhase::BeforePayloadCapture,
                 DiagnosticPhase::LiveDocumentRead,
                 DiagnosticPhase::EmbeddedFinish,
                 DiagnosticPhase::UnrelatedStreamValidation,
@@ -8800,8 +8810,8 @@ mod tests {
             started_phases(&events),
             [
                 DiagnosticPhase::DocumentCommit,
-                DiagnosticPhase::BeforePayloadCapture,
                 DiagnosticPhase::EmbeddedOpen,
+                DiagnosticPhase::BeforePayloadCapture,
                 DiagnosticPhase::LiveDocumentRead,
                 DiagnosticPhase::EmbeddedFinish,
                 DiagnosticPhase::UnrelatedStreamValidation,
@@ -8851,8 +8861,8 @@ mod tests {
             started_phases(&events),
             [
                 DiagnosticPhase::DocumentCommit,
-                DiagnosticPhase::BeforePayloadCapture,
                 DiagnosticPhase::EmbeddedOpen,
+                DiagnosticPhase::BeforePayloadCapture,
                 DiagnosticPhase::LiveDocumentRead,
             ]
         );
@@ -8895,8 +8905,8 @@ mod tests {
             started_phases(&events),
             [
                 DiagnosticPhase::DocumentCommit,
-                DiagnosticPhase::BeforePayloadCapture,
                 DiagnosticPhase::EmbeddedOpen,
+                DiagnosticPhase::BeforePayloadCapture,
                 DiagnosticPhase::LiveDocumentRead,
             ]
         );

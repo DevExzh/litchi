@@ -558,6 +558,58 @@ mod candidate_finish_tests {
     }
 
     #[test]
+    fn open_reads_document_and_current_user_streams_once() {
+        let source = fixture();
+        let editor = Editor::open_records(source.clone()).unwrap();
+        let mut ole = OleFile::open(Cursor::new(source.as_slice())).unwrap();
+        assert_eq!(editor.streams.len(), ole.list_streams().len());
+        assert_eq!(
+            editor.document,
+            ole.open_stream(&stream_refs(&editor.document_path))
+                .unwrap()
+        );
+        assert_eq!(
+            editor.current_user,
+            ole.open_stream(&stream_refs(&editor.current_user_path))
+                .unwrap()
+        );
+        for (path, data) in &editor.streams {
+            if path == &editor.document_path || path == &editor.current_user_path {
+                assert!(data.is_empty(), "{path:?} is owned by its dedicated field");
+            } else {
+                assert_eq!(data, &ole.open_stream(&stream_refs(path)).unwrap());
+            }
+        }
+    }
+
+    #[test]
+    fn finish_ignores_list_payloads_of_the_owned_streams() {
+        let source = fixture();
+        for policy in [SectorLayoutPolicy::Reuse, SectorLayoutPolicy::Rewrite] {
+            let mut lean = Editor::open_records(source.clone()).unwrap();
+            lean.set_sector_layout_policy(policy);
+            let persist_id = lean.document_persist_id;
+            let record = lean.persisted_record(persist_id).unwrap();
+            lean.replace_persisted_record(persist_id, record).unwrap();
+            // The pre-0745 open also copied both owned streams into the list.
+            let mut materialized = lean.clone();
+            let (document, current_user) = (
+                materialized.document.clone(),
+                materialized.current_user.clone(),
+            );
+            for (path, data) in &mut materialized.streams {
+                if *path == materialized.document_path {
+                    data.clone_from(&document);
+                } else if *path == materialized.current_user_path {
+                    data.clone_from(&current_user);
+                }
+            }
+            let expected = materialized.finish().unwrap();
+            assert_eq!(lean.finish().unwrap(), expected, "policy {policy:?}");
+        }
+    }
+
+    #[test]
     fn projected_output_limit_remains_typed() {
         let source = fixture();
         let mut editor = Editor::open_records(source).unwrap();
