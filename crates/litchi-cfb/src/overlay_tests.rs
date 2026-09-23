@@ -971,9 +971,16 @@ fn owned_vec_source_is_sealed_and_publishes_the_generic_bytes() {
     assert_eq!(public.target_fingerprint(), generic.target_fingerprint());
 }
 
-/// Publishes one overlay set through every provenance and returns the direct
-/// output, after asserting that all of them agree on every byte and digest.
+/// Publishes one overlay set through every provenance and every publication
+/// route, asserting that all of them agree on every byte and digest.
 fn assert_provenances_agree(bytes: &[u8], overlays: &dyn Fn() -> Vec<SameLengthStreamOverlay>) {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let directory = std::env::temp_dir().join(format!(
+        "litchi-cfb-overlay-provenances-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    std::fs::create_dir(&directory).unwrap();
     let generic = shared(bytes.to_vec())
         .plan_same_length_stream_overlays(overlays(), limits())
         .unwrap();
@@ -1000,7 +1007,7 @@ fn assert_provenances_agree(bytes: &[u8], overlays: &dyn Fn() -> Vec<SameLengthS
     );
     assert_eq!(generic.is_noop(), expected == bytes);
 
-    for plan in [&generic, &owned_arc, &owned_vec] {
+    for (index, plan) in [&generic, &owned_arc, &owned_vec].into_iter().enumerate() {
         assert_eq!(plan.source_fingerprint(), generic.source_fingerprint());
         assert_eq!(plan.target_fingerprint(), generic.target_fingerprint());
         assert_eq!(plan.changed_spans(), generic.changed_spans());
@@ -1016,12 +1023,18 @@ fn assert_provenances_agree(bytes: &[u8], overlays: &dyn Fn() -> Vec<SameLengthS
         assert_eq!(plan.write_to(&mut again).unwrap(), report);
         assert_eq!(again, expected);
 
+        let destination = directory.join(format!("document-{index}.ole"));
+        assert_eq!(plan.save(&destination).unwrap(), report);
+        assert_eq!(std::fs::read(&destination).unwrap(), expected);
+        std::fs::remove_file(destination).unwrap();
+
         let view = plan.composed_source().unwrap();
         assert_eq!(view.len().unwrap(), bytes.len() as u64);
         let mut viewed = vec![0; bytes.len()];
         view.read_exact_at(0, &mut viewed).unwrap();
         assert_eq!(viewed, expected);
     }
+    std::fs::remove_dir(directory).unwrap();
 }
 
 #[test]
