@@ -1,0 +1,209 @@
+{
+ "remove-45543": {
+  "A": {
+   "allocated_bytes": 11391768,
+   "deallocated_bytes": 11001624,
+   "allocation_calls": 5658,
+   "peak_live_bytes": 1992885,
+   "retained_bytes": 390144
+  },
+  "B": {
+   "allocated_bytes": 11391736,
+   "deallocated_bytes": 11001592,
+   "allocation_calls": 5658,
+   "peak_live_bytes": 1992933,
+   "retained_bytes": 390144
+  },
+  "C": {
+   "allocated_bytes": 9041924,
+   "deallocated_bytes": 8651780,
+   "allocation_calls": 5447,
+   "peak_live_bytes": 1992933,
+   "retained_bytes": 390144
+  }
+ },
+ "remove-41246": {
+  "A": {
+   "allocated_bytes": 10444631,
+   "deallocated_bytes": 10159447,
+   "allocation_calls": 18662,
+   "peak_live_bytes": 1976223,
+   "retained_bytes": 285184
+  },
+  "B": {
+   "allocated_bytes": 10444599,
+   "deallocated_bytes": 10159415,
+   "allocation_calls": 18662,
+   "peak_live_bytes": 1976271,
+   "retained_bytes": 285184
+  },
+  "C": {
+   "allocated_bytes": 9717292,
+   "deallocated_bytes": 9432108,
+   "allocation_calls": 18454,
+   "peak_live_bytes": 1976271,
+   "retained_bytes": 285184
+  }
+ },
+ "remove-durable-45543": {
+  "A": {
+   "allocated_bytes": 11601950,
+   "deallocated_bytes": 11203455,
+   "allocation_calls": 5939,
+   "peak_live_bytes": 1992885,
+   "retained_bytes": 398495
+  },
+  "B": {
+   "allocated_bytes": 11602046,
+   "deallocated_bytes": 11203551,
+   "allocation_calls": 5941,
+   "peak_live_bytes": 1992933,
+   "retained_bytes": 398495
+  },
+  "C": {
+   "allocated_bytes": 9252234,
+   "deallocated_bytes": 8853739,
+   "allocation_calls": 5730,
+   "peak_live_bytes": 1992933,
+   "retained_bytes": 398495
+  }
+ },
+ "chain-durable-45543": {
+  "A": {
+   "allocated_bytes": 21146898,
+   "deallocated_bytes": 20734420,
+   "allocation_calls": 10625,
+   "peak_live_bytes": 2475857,
+   "retained_bytes": 412478
+  },
+  "B": {
+   "allocated_bytes": 21146978,
+   "deallocated_bytes": 20734500,
+   "allocation_calls": 10627,
+   "peak_live_bytes": 2475953,
+   "retained_bytes": 412478
+  },
+  "C": {
+   "allocated_bytes": 16410543,
+   "deallocated_bytes": 15998065,
+   "allocation_calls": 10205,
+   "peak_live_bytes": 2475953,
+   "retained_bytes": 412478
+  }
+ },
+ "apply-durable-45543": {
+  "A": {
+   "allocated_bytes": 10400466,
+   "deallocated_bytes": 10010322,
+   "allocation_calls": 4705,
+   "peak_live_bytes": 1599589,
+   "retained_bytes": 390144
+  },
+  "B": {
+   "allocated_bytes": 10400450,
+   "deallocated_bytes": 10010242,
+   "allocation_calls": 4705,
+   "peak_live_bytes": 1599653,
+   "retained_bytes": 390208
+  },
+  "C": {
+   "allocated_bytes": 7726570,
+   "deallocated_bytes": 7336362,
+   "allocation_calls": 4477,
+   "peak_live_bytes": 1599653,
+   "retained_bytes": 390208
+  }
+ },
+ "noop-45543": {
+  "A": {
+   "allocated_bytes": 1348321,
+   "deallocated_bytes": 963297,
+   "allocation_calls": 1373,
+   "peak_live_bytes": 703148,
+   "retained_bytes": 385024
+  },
+  "B": {
+   "allocated_bytes": 1348193,
+   "deallocated_bytes": 963169,
+   "allocation_calls": 1371,
+   "peak_live_bytes": 703148,
+   "retained_bytes": 385024
+  },
+  "C": {
+   "allocated_bytes": 1024125,
+   "deallocated_bytes": 639101,
+   "allocation_calls": 1354,
+   "peak_live_bytes": 442477,
+   "retained_bytes": 385024
+  }
+ },
+ "hide-45543": {
+  "A": {
+   "allocated_bytes": 10382391,
+   "deallocated_bytes": 9985079,
+   "allocation_calls": 3963,
+   "peak_live_bytes": 1555090,
+   "retained_bytes": 397312
+  },
+  "B": {
+   "allocated_bytes": 10382311,
+   "deallocated_bytes": 9984999,
+   "allocation_calls": 3962,
+   "peak_live_bytes": 1555090,
+   "retained_bytes": 397312
+  },
+  "C": {
+   "allocated_bytes": 8110393,
+   "deallocated_bytes": 7713081,
+   "allocation_calls": 3858,
+   "peak_live_bytes": 1555090,
+   "retained_bytes": 397312
+  }
+ },
+ "doc-replace-floating": {
+  "A": {
+   "allocated_bytes": 14115027,
+   "deallocated_bytes": 13772499,
+   "allocation_calls": 15141,
+   "peak_live_bytes": 3128190,
+   "retained_bytes": 342528
+  },
+  "B": {
+   "allocated_bytes": 14115027,
+   "deallocated_bytes": 13772499,
+   "allocation_calls": 15141,
+   "peak_live_bytes": 3128190,
+   "retained_bytes": 342528
+  },
+  "C": {
+   "allocated_bytes": 14115027,
+   "deallocated_bytes": 13772499,
+   "allocation_calls": 15141,
+   "peak_live_bytes": 3128190,
+   "retained_bytes": 342528
+  }
+ },
+ "doc-replace-durable-floating": {
+  "A": {
+   "allocated_bytes": 14153167,
+   "deallocated_bytes": 13810070,
+   "allocation_calls": 15362,
+   "peak_live_bytes": 3128190,
+   "retained_bytes": 343097
+  },
+  "B": {
+   "allocated_bytes": 14153167,
+   "deallocated_bytes": 13810070,
+   "allocation_calls": 15362,
+   "peak_live_bytes": 3128190,
+   "retained_bytes": 343097
+  },
+  "C": {
+   "allocated_bytes": 14153167,
+   "deallocated_bytes": 13810070,
+   "allocation_calls": 15362,
+   "peak_live_bytes": 3128190,
+   "retained_bytes": 343097
+  }
+ }
+}

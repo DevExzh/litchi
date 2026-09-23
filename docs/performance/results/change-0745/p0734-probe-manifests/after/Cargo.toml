@@ -1,0 +1,28 @@
+[package]
+name = "ole-format-save-probe-0734"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "ole_format_save_probe"
+path = "src/main.rs"
+
+[[bin]]
+name = "ole_format_save_probe_alloc"
+path = "src/bin/alloc.rs"
+
+[dependencies]
+litchi-cfb = { path = "/home/zhuhe/code/litchi-worktrees/0745-ppt-lazy-artifact-digests/crates/litchi-cfb" }
+litchi-core = { path = "/home/zhuhe/code/litchi-worktrees/0745-ppt-lazy-artifact-digests/crates/litchi-core" }
+litchi-doc = { path = "/home/zhuhe/code/litchi-worktrees/0745-ppt-lazy-artifact-digests/crates/litchi-doc" }
+litchi-ole-common = { path = "/home/zhuhe/code/litchi-worktrees/0745-ppt-lazy-artifact-digests/crates/litchi-ole-common" }
+litchi-ppt = { path = "/home/zhuhe/code/litchi-worktrees/0745-ppt-lazy-artifact-digests/crates/litchi-ppt" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+
+[profile.release]
+debug = 1
