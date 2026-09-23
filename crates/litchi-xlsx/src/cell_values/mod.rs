@@ -54,6 +54,9 @@ mod admission_tests;
 #[path = "facts_oracle_tests.rs"]
 mod facts_oracle_tests;
 mod patch;
+#[cfg(test)]
+#[path = "publication_audit_tests.rs"]
+mod publication_audit_tests;
 mod snapshot;
 mod source;
 mod validation;

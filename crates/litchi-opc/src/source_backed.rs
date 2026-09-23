@@ -7934,8 +7934,11 @@ impl SourceBackedPackage {
                     part.partname.as_str(),
                     &part.content_type,
                 ) {
-                    validate_source_part_xml(part.partname.as_str(), original.as_bytes())?;
-                    validate_source_part_xml(part.partname.as_str(), &replacement.replacement)?;
+                    validate_source_part_replacement_xml(
+                        part.partname.as_str(),
+                        original.as_bytes(),
+                        &replacement.replacement,
+                    )?;
                 }
                 changed.push(ChangedOverlay {
                     target: ChangedOverlayTarget::Part(replacement.target),
@@ -8369,8 +8372,11 @@ impl SourceBackedPackage {
             target_part.partname.as_str(),
             &target_part.content_type,
         ) {
-            validate_source_part_xml(target_part.partname.as_str(), original.as_bytes())?;
-            validate_source_part_xml(target_part.partname.as_str(), &replacement)?;
+            validate_source_part_replacement_xml(
+                target_part.partname.as_str(),
+                original.as_bytes(),
+                &replacement,
+            )?;
         }
         // Changed publication re-reads unchanged source records and only
         // owns the replacement payload.
@@ -8482,11 +8488,17 @@ impl SourceBackedPackage {
             target_part.partname.as_str(),
             &target_part.content_type,
         ) {
-            validate_source_part_xml(target_part.partname.as_str(), original_part.as_bytes())?;
-            validate_source_part_xml(target_part.partname.as_str(), &replacement)?;
+            validate_source_part_replacement_xml(
+                target_part.partname.as_str(),
+                original_part.as_bytes(),
+                &replacement,
+            )?;
         }
-        validate_source_part_xml(relationship_uri.as_str(), &original_relationships)?;
-        validate_source_part_xml(relationship_uri.as_str(), &relationship_xml)?;
+        validate_source_part_replacement_xml(
+            relationship_uri.as_str(),
+            &original_relationships,
+            &relationship_xml,
+        )?;
         drop(original_part);
 
         let changed = [
@@ -8679,8 +8691,11 @@ impl SourceBackedPackage {
                 .partname
                 .rels_uri()
                 .map_err(OpcError::InvalidPackUri)?;
-            validate_source_part_xml(relationship_uri.as_str(), original_relationships.as_slice())?;
-            validate_source_part_xml(relationship_uri.as_str(), relationship_xml)?;
+            validate_source_part_replacement_xml(
+                relationship_uri.as_str(),
+                original_relationships.as_slice(),
+                relationship_xml,
+            )?;
             relationship_entries.push((*relationship_entry, relationship_xml.len()));
         }
         self.validate_combined_relationship_overlay_limits(
@@ -8703,8 +8718,11 @@ impl SourceBackedPackage {
                 target_part.partname.as_str(),
                 &target_part.content_type,
             ) {
-                validate_source_part_xml(target_part.partname.as_str(), original.as_bytes())?;
-                validate_source_part_xml(target_part.partname.as_str(), &overlay.replacement)?;
+                validate_source_part_replacement_xml(
+                    target_part.partname.as_str(),
+                    original.as_bytes(),
+                    &overlay.replacement,
+                )?;
             }
             if original.as_bytes() != overlay.replacement.as_slice() {
                 changed.push(ChangedOverlay {
@@ -8951,8 +8969,11 @@ impl SourceBackedPackage {
                 target_part.partname.as_str(),
                 &target_part.content_type,
             ) {
-                validate_source_part_xml(target_part.partname.as_str(), original.as_bytes())?;
-                validate_source_part_xml(target_part.partname.as_str(), &overlay.replacement)?;
+                validate_source_part_replacement_xml(
+                    target_part.partname.as_str(),
+                    original.as_bytes(),
+                    &overlay.replacement,
+                )?;
             }
             drop(original);
             replacements.push(ChangedOverlay {
@@ -11201,37 +11222,54 @@ fn validate_overlay_xml(part: &str, bytes: &[u8]) -> Result<()> {
 }
 
 /// Audit a Part or relationship stream that a source-backed publication
-/// replaces, on either side of the replacement.
+/// replaces, on both sides of the replacement: the original bytes the package
+/// holds, then the replacement published in their place.
 ///
-/// Change 0654 introduced this for the *original* bytes: they were written by
-/// whatever produced the package, this library did not author them, and the
-/// compact output contract does not apply to them (change 0652, decision 2).
-/// Change 0657 extended it to the *replacement* at the seven paired sites,
-/// because a source-backed replacement is a splice: the XLSX value editor
-/// copies every unedited row and cell record and the whole envelope from the
-/// source and authors compact bytes only for the cells it changed, so holding
-/// the assembled part to the compact contract refuses the producer's own
-/// indentation and, with it, every real third-party package. Compactness is
-/// therefore a property of this library's serializers, asserted by their own
-/// tests, and not a publication refusal on this route.
+/// Change 0654 introduced the source policy for the *original* bytes: they
+/// were written by whatever produced the package, this library did not author
+/// them, and the compact output contract does not apply to them (change 0652,
+/// decision 2). Change 0657 extended it to the *replacement* at the seven
+/// paired sites, because a source-backed replacement is a splice: the XLSX
+/// value editor copies every unedited row and cell record and the whole
+/// envelope from the source and authors compact bytes only for the cells it
+/// changed, so holding the assembled part to the compact contract refuses the
+/// producer's own indentation and, with it, every real third-party package.
+/// Compactness is therefore a property of this library's serializers,
+/// asserted by their own tests, and not a publication refusal on this route.
 ///
-/// Every other check stays, and reports the same
+/// Every other check stays, on both sides, and reports the same
 /// [`OpcError::XmlPublication`] [`validate_overlay_xml`] reports: UTF-8,
 /// well-formed XML, exactly one document element, no DTD or DOCTYPE, and
 /// every [`xml_minifier::audit::Limits`] budget. Indentation, a line ending
 /// after the XML declaration, attribute separators of any length and
 /// whitespace before a tag close are accepted as the producer spelled them.
 ///
+/// Change 0747 audits the pair with one
+/// [`xml_minifier::audit::verify_source_replacement`] call. Its verdict is
+/// exactly that of auditing the original and then the replacement with
+/// `verify_source`, including which side fails first and the error it
+/// reports; it only avoids scanning again the replacement bytes that repeat
+/// the original's outside the one element an edit replaced, which the
+/// original's audit checked in the same parser state moments earlier.
+///
 /// [`validate_overlay_xml`] keeps the authored contract where this library
 /// composes a whole stream with no source to inherit from: its canonical
 /// relationship XML and a Part a plan *adds*.
-fn validate_source_part_xml(part: &str, bytes: &[u8]) -> Result<()> {
-    xml_minifier::audit::verify_source(bytes, xml_minifier::audit::Limits::default())
-        .map(|_report| ())
-        .map_err(|source| OpcError::XmlPublication {
-            part: part.to_string(),
-            source,
-        })
+fn validate_source_part_replacement_xml(
+    part: &str,
+    original: &[u8],
+    replacement: &[u8],
+) -> Result<()> {
+    xml_minifier::audit::verify_source_replacement(
+        original,
+        replacement,
+        xml_minifier::audit::Limits::default(),
+    )
+    .map(|_proof| ())
+    .map_err(|error| OpcError::XmlPublication {
+        part: part.to_string(),
+        source: error.into_error(),
+    })
 }
 
 fn checked_overlay_total(
