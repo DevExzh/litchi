@@ -1,0 +1,59 @@
+start 2026-09-23T00:50:17Z  20:50:17 up 11 days, 18:17,  2 users,  load average: 6.18, 10.06, 10.80
+54016.xls:open                         open_ns   before   10.640 ms  after    7.564 ms  ratio 0.715 CI [0.678, 0.743]
+54016.xls:number-plan                  commit_ns before   11.509 ms  after    4.776 ms  ratio 0.415 CI [0.400, 0.440]
+54016.xls:number-source-backed         commit_ns before   14.953 ms  after   11.546 ms  ratio 0.768 CI [0.764, 0.776]
+54016.xls:number-generic               commit_ns before   24.094 ms  after   13.276 ms  ratio 0.553 CI [0.525, 0.558]
+54016.xls:string-generic               commit_ns before   24.533 ms  after   13.915 ms  ratio 0.569 CI [0.557, 0.571]
+54016.xls:comments-open                open_ns   before   11.221 ms  after    7.483 ms  ratio 0.678 CI [0.610, 0.683]
+54016.xls:visibility-open              open_ns   before   11.055 ms  after    6.993 ms  ratio 0.623 CI [0.596, 0.653]
+54016.xls:reader-open                  open_ns   before   10.595 ms  after   10.430 ms  ratio 0.979 CI [0.950, 1.001]
+xls-large.xls:open                     open_ns   before    1.568 ms  after    1.360 ms  ratio 0.853 CI [0.848, 0.922]
+xls-large.xls:number-plan              commit_ns before    1.598 ms  after    0.692 ms  ratio 0.433 CI [0.399, 0.436]
+xls-large.xls:number-source-backed     commit_ns before    2.187 ms  after    1.815 ms  ratio 0.836 CI [0.825, 0.841]
+xls-large.xls:number-generic           commit_ns before    3.473 ms  after    2.212 ms  ratio 0.637 CI [0.589, 0.665]
+xls-large.xls:comments-open            open_ns   before    1.536 ms  after    1.300 ms  ratio 0.836 CI [0.751, 0.870]
+xls-large.xls:visibility-open          open_ns   before    1.449 ms  after    1.228 ms  ratio 0.851 CI [0.820, 0.884]
+xls-large.xls:reader-open              open_ns   before    1.430 ms  after    1.388 ms  ratio 0.968 CI [0.922, 1.000]
+54016.xls      open                  instr    154,144,661 ->     85,426,375 ( -44.6%)  cycles     53,896,767 ->     35,792,984 ( -33.6%)
+54016.xls      number-plan           instr    153,836,255 ->     85,747,297 ( -44.3%)  cycles     61,342,245 ->     26,412,947 ( -56.9%)
+54016.xls      number-source-backed  instr    185,045,516 ->    116,599,467 ( -37.0%)  cycles     79,337,685 ->     55,688,809 ( -29.8%)
+54016.xls      number-generic        instr    219,517,267 ->    118,840,583 ( -45.9%)  cycles    110,789,804 ->     60,093,272 ( -45.8%)
+54016.xls      string-generic        instr    230,424,097 ->    129,180,485 ( -43.9%)  cycles    112,403,452 ->     63,453,876 ( -43.5%)
+54016.xls      comments-open         instr    146,272,446 ->     77,848,491 ( -46.8%)  cycles     52,302,875 ->     30,287,252 ( -42.1%)
+54016.xls      visibility-open       instr    140,622,628 ->     72,199,896 ( -48.7%)  cycles     52,928,168 ->     30,005,456 ( -43.3%)
+54016.xls      reader-open           instr    139,964,826 ->    139,739,210 (  -0.2%)  cycles     44,699,968 ->     43,209,843 (  -3.3%)
+xls-large.xls  open                  instr     25,472,291 ->     13,473,226 ( -47.1%)  cycles      7,179,989 ->      6,033,228 ( -16.0%)
+xls-large.xls  number-plan           instr     25,198,850 ->     13,237,949 ( -47.5%)  cycles      7,585,278 ->      3,685,368 ( -51.4%)
+xls-large.xls  number-source-backed  instr     29,254,784 ->     17,261,772 ( -41.0%)  cycles     10,356,263 ->      8,632,944 ( -16.6%)
+xls-large.xls  number-generic        instr     34,771,216 ->     17,359,006 ( -50.1%)  cycles     15,079,813 ->      9,784,724 ( -35.1%)
+xls-large.xls  comments-open         instr     24,761,610 ->     12,837,017 ( -48.2%)  cycles      6,750,186 ->      5,273,417 ( -21.9%)
+xls-large.xls  visibility-open       instr     23,503,394 ->     11,528,024 ( -51.0%)  cycles      6,866,161 ->      6,073,669 ( -11.5%)
+xls-large.xls  reader-open           instr     23,397,826 ->     23,382,500 (  -0.1%)  cycles      6,490,953 ->      6,198,289 (  -4.5%)
+xls_semantic_one_edit_save                       before    3.4281 ms  after    1.6082 ms  ratio 0.466 CI [0.462, 0.476]
+xls_semantic_noop_edit_save                      before    0.0026 ms  after    0.0028 ms  ratio 1.079 CI [0.966, 1.831]
+xls_semantic_open                                before    1.4655 ms  after    1.3713 ms  ratio 0.943 CI [0.912, 0.997]
+xls_semantic_full_cell_scan                      before    0.0754 ms  after    0.0740 ms  ratio 0.993 CI [0.933, 1.054]
+xls_numeric_eager_number_edit_save               before   27.8234 ms  after   14.7346 ms  ratio 0.534 CI [0.506, 0.686]
+xls_numeric_source_backed_number_edit_save       before   78.3141 ms  after   75.4171 ms  ratio 0.963 CI [0.958, 0.963]
+xls_numeric_plan_only_number_edit_save           before   33.6813 ms  after   33.7348 ms  ratio 1.003 CI [0.996, 1.011]
+xls_numeric_eager_rk_mulrk_edit_save             before    2.3963 ms  after    1.2340 ms  ratio 0.515 CI [0.513, 0.516]
+xls_numeric_source_backed_rk_mulrk_edit_save     before    0.8234 ms  after    0.8239 ms  ratio 1.001 CI [1.000, 1.004]
+xls_numeric_plan_only_rk_mulrk_edit_save         before    0.4036 ms  after    0.4041 ms  ratio 1.000 CI [0.995, 1.004]
+xls_comments_eager_edit_save                     before   22.2981 ms  after   17.6413 ms  ratio 0.771 CI [0.701, 0.806]
+xls_comments_source_backed_edit_save             before   33.6907 ms  after   35.0138 ms  ratio 1.040 CI [0.922, 1.079]
+xls_comments_eager_batch_edit_save               before   21.4804 ms  after   15.3996 ms  ratio 0.772 CI [0.593, 0.793]
+xls_comments_source_backed_batch_edit_save       before   36.6166 ms  after   34.3121 ms  ratio 0.937 CI [0.928, 1.004]
+xls_visibility_eager_edit_save                   before   25.9268 ms  after   13.5895 ms  ratio 0.526 CI [0.520, 0.528]
+xls_visibility_source_backed_edit_save           before   10.3407 ms  after   10.3265 ms  ratio 0.999 CI [0.994, 1.001]
+xls_visibility_eager_batch_edit_save             before   25.7773 ms  after   13.5061 ms  ratio 0.524 CI [0.521, 0.529]
+xls_visibility_source_backed_batch_edit_save     before   10.2769 ms  after   10.2655 ms  ratio 0.999 CI [0.993, 1.002]
+xls_owned_source_control_open_one_cell           before    0.5787 ms  after    0.5574 ms  ratio 0.961 CI [0.922, 1.037]
+xls_comments_eager_edit_save                 instr    204,361,239 ->    197,692,120 ( -3.26%)  cycles    187,643,437 ->    177,273,232 ( -5.53%)
+xls_comments_eager_batch_edit_save           instr    210,441,843 ->    202,912,074 ( -3.58%)  cycles    185,852,021 ->    176,517,432 ( -5.02%)
+xls_comments_source_backed_batch_edit_save   instr    357,157,570 ->    356,748,628 ( -0.11%)  cycles    286,518,589 ->    282,468,746 ( -1.41%)
+xls_visibility_eager_edit_save               instr    180,159,551 ->    112,284,263 (-37.68%)  cycles    134,961,857 ->     81,371,797 (-39.71%)
+xls_visibility_eager_batch_edit_save         instr    180,213,294 ->    112,385,788 (-37.64%)  cycles    135,957,262 ->     84,428,236 (-37.90%)
+xls_semantic_noop_edit_save                  instr    143,201,064 ->    121,205,083 (-15.36%)  cycles     41,368,942 ->     42,315,162 ( +2.29%)
+xls_semantic_one_edit_save                   instr    227,098,330 ->    166,363,200 (-26.74%)  cycles     71,273,183 ->     54,711,326 (-23.24%)
+end 2026-09-23T00:56:09Z  20:56:09 up 11 days, 18:23,  2 users,  load average: 16.77, 14.78, 12.61
+final run done

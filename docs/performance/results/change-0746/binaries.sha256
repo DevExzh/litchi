@@ -1,0 +1,31 @@
+# SHA-256 of every binary measured or used for correctness in change 0746
+# probe-* / corpus-* / matrix-* / mutate-*: scratch probe crate (probe/), rustc 1.98.1, release debug=1
+#   *-before: base 009d515bef; *-fix: 3a2f233cdc; *-after: b85d3e534c (shipped); probe-after-v1: working tree at ec747fbd64; probe-c4: rebuild at 3eea4a8bec
+#   probe-*-alloc: same with --features alloc-count; probe-*-fp: frame-pointer profiling builds (probe-after-fp at 3eea4a8bec, probe-after-v1-fp at the ec747fbd64 working tree)
+# harness-*: tools/perf-baseline litchi-perf-baseline, rustc 1.95.0; harness-before = shared prebuilt base; harness-before-selfbuilt = base built with the after leg's command
+# harness-alloc-*: litchi-perf-baseline-alloc (--features allocator-metrics)
+# first-run after binaries (3eea4a8bec state, since overwritten): probe-after 58512767b8a63986fe83df86b5144b069f49bd0829f306052068580f24caea25, probe-after-alloc 5dd34c90739e9ea7bb689697f4c0dbce13ea037231205351f0e062706c2f5b9c, harness-after a864e839d4feb12cc7be5cc3a5dad1c0aba99cb20ed219ac5e92f49b17e87fbd, corpus-after c07785e35ad5091ab41cdacc7eb21e02c5656cd92742215c5c2c3854a8076ea8, matrix-after af8a77524692ea17ff9c5eba67031a20810aeac251604c82bb8528ff83dd0c78, mutate-after eee4a58e65a37eabfbb6e489d74c117bda1b5f684c8b11b9df3c6cca1b4e33dc
+80f605d95f49fe1a4a9da80339decfa0c0ce24fb159c665237c14420a27a21d3  corpus-after
+b40f31e733ab773de181fd3511c750c9aab6f7ac05ce042f54608741ba62b915  corpus-before
+a975b554f6b0d44aebc03afb83cfa9b5a8482c6a4165df6b30b1e139422aab3a  corpus-fix
+3770413da4aefb9960a119e7ec51c28d067caf298ab50b8631b000a276da3722  harness-after
+4e1588e092643129c2e8b838a12f126e7664e60be2b66c02c5bc8a99ca91d649  harness-alloc-after
+24555dcb895d2400c27b107d78a310135e21770e82fb9122c8ecadcfe2d7e7ec  harness-alloc-before
+fb535ebb4abb4154c4ac445b90a60399edf189d52cae76fea2947852a406cb0b  harness-before
+14c6faf985f2c04a50f7700f1f7d92a2ecd3f4d1678241d93e504d601217e469  harness-before-selfbuilt
+0d30fa558c38777417b04e96c8b62cfedd834e1a5d7541eeaea5c74ab3282c54  matrix-after
+21ab10ffe7cee0f9288654aee90f75a63ae29d36a78357e2db611c61c5d9392c  matrix-before
+fd472e23bfd890c463eb8a9a285478eb525d566b1372439427962f66f27b42f2  matrix-fix
+48deef277af61f55ef1092fea3a7bee2db4d6651605d1bd1c451ab73db8a70e9  mutate-after
+976041a84886d8324fc82306f7264907129084a267d261c6fa1d4e30ed3bdcb8  mutate-before
+27fdabcdeaef2eee421736e1f6068cbb16ccd25585451ea16dca701eafc32717  mutate-fix
+4707d0a5bae9a541d1e872876746cd2456288549d0970754a3e67b47a2853c4f  probe-after
+92000f09d4b434bcf9ee770b30e014d076d42611ec58f0ad5f6b965f69556b16  probe-after-alloc
+86cd756ccadd5304d27330ee154b6dfaee5edc133f0b9b034819a0c19fb0ce28  probe-after-fp
+38485d63cc88e47edb74c061f1d4f790048d29c1dc5da59c1ecec10b3aad65e4  probe-after-v1
+962e78f287bfeabe0ece9be03987d992b2357a2fdc5636561fa91d73407a9f96  probe-after-v1-fp
+2448a2ff1be753d8e1ba124715d97e07af8370f413f8a06d037f264918fbca13  probe-before
+0905c790b90da121f5a61a5207cc6397a6f78b3aa528636d2278c922c99015fd  probe-before-alloc
+fdf4360b5aead4141555a30c17f26fd4f35dd9e3f00e93d830f094cce383b4cd  probe-before-fp
+9117c4891f776b3e0ba861343bee0173ff5384df3dc12bfbe2d640da6e3a6183  probe-c4
+f7476cc74c2fe817ee135c312653d98f41a1c165fe5d6ed15d9bfaf99f4a58c3  probe-fix

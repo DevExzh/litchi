@@ -1,0 +1,56 @@
+{
+ "change": "0746",
+ "performed_after": "the record commit was created (binary SHA-256s recorded in binaries.sha256, all gates run); that commit was then amended to add this file",
+ "deleted": [
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0746",
+   "bytes": 47894495599,
+   "what": "after-leg target dir: debug/release litchi-xls and facade builds for the gates, the probe (plain, alloc-count, frame-pointer) and the harness (native and allocator-metrics) builds"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0746-before",
+   "bytes": 4115811644,
+   "what": "before-leg target dir: base probe builds (plain, alloc-count, frame-pointer), the fix-only and 3eea4a8bec probe rebuilds, the base harness (native and allocator-metrics) and the base clippy check"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/0746-before-src",
+   "bytes": 10150295703,
+   "method": "git worktree remove --force",
+   "what": "detached worktree used for the fix-only correctness leg (3a2f233cdc) and the 3eea4a8bec layout rebuild"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/scratch/0746/*",
+   "bytes": 1848684309,
+   "what": "staged binaries, perf.data files (~394 MB), the 9.4 MB mutation outputs of each leg, probe manifests and sources (copied into probe/), drafts and intermediate JSON"
+  }
+ ],
+ "retained_in_packet": [
+  "probe/ sources and manifests",
+  "scripts/",
+  "latency-probe/ (120 raw reports)",
+  "latency-harness-selfbuilt/ and latency-harness/ (152 raw reports each)",
+  "instructions/ and instructions-harness/",
+  "alloc/",
+  "attribution/",
+  "layout/",
+  "profiles/ (summaries only)",
+  "correctness/ (matrix outputs, one census output, SHA-256 of every output, mutation summary)",
+  "superseded-run-3eea4a8bec/ (summaries only)",
+  "binaries.sha256",
+  "environment.txt",
+  "gates.txt",
+  "logs/",
+  "log-sections.md"
+ ],
+ "kept": [
+  "/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse (worktree)",
+  "perf/0746-xls-validation-only-parse (branch)"
+ ],
+ "not_touched": [
+  "the main checkout",
+  "base-009d515bef (read-only use)",
+  "targets/base-009d515bef (the shared prebuilt harness, copied for use)",
+  "other implementers' worktrees and target dirs"
+ ],
+ "tmp_usage": "no files left under /tmp; the session scratchpad was not used for artifacts"
+}

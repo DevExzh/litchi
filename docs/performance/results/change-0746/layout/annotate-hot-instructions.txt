@@ -1,0 +1,41 @@
+# Hottest instructions of parse_worksheet_records_with_compatibility::<ValidateCells>
+# perf record -e cycles:u on xls-large open (400 samples), perf annotate --stdio
+
+## probe-c4 (fast layout; function = 32.0% of process cycles)
+   65.78 :   19d35d:        movups  -0x3c(%rcx), %xmm1
+    3.74 :   19cd70:        jne     0x19f44e <<litchi_xls::workbook::model::Workbook<core::io::cursor::Cursor<&[u8]>>>::
+    3.50 :   19cd9c:        jne     0x19f44e <<litchi_xls::workbook::model::Workbook<core::io::cursor::Cursor<&[u8]>>>::
+    3.43 :   19cbdc:        jne     0x19f44e <<litchi_xls::workbook::model::Workbook<core::io::cursor::Cursor<&[u8]>>>::
+    2.64 :   19cc60:        jne     0x19f44e <<litchi_xls::workbook::model::Workbook<core::io::cursor::Cursor<&[u8]>>>::
+    2.20 :   19cbea:        leaq    0xca0(%rsp), %rsi
+    1.71 :   19cdaa:        movl    %ebp, %esi
+    1.54 :   19cf9d:        jne     0x19fd0d <<litchi_xls::workbook::model::Workbook<core::io::cursor::Cursor<&[u8]>>>::
+
+## probe-after, final commit (slow layout; function = 51.4% of process cycles)
+   30.87 :   19ea7d:        movups  -0x3c(%rcx), %xmm1
+   13.48 :   19e2fc:        jne     0x1a0bac <<litchi_xls::workbook::model::Workbook<core::io::cursor::Cursor<&[u8]>>>::
+   10.37 :   19e380:        jne     0x1a0bac <<litchi_xls::workbook::model::Workbook<core::io::cursor::Cursor<&[u8]>>>::
+    9.99 :   19e4bc:        jne     0x1a0bac <<litchi_xls::workbook::model::Workbook<core::io::cursor::Cursor<&[u8]>>>::
+    9.93 :   19e490:        jne     0x1a0bac <<litchi_xls::workbook::model::Workbook<core::io::cursor::Cursor<&[u8]>>>::
+    5.33 :   19e26c:        jne     0x1a0bac <<litchi_xls::workbook::model::Workbook<core::io::cursor::Cursor<&[u8]>>>::
+    4.57 :   19e38e:        leaq    0x3f0(%rsp), %rdi
+    2.10 :   19e30a:        leaq    0xca0(%rsp), %rsi
+
+## context of the hottest instruction (final build): the 16-byte reloads of the CellRecord that CellRecord::parse just returned through the stack
+    0.13 :   19ea49:        jmpq    *%rax
+    0.13 :   19ea4b:        leaq    0x3f0(%rsp), %rdi
+    0.03 :   19ea53:        movl    %ebp, %esi
+    0.00 :   19ea55:        movq    %r13, %rdx
+    0.00 :   19ea58:        movq    %r15, %rcx
+    0.00 :   19ea5b:        movq    0x80(%rsp), %r8
+    0.00 :   19ea63:        callq   *0x2723df(%rip)  # 0x410e48 <_DYNAMIC+0x358>
+    0.00 :   19ea69:        movq    0x3f0(%rsp), %rax
+    0.00 :   19ea71:        leaq    0x444(%rsp), %rcx
+    0.00 :   19ea79:        movups  -0x4c(%rcx), %xmm0
+   30.87 :   19ea7d:        movups  -0x3c(%rcx), %xmm1
+    0.00 :   19ea81:        movups  -0x2c(%rcx), %xmm2
+    0.00 :   19ea85:        movaps  %xmm0, 0x150(%rsp)
+    0.00 :   19ea8d:        movaps  %xmm1, 0x160(%rsp)
+    0.00 :   19ea95:        movaps  %xmm2, 0x170(%rsp)
+    0.00 :   19ea9d:        cmpq    $-0x1, %rax
+    0.00 :   19eaa1:        je      0x1a1c54 <<litchi_xls::workbook::model::Workbook<core::io::cursor::Cursor<&[u8]>>>::

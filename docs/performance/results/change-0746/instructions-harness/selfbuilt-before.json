@@ -1,0 +1,157 @@
+[
+ {
+  "selector": "xls_comments_source_backed_edit_save",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 3262282150,
+    "cycles": 2237458413
+   },
+   "raw_large": {
+    "instructions": 10207744449,
+    "cycles": 7817880021
+   },
+   "instructions_per_sample": 347273114.95,
+   "cycles_per_sample": 279021080.4
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 3257114778,
+    "cycles": 2165246268
+   },
+   "raw_large": {
+    "instructions": 10204217518,
+    "cycles": 7746070287
+   },
+   "instructions_per_sample": 347355137.0,
+   "cycles_per_sample": 279041200.95
+  },
+  "instructions_per_sample_change": 0.00023618888554577389,
+  "cycles_per_sample_change": 7.211121816008692e-05
+ },
+ {
+  "selector": "xls_semantic_open",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 1571681344,
+    "cycles": 635332452
+   },
+   "raw_large": {
+    "instructions": 4393196590,
+    "cycles": 1459129089
+   },
+   "instructions_per_sample": 141075762.3,
+   "cycles_per_sample": 41189831.85
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 1533218598,
+    "cycles": 661586611
+   },
+   "raw_large": {
+    "instructions": 4151645642,
+    "cycles": 1472696347
+   },
+   "instructions_per_sample": 130921352.2,
+   "cycles_per_sample": 40555486.8
+  },
+  "instructions_per_sample_change": -0.0719784173726914,
+  "cycles_per_sample_change": -0.015400525360484196
+ },
+ {
+  "selector": "xls_semantic_full_cell_scan",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 1579192843,
+    "cycles": 641482067
+   },
+   "raw_large": {
+    "instructions": 4436458621,
+    "cycles": 1482855326
+   },
+   "instructions_per_sample": 142863288.9,
+   "cycles_per_sample": 42068662.95
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 1540447020,
+    "cycles": 665177472
+   },
+   "raw_large": {
+    "instructions": 4194509431,
+    "cycles": 1578945366
+   },
+   "instructions_per_sample": 132703120.55,
+   "cycles_per_sample": 45688394.7
+  },
+  "instructions_per_sample_change": -0.07111811878495822,
+  "cycles_per_sample_change": 0.08604342273254972
+ },
+ {
+  "selector": "xls_visibility_eager_edit_save",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 2075026302,
+    "cycles": 1278513025
+   },
+   "raw_large": {
+    "instructions": 5678300434,
+    "cycles": 3930015999
+   },
+   "instructions_per_sample": 180163706.6,
+   "cycles_per_sample": 132575148.7
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 1738151701,
+    "cycles": 1006897235
+   },
+   "raw_large": {
+    "instructions": 3984308812,
+    "cycles": 2587343385
+   },
+   "instructions_per_sample": 112307855.55,
+   "cycles_per_sample": 79022307.5
+  },
+  "instructions_per_sample_change": -0.3766344083975457,
+  "cycles_per_sample_change": -0.40394328594104
+ },
+ {
+  "selector": "xls_comments_eager_edit_save",
+  "small": 4,
+  "large": 24,
+  "before": {
+   "raw_small": {
+    "instructions": 2516540115,
+    "cycles": 1662125044
+   },
+   "raw_large": {
+    "instructions": 6603481912,
+    "cycles": 5213975056
+   },
+   "instructions_per_sample": 204347089.85,
+   "cycles_per_sample": 177592500.6
+  },
+  "after": {
+   "raw_small": {
+    "instructions": 2477018109,
+    "cycles": 1611076289
+   },
+   "raw_large": {
+    "instructions": 6431310041,
+    "cycles": 5092020559
+   },
+   "instructions_per_sample": 197714596.6,
+   "cycles_per_sample": 174047213.5
+  },
+  "instructions_per_sample_change": -0.032456998799780035,
+  "cycles_per_sample_change": -0.019963045106196287
+ }
+]

@@ -1,0 +1,36 @@
+[package]
+name = "xls-edit-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "xls_edit_probe"
+path = "../probe/src/main.rs"
+
+[[bin]]
+name = "xls_edit_corpus"
+path = "../probe/src/corpus.rs"
+
+[[bin]]
+name = "xls_error_matrix"
+path = "../probe/src/matrix.rs"
+
+[[bin]]
+name = "xls_mutation_corpus"
+path = "../probe/src/mutate.rs"
+
+[features]
+alloc-count = []
+
+[dependencies]
+litchi-xls = { path = "/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-xls" }
+litchi-biff = { path = "/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-biff" }
+litchi-cfb = { path = "/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-cfb" }
+sha2 = "0.11"
+litchi-core = { path = "/home/zhuhe/code/litchi-worktrees/0746-xls-validation-only-parse/crates/litchi-core" }
+
+[profile.release]
+debug = 1
