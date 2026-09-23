@@ -1,4 +1,4 @@
-use super::model::{CellValue, Writer};
+use super::model::Writer;
 use super::stream;
 use crate::encryption::encrypt_workbook_for_write;
 use crate::error::Result;
@@ -29,9 +29,6 @@ impl Writer {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<()> {
-        // Build shared string table
-        self.build_shared_strings();
-
         // Generate the Workbook stream + pivot cache streams
         let streams = self.generate_workbook_streams()?;
 
@@ -58,9 +55,6 @@ impl Writer {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn write_to<W: std::io::Write + std::io::Seek>(&mut self, writer: &mut W) -> Result<()> {
-        // Build shared string table
-        self.build_shared_strings();
-
         // Generate the Workbook stream + pivot cache streams
         let streams = self.generate_workbook_streams()?;
 
@@ -112,27 +106,9 @@ impl Writer {
         Ok(())
     }
 
-    /// Build the shared string table from all string cells
-    pub(super) fn build_shared_strings(&mut self) {
-        self.shared_strings.clear();
-        self.string_map.clear();
-        self.sst_total = 0;
-
-        // Collect all unique strings from all worksheets
-        for worksheet in &self.worksheets {
-            for cell in worksheet.cells.values() {
-                if let CellValue::String(ref s) = cell.value {
-                    // Count total occurrences
-                    self.sst_total = self.sst_total.saturating_add(1);
-                    // Insert unique strings
-                    if !self.string_map.contains_key(s) {
-                        let index = crate::utils::truncate_usize_to_u32(self.shared_strings.len());
-                        self.string_map.insert(s.clone(), index);
-                        self.shared_strings.push(s.clone());
-                    }
-                }
-            }
-        }
+    /// Stage the shared string table from all string cells, borrowing them.
+    pub(super) fn shared_string_table(&self) -> stream::SharedStringTable<'_> {
+        stream::SharedStringTable::build(&self.worksheets)
     }
 
     /// Generate the complete Workbook stream (plus pivot cache streams) with
@@ -162,8 +138,7 @@ impl Writer {
             self.custom_table_styles.as_ref(),
             &self.defined_names,
             &self.defined_name_records,
-            &self.shared_strings,
-            self.sst_total,
+            &self.shared_string_table(),
             self.workbook_protection,
             self.file_sharing.as_ref(),
             self.book_ext.as_ref(),
@@ -174,7 +149,6 @@ impl Writer {
             &self.xf_extensions,
             &self.style_extensions,
             &self.worksheets,
-            &self.string_map,
         )?;
         streams.toolbar = self
             .toolbar

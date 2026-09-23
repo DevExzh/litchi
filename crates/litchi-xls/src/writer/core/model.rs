@@ -6,7 +6,7 @@ use crate::encryption::WriterEncryption;
 use crate::error::{Error, Result};
 use crate::page_setup::{PrintComments, PrintErrors, PrintOrder, PrintOrientation};
 use crate::{DifferentialFormat, TableStyle, TableStyles, XfProperty};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 /// Public configuration for adding a pivot table via [`Writer::add_pivot_table`].
 #[derive(Debug, Clone)]
 pub struct PivotTableConfig {
@@ -1257,17 +1257,11 @@ pub(super) fn prepare_data_validation(
 pub struct Writer {
     /// Worksheets to write
     pub(super) worksheets: Vec<WritableWorksheet>,
-    /// Shared string table
-    pub(super) shared_strings: Vec<String>,
-    /// String to index mapping for deduplication
-    pub(super) string_map: HashMap<String, u32>,
     /// Workbook-level defined names (named ranges).
     pub(super) defined_names: Vec<super::named_range::DefinedName>,
     pub(super) defined_name_records:
         Vec<(DefinedNameRecordOptions, crate::DefinedNameFutureRecords)>,
     pub(super) fmt: FormattingManager,
-    /// Total number of string occurrences (including duplicates) for SST.cstTotal
-    pub(super) sst_total: u32,
     pub(super) workbook_protection: Option<WorkbookProtection>,
     pub(super) file_sharing: Option<FileSharing>,
     /// Use 1904 date system (Mac) instead of 1900 (Windows)

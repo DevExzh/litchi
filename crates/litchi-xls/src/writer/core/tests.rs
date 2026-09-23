@@ -10,7 +10,7 @@ use crate::formula_metadata::{Cell as FormulaCell, Range as FormulaRange};
 fn test_create_writer() {
     let writer = Writer::new();
     assert_eq!(writer.worksheets.len(), 0);
-    assert_eq!(writer.shared_strings.len(), 0);
+    assert!(writer.shared_string_table().strings().is_empty());
 }
 
 #[test]
@@ -804,11 +804,12 @@ fn test_shared_strings_build() {
     writer.write_string(sheet, 0, 1, "Hello").unwrap();
     writer.write_string(sheet, 1, 0, "World").unwrap();
 
-    // Build shared strings table (normally done during write)
-    writer.build_shared_strings();
+    // Stage the shared string table (normally done during write)
+    let table = writer.shared_string_table();
 
-    // Should only have 2 unique strings
-    assert_eq!(writer.shared_strings.len(), 2);
+    // Should only have 2 unique strings, from 3 string cells
+    assert_eq!(table.strings().len(), 2);
+    assert_eq!(table.total(), 3);
 }
 
 #[test]
@@ -852,7 +853,7 @@ fn test_save_to_file() {
 fn test_xls_writer_default() {
     let writer: Writer = Default::default();
     assert_eq!(writer.worksheets.len(), 0);
-    assert_eq!(writer.shared_strings.len(), 0);
+    assert!(writer.shared_string_table().strings().is_empty());
 }
 
 #[test]

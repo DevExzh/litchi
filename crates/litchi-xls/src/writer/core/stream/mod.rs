@@ -6,10 +6,9 @@
 
 mod codec;
 mod semantic;
+mod shared_strings;
 mod validation;
-
-#[cfg(test)]
-mod tests;
 
 pub(crate) use self::codec::generate_workbook_stream;
 pub(crate) use self::semantic::WorkbookStreams;
+pub(crate) use self::shared_strings::SharedStringTable;
