@@ -224,3 +224,139 @@ fn a_custom_part_without_its_own_verified_storage_drops_the_proof() {
     package.add_part(Box::new(custom));
     assert_eq!(published_document(&package), EDITED);
 }
+
+/// A custom part whose accessors disagree: `blob` (and so the default
+/// `decoded_blob`) shows one payload while `blob_arc` hands out another.
+#[derive(Clone)]
+struct Split {
+    partname: PackURI,
+    shown: Arc<Vec<u8>>,
+    handed_out: Arc<Vec<u8>>,
+    handle: Option<PayloadHandle>,
+    rels: Relationships,
+}
+
+impl Split {
+    fn new(shown: Arc<Vec<u8>>, handed_out: &[u8], handle: Option<PayloadHandle>) -> Self {
+        Self {
+            partname: document_uri(),
+            shown,
+            handed_out: Arc::new(handed_out.to_vec()),
+            handle,
+            rels: Relationships::new(DOCUMENT.to_owned()),
+        }
+    }
+}
+
+impl Part for Split {
+    fn blob(&self) -> &[u8] {
+        &self.shown
+    }
+
+    fn blob_arc(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.handed_out)
+    }
+
+    fn content_type(&self) -> &str {
+        CONTENT_TYPE
+    }
+
+    fn partname(&self) -> &PackURI {
+        &self.partname
+    }
+
+    fn payload_handle(&self) -> PayloadHandle {
+        match &self.handle {
+            Some(handle) => handle.clone(),
+            None => {
+                XmlPart::new(document_uri(), CONTENT_TYPE.to_owned(), Vec::new()).payload_handle()
+            },
+        }
+    }
+
+    fn rels(&self) -> &Relationships {
+        &self.rels
+    }
+
+    fn rels_mut(&mut self) -> &mut Relationships {
+        &mut self.rels
+    }
+
+    fn set_blob(&mut self, blob: Vec<u8>) {
+        self.shown = Arc::new(blob);
+    }
+}
+
+/// Pre-existing gap, fixed with change 0754's review: the owned-source
+/// preservation route regenerated a changed member from `blob_arc`, while
+/// the plan audited `blob`. Every route must audit exactly the bytes it
+/// publishes.
+#[test]
+fn every_route_audits_the_bytes_it_publishes() {
+    let proven = proof(EDITED);
+    let mut donor = XmlPart::new(document_uri(), CONTENT_TYPE.to_owned(), Vec::new());
+    donor.set_blob_verified(proven.clone());
+    for (label, shown, handle) in [
+        ("audited bytes shown", Arc::new(EDITED.to_vec()), None),
+        (
+            "proven bytes shown with a borrowed proof",
+            Arc::clone(proven.bytes()),
+            Some(donor.payload_handle()),
+        ),
+    ] {
+        // The owned-source route (preservation) and the borrowed-source route.
+        for owned in [true, false] {
+            let archive = archive(ORIGINAL);
+            let mut package = if owned {
+                OpcPackage::from_vec(archive).unwrap()
+            } else {
+                OpcPackage::from_bytes(&archive).unwrap()
+            };
+            package.add_part(Box::new(Split::new(
+                Arc::clone(&shown),
+                REFUSED,
+                handle.clone(),
+            )));
+            match PackageWriter::to_bytes(&package) {
+                Err(OpcError::XmlPublication { part, source }) => {
+                    assert_eq!(part, DOCUMENT, "{label}, owned {owned}");
+                    assert_eq!(
+                        source,
+                        verify_source(REFUSED, Limits::default()).unwrap_err(),
+                        "{label}, owned {owned}"
+                    );
+                },
+                Err(error) => panic!("{label}, owned {owned}: unexpected error {error:?}"),
+                Ok(bytes) => panic!(
+                    "{label}, owned {owned}: published {:?} unaudited",
+                    String::from_utf8_lossy(
+                        &ArchiveReader::new(&bytes)
+                            .unwrap()
+                            .read("word/document.xml")
+                            .unwrap()
+                    )
+                ),
+            }
+        }
+    }
+}
+
+#[test]
+fn a_consistent_custom_part_publishes_on_the_owned_source_route() {
+    // The same custom part, with both accessors handing out the edited
+    // bytes, publishes them on both routes.
+    for owned in [true, false] {
+        let archive = archive(ORIGINAL);
+        let mut package = if owned {
+            OpcPackage::from_vec(archive).unwrap()
+        } else {
+            OpcPackage::from_bytes(&archive).unwrap()
+        };
+        package.add_part(Box::new(Split::new(
+            Arc::new(EDITED.to_vec()),
+            EDITED,
+            None,
+        )));
+        assert_eq!(published_document(&package), EDITED, "owned {owned}");
+    }
+}

@@ -15,6 +15,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 use std::io::Write;
 use std::path::Path;
+use std::sync::Arc;
 
 const EXACT_SOURCE_CHUNK_BYTES: usize = 64 * 1024;
 
@@ -77,7 +78,15 @@ struct PlannedPart<'package> {
     /// decoded cannot have been replaced, because no caller has ever held its
     /// bytes. Publication uses that to copy the source member without
     /// decoding it (ADR 0030).
-    blob: Option<&'package [u8]>,
+    ///
+    /// This allocation is the one handle to the part's bytes: the audit, the
+    /// proof check, the copy-or-regenerate decision, the sizes and every
+    /// writer read it, and nothing asks the part for its bytes again. The
+    /// bytes audited are therefore the bytes published even for a custom part
+    /// whose `blob` and `blob_arc` disagree. Before change 0754's review the
+    /// owned-source route regenerated a changed member from `blob_arc` after
+    /// the plan had audited `blob`.
+    blob: Option<Arc<Vec<u8>>>,
     /// Audit every authored/replaced XML allocation, including replacements
     /// equal to source bytes. Unchanged source allocations and deferred source
     /// members retain their publication provenance (0665 and ADR 0030).
@@ -101,13 +110,14 @@ impl<'package> PlannedPart<'package> {
     ///
     /// Every route that must emit or measure a part's bytes goes through
     /// this, so a deferred payload's refusal reaches the caller instead of
-    /// being read as an empty member.
-    fn materialized_blob(&self) -> Result<&'package [u8]> {
-        if let Some(blob) = self.blob {
-            return Ok(blob);
+    /// being read as an empty member. A payload the plan already holds is
+    /// that same allocation.
+    fn materialized_blob(&self) -> Result<Arc<Vec<u8>>> {
+        if let Some(blob) = &self.blob {
+            return Ok(Arc::clone(blob));
         }
         self.part.ensure_payload()?;
-        Ok(self.part.blob())
+        Ok(self.part.blob_arc())
     }
 }
 
@@ -169,15 +179,16 @@ impl<'package> PublicationPlan<'package> {
                 .is_some_and(|source_part| source_part.content_type == part.content_type());
             let relationships_pristine = source_part.is_some_and(|source_part| {
                 source_part.relationships_member_present
-                    && part.rels().source_capture().is_some_and(|capture| {
-                        std::sync::Arc::ptr_eq(capture, &source_part.relationships_xml)
-                    })
+                    && part
+                        .rels()
+                        .source_capture()
+                        .is_some_and(|capture| Arc::ptr_eq(capture, &source_part.relationships_xml))
             });
             parts.push(PlannedPart {
                 part,
                 partname: part.partname(),
                 content_type: part.content_type(),
-                blob: part.decoded_blob(),
+                blob: part.decoded_blob().map(|_decoded| part.blob_arc()),
                 audit_payload: xml_minifier::audit::package::is_xml_part(
                     part.partname().as_str(),
                     part.content_type(),
@@ -194,9 +205,10 @@ impl<'package> PublicationPlan<'package> {
         let content_types_pristine = content_types_match_source
             && provenance.is_some_and(|provenance| provenance.parts.len() == parts.len());
         let package_rels_pristine = provenance.is_some_and(|provenance| {
-            package.rels().source_capture().is_some_and(|capture| {
-                std::sync::Arc::ptr_eq(capture, &provenance.package_relationships_xml)
-            })
+            package
+                .rels()
+                .source_capture()
+                .is_some_and(|capture| Arc::ptr_eq(capture, &provenance.package_relationships_xml))
         });
 
         let content_types_uri =
@@ -224,19 +236,20 @@ impl<'package> PublicationPlan<'package> {
         for part in &mut parts {
             if part.audit_payload {
                 let blob = part.materialized_blob()?;
-                part.blob = Some(blob);
                 // A payload whose exact allocation already passed this audit
                 // under these limits carries the proof (change 0754); any
                 // other bytes, including a copy or a substitute of proven
-                // ones, are audited here.
+                // ones, are audited here. Either way it is the allocation the
+                // plan keeps and every writer publishes.
                 if !part
                     .part
                     .payload_handle()
                     .payload()
-                    .publication_audit_covers(blob)
+                    .publication_audit_covers(&blob)
                 {
-                    PackageWriter::audit_published_xml(part.partname.as_str(), blob)?;
+                    PackageWriter::audit_published_xml(part.partname.as_str(), &blob)?;
                 }
+                part.blob = Some(blob);
             }
             if part.relationships_pristine {
                 continue;
@@ -312,7 +325,7 @@ impl<'package> PublicationPlan<'package> {
             if part.relationships_pristine {
                 return Err(unmaterialized_publication_error());
             }
-            let Some(blob) = part.blob else {
+            let Some(blob) = part.blob.as_deref() else {
                 return Err(unmaterialized_publication_error());
             };
             physical.write(part.partname, blob)?;
@@ -796,7 +809,8 @@ fn try_write_preserved<W: Write>(
                         regenerated_part_action(
                             indexed_entry.id(),
                             preservation_member_name(source_member, indexed_entry),
-                            package.get_part(partname)?,
+                            part.part,
+                            part.materialized_blob()?,
                         )?
                     }
                 },
@@ -838,7 +852,8 @@ fn try_write_preserved<W: Write>(
         let entry = match append {
             PlannedAppend::Part(part) => regenerated_part_entry(
                 part.partname.membername(),
-                package.get_part(part.partname)?,
+                part.part,
+                part.materialized_blob()?,
             )?,
             PlannedAppend::Relationships(part) => {
                 let Some(relationships) = part.relationships.as_ref() else {
@@ -871,7 +886,7 @@ fn try_write_preserved<W: Write>(
 /// comparison is charged. The byte comparison remains the decision for every
 /// part whose payload was replaced.
 fn source_blob_retained(source_part: &crate::package::SourcePart, part: &PlannedPart<'_>) -> bool {
-    let Some(blob) = part.blob else {
+    let Some(blob) = part.blob.as_deref().map(Vec::as_slice) else {
         // The part still holds the payload its source member carries, so no
         // caller has ever held its bytes and it cannot have been replaced.
         // The member is copied without decoding it (ADR 0030).
@@ -971,15 +986,16 @@ fn regenerated_action(
     })
 }
 
-/// Regenerate one existing member from a part's current payload.
+/// Regenerate one existing member from the payload the plan holds.
 fn regenerated_part_action(
     id: soapberry_zip::PreservationEntryId,
     name: Option<&str>,
     part: &dyn Part,
+    blob: Arc<Vec<u8>>,
 ) -> Result<soapberry_zip::PreservationAction> {
     Ok(soapberry_zip::PreservationAction::Regenerate {
         id,
-        entry: part_entry(regenerated_name(name)?, part),
+        entry: part_entry(regenerated_name(name)?, part, blob),
     })
 }
 
@@ -998,12 +1014,16 @@ fn regenerated_entry(
     )
 }
 
-/// Generate one appended member from a part's current payload.
-fn regenerated_part_entry(name: &str, part: &dyn Part) -> Result<soapberry_zip::RegeneratedEntry> {
-    Ok(part_entry(regenerated_name(Some(name))?, part))
+/// Generate one appended member from the payload the plan holds.
+fn regenerated_part_entry(
+    name: &str,
+    part: &dyn Part,
+    blob: Arc<Vec<u8>>,
+) -> Result<soapberry_zip::RegeneratedEntry> {
+    Ok(part_entry(regenerated_name(Some(name))?, part, blob))
 }
 
-/// The generated entry for a part's current payload.
+/// The generated entry for the payload the plan holds for `part`.
 ///
 /// A part built from a verified compressed transfer (change 0742) carries the
 /// exact compressed bytes its payload decodes from, with their method, actual
@@ -1011,13 +1031,16 @@ fn regenerated_part_entry(name: &str, part: &dyn Part) -> Result<soapberry_zip::
 /// other payload is deflated from its decoded bytes, as before. The payload
 /// and its compressed representation are one value, so a part whose payload
 /// was replaced no longer carries one; the capture is still used only when
-/// the part's visible allocation is the one it was verified against, so a
-/// custom part that forwards its payload handle cannot publish stale bytes.
-fn part_entry(name: String, part: &dyn Part) -> soapberry_zip::RegeneratedEntry {
-    let blob = part.blob_arc();
+/// the planned allocation is the one it was verified against, so a custom
+/// part that forwards its payload handle cannot publish stale bytes.
+fn part_entry(
+    name: String,
+    part: &dyn Part,
+    blob: Arc<Vec<u8>>,
+) -> soapberry_zip::RegeneratedEntry {
     let handle = part.payload_handle();
     match handle.payload().compressed_transfer() {
-        Some((decoded, compressed)) if std::sync::Arc::ptr_eq(decoded, &blob) => {
+        Some((decoded, compressed)) if Arc::ptr_eq(decoded, &blob) => {
             soapberry_zip::RegeneratedEntry::new_precompressed_shared(name, compressed.clone())
         },
         _ => soapberry_zip::RegeneratedEntry::new_shared(name, blob)
