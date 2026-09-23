@@ -792,9 +792,8 @@ mod tests {
         let w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
         let documents = [
             // More prefixes than cache slots, resolved round robin.
-            format!(
-                r#"<a:r xmlns:a="urn:a" xmlns:b="urn:b" xmlns:c="urn:c" xmlns:d="urn:d" xmlns:e="urn:e" xmlns:f="urn:f"><a:x/><b:x/><c:x/><d:x/><e:x/><f:x/><a:x/><f:x/><c:x/><e:x/></a:r>"#
-            ),
+            r#"<a:r xmlns:a="urn:a" xmlns:b="urn:b" xmlns:c="urn:c" xmlns:d="urn:d" xmlns:e="urn:e" xmlns:f="urn:f"><a:x/><b:x/><c:x/><d:x/><e:x/><f:x/><a:x/><f:x/><c:x/><e:x/></a:r>"#
+                .to_owned(),
             // A cached prefix redeclared deeper, then popped back out.
             format!(
                 r#"<w:r xmlns:w="{w}"><w:x/><w:s xmlns:w="urn:inner"><w:x/><w:t xmlns:w=""><w:x/></w:t><w:x/></w:s><w:x/></w:r>"#

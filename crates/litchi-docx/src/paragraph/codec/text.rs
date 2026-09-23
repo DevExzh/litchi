@@ -1461,7 +1461,6 @@ fn extract_word_text_base_oracle(xml_bytes: &[u8]) -> Result<String> {
             | Event::DocType(_) => {},
         }
     }
-    drop(append);
     Ok(result)
 }
 
