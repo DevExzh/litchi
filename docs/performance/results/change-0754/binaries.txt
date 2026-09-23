@@ -11,3 +11,9 @@ harness, identical command: cargo build --release --manifest-path tools/perf-bas
 probe (probe/, Cargo.toml.template per leg, cargo +1.95.0 build --release --offline, debug line tables, counting global allocator)
 fcb6357ba221d1aa5c6e46f5e4a48728adaa757034ec2c865509b604c7673ea2  probe0754 before leg (63ec6a5027)
 18a3e067809313c94222e50256910e67eda6c02780deb13d005ae89f24bb825d  probe0754 after leg (2c467b3e66)
+
+review round (commits 24c61402bd, 7b6ae3cb5d; builds are not bit-reproducible, so the base hash differs from round one)
+b0e208f415530fbe8f9755e221a5f87a351beda7cc4b6c0aec5f75dd2008fc6b  bin/lpb-A  before leg: base 63ec6a5027, rebuilt, target targets/0754/review-before
+c192a9a2de71e79de49a2a65141e6414ab5314dfe33b5d246017b45861530e7d  bin/lpb-B  after leg: 7b6ae3cb5d, target targets/0754/review
+fcb6357ba221d1aa5c6e46f5e4a48728adaa757034ec2c865509b604c7673ea2  probe0754 before leg (63ec6a5027; identical to round one)
+0386167f95923af7612d3b9df64df65c139960aff4f4f80da5d8a77f71866b64  probe0754 after leg (7b6ae3cb5d)

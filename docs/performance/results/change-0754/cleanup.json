@@ -2,17 +2,77 @@
   "change": "0754",
   "order": "record and packet committed first; deletions run in the foreground immediately after",
   "removed": [
-    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0754", "size": "93G", "what": "after-leg target: release harness, debug tests of every gated crate, clippy and rustdoc output"},
-    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0754-before", "size": "1.0G", "what": "before-leg harness target"},
-    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0754-probe-before", "size": "785M", "what": "probe target, before leg"},
-    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0754-probe-after", "size": "784M", "what": "probe target, after leg"},
-    {"path": "/home/zhuhe/code/litchi-worktrees/0754-before-src", "size": "9.9G", "what": "detached before-leg worktree at 63ec6a5027, removed with git worktree remove --force"},
-    {"path": "/home/zhuhe/code/litchi-worktrees/scratch/0754/*", "size": "724M", "what": "binaries, generated corpora, differential inputs and raw outputs, callgrind and perf data, logs, TMPDIR"}
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0754",
+      "size": "93G",
+      "what": "after-leg target: release harness, debug tests of every gated crate, clippy and rustdoc output"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0754-before",
+      "size": "1.0G",
+      "what": "before-leg harness target"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0754-probe-before",
+      "size": "785M",
+      "what": "probe target, before leg"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0754-probe-after",
+      "size": "784M",
+      "what": "probe target, after leg"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0754-before-src",
+      "size": "9.9G",
+      "what": "detached before-leg worktree at 63ec6a5027, removed with git worktree remove --force"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/scratch/0754/*",
+      "size": "724M",
+      "what": "binaries, generated corpora, differential inputs and raw outputs, callgrind and perf data, logs, TMPDIR"
+    }
   ],
   "kept": [
-    {"path": "/home/zhuhe/code/litchi-worktrees/0754-docx-semantic-edit-and-text-path", "what": "branch worktree"},
-    {"path": "branch perf/0754-docx-semantic-edit-and-text-path", "what": "commits 5bb8bd1050, 3ab983e5cf, fde01f68e1, 2c467b3e66 and the record commit"},
-    {"path": "docs/performance/results/change-0754", "what": "this packet: summaries, compressed raw reports, scripts, probe source; no binaries, profiles or corpora"}
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0754-docx-semantic-edit-and-text-path",
+      "what": "branch worktree"
+    },
+    {
+      "path": "branch perf/0754-docx-semantic-edit-and-text-path",
+      "what": "commits 5bb8bd1050, 3ab983e5cf, fde01f68e1, 2c467b3e66 and the record commit"
+    },
+    {
+      "path": "docs/performance/results/change-0754",
+      "what": "this packet: summaries, compressed raw reports, scripts, probe source; no binaries, profiles or corpora"
+    }
   ],
-  "binary_hashes": "binaries.txt"
+  "binary_hashes": "binaries.txt",
+  "review_round": {
+    "order": "review fixes and record update committed first; deletions run in the foreground immediately after",
+    "removed": [
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/targets/0754",
+        "what": "review/ (after-leg harness, debug tests, clippy, rustdoc), review-before/ (before-leg harness), probe-before/ and probe-after/"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/0754-before-src",
+        "what": "the detached before-leg worktree, recreated at 63ec6a5027 for the review round, removed with git worktree remove --force"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/scratch/0754/*",
+        "what": "binaries, corpora, the review witnesses, raw timing and perf-stat output, logs, TMPDIR"
+      }
+    ],
+    "kept": [
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/0754-docx-semantic-edit-and-text-path",
+        "what": "branch worktree"
+      },
+      {
+        "path": "docs/performance/results/change-0754/review",
+        "what": "summaries and compressed raw reports of the review round"
+      }
+    ]
+  }
 }
