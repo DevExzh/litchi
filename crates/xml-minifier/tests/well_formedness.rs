@@ -416,7 +416,10 @@ fn the_xml_declaration_follows_its_grammar() {
     ] {
         refused(xml, offset, detail);
     }
-    // The audit reads UTF-8, so a declaration of another encoding is refused.
+    // The audit reads UTF-8, so a declaration of another encoding is refused:
+    // OPC rule M1.17 forbids naming any encoding but UTF-8 or UTF-16, even
+    // over bytes that are all ASCII as these are, and UTF-16 over UTF-8 bytes
+    // is the mismatch XML 1.0 section 4.3.3 makes fatal.
     for encoding in ["ISO-8859-1", "UTF-16", "windows-1252", "US-ASCII", "UTF8"] {
         refused(
             format!("<?xml version=\"1.0\" encoding=\"{encoding}\"?><r/>").as_bytes(),

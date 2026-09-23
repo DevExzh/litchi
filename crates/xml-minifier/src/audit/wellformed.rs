@@ -412,10 +412,13 @@ pub(super) fn check_processing_instruction(raw: &[u8]) -> Result<(), (usize, &'s
 /// `no`, in that order and nothing else.
 ///
 /// The audit reads its input as UTF-8, so an encoding declaration must name
-/// UTF-8 (compared without regard to ASCII case). Naming any other encoding
-/// declares bytes this audit does not decode, and XML 1.0 section 4.3.3 makes
-/// presenting an entity in an encoding other than the one it declares a fatal
-/// error.
+/// UTF-8 (compared without regard to ASCII case). OPC rule M1.17 (ECMA-376
+/// Part 2, section 6.2.5 a) in the fifth edition) forbids a declaration that
+/// names any encoding other than UTF-8 or UTF-16, whatever bytes follow it, so
+/// `US-ASCII` or `ISO-8859-1` is refused even over bytes that are all ASCII. A
+/// declaration of UTF-16 over the UTF-8 this audit has read presents the
+/// entity in an encoding other than the one it declares, which XML 1.0
+/// section 4.3.3 makes a fatal error.
 ///
 /// # Errors
 ///
