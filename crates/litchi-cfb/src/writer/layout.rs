@@ -26,7 +26,7 @@ use super::super::consts::{
     DIRENTRY_SIZE, ENDOFCHAIN, FATSECT, FREESECT, HEADER_DIFAT_ENTRIES, HEADER_DIFAT_OFFSET,
     MAXREGSECT, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM,
 };
-use super::super::file::{CandidateBytes, OleError, OleFile, OleFileLimits, StreamCompareScratch};
+use super::super::file::{CandidateBytes, OleError, OleFile, OleFileLimits};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 
@@ -817,7 +817,7 @@ impl Seek for PlanCursor<'_> {
 
 /// The planned artifact's bytes, examined where they lie.
 ///
-/// [`OleFile::stream_equals`] asks this view about exactly the byte ranges
+/// A [`StreamComparer`](super::super::file::StreamComparer) asks this view about exactly the byte ranges
 /// [`OleFile::open_stream`] would read through a [`PlanCursor`]. The view
 /// answers from the same sources [`ReusePlan::read_at`] copies from, without
 /// copying, and fails exactly where that read fails. Its failures are the
@@ -840,6 +840,22 @@ impl CandidateBytes for PlanView<'_> {
         self.plan
             .examine_at(self.streams, offset, len, None)
             .map(drop)
+    }
+}
+
+/// Folds one comparison into `equal`. Without an expectation, only the
+/// readability of the bytes is examined. An expectation that does not cover
+/// `range` is a mismatch, never a match.
+fn fold_comparison(
+    equal: &mut bool,
+    expected: Option<&[u8]>,
+    range: std::ops::Range<usize>,
+    same: impl FnOnce(&[u8]) -> bool,
+) {
+    if let Some(expected) = expected
+        && *equal
+    {
+        *equal = expected.get(range).is_some_and(same);
     }
 }
 
@@ -883,14 +899,16 @@ impl ReusePlan {
     /// assigned chains. The validation view is positional and does not
     /// allocate a second full output artifact.
     ///
-    /// The readback does not materialize the streams either.
-    /// [`OleFile::stream_equals`] performs [`OleFile::open_stream`]'s lookup
-    /// and allocation traversal with its checks and asks the plan whether
-    /// each physical range it would read holds the model's bytes. The verdict
-    /// is the one `open_stream` followed by a byte comparison would reach; a
-    /// range whose planned source is the very payload slice the model
-    /// supplies for that position compares equal without being read, and
-    /// every other range is compared byte for byte.
+    /// The readback does not materialize the streams either. A
+    /// [`StreamComparer`](super::super::file::StreamComparer) over the
+    /// reparsed view performs [`OleFile::open_stream`]'s lookup and
+    /// allocation traversal with its checks, loading the root mini stream
+    /// once as `open_stream` does, and asks the plan whether each physical
+    /// range it would read holds the model's bytes. The verdict is the one
+    /// `open_stream` followed by a byte comparison would reach; a range whose
+    /// planned source is the very payload slice the model supplies for that
+    /// position compares equal without being read, and every other range is
+    /// compared byte for byte.
     pub(super) fn validate(&self, streams: &[StreamInput<'_>]) -> Result<(), OleError> {
         let output_length = self.output_len()?;
         let directory_length = u64::try_from(self.directory_image.len())
@@ -901,14 +919,14 @@ impl ReusePlan {
             plan: self,
             streams,
         };
-        let mut scratch = StreamCompareScratch::default();
+        let mut comparer = check.stream_comparer(&view);
         let mut refs: Vec<&str> = Vec::new();
         for stream in streams {
             refs.clear();
             refs.try_reserve(stream.path.len())
                 .map_err(|source| OleError::allocation("CFB planned stream path", source))?;
             refs.extend(stream.path.iter().map(String::as_str));
-            if !check.stream_equals(&refs, stream.bytes, &mut scratch, &view)? {
+            if !comparer.stream_equals(&refs, stream.bytes)? {
                 return Err(invalid("CFB reused layout stream readback differs"));
             }
         }
@@ -989,15 +1007,13 @@ impl ReusePlan {
                         .map_err(|_error| invalid("CFB planned read offset exceeds u64"))?,
                 )
                 .ok_or_else(|| invalid("CFB planned read offset overflows u64"))?;
-            let expected_part =
-                |count: usize| expected.and_then(|expected| expected.get(done..done + count));
             if absolute < header_len {
                 let source_offset = usize::try_from(absolute)
                     .map_err(|_error| invalid("CFB planned header offset exceeds usize"))?;
                 let count = (self.header_sector.len() - source_offset).min(len - done);
-                if equal && let Some(wanted) = expected_part(count) {
-                    equal = self.header_sector[source_offset..source_offset + count] == *wanted;
-                }
+                fold_comparison(&mut equal, expected, done..done + count, |wanted| {
+                    self.header_sector[source_offset..source_offset + count] == *wanted
+                });
                 done += count;
                 continue;
             }
@@ -1033,12 +1049,13 @@ impl ReusePlan {
                 span += self.sector_size;
             }
             let count = span.min(remaining);
+            let compared = done..done + count;
 
             match planned {
                 PlannedSector::Free => {
-                    if equal && let Some(wanted) = expected_part(count) {
-                        equal = wanted.iter().all(|&byte| byte == 0);
-                    }
+                    fold_comparison(&mut equal, expected, compared, |wanted| {
+                        wanted.iter().all(|&byte| byte == 0)
+                    });
                 },
                 PlannedSector::Fat(position)
                 | PlannedSector::MiniFat(position)
@@ -1051,9 +1068,9 @@ impl ReusePlan {
                         _ => (&self.ministream_image, "mini stream"),
                     };
                     let image = Self::image_run(image, position, run, self.sector_size, resource)?;
-                    if equal && let Some(wanted) = expected_part(count) {
-                        equal = image[within..within + count] == *wanted;
-                    }
+                    fold_comparison(&mut equal, expected, compared, |wanted| {
+                        image[within..within + count] == *wanted
+                    });
                 },
                 PlannedSector::Stream { index, chunk } => {
                     let stream_index =
@@ -1072,7 +1089,7 @@ impl ReusePlan {
                         .checked_add(run - 1)
                         .and_then(|last_chunk| last_chunk.checked_mul(self.sector_size))
                         .ok_or_else(|| invalid("CFB reused layout chunk offset overflows usize"))?;
-                    if equal && let Some(wanted) = expected_part(count) {
+                    fold_comparison(&mut equal, expected, compared, |wanted| {
                         let data_len = if source_start < bytes.len() {
                             count.min(bytes.len() - source_start)
                         } else {
@@ -1087,9 +1104,9 @@ impl ReusePlan {
                         // The same slice is equal to itself: a correct plan
                         // places each model chunk exactly where the reader
                         // looks for it, so this is the common case.
-                        equal = (std::ptr::eq(data.as_ptr(), payload.as_ptr()) || data == payload)
-                            && padding.iter().all(|&byte| byte == 0);
-                    }
+                        (std::ptr::eq(data.as_ptr(), payload.as_ptr()) || data == payload)
+                            && padding.iter().all(|&byte| byte == 0)
+                    });
                 },
             }
             done += count;

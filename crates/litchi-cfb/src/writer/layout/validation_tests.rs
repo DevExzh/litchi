@@ -803,3 +803,44 @@ fn real_fixture_plans_reach_the_readback_verdict() {
         sweep_agreement(fixture, &base, &streams, 500, 0x0749 + number as u64);
     }
 }
+
+/// Hundreds of mini streams, in both geometries: mini growth that appends,
+/// a shrink that reclaims, and a mini-to-regular migration, then random
+/// faults, all with identical verdicts.
+#[test]
+fn many_mini_stream_plans_reach_the_readback_verdict() {
+    for sector_size in [512, 4096] {
+        let names: Vec<String> = (0..240).map(|index| format!("M{index:04}")).collect();
+        let paths: Vec<[&str; 1]> = names.iter().map(|name| [name.as_str()]).collect();
+        let specs: Vec<(&[&str], Vec<u8>)> = paths
+            .iter()
+            .enumerate()
+            .map(|(index, path)| {
+                let seed = u8::try_from(index % 251).unwrap();
+                (path.as_slice(), pattern(1_000 + index % 7, seed))
+            })
+            .collect();
+        let source = build_with(sector_size, &specs);
+        let mut model = read_model(&source);
+        model[3].1.extend(pattern(900, 1));
+        model[40].1.truncate(100);
+        model[77].1 = pattern(6_000, 2);
+        let layout = SourceLayout::parse(&source).unwrap();
+        let streams = inputs(&model);
+        let base = plan(&layout, &streams);
+        assert!(base.report().reused_source_layout(), "{sector_size}");
+        assert_verdict(&base, &streams, Verdict::Accepted, "many mini streams");
+        let mut payload = base.clone();
+        let middle = payload.ministream_image.len() / 2;
+        payload.ministream_image[middle] ^= 0x10;
+        // Payload or padding, the two validators must agree on it.
+        agreed(&payload, &streams, "mini stream image byte");
+        sweep_agreement(
+            &format!("many mini streams, {sector_size}-byte sectors"),
+            &base,
+            &streams,
+            300,
+            0x0749_0240 + sector_size as u64,
+        );
+    }
+}
