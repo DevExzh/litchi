@@ -1,0 +1,59 @@
+{
+ "schema": "0749-cleanup-v2",
+ "round_one": {
+  "performed_by": "the coordinator, after committing the record and packet as fc308af0d7 (the implementer had stalled at this step)",
+  "removed": [
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0749",
+    "size": "55G",
+    "what": "round-one build output: workspace gates (debug tests), probe, frame-pointer probe and harness builds"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0749-before",
+    "size": "2.7G",
+    "what": "round-one base-leg probe, frame-pointer probe and harness builds"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/0749-before-src",
+    "what": "detached checkout of ab29ac6291 for the base leg, removed as a git worktree"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/scratch/0749",
+    "what": "round-one scratch: binaries, raw perf.data and Callgrind outputs (summarized in profiles/ first), argv0 symlinks, raw matrix and lane outputs (kept in the packet)"
+   }
+  ]
+ },
+ "review_round": {
+  "performed_by": "the implementer, after committing this record and packet",
+  "planned_removals_measured_before_deletion": [
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0749",
+    "bytes": 50568663100,
+    "size": "47G",
+    "what": "review-round build output: ws (43G, debug gate and test builds), probe-A/B/C (873M each), harness-A and harness-C (1.0G each)"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/0749-before-src",
+    "bytes": 10153541002,
+    "size": "9.5G",
+    "what": "detached checkout of ab29ac6291 (arm A), removed with git worktree remove --force"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/0749-v1-src",
+    "bytes": 10153607692,
+    "size": "9.5G",
+    "what": "detached checkout of 776ad05175 (arm B), removed with git worktree remove --force"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/scratch/0749",
+    "bytes": 670970400,
+    "size": "640M",
+    "what": "review-round scratch: staged binaries (hashes in round2/binaries.json), generated inputs (regenerable, hashes recorded), argv0 symlinks, raw matrix, counter, corpus, scaling and allocation outputs (kept compressed in round2/), TMPDIR"
+   }
+  ],
+  "kept": [
+   "the worktree /home/zhuhe/code/litchi-worktrees/0749-cfb-reuse-plan-validation and branch perf/0749-cfb-reuse-plan-validation",
+   "this packet: sources, scripts, compressed raw reports and summaries; no binaries, perf.data, Callgrind outputs or corpora"
+  ]
+ }
+}

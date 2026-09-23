@@ -1,0 +1,41 @@
+# Change 0749 review-round gates
+
+Worktree /home/zhuhe/code/litchi-worktrees/0749-cfb-reuse-plan-validation at f2a57ac936f6c8dde5d8b7c49e9ae70829056384; CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0749/ws; CARGO_BUILD_JOBS=6; RUST_TEST_THREADS=6; TMPDIR=/home/zhuhe/code/litchi-worktrees/scratch/0749/tmp; rustc 1.95.0 (59807616e 2026-04-14).
+Each command ran from the repository root in the foreground; exit codes as recorded.
+
+== fmt: cargo fmt --all --check
+exit=0
+== check-cfb-dependents: cargo check -p litchi-cfb -p litchi-ole-common -p litchi-doc -p litchi-ppt -p litchi-xls -p litchi-vba -p litchi-ograph -p litchi-crypto -p litchi-sign --all-targets --locked --offline
+exit=0
+== clippy-cfb-lib: cargo clippy -p litchi-cfb --lib --no-deps --locked --offline -- -D warnings
+exit=0
+== clippy-cfb-all: cargo clippy -p litchi-cfb --all-targets --no-deps --locked --offline -- -D warnings
+exit=0
+== doc-cfb: RUSTDOCFLAGS="-D warnings" cargo doc -p litchi-cfb --no-deps --locked --offline
+exit=0
+== boundaries: python3 tools/check_crate_boundaries.py
+exit=0
+== non-iwork: python3 tools/non_iwork_gate.py verify
+exit=0
+== perf-claims: python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+exit=0
+== test-litchi-cfb: cargo test -p litchi-cfb --locked --offline
+exit=0
+== test-litchi-ole-common: cargo test -p litchi-ole-common --locked --offline
+exit=0
+== test-litchi-doc: cargo test -p litchi-doc --locked --offline
+exit=0
+== test-litchi-ppt: cargo test -p litchi-ppt --locked --offline
+exit=0
+== test-litchi-xls: cargo test -p litchi-xls --locked --offline
+exit=0
+
+Test totals (sum of all test binaries and doctests):
+  test-litchi-cfb: passed=447 failed=0 ignored=1
+  test-litchi-ole-common: passed=165 failed=0 ignored=0
+  test-litchi-doc: passed=1198 failed=0 ignored=13
+  test-litchi-ppt: passed=1229 failed=0 ignored=11
+  test-litchi-xls: passed=1474 failed=0 ignored=1
+  boundaries: crate boundaries valid for 64 workspace packages and 241 internal dependency declarations (11 explicit debt items)
+  non-iwork: verified_facade_combined_tree=1
+  perf-claims: OK: 10 performance claims validated (structural)

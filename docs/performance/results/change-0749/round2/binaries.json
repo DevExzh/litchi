@@ -1,0 +1,107 @@
+{
+ "arms": {
+  "A": {
+   "commit": "ab29ac6291363c8eb43809fe3c023b0fbca5caf3",
+   "what": "the base (detached checkout /home/zhuhe/code/litchi-worktrees/0749-before-src)",
+   "binaries": {
+    "litchi-perf-baseline": {
+     "sha256": "2b169457c2824f477a472d5f984b97807555c6cf4cad6e09361a99e54270d5b7",
+     "bytes": 62949632
+    },
+    "probe": {
+     "sha256": "cd593a0e0eb423719decd0d4d54916c85f020501e7a4925beaee235c4a2373f2",
+     "bytes": 74505408
+    },
+    "probe_alloc": {
+     "sha256": "3ba2be4064ddbf5748de42d006d474a0cbfc3005a2858127133aa05aad98bcf9",
+     "bytes": 74509088
+    }
+   }
+  },
+  "B": {
+   "commit": "776ad0517512e5d64c37c37751c4de4d694c236f",
+   "what": "the first 0749 version, quadratic mini-stream readback (detached checkout /home/zhuhe/code/litchi-worktrees/0749-v1-src)",
+   "binaries": {
+    "probe": {
+     "sha256": "6aa402a5bab69d05852f5c454a4b3f818c9c3040d4cb501648ac3da50dff1344",
+     "bytes": 74534128
+    },
+    "probe_alloc": {
+     "sha256": "df6e38f5f06629c12953e88741653febede1e8601fb79b1e8e98c193a36524b7",
+     "bytes": 74537736
+    }
+   }
+  },
+  "C": {
+   "commit": "f2a57ac936",
+   "what": "the fix: 56548fd06e + 59d853618f + f2a57ac936 (the worktree)",
+   "binaries": {
+    "litchi-perf-baseline": {
+     "sha256": "1ce99416cae39824e2e24d4c7dff5117beb7248e5a63b366b9dc1ac79fcd0059",
+     "bytes": 62974336
+    },
+    "probe": {
+     "sha256": "6422d981e6bbd2cec0ea6013ef26a0cbc78046bec9389f6d82d0e5872717695e",
+     "bytes": 74588056
+    },
+    "probe_alloc": {
+     "sha256": "880ae538a0bbc4eba986ad88e81e6d39a11f6c5b6065dd9c71a49310061b5343",
+     "bytes": 74591688
+    }
+   }
+  }
+ },
+ "inputs": {
+  "gen/v3-1000x2000.cfb": {
+   "sha256": "4fd4cb2405fd90b256b48fd616c7bbb4b21e0a49e4966326c22ae3cb4e0428f2",
+   "bytes": 2323456
+  },
+  "gen/v3-3000x2000.cfb": {
+   "sha256": "7356aabdd748e662e90e6a58eefe50d8db4418a516b1925c93022ea6476df1e5",
+   "bytes": 6967808
+  },
+  "gen/v4-3000x2000.cfb": {
+   "sha256": "9c9e96db4e66656f106e61bff80b6b6aa0782b0514b6957706f73b74ec32a609",
+   "bytes": 6926336
+  },
+  "gen/v4-10000x4000.cfb": {
+   "sha256": "03a8f3ec89a6520731176237c74566934a4e200a87352154ed6dfee833b02d29",
+   "bytes": 44175360
+  },
+  "test-data/ole/doc/hyperlink.doc": {
+   "sha256": "090c1e410cf91552c91e50585031900c48c659fbb9efe54bf12a35137b86b7e6",
+   "bytes": 9728
+  },
+  "test-data/ole/ppt/empty.ppt": {
+   "sha256": "cc2bd402a951c443d6296b855c49ad79710da2c6ffb16db3ebde55351621ae6a",
+   "bytes": 10240
+  },
+  "test-data/ole/xls/WithCheckBoxes.xls": {
+   "sha256": "8281c55a88a92644525c1fa45540897c15097cdfcca1176e5edae7618a0421ab",
+   "bytes": 16896
+  },
+  "test-data/poi/test-data/slideshow/45543.ppt": {
+   "sha256": "218aaac542e5f9b567736407f2631defc65797c6ba2a7818f066e2f93bcfacaf",
+   "bytes": 385024
+  },
+  "test-data/poi/test-data/slideshow/41246-1.ppt": {
+   "sha256": "10596758d092302d1efc22282c31addd3ec2f994fdc763b561cef80fe2a6e147",
+   "bytes": 275456
+  },
+  "test-data/ole/doc/FloatingPictures.doc": {
+   "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+   "bytes": 335360
+  },
+  "test-data/ole/doc/NoHeadFoot.doc": {
+   "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48",
+   "bytes": 26112
+  }
+ },
+ "generation": "bin/A/probe --mode generate --sector-size {512|4096} --streams N --size BYTES --output gen/v{3|4}-NxBYTES.cfb (deterministic content; the files are not kept in the packet and regenerate byte-identically from the probe source)",
+ "builds": {
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14) for every binary (RUSTUP_TOOLCHAIN=1.95.0).",
+  "probe": "scripts/build-probe.sh ARM: cd probe/manifests/ARM (dependency paths point at the arm source tree) && RUSTUP_TOOLCHAIN=1.95.0 CARGO_BUILD_JOBS=6 CARGO_TARGET_DIR=targets/0749/probe-ARM RUSTFLAGS=\"--remap-path-prefix=<arm tree>=/litchi --remap-path-prefix=<probe dir>=/probe\" cargo build --release --locked --offline --bins. One lockfile (manifests/Cargo.lock) for all arms.",
+  "harness": "scripts/build-harness.sh ARM (A and C): cd <arm tree> && RUSTUP_TOOLCHAIN=1.95.0 CARGO_BUILD_JOBS=6 CARGO_TARGET_DIR=targets/0749/harness-ARM cargo build --release --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline (no RUSTFLAGS, no features).",
+  "note": "Builds are not bit-reproducible on this host: round one's base harness hash differs from round two's for the same commit and command."
+ }
+}

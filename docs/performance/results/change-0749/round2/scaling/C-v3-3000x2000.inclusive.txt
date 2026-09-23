@@ -1,0 +1,70 @@
+--------------------------------------------------------------------------------
+Profile data file 'callgrind-scaling/C-v3-3000x2000.callgrind' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 426213561
+Trigger: Program termination
+Profiled target:  /home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe --mode cfb-write-reuse --edit grow --input /home/zhuhe/code/litchi-worktrees/scratch/0749/gen/v3-3000x2000.cfb --warmups 0 --samples 2 --oracle first (PID 2207913, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       100
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                   
+--------------------------------------------------------------------------------
+241,832,247 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                    file:function
+--------------------------------------------------------------------------------
+241,832,247 (100.0%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+241,832,247 (100.0%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+241,832,247 (100.0%)  /probe/manifests/C/../../src/lib.rs:probe_0749::run [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+241,832,247 (100.0%)  /probe/manifests/C/../../src/lib.rs:probe_0749::timed_owner [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+241,832,247 (100.0%)  /probe/manifests/C/../../src/main.rs:probe::main [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+241,832,247 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:std::rt::lang_start::{{closure}}
+241,832,247 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:std::rt::lang_start_internal
+241,832,247 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:std::sys::backtrace::__rust_begin_short_backtrace
+241,832,247 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:std::rt::lang_start::{{closure}} [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+241,832,247 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:std::rt::lang_start_internal [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+241,832,247 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:std::sys::backtrace::__rust_begin_short_backtrace [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+241,832,247 (100.0%)  ???:(below main) [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+241,832,247 (100.0%)  ???:0x0000000000023cc0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+241,832,247 (100.0%)  ???:main [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+241,832,159 (100.0%)  /probe/manifests/C/../../src/lib.rs:probe_0749::cfb_write [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+241,832,121 (100.0%)  /litchi/crates/litchi-cfb/src/writer/core.rs:litchi_cfb::writer::core::OleWriter::write_to [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+146,812,283 (60.71%)  /litchi/crates/litchi-cfb/src/writer/layout.rs:litchi_cfb::writer::layout::ReusePlan::validate [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+106,164,432 (43.90%)  /litchi/crates/litchi-cfb/src/file.rs:litchi_cfb::file::OleFile<R>::open_with_limits [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+ 89,562,364 (37.03%)  /litchi/crates/litchi-cfb/src/writer/core.rs:litchi_cfb::writer::core::OleWriter::plan_sector_layout [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+ 89,354,758 (36.95%)  /litchi/crates/litchi-cfb/src/writer/layout.rs:litchi_cfb::writer::layout::plan_reuse [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+ 84,603,473 (34.98%)  /litchi/crates/litchi-cfb/src/file.rs:litchi_cfb::file::OleFile<R>::validate_stream_allocations [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+ 79,084,223 (32.70%)  /litchi/crates/litchi-cfb/src/file.rs:litchi_cfb::file::SectorChainScratch::collect_exact [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+ 77,951,710 (32.23%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 72,234,000 (29.87%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/specialize.rs:litchi_cfb::file::SectorChainScratch::collect_exact
+ 39,050,679 (16.15%)  /litchi/crates/litchi-cfb/src/file.rs:litchi_cfb::file::StreamComparer<R,C>::stream_equals [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+ 19,294,179 ( 7.98%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:alloc::raw_vec::RawVecInner<A>::finish_grow [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+ 17,682,843 ( 7.31%)  /litchi/crates/litchi-cfb/src/file.rs:litchi_cfb::file::OleFile<R>::load_directory [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+ 17,619,343 ( 7.29%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:alloc::raw_vec::RawVecInner<A>::finish_grow
+ 15,935,376 ( 6.59%)  ???:__rustc::__rust_realloc [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+ 15,899,272 ( 6.57%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:__rustc::__rdl_realloc [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+ 15,610,440 ( 6.46%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:__rustc::__rdl_realloc
+ 15,104,984 ( 6.25%)  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 14,636,633 ( 6.05%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:litchi_cfb::writer::layout::plan_reuse
+ 13,927,645 ( 5.76%)  /litchi/crates/litchi-cfb/src/writer/layout.rs:litchi_cfb::writer::layout::walk_chain [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+ 12,469,397 ( 5.16%)  ./malloc/./malloc/malloc.c:_int_realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 12,348,164 ( 5.11%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:alloc::raw_vec::RawVecInner<A>::try_reserve [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+ 11,566,521 ( 4.78%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/collections/btree/map.rs:alloc::collections::btree::map::BTreeMap<K,V,A>::insert [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+ 11,104,560 ( 4.59%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 10,730,931 ( 4.44%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:litchi_cfb::file::EndChainScratch::collect [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+  9,733,645 ( 4.02%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:litchi_cfb::writer::layout::walk_chain
+  7,750,208 ( 3.20%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  7,335,344 ( 3.03%)  ./malloc/./malloc/malloc.c:_int_free_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  6,757,782 ( 2.79%)  /litchi/crates/litchi-cfb/src/file.rs:litchi_cfb::file::EndChainScratch::collect
+  6,712,878 ( 2.78%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/collections/btree/map.rs:alloc::collections::btree::map::BTreeMap<K,V,A>::get [/home/zhuhe/code/litchi-worktrees/scratch/0749/bin/C/probe]
+  6,297,375 ( 2.60%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]

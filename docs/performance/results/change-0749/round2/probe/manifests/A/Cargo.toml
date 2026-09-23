@@ -1,0 +1,29 @@
+[package]
+name = "probe-0749"
+version = "0.2.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+name = "probe_0749"
+path = "../../src/lib.rs"
+
+[[bin]]
+name = "probe"
+path = "../../src/main.rs"
+
+[[bin]]
+name = "probe_alloc"
+path = "../../src/bin/probe_alloc.rs"
+
+[dependencies]
+litchi-cfb = { path = "/home/zhuhe/code/litchi-worktrees/0749-before-src/crates/litchi-cfb" }
+litchi-core = { path = "/home/zhuhe/code/litchi-worktrees/0749-before-src/crates/litchi-core" }
+litchi-doc = { path = "/home/zhuhe/code/litchi-worktrees/0749-before-src/crates/litchi-doc" }
+litchi-ole-common = { path = "/home/zhuhe/code/litchi-worktrees/0749-before-src/crates/litchi-ole-common" }
+litchi-ppt = { path = "/home/zhuhe/code/litchi-worktrees/0749-before-src/crates/litchi-ppt" }
+
+[profile.release]
+debug = 1

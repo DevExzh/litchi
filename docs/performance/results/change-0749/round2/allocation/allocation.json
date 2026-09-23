@@ -1,0 +1,549 @@
+{
+ "schema": "0749-allocation-r2-v1",
+ "summary": {
+  "reuse-45543-public": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 1635017,
+     "allocation_calls": 143,
+     "peak_live_bytes": 715524,
+     "retained_bytes": 701440
+    },
+    "owners_identical": true,
+    "output_sha256": "545ed7e5ba7b8cc0687f8d21ac95aca68fa4d67fd89fd4277ed7cce047bdb859"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 1248111,
+     "allocation_calls": 115,
+     "peak_live_bytes": 715524,
+     "retained_bytes": 701440
+    },
+    "owners_identical": true,
+    "output_sha256": "545ed7e5ba7b8cc0687f8d21ac95aca68fa4d67fd89fd4277ed7cce047bdb859"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 1248111,
+     "allocation_calls": 115,
+     "peak_live_bytes": 715524,
+     "retained_bytes": 701440
+    },
+    "owners_identical": true,
+    "output_sha256": "545ed7e5ba7b8cc0687f8d21ac95aca68fa4d67fd89fd4277ed7cce047bdb859"
+   }
+  },
+  "reuse-41246-public": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 894798,
+     "allocation_calls": 149,
+     "peak_live_bytes": 380632,
+     "retained_bytes": 368496
+    },
+    "owners_identical": true,
+    "output_sha256": "eae101c746a44eb13e0ec9a37a1ae609eee14ea6f23b211ca66e2d1799b3c972"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 612501,
+     "allocation_calls": 123,
+     "peak_live_bytes": 380632,
+     "retained_bytes": 368496
+    },
+    "owners_identical": true,
+    "output_sha256": "eae101c746a44eb13e0ec9a37a1ae609eee14ea6f23b211ca66e2d1799b3c972"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 612501,
+     "allocation_calls": 123,
+     "peak_live_bytes": 380632,
+     "retained_bytes": 368496
+    },
+    "owners_identical": true,
+    "output_sha256": "eae101c746a44eb13e0ec9a37a1ae609eee14ea6f23b211ca66e2d1799b3c972"
+   }
+  },
+  "reuse-floating-public": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 1346403,
+     "allocation_calls": 308,
+     "peak_live_bytes": 607656,
+     "retained_bytes": 587776
+    },
+    "owners_identical": true,
+    "output_sha256": "3a8541bdf7e28a3e52723f13432d0e9544d1b8a3b0e8abf18e401818cb8c1160"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 1003359,
+     "allocation_calls": 240,
+     "peak_live_bytes": 607656,
+     "retained_bytes": 587776
+    },
+    "owners_identical": true,
+    "output_sha256": "3a8541bdf7e28a3e52723f13432d0e9544d1b8a3b0e8abf18e401818cb8c1160"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 1003359,
+     "allocation_calls": 240,
+     "peak_live_bytes": 607656,
+     "retained_bytes": 587776
+    },
+    "owners_identical": true,
+    "output_sha256": "3a8541bdf7e28a3e52723f13432d0e9544d1b8a3b0e8abf18e401818cb8c1160"
+   }
+  },
+  "reuse-nohf-public": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 110654,
+     "allocation_calls": 132,
+     "peak_live_bytes": 40948,
+     "retained_bytes": 36864
+    },
+    "owners_identical": true,
+    "output_sha256": "db6254c2fc4d70e84af1751f6354ecff6b2932345c660ec2c493838c0f65660f"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 85829,
+     "allocation_calls": 105,
+     "peak_live_bytes": 40948,
+     "retained_bytes": 36864
+    },
+    "owners_identical": true,
+    "output_sha256": "db6254c2fc4d70e84af1751f6354ecff6b2932345c660ec2c493838c0f65660f"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 85829,
+     "allocation_calls": 105,
+     "peak_live_bytes": 40948,
+     "retained_bytes": 36864
+    },
+    "owners_identical": true,
+    "output_sha256": "db6254c2fc4d70e84af1751f6354ecff6b2932345c660ec2c493838c0f65660f"
+   }
+  },
+  "reuse-hyperlink-same": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 66584,
+     "allocation_calls": 147,
+     "peak_live_bytes": 27248,
+     "retained_bytes": 17408
+    },
+    "owners_identical": true,
+    "output_sha256": "e12d55ceb546042d27bb16349566982d1ce988e3bfeb84d6b2102f925233c14e"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 53070,
+     "allocation_calls": 117,
+     "peak_live_bytes": 27248,
+     "retained_bytes": 17408
+    },
+    "owners_identical": true,
+    "output_sha256": "e12d55ceb546042d27bb16349566982d1ce988e3bfeb84d6b2102f925233c14e"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 53070,
+     "allocation_calls": 117,
+     "peak_live_bytes": 27248,
+     "retained_bytes": 17408
+    },
+    "owners_identical": true,
+    "output_sha256": "e12d55ceb546042d27bb16349566982d1ce988e3bfeb84d6b2102f925233c14e"
+   }
+  },
+  "reuse-hyperlink-grow": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 68209,
+     "allocation_calls": 154,
+     "peak_live_bytes": 27368,
+     "retained_bytes": 17408
+    },
+    "owners_identical": true,
+    "output_sha256": "4fe9f985d7d96d6ca206396ff7c35bfbd314ac02a2c6530bad2c7fe3c807bab4"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 53536,
+     "allocation_calls": 126,
+     "peak_live_bytes": 27368,
+     "retained_bytes": 17408
+    },
+    "owners_identical": true,
+    "output_sha256": "4fe9f985d7d96d6ca206396ff7c35bfbd314ac02a2c6530bad2c7fe3c807bab4"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 53536,
+     "allocation_calls": 126,
+     "peak_live_bytes": 27368,
+     "retained_bytes": 17408
+    },
+    "owners_identical": true,
+    "output_sha256": "4fe9f985d7d96d6ca206396ff7c35bfbd314ac02a2c6530bad2c7fe3c807bab4"
+   }
+  },
+  "reuse-empty-same": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 71233,
+     "allocation_calls": 127,
+     "peak_live_bytes": 29212,
+     "retained_bytes": 18432
+    },
+    "owners_identical": true,
+    "output_sha256": "df010c1168b0a56fbd6acef295380db663d35d247a557cd38be4fe66e76ad284"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 55364,
+     "allocation_calls": 107,
+     "peak_live_bytes": 29212,
+     "retained_bytes": 18432
+    },
+    "owners_identical": true,
+    "output_sha256": "df010c1168b0a56fbd6acef295380db663d35d247a557cd38be4fe66e76ad284"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 55364,
+     "allocation_calls": 107,
+     "peak_live_bytes": 29212,
+     "retained_bytes": 18432
+    },
+    "owners_identical": true,
+    "output_sha256": "df010c1168b0a56fbd6acef295380db663d35d247a557cd38be4fe66e76ad284"
+   }
+  },
+  "reuse-empty-grow": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 72883,
+     "allocation_calls": 134,
+     "peak_live_bytes": 29344,
+     "retained_bytes": 18432
+    },
+    "owners_identical": true,
+    "output_sha256": "283d8b9f07fd6c26b8ff506b49e6c1f88bcdce1f44a7e4518bbaca967ae9bbc5"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 55855,
+     "allocation_calls": 116,
+     "peak_live_bytes": 29344,
+     "retained_bytes": 18432
+    },
+    "owners_identical": true,
+    "output_sha256": "283d8b9f07fd6c26b8ff506b49e6c1f88bcdce1f44a7e4518bbaca967ae9bbc5"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 55855,
+     "allocation_calls": 116,
+     "peak_live_bytes": 29344,
+     "retained_bytes": 18432
+    },
+    "owners_identical": true,
+    "output_sha256": "283d8b9f07fd6c26b8ff506b49e6c1f88bcdce1f44a7e4518bbaca967ae9bbc5"
+   }
+  },
+  "reuse-checkboxes-same": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 117979,
+     "allocation_calls": 300,
+     "peak_live_bytes": 42488,
+     "retained_bytes": 24576
+    },
+    "owners_identical": true,
+    "output_sha256": "9fbf51f690307b2083e06b11ffcb8c07c89544310c2d9814757a4f87a8192833"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 91893,
+     "allocation_calls": 231,
+     "peak_live_bytes": 42488,
+     "retained_bytes": 24576
+    },
+    "owners_identical": true,
+    "output_sha256": "9fbf51f690307b2083e06b11ffcb8c07c89544310c2d9814757a4f87a8192833"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 91893,
+     "allocation_calls": 231,
+     "peak_live_bytes": 42488,
+     "retained_bytes": 24576
+    },
+    "owners_identical": true,
+    "output_sha256": "9fbf51f690307b2083e06b11ffcb8c07c89544310c2d9814757a4f87a8192833"
+   }
+  },
+  "reuse-checkboxes-grow": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 120093,
+     "allocation_calls": 310,
+     "peak_live_bytes": 43191,
+     "retained_bytes": 24576
+    },
+    "owners_identical": true,
+    "output_sha256": "83eb48abaccf2762b0d86a7deb74db7689ee68aa2b7ed7738fcfed912582d997"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 92864,
+     "allocation_calls": 243,
+     "peak_live_bytes": 42620,
+     "retained_bytes": 24576
+    },
+    "owners_identical": true,
+    "output_sha256": "83eb48abaccf2762b0d86a7deb74db7689ee68aa2b7ed7738fcfed912582d997"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 92864,
+     "allocation_calls": 243,
+     "peak_live_bytes": 42620,
+     "retained_bytes": 24576
+    },
+    "owners_identical": true,
+    "output_sha256": "83eb48abaccf2762b0d86a7deb74db7689ee68aa2b7ed7738fcfed912582d997"
+   }
+  },
+  "reuse-v3-1000x2000-grow": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 18733624,
+     "allocation_calls": 17260,
+     "peak_live_bytes": 6509204,
+     "retained_bytes": 4097024
+    },
+    "owners_identical": true,
+    "output_sha256": "ab123018ff66545a07d055691e29e74d58502056e4c74cb7c2d366659d0b387f"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 10414865,
+     "allocation_calls": 10265,
+     "peak_live_bytes": 6509204,
+     "retained_bytes": 4097024
+    },
+    "owners_identical": true,
+    "output_sha256": "ab123018ff66545a07d055691e29e74d58502056e4c74cb7c2d366659d0b387f"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 10414865,
+     "allocation_calls": 10265,
+     "peak_live_bytes": 6509204,
+     "retained_bytes": 4097024
+    },
+    "owners_identical": true,
+    "output_sha256": "ab123018ff66545a07d055691e29e74d58502056e4c74cb7c2d366659d0b387f"
+   }
+  },
+  "reuse-v3-3000x2000-grow": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 80108259,
+     "allocation_calls": 51599,
+     "peak_live_bytes": 19518408,
+     "retained_bytes": 12289024
+    },
+    "owners_identical": true,
+    "output_sha256": "fdf8a4130161300d8e10c78be15d31a080efeb3bf3bec5c4c594d60f47c3cdfe"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 31157500,
+     "allocation_calls": 30604,
+     "peak_live_bytes": 19518408,
+     "retained_bytes": 12289024
+    },
+    "owners_identical": true,
+    "output_sha256": "fdf8a4130161300d8e10c78be15d31a080efeb3bf3bec5c4c594d60f47c3cdfe"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 31157500,
+     "allocation_calls": 30604,
+     "peak_live_bytes": 19518408,
+     "retained_bytes": 12289024
+    },
+    "owners_identical": true,
+    "output_sha256": "fdf8a4130161300d8e10c78be15d31a080efeb3bf3bec5c4c594d60f47c3cdfe"
+   }
+  },
+  "reuse-v4-3000x2000-grow": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 79248973,
+     "allocation_calls": 51580,
+     "peak_live_bytes": 19339040,
+     "retained_bytes": 12296192
+    },
+    "owners_identical": true,
+    "output_sha256": "4e8696e4a7ce10b77554988c93b52d4082a2cf27250b7249a58efbd3b9017476"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 30255062,
+     "allocation_calls": 30588,
+     "peak_live_bytes": 19339040,
+     "retained_bytes": 12296192
+    },
+    "owners_identical": true,
+    "output_sha256": "4e8696e4a7ce10b77554988c93b52d4082a2cf27250b7249a58efbd3b9017476"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 30255062,
+     "allocation_calls": 30588,
+     "peak_live_bytes": 19339040,
+     "retained_bytes": 12296192
+    },
+    "owners_identical": true,
+    "output_sha256": "4e8696e4a7ce10b77554988c93b52d4082a2cf27250b7249a58efbd3b9017476"
+   }
+  },
+  "reuse-v4-10000x4000-grow": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 1063195018,
+     "allocation_calls": 201761,
+     "peak_live_bytes": 125262940,
+     "retained_bytes": 80642048
+    },
+    "owners_identical": true,
+    "output_sha256": "0ac6365b7ca114e8351082d980b7c87ceb5c78d9518b667bb928bf2c59260b31"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 189424083,
+     "allocation_calls": 121771,
+     "peak_live_bytes": 125262940,
+     "retained_bytes": 80642048
+    },
+    "owners_identical": true,
+    "output_sha256": "0ac6365b7ca114e8351082d980b7c87ceb5c78d9518b667bb928bf2c59260b31"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 189424083,
+     "allocation_calls": 121771,
+     "peak_live_bytes": 125262940,
+     "retained_bytes": 80642048
+    },
+    "owners_identical": true,
+    "output_sha256": "0ac6365b7ca114e8351082d980b7c87ceb5c78d9518b667bb928bf2c59260b31"
+   }
+  },
+  "rewrite-45543-public": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 1283317,
+     "allocation_calls": 42,
+     "peak_live_bytes": 773545,
+     "retained_bytes": 763598
+    },
+    "owners_identical": true,
+    "output_sha256": "f6606e3b6f37f8c9166ab12745f15c10fdd1070ed83179c67be6cba2471d6b52"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 1283317,
+     "allocation_calls": 42,
+     "peak_live_bytes": 773545,
+     "retained_bytes": 763598
+    },
+    "owners_identical": true,
+    "output_sha256": "f6606e3b6f37f8c9166ab12745f15c10fdd1070ed83179c67be6cba2471d6b52"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 1283317,
+     "allocation_calls": 42,
+     "peak_live_bytes": 773545,
+     "retained_bytes": 763598
+    },
+    "owners_identical": true,
+    "output_sha256": "f6606e3b6f37f8c9166ab12745f15c10fdd1070ed83179c67be6cba2471d6b52"
+   }
+  },
+  "rewrite-checkboxes-grow": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 133569,
+     "allocation_calls": 171,
+     "peak_live_bytes": 51704,
+     "retained_bytes": 29440
+    },
+    "owners_identical": true,
+    "output_sha256": "3c00b10f22bd5750efa23e885142d4c3ae8f08d44f5118588437bbd7040c8795"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 133569,
+     "allocation_calls": 171,
+     "peak_live_bytes": 51704,
+     "retained_bytes": 29440
+    },
+    "owners_identical": true,
+    "output_sha256": "3c00b10f22bd5750efa23e885142d4c3ae8f08d44f5118588437bbd7040c8795"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 133569,
+     "allocation_calls": 171,
+     "peak_live_bytes": 51704,
+     "retained_bytes": 29440
+    },
+    "owners_identical": true,
+    "output_sha256": "3c00b10f22bd5750efa23e885142d4c3ae8f08d44f5118588437bbd7040c8795"
+   }
+  },
+  "open-read-45543": {
+   "A": {
+    "per_owner": {
+     "allocated_bytes": 406521,
+     "allocation_calls": 94,
+     "peak_live_bytes": 322319,
+     "retained_bytes": 8
+    },
+    "owners_identical": true,
+    "output_sha256": "21b0c10e7f90085ce63f5087ee304619bfe266017d08c5164e01a630cb1e3344"
+   },
+   "B": {
+    "per_owner": {
+     "allocated_bytes": 406521,
+     "allocation_calls": 94,
+     "peak_live_bytes": 322319,
+     "retained_bytes": 8
+    },
+    "owners_identical": true,
+    "output_sha256": "21b0c10e7f90085ce63f5087ee304619bfe266017d08c5164e01a630cb1e3344"
+   },
+   "C": {
+    "per_owner": {
+     "allocated_bytes": 406521,
+     "allocation_calls": 94,
+     "peak_live_bytes": 322319,
+     "retained_bytes": 8
+    },
+    "owners_identical": true,
+    "output_sha256": "21b0c10e7f90085ce63f5087ee304619bfe266017d08c5164e01a630cb1e3344"
+   }
+  }
+ }
+}

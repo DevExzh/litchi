@@ -1,0 +1,175 @@
+{
+ "events": "instructions,cycles,instructions:u,cycles:u,page-faults",
+ "layouts_argv0_extra_bytes": [
+  0,
+  16,
+  40
+ ],
+ "rows": [
+  {
+   "case": "doc_semantic_one_edit_save/large",
+   "arm": "A",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    20,
+    220
+   ],
+   "per_owner": {
+    "instructions": 41491041.375,
+    "cycles": 10654913.535,
+    "instructions:u": 41449797.125,
+    "cycles:u": 10621745.92,
+    "page-faults": 0.52
+   }
+  },
+  {
+   "case": "doc_semantic_one_edit_save/large",
+   "arm": "C",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    20,
+    220
+   ],
+   "per_owner": {
+    "instructions": 41391839.72,
+    "cycles": 10300520.225,
+    "instructions:u": 41344425.2,
+    "cycles:u": 10231338.15,
+    "page-faults": -0.11
+   }
+  },
+  {
+   "case": "doc_semantic_one_edit_save/large",
+   "arm": "A",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    20,
+    220
+   ],
+   "per_owner": {
+    "instructions": 41486910.275,
+    "cycles": 10840835.815,
+    "instructions:u": 41430084.615,
+    "cycles:u": 10796198.845,
+    "page-faults": 0.23
+   }
+  },
+  {
+   "case": "doc_semantic_one_edit_save/large",
+   "arm": "C",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    20,
+    220
+   ],
+   "per_owner": {
+    "instructions": 41402022.59,
+    "cycles": 10949912.14,
+    "instructions:u": 41354366.225,
+    "cycles:u": 10897075.8,
+    "page-faults": 0.05
+   }
+  },
+  {
+   "case": "doc_semantic_one_edit_save/large",
+   "arm": "A",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    20,
+    220
+   ],
+   "per_owner": {
+    "instructions": 41508865.235,
+    "cycles": 10305715.325,
+    "instructions:u": 41450742.43,
+    "cycles:u": 10263504.89,
+    "page-faults": 0.465
+   }
+  },
+  {
+   "case": "doc_semantic_one_edit_save/large",
+   "arm": "C",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    20,
+    220
+   ],
+   "per_owner": {
+    "instructions": 41414306.995,
+    "cycles": 10700749.28,
+    "instructions:u": 41363862.855,
+    "cycles:u": 10677764.755,
+    "page-faults": -0.245
+   }
+  }
+ ],
+ "summary": {
+  "doc_semantic_one_edit_save/large": {
+   "instructions": {
+    "A": [
+     41491041.4,
+     41486910.3,
+     41508865.2
+    ],
+    "C": [
+     41391839.7,
+     41402022.6,
+     41414307.0
+    ],
+    "median_change_C_vs_A_pct": -0.215
+   },
+   "cycles": {
+    "A": [
+     10654913.5,
+     10840835.8,
+     10305715.3
+    ],
+    "C": [
+     10300520.2,
+     10949912.1,
+     10700749.3
+    ],
+    "median_change_C_vs_A_pct": 0.43
+   },
+   "instructions:u": {
+    "A": [
+     41449797.1,
+     41430084.6,
+     41450742.4
+    ],
+    "C": [
+     41344425.2,
+     41354366.2,
+     41363862.9
+    ],
+    "median_change_C_vs_A_pct": -0.23
+   },
+   "cycles:u": {
+    "A": [
+     10621745.9,
+     10796198.8,
+     10263504.9
+    ],
+    "C": [
+     10231338.2,
+     10897075.8,
+     10677764.8
+    ],
+    "median_change_C_vs_A_pct": 0.527
+   },
+   "page-faults": {
+    "A": [
+     0.5,
+     0.2,
+     0.5
+    ],
+    "C": [
+     -0.1,
+     0.1,
+     -0.2
+    ],
+    "median_change_C_vs_A_pct": -120.0
+   }
+  }
+ }
+}
