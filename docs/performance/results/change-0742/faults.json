@@ -1,0 +1,113 @@
+{
+  "pptx_cross_copy_media_rich_lifecycle": {
+    "after": {
+      "processes_by_median_fresh_regions": {
+        "1": 4,
+        "2": 2,
+        "3": 2
+      },
+      "samples_by_fresh_regions": {
+        "1": {
+          "median_commit_ms": 88.691,
+          "median_lifecycle_ms": 180.809,
+          "median_plan_ms": 63.758,
+          "median_publication_ms": 6.338,
+          "samples": 70
+        },
+        "2": {
+          "median_commit_ms": 88.756,
+          "median_lifecycle_ms": 187.549,
+          "median_plan_ms": 70.465,
+          "median_publication_ms": 6.368,
+          "samples": 49
+        },
+        "3": {
+          "median_commit_ms": 95.802,
+          "median_lifecycle_ms": 195.537,
+          "median_plan_ms": 70.704,
+          "median_publication_ms": 6.519,
+          "samples": 32
+        },
+        "4": {
+          "median_commit_ms": 95.575,
+          "median_lifecycle_ms": 199.089,
+          "median_plan_ms": 79.958,
+          "median_publication_ms": 1.52,
+          "samples": 9
+        }
+      }
+    },
+    "before": {
+      "processes_by_median_fresh_regions": {
+        "0": 1,
+        "1": 5,
+        "2": 2
+      },
+      "samples_by_fresh_regions": {
+        "0": {
+          "median_commit_ms": 88.61,
+          "median_lifecycle_ms": 400.36,
+          "median_plan_ms": 288.105,
+          "median_publication_ms": 1.532,
+          "samples": 20
+        },
+        "1": {
+          "median_commit_ms": 88.564,
+          "median_lifecycle_ms": 405.383,
+          "median_plan_ms": 288.316,
+          "median_publication_ms": 6.504,
+          "samples": 100
+        },
+        "2": {
+          "median_commit_ms": 88.573,
+          "median_lifecycle_ms": 412.45,
+          "median_plan_ms": 295.764,
+          "median_publication_ms": 6.341,
+          "samples": 40
+        }
+      }
+    }
+  },
+  "pptx_source_backed_cross_copy_media_rich_lifecycle": {
+    "after": {
+      "processes_by_median_fresh_regions": {
+        "0": 1,
+        "1": 7
+      },
+      "samples_by_fresh_regions": {
+        "0": {
+          "median_lifecycle_ms": 12.038,
+          "median_plan_ms": 4.114,
+          "median_publication_ms": 7.283,
+          "samples": 40
+        },
+        "1": {
+          "median_lifecycle_ms": 16.809,
+          "median_plan_ms": 4.105,
+          "median_publication_ms": 12.089,
+          "samples": 280
+        }
+      }
+    },
+    "before": {
+      "processes_by_median_fresh_regions": {
+        "0": 2,
+        "1": 6
+      },
+      "samples_by_fresh_regions": {
+        "0": {
+          "median_lifecycle_ms": 12.055,
+          "median_plan_ms": 4.132,
+          "median_publication_ms": 7.306,
+          "samples": 80
+        },
+        "1": {
+          "median_lifecycle_ms": 16.845,
+          "median_plan_ms": 4.118,
+          "median_publication_ms": 12.121,
+          "samples": 240
+        }
+      }
+    }
+  }
+}

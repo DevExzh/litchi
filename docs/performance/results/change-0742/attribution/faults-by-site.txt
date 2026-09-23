@@ -1,0 +1,9 @@
+frame-pointer build of b2132486af; perf record -e page-faults -c 64 --call-graph fp; lifecycle-rooted stacks only
+harness minor faults per lifecycle sample: [16407, 16407, 16407, 16407, 16407, 16407, 16407, 16407, 16407, 16407, 16407, 16407]
+faults	share	phase | innermost litchi frames
+212928	0.362	other (ingress, snapshots, untimed verification) | ensure_payload > decode > read_with_accounting
+155584	0.265	other (ingress, snapshots, untimed verification) | (no litchi frame)
+106688	0.181	plan | plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate
+106624	0.181	publication | write_to_stream
+6144	0.010	other (ingress, snapshots, untimed verification) | read > read_with_accounting
+total	587968

@@ -1,0 +1,87 @@
+{
+  "lifecycle_period": 16299496906,
+  "phases": {
+    "other-lifecycle": {
+      "share_of_lifecycle": 0.406,
+      "leaf_shares": {
+        "sha256": 0.4272,
+        "kernel-or-unknown": 0.2288,
+        "memcpy": 0.143,
+        "crc32": 0.1027,
+        "other": 0.0333,
+        "memset": 0.0274,
+        "memcmp": 0.0156,
+        "inflate": 0.014,
+        "allocator": 0.0078
+      },
+      "path_shares": {}
+    },
+    "commit": {
+      "share_of_lifecycle": 0.3431,
+      "leaf_shares": {
+        "sha256": 0.8,
+        "kernel-or-unknown": 0.0815,
+        "memcmp": 0.0314,
+        "memcpy": 0.0302,
+        "other": 0.024,
+        "crc32": 0.0159,
+        "memset": 0.0089,
+        "allocator": 0.0058,
+        "inflate": 0.0023
+      },
+      "path_shares": {
+        "prepare_cross_slide_copy_for_slides > build_candidate > capture_internal": 0.1639,
+        "prepare_cross_slide_copy_for_slides > build_candidate": 0.161,
+        "physical_package_fingerprint > write_to_stream > write": 0.1607,
+        "package_fingerprint_with_memo > feed": 0.1606,
+        "validate_application_candidate > capture_internal > package_fingerprint_with_memo": 0.1599,
+        "prepare_cross_slide_copy_for_slides": 0.0869,
+        "prepare_cross_slide_copy_for_slides > build_candidate > from_vec_reusing_payloads": 0.0704,
+        "prepare_cross_slide_copy_for_slides > prove_package_dialect": 0.0155,
+        "prepare_cross_slide_copy_for_slides > prove_layout_inheritance > prove_inherited_part": 0.0058,
+        "capture_with_revision > capture_internal > load_snapshot_with_slide_root_proofs": 0.0027,
+        "validate_application_candidate > capture_internal > load_snapshot_with_slide_root_proofs": 0.0019,
+        "prepare_cross_slide_copy_for_slides > validate_registered_layout > slide_layouts": 0.0019,
+        "prepare_cross_slide_copy_for_slides > validate_xml_surface": 0.0012,
+        "capture_with_revision > capture_internal > capture_slides_with_mce": 0.0012,
+        "(root)": 0.0008,
+        "capture_with_revision > capture_internal > from_part": 0.0008,
+        "prepare_cross_slide_copy_for_slides > prove_package_dialect > dialect_namespace_flags": 0.0008,
+        "capture_with_revision > capture_internal > clone": 0.0004,
+        "prepare_cross_slide_copy_for_slides > capture > new": 0.0004,
+        "prepare_cross_slide_copy_for_slides > build_candidate > try_add_part": 0.0004,
+        "validate_application_candidate > capture_internal > capture_slides_with_mce": 0.0004,
+        "capture_with_revision > capture_internal": 0.0004,
+        "package_fingerprint_with_memo": 0.0004,
+        "prepare_cross_slide_copy_for_slides > build_candidate > clone": 0.0004,
+        "package_fingerprint_with_memo > feed_relationships": 0.0004
+      }
+    },
+    "plan": {
+      "share_of_lifecycle": 0.2508,
+      "leaf_shares": {
+        "sha256": 0.6567,
+        "kernel-or-unknown": 0.1018,
+        "memcpy": 0.1004,
+        "memcmp": 0.0471,
+        "crc32": 0.0423,
+        "other": 0.0328,
+        "memset": 0.009,
+        "allocator": 0.0053,
+        "inflate": 0.0026,
+        "deflate": 0.0021
+      },
+      "path_shares": {
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate": 0.7445,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > snapshot_physical_revision": 0.22,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > prove_package_dialect": 0.0222,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > prove_layout_inheritance": 0.0079,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > validate_registered_layout": 0.0032,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > reject_protected": 0.0005,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > reject_mce": 0.0005,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > validate_xml_surface": 0.0005,
+        "resolve_slide": 0.0005
+      }
+    }
+  }
+}

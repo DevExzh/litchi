@@ -1,0 +1,13 @@
+[package]
+name = "change0742-legacy-fixture"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Packet-only generator, outside every workspace. It is built against the
+# unchanged base tree to capture genuine LPCP0003 durable patches.
+[workspace]
+
+[dependencies]
+litchi-pptx = { path = "BASE/crates/litchi-pptx" }
+sha2 = "0.10"

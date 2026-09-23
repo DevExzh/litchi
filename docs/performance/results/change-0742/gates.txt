@@ -1,0 +1,29 @@
+# Change 0742 gates
+
+Run from the worktree root on commit b2132486af (the record and this packet
+untracked), CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0742,
+CARGO_BUILD_JOBS=6, Rust 1.95.0 from rust-toolchain.toml.
+
+fmt	exit=0	cargo fmt --all --check
+check	exit=0	cargo check -p soapberry-zip -p litchi-sign -p litchi-opc -p litchi-pptx -p litchi-docx -p litchi-spreadsheet-drawing -p litchi-ooxml-common -p litchi-xlsb -p litchi -p litchi-ppt -p litchi-xlsx --all-targets --locked --offline
+clippy-lib	exit=0	cargo clippy -p soapberry-zip -p litchi-opc -p litchi-pptx --lib --no-deps --locked --offline -- -D warnings
+clippy-opc-zip-all-targets	exit=0	cargo clippy -p soapberry-zip -p litchi-opc --all-targets --no-deps --locked --offline -- -D warnings
+clippy-pptx-all-targets	exit=101	cargo clippy -p litchi-pptx --all-targets --no-deps --locked --offline --keep-going -- -D warnings
+    pre-existing clippy::err_expect only, unchanged from base 009d515bef: crates/litchi-pptx/src/opened/tests.rs:464:14, crates/litchi-pptx/src/opened/tests.rs:538:10, crates/litchi-pptx/src/opened/tests.rs:557:10
+test-core	exit=0	cargo test -p soapberry-zip -p litchi-opc -p litchi-pptx --locked --offline
+    passed=2346 failed=0 ignored=5
+test-dependents	exit=0	cargo test -p litchi-sign -p litchi-ooxml-common -p litchi-docx -p litchi-xlsx -p litchi-xlsb -p litchi-spreadsheet-drawing -p litchi-ppt --locked --offline
+    passed=5205 failed=0 ignored=55
+test-facade	exit=0	cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+    passed=382 failed=0 ignored=7
+doc	exit=0	env RUSTDOCFLAGS=-D warnings cargo doc -p soapberry-zip -p litchi-opc -p litchi-pptx --no-deps --locked --offline
+crate-boundaries	exit=0	python3 tools/check_crate_boundaries.py
+    crate boundaries valid for 64 workspace packages and 241 internal dependency declarations (11 explicit debt items)
+non-iwork	exit=0	python3 tools/non_iwork_gate.py verify
+    verified_bulk_tree_roots=45; verified_facade_safe_trees=35; verified_facade_combined_tree=1
+perf-claims	exit=0	python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+    OK: 10 performance claims validated (structural)
+
+Earlier, on 317920af5c: the same fmt/check/clippy/test/doc/python gates passed
+for litchi-opc, litchi-pptx and their dependents (opc+pptx 1,704 passed, dependents
+5,180, facade 382), with the same three pre-existing clippy lints.
