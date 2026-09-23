@@ -857,9 +857,9 @@ pub(crate) fn write_boolerr<W: Write>(
 ///
 /// This implementation properly handles string splitting across CONTINUE boundaries,
 /// based on Apache POI's `SSTSerializer`.
-pub(crate) fn write_sst<W: Write>(
+pub(crate) fn write_sst<W: Write, S: AsRef<str>>(
     writer: &mut W,
-    strings: &[String],
+    strings: &[S],
     cst_total: u32,
 ) -> Result<()> {
     sst::write_sst(writer, strings, cst_total)

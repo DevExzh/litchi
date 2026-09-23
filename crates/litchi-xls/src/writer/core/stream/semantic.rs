@@ -1,7 +1,5 @@
 //! Semantic stream-planning values shared by validation and BIFF encoding.
 
-use std::collections::HashMap;
-
 use crate::{Error, Result};
 
 use super::super::worksheet::WritableWorksheet;
@@ -24,32 +22,6 @@ pub(super) struct PivotCacheIdentity {
     pub(super) cache_index: u16,
     /// One-based identifier used by `SXStreamID` and `_SX_DB_CUR/nnnn`.
     pub(super) stream_id: u16,
-}
-
-pub(super) fn lookup_shared_string_index(
-    shared_strings: &[String],
-    string_map: &HashMap<String, u32>,
-    value: &str,
-) -> Result<u32> {
-    let index = string_map.get(value).copied().ok_or_else(|| {
-        Error::InvalidData(format!(
-            "string cell value {value:?} is missing from the shared string table"
-        ))
-    })?;
-    let table_index = usize::try_from(index).map_err(|_error| {
-        Error::InvalidData(format!(
-            "shared string index {index} for value {value:?} cannot be represented"
-        ))
-    })?;
-    match shared_strings.get(table_index) {
-        Some(entry) if entry == value => Ok(index),
-        Some(_) => Err(Error::InvalidData(format!(
-            "shared string index {index} for value {value:?} does not match the shared string table"
-        ))),
-        None => Err(Error::InvalidData(format!(
-            "shared string index {index} for value {value:?} is outside the shared string table"
-        ))),
-    }
 }
 
 pub(super) fn stage_pivot_cache_identities(

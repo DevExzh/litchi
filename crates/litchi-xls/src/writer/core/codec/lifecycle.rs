@@ -6,7 +6,6 @@ use super::super::{
 use crate::encryption::{WriterEncryption, validate_writer_encryption};
 use crate::error::{Error, Result};
 use crate::{EncryptionProfile, WeakEncryptionPolicy};
-use std::collections::HashMap;
 use zeroize::Zeroizing;
 
 impl Writer {
@@ -15,11 +14,8 @@ impl Writer {
     pub fn new() -> Self {
         Self {
             worksheets: Vec::new(),
-            shared_strings: Vec::new(),
-            string_map: HashMap::new(),
             defined_names: Vec::new(),
             defined_name_records: Vec::new(),
-            sst_total: 0,
             fmt: FormattingManager::new(),
             workbook_protection: None,
             file_sharing: None,

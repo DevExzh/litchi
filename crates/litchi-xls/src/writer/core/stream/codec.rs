@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::writer::biff;
 use crate::writer::formatting::FormattingManager;
@@ -12,7 +12,8 @@ use super::super::{
     FunctionGroupOptions, VbaWriteMetadata, WorkbookEnvironmentOptions, WorkbookProtection,
     WorkbookWindowOptions,
 };
-use super::semantic::{WorkbookStreams, lookup_shared_string_index};
+use super::SharedStringTable;
+use super::semantic::WorkbookStreams;
 use super::validation::validate_workbook_inputs;
 
 const DEFAULT_WRITE_ACCESS_USER: &str = "litchi";
@@ -42,8 +43,7 @@ pub(crate) fn generate_workbook_stream(
         super::super::DefinedNameRecordOptions,
         crate::DefinedNameFutureRecords,
     )],
-    shared_strings: &[String],
-    sst_total: u32,
+    shared_strings: &SharedStringTable<'_>,
     workbook_protection: Option<WorkbookProtection>,
     file_sharing: Option<&FileSharing>,
     book_ext: Option<&crate::BookExt>,
@@ -54,7 +54,6 @@ pub(crate) fn generate_workbook_stream(
     xf_extensions: &[crate::XfExt],
     style_extensions: &[crate::StyleExt],
     worksheets: &[WritableWorksheet],
-    string_map: &HashMap<String, u32>,
 ) -> Result<WorkbookStreams> {
     let pivot_cache_identities = validate_workbook_inputs(
         fmt,
@@ -505,8 +504,24 @@ pub(crate) fn generate_workbook_stream(
     }
 
     // SST record (shared string table)
-    if !shared_strings.is_empty() {
-        biff::write_sst(&mut stream, shared_strings, sst_total)?;
+    if !shared_strings.strings().is_empty() {
+        // Reserve the shared strings and room for the worksheet records that
+        // follow them, so the stream does not copy the table while growing.
+        let worksheet_slack = worksheets.iter().fold(64 * 1024usize, |bytes, worksheet| {
+            bytes
+                .saturating_add(1024)
+                .saturating_add(worksheet.cells.len().saturating_mul(32))
+        });
+        stream.reserve(
+            shared_strings
+                .sst_bytes_hint()
+                .saturating_add(worksheet_slack),
+        );
+        biff::write_sst(
+            &mut stream,
+            shared_strings.strings(),
+            shared_strings.total(),
+        )?;
     }
 
     // WEBPUB follows ExtSST in the workbook globals grammar.
@@ -779,19 +794,34 @@ pub(crate) fn generate_workbook_stream(
             }
         }
 
-        // Cell records (sorted by row, then column)
-        let mut sorted_cells: Vec<_> = worksheet.cells.iter().collect();
-        sorted_cells.sort_by_key(|(k, _)| *k);
+        // Cell records (sorted by row, then column). A string cell also
+        // carries its ordinal among the worksheet's string cells in cell-map
+        // iteration order, the order the shared string table recorded their
+        // indices in.
+        let mut string_cells = 0usize;
+        let mut sorted_cells: Vec<_> = worksheet
+            .cells
+            .iter()
+            .map(|(key, cell)| {
+                let string_ordinal = string_cells;
+                if matches!(cell.value, CellValue::String(_)) {
+                    string_cells += 1;
+                }
+                (key, cell, string_ordinal)
+            })
+            .collect();
+        sorted_cells.sort_by_key(|(k, _, _)| *k);
 
         let pivot_xf_indices = fmt.pivot_xf_indices();
 
         let mut cell_index = 0usize;
         while cell_index < sorted_cells.len() {
-            let ((row, col), cell) = sorted_cells.get(cell_index).copied().ok_or_else(|| {
-                Error::InvalidData(format!(
-                    "worksheet cell index {cell_index} is outside the sorted cell list"
-                ))
-            })?;
+            let ((row, col), cell, string_ordinal) =
+                sorted_cells.get(cell_index).copied().ok_or_else(|| {
+                    Error::InvalidData(format!(
+                        "worksheet cell index {cell_index} is outside the sorted cell list"
+                    ))
+                })?;
             let xf_index = match cell.pivot_xf_role {
                 Some(super::super::worksheet::PivotCellXfRole::HeaderAccent) => {
                     pivot_xf_indices.header_accent
@@ -818,7 +848,7 @@ pub(crate) fn generate_workbook_stream(
                 let mut expected_col = *col;
 
                 while next_index < sorted_cells.len() {
-                    let ((next_row, next_col), next_cell) =
+                    let ((next_row, next_col), next_cell, _) =
                         sorted_cells.get(next_index).copied().ok_or_else(|| {
                             Error::InvalidData(format!(
                                 "worksheet cell index {next_index} is outside the sorted cell list"
@@ -868,7 +898,7 @@ pub(crate) fn generate_workbook_stream(
                     biff::write_number(&mut stream, *row, *col, xf_index, *value)?;
                 },
                 CellValue::String(s) => {
-                    let sst_index = lookup_shared_string_index(shared_strings, string_map, s)?;
+                    let sst_index = shared_strings.index_for(worksheet_index, string_ordinal, s)?;
                     biff::write_labelsst(&mut stream, *row, *col, xf_index, sst_index)?;
                 },
                 CellValue::Boolean(value) => {
