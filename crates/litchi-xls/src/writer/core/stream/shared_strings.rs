@@ -100,6 +100,13 @@ impl<'a> SharedStringTable<'a> {
         payload.saturating_add((payload / 8_223).saturating_add(1).saturating_mul(5))
     }
 
+    /// Whether worksheet `sheet` had any string cell when the table was built.
+    pub(crate) fn has_string_cells(&self, sheet: usize) -> bool {
+        self.cell_indices
+            .get(sheet)
+            .is_some_and(|cells| !cells.is_empty())
+    }
+
     /// Returns the SST index of the `string_ordinal`-th string cell, in
     /// cell-map iteration order, of worksheet `sheet`, whose value is `value`.
     ///

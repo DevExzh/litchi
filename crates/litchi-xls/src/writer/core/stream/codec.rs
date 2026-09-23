@@ -798,19 +798,22 @@ pub(crate) fn generate_workbook_stream(
         // carries its ordinal among the worksheet's string cells in cell-map
         // iteration order, the order the shared string table recorded their
         // indices in.
+        let has_string_cells = shared_strings.has_string_cells(worksheet_index);
         let mut string_cells = 0usize;
         let mut sorted_cells: Vec<_> = worksheet
             .cells
             .iter()
             .map(|(key, cell)| {
                 let string_ordinal = string_cells;
-                if matches!(cell.value, CellValue::String(_)) {
+                if has_string_cells && matches!(cell.value, CellValue::String(_)) {
                     string_cells += 1;
                 }
                 (key, cell, string_ordinal)
             })
             .collect();
-        sorted_cells.sort_by_key(|(k, _, _)| *k);
+        // Keys are the distinct keys of the cell map, so an unstable sort
+        // yields exactly the order a stable one would.
+        sorted_cells.sort_unstable_by_key(|(k, _, _)| *k);
 
         let pivot_xf_indices = fmt.pivot_xf_indices();
 
