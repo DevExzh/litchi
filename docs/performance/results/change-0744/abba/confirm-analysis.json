@@ -1,0 +1,355 @@
+{
+ "method": "Change 0744 ABBA analysis.\n\nFor every (group, case, shape): per-process p50/p95/mean, the median of the\nprocess p50s per arm, paired after/before ratios over the adjacent ABBA pairs\n(A1,B1) (A2,B2) (A3,B3) (A4,B4), a percentile bootstrap 95% CI of the mean\npaired p50 ratio over those pairs, same-arm drift, and >5% regression flags.",
+ "groups": {
+  "eager": {
+   "environment": {
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "git_revision": "009d515befc1b56c07653258b5250139507a33f5",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "12",
+    "storage_identifier": null
+   },
+   "entries": [
+    {
+     "case": "xlsx_eager_cell_values_one_edit_save",
+     "shape": "medium",
+     "processes": {
+      "A1": {
+       "p50": 6434545,
+       "p95": 6499636,
+       "mean": 6433834.159999999,
+       "samples": 100,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "A2": {
+       "p50": 5743335,
+       "p95": 5796980,
+       "mean": 5749953.96,
+       "samples": 100,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "A3": {
+       "p50": 6177252,
+       "p95": 6261572,
+       "mean": 6184461.760000002,
+       "samples": 100,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "A4": {
+       "p50": 6127680,
+       "p95": 6179391,
+       "mean": 6129440.330000001,
+       "samples": 100,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "B1": {
+       "p50": 2950826,
+       "p95": 3104308,
+       "mean": 2980769.99,
+       "samples": 100,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "B2": {
+       "p50": 3361788,
+       "p95": 3513049,
+       "mean": 3389840.41,
+       "samples": 100,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "B3": {
+       "p50": 2790389,
+       "p95": 2870134,
+       "mean": 2797251.8000000003,
+       "samples": 100,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      },
+      "B4": {
+       "p50": 2772694,
+       "p95": 2815234,
+       "mean": 2776366.430000001,
+       "samples": 100,
+       "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+       "accepted_bytes": 4226480,
+       "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+      }
+     },
+     "before_median_p50_ns": 6152466.0,
+     "after_median_p50_ns": 2870607.5,
+     "paired_p50_ratios": [
+      0.4585912446023767,
+      0.5853372648469922,
+      0.4517201176186434,
+      0.45248674865528227
+     ],
+     "paired_mean_ratios": [
+      0.46329605580010796,
+      0.5895421830473231,
+      0.4523031928327421,
+      0.45295594385858073
+     ],
+     "mean_paired_p50_ratio": 0.48703384393082366,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.45210343313696283,
+      0.5521246357990648
+     ],
+     "before_p50_drift": 0.12034993605631561,
+     "after_p50_drift": 0.21246268069970942,
+     "outputs_identical": true,
+     "corpus_identical": true
+    }
+   ]
+  },
+  "noop": {
+   "environment": {
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "git_revision": "009d515befc1b56c07653258b5250139507a33f5",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "12",
+    "storage_identifier": null
+   },
+   "entries": [
+    {
+     "case": "xlsx_noop_commit_save",
+     "shape": "dense-wide",
+     "processes": {
+      "A1": {
+       "p50": 16205,
+       "p95": 19010,
+       "mean": 15802.23949999999,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A2": {
+       "p50": 17700,
+       "p95": 19591,
+       "mean": 17728.156000000003,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A3": {
+       "p50": 16760,
+       "p95": 18561,
+       "mean": 16879.361999999983,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "A4": {
+       "p50": 16561,
+       "p95": 18280,
+       "mean": 16615.13100000001,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B1": {
+       "p50": 15990,
+       "p95": 19900,
+       "mean": 15948.713500000005,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B2": {
+       "p50": 15880,
+       "p95": 18480,
+       "mean": 15630.81049999999,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B3": {
+       "p50": 16030,
+       "p95": 17670,
+       "mean": 16164.4905,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      },
+      "B4": {
+       "p50": 15750,
+       "p95": 17310,
+       "mean": 15887.804500000002,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 384525,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+      }
+     },
+     "before_median_p50_ns": 16660.5,
+     "after_median_p50_ns": 15935.0,
+     "paired_p50_ratios": [
+      0.9867324899722308,
+      0.8971751412429378,
+      0.9564439140811456,
+      0.9510295272024636
+     ],
+     "paired_mean_ratios": [
+      1.0092691925090753,
+      0.8816940972315445,
+      0.9576481919162594,
+      0.9562250517314606
+     ],
+     "mean_paired_p50_ratio": 0.9478452681246945,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.9119923344524898,
+      0.9778067492797891
+     ],
+     "before_p50_drift": 0.09225547670472078,
+     "after_p50_drift": 0.01777777777777767,
+     "outputs_identical": true,
+     "corpus_identical": true
+    },
+    {
+     "case": "xlsx_noop_commit_save",
+     "shape": "medium",
+     "processes": {
+      "A1": {
+       "p50": 590,
+       "p95": 780,
+       "mean": 610.0174999999983,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A2": {
+       "p50": 570,
+       "p95": 700,
+       "mean": 599.5639999999992,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A3": {
+       "p50": 570,
+       "p95": 690,
+       "mean": 591.2179999999996,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "A4": {
+       "p50": 550,
+       "p95": 620,
+       "mean": 561.0590000000003,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B1": {
+       "p50": 560,
+       "p95": 710,
+       "mean": 599.2324999999993,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B2": {
+       "p50": 550,
+       "p95": 680,
+       "mean": 579.8784999999997,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B3": {
+       "p50": 580,
+       "p95": 680,
+       "mean": 592.8419999999998,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      },
+      "B4": {
+       "p50": 560,
+       "p95": 680,
+       "mean": 583.106499999999,
+       "samples": 2000,
+       "output_sha256": null,
+       "accepted_bytes": 15254,
+       "archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+      }
+     },
+     "before_median_p50_ns": 570.0,
+     "after_median_p50_ns": 560.0,
+     "paired_p50_ratios": [
+      0.9491525423728814,
+      0.9649122807017544,
+      1.0175438596491229,
+      1.018181818181818
+     ],
+     "paired_mean_ratios": [
+      0.9823201793391189,
+      0.9671669746682597,
+      1.0027468717122958,
+      1.039296223748302
+     ],
+     "mean_paired_p50_ratio": 0.9874476252263942,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.9570324115373179,
+      1.0178628389154705
+     ],
+     "before_p50_drift": 0.07272727272727275,
+     "after_p50_drift": 0.05454545454545445,
+     "outputs_identical": true,
+     "corpus_identical": true
+    }
+   ]
+  }
+ },
+ "regression_flags_over_5pct": []
+}

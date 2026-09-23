@@ -1,0 +1,58 @@
+total samples 7373, inside root 3530
+lane_walk                        1976  55.98%
+other                             542  15.35%
+lane_recognize                    466  13.20%
+materialize                       390  11.05%
+from_unsorted                     156   4.42%
+
+== lane_walk top leaves
+     1110  31.44%  litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::lane_event
+      461  13.06%  litchi_xlsx::raw::worksheet::lane::walk
+      147   4.16%  litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::close_lane_cell
+       92   2.61%  litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::open_lane_cell
+       40   1.13%  litchi_xlsx::raw::worksheet::validation::parse_a1
+       35   0.99%  litchi_xlsx::raw::worksheet::codec::parse_cell_u32
+       23   0.65%  litchi_ooxml_common::xml::unqualified_attribute_value
+       17   0.48%  litchi_xlsx::raw::worksheet::lane::start_tag
+       15   0.42%  core::str::converts::from_utf8
+       11   0.31%  litchi_xlsx::raw::worksheet::validation::optional_bool
+        6   0.17%  litchi_xlsx::raw::worksheet::validation::optional_u32
+        5   0.14%  litchi_xlsx::raw::worksheet::codec::lane_slice
+
+== other top leaves
+      387  10.96%  litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+       88   2.49%  __memmove_avx512_unaligned_erms
+       21   0.59%  litchi_xlsx::workbook::model::Inner::validate_styles
+       13   0.37%  memchr::arch::x86_64::avx2::packedpair::Finder::find_impl
+       12   0.34%  core::str::converts::from_utf8
+       11   0.31%  [unknown]
+        6   0.17%  memchr::arch::x86_64::avx2::memchr::One::find_raw_avx2
+        2   0.06%  memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+        1   0.03%  litchi_xlsx::workbook::model::Worksheet::store
+        1   0.03%  _int_malloc
+
+== lane_recognize top leaves
+      328   9.29%  litchi_xlsx::raw::worksheet::lane::recognize
+       97   2.75%  litchi_xlsx::raw::worksheet::lane::start_tag
+       19   0.54%  __memcmp_evex_movbe
+       15   0.42%  memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+        5   0.14%  memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+        2   0.06%  memchr::arch::x86_64::avx2::memchr::Two::find_raw
+
+== materialize top leaves
+      358  10.14%  litchi_xlsx::raw::worksheet::semantic::materialize
+        7   0.20%  litchi_xlsx::raw::worksheet::semantic::parse_value
+        7   0.20%  litchi_xlsx::cell::Number::validate_lexical
+        4   0.11%  _int_malloc
+        3   0.08%  __libc_malloc2
+        3   0.08%  litchi_xlsx::cell::Number::new
+        2   0.06%  __memmove_avx512_unaligned_erms
+        2   0.06%  core::ptr::drop_in_place<litchi_xlsx::cell::Cell>
+        1   0.03%  __rustc::__rdl_alloc
+        1   0.03%  __rustc::__rust_no_alloc_shim_is_unstable_v2
+        1   0.03%  core::str::<impl str>::trim_matches
+        1   0.03%  malloc
+
+== from_unsorted top leaves
+      109   3.09%  litchi_xlsx::cell::Store::from_unsorted
+       47   1.33%  core::slice::sort::unstable::ipnsort
