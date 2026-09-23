@@ -1,0 +1,58 @@
+# Change 0749 gates
+
+Worktree /home/zhuhe/code/litchi-worktrees/0749-cfb-reuse-plan-validation at 776ad0517512e5d64c37c37751c4de4d694c236f; CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0749/ws; CARGO_BUILD_JOBS=6; RUST_TEST_THREADS=6; rustc 1.95.0 (59807616e 2026-04-14).
+Each command ran from the repository root; exit codes as recorded.
+
+== fmt: cargo fmt --all --check
+exit=0
+== check-cfb-dependents: cargo check -p litchi-cfb -p litchi-ole-common -p litchi-doc -p litchi-ppt -p litchi-xls -p litchi-vba -p litchi-ograph -p litchi-crypto -p litchi-sign --all-targets --locked --offline
+exit=0
+== check-facade: cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked --offline
+exit=0
+== clippy-cfb-lib: cargo clippy -p litchi-cfb --lib --no-deps --locked --offline -- -D warnings
+exit=0
+== clippy-cfb-all: cargo clippy -p litchi-cfb --all-targets --no-deps --locked --offline -- -D warnings
+exit=0
+== doc-cfb: env RUSTDOCFLAGS=-D warnings cargo doc -p litchi-cfb --no-deps --locked --offline
+exit=0
+== boundaries: python3 tools/check_crate_boundaries.py
+exit=0
+== non-iwork: python3 tools/non_iwork_gate.py verify
+exit=0
+== perf-claims: python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+exit=0
+== test-litchi-cfb: cargo test -p litchi-cfb --locked --offline
+exit=0
+== test-litchi-ole-common: cargo test -p litchi-ole-common --locked --offline
+exit=0
+== test-litchi-doc: cargo test -p litchi-doc --locked --offline
+exit=0
+== test-litchi-ppt: cargo test -p litchi-ppt --locked --offline
+exit=0
+== test-litchi-xls: cargo test -p litchi-xls --locked --offline
+exit=0
+== test-litchi-vba: cargo test -p litchi-vba --locked --offline
+exit=0
+== test-litchi-ograph: cargo test -p litchi-ograph --locked --offline
+exit=0
+== test-litchi-crypto: cargo test -p litchi-crypto --locked --offline
+exit=0
+== test-litchi-sign: cargo test -p litchi-sign --locked --offline
+exit=0
+== test-facade: cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+exit=0
+
+Test totals (sum of all test binaries and doctests):
+  test-facade: passed=382 failed=0 ignored=7
+  test-litchi-cfb: passed=440 failed=0 ignored=1
+  test-litchi-crypto: passed=33 failed=0 ignored=0
+  test-litchi-doc: passed=1198 failed=0 ignored=13
+  test-litchi-ograph: passed=67 failed=0 ignored=0
+  test-litchi-ole-common: passed=165 failed=0 ignored=0
+  test-litchi-ppt: passed=1229 failed=0 ignored=11
+  test-litchi-sign: passed=25 failed=0 ignored=0
+  test-litchi-vba: passed=29 failed=0 ignored=0
+  test-litchi-xls: passed=1474 failed=0 ignored=1
+  boundaries: crate boundaries valid for 64 workspace packages and 241 internal dependency declarations (11 explicit debt items)
+  non-iwork: verified_facade_combined_tree=1
+  perf-claims: OK: 10 performance claims validated (structural)

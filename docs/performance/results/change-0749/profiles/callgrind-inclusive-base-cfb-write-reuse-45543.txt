@@ -1,0 +1,60 @@
+Ir                  
+--------------------------------------------------------------------------------
+13,897,748 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                   file:function
+--------------------------------------------------------------------------------
+13,897,748 (100.0%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+13,897,748 (100.0%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+13,897,748 (100.0%)  /probe/manifests/before/../../src/lib.rs:probe_0749::run [probe]
+13,897,748 (100.0%)  /probe/manifests/before/../../src/lib.rs:probe_0749::timed_owner [probe]
+13,897,748 (100.0%)  /probe/manifests/before/../../src/main.rs:probe::main [probe]
+13,897,748 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:std::rt::lang_start::{{closure}}
+13,897,748 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:std::rt::lang_start_internal
+13,897,748 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ops/function.rs:std::sys::backtrace::__rust_begin_short_backtrace
+13,897,748 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:std::rt::lang_start::{{closure}} [probe]
+13,897,748 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/rt.rs:std::rt::lang_start_internal [probe]
+13,897,748 (100.0%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/backtrace.rs:std::sys::backtrace::__rust_begin_short_backtrace [probe]
+13,897,748 (100.0%)  ???:(below main) [probe]
+13,897,748 (100.0%)  ???:0x0000000000023cc0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+13,897,748 (100.0%)  ???:main [probe]
+13,897,308 (100.0%)  /probe/manifests/before/../../src/lib.rs:probe_0749::cfb_write [probe]
+13,897,118 (100.0%)  /litchi/crates/litchi-cfb/src/writer/core.rs:litchi_cfb::writer::core::OleWriter::write_to [probe]
+ 7,325,072 (52.71%)  /litchi/crates/litchi-cfb/src/writer/layout.rs:litchi_cfb::writer::layout::ReusePlan::validate [probe]
+ 5,937,829 (42.73%)  /litchi/crates/litchi-cfb/src/file.rs:litchi_cfb::file::OleFile<R>::open_stream [probe]
+ 5,901,199 (42.46%)  /litchi/crates/litchi-cfb/src/file.rs:litchi_cfb::file::OleFile<R>::read_stream_from_fat [probe]
+ 5,111,231 (36.78%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 4,754,903 (34.21%)  /litchi/crates/litchi-cfb/src/writer/layout.rs:litchi_cfb::writer::layout::ReusePlan::emit [probe]
+ 4,333,930 (31.18%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 3,850,410 (27.71%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:litchi_cfb::file::OleFile<R>::read_stream_from_fat
+ 3,737,488 (26.89%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:litchi_cfb::writer::layout::ReusePlan::emit
+ 1,807,245 (13.00%)  /litchi/crates/litchi-cfb/src/writer/core.rs:litchi_cfb::writer::core::OleWriter::plan_sector_layout [probe]
+ 1,801,405 (12.96%)  /litchi/crates/litchi-cfb/src/writer/layout.rs:litchi_cfb::writer::layout::plan_reuse [probe]
+ 1,657,230 (11.92%)  /litchi/crates/litchi-cfb/src/file.rs:litchi_cfb::file::OleFile<R>::read_sectors_batched [probe]
+ 1,564,310 (11.26%)  /litchi/crates/litchi-cfb/src/writer/layout.rs:<litchi_cfb::writer::layout::PlanCursor as std::io::Read>::read [probe]
+ 1,551,830 (11.17%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/io/mod.rs:litchi_cfb::file::OleFile<R>::read_sectors_batched
+ 1,154,726 ( 8.31%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:alloc::raw_vec::RawVecInner<A>::finish_grow [probe]
+ 1,112,266 ( 8.00%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/alloc.rs:alloc::raw_vec::RawVecInner<A>::finish_grow
+ 1,048,045 ( 7.54%)  ???:__rustc::__rust_realloc [probe]
+ 1,047,405 ( 7.54%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/alloc.rs:__rustc::__rdl_realloc [probe]
+ 1,042,285 ( 7.50%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/std/src/sys/alloc/unix.rs:__rustc::__rdl_realloc
+ 1,033,325 ( 7.44%)  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   986,610 ( 7.10%)  ./malloc/./malloc/malloc.c:_int_realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   843,341 ( 6.07%)  /litchi/crates/litchi-cfb/src/file.rs:litchi_cfb::file::OleFile<R>::open_with_limits [probe]
+   772,003 ( 5.55%)  ./malloc/../string/bits/string_fortified.h:_int_realloc
+   769,523 ( 5.54%)  ???:0x0000000004c16680 [???]
+   759,005 ( 5.46%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:litchi_cfb::writer::layout::ReusePlan::emit
+   758,385 ( 5.46%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle [probe]
+   608,870 ( 4.38%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/ptr/mod.rs:<litchi_cfb::writer::layout::PlanCursor as std::io::Read>::read
+   519,054 ( 3.73%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   512,760 ( 3.69%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/cmp.rs:litchi_cfb::writer::layout::ReusePlan::validate
+   421,160 ( 3.03%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/slice/specialize.rs:<litchi_cfb::writer::layout::PlanCursor as std::io::Read>::read
+   374,871 ( 2.70%)  /litchi/crates/litchi-cfb/src/file.rs:litchi_cfb::file::collect_sector_chain [probe]
+   358,516 ( 2.58%)  /litchi/crates/litchi-cfb/src/file.rs:litchi_cfb::file::OleFile<R>::validate_stream_allocations [probe]
+   306,163 ( 2.20%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:litchi_cfb::writer::layout::plan_reuse
+   276,649 ( 1.99%)  /litchi/crates/litchi-cfb/src/writer/layout.rs:litchi_cfb::writer::layout::walk_chain [probe]
+   269,396 ( 1.94%)  /litchi/crates/litchi-cfb/src/file.rs:litchi_cfb::file::SectorChainScratch::collect_exact [probe]
+   246,982 ( 1.78%)  /litchi/crates/litchi-cfb/src/file.rs:litchi_cfb::file::OleFile<R>::load_directory [probe]
+   220,590 ( 1.59%)  /litchi/crates/litchi-cfb/src/writer/layout.rs:litchi_cfb::writer::layout::plan_reuse::{{closure}} [probe]
+   207,961 ( 1.50%)  /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/raw_vec/mod.rs:alloc::raw_vec::RawVecInner<A>::try_reserve [probe]

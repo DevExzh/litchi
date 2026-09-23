@@ -1,0 +1,250 @@
+{
+ "label": "base ab29ac6291, cfb-write-reuse 45543.ppt, frame pointers, 20,000 owners",
+ "samples_total": 17900,
+ "samples_in_timed_owner": 17700,
+ "phase_share_of_timed": {
+  "plan": 0.3258,
+  "validate/readback": 0.2944,
+  "write_to/other": 0.2089,
+  "validate/reparse": 0.118,
+  "emit": 0.042,
+  "validate/other": 0.0094,
+  "outside write_to": 0.0015
+ },
+ "leaf_share_of_timed_by_phase": {
+  "plan": [
+   [
+    "{closure#60}",
+    0.0859
+   ],
+   [
+    "eq",
+    0.024
+   ],
+   [
+    "plan_reuse",
+    0.0205
+   ],
+   [
+    "walk_chain",
+    0.0201
+   ],
+   [
+    "claim",
+    0.0146
+   ],
+   [
+    "_int_malloc",
+    0.0129
+   ],
+   [
+    "__memmove_avx512_unaligned_erms",
+    0.0114
+   ],
+   [
+    "non_null<alloc::alloc::Global, u32>",
+    0.0089
+   ]
+  ],
+  "validate/readback": [
+   [
+    "__memset_avx512_unaligned_erms",
+    0.1236
+   ],
+   [
+    "__memmove_avx512_unaligned_erms",
+    0.0924
+   ],
+   [
+    "collect_sector_chain",
+    0.012
+   ],
+   [
+    "try_reserve<u32, alloc::alloc::Global>",
+    0.0076
+   ],
+   [
+    "_int_malloc",
+    0.007
+   ],
+   [
+    "{closure#0}",
+    0.0068
+   ],
+   [
+    "read_sectors_batched<litchi_cfb::writer::layout::PlanCursor>",
+    0.0062
+   ],
+   [
+    "[unknown]",
+    0.0036
+   ]
+  ],
+  "write_to/other": [
+   [
+    "__memcmp_evex_movbe",
+    0.104
+   ],
+   [
+    "__memmove_avx512_unaligned_erms",
+    0.0977
+   ],
+   [
+    "[unknown]",
+    0.0024
+   ],
+   [
+    "__libc_free",
+    0.0012
+   ],
+   [
+    "write_to<std::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>",
+    0.0006
+   ],
+   [
+    "drop<alloc::vec::Vec<alloc::string::String, alloc::alloc::Global>, [u8; 16], alloc::alloc::Global>",
+    0.0005
+   ],
+   [
+    "__memset_avx512_unaligned_erms",
+    0.0003
+   ],
+   [
+    "_int_free_create_chunk",
+    0.0003
+   ]
+  ],
+  "validate/reparse": [
+   [
+    "{closure#0}",
+    0.0215
+   ],
+   [
+    "eq",
+    0.0105
+   ],
+   [
+    "__memmove_avx512_unaligned_erms",
+    0.0098
+   ],
+   [
+    "validate_physical_sector_layout<litchi_cfb::shared::ReadAtCursor>",
+    0.0085
+   ],
+   [
+    "write<(u32, core::option::Option<u32>, core::option::Option<u32>, usize)>",
+    0.0036
+   ],
+   [
+    "insert",
+    0.0036
+   ],
+   [
+    "push_mut<u32, alloc::alloc::Global>",
+    0.0034
+   ],
+   [
+    "from_buf_and_len_unchecked<[u16; 32]>",
+    0.003
+   ]
+  ],
+  "emit": [
+   [
+    "emit<std::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>",
+    0.0106
+   ],
+   [
+    "__memmove_avx512_unaligned_erms",
+    0.0098
+   ],
+   [
+    "follows",
+    0.0096
+   ],
+   [
+    "image_run",
+    0.003
+   ],
+   [
+    "index<litchi_cfb::writer::layout::PlannedSector>",
+    0.0016
+   ],
+   [
+    "_int_malloc",
+    0.0014
+   ],
+   [
+    "checked_add",
+    0.0011
+   ],
+   [
+    "_int_realloc",
+    0.0009
+   ]
+  ],
+  "validate/other": [
+   [
+    "__libc_free",
+    0.0014
+   ],
+   [
+    "unlink_chunk",
+    0.0012
+   ],
+   [
+    "_int_free_create_chunk",
+    0.0007
+   ],
+   [
+    "_int_free_merge_chunk",
+    0.0007
+   ],
+   [
+    "_int_free_maybe_trim",
+    0.0005
+   ],
+   [
+    "branch<litchi_cfb::file::OleFile<litchi_cfb::writer::layout::PlanCursor>, litchi_cfb::file::OleError",
+    0.0005
+   ],
+   [
+    "drop_in_place<core::option::Option<litchi_cfb::file::DirectoryEntry>>",
+    0.0003
+   ],
+   [
+    "runtime",
+    0.0003
+   ]
+  ],
+  "outside write_to": [
+   [
+    "branch<(), litchi_cfb::file::OleError>",
+    0.0006
+   ],
+   [
+    "timed_owner",
+    0.0003
+   ],
+   [
+    "drop_in_place<alloc::boxed::Box<litchi_cfb::writer::layout::ReusePlan, alloc::alloc::Global>>",
+    0.0003
+   ],
+   [
+    "cfb_write",
+    0.0001
+   ],
+   [
+    "tcache_put_n",
+    0.0001
+   ],
+   [
+    "__libc_free",
+    0.0001
+   ],
+   [
+    "__rustc::__rust_dealloc",
+    0.0001
+   ]
+  ]
+ }
+}
