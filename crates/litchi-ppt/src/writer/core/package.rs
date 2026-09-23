@@ -228,25 +228,19 @@ impl Writer {
     /// Capacity for the `PowerPoint Document` stream, used only to allocate it
     /// once instead of growing it by doubling when its text is large.
     ///
-    /// Plain text boxes carry the bulk of a presentation's text: one byte per
-    /// character when it is ASCII (a `TextBytesAtom`), otherwise two per UTF-16
-    /// code unit and so never more than two per UTF-8 byte. A presentation with
-    /// less than 32 KiB of such text reserves nothing and grows as it always
-    /// did; a larger one also gets an allowance per shape and per slide for
-    /// their other records and a fixed one for the document, master and
-    /// persist records. A short estimate only means the stream grows as it
-    /// always did.
+    /// Plain text boxes carry the bulk of a presentation's text. Their UTF-8
+    /// length is exactly the size of an ASCII text's `TextBytesAtom` and is read
+    /// without scanning the text; other text may need up to twice as much. A
+    /// presentation with less than 32 KiB of such text reserves nothing and
+    /// grows as it always did; a larger one also gets an allowance per shape and
+    /// per slide for their other records and a fixed one for the document,
+    /// master and persist records. A short estimate only means the stream grows
+    /// as it always did.
     fn document_stream_capacity_hint(&self) -> usize {
         let (text, shapes) = self.slides.iter().flat_map(|slide| &slide.shapes).fold(
             (0usize, 0usize),
             |(text, shapes), shape| {
-                let bytes = shape.properties.text.as_deref().map_or(0, |text| {
-                    if text.is_ascii() {
-                        text.len()
-                    } else {
-                        text.len().saturating_mul(2)
-                    }
-                });
+                let bytes = shape.properties.text.as_deref().map_or(0, str::len);
                 (text.saturating_add(bytes), shapes.saturating_add(1))
             },
         );
