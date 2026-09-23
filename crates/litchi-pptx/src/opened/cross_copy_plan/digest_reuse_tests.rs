@@ -12,6 +12,12 @@
 //! revision, and the text of every refusal, and compares the transcript with
 //! the one base `6d989cad63` produces. The module compiles unchanged on the
 //! base tree, which is how `GOLDEN` was generated.
+//!
+//! After 0751's review the transcript also covers a destination holding a
+//! caller-defined part, by plan and by durable patch in both directions, and
+//! size-limit refusals end to end: durable patches read under limits that
+//! admit the patch but not the source or destination archive, and planning
+//! under the same limits.
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
@@ -25,6 +31,7 @@ use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 use super::{CrossSlideCopyPatch, CrossSlideCopyPlan};
 use crate::media_parts::Resource;
+use crate::opened::Limits;
 use crate::{Package, Result};
 
 const PHOTO: &str = "/ppt/media/digest-photo.png";
@@ -394,11 +401,211 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
     Ok(transcript)
 }
 
+/// A caller-defined part that copies its payload whenever it is cloned.
+struct CallerPart {
+    inner: litchi_opc::BlobPart,
+}
+
+impl CallerPart {
+    fn new(bytes: Vec<u8>) -> Self {
+        Self {
+            inner: litchi_opc::BlobPart::new(
+                litchi_opc::PackURI::new("/custom/change-0751.bin").expect("part name"),
+                "application/octet-stream".to_owned(),
+                bytes,
+            ),
+        }
+    }
+}
+
+impl Clone for CallerPart {
+    fn clone(&self) -> Self {
+        Self::new(litchi_opc::Part::blob(&self.inner).to_vec())
+    }
+}
+
+impl litchi_opc::Part for CallerPart {
+    fn blob(&self) -> &[u8] {
+        litchi_opc::Part::blob(&self.inner)
+    }
+    fn blob_arc(&self) -> std::sync::Arc<Vec<u8>> {
+        litchi_opc::Part::blob_arc(&self.inner)
+    }
+    fn content_type(&self) -> &str {
+        litchi_opc::Part::content_type(&self.inner)
+    }
+    fn partname(&self) -> &litchi_opc::PackURI {
+        litchi_opc::Part::partname(&self.inner)
+    }
+    fn rels(&self) -> &litchi_opc::Relationships {
+        litchi_opc::Part::rels(&self.inner)
+    }
+    fn rels_mut(&mut self) -> &mut litchi_opc::Relationships {
+        litchi_opc::Part::rels_mut(&mut self.inner)
+    }
+    fn set_blob(&mut self, blob: Vec<u8>) {
+        litchi_opc::Part::set_blob(&mut self.inner, blob);
+    }
+}
+
+/// Open `bytes` and add a [`CallerPart`].
+fn with_caller_part(bytes: &[u8]) -> Result<Package> {
+    let mut package = Package::from_vec(bytes.to_vec())?;
+    package.opc.try_add_part(Box::new(CallerPart::new(
+        b"change-0751 caller-defined payload".to_vec(),
+    )))?;
+    Ok(package)
+}
+
+/// A destination holding a caller-defined part: planned against it, by plan
+/// and by durable patch forward and back; and a plan and patch planned against
+/// an ordinary destination with the same bytes, applied to it.
+fn caller_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -> Result<String> {
+    let mut transcript = String::new();
+    let source = Package::from_vec(source_bytes.to_vec())?;
+    let mut custom = with_caller_part(destination_bytes)?;
+    let custom_bytes = litchi_opc::PackageWriter::to_bytes(&custom.opc)?;
+    writeln!(transcript, "{label}.caller.bytes={}", hex(&custom_bytes)).unwrap();
+    let plan = plan_copy(&source, &custom)?;
+    record_patch(
+        &mut transcript,
+        &format!("{label}.caller.plan"),
+        plan.patch(),
+    )?;
+    let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
+    let outcome = custom.apply_cross_slide_copy_plan(&source, &plan);
+    record_outcome(
+        &mut transcript,
+        &format!("{label}.caller.apply"),
+        &mut custom,
+        outcome,
+    )?;
+    let mut patched = with_caller_part(destination_bytes)?;
+    let outcome = patched.apply_cross_slide_copy_patch(&source, &durable);
+    record_outcome(
+        &mut transcript,
+        &format!("{label}.caller.patch.forward"),
+        &mut patched,
+        outcome,
+    )?;
+    let outcome = patched.apply_cross_slide_copy_patch(&source, &durable.inverse());
+    record_outcome(
+        &mut transcript,
+        &format!("{label}.caller.patch.undo"),
+        &mut patched,
+        outcome,
+    )?;
+
+    let ordinary = Package::from_vec(custom_bytes)?;
+    let ordinary_plan = plan_copy(&source, &ordinary)?;
+    record_patch(
+        &mut transcript,
+        &format!("{label}.caller.ordinary.plan"),
+        ordinary_plan.patch(),
+    )?;
+    let mut target = with_caller_part(destination_bytes)?;
+    let outcome = target.apply_cross_slide_copy_plan(&source, &ordinary_plan);
+    record_outcome(
+        &mut transcript,
+        &format!("{label}.caller.ordinary.apply"),
+        &mut target,
+        outcome,
+    )?;
+    let ordinary_durable = CrossSlideCopyPatch::from_bytes(&ordinary_plan.patch().to_bytes()?)?;
+    let mut target = with_caller_part(destination_bytes)?;
+    let outcome = target.apply_cross_slide_copy_patch(&source, &ordinary_durable);
+    record_outcome(
+        &mut transcript,
+        &format!("{label}.caller.ordinary.patch"),
+        &mut target,
+        outcome,
+    )?;
+    Ok(transcript)
+}
+
+/// Size-limit refusals end to end: the durable patch read under limits that
+/// admit it but bound the archives, applied; and planning under those limits,
+/// applied when it plans.
+fn limits_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -> Result<String> {
+    let mut transcript = String::new();
+    let source = Package::from_vec(source_bytes.to_vec())?;
+    let destination = Package::from_vec(destination_bytes.to_vec())?;
+    let bytes = plan_copy(&source, &destination)?.patch().to_bytes()?;
+    for (name, bound) in [
+        ("patch", bytes.len()),
+        ("source-under", source_bytes.len() - 1),
+        ("source-exact", source_bytes.len()),
+        ("destination-under", destination_bytes.len() - 1),
+        ("destination-exact", destination_bytes.len()),
+    ] {
+        let limits = Limits::new(4096, bound, 8 * 1024 * 1024, 64, 256 * 1024 * 1024, 1)
+            .expect("finite nonzero limits");
+        let stage = format!("{label}.limits.{name}");
+        writeln!(transcript, "{stage}.bound={bound}").unwrap();
+        match CrossSlideCopyPatch::from_bytes_with_limits(&bytes, limits) {
+            Ok(patch) => {
+                let mut target = Package::from_vec(destination_bytes.to_vec())?;
+                let outcome = target.apply_cross_slide_copy_patch(&source, &patch);
+                record_outcome(
+                    &mut transcript,
+                    &format!("{stage}.patch"),
+                    &mut target,
+                    outcome,
+                )?;
+            },
+            Err(error) => writeln!(transcript, "{stage}.patch.parse.refused={error:?}").unwrap(),
+        }
+        let planned = source
+            .opened_presentation_with_limits(limits)
+            .and_then(|source_snapshot| {
+                destination
+                    .opened_presentation_with_limits(limits)?
+                    .plan_cross_slide_copy(
+                        &source_snapshot,
+                        SOURCE_SLIDE,
+                        DESTINATION_SLIDE,
+                        POSITION,
+                    )
+            });
+        match planned {
+            Ok(plan) => {
+                record_patch(&mut transcript, &format!("{stage}.plan"), plan.patch())?;
+                let mut target = Package::from_vec(destination_bytes.to_vec())?;
+                let outcome = target.apply_cross_slide_copy_plan(&source, &plan);
+                record_outcome(
+                    &mut transcript,
+                    &format!("{stage}.plan.apply"),
+                    &mut target,
+                    outcome,
+                )?;
+            },
+            Err(error) => writeln!(transcript, "{stage}.plan.refused={error:?}").unwrap(),
+        }
+    }
+    Ok(transcript)
+}
+
 fn full_transcript() -> Result<String> {
     let (source, destination) = media_pair()?;
     let mut transcript = pair_transcript("media", &source, &destination)?;
-    let (source, destination) = plain_pair()?;
-    transcript.push_str(&pair_transcript("plain", &source, &destination)?);
+    let (plain_source, plain_destination) = plain_pair()?;
+    transcript.push_str(&pair_transcript(
+        "plain",
+        &plain_source,
+        &plain_destination,
+    )?);
+    transcript.push_str(&caller_transcript("media", &source, &destination)?);
+    transcript.push_str(&caller_transcript(
+        "plain",
+        &plain_source,
+        &plain_destination,
+    )?);
+    transcript.push_str(&limits_transcript("media", &source, &destination)?);
+    transcript.push_str(&limits_transcript(
+        "plain",
+        &plain_source,
+        &plain_destination,
+    )?);
     Ok(transcript)
 }
 
@@ -504,6 +711,104 @@ plain.revoked.source.target_physical=a34fa32c78bbcc904cfa093a7f8c5a8f60cffda928f
 plain.revoked.source.transfers=false
 plain.revoked.source.apply.published=15aa2b596658ca2baa30e0b9b2274ed69ee508a2a6da97a82982eb30bc4a530d
 plain.revoked.source.apply.revision=0efbb26e7c5f17d10013ff269f43d1912a05037d809ab6c7eeab74e0b7e64632
+media.caller.bytes=0f9c088a35ff12285497a2c55156f57712059c4941f8405f26b2f7f0c7ba98f0
+media.caller.plan.bytes=4a73d4d428e226ce2ebd05edf9f2747dc7d7c7050c70408ef03a83ca8dffdaae
+media.caller.plan.inverse=559c4f2efb14ce8f892964ffa6d043a19db8a56bb65bf0f24e502db06b5c0fe6
+media.caller.plan.source=18deeee36c7eb857d871c149950b9581180b2dce31dc602f6103622fd0e3dc52
+media.caller.plan.destination=92e724ea72b99f612be92ba883dd1d91d0c8eba178389b81eb35a962f6e707d9
+media.caller.plan.target=44594b917c833377b04450c3daad7d4db66b57fb828f3b1802a42b6b7a8222fa
+media.caller.plan.source_physical=770d39d094ed3fbcad1778de65b02a4ad6ea7c5ef2e30f0abb4fd69576e57462
+media.caller.plan.destination_physical=14512ef6686232f1459e79c19c8f0dfd259ad2bbc653b699020435cfc512b30f
+media.caller.plan.target_physical=4e9979a6efe2c6dadc1617984342651c125337f2ca4f17bda6614bef2c7886d4
+media.caller.plan.transfers=false
+media.caller.apply.published=b0bc10be4a18d1f80c32a4955d4a5dcfad41d400e01d2812edbfc9b72e53d331
+media.caller.apply.revision=44594b917c833377b04450c3daad7d4db66b57fb828f3b1802a42b6b7a8222fa
+media.caller.patch.forward.published=b0bc10be4a18d1f80c32a4955d4a5dcfad41d400e01d2812edbfc9b72e53d331
+media.caller.patch.forward.revision=44594b917c833377b04450c3daad7d4db66b57fb828f3b1802a42b6b7a8222fa
+media.caller.patch.undo.published=0f9c088a35ff12285497a2c55156f57712059c4941f8405f26b2f7f0c7ba98f0
+media.caller.patch.undo.revision=92e724ea72b99f612be92ba883dd1d91d0c8eba178389b81eb35a962f6e707d9
+media.caller.ordinary.plan.bytes=32f4519cc30e207157f9888a2dbd0405d0787e44a4d7eea9dcb1df55ce4720d8
+media.caller.ordinary.plan.inverse=93d56a404c612d461711663438d3cb1cd63cfac3a04501b4ee1f125ef709b688
+media.caller.ordinary.plan.source=18deeee36c7eb857d871c149950b9581180b2dce31dc602f6103622fd0e3dc52
+media.caller.ordinary.plan.destination=92e724ea72b99f612be92ba883dd1d91d0c8eba178389b81eb35a962f6e707d9
+media.caller.ordinary.plan.target=44594b917c833377b04450c3daad7d4db66b57fb828f3b1802a42b6b7a8222fa
+media.caller.ordinary.plan.source_physical=770d39d094ed3fbcad1778de65b02a4ad6ea7c5ef2e30f0abb4fd69576e57462
+media.caller.ordinary.plan.destination_physical=14512ef6686232f1459e79c19c8f0dfd259ad2bbc653b699020435cfc512b30f
+media.caller.ordinary.plan.target_physical=71b1578456b8b11bc7a674b5ae91864cd56e3a9c4c9aa0fc7305292de12edc62
+media.caller.ordinary.plan.transfers=true
+media.caller.ordinary.apply.refused=SlideCopyPlan { kind: CallerDefinedPart, detail: "a cross-slide copy that frames source-compressed media publishes the reopen of the destination's bytes, which cannot keep its caller-defined parts; plan the copy against this destination to record the recompressing route" }
+media.caller.ordinary.apply.untouched=0f9c088a35ff12285497a2c55156f57712059c4941f8405f26b2f7f0c7ba98f0
+media.caller.ordinary.patch.refused=SlideCopyPlan { kind: CallerDefinedPart, detail: "a cross-slide copy that frames source-compressed media publishes the reopen of the destination's bytes, which cannot keep its caller-defined parts; plan the copy against this destination to record the recompressing route" }
+media.caller.ordinary.patch.untouched=0f9c088a35ff12285497a2c55156f57712059c4941f8405f26b2f7f0c7ba98f0
+plain.caller.bytes=0c13f8aaed85234850be3ba4c2e222d4345aabd98e71ce246ece2040816b7d5a
+plain.caller.plan.bytes=ff2463aaa8651275719ef8c22553c14583f5ecf984aafe4078bc88432d0f2c43
+plain.caller.plan.inverse=dcaab63bf885a4f33d5c938c0c2cc9b8486fc02a08c8a38256a9ef028f4114c7
+plain.caller.plan.source=db34b5c259c836a4dfa2a9db172f5778ccc7bbc23bf1fdc7316f5026ad56d980
+plain.caller.plan.destination=3dfaedf12382c76c8fecec10161dd55b2ed0f5333ebb952832dacb4673c4e315
+plain.caller.plan.target=67cbaa3138287f6900b57dad783134da7fc89929d9316f54a5aba1463c47307f
+plain.caller.plan.source_physical=427b61c25dd2a2369be5aa553df944b00bac2ff9c04cf9aa1133614e7b114fcc
+plain.caller.plan.destination_physical=b483cc3356c9edc685e141cd164e39f00d00d5798c0b8dd6001074892a60ab24
+plain.caller.plan.target_physical=68eb01c3613dc2b0d582f1d74b2ac8261944dae237e654781ae3b14716d97957
+plain.caller.plan.transfers=false
+plain.caller.apply.published=859d1f66d9aa849f86d89e27d2b3018fa24125f7024b34b489254c1a93c55d9c
+plain.caller.apply.revision=67cbaa3138287f6900b57dad783134da7fc89929d9316f54a5aba1463c47307f
+plain.caller.patch.forward.published=859d1f66d9aa849f86d89e27d2b3018fa24125f7024b34b489254c1a93c55d9c
+plain.caller.patch.forward.revision=67cbaa3138287f6900b57dad783134da7fc89929d9316f54a5aba1463c47307f
+plain.caller.patch.undo.published=0c13f8aaed85234850be3ba4c2e222d4345aabd98e71ce246ece2040816b7d5a
+plain.caller.patch.undo.revision=3dfaedf12382c76c8fecec10161dd55b2ed0f5333ebb952832dacb4673c4e315
+plain.caller.ordinary.plan.bytes=ff2463aaa8651275719ef8c22553c14583f5ecf984aafe4078bc88432d0f2c43
+plain.caller.ordinary.plan.inverse=dcaab63bf885a4f33d5c938c0c2cc9b8486fc02a08c8a38256a9ef028f4114c7
+plain.caller.ordinary.plan.source=db34b5c259c836a4dfa2a9db172f5778ccc7bbc23bf1fdc7316f5026ad56d980
+plain.caller.ordinary.plan.destination=3dfaedf12382c76c8fecec10161dd55b2ed0f5333ebb952832dacb4673c4e315
+plain.caller.ordinary.plan.target=67cbaa3138287f6900b57dad783134da7fc89929d9316f54a5aba1463c47307f
+plain.caller.ordinary.plan.source_physical=427b61c25dd2a2369be5aa553df944b00bac2ff9c04cf9aa1133614e7b114fcc
+plain.caller.ordinary.plan.destination_physical=b483cc3356c9edc685e141cd164e39f00d00d5798c0b8dd6001074892a60ab24
+plain.caller.ordinary.plan.target_physical=68eb01c3613dc2b0d582f1d74b2ac8261944dae237e654781ae3b14716d97957
+plain.caller.ordinary.plan.transfers=false
+plain.caller.ordinary.apply.published=859d1f66d9aa849f86d89e27d2b3018fa24125f7024b34b489254c1a93c55d9c
+plain.caller.ordinary.apply.revision=67cbaa3138287f6900b57dad783134da7fc89929d9316f54a5aba1463c47307f
+plain.caller.ordinary.patch.published=859d1f66d9aa849f86d89e27d2b3018fa24125f7024b34b489254c1a93c55d9c
+plain.caller.ordinary.patch.revision=67cbaa3138287f6900b57dad783134da7fc89929d9316f54a5aba1463c47307f
+media.limits.patch.bound=71855
+media.limits.patch.patch.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 71855 }
+media.limits.patch.patch.untouched=c1b8ae334472a75240e2590b9925f5fe50387d45e1c623b3d99d16baae91d58d
+media.limits.patch.plan.refused=Limit { resource: "cross-slide candidate patch bytes", limit: 71855 }
+media.limits.source-under.bound=71942
+media.limits.source-under.patch.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 71942 }
+media.limits.source-under.patch.untouched=c1b8ae334472a75240e2590b9925f5fe50387d45e1c623b3d99d16baae91d58d
+media.limits.source-under.plan.refused=Limit { resource: "cross-slide candidate patch bytes", limit: 71942 }
+media.limits.source-exact.bound=71943
+media.limits.source-exact.patch.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 71943 }
+media.limits.source-exact.patch.untouched=c1b8ae334472a75240e2590b9925f5fe50387d45e1c623b3d99d16baae91d58d
+media.limits.source-exact.plan.refused=Limit { resource: "cross-slide candidate patch bytes", limit: 71943 }
+media.limits.destination-under.bound=72047
+media.limits.destination-under.patch.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 72047 }
+media.limits.destination-under.patch.untouched=c1b8ae334472a75240e2590b9925f5fe50387d45e1c623b3d99d16baae91d58d
+media.limits.destination-under.plan.refused=Limit { resource: "cross-slide candidate patch bytes", limit: 72047 }
+media.limits.destination-exact.bound=72048
+media.limits.destination-exact.patch.refused=UnsafeEdit { operation: "apply_cross_slide_copy_patch", reason: "the durable cross-slide patch does not match a freshly proven candidate" }
+media.limits.destination-exact.patch.untouched=c1b8ae334472a75240e2590b9925f5fe50387d45e1c623b3d99d16baae91d58d
+media.limits.destination-exact.plan.refused=Limit { resource: "cross-slide candidate patch bytes", limit: 72048 }
+plain.limits.patch.bound=4895
+plain.limits.patch.patch.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 4895 }
+plain.limits.patch.patch.untouched=6cdd00f339051b5f0a35d4809233fd3f64e7cbee86d9524bd8fe748c44722db4
+plain.limits.patch.plan.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 4895 }
+plain.limits.source-under.bound=31374
+plain.limits.source-under.patch.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 31374 }
+plain.limits.source-under.patch.untouched=6cdd00f339051b5f0a35d4809233fd3f64e7cbee86d9524bd8fe748c44722db4
+plain.limits.source-under.plan.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 31374 }
+plain.limits.source-exact.bound=31375
+plain.limits.source-exact.patch.refused=UnsafeEdit { operation: "apply_cross_slide_copy_patch", reason: "the durable cross-slide patch does not match a freshly proven candidate" }
+plain.limits.source-exact.patch.untouched=6cdd00f339051b5f0a35d4809233fd3f64e7cbee86d9524bd8fe748c44722db4
+plain.limits.source-exact.plan.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 31375 }
+plain.limits.destination-under.bound=30460
+plain.limits.destination-under.patch.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 30460 }
+plain.limits.destination-under.patch.untouched=6cdd00f339051b5f0a35d4809233fd3f64e7cbee86d9524bd8fe748c44722db4
+plain.limits.destination-under.plan.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 30460 }
+plain.limits.destination-exact.bound=30461
+plain.limits.destination-exact.patch.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 30461 }
+plain.limits.destination-exact.patch.untouched=6cdd00f339051b5f0a35d4809233fd3f64e7cbee86d9524bd8fe748c44722db4
+plain.limits.destination-exact.plan.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 30461 }
 "#;
 
 /// Every durable patch byte, recorded revision, published byte, snapshot
