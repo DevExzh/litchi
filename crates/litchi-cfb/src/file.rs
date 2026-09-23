@@ -3197,6 +3197,10 @@ fn collect_sector_chain(
 /// `allocation_table`, be visited once, and lead to `ENDOFCHAIN` or a regular
 /// sector. On success, the bits it set are exactly those of the sectors it
 /// recorded.
+///
+/// Always inlined, so that each caller keeps its chain and map in locals as
+/// the loop did before it was shared.
+#[inline(always)]
 fn walk_chain_to_end(
     allocation_table: &[u32],
     start_sector: u32,
@@ -3445,11 +3449,11 @@ impl SectorChainScratch {
 /// (both run [`walk_chain_to_end`]).
 ///
 /// The visited map keeps every bit clear between collections. A successful
-/// walk marks exactly the sectors it records, so clearing those restores the
-/// map in time proportional to the chain rather than to the table; a failed
-/// walk clears the whole map. Collecting many short chains against one large
-/// table therefore costs time proportional to the chains, where
-/// [`collect_sector_chain`] allocates and clears a table-sized map for each.
+/// walk marks exactly the sectors it records, so the map is restored by
+/// clearing those bits or the table's words, whichever is fewer; a failed walk
+/// clears the table's words. Collecting chains against one table therefore
+/// costs time proportional to the chains, where [`collect_sector_chain`]
+/// allocates and clears a table-sized map for each.
 #[derive(Debug, Default)]
 struct EndChainScratch {
     sectors: Vec<u32>,
@@ -3493,14 +3497,17 @@ impl EndChainScratch {
             &mut self.visited,
             &mut self.sectors,
         );
-        if result.is_ok() {
+        // Only the table's words can hold bits this walk set.
+        if result.is_ok() && self.sectors.len() < word_count {
             for &sector in &self.sectors {
                 if let Ok(index) = usize::try_from(sector) {
                     self.visited.remove(index);
                 }
             }
-        } else {
-            self.visited.words.fill(0);
+        } else if let Some(words) = self.visited.words.get_mut(..word_count) {
+            words.fill(0);
+        }
+        if result.is_err() {
             self.sectors.clear();
         }
         result
@@ -3515,6 +3522,10 @@ impl EndChainScratch {
 /// `buffer_len`-byte destination the batched read fills, and the number of
 /// destination bytes the read requests; like the batched read, a run that
 /// requests no bytes is skipped.
+///
+/// Always inlined into each caller, so that sharing the segmentation costs
+/// the batched read nothing.
+#[inline(always)]
 fn visit_sector_runs<V>(
     sectors: &[u32],
     sector_size: usize,
