@@ -1,0 +1,126 @@
+file=docx.script.txt
+total_samples=61424 kept=38252 (62.3% of process samples)
+
+== leaf (self) categories, % of kept ==
+ 76.80%    29379  other:litchi-perf-baseline
+ 11.16%     4270  crc32
+  4.39%     1678  other:), litchi_docx::streaming::{impl#8}::start_run::{closure_env#5}<litchi_perf_baseline::HashingDiscardSink>>+0x348 (inlined
+  3.96%     1515  other:), litchi_docx::streaming::{impl#8}::start_paragraph::{closure_env#3}<litchi_perf_baseline::HashingDiscardSink>>+0x25a (inlined
+  1.45%      554  deflate(zlib-rs)
+  1.33%      508  memcpy/memmove
+  0.45%      173  kernel
+  0.17%       66  other:__rustc
+  0.15%       56  malloc/free
+  0.07%       27  sha256
+  0.05%       20  other:u16, u8), &mut zlib_rs::deflate::sym_buf::{impl#0}::iter::{closure_env#0}>+0x21d4 (inlined
+  0.00%        1  other:libc.so.6
+  0.00%        1  other:&soapberry_zip::office::StreamingArchiveEntry<litchi_docx::streaming::BudgetedOutput<litchi_perf_baseline::HashingDiscardSink>>)>+0xfc (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x74 (inlined
+  0.00%        1  memset
+  0.00%        1  hashing
+  0.00%        1  other:)), alloc::alloc::Global, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x2c (inlined
+
+== inclusive components, % of kept ==
+ 15.53%     5941  deflate
+ 21.68%     8294  crc32
+  0.21%       79  sha256(sink)
+ 27.91%    10675  escape_text
+ 11.85%     4534  encoded_text_size
+  5.87%     2244  text_gen(format!)
+ 31.77%    12154  context.check/consume/reserve
+ 38.64%    14781  zipdatawriter.write
+  9.97%     3813  finish
+
+== top 45 leaf details ==
+ 13.38%  other:litchi-perf-baseline try_update<litchi_core::budget::{impl#3}::consume::{closure_env#0}> @ main
+ 10.76%  crc32              update_slow @ main
+  7.93%  other:litchi-perf-baseline eq<u8> @ main
+  7.01%  other:litchi-perf-baseline insert_string @ main
+  6.00%  other:litchi-perf-baseline drop<litchi_core::budget::Node, alloc::alloc::Global> @ main
+  4.89%  other:litchi-perf-baseline emit_escaped_text<litchi_perf_baseline::HashingDiscardSink> @ main
+  4.14%  other:), litchi_docx::streaming::{impl#8}::start_run::{closure_env#5}<litchi_perf_baseline::HashingDiscardSink>>+0x348 (inlined try_update<litchi_core::budget::{impl#3}::consume::{closure_env#0}> @ and_then<(), litchi_core::execution::ExecutionError,
+  3.86%  other:), litchi_docx::streaming::{impl#8}::start_paragraph::{closure_env#3}<litchi_perf_baseline::HashingDiscardSink>>+0x25a (inlined try_update<litchi_core::budget::{impl#3}::consume::{closure_env#0}> @ and_then<(), litchi_core::execution::ExecutionError,
+  3.49%  other:litchi-perf-baseline pad_integral @ main
+  2.42%  other:litchi-perf-baseline add<u8> @ main
+  2.12%  other:litchi-perf-baseline append_character @ main
+  2.11%  other:litchi-perf-baseline is_plain_text_character @ main
+  1.63%  other:litchi-perf-baseline clone<litchi_core::budget::Node, alloc::alloc::Global> @ main
+  1.61%  other:litchi-perf-baseline escaped_character_len @ main
+  1.33%  memcpy/memmove     __memmove_avx512_unaligned_erms @ __memmove_avx512_unaligned_erms
+  1.12%  other:litchi-perf-baseline utf8_first_byte @ main
+  1.07%  other:litchi-perf-baseline compress @ main
+  0.96%  other:litchi-perf-baseline get_offset_len_mut_noubcheck<u8> @ main
+  0.91%  other:litchi-perf-baseline next_code_point<core::slice::iter::Iter<u8>> @ main
+  0.87%  other:litchi-perf-baseline write<soapberry_zip::writer::OwnedCompressor<soapberry_zip::office::BoundedOutput<litchi_docx::streaming::BudgetedOutput<litchi_perf_baseline::HashingDiscardSink>>>> @ ma
+  0.80%  other:litchi-perf-baseline next<u8> @ main
+  0.79%  other:litchi-perf-baseline try_update<litchi_core::budget::{impl#3}::charge::{closure_env#0}> @ main
+  0.76%  other:litchi-perf-baseline len_utf8 @ main
+  0.76%  other:litchi-perf-baseline deflate @ main
+  0.68%  other:litchi-perf-baseline encode_utf8_raw_unchecked @ main
+  0.68%  other:litchi-perf-baseline update @ main
+  0.62%  other:litchi-perf-baseline emit_document<litchi_perf_baseline::HashingDiscardSink> @ main
+  0.56%  other:litchi-perf-baseline generic_slide_hash_chain<64> @ main
+  0.55%  other:litchi-perf-baseline write_all<litchi_opc::phys_pkg::PartWriter<litchi_docx::streaming::BudgetedOutput<litchi_perf_baseline::HashingDiscardSink>>> @ main
+  0.54%  other:litchi-perf-baseline consume @ main
+  0.53%  other:litchi-perf-baseline quick_insert_value @ main
+  0.50%  other:litchi-perf-baseline compress_once @ main
+  0.50%  deflate(zlib-rs)   deflate_medium @ main
+  0.50%  other:litchi-perf-baseline unlikely @ main
+  0.49%  other:litchi-perf-baseline check @ main
+  0.48%  other:litchi-perf-baseline hash_calc @ main
+  0.45%  other:litchi-perf-baseline new_with_initial @ main
+  0.45%  kernel             kernel
+  0.44%  other:litchi-perf-baseline preflight_document_and_paragraph<litchi_perf_baseline::HashingDiscardSink> @ main
+  0.40%  other:litchi-perf-baseline checked_add @ main
+  0.37%  other:litchi-perf-baseline compress_uninit @ main
+  0.37%  other:litchi-perf-baseline encoded_text_size<litchi_perf_baseline::HashingDiscardSink> @ main
+  0.37%  other:litchi-perf-baseline atomic_load<u64> @ main
+  0.37%  other:litchi-perf-baseline write_text<litchi_perf_baseline::HashingDiscardSink> @ main
+  0.35%  other:litchi-perf-baseline start_run<litchi_perf_baseline::HashingDiscardSink> @ main
+
+== top 45 inclusive frames (below root) ==
+ 93.40%  branch<(), litchi_docx::streaming::StreamingDocumentError>
+ 52.07%  write_text<litchi_perf_baseline::HashingDiscardSink>
+ 41.67%  emit_document<litchi_perf_baseline::HashingDiscardSink>
+ 40.85%  write_all<litchi_opc::phys_pkg::PartWriter<litchi_docx::streaming::BudgetedOutput<litchi_perf_baseline::HashingDiscardSink>>>
+ 40.33%  write<litchi_docx::streaming::BudgetedOutput<litchi_perf_baseline::HashingDiscardSink>>
+ 38.86%  write<soapberry_zip::office::BoundedOutput<litchi_docx::streaming::BudgetedOutput<litchi_perf_baseline::HashingDiscardSink>>>
+ 38.64%  write<soapberry_zip::writer::OwnedCompressor<soapberry_zip::office::BoundedOutput<litchi_docx::streaming::BudgetedOutput<litchi_perf_baseline::HashingDiscardSink>>>>
+ 27.91%  emit_escaped_text<litchi_perf_baseline::HashingDiscardSink>
+ 22.86%  consume
+ 22.09%  update
+ 21.90%  try_update<litchi_core::budget::{impl#3}::consume::{closure_env#0}>
+ 21.90%  fetch_update<litchi_core::budget::{impl#3}::consume::{closure_env#0}>
+ 21.68%  crc32_chunk
+ 21.24%  update_fast_16
+ 20.93%  update_slow
+ 18.74%  start_paragraph<litchi_perf_baseline::HashingDiscardSink>
+ 16.01%  write_to<soapberry_zip::writer::OwnedCompressedEntry<soapberry_zip::office::BoundedOutput<litchi_docx::streaming::BudgetedOutput<litchi_perf_baseline::HashingDiscardSink>>>>
+ 15.60%  branch<(flate2::mem::Status, usize, usize), std::io::error::Error>
+ 15.53%  compress_once
+ 14.90%  compress
+ 14.68%  map_err<flate2::mem::Status, flate2::mem::CompressError, std::io::error::Error, soapberry_zip::writer::{impl#18}::compress_once::{closure_env#0}>
+ 13.48%  compress_uninit
+ 13.09%  from
+ 13.09%  into<zlib_rs::ReturnCode, core::result::Result<zlib_rs::stable::Status, zlib_rs::stable::DeflateError>>
+ 12.98%  deflate
+ 11.98%  deflate_medium
+ 11.85%  encoded_text_size<litchi_perf_baseline::HashingDiscardSink>
+ 11.72%  start_run<litchi_perf_baseline::HashingDiscardSink>
+ 11.15%  next<u8>
+  8.36%  and_then<(), litchi_core::execution::ExecutionError,
+  8.24%  insert_match
+  8.21%  insert_string
+  7.97%  eq<u8>
+  6.33%  as_str
+  6.33%  as_slice<u8, alloc::alloc::Global>
+  6.33%  deref
+  6.32%  non_null<alloc::alloc::Global, u8>
+  6.32%  ptr<alloc::alloc::Global, u8>
+  6.32%  ptr<u8, alloc::alloc::Global>
+  6.32%  as_ptr<u8, alloc::alloc::Global>
+  6.10%  drop<litchi_core::budget::Node, alloc::alloc::Global>
+  6.10%  drop_in_place<alloc::sync::Arc<litchi_core::budget::Node, alloc::alloc::Global>>
+  6.08%  map_err<(), litchi_core::execution::ExecutionError, litchi_docx::streaming::StreamingDocumentError, litchi_docx::streaming::{impl#8}::encoded_text_size::{closure_env#5}<litchi_perf_baseline:
+  5.83%  format_inner
+  5.63%  commit

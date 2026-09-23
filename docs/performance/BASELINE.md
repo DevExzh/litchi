@@ -1,5 +1,21 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0756 — descriptive baseline at the OLE2/OOXML wave tip
+
+[0756](0756-ole2-ooxml-wave-integration.md) retains two descriptive sweeps.
+- **Base `009d515bef`:** about 100 cases, 7 samples each
+  ([base-sweep](results/change-0756/base-sweep/)).
+- **Base vs tip `ddf788eb80`:** the same harness case groups, run in A B B A
+  order with 4 processes per arm and 9 samples each, on one core. Both binaries
+  were built with the same command from equal-length paths
+  ([sweep](results/change-0756/sweep/summary.md)).
+
+Per-format geometric means of the tip/base ratios are DOCX 0.675, PPTX 0.813,
+XLSX 0.551, DOC 0.864, PPT 0.813, XLS 0.502 and OLE2 common 0.991. Every flag
+above 5% is listed with its explanation. These are observations on a host
+shared with other agents, not claims. Physical cold-cache, remote/range,
+concurrency-scaling and RSS baselines remain unmeasured.
+
 ## 0740 — diagnostic native cross-copy planning attribution
 
 [0740](0740-pptx-cross-copy-native-profile.md) preserves unchanged production and

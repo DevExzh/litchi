@@ -1,0 +1,5 @@
+HEAD 60faefaa5fe4d33c75515abfc2f697de96c23fc9
+$ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --evidence-root . --mode strict
+OK: 10 performance claims validated (strict)
+
+exit 0

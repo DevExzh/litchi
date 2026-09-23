@@ -1,5 +1,298 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0756 — wave integration: measured gains, reviewed correctness, open owner decisions
+
+[0756](0756-ole2-ooxml-wave-integration.md) closes a coordinated wave.
+- **Evidence:** Opus implementers in isolated worktrees, independent adversarial
+  reviews (every branch changed as a result), identical-command before/after
+  builds, and a wave-wide descriptive sweep.
+- **ADR work:** accepted ADRs were kept as hard constraints. One
+  ADR-incompatible memo was withdrawn and proposed as ADR 0032. A coordinator
+  reading of ADR 0005's memo amendment is listed for confirmation.
+- **Also listed for the owner:** G5, deterministic byte changes for creation,
+  save durability and budget leases.
+- **Still unproved:** physical cold-cache, remote/range, concurrency scaling,
+  and full CRUD-category completion.
+
+The non-iWork goal remains active. [Evidence](results/change-0756/README.md).
+
+## 0757 — ADR 0006 determinism restored for the fresh XLS writer, and GOAL rule 3 enforced on its string fields
+
+[0757](0757-xls-fresh-writer-sst-determinism.md) removes a process-dependent
+output from the fresh XLS writer (the SST order followed a per-process hash
+seed; ADR 0006 requires deterministic serialization) and replaces silent
+truncation, wrapped lengths and misencoded strings in its SST, formula-string,
+number-format, worksheet-name, defined-name and data-validation encoders with a
+typed refusal before any output (GOAL.md rule 3: never trade a typed refusal for
+a partial edit). Refusals leave the writer unchanged (ADR 0016); no limit is
+relaxed, and the worksheet-name rule now counts the UTF-16 units MS-XLS counts.
+The public API changes (`Error::StringTooLong`, a fallible `encode_ptg_tokens`)
+rely on owner decision 1 of change 0652; the source-backed editor's
+`insert_formula`, which shares the encoder, now refuses instead of truncating.
+Refusals happen when a string is registered, never only at write time, so a
+refused call cannot leave the writer unable to write (the review's finding,
+fixed). Recorded for follow-up: internal-hyperlink, AutoFilter, font-name and
+PivotTable string lengths, the font index 4 of added cell styles, forbidden
+sheet-name characters, the custom number-format count, and possible
+XFEXT/STYLEEXT/CRN length wraps. The non-iWork goal remains active.
+
+## 0755 — malformed input is refused, never a panic, and readers of one element agree
+
+[0755](0755-pptx-nested-text-run-panic.md) closes a gap between three readers of the same DrawingML text element: semantic text refused a nested `a:t` in both forms, the scene reader only in one, and the opened edit path turned the other into an out-of-order span and a slicing panic, which `panic = "abort"` makes a process abort. The fix aligns the refusals and, beyond the reported site, routes every span slice of the opened edit path through a checked helper, so the path is panic-free by construction rather than by the ordering arguments each call site relied on. Capture still accepts such a deck, because it validates the package graph and notes roots rather than text runs; every verb that reads the runs refuses it. [Evidence](results/change-0755/README.md).
+
+## 0754 — DOCX semantic edit and text path
+
+[0754](0754-docx-semantic-edit-and-text-path.md) removes unnecessary parsing
+and validation work (GOAL.md optimization steps 1–2) without moving a refusal:
+the admission scan keeps its refusal set, error text and timing (the previous
+scanner is a test oracle over fixtures, mutations, limits and managed budgets);
+the audit skipped at publication was run by the same auditor under the same
+limits on exactly the published allocation — for a proven part the
+publication rests on that pair audit (0747's window proof for a one-element
+edit) and the proof's binding, not on the writer — and every other byte is
+still audited by the writer, the last line of defence for unproven bytes (ADR
+0006 does not move); exact no-ops still share their source allocation (ADR
+0003). The namespace lookup's worst case falls from linear in every
+declaration in scope to at most 64 comparisons plus one ordered-map descent,
+with no hashing (ADR 0005); a pre-existing OPC gap that let a custom part's
+unaudited bytes through the owned-source route is closed; and 0652's trade-offs
+hold: the
+benign path is the one made cheaper, and nothing is removed from the
+malicious minority's defences. `performance_claim: none`; all gates pass on
+the first-round commit (7,830 tests, 0 failures) and the review round's
+(5,508 tests over the touched crates, their dependents and the facade, 0
+failures).
+
+## 0753 — redundant text work removed from the fresh writers with every byte, refusal and hash guarantee kept
+
+[0753](0753-legacy-fresh-writer-text-paths.md) keeps the fresh writers' output
+byte-identical and deterministic where it was, keeps every limit and typed
+refusal in its order (length checks still precede the work they guard; the
+overflow checks of the skipped per-character walks are made once with the same
+messages; a PPT write refused after a slide's drawing is already in the stream
+leaves the destination untouched), keeps infallible growth where it was, and
+keeps hash-flooding resistance: the XLS table caches the same randomly keyed
+SipHash-1-3 `std`'s map computes and passes it through, with a collision test.
+No ADR, owner decision, public API, format or dependency changed. It records a
+pre-existing ADR 0006 gap for follow-up: the fresh XLS writer's SST order for a
+worksheet with several distinct strings depends on a per-process `HashMap`
+seed. The non-iWork goal remains active.
+
+## 0752 — exact semantics for streaming-writer write batching
+
+[0752](0752-streaming-writer-small-write-batching.md) keeps every budget
+limit, refusal value, cancellation point, reported progress and output byte of
+the DOCX, XLSX and PPTX streaming writers. Compressor input is not coalesced,
+because zlib-rs's stream depends on its write boundaries, as measured.
+DOCX escaping preserves the 64-byte chunk boundaries for the same reason. The
+CRC stage is invisible outside the data descriptor. The borrowed reservation
+charges and releases through the same functions as the owned one. Evidence:
+unit tests at N−1/N/N+1 on a three-level hierarchy, the old escaping and
+scanning loops kept as test oracles, the owned-versus-borrowed complete-ZIP
+differential, and a probe built against both trees whose 28,266-scenario
+transcripts are byte-identical. Decision 8's error-timing allowance was not
+used. The additions (`reserve_scoped`, `ScopedReservation`) are
+non-breaking.
+
+## 0751 — proven-byte digest reuse under the alpha trade-offs
+
+[0751](0751-pptx-cross-copy-apply-digest-reuse.md) applies 0652's trade-offs:
+
+- **Trade-off 3.** It speeds the common benign path: unmodified owned packages
+  captured and published through the facade.
+- **Trade-off 2.** It declines three hash skips:
+  - the retained archive's digest is recomputed at application, under 0646's
+    G5;
+  - each archive's first hash at planning stays;
+  - packages no memo describes are hashed.
+
+  It also accepts a small cost on the semantic controls to meet the ADR 0005
+  memo amendment's re-projection clause literally at every facade adoption.
+- **Bound memos.** Every skipped hash is answered by a memo bound to its bytes
+  by allocation identity, or by a single-constructor digest cell on an
+  immutable archive, and every read is re-derived in debug builds. Every
+  freshness, revision, physical-provenance, budget and refusal check still
+  runs.
+- **ADR 0005.** Filling an empty facade slot from a capture follows the
+  coordinator's ruling in 0751's review. The ADR text is unchanged, and the
+  reading is listed for the owner's confirmation.
+
+The non-iWork goal stays open.
+
+## 0750 — ADR 0006 well-formedness in the publication audit
+
+[0750](0750-xml-audit-well-formedness-gaps.md) closes an ADR 0006 gap: the
+source audit that publication runs (the eager writer's `audit_published_xml`
+over every payload, `litchi-opc`'s source-backed replacement pairs and
+`litchi-docx`'s preserved-publication gate) accepted documents that are not
+well-formed. Examples are `<r>&;</r>`, `<r>]]></r>`, an inner `<?xml …?>` and
+undeclared prefixes, because its checks stopped at quick-xml's tokenizer. No
+record tolerated them on purpose, and none of 7,222 real members needs them.
+They are now refused with typed errors; no public API changes. Every new check
+costs time linear in the input in expectation. The review found one check that
+did not: the expanded-name check read ancestors' namespace names on every tag.
+It was fixed before merge, and tests now bound the name bytes each audit reads.
+Declared non-UTF-8 encodings are refused under OPC rule M1.17. Five dependent
+tests had fixtures that were not well-formed and now declare their prefixes, or
+put deliberately malformed story bytes past the writer. Still open: `litchi-opc`
+sites that audit complete authored documents with `verify_authored` keep the
+tokenizer-level checks, because that policy also serves fragments. A
+`SourceXmlPart` replacement relies on `validate_source_xml`. Namespace names are
+not checked as URIs.
+
+## 0749 — CFB validation preserved, readback made copy-free and linear
+
+[0749](0749-cfb-reuse-plan-validation.md) states what the Reuse-plan
+validation proves: the structural reparse (header, FAT, directory tree,
+MiniFAT, exact acyclic non-overlapping chains, physical partition) and the
+readback (each model path is a stream of the model's length and bytes, with
+every touched range readable). It also states which later obligations
+depend on each part.
+
+The reparse is unchanged. The readback reaches the same verdict without
+copying, call for call with `open_stream`, including its one-time
+mini-stream load. The old validator is kept as a test oracle. So every CFB
+validation, ownership, cycle, overlap, FAT, MiniFAT, directory and
+truncation check the goal requires is preserved (ADR 0006, ADR 0005's
+validated-before-sink rule, ADR 0026). Test-only fault injection (5,600
+random plan faults and named faults) shows each harmful fault still
+refused.
+
+The review's quadratic mini-stream cost, an adversarial CPU cost as well as
+a regression, is fixed and tested for work per stream. A plan-derived
+`LimitExceeded` now declines as the documented contract says.
+
+Remaining debt:
+
+- the reparse's A5 per-stream map clearing, which predates this record and
+  sits on every reader open;
+- placement-only read-control flags;
+- planning, now the largest phase of the Reuse write.
+
+No coverage, claim or timing-contract promotion; the non-iWork goal remains
+open.
+
+## 0748 — freshness proofs stay where the source can change
+
+[0748](0748-cfb-overlay-fingerprint-reuse.md) removes only proofs over bytes that
+cannot change: a plan over an owned `Arc<[u8]>`/`Arc<Vec<u8>>` retained by the
+CFB reader (typed, crate-private provenance; no flag or wrapper can claim it)
+computes its digests once, while every generic `ReadAt` keeps planning's
+confirming scan, the view preflight, the write fences, the emission hash and
+the save fences, each still pinned by a mutating-source test; the no-hash
+emission is derived from the plan's seal inside the publisher, so no internal
+caller can select it for a generic source. Recorded
+fingerprint values, composed-view versions and published bytes are unchanged
+(census, tests); the composed reopen, owner validation and read-back all run.
+Breaking changes, stated: sealed plans report zero preflight and zero hashed
+emission bytes in `OverlayOperationShape`, the harness evidence moves to `v2`,
+and sealed plans can no longer return fingerprint-changed refusals that could
+never fire. ADR 0003/0005/0006 unchanged; 0652 trade-offs 1–3 applied. No
+claim registered.
+
+## 0747 — audit duplicates in source-backed XLSX publication
+
+[0747](0747-xlsx-publication-audit-reuse.md) enumerates every check on the
+source-backed publication path and asks, for each XML audit, whether an equal or
+stronger check already ran over the identical bytes in the same operation. For
+the original bytes the answer is no. `litchi-xlsx` never calls the auditor, and
+witnesses show planning admits CDATA outside the root, a missing attribute
+separator, an invalid `xml:space` and an over-budget attribute count. Two of
+these are refused only by the original's audit, so that audit stays complete,
+and the existing `SourceXmlPart` route is no substitute. For the replacement,
+the writer can turn an audited original into a refused one, so its verdict must
+still be established. It now is, by scanning only the edited element in the
+original's parser state (ADR 0006 unchanged, 0652 decision 2 honoured, 0705's
+rejection of readback-based dropping kept). Gates, the differential campaigns,
+fail-closed refusals with empty sinks and identical outputs are recorded.
+
+## 0746 — validation work stays, the discarded per-cell model goes
+
+[0746](0746-xls-validation-only-parse.md) keeps every XLS validation obligation
+(the complete reopen under default limits, the same parser, coverage,
+protection, macro and typed readback checks, the 29-case first-error matrix
+unchanged, and a new frozen worksheet-level multi-defect matrix whose
+expectations were generated on the base) while removing the per-cell model those
+owners never read and the second CFB render of three generic commits. It adds
+one ADR 0006 determinism fix (orphan-`PtgExp` and unmatched-comment refusals
+were hash-ordered; they now name the lowest position or object id). No ADR is
+amended, no limit moved, no public API changed, no output byte changed
+(three-leg census and mutation differential, rerun on the final source). The
+only new failure mode is resource exhaustion. Inside a worksheet it fails that
+worksheet's parse with a typed `Allocation` error, the package walk drops the
+sheet as it drops any worksheet refusal, and the edit owners refuse with their
+typed coverage `UnsafeEdit` where the old infallible map would abort; listing
+the few cells a readback keeps returns the `Allocation` error directly. The
+occupancy map is proportional to the occupied rows (the independent review's
+sparse-band case is fixed). Evidence is paired timing, isolation-pair
+instructions and deterministic allocation counts; the record reports that the
+lean walk's cycles vary with build and host rather than a single speedup. No
+claim registered.
+
+## 0745 — deferred PPT artifact digests and single-read editor streams
+
+[0745](0745-ppt-lazy-artifact-digests.md) keeps the ADR 0003 durable patch
+contract byte for byte: tested unchanged in eight unit scenarios pinned to
+the eager base, and in 32 golden entries, including refusals, across three
+builds. A review fix makes the durable artifact-conflict test reach that check
+in both directions. The change retains no additional artifact. Each snapshot
+carries a small, bounded digest memo: 48 bytes, plus a 64-byte hex string once
+hashed. The bytes and memo are bound by construction, and in-memory apply
+still authorizes by exact bytes.
+
+The feature-gated `DiagnosticPhase` loses its two artifact-hash phases and
+gains `IntermediateArtifactHash`. That is a breaking change under 0652
+trade-off 1.
+
+The survey found no other eager durable-only digest in the OLE2 or OOXML
+crates, and lists the authorization and redundant-check sites it left
+unchanged. Heap-layout randomization is now the measurement method for PPT
+lifecycles. No coverage, claim or timing-contract promotion; the non-iWork
+goal remains open.
+
+## 0744 — eager XLSX sheetData lane and dense reduced readback
+
+[0744](0744-xlsx-eager-workbook-cell-path.md) advances workstreams D (fewer
+passes, no namespace resolution where a strict local grammar proves it
+unnecessary) and C (borrowed value text, compact admitted-cell records, inline
+payload spans) for eager XLSX reads and edit/commit/save. Every refusal, limit,
+MCE path and output byte is kept; anything outside the benign subset takes the
+unchanged reader route. Measured scope: synthetic dense-wide and medium corpora
+and the cell-CRUD controls on one host. Not established: RSS, cold cache,
+Excel-produced sheets' MCE and x14ac pre-passes, inline-string bodies, and the
+publication audit and deflate that now dominate. A pre-existing defect found in
+review remains open: eager edits of byte-order-marked worksheets fail on both
+routes because the edit scanner's spans exclude the mark. The program goal
+remains open.
+[Evidence](results/change-0744/README.md).
+
+## 0743 — reuse only what identity proves, withdraw what an ADR does not admit, and keep refusal precedence when two passes become one
+
+[0743](0743-pptx-semantic-text-and-edit-path.md) removes repeated validation without removing any validation obligation. The one reuse that outlived its operation, a snapshot memo of per-payload notes-root classifications, was withdrawn after review: ADR 0005's 2026-09-16 amendment admits snapshot memos of digests only and requires reservation exhaustion to be a typed error, so under `docs/GOAL.md` it is reverted and proposed as ADR 0032 with its measured effect, rather than kept on a stretched reading. What remains reuses only within one operation or one transaction and only by allocation identity: the scene-read record holds `Weak` references, which `Arc::make_mut` disassociates, and the raw-span shortcut applies only when the scene read the very same unmarked bytes under ceilings no looser than the raw passes'. Where two passes over one event stream became one, the raw scan still refuses first at any position, a semantic refusal is deferred until the raw scan completes, and only checks that repeat the raw scan's own checks of the same event are skipped — with debug builds re-running them; a compile-time assertion keeps the ceiling ordering that route relies on. MCE processing now precedes the raw scan, so a malformed marker-bearing slide pays a bounded MCE pass before its refusal (0652 trade-off 3). The previous three-pass text implementation and the previous buffered notes scanner are kept verbatim as test oracles (21,404 and 650,060 comparisons, values and refusals), and the published archives of 21 edit/save and text artifacts are byte-identical. [Evidence](results/change-0743/README.md).
+
+## 0742 — owned cross-copy media transfer under the alpha trade-offs
+
+[0742](0742-pptx-owned-cross-copy-media-transfer.md) applies 0652's standing
+trade-offs:
+
+- **Format.** The durable cross-copy format bumps to `LPCP0004`, and genuine
+  legacy patches are refused by name.
+- **Destinations.** A transferring copy into a destination that is not an
+  unmodified owned source publishes the reopened candidate, with save
+  preferences carried. A destination holding a caller-defined part is planned
+  with the recompressing route, which keeps the part; a transferring plan or
+  patch that meets one is refused with `SlideCopyRefusal::CallerDefinedPart`.
+  Keeping the captures instead would retain source bytes in the caller's
+  package, against ADR 0005's retained-state rule.
+- **What stays recompressed.** Members whose own bytes disprove the capture or
+  fail the size guard are recompressed deterministically, as are
+  relationship-bearing and XML parts and unprovable layouts. Resource failures
+  stay typed errors.
+- **Stored images.** A Stored compressible image stays Stored, larger than
+  recompression would make it. The record states that cost.
+
+The non-iWork goal stays open.
+
 ## 0740 — diagnostic native cross-copy planning attribution
 
 [0740](0740-pptx-cross-copy-native-profile.md) preserves unchanged production and

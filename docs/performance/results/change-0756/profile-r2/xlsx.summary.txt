@@ -1,0 +1,110 @@
+file=xlsx.script.txt
+total_samples=65888 kept=43751 (66.4% of process samples)
+
+== leaf (self) categories, % of kept ==
+ 68.49%    29966  other:litchi-perf-baseline
+ 28.82%    12610  deflate(zlib-rs)
+  1.24%      544  memcpy/memmove
+  0.62%      271  crc32
+  0.50%      220  kernel
+  0.22%       96  sha256
+  0.07%       31  other:u16, u8), &mut zlib_rs::deflate::sym_buf::{impl#0}::iter::{closure_env#0}>+0x21d4 (inlined
+  0.02%        9  memset
+  0.00%        2  malloc/free
+  0.00%        2  other:__rustc
+
+== inclusive components, % of kept ==
+ 75.92%    33215  deflate
+  2.84%     1241  crc32
+  0.67%      293  sha256(sink)
+ 13.92%     6092  budget
+  2.32%     1014  text_gen(format!)
+ 98.53%    43107  write_row
+  1.15%      504  float_fmt
+  0.82%      357  int_fmt
+  1.25%      547  memcpy
+  0.05%       21  finish
+
+== top 40 leaf details ==
+ 24.86%  deflate(zlib-rs)   longest_match_help<false> @ main
+ 17.95%  other:litchi-perf-baseline is_match<8> @ main
+  8.55%  other:litchi-perf-baseline try_update<litchi_core::budget::{impl#3}::consume::{closure_env#0}> @ main
+  7.26%  other:litchi-perf-baseline insert_string @ main
+  4.19%  other:litchi-perf-baseline copied<[u8; 8], core::array::TryFromSliceError> @ main
+  3.13%  other:litchi-perf-baseline drop<litchi_core::budget::Node, alloc::alloc::Global> @ main
+  2.78%  other:litchi-perf-baseline spec_eq<u8, u8, 8> @ main
+  2.14%  other:litchi-perf-baseline next<u8> @ main
+  1.94%  deflate(zlib-rs)   deflate_medium @ main
+  1.69%  other:litchi-perf-baseline quick_insert_value @ main
+  1.51%  other:litchi-perf-baseline clone<litchi_core::budget::Node, alloc::alloc::Global> @ main
+  1.24%  memcpy/memmove     __memmove_avx512_unaligned_erms @ __memmove_avx512_unaligned_erms
+  1.16%  other:litchi-perf-baseline hash_calc @ main
+  0.91%  deflate(zlib-rs)   longest_match @ main
+  0.89%  other:litchi-perf-baseline index<u8> @ main
+  0.83%  other:litchi-perf-baseline is_xml_character @ main
+  0.77%  other:litchi-perf-baseline pad_integral @ main
+  0.69%  other:litchi-perf-baseline push_escaped @ main
+  0.66%  deflate(zlib-rs)   send_bits @ main
+  0.65%  other:litchi-perf-baseline fizzle_matches @ main
+  0.64%  other:litchi-perf-baseline generic_slide_hash_chain<64> @ main
+  0.62%  other:litchi-perf-baseline compare256 @ main
+  0.59%  other:litchi-perf-baseline encode_dist @ main
+  0.56%  crc32              update_slow @ main
+  0.54%  other:litchi-perf-baseline _mm_xor_si128 @ main
+  0.50%  kernel             kernel
+  0.50%  other:litchi-perf-baseline eq<u8> @ main
+  0.43%  other:litchi-perf-baseline try_update<litchi_core::budget::{impl#3}::charge::{closure_env#0}> @ main
+  0.42%  other:litchi-perf-baseline d_code @ main
+  0.35%  other:litchi-perf-baseline first_chunk<u8, 256> @ main
+  0.35%  other:litchi-perf-baseline _mm_clmulepi64_si128<17> @ main
+  0.34%  other:litchi-perf-baseline _mm256_movemask_epi8 @ main
+  0.33%  other:litchi-perf-baseline copy_nonoverlapping<u8> @ main
+  0.32%  other:litchi-perf-baseline tally_dist @ main
+  0.32%  other:litchi-perf-baseline next_code_point<core::slice::iter::Iter<u8>> @ main
+  0.31%  other:litchi-perf-baseline encode_len @ main
+  0.29%  other:litchi-perf-baseline trailing_zeros @ main
+  0.29%  other:litchi-perf-baseline compare256_slice @ main
+  0.27%  other:litchi-perf-baseline as_slice<u16, 65536> @ main
+  0.27%  other:litchi-perf-baseline saturating_add @ main
+
+== top 40 inclusive frames (below root) ==
+ 98.72%  branch<(), litchi_xlsx::error::Error>
+ 98.53%  write_row<litchi_perf_baseline::HashingDiscardSink, [litchi_xlsx::streaming::StreamingCell; 4]>
+ 79.66%  write_all<litchi_opc::phys_pkg::PartWriter<litchi_xlsx::streaming::BudgetedOutput<litchi_perf_baseline::HashingDiscardSink>>>
+ 79.62%  write<litchi_xlsx::streaming::BudgetedOutput<litchi_perf_baseline::HashingDiscardSink>>
+ 79.53%  write<soapberry_zip::office::BoundedOutput<litchi_xlsx::streaming::BudgetedOutput<litchi_perf_baseline::HashingDiscardSink>>>
+ 79.52%  write<soapberry_zip::writer::OwnedCompressor<soapberry_zip::office::BoundedOutput<litchi_xlsx::streaming::BudgetedOutput<litchi_perf_baseline::HashingDiscardSink>>>>
+ 76.56%  write_to<soapberry_zip::writer::OwnedCompressedEntry<soapberry_zip::office::BoundedOutput<litchi_xlsx::streaming::BudgetedOutput<litchi_perf_baseline::HashingDiscardSink>>>>
+ 76.45%  compress
+ 75.92%  compress_once
+ 75.89%  branch<(flate2::mem::Status, usize, usize), std::io::error::Error>
+ 75.79%  map_err<flate2::mem::Status, flate2::mem::CompressError, std::io::error::Error, soapberry_zip::writer::{impl#18}::compress_once::{closure_env#0}>
+ 75.60%  compress_uninit
+ 75.49%  from
+ 75.47%  into<zlib_rs::ReturnCode, core::result::Result<zlib_rs::stable::Status, zlib_rs::stable::DeflateError>>
+ 75.42%  deflate
+ 75.03%  deflate_medium
+ 53.69%  longest_match
+ 52.77%  longest_match_help<false>
+ 20.82%  is_match<8>
+ 10.82%  insert_match
+ 10.59%  insert_string
+  8.76%  consume
+  8.61%  try_update<litchi_core::budget::{impl#3}::consume::{closure_env#0}>
+  8.61%  fetch_update<litchi_core::budget::{impl#3}::consume::{closure_env#0}>
+  7.47%  map_err<(), litchi_core::execution::ExecutionError, litchi_xlsx::error::Error, litchi_xlsx::streaming::{impl#3}::write_row::{closure_env#5}<litchi_perf_baseline::HashingDiscardSink, [litchi_
+  4.51%  append_cell
+  4.21%  copied<[u8; 8], core::array::TryFromSliceError>
+  4.21%  try_from<u8, 8>
+  4.21%  try_into<&[u8], [u8; 8]>
+  3.43%  update
+  3.15%  drop<litchi_core::budget::Node, alloc::alloc::Global>
+  3.15%  drop_in_place<alloc::sync::Arc<litchi_core::budget::Node, alloc::alloc::Global>>
+  2.84%  crc32_chunk
+  2.80%  spec_eq<u8, u8, 8>
+  2.80%  eq<u8, u8, 8>
+  2.80%  memcmp_n_ptr<8>
+  2.76%  commit
+  2.71%  truncate<[alloc::sync::Arc<litchi_core::budget::Node, alloc::alloc::Global>; 4]>
+  2.71%  clear<[alloc::sync::Arc<litchi_core::budget::Node, alloc::alloc::Global>; 4]>
+  2.68%  next<u8>

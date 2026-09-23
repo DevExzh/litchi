@@ -1,5 +1,15 @@
 # Performance CRUD coverage
 
+## 0756 — wave integration, no coverage promotion
+
+[0756](0756-ole2-ooxml-wave-integration.md) changes no coverage-index row and
+adds no selector. The machine-readable index is unchanged, and the harness
+changes only 0748's XLS numeric evidence schema label, outside any timed region.
+The wave measured existing selectors across content reading, creation,
+targeted edits, cross-document copying, low-level stream and package paths, and
+save. Those measurements live in each record; they do not by themselves
+complete any CRUD category.
+
 ## 0740 — diagnostic native cross-copy planning attribution
 
 [0740](0740-pptx-cross-copy-native-profile.md) preserves unchanged production and
