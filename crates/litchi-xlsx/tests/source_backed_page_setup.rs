@@ -185,7 +185,9 @@ fn fixture(sheet_xml: String, workbook_suffix: &str, signed: bool) -> Vec<u8> {
 
 fn ordinary_fixture(workbook_suffix: &str, signed: bool) -> Vec<u8> {
     fixture(
-        format!(r#"<worksheet xmlns="{SML}"><sheetData/><drawing r:id="rIdDrawing"/></worksheet>"#),
+        format!(
+            r#"<worksheet xmlns="{SML}" xmlns:r="{REL}"><sheetData/><drawing r:id="rIdDrawing"/></worksheet>"#
+        ),
         workbook_suffix,
         signed,
     )

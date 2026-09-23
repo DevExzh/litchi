@@ -8274,12 +8274,13 @@ mod tests {
         assert!(publication_accepts_preserved_xml(&compact));
 
         // Change 0665: every one of these is a compactness verdict the writer
-        // no longer raises, so the preserving policy must publish them.
+        // no longer raises, so the preserving policy must publish them. Each
+        // declares its prefix, as change 0750's namespace check requires.
         let accepted: [&[u8]; 4] = [
-            b"<?xml version=\"1.0\"?>\n<w:p/>",
-            b" <w:p/>",
-            b"<w:p/>\n",
-            b"<w:p a=\"1\"\n     b=\"2\"/>",
+            b"<?xml version=\"1.0\"?>\n<w:p xmlns:w=\"urn:w\"/>",
+            b" <w:p xmlns:w=\"urn:w\"/>",
+            b"<w:p xmlns:w=\"urn:w\"/>\n",
+            b"<w:p xmlns:w=\"urn:w\" a=\"1\"\n     b=\"2\"/>",
         ];
         for case in accepted {
             assert!(

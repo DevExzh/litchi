@@ -249,8 +249,10 @@ fn fixture(dialect: Dialect, mutation: Mutation) -> Vec<u8> {
     } else {
         footnotes_xml
     };
+    // The unknown entity is not well-formed, so the writer publishes this
+    // stand-in and the fixture puts the entity back unaudited.
     let footnotes_xml = if matches!(mutation, Mutation::UnknownNamedEntityFootnote) {
-        unknown_named_entity_footnotes_xml(word)
+        unknown_named_entity_footnotes_xml(word).replace("&unknown;", "unknown")
     } else {
         footnotes_xml
     };
@@ -521,7 +523,34 @@ fn fixture(dialect: Dialect, mutation: Mutation) -> Vec<u8> {
             .unwrap();
     }
     package.relate_to("word/document.xml", dialect.office_document());
-    PackageWriter::to_bytes(&package).unwrap()
+    let bytes = PackageWriter::to_bytes(&package).unwrap();
+    if matches!(mutation, Mutation::UnknownNamedEntityFootnote) {
+        with_unaudited_member(
+            &bytes,
+            "word/footnotes.xml",
+            unknown_named_entity_footnotes_xml(word).as_bytes(),
+        )
+    } else {
+        bytes
+    }
+}
+
+/// Rewrites `archive` with `member` holding `bytes`, without the publication
+/// audit. Change 0750: the eager writer refuses to publish XML that is not
+/// well-formed, so a fixture that must carry such XML to a reader is written
+/// with a well-formed stand-in and its bytes are put back here.
+fn with_unaudited_member(archive: &[u8], member: &str, bytes: &[u8]) -> Vec<u8> {
+    let reader = litchi_opc::phys_pkg::PhysPkgReader::new(archive).unwrap();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    for name in reader.member_names().unwrap() {
+        let data = if name == member {
+            bytes.to_vec()
+        } else {
+            reader.read_member(&name).unwrap()
+        };
+        writer.write_deflated_sized(&name, &data).unwrap();
+    }
+    writer.finish_to_bytes().unwrap()
 }
 
 fn open(bytes: &[u8]) -> source_backed::Package {
