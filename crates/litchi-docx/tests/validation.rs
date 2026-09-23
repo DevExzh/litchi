@@ -88,7 +88,7 @@ fn relationship_fixture() -> Vec<u8> {
     let mut header = BlobPart::new(
         PackURI::new("/word/header1.xml").unwrap(),
         ct::WML_HEADER.to_owned(),
-        b"<w:hdr/>".to_vec(),
+        format!(r#"<w:hdr xmlns:w="{WORD_NS}"/>"#).into_bytes(),
     );
     header.relate_to("missing-image.png", rt::IMAGE);
     package.try_add_part(Box::new(header)).unwrap();

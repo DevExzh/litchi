@@ -197,6 +197,11 @@ fn fixture(dialect: Dialect, mutation: Mutation) -> Vec<u8> {
     let glossary_xml = format!(
         r#"<w:glossaryDocument xmlns:w="{root_word}" xmlns:x="urn:root-opaque"><!--root-before--><x:rootOpaque x:value="preserve"/><w:docParts>{alpha_entry}<w:docPart><w:docPartPr><w:name w:val="{beta_name}"/><w:guid w:val="{beta_id}"/></w:docPartPr><w:docPartBody>{beta_paragraphs}</w:docPartBody></w:docPart>{gamma_entry}</w:docParts><!--root-after--></w:glossaryDocument>"#
     );
+    // The unknown entity and the illegal character reference are not
+    // well-formed, so the writer publishes a stand-in without them.
+    let published_glossary = glossary_xml
+        .replace("&unknown;", "unknown")
+        .replace("&#x1;", "");
     let mut package = OpcPackage::new();
     let mut main = BlobPart::new(
         PackURI::new("/word/document.xml").unwrap(),
@@ -235,7 +240,7 @@ fn fixture(dialect: Dialect, mutation: Mutation) -> Vec<u8> {
                 } else {
                     ct::WML_DOCUMENT_GLOSSARY.to_owned()
                 },
-                compact(glossary_xml.as_bytes()),
+                compact(published_glossary.as_bytes()),
             )))
             .unwrap();
     }
@@ -312,7 +317,7 @@ fn fixture(dialect: Dialect, mutation: Mutation) -> Vec<u8> {
             .try_add_part(Box::new(BlobPart::new(
                 PackURI::new("/word/glossary/document.xml").unwrap(),
                 ct::WML_DOCUMENT_GLOSSARY.to_owned(),
-                compact(glossary_xml.as_bytes()),
+                compact(published_glossary.as_bytes()),
             )))
             .unwrap();
     }
@@ -391,7 +396,34 @@ fn fixture(dialect: Dialect, mutation: Mutation) -> Vec<u8> {
             .unwrap();
     }
     package.relate_to("word/document.xml", dialect.office_document());
-    PackageWriter::to_bytes(&package).unwrap()
+    let bytes = PackageWriter::to_bytes(&package).unwrap();
+    if published_glossary == glossary_xml {
+        bytes
+    } else {
+        with_unaudited_member(
+            &bytes,
+            "word/glossary/document.xml",
+            glossary_xml.as_bytes(),
+        )
+    }
+}
+
+/// Rewrites `archive` with `member` holding `bytes`, without the publication
+/// audit. Change 0750: the eager writer refuses to publish XML that is not
+/// well-formed, so a fixture that must carry such XML to a reader is written
+/// with a well-formed stand-in and its bytes are put back here.
+fn with_unaudited_member(archive: &[u8], member: &str, bytes: &[u8]) -> Vec<u8> {
+    let reader = litchi_opc::phys_pkg::PhysPkgReader::new(archive).unwrap();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    for name in reader.member_names().unwrap() {
+        let data = if name == member {
+            bytes.to_vec()
+        } else {
+            reader.read_member(&name).unwrap()
+        };
+        writer.write_deflated_sized(&name, &data).unwrap();
+    }
+    writer.finish_to_bytes().unwrap()
 }
 
 fn open(bytes: &[u8]) -> source_backed::Package {
