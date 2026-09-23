@@ -4365,12 +4365,30 @@ mod tests {
                 let mut offset = 0_usize;
                 for index in 0..sizes.len() {
                     let size = sizes[(index + rotation) % sizes.len()];
-                    stage.update(&mut crc, &payload[offset..offset + size]);
+                    let written = &payload[offset..offset + size];
+                    let staged_before = stage.bytes.len();
+                    stage.update(&mut crc, written);
                     offset += size;
                     // The stage never grows past its fixed allocation.
                     assert!(stage.bytes.len() <= CRC_STAGE_CAPACITY);
                     assert!(stage.bytes.capacity() <= CRC_STAGE_CAPACITY);
-                    assert_eq!(stage.bytes.is_empty(), !enabled || stage.is_empty());
+                    // A disabled stage never holds bytes.
+                    assert!(enabled || stage.is_empty());
+                    if enabled {
+                        if size == 0 {
+                            // An empty write changes nothing.
+                            assert_eq!(stage.bytes.len(), staged_before);
+                        } else if size <= CRC_STAGE_MAX_WRITE {
+                            // A short write is staged, not checksummed: the
+                            // stage now ends with exactly these bytes.
+                            assert!(!stage.is_empty());
+                            assert!(stage.bytes.ends_with(written));
+                        } else {
+                            // A long write folds the stage first and is then
+                            // checksummed in place.
+                            assert!(stage.is_empty());
+                        }
+                    }
                 }
                 stage.fold_into(&mut crc);
                 assert!(stage.is_empty());

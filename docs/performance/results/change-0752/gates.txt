@@ -49,3 +49,21 @@ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1
 Not run: the CRUD coverage validator (no harness selector changed).
 Excluded from the dependent test set by the program's scope: ODF crates, iWork crates, and the Python binding (litchi-py).
 Note: a first foreground run of the harness tests was stopped by the 10-minute tool limit (exit 124, no failure reported); the background run above completed.
+
+Review follow-up (after 247483ad8f; the fold-size wording, the vacuous CRC-stage assertion, the concurrent
+owned/scoped hierarchy test and the drop-order note). Fresh CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0752/review,
+CARGO_BUILD_JOBS=6, TMPDIR under scratch/0752, every command in the foreground with a timeout.
+
+cargo fmt --all --check                                                   exit 0
+cargo clippy -p litchi-core -p soapberry-zip -p litchi-docx -p litchi-xlsx --lib --no-deps --locked -- -D warnings          exit 0
+cargo clippy -p litchi-core -p soapberry-zip -p litchi-docx -p litchi-xlsx --all-targets --no-deps --locked -- -D warnings  exit 0
+RUSTDOCFLAGS="-D warnings" cargo doc -p litchi-core -p soapberry-zip -p litchi-docx -p litchi-xlsx --no-deps --locked       exit 0
+cargo test -p litchi-core              --locked  exit 0  223 passed, 0 failed, 0 ignored
+cargo test -p soapberry-zip            --locked  exit 0  643 passed, 0 failed, 2 ignored
+cargo test -p litchi-docx              --locked  exit 0  1530 passed, 0 failed, 31 ignored
+cargo test -p litchi-xlsx              --locked  exit 0  1420 passed, 0 failed, 0 ignored
+
+Mutation check of the new concurrency test (each run separately, then reverted; the file compared equal
+to its saved copy afterwards): rolling back one level too few on a refusal failed it in 10 of 10 runs
+(final Memory 22 at left); a check-after-add charge failed it in 10 of 10 runs (the monitor saw left_b
+above its limit).

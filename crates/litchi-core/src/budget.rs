@@ -752,6 +752,231 @@ mod tests {
         assert_eq!(budget.used(Resource::Memory), 1);
     }
 
+    /// The concurrency test's hierarchy, by index:
+    ///
+    /// ```text
+    /// root ─┬─ left ─┬─ left_a
+    ///       │        └─ left_b
+    ///       └─ right ── right_a
+    /// ```
+    const TREE_NAMES: [&str; 6] = ["root", "left", "left_a", "left_b", "right", "right_a"];
+    const TREE_PARENT: [Option<usize>; 6] = [None, Some(0), Some(1), Some(1), Some(0), Some(4)];
+    const TREE_MEMORY: [u64; 6] = [48, 32, 20, 20, 32, 20];
+    const TREE_WORK: [u64; 6] = [9_000, 6_000, 2_500, 2_500, 4_000, 3_000];
+    /// The node each worker charges: two siblings under `left`, the leaf under
+    /// `right`, a middle level and the root itself.
+    const TREE_WORKER_NODE: [usize; 8] = [2, 2, 3, 3, 5, 5, 1, 0];
+    const TREE_STEPS: usize = 4_000;
+
+    /// A node and its ancestors, innermost first.
+    fn tree_chain(mut node: usize) -> Vec<usize> {
+        let mut chain = vec![node];
+        while let Some(parent) = TREE_PARENT[node] {
+            chain.push(parent);
+            node = parent;
+        }
+        chain
+    }
+
+    #[derive(Debug, Default)]
+    struct TreeWorkerOutcome {
+        work_granted: u64,
+        consume_demand: u64,
+        work_refusals: u64,
+    }
+
+    /// One worker's fixed pseudo-random sequence of owned and scoped
+    /// reservations, commits and releases, and consumptions. Memory is only
+    /// ever reserved and then released (dropped, committed at zero or
+    /// over-committed); Work is kept exactly where the budget granted it.
+    fn tree_worker(budget: &Budget, chain: &[usize], seed: u64) -> TreeWorkerOutcome {
+        let refused = |error: &ResourceLimit, resource: Resource| {
+            let level = chain
+                .iter()
+                .copied()
+                .find(|&level| TREE_NAMES[level] == &*error.scope)
+                .expect("a refusal names a level of the charged chain");
+            let limit = if resource == Resource::Memory {
+                TREE_MEMORY[level]
+            } else {
+                TREE_WORK[level]
+            };
+            assert_eq!(error.resource, resource);
+            assert_eq!(error.limit, limit);
+            assert!(error.observed > limit);
+        };
+        let mut outcome = TreeWorkerOutcome::default();
+        let mut owned: Vec<Reservation> = Vec::new();
+        let mut scoped: Vec<ScopedReservation<'_>> = Vec::new();
+        let mut state = seed;
+        for _ in 0..TREE_STEPS {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let amount = 1 + state % 6;
+            let release = (state >> 16) % 3;
+            match (state >> 8) % 8 {
+                0 => match budget.reserve(Resource::Memory, amount) {
+                    Ok(reservation) if owned.len() < 3 => owned.push(reservation),
+                    Ok(reservation) => drop(reservation),
+                    Err(error) => refused(&error, Resource::Memory),
+                },
+                1 => match budget.reserve_scoped(Resource::Memory, amount) {
+                    Ok(reservation) if scoped.len() < 2 => scoped.push(reservation),
+                    Ok(reservation) => drop(reservation),
+                    Err(error) => refused(&error, Resource::Memory),
+                },
+                2 => {
+                    if let Some(reservation) = owned.pop() {
+                        let held = reservation.amount();
+                        match release {
+                            0 => drop(reservation),
+                            1 => assert!(reservation.commit(0)),
+                            _ => assert!(!reservation.commit(held + 1)),
+                        }
+                    }
+                },
+                3 => {
+                    if let Some(reservation) = scoped.pop() {
+                        let held = reservation.amount();
+                        match release {
+                            0 => drop(reservation),
+                            1 => assert!(reservation.commit(0)),
+                            _ => assert!(!reservation.commit(held + 1)),
+                        }
+                    }
+                },
+                4 => match budget.reserve(Resource::Work, amount) {
+                    Ok(reservation) => {
+                        let keep = (state >> 20) % (amount + 1);
+                        assert!(reservation.commit(keep));
+                        outcome.work_granted += keep;
+                    },
+                    Err(error) => {
+                        refused(&error, Resource::Work);
+                        outcome.work_refusals += 1;
+                    },
+                },
+                5 => match budget.reserve_scoped(Resource::Work, amount) {
+                    Ok(reservation) => {
+                        let keep = (state >> 20) % (amount + 1);
+                        assert!(reservation.commit(keep));
+                        outcome.work_granted += keep;
+                    },
+                    Err(error) => {
+                        refused(&error, Resource::Work);
+                        outcome.work_refusals += 1;
+                    },
+                },
+                6 => {
+                    outcome.consume_demand += amount;
+                    match budget.consume(Resource::Work, amount) {
+                        Ok(()) => outcome.work_granted += amount,
+                        Err(error) => {
+                            refused(&error, Resource::Work);
+                            outcome.work_refusals += 1;
+                        },
+                    }
+                },
+                _ => match budget.reserve_scoped(Resource::Memory, amount) {
+                    Ok(reservation) => drop(reservation),
+                    Err(error) => refused(&error, Resource::Memory),
+                },
+            }
+        }
+        drop(scoped);
+        drop(owned);
+        outcome
+    }
+
+    /// Stops the monitor even when a worker's panic unwinds the test.
+    struct StopOnDrop<'flag>(&'flag std::sync::atomic::AtomicBool);
+
+    impl Drop for StopOnDrop<'_> {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::Release);
+        }
+    }
+
+    #[test]
+    fn concurrent_owned_and_scoped_reservations_keep_a_shared_hierarchy_exact() {
+        let mut budgets: Vec<Budget> = Vec::new();
+        for index in 0..TREE_NAMES.len() {
+            let limits = Limits::new(TREE_MEMORY[index], 100, 100, 100, 100, TREE_WORK[index]);
+            let budget = match TREE_PARENT[index] {
+                None => Budget::root(TREE_NAMES[index], limits),
+                Some(parent) => budgets[parent].child(TREE_NAMES[index], limits),
+            };
+            budgets.push(budget);
+        }
+        let stop = std::sync::atomic::AtomicBool::new(false);
+        let outcomes: Vec<TreeWorkerOutcome> = std::thread::scope(|scope| {
+            // Every read of every level, while the workers run, is within its
+            // limit: no charge is ever visible above a limit, even briefly.
+            let monitor = scope.spawn(|| {
+                let mut passes = 0_u64;
+                loop {
+                    let last = stop.load(Ordering::Acquire);
+                    for (index, budget) in budgets.iter().enumerate() {
+                        let memory = budget.used(Resource::Memory);
+                        let work = budget.used(Resource::Work);
+                        assert!(memory <= TREE_MEMORY[index], "{}", TREE_NAMES[index]);
+                        assert!(work <= TREE_WORK[index], "{}", TREE_NAMES[index]);
+                    }
+                    passes += 1;
+                    if last {
+                        break passes;
+                    }
+                    std::thread::yield_now();
+                }
+            });
+            let stop_monitor = StopOnDrop(&stop);
+            let workers: Vec<_> = TREE_WORKER_NODE
+                .iter()
+                .enumerate()
+                .map(|(worker, &node)| {
+                    let budget = budgets[node].clone();
+                    let seed = 0x9E37_79B9_7F4A_7C15_u64
+                        ^ (u64::try_from(worker).expect("worker index") + 1)
+                            .wrapping_mul(0x2545_F491_4F6C_DD1D);
+                    scope.spawn(move || tree_worker(&budget, &tree_chain(node), seed))
+                })
+                .collect();
+            let outcomes = workers
+                .into_iter()
+                .map(|worker| worker.join().expect("worker"))
+                .collect();
+            drop(stop_monitor);
+            assert!(monitor.join().expect("monitor") > 0);
+            outcomes
+        });
+
+        // Every level ends exactly at what its subtree was granted: no
+        // reserved Memory survives, and Work is the sum of the kept commits
+        // and consumptions of every worker that charges through the level.
+        for (index, budget) in budgets.iter().enumerate() {
+            assert_eq!(budget.used(Resource::Memory), 0, "{}", TREE_NAMES[index]);
+            let granted: u64 = TREE_WORKER_NODE
+                .iter()
+                .zip(&outcomes)
+                .filter(|(node, _)| tree_chain(**node).contains(&index))
+                .map(|(_, outcome)| outcome.work_granted)
+                .sum();
+            assert_eq!(
+                budget.used(Resource::Work),
+                granted,
+                "{}",
+                TREE_NAMES[index]
+            );
+        }
+        // The seeds ask for more Work through `consume` alone than the root
+        // allows, so some Work charge must have been refused, whatever the
+        // interleaving; each refusal named a level of its chain and its limit.
+        let demand: u64 = outcomes.iter().map(|outcome| outcome.consume_demand).sum();
+        assert!(demand > TREE_WORK[0]);
+        assert!(outcomes.iter().any(|outcome| outcome.work_refusals > 0));
+    }
+
     #[test]
     fn execution_io_builder_composes_all_runtime_dimensions() {
         let limits = Limits::new(1, 2, 3, 4, 5, 6).with_execution_io(7, 8, 9);

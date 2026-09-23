@@ -74,7 +74,14 @@ the CRC-32 is staged.
   * The writer's fields other than its `ExecutionContext` and scratch
     reservation move into a private `DocumentState`, so `write_text` holds
     its `InputBytes` reservation as a `ScopedReservation` borrowed from the
-    context while the state emits. The public API is unchanged.
+    context while the state emits. The public API is unchanged. The move
+    changes the writer's field drop order: the part, with the caller's sink,
+    still drops first and the scratch reservation is still released after it
+    and after the writer's context handle, but that handle now drops after
+    the other state fields instead of second, and `poison` before the scratch
+    reservation instead of last. Nothing observes the difference: the only
+    `Drop` impls involved are the two reservations' releases, and the context
+    and the poison reason only release shared handles and error values.
 * `crates/litchi-xlsx/src/streaming.rs`: `write_row` holds its row's
   `Objects` reservation as a `ScopedReservation`. The poisoning helpers borrow
   only the fields they poison (private `PoisonTarget` and `poison_target!`),
@@ -114,10 +121,19 @@ carry-less-multiply path starts at 128 bytes, and every DOCX write (5, 31,
 about 56, 12 and 6 bytes per paragraph) is shorter, so each byte took a table
 lookup, and writes under 64 bytes the one-byte loop. The workspace lock
 resolves crc32fast 1.5.1, whose SIMD path starts at 16 bytes. Staging serves
-both: every fold of the stage is at least 3 KiB. On the exact DOCX payload
+both. A fold triggered by a full stage covers more than 3 KiB: a write of at
+most 1,024 bytes overflows the 4,096-byte stage only when it already holds
+more than 3,072. A write longer than 1 KiB is checksummed in place. Only the
+fold made just before such a longer write, and the one at `finish`, can be
+short, as short as one byte (one byte staged, then a 2 KiB write, folds one
+byte). The DOCX document member's writes are all shorter than 1 KiB, so every
+fold but its last is triggered by a full stage. On the exact DOCX payload
 (14,418,099 bytes in 655,362 writes) the probe measures 26.28 ms for
 per-write CRC-32 against 2.25 ms staged at 4 KiB (0.80 ms for one buffer)
-(`probe/crc_deflate_probe-output.txt`).
+(`probe/crc_deflate_probe-output.txt`). As supporting evidence outside this
+record's measured matrix, the coordinator reports that the independent review
+ran the large DOCX case with the workspace's crc32fast 1.5.1 and saw about
+85–87 ms before and 52–54 ms after, with the same output digest.
 
 What each budget operation costs. The large DOCX writes 131,072 paragraphs,
 each with seven `consume` charges and one input-byte `reserve`/`commit`. A
@@ -366,7 +382,8 @@ establish:
 
 * the saving in production builds with the workspace lock's crc32fast 1.5.1,
   whose SIMD path starts at 16 bytes, so writes of 16–127 bytes were already
-  cheaper there (not measured);
+  cheaper there: this record did not measure it; the review's informal
+  observation above (about 85–87 → 52–54 ms) is supporting evidence only;
 * behaviour with shared or deep budget hierarchies under concurrency: the
   harness contexts are single-level roots, and the reservation change was
   exercised concurrently only by the unit tests;
@@ -443,6 +460,45 @@ Work limits, hand-picked boundary cases plus generated texts over every
 character class, refused characters included), and
 `plain_ascii_word_matches_a_byte_by_byte_test` (every byte value at every
 position, and 200,000 boundary-biased words).
+
+## Review follow-up
+
+The coordinator relayed an independent review that recommended merging with
+no blocker. It reproduced the 28,266-line transcript and ran its own
+differentials: 1.6 million budget steps over owned, scoped and base
+reservations, a 16-thread stress test (200,000 operations per thread, three
+seeds), 7,000 archives of random writes (14,780 CRCs verified), and 122,000
+texts (2.73 million runs) through the escaper. All matched exactly. Its four
+nits are folded in without rewriting history:
+
+* The fold-size sentence above was narrowed: only folds triggered by a full
+  stage are guaranteed to exceed 3 KiB. The review's crc32fast 1.5.1
+  observation is added as supporting evidence.
+* `crc_stage_matches_a_one_pass_checksum_at_every_boundary` had an assertion
+  that was vacuous for an enabled stage. It now asserts that a disabled stage
+  never holds bytes, and, for an enabled one, that an empty write changes
+  nothing, a short write leaves the stage ending with exactly its bytes, and a
+  long write leaves it empty.
+* New `concurrent_owned_and_scoped_reservations_keep_a_shared_hierarchy_exact`
+  in `litchi-core`: eight threads on a six-node, three-level tree (two
+  sibling leaves under one middle node, one leaf under the other; two
+  workers on each leaf, one on a middle node, one on the root) run fixed
+  pseudo-random mixes of owned and
+  scoped reservations of Memory and Work, drops, zero commits, over-commits,
+  partial Work commits and Work consumption. Every refusal must name a level
+  of its chain with that level's limit. A monitor thread reads every level
+  throughout and must never see one above its limit. At the end, every
+  level's Memory must be zero and its Work exactly its subtree's granted sum.
+  The seeds ask for more Work through `consume` alone than the root allows,
+  so at least one refusal is certain in any interleaving. It takes about
+  10 ms in a debug build. As a mutation check, rolling back one level too few
+  on a refusal failed it in 10 of 10 runs (22 units of Memory left at
+  `left`), and a check-after-add charge failed it in 10 of 10 runs (the
+  monitor saw `left_b` over its limit); both mutations were reverted and the
+  file compared equal.
+* The drop-order sentence under *What was changed* was added.
+
+The follow-up gates are appended to `results/change-0752/gates.txt`.
 
 ## Cleanup
 
