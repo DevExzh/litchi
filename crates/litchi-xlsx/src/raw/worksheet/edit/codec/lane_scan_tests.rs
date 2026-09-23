@@ -172,3 +172,12 @@ fn ordering_and_coordinate_refusals_are_unchanged() {
         assert!(assert_parity(worksheet(body).as_bytes(), None), "{body}");
     }
 }
+
+#[test]
+fn byte_order_marked_worksheets_keep_the_reader_with_identical_layouts() {
+    let mut random = Lcg(0xB0C);
+    for _ in 0..50 {
+        let document = format!("\u{feff}{}", worksheet(&generated_body(&mut random, false)));
+        assert!(!assert_parity(document.as_bytes(), None), "{document}");
+    }
+}

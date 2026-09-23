@@ -13,6 +13,8 @@ mod tests;
 
 #[cfg(test)]
 pub(crate) use codec::codec_sizes;
+#[cfg(test)]
+pub(crate) use codec::writer_fault;
 pub(crate) use codec::{EventSpan, FactsBuilder, SourceFacts};
 #[allow(
     unused_imports,

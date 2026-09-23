@@ -386,6 +386,9 @@ fn write_replacement_row(
             let (_, action) = pending
                 .next()
                 .ok_or_else(|| invalid("worksheet cell edit ordering was lost"))?;
+            #[cfg(test)]
+            let cell_start =
+                fault::reemit_changed_into_run(output, source, cell, &mut run, cell_start);
             if let Some((start, first, last)) = run.take() {
                 record_omitted(omitted, recording, first, last, start, cell_start)?;
             }
@@ -409,6 +412,57 @@ fn write_replacement_row(
     }
     output.extend_from_slice(&source[row.close_start..row.span.end]);
     Ok(())
+}
+
+/// Test-only fault injection into the provenance writer.
+///
+/// With the fault active, a replaced cell's old record is also copied into
+/// the preceding omitted run before the new record is written, so the
+/// published row holds two records at one address while the provenance
+/// claims the old one is a verbatim source record. The complete parse
+/// refuses that as a duplicate; a reduced readback must not accept it.
+#[cfg(test)]
+pub(crate) mod fault {
+    use std::cell::Cell;
+
+    use litchi_sheet::Cell as Address;
+
+    use super::super::super::model::CellSlot;
+
+    thread_local! {
+        static ACTIVE: Cell<bool> = const { Cell::new(false) };
+    }
+
+    /// Run `work` with the fault active on this thread.
+    pub(crate) fn with_reemitted_changed_cells<T>(work: impl FnOnce() -> T) -> T {
+        struct Restore(bool);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                ACTIVE.with(|active| active.set(self.0));
+            }
+        }
+        let _restore = Restore(ACTIVE.with(|active| active.replace(true)));
+        work()
+    }
+
+    /// Apply the fault to the replaced `cell`, returning where the omitted
+    /// run now ends.
+    pub(super) fn reemit_changed_into_run(
+        output: &mut Vec<u8>,
+        source: &[u8],
+        cell: &CellSlot,
+        run: &mut Option<(usize, Address, Address)>,
+        cell_start: usize,
+    ) -> usize {
+        if !ACTIVE.with(Cell::get) {
+            return cell_start;
+        }
+        let start = run.map_or(cell_start, |(start, _, _)| start);
+        let first = run.map_or(cell.address, |(_, first, _)| first);
+        *run = Some((start, first, cell.address));
+        output.extend_from_slice(&source[cell.span.start..cell.span.end]);
+        output.len()
+    }
 }
 
 fn record_omitted_row(

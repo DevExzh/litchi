@@ -21,6 +21,8 @@ mod tests;
 pub(super) use snapshot::scan_with_event_limit;
 #[cfg(test)]
 pub(crate) use snapshot::sizes as codec_sizes;
+#[cfg(test)]
+pub(crate) use snapshot::writer_fault;
 #[allow(
     unused_imports,
     reason = "the codec facade preserves the complete crate-visible snapshot surface"
