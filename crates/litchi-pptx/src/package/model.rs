@@ -263,14 +263,18 @@ impl Package {
     ///
     /// A plan whose candidate transfers source-compressed media
     /// ([`crate::opened::CrossSlideCopyPlan::transfers_source_compressed_media`])
-    /// publishes only into an unmodified owned destination; a destination
-    /// edited since it was opened needs the copy planned against it afresh.
+    /// is rebuilt from the two packages' bytes, so it publishes the same
+    /// output into any destination with the recorded revisions. Into a
+    /// destination that is not an unmodified owned source it publishes the
+    /// candidate reopened from its archive, which carries the destination's
+    /// save preferences but holds built-in parts in place of caller-defined
+    /// `Part` implementations.
     ///
     /// # Errors
     ///
     /// Returns an error for stale source/destination graphs, a foreign source,
-    /// package mutation policy, a transferring plan applied to a modified
-    /// destination, or a candidate graph that no longer applies exactly.
+    /// package mutation policy, or a candidate graph that no longer applies
+    /// exactly.
     pub fn apply_cross_slide_copy_plan(
         &mut self,
         source: &Self,
@@ -319,14 +323,14 @@ impl Package {
     /// Both packages must retain source-preserving physical provenance.
     /// A forward patch that transfers source-compressed media
     /// ([`crate::opened::CrossSlideCopyPatch::transfers_source_compressed_media`])
-    /// publishes only into an unmodified owned destination; its inverse also
-    /// publishes into a modified one.
+    /// is rebuilt from the two packages' bytes with the encoding it records,
+    /// so a redo after its inverse, or any destination with the recorded
+    /// revisions, publishes the output of the first application.
     ///
     /// # Errors
     ///
     /// Returns an error for stale or foreign packages, malformed forged patch
-    /// descriptors, rejected mutation policy, a transferring forward patch
-    /// applied to a modified destination, or candidate validation failure.
+    /// descriptors, rejected mutation policy, or candidate validation failure.
     pub fn apply_cross_slide_copy_patch(
         &mut self,
         source: &Self,

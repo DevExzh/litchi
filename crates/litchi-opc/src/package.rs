@@ -20,12 +20,6 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-/// The lazily built ZIP index over an owned package's retained source
-/// archive, boxed so the cell every owned open allocates stays small.
-type TransferIndexCell = OnceLock<
-    std::result::Result<Box<soapberry_zip::office::IndexedArchive<Arc<Vec<u8>>>>, OpcError>,
->;
-
 /// Options for saving an OPC package.
 #[derive(Debug, Clone, Default)]
 pub struct SaveOptions {
@@ -254,6 +248,19 @@ impl OpcPackage {
     #[must_use]
     pub fn is_unmodified_owned_source(&self) -> bool {
         self.exact_source().is_some()
+    }
+
+    /// The read limits this package's owned source archive was admitted
+    /// under, or `None` when the package retains no owned source archive.
+    ///
+    /// A caller that re-admits the bytes this package publishes, for example
+    /// to decide something from those bytes alone, can hold them to the
+    /// policy the package itself was opened under (change 0742).
+    #[must_use]
+    pub fn source_read_limits(&self) -> Option<ReadLimits> {
+        self.source_archive
+            .as_ref()
+            .map(|_archive| self.source_limits)
     }
 
     /// Configure font embedding with one self-documenting policy.
@@ -1397,6 +1404,7 @@ impl OpcPackage {
 
 mod compressed_transfer;
 pub use compressed_transfer::CompressedPartTransfer;
+use compressed_transfer::TransferIndexCell;
 
 #[cfg(test)]
 mod payload_reuse_tests;
