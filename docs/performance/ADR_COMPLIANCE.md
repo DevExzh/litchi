@@ -1,5 +1,45 @@
 # Performance optimization ADR-compliance matrix
 
+## 0742–0757 — the OLE2/OOXML wave of 2026-09-22/23
+
+[0756](0756-ole2-ooxml-wave-integration.md) integrates fifteen records; each
+record's own ADR section is authoritative. In summary:
+
+- **ADR 0003.** Durable patches stay exact-source-checked and deterministic.
+  0742 bumps the owned cross-copy format to `LPCP0004` and refuses
+  `LPCP0002`/`LPCP0003` by name (owner decision 4 precedent). Its transfer
+  decision depends only on recorded revisions and published bytes, so redo after
+  undo is byte-identical. 0745's lazily computed digests are byte-identical to
+  the base's eager ones. 0746 publishes the render it validated.
+- **ADR 0005.** No ambient state, threads or unbudgeted caches were added.
+  0742's captures are charged to `max_patch_bytes`. 0751's memos stay within
+  the 2026-09-16 digest-memo amendment; its capture-time fill with explicit
+  re-projection is a coordinator ruling listed for owner confirmation. 0743's
+  classification memo did not fit the amendment and was withdrawn; proposed ADR
+  0032 is raised for human review. 0752 keeps budget semantics exact, with
+  additive scoped reservations.
+- **ADR 0006.** Publication still audits every XML member. 0747's window proof
+  and 0754's `VerifiedSource` are proven equivalent to complete audits of the
+  exact bytes written, with debug cross-checks. 0750 closes well-formedness gaps
+  the ADR already required, and 0754 closes an audited-handle gap. 0757 restores
+  determinism in the fresh XLS writer, and 0744 and 0746 make error ordering
+  deterministic. First errors, refusals and output bytes are otherwise
+  unchanged (every record carries its differential evidence). Exceptions:
+  0742's copied images (fresh framing, verified bytes); 0757's multi-string
+  sheets and previously unreadable names (now deterministic and readable).
+- **ADRs 0010, 0011, 0024 and crate boundaries.** Archive types stay in
+  `soapberry-zip`/`litchi-opc`; the boundary check passes with its eleven known
+  debt items.
+- **CFB (GOAL legacy rules, ADR 0026).** 0748 keeps every freshness re-check for
+  sources that can change. 0749 keeps every chain, overlap, FAT, MiniFAT and
+  directory check; its in-place comparison is proven equivalent on 11,980
+  fault cases, and it now fails closed.
+- **0652 trade-offs.** The breaking changes are declared in their records:
+  `LPCP0004`, `Error::StringTooLong`, `encode_ptg_tokens` returning `Result`,
+  a diagnostics enum and `BindingTracker` no longer `Sync`. No `unsafe` code or
+  new dependency was added, and no limit or malformed-input defence was
+  weakened.
+
 ## 0723 — rejected XLS target-frame checkpoint
 
 [0723](0723-xls-target-frame-chain-checkpoint.md) archives a private XLS index

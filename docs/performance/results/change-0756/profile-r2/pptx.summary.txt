@@ -1,0 +1,250 @@
+file=pptx.script.txt
+total_samples=46776 kept=37552 (80.3% of process samples)
+
+== leaf (self) categories, % of kept ==
+ 45.76%    17183  other:litchi-perf-baseline
+ 30.04%    11282  deflate(zlib-rs)
+ 10.23%     3842  memset
+  3.47%     1303  memcpy/memmove
+  2.29%      860  malloc/free
+  2.00%      751  hashing
+  1.62%      607  crc32
+  0.75%      281  other:u16, u8), &mut zlib_rs::deflate::sym_buf::{impl#0}::iter::{closure_env#0}>+0x21d4 (inlined
+  0.61%      229  other:libc.so.6
+  0.59%      220  sha256
+  0.46%      174  kernel
+  0.34%      129  other:soapberry_zip
+  0.25%       95  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0xe1 (inlined
+  0.19%       71  other:)), alloc::alloc::Global, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x155 (inlined
+  0.17%       62  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0xe1 (inlined
+  0.14%       52  other:__rustc
+  0.09%       32  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x23 (inlined
+  0.08%       30  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x23 (inlined
+  0.05%       20  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x83 (inlined
+  0.04%       15  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x1d (inlined
+  0.03%       12  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x12b (inlined
+  0.03%       12  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<str, alloc::string::String, ()>>+0x88 (inlined
+  0.03%       11  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x1d (inlined
+  0.03%       11  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x83 (inlined
+  0.03%       10  other:)), alloc::alloc::Global, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x169 (inlined
+  0.03%       10  other:), std::hash::random::RandomState, alloc::alloc::Global, str>+0x52 (inlined
+  0.02%        9  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x1 (inlined
+  0.02%        9  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x1 (inlined
+  0.02%        9  other:)), alloc::alloc::Global, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x15c (inlined
+  0.02%        9  other:)), alloc::alloc::Global, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x16f (inlined
+  0.02%        8  other:), core::iter::traits::iterator::Iterator::all::check::{closure_env#0}<char, fn(char) -> bool>, core::ops::control_flow::ControlFlow<(), ()>>+0x73 (inlined
+  0.02%        8  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x74 (inlined
+  0.02%        7  other:char)>+0x4e (inlined
+  0.02%        7  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<alloc::string::String, alloc::string::String, ()>, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x78 (inlined
+  0.02%        6  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<alloc::string::String, alloc::string::String, ()>, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x19c (inlined
+  0.02%        6  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0xba (inlined
+  0.02%        6  other:)), alloc::alloc::Global, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x184 (inlined
+  0.01%        5  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<alloc::string::String, alloc::string::String, ()>, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x88 (inlined
+  0.01%        5  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x11e (inlined
+  0.01%        5  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0xba (inlined
+  0.01%        4  other:), core::iter::traits::iterator::Iterator::all::check::{closure_env#0}<char, fn(char) -> bool>, core::ops::control_flow::ControlFlow<(), ()>>+0x85 (inlined
+  0.01%        4  other:char)>+0x52 (inlined
+  0.01%        4  other:)), alloc::alloc::Global, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x1a4 (inlined
+  0.01%        4  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<str, alloc::string::String, ()>>+0x90 (inlined
+  0.01%        4  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<alloc::string::String, alloc::string::String, ()>, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x14b (inlined
+  0.01%        4  other:), std::hash::random::RandomState, alloc::alloc::Global>+0x23 (inlined
+  0.01%        4  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x74 (inlined
+  0.01%        4  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x20 (inlined
+  0.01%        4  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x13 (inlined
+  0.01%        3  other:char)>+0x8c (inlined
+  0.01%        3  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<str, alloc::string::String, ()>>+0x59 (inlined
+  0.01%        3  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<str, alloc::string::String, ()>>+0x66 (inlined
+  0.01%        3  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0xf6 (inlined
+  0.01%        3  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x20 (inlined
+  0.01%        3  other:char)>+0x40 (inlined
+  0.01%        3  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x15 (inlined
+  0.01%        3  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<alloc::string::String, alloc::string::String, ()>, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x80 (inlined
+  0.01%        3  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0xf6 (inlined
+  0.01%        2  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0xa (inlined
+  0.01%        2  other:)>+0xcd (inlined
+  0.01%        2  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<str, alloc::string::String, ()>>+0x122 (inlined
+  0.01%        2  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<str, alloc::string::String, ()>>+0x113 (inlined
+  0.01%        2  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<alloc::string::String, alloc::string::String, ()>, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x92 (inlined
+  0.01%        2  other:))>+0x13a (inlined
+  0.01%        2  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x122 (inlined
+  0.01%        2  other:)), alloc::alloc::Global, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x179 (inlined
+  0.01%        2  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0xb7 (inlined
+  0.01%        2  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0xa1 (inlined
+  0.01%        2  other:char)>+0x67 (inlined
+  0.01%        2  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0xdd (inlined
+  0.01%        2  other:), core::iter::traits::iterator::Iterator::all::check::{closure_env#0}<char, fn(char) -> bool>, core::ops::control_flow::ControlFlow<(), ()>>+0x70 (inlined
+  0.01%        2  other:))>+0xa0 (inlined
+  0.01%        2  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0xb2 (inlined
+  0.01%        2  other:), core::iter::traits::iterator::Iterator::all::check::{closure_env#0}<char, fn(char) -> bool>, core::ops::control_flow::ControlFlow<(), ()>>+0x82 (inlined
+  0.01%        2  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<str, alloc::string::String, ()>>+0x98 (inlined
+  0.01%        2  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x9d (inlined
+  0.01%        2  other:)), alloc::alloc::Global, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x2b (inlined
+  0.01%        2  other:char)>+0x47 (inlined
+  0.01%        2  other:)), alloc::alloc::Global, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x1c0 (inlined
+  0.00%        1  other:)>+0xc9 (inlined
+  0.00%        1  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<str, alloc::string::String, ()>>+0x9e (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x12e (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x0 (inlined
+  0.00%        1  other:)), alloc::alloc::Global, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x110 (inlined
+  0.00%        1  other:char)>+0x64 (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x11e (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x141 (inlined
+  0.00%        1  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<str, alloc::string::String, ()>>+0x62 (inlined
+  0.00%        1  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<alloc::string::String, alloc::string::String, ()>, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x44 (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0xa8 (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x122 (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x1 (inlined
+  0.00%        1  other:)), alloc::alloc::Global>+0x1d2 (inlined
+  0.00%        1  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<alloc::string::String, alloc::string::String, ()>, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x13c (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x21 (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0xdc (inlined
+  0.00%        1  other:)), alloc::alloc::Global, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x1c5 (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x2d (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0xb (inlined
+  0.00%        1  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<str, alloc::string::String, ()>>+0x82 (inlined
+  0.00%        1  other:))>+0x1e4 (inlined
+  0.00%        1  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<str, alloc::string::String, ()>>+0xa6 (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x0 (inlined
+  0.00%        1  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<alloc::string::String, alloc::string::String, ()>, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x6f (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x15 (inlined
+  0.00%        1  other:)), alloc::alloc::Global, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x158 (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x12e (inlined
+  0.00%        1  other:))>+0x54 (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::all::check::{closure_env#0}<char, fn(char) -> bool>, core::ops::control_flow::ControlFlow<(), ()>>+0x87 (inlined
+  0.00%        1  other:)), alloc::alloc::Global, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x17f (inlined
+  0.00%        1  other:)), alloc::alloc::Global>+0x1bd (inlined
+  0.00%        1  other:)), alloc::alloc::Global>+0x1db (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x2d (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0xb2 (inlined
+  0.00%        1  other:)), alloc::alloc::Global, hashbrown::map::equivalent_key::{closure_env#0}<alloc::string::String, alloc::string::String, ()>, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x14e (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<char, litchi_opc::packuri::{impl#0}::new::{closure_env#0}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0x13 (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<&str>>, core::ops::control_flow::ControlFlow<(), ()>>+0xdc (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0xa1 (inlined
+  0.00%        1  other:)), alloc::alloc::Global>+0x1c6 (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0x12b (inlined
+  0.00%        1  other:), core::iter::traits::iterator::Iterator::any::check::{closure_env#0}<&str, litchi_opc::packuri::{impl#0}::new::{closure_env#1}<alloc::string::String>>, core::ops::control_flow::ControlFlow<(), ()>>+0xe5 (inlined
+  0.00%        1  other:)), alloc::alloc::Global, hashbrown::map::make_hasher::{closure_env#0}<alloc::string::String, (), std::hash::random::RandomState>>+0x16d (inlined
+  0.00%        1  other:))>+0xb8 (inlined
+
+== inclusive components, % of kept ==
+ 67.80%    25459  deflate(all)
+  6.72%     2523  deflate_reset
+ 50.12%    18820  sync_flush
+  2.16%      813  finish_to(Z_FINISH)
+  3.49%     1309  crc32
+  1.58%      592  sha256(sink)
+  6.59%     2474  part_name_policy
+  6.35%     2386  packuri_new
+ 15.79%     5929  start_part
+  0.56%      209  part.finish
+  1.28%      480  zip_name_policy
+ 55.57%    20867  central_dir
+  4.02%     1511  hashing
+ 10.25%     3850  memset
+  3.48%     1306  memcpy
+  2.59%      974  malloc
+  1.59%      597  text_gen
+
+== top 50 leaf details ==
+ 18.25%  deflate(zlib-rs)   zlib_rs::deflate::Heap::pqdownheap @ zlib_rs::deflate::Heap::pqdownheap
+ 10.23%  memset             __memset_avx512_unaligned_erms @ __memset_avx512_unaligned_erms
+  3.97%  other:litchi-perf-baseline quick_insert_value @ main
+  3.76%  deflate(zlib-rs)   deflate_medium @ main
+  3.47%  memcpy/memmove     __memmove_avx512_unaligned_erms @ __memmove_avx512_unaligned_erms
+  3.38%  deflate(zlib-rs)   send_bits @ main
+  2.40%  deflate(zlib-rs)   longest_match_help<false> @ main
+  2.22%  other:litchi-perf-baseline send_tree @ main
+  1.87%  other:litchi-perf-baseline split_at_checked<u8> @ main
+  1.71%  other:litchi-perf-baseline is_match<8> @ main
+  1.60%  other:litchi-perf-baseline insert_string @ main
+  1.51%  other:litchi-perf-baseline gen_bitlen<573> @ main
+  1.50%  other:litchi-perf-baseline scan_tree @ main
+  1.39%  other:litchi-perf-baseline swap_chunk<8> @ main
+  1.23%  crc32              update_slow @ main
+  1.21%  other:litchi-perf-baseline gen_codes @ main
+  1.18%  hashing            write<core::hash::sip::Sip13Rounds> @ main
+  1.08%  deflate(zlib-rs)   fill_window @ main
+  1.07%  other:litchi-perf-baseline branch<litchi_perf_baseline::PreparedSinkWrite, std::io::error::Error> @ main
+  1.03%  other:litchi-perf-baseline eq<u8> @ main
+  0.99%  other:litchi-perf-baseline construct_huffman_tree @ main
+  0.83%  other:litchi-perf-baseline reverse_bits @ main
+  0.79%  other:litchi-perf-baseline push_lit @ main
+  0.75%  other:u16, u8), &mut zlib_rs::deflate::sym_buf::{impl#0}::iter::{closure_env#0}>+0x21d4 (inlined {closure#0} @ map<&[u8],
+  0.71%  other:litchi-perf-baseline index<u8> @ main
+  0.71%  other:litchi-perf-baseline initialize @ main
+  0.62%  other:litchi-perf-baseline is_empty<usize> @ main
+  0.61%  other:libc.so.6    __memcmp_evex_movbe @ __memcmp_evex_movbe
+  0.57%  other:litchi-perf-baseline try_owned_string @ main
+  0.56%  other:litchi-perf-baseline pqremove @ main
+  0.55%  hashing            write<core::hash::sip::Sip13Rounds> @ reserve_rehash<(alloc::string::String,
+  0.54%  malloc/free        __libc_free @ main
+  0.54%  other:litchi-perf-baseline next<u8> @ main
+  0.51%  other:litchi-perf-baseline tally_lit_help @ main
+  0.51%  other:litchi-perf-baseline compress @ main
+  0.49%  other:litchi-perf-baseline len<u8> @ main
+  0.48%  malloc/free        _int_malloc @ _int_malloc
+  0.46%  kernel             kernel
+  0.44%  deflate(zlib-rs)   longest_match @ main
+  0.44%  other:litchi-perf-baseline _mm_add_epi32 @ main
+  0.42%  other:litchi-perf-baseline map_err<litchi_opc::phys_pkg::PhysPkgWriter<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>, litchi_opc::error::OpcError, litchi_p
+  0.41%  other:litchi-perf-baseline init_block @ main
+  0.40%  other:litchi-perf-baseline copy_nonoverlapping<u8> @ main
+  0.36%  other:litchi-perf-baseline gen_bitlen<39> @ main
+  0.34%  crc32              update_fast_16 @ main
+  0.33%  other:litchi-perf-baseline replace<core::option::Option<soapberry_zip::office::StreamingArchiveEntry<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>>> @ main
+  0.31%  other:soapberry_zip init_block @ soapberry_zip::writer::ReusableDeflateState::begin_member
+  0.30%  other:litchi-perf-baseline next_code_point<core::slice::iter::Iter<u8>> @ main
+  0.29%  other:litchi-perf-baseline validate_percent_encoding @ main
+  0.28%  sha256             _mm_sha256msg1_epu32 @ main
+
+== top 50 inclusive frames (below root) ==
+ 93.37%  finish_pptx_stream<litchi_perf_baseline::HashingDiscardSink>
+ 77.98%  branch<litchi_pptx::writer::streaming::StreamingPresentationWriter<litchi_perf_baseline::HashingDiscardSink>, litchi_pptx::error::Error>
+ 73.08%  finish<litchi_perf_baseline::HashingDiscardSink>
+ 67.18%  compress
+ 65.94%  compress_once
+ 65.55%  map_err<flate2::mem::Status, flate2::mem::CompressError, std::io::error::Error, soapberry_zip::writer::{impl#18}::compress_once::{closure_env#0}>
+ 65.03%  compress_uninit
+ 65.03%  from
+ 64.92%  into<zlib_rs::ReturnCode, core::result::Result<zlib_rs::stable::Status, zlib_rs::stable::DeflateError>>
+ 64.77%  deflate
+ 64.07%  deflate_medium
+ 56.88%  map_err<litchi_opc::phys_pkg::PhysPkgWriter<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>, litchi_opc::error::OpcError, litchi_pptx::error::Error, f
+ 56.38%  finish<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>
+ 55.57%  finish_with_progress<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>
+ 54.77%  map_err<(soapberry_zip::office::StreamingArchiveWriter<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>, soapberry_zip::office::StreamingArchiveProgres
+ 54.15%  finish<soapberry_zip::office::BoundedOutput<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>>
+ 50.12%  flush_to<soapberry_zip::writer::OwnedCompressedEntry<soapberry_zip::office::BoundedOutput<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>>>
+ 50.12%  flush<soapberry_zip::office::BoundedOutput<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>>
+ 50.12%  flush<soapberry_zip::writer::OwnedCompressor<soapberry_zip::office::BoundedOutput<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>>>
+ 50.12%  finish<soapberry_zip::writer::OwnedCompressor<soapberry_zip::office::BoundedOutput<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>>>
+ 42.42%  flush_block_only
+ 42.35%  zng_tr_flush_block
+ 22.61%  write<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>
+ 22.31%  write<soapberry_zip::office::BoundedOutput<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>>
+ 21.39%  build_tree<573>
+ 19.78%  write_part_bytes<litchi_perf_baseline::HashingDiscardSink>
+ 19.63%  write_all<litchi_opc::phys_pkg::PartWriter<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>>
+ 19.14%  write<soapberry_zip::writer::OwnedCompressor<soapberry_zip::office::BoundedOutput<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>>>
+ 18.64%  construct_huffman_tree
+ 18.32%  zlib_rs::deflate::Heap::pqdownheap
+ 17.78%  gen_bitlen<573>
+ 17.58%  branch<(flate2::mem::Status, usize, usize), std::io::error::Error>
+ 17.15%  branch<(), litchi_pptx::error::Error>
+ 15.99%  map_err<litchi_opc::phys_pkg::PartWriter<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>, litchi_opc::error::OpcError, litchi_pptx::error::Error, fn(l
+ 15.79%  start_part_inner<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>
+ 15.44%  write_to<soapberry_zip::writer::OwnedCompressedEntry<soapberry_zip::office::BoundedOutput<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>>>
+ 11.11%  branch<litchi_pptx::writer::streaming::StreamingSlideWriter<litchi_perf_baseline::HashingDiscardSink>, litchi_pptx::error::Error>
+ 10.81%  start_slide<litchi_perf_baseline::HashingDiscardSink>
+ 10.58%  map_err<soapberry_zip::office::StreamingArchiveEntry<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>, soapberry_zip::office::StreamingArchiveFailure, 
+ 10.35%  start_entry<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>
+ 10.25%  __memset_avx512_unaligned_erms
+  8.93%  write_fragment<litchi_perf_baseline::HashingDiscardSink>
+  8.89%  write_text_box<litchi_perf_baseline::HashingDiscardSink>
+  8.69%  map<soapberry_zip::writer::ZipOwnedEntryWriter<soapberry_zip::office::BoundedOutput<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>>, soapberry_zip::e
+  8.44%  start_file_owned<soapberry_zip::office::BoundedOutput<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>>
+  8.33%  write_text_shape<litchi_perf_baseline::HashingDiscardSink>
+  7.89%  start_file_owned_with_options<soapberry_zip::office::BoundedOutput<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>>
+  6.73%  take_reusable_deflate<soapberry_zip::office::BoundedOutput<litchi_pptx::writer::streaming::BudgetedSink<litchi_perf_baseline::HashingDiscardSink>>>
+  6.72%  soapberry_zip::writer::ReusableDeflateState::begin_member
+  6.69%  compress_block_help

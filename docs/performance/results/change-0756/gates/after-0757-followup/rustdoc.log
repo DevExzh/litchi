@@ -1,0 +1,8 @@
+HEAD db07e4d53fd287b56d8c84d24a5a04fc91596f60
+$ cargo doc -p litchi-core -p soapberry-zip -p litchi-cfb -p litchi-ole-common -p litchi-opc -p litchi-ooxml-common -p litchi-doc -p litchi-docx -p litchi-ppt -p litchi-pptx -p litchi-xls -p litchi-xlsx -p litchi-xlsb -p xml-minifier --no-deps --locked
+ Documenting litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+ Documenting litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.56s
+   Generated /home/zhuhe/code/litchi-worktrees/targets/integ-main/doc/litchi_cfb/index.html and 13 other files
+
+exit 0

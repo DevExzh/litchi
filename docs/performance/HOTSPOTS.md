@@ -1,5 +1,343 @@
 # Performance hotspot inventory
 
+## 0756 — the OLE2/OOXML wave of 2026-09-22/23 integrated; the next hotspots
+
+[0756](0756-ole2-ooxml-wave-integration.md) integrates records 0742–0755 and
+0757. A descriptive before/after sweep of the wave (base `009d515bef`, tip
+`ddf788eb80`) gives per-format geometric means of 0.675 (DOCX), 0.813 (PPTX),
+0.551 (XLSX), 0.864 (DOC), 0.813 (PPT) and 0.502 (XLS). What leads now:
+- XLSX commit+save is 60% deflate and 12.6% audit;
+- PPTX per-capture notes-graph validation;
+- DOCX's remaining full source audit at commit;
+- XLS per-string UTF-16 temporaries;
+- DOC fresh-write CFB zero-fill;
+- PPTX streaming per-member deflate;
+- incompressible `opc_mutated_save` (not yet profiled).
+
+Six owner decisions are pending, including proposed ADR 0032. The program goal
+remains open. [Evidence](results/change-0756/README.md).
+
+## 0757 — The fresh XLS writer's shared-string order is a function of the cells, and its SST, formula, number-format, sheet-name and defined-name fields refuse what they cannot hold
+
+[0757](0757-xls-fresh-writer-sst-determinism.md) closes the two findings 0753
+left open. The SST now lists each string at its first occurrence in worksheet,
+row and column order (the order of the cell records), found by sorting each
+worksheet's string cells by one packed `row << 16 | column` key; the keyed
+SipHash map only deduplicates. These fields refuse what BIFF8 cannot hold with
+`Error::StringTooLong` before any output — when the string is given to the
+writer, not when the workbook is written: SST entries (65,535 UTF-16 units; the
+old cut through a surrogate pair made litchi's reader refuse the workbook),
+formula string constants (255), number formats (1–255; 70,000 units used to
+overflow a `u16`, and an empty one was written and refused on open), worksheet
+names (31, now counted in UTF-16 units) and defined names and their comments
+(255, now encoded correctly for Latin-1 and supplementary characters);
+data-validation strings with Latin-1 characters no longer make the worksheet
+unreadable. Cost, on a `write_to`-only probe of 80,000 string cells:
++11.4–15.2% instructions and 0.4–12.2% wall time depending on glibc heap state;
+the harness's numeric and single-string shapes are within noise in
+instructions, with `xls_fresh_write_to/large` 1.05–1.08 in wall time from a
+heap-trim effect (0.983 with malloc thresholds pinned). Found, not fixed (with
+the review): internal hyperlinks and AutoFilter strings are written with the
+wrong length for non-ASCII text and litchi's reader then drops them (with the
+worksheet's cells, for hyperlinks); font names are cut to 31 units; fonts added
+through `add_cell_style` get the invalid index 4; forbidden sheet-name
+characters make the reader refuse the workbook; more than 210 custom number
+formats make the reader refuse it; PivotTable writers count characters instead
+of UTF-16 units; XFEXT/STYLEEXT/CRN lengths may wrap. Left: the table and the
+emission sort a string worksheet's cells twice (sharing one sort costs +7.5%
+peak on the probe). A multi-string XLS harness selector would now measure the
+SST path.
+
+---
+
+## 0755 — a nested empty text run panicked `set_shape_text`
+
+[0755](0755-pptx-nested-text-run-panic.md) is a correctness fix found by change 0743's review, not a performance change. An empty `a:t` inside an open `a:t` passed the scene reader, which refused only a nested start tag, and the opened text-run locator recorded it as a span starting inside its parent's span; `set_shape_text` then sliced the slide with a reversed range and, with `panic = "abort"`, killed the process. The scene reader and the locator now refuse any nested `a:t` with the typed error semantic text already used, the rewrite checks its spans before emitting, and every slice the opened edit path takes from span data goes through a checked helper. It costs nothing measurable (instructions within ±0.05% on every semantic PPTX region). Open follow-up: quick-xml does not count a skipped UTF-8 byte-order mark in `buffer_position`, so every span of a BOM-prefixed part is three bytes early and its text edits are refused (never corrupted); the fix belongs in the crate's position helpers. [Evidence](results/change-0755/README.md).
+
+## 0754 — the DOCX semantic edit and full-text paths without their three largest avoidable costs
+
+[0754](0754-docx-semantic-edit-and-text-path.md) removes what profile r2
+attributed on the ordinary DOCX semantic routes. The layout scan behind
+`edit_document` is also every snapshot's admission check, so it stays eager and
+was made cheaper instead: a plain `Reader` with the shared binding tracker,
+borrowed events, and namespace resolution only where a verdict reads it
+(69.9 M → 33.8 M instructions and 70,040 → 31 allocations per scan of the
+1 MB large main part; 65% of what remains is quick-xml's tokenizer). A
+one-paragraph edit's commit answers its source gate with 0747's pair audit and
+hands the proven candidate to the eager writer as an
+`xml_minifier::audit::VerifiedSource` bound to the exact allocation, so the main
+part is audited completely once instead of twice (100.7 M → 52.3 M audit
+instructions per edit); for such a proven part the publication rests on the
+pair audit and the proof's binding to the written allocation, and the writer
+audits every byte no proof covers. The namespace tracker caches recent
+prefixes, keeps a default-namespace stack, and past 64 bindings of any kind
+builds an ordered prefix index lazily, which also removes a pre-existing
+quadratic case (a 1 MB part with ~30,600 in-scope declarations: 437 ms →
+14 ms per `Document::text`; review witnesses filling the scope with default
+declarations: 178 ms → 2 ms). The review also found a pre-existing OPC gap,
+fixed separately: the owned-source preservation route regenerated a member
+from `blob_arc` while the plan audited `blob`; every route now audits and
+writes one captured allocation. Remaining: the commit's one
+complete source audit (~2 ms on this part), multi-window proofs for scattered
+edits (the one-percent route still audits its candidate completely), the
+source-backed route's own gate-plus-original duplicate that 0750 noted, and
+the text copy helpers' byte-by-byte scans.
+
+## 0753 — The legacy fresh writers encode each text once into its final buffer and hash each shared string once
+
+[0753](0753-legacy-fresh-writer-text-paths.md) removes the three fresh-writer
+costs profile r2 priced. The DOC writer counted, walked and appended every
+character separately (three passes, 60% of `doc_fresh_write_to`): it now counts
+UTF-16 units without decoding, widens ASCII through a `TrustedLen` iterator,
+walks characters for field CPs only when a vectorized byte scan finds one, and
+writes the text once, straight after the FIB placeholder in a stream reserved
+from the model, instead of growing a separate buffer and copying it twice. The
+PPT writer re-counted ASCII text as UTF-16 and copied each text byte about
+fifteen times through record builders; its text box, shape, drawing and slide
+records are now written in place into the document stream. The XLS writer
+hashed each shared string three times plus once per map resize and cloned it
+twice; a per-write table now borrows the strings, caches each keyed SipHash-1-3
+once and records every cell's index. Output is byte-identical (base-captured
+goldens, a differential SST test and an in-process order test). Paired ABBA on
+CPU 8, payload-heavy: DOC 0.286, PPT 0.191, XLS 0.374 of base time; large: DOC
+0.787, PPT 0.527; instructions per write fall to 0.091, 0.160 and 0.425.
+Remaining: DOC is now mostly the CFB writer's destination `memset` (37%) and
+first-touch page faults of output-sized buffers; PPT clones each text into
+`UserShapeData` (15% with the conversion); XLS pays one keyed SipHash per string
+cell (27%). Found, not fixed: the fresh XLS SST order follows a per-process
+`HashMap` seed for sheets with several distinct strings.
+
+---
+
+## 0752 — per-tiny-write CRC-32 and budget handles in the streaming writers
+
+[0752](0752-streaming-writer-small-write-batching.md) removes the streaming
+writers' per-write costs that exact semantics allow. Owned ZIP entries stage
+short writes for a one-pass CRC-32: the harness lock's crc32fast 1.5.0 took a
+table lookup per byte for every DOCX write, since all are shorter than its
+128-byte SIMD threshold. Budget charging walks the parent chain by reference,
+a `Reservation` holds one handle, and the new borrowed `ScopedReservation`
+holds none. DOCX escaping copies plain runs whole with the old 64-byte chunk
+boundaries. Large DOCX creation falls 46.7% (91.5 → 48.6 ms). XLSX and PPTX
+creation improve 1–3%: Deflate dominates them. Disproven: coalescing
+compressor input is not byte-transparent for zlib-rs 0.6.7 (seven re-splits of
+the DOCX payload give seven different valid streams), so it stays out. It
+would save about 10 ms of the DOCX iteration at the cost of new output bytes.
+The remaining DOCX hotspot is its seven one-atomic `consume` charges per
+paragraph (26% of samples), which only a semantic decision can reduce.
+
+## 0751 — owned cross-copy application stops re-hashing proven bytes
+
+[0751](0751-pptx-cross-copy-apply-digest-reuse.md) removes four of the five
+SHA-256 passes that 0742 left in the owned cross-copy's commit phase, and one
+pass from planning. The two live revisions are answered from the facades'
+payload-digest memos and from a SHA-256 that `litchi-opc` now binds to each
+retained owned archive. The two candidate captures consult the snapshots'
+memos and each other's. The plan's retained archive is shared instead of
+copied; its digest is still recomputed at application, as 0646's G5 requires.
+
+On the media-rich pair, with both legs built by the same command:
+
+- commit: 88.9 → 25.8 ms;
+- planning: 67.0 → 55.3 ms;
+- lifecycle median p50: 184.2 → 109.8 ms (paired 0.61), and 0.565 at equal
+  page faults.
+
+What remains in commit is that one digest (59.5%) and the shared reopen
+(25.5%). Planning keeps the first hash of each archive and the candidate
+serialization digest.
+
+## 0750 — the source XML audit's well-formedness checks and their cost
+
+[0750](0750-xml-audit-well-formedness-gaps.md) is a correctness change, but it
+moves a hot path: every `verify_source` / `verify_source_replacement` now also
+checks legal characters (one branch-free pass in 64-byte blocks), names,
+references, `]]>`, comments, PI targets, the XML declaration and Namespaces in
+XML 1.0. On real parts a source audit executes 14–24% more instructions and
+takes 8–18% more time (timed on the first candidate; 7,213 accepted `test-data`
+members: 385 → 340 MB/s), plus about 200 ns fixed per audit. Every new check is
+linear in the input in expectation. The review-found expanded-name path, which
+read ancestors' namespace names on every tag (180 s on one 14.8 MB input), now
+compares name identities (0.038 s). Re-measured on the fix, the DOCX one-edit
+save is +2.67% (CI [+2.15%, +3.90%], +43 µs): it audits its main document
+completely twice per commit, so it pays the new checks in full. Those two audits
+are `litchi-docx`'s `publication_accepts_preserved_xml` gate in `Edit::commit`
+and the original half of `litchi-opc`'s replacement pair, which on a first edit
+are the same bytes. Carrying the gate's verdict into the pair would remove one
+complete audit per DOCX commit and is the next opportunity here. The XLSX
+dense-sparse one-edit save is +1.91% (about 210 µs of audit, the rest planning
+code this change does not touch). The character pass's byte-by-byte tail is
+about half of the fixed cost.
+
+## 0749 — Reuse-plan validation compares streams in place
+
+[0749](0749-cfb-reuse-plan-validation.md) removes the copying half of the
+CFB Reuse-plan validation that 0733 put at 51% of the PPT finish's CFB write.
+`ReusePlan::validate` keeps its structural reparse of the planned view. Its
+stream readback no longer materializes each stream through `open_stream`. A
+`StreamComparer` bound to the reparsed view performs `open_stream`'s
+traversal, with its checks and errors, loading the root mini stream once as
+`open_stream` does. It compares each physical range where it lies, and a
+correctly placed payload run compares by identity.
+
+The first version was quadratic in mini streams (review: 3,000 mini streams,
+8.2 → 114 ms); the review round made the readback linear (×3.07 Callgrind
+instructions from 1,000 to 3,000 streams). On 45543.ppt, validation fell
+from 732.5 K to 163.4 K Ir per write.
+
+What remains:
+
+- The unchanged reparse's per-stream table-sized map clearing (A5,
+  `prepare_visited`) is now the one super-linear term, and it runs on every
+  `OleFile::open`.
+- Planning is the largest phase of the CFB-only write.
+- The common editor still grows its output `Vec` from empty.
+
+OLE2 lifecycle timings on this host move with glibc's heap-trim and mmap
+thresholds; fixing both at 256 MiB removes the page-fault differences. The
+non-iWork goal remains active.
+
+## 0748 — sealed owned CFB overlay plans hash their artifact once
+
+[0748](0748-cfb-overlay-fingerprint-reuse.md) removes the SHA-256 passes that
+0746 priced at about 42% of the XLS generic commit and 0745 listed as a
+follow-up. A CFB same-length overlay plan re-hashed the whole artifact (source
+and target) at the composed-view preflight, around and during every write, and
+twice at planning for a generic source, to prove digests that cannot change
+when the source is an owned immutable allocation. A plan over sealed owned
+bytes (`open_owned`, new `open_owned_vec`) now computes both digests once, at
+planning; generic `ReadAt` sources keep every pass. `render_copy_through` (the
+object editor's copy-through, which opened its immutable original generically:
+six passes per render) and the XLS visibility source-backed commit now open
+sealed. On this base the XLS generic commit goes from 24 whole-artifact digests
+to 4: `54016.xls` commit 23.68 → 14.26 ms (0.600), `xls_semantic_one_edit_save`
+3.38 → 1.80 ms (0.533), `xls_visibility_eager_edit_save` 25.3 → 5.47 ms
+(0.216), `xls_numeric_eager_rk_mulrk_edit_save` 0.213,
+`xls_numeric_source_backed_number_edit_save` 0.391, plan-only publication
+0.045; generic, DOC, PPT and gated controls are flat with identical
+instructions. Remaining: the one planning pass (the target digest could fork
+from the source hasher at the first changed byte, a median 35–50% into real
+edits); DOC's owned opens are still generic.
+
+---
+
+## 0747 — replaced-Part replacement audit proved from its original's audit
+
+[0747](0747-xlsx-publication-audit-reuse.md) retires the duplicate half of the
+source-backed publication's XML audit pair. For a local edit the replacement
+repeats the original byte for byte outside one element, and the replacement's
+`verify_source` re-scanned those bytes moments after the original's audit had
+accepted them in the same parser state. The measured one-cell worksheet pair
+differs in one byte of 63,294 / 462,568. `xml_minifier::audit::verify_source_replacement`
+keeps the pair's exact verdict and error. It rescans only the replaced
+element's new bytes from the original's state, with every budget re-totalled,
+and falls back to the complete scan on any doubt. The one-cell edit/save's audit
+instructions fall 47.6% / 47.8%, publication time 15.5%, and the whole
+operation 6.63% / 6.32% (medium / dense-sparse). The original-bytes audit
+remains a complete scan: planning does not subsume it (six witnesses). Fusing
+it into planning's traversal is the next opportunity, bounded by the tokenizer
+at about 3%. Multi-edit commits need writer-declared windows, since 0705's audit
+share of one-percent publication is unchanged.
+
+## 0746 — XLS edit owners validate through a validation-only mode of the complete reader; their generic commits stop rendering twice
+
+[0746](0746-xls-validation-only-parse.md) removes the last big item change
+[0633](0633-xls-commit-single-framing.md) named for the XLS edit path: every
+`cell_values`, comments and sheet-visibility owner opened the complete eager
+`Workbook::new` only to validate and read a few facts, building and dropping a
+per-cell `BTreeMap` with cloned strings (85% of `Snapshot::from_bytes` on
+`54016.xls`). The worksheet walk is now generic over a `CellStore`; the
+validation-only store answers the two questions the checks ask of earlier cells
+(occupied? latest a `Formula`?) from an occupancy map of 64 bytes per occupied
+row and decodes only the cells a readback keeps, so every record is still
+validated by the same code in the same order. The generic commits also publish
+the rendering `put_stream_shared` had already validated instead of rendering
+again (0730's handoff), which was 49% of the `cell_values` generic commit.
+Reviewed build: instructions fall 43.9–51.0% on every open and commit touched
+(37.0% / 41.0% on `commit_source_backed`), allocations 26–68%, peak live bytes
+44–83%; the public reader is unchanged to the instruction. The review found that
+the first occupancy map (256-row bands, 16 KiB each) made a crafted sparse
+workbook, one cell per band, slower than the base; the final map is proportional
+to occupied rows, and in one window the final source runs that shape at
+0.433–0.453× the base, the `54016.xls` open at 10.46 → 4.87 ms (0.465) and the
+generic commit at 23.24 → 10.12 ms (0.436), at 4.1–9.6% more allocated bytes
+than the banded map on `54016.xls`. Wall clock of this lean walk varies with
+build layout and host state (one binary's cycles per `54016.xls` open measured
+29.99 M and 21.98 M four minutes apart, instructions unchanged); instructions
+and allocations are the stable evidence.
+Remaining: five SHA-256 overlay fingerprint passes are ~42% of the generic
+commit; the measure-only record path would remove a store-forwarding stall.
+
+---
+
+## 0745 — PPT slide-order digests deferred; editor opens read owned streams once
+
+[0745](0745-ppt-lazy-artifact-digests.md) moves the two whole-artifact SHA-256
+digests out of PPT slide-order commit into `Patch::to_durable`. They are
+memoized per snapshot, computed from exactly the retained bytes, and the
+durable bytes are unchanged (pinned goldens from the base). Only a mixed
+formatting-then-structural commit still hashes once, because it binds an
+intermediate artifact that the patch does not retain. Two further duplicates
+are removed:
+
+- PPT editor opens no longer read the Document and Current User streams twice.
+- Commit reuses its publishing editor for the before-payload capture.
+
+Remaining PPT lifecycle cost is editor opens, finish and reopen. The editor
+that `edit()` discards is a validation and is kept. Next candidates found:
+`litchi-ole-common` `render_copy_through` opens in-memory sources generically,
+so the CFB overlay hashes source and target on several passes. PPT timings on
+this host swing up to about ±15% with the early heap layout, which the
+length of argv[0] shifts through each binary's own `std::env::args()` copy.
+Page faults vary with it, and the glibc mechanism is inferred, not tested.
+Randomize that layout in paired measurements. The non-iWork goal remains active.
+
+## 0744 — eager XLSX sheetData lane and dense reduced readback
+
+[0744](0744-xlsx-eager-workbook-cell-path.md) removes the eager `Workbook`'s
+repeated generic XML work on dense sheets. Base profiles showed four of six
+complete passes over the touched sheet (base parse, edit scan, compaction,
+verification parse; 68% of one-cell commit+save) spent in namespace-resolving
+reader machinery over benign `row`/`c`/`v` markup. A strict `<sheetData>`
+recognizer replays the reader's exact events into all three passes and declines
+everything else; dense value edits above the handoff bound verify through
+0525's reduced readback. Against a same-command before leg on CPU 12, dense-wide
+first cell falls 71.91% (27.87 → 7.82 ms) and one-cell commit+save 59.53%
+(149.2 → 60.5 ms); outputs are byte-identical. Deflate (60%) and the publication
+audit (12.6%) now dominate; inline strings, Excel MCE/x14ac pre-passes and
+per-row scanner slots remain. Review fixes make the reduced-readback admission
+exact (worksheet's own SpreadsheetML body, 16 MiB bound, 0525's collision
+refusal); re-measured one-cell −59.79%. `performance_claim: none`;
+[evidence](results/change-0744/README.md).
+
+## 0743 — the PPTX semantic read and edit paths stop re-reading bytes they already validated
+
+[0743](0743-pptx-semantic-text-and-edit-path.md) profiled the timed regions of the five `pptx_semantic_*` cases on the 100-slide × 100-text-box deck and found the work was repeated, not superlinear. Capture was 88% the notes-graph root scan of every slide, which allocated an owned string for every namespace, name and attribute value; every commit captures the staged package again; full text ran two complete namespace-aware passes over each marker-free slide; `set_shape_text` owned every scene event and cloned the namespace resolver per event, split each qualified name about twenty times, and ran a raw offset pass the scene's own read already proves; and commit compaction re-read scenes its verbs had just read. Eight retained commits in `litchi-pptx` remove that work: a borrowed notes scan, a single-pass semantic text route that keeps raw-scan refusals ahead of semantic ones, borrowed scene and locator events, a scene-proved raw-span route for unmarked slides, and identity-checked compaction shortcuts. Harness p50, both legs built by one command from equal-length paths, 8 paired processes per arm on core 8: large full text 50.69 → 27.14 ms (−46.5%), one-percent edit/save 269.6 → 144.7 ms (−46.0%), one-edit 55.57 → 44.55 ms (−18.7%), no-op 27.93 → 23.17 ms (−16.4%); medium −42.6%, −12.3%, −12.3%, −5.1%; per-operation instructions agree (−45.7%, −46.8%, −18.8%, −16.9%); the DOCX control and the unchanged open path stay inside their A/A floors with identical instruction counts. Published bytes, revisions and text are identical; allocation calls fall 49–89%. The largest remaining item is the commit's recapture, which rescans every untouched slide: a snapshot memo of proved slide-root classifications removed it (one-edit commit 21.4 → 2.1 ms in a probe) but is withdrawn because ADR 0005's amendment admits digest memos only, and is proposed as ADR 0032. After it: one complete notes-root validation scan of every slide per capture (quick-xml's namespace push and prefix resolution dominate it), SHA-256 of every payload, and publication's audit and deflate of changed slides. [Evidence](results/change-0743/README.md).
+
+## 0742 — owned cross-copy stops re-deflating copied images
+
+[0742](0742-pptx-owned-cross-copy-media-transfer.md) removes the generated-entry
+Deflate that 0740 located under owned cross-copy planning. Eligible copied
+image members (relationship-free, non-XML `image/*`, with a provable Store or
+Deflate layout and a bounded compressed size) are framed from the source
+member's verified compressed bytes. The decision depends only on the bytes the
+source publishes.
+
+On the media-rich pair, with both legs built by the same command:
+
+- the lifecycle median p50 moves 410.1 → 183.0 ms (paired ratio 0.444);
+- planning moves 292.6 → 65.7 ms.
+
+What remains is bound by SHA-256. Commit (about 89 ms) is 80% SHA-256, in five
+passes of about 16% each:
+
+- the live semantic re-fingerprints;
+- the live physical re-fingerprints;
+- the retained-archive digest;
+- two semantic captures of the same reopened candidate.
+
+Reusing proven digests there is the next opportunity; it is not implemented.
+
 ## 0740 — diagnostic native cross-copy planning attribution
 
 [0740](0740-pptx-cross-copy-native-profile.md) preserves unchanged production and

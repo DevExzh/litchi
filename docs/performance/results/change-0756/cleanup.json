@@ -1,0 +1,31 @@
+{
+  "change": "0756",
+  "recorded": "2026-09-23",
+  "removed_by_coordinator": [
+    {"path": "/tmp/claude-1001/-home-zhuhe-code-litchi/<six earlier session scratchpads>", "size": "~5.8G", "what": "RAM-backed scratchpads left by earlier coordinator sessions (records 0587-0664 era), removed at wave start"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets (0661-0670 era)", "size": "71G", "what": "obsolete before/after build dirs of committed records, removed at wave start"},
+    {"path": "/home/zhuhe/code/litchi/target/debug/incremental", "size": "93G", "what": "stale incremental caches in the main checkout's build dir (rebuildable), removed mid-wave to keep implementer test builds from exhausting the disk"},
+    {"path": "/home/zhuhe/code/litchi/target/debug/examples", "size": "195G", "what": "stale example binaries in the main checkout's build dir (rebuildable), removed mid-wave for the same reason"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/{0743*,0749,0749-before}", "size": "~119G", "what": "build dirs of implementers that stalled at their final cleanup step; the coordinator committed their pending records first"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/scratch/{0743,0748,0749}", "size": "~4G", "what": "scratch of the same stalled implementers"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/0757-xls-fresh-writer-sst-determinism", "size": "9.9G", "what": "last implementer worktree, after its branch was cherry-picked"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/base-009d515bef", "size": "9.8G", "what": "shared read-only base checkout for before legs"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/integ-main", "size": "126G", "what": "coordinator integration build dir (final gate run)"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/base-009d515bef", "size": "1.0G", "what": "prebuilt base harness binary used by the opening sweep and the wave sweep (SHA-256 fb535ebb4abb4154c4ac445b90a60399edf189d52cae76fea2947852a406cb0b)"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/scratch", "size": "14M", "what": "briefing, profile data, sweep deliverables and gate logs, after copying the cited evidence into this packet"},
+    {"path": "/home/zhuhe/code/litchi-worktrees", "size": "empty", "what": "the wave's worktree root"},
+    {"path": "session scratchpad sweep/", "size": "~1M", "what": "the opening sweep's JSON, gzipped into base-sweep/ first"}
+  ],
+  "removed_by_agents": "Each implementing record's results/change-07xx/cleanup.json lists its own target dirs, before-src worktrees and scratch; each reviewer and tester deleted its own target dir and scratch (review-07xx, integ-1, integ-2, sweep-0756, profile-r2).",
+  "kept": [
+    "branches perf/0742-* ... perf/0757-* (implementing history; no disk cost beyond git objects)",
+    "/home/zhuhe/code/litchi/target (gitignored build output of the main checkout; about 434G of deps remain after the mid-wave removal of incremental caches and examples)"
+  ],
+  "preserved_untouched": [
+    "docs/UNIFIED_OPS_API_DESIGN.md (untracked; not this wave's)",
+    "docs/performance/results/change-0741/ (untracked unfinished packet of a previous agent; 0742 implements the optimization it was preparing)",
+    "/home/zhuhe/code/litchi-target-0741-baseline (that packet's build dir)",
+    "/tmp/codex-target-*, /tmp/litchi-* and other directories of other agents",
+    "worktrees litchi-array-worktree, litchi-current-baseline-orchestration, litchi-inline-images, litchi-spec-gaps (other agents)"
+  ]
+}
