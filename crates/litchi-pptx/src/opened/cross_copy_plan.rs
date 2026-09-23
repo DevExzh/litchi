@@ -469,8 +469,9 @@ impl CrossSlideCopyPatch {
     /// preferences onto it. A destination holding a caller-defined `Part`
     /// implementation refuses a transferring copy with
     /// [`crate::SlideCopyRefusal::CallerDefinedPart`], because the reopen
-    /// would replace that part with a built-in one; a recorded transfer whose
-    /// captures no longer fit is refused with [`crate::Error::Limit`].
+    /// would replace that part with a built-in one. A durable patch read under
+    /// limits its recorded captures do not fit cannot rebuild its candidate
+    /// and is refused.
     #[must_use]
     pub fn transfers_source_compressed_media(&self) -> bool {
         self.copied_media == CopiedMedia::SourceCompressed
