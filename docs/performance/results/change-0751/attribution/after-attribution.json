@@ -1,0 +1,169 @@
+{
+  "lifecycle_period": 11274208161,
+  "phases": {
+    "other": {
+      "share_of_lifecycle": 0.3812,
+      "leaf_shares": {
+        "kernel-or-unknown": 0.3388,
+        "sha256": 0.2563,
+        "memcpy": 0.1903,
+        "crc32": 0.1169,
+        "memset": 0.0392,
+        "memcmp": 0.0209,
+        "other": 0.019,
+        "inflate": 0.0116,
+        "allocator": 0.0069
+      },
+      "path_shares": {},
+      "sha256_site_shares_of_phase": {}
+    },
+    "plan": {
+      "share_of_lifecycle": 0.2837,
+      "leaf_shares": {
+        "sha256": 0.5564,
+        "kernel-or-unknown": 0.1473,
+        "memcpy": 0.1186,
+        "memcmp": 0.0572,
+        "crc32": 0.0543,
+        "other": 0.0439,
+        "memset": 0.0119,
+        "inflate": 0.0046,
+        "allocator": 0.004,
+        "deflate": 0.0017
+      },
+      "path_shares": {
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > build_candidate": 0.6173,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > snapshot_physical_revision": 0.2799,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > capture": 0.0565,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > prove_package_dialect": 0.0286,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > prove_layout_inheritance": 0.0104,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > validate_registered_layout": 0.0033,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > validate_master_layout_graph": 0.001,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > classify_media": 0.001,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > reject_mce": 0.0007,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > validate_xml_surface": 0.0007,
+        "plan_cross_slide_copy_for_slides > prepare_cross_slide_copy_for_slides > reject_protected": 0.0003,
+        "plan_cross_slide_copy_for_slides": 0.0003
+      },
+      "sha256_site_shares_of_phase": {
+        "snapshot_physical_revision > physical_package_fingerprint > exact_source_sha256": 0.2775,
+        "write_prepared_local > write_all_counted > write": 0.1412,
+        "write_to > write_all_counted > write": 0.1377
+      }
+    },
+    "capture": {
+      "share_of_lifecycle": 0.1914,
+      "leaf_shares": {
+        "sha256": 0.8324,
+        "crc32": 0.0538,
+        "memcpy": 0.0537,
+        "other": 0.0285,
+        "memset": 0.0173,
+        "inflate": 0.0069,
+        "allocator": 0.0049,
+        "memcmp": 0.002,
+        "kernel-or-unknown": 0.0005
+      },
+      "path_shares": {
+        "capture_internal > package_fingerprint_with_memo > feed": 0.8324,
+        "capture_internal > package_fingerprint_with_memo > get_part": 0.1342,
+        "capture_internal > finish_from_processed > scan_processed_xml": 0.0079,
+        "capture_internal > load_snapshot_with_slide_root_proofs > load_index_with_slide_root_proofs": 0.0079,
+        "capture_internal > clone > clone": 0.0035,
+        "capture_internal > load_snapshot_with_slide_root_proofs > snapshot_from_index": 0.0034,
+        "capture_internal > package_fingerprint_with_memo": 0.0015,
+        "capture_internal > processed_xml_with_capture": 0.0015,
+        "capture_internal > validate_slide_relationship > get_part": 0.0015,
+        "capture_internal > package_fingerprint_with_memo > feed_relationships": 0.0015,
+        "capture_internal > slide_references > append_slide_reference": 0.001,
+        "capture_internal > finish_from_processed > presentation_name": 0.001,
+        "capture_internal > package_fingerprint_with_memo > insert": 0.0005,
+        "holds_only_built_in_parts": 0.0005,
+        "capture_internal > package_fingerprint_with_memo > partname": 0.0005,
+        "capture_internal > main_document_part > target_partname": 0.0005,
+        "capture_internal > clone": 0.0005,
+        "capture_internal > build": 0.0005
+      },
+      "sha256_site_shares_of_phase": {
+        "capture_internal > package_fingerprint_with_memo > feed": 0.8319,
+        "package_fingerprint_with_memo > feed_relationships > feed": 0.0005
+      }
+    },
+    "commit": {
+      "share_of_lifecycle": 0.1336,
+      "leaf_shares": {
+        "sha256": 0.5926,
+        "memcmp": 0.1015,
+        "other": 0.099,
+        "crc32": 0.0845,
+        "memcpy": 0.069,
+        "memset": 0.0281,
+        "allocator": 0.0113,
+        "inflate": 0.0092,
+        "kernel-or-unknown": 0.005
+      },
+      "path_shares": {
+        "prepare_cross_slide_copy_for_slides > build_candidate > exact_source_sha256": 0.5947,
+        "prepare_cross_slide_copy_for_slides > build_candidate > from_shared_vec_reusing_payloads": 0.2554,
+        "prepare_cross_slide_copy_for_slides > prove_package_dialect": 0.0473,
+        "prepare_cross_slide_copy_for_slides > prove_layout_inheritance > prove_inherited_part": 0.0226,
+        "prepare_cross_slide_copy_for_slides > build_candidate > capture_internal": 0.0128,
+        "capture_internal > load_snapshot_with_slide_root_proofs > load_index_with_slide_root_proofs": 0.012,
+        "prepare_cross_slide_copy_for_slides > prove_package_dialect > dialect_namespace_flags": 0.0113,
+        "validate_application_candidate > validate_candidate > capture_internal": 0.0106,
+        "prepare_cross_slide_copy_for_slides > validate_registered_layout > slide_layouts": 0.005,
+        "(root)": 0.0028,
+        "capture_internal > finish_from_processed > scan_processed_xml": 0.0028,
+        "prepare_cross_slide_copy_for_slides > build_candidate": 0.0021,
+        "capture_internal > clone > clone": 0.0021,
+        "prepare_cross_slide_copy_for_slides > build_candidate > try_add_part": 0.0014,
+        "prepare_cross_slide_copy_for_slides": 0.0014,
+        "prepare_cross_slide_copy_for_slides > validate_master_layout_graph > parse_layout_id_list": 0.0014,
+        "prepare_cross_slide_copy_for_slides > validate_xml_surface > reject_mce": 0.0014,
+        "prepare_cross_slide_copy_for_slides > prove_package_dialect > get_part": 0.0014,
+        "capture_internal > load_snapshot_with_slide_root_proofs > snapshot_from_index": 0.0014,
+        "package_fingerprint_with_memo > blob_arc": 0.0014,
+        "prepare_cross_slide_copy_for_slides > get_part": 0.0007,
+        "prepare_cross_slide_copy_for_slides > capture > capture_bounded": 0.0007,
+        "prepare_cross_slide_copy_for_slides > validate_registered_layout > from_part": 0.0007,
+        "prepare_cross_slide_copy_for_slides > build_candidate > get_part_mut": 0.0007,
+        "prepare_cross_slide_copy_for_slides > validate_xml_surface": 0.0007
+      },
+      "sha256_site_shares_of_phase": {
+        "prepare_cross_slide_copy_for_slides > build_candidate > exact_source_sha256": 0.5919,
+        "package_fingerprint_with_memo > feed_relationships > feed": 0.0007
+      }
+    },
+    "open": {
+      "share_of_lifecycle": 0.0102,
+      "leaf_shares": {
+        "other": 0.6582,
+        "allocator": 0.1481,
+        "inflate": 0.1015,
+        "memcpy": 0.0552,
+        "memset": 0.0278,
+        "memcmp": 0.0092
+      },
+      "path_shares": {
+        "from_shared_bytes_with_limits > from_phys_reader_deferred > load_parts_deferred": 0.5,
+        "from_shared_bytes_with_limits > from_phys_reader_deferred > from_xml": 0.1113,
+        "from_shared_bytes_with_limits > unmarshal_with_payload_donor": 0.0648,
+        "from_shared_bytes_with_limits > authorize_shared_owned_source > rels_uri": 0.0648,
+        "from_shared_bytes_with_limits > from_phys_reader_deferred > load_rels_lazy": 0.0555,
+        "from_shared_bytes_with_limits > authorize_shared_owned_source > try_to_xml_bytes": 0.0371,
+        "from_shared_bytes_with_limits > unmarshal_with_payload_donor > try_add_relationship": 0.0279,
+        "from_shared_bytes_with_limits > new_with_limits > new_with_limits_and_budget": 0.0278,
+        "from_shared_bytes_with_limits": 0.0185,
+        "from_shared_bytes_with_limits > from_phys_reader_deferred > read_shared": 0.0185,
+        "from_shared_bytes_with_limits > authorize_shared_owned_source": 0.0185,
+        "from_shared_bytes_with_limits > authorize_shared_owned_source > payload_handle": 0.0093,
+        "from_shared_bytes_with_limits > authorize_shared_owned_source > from_relationships": 0.0093,
+        "from_shared_bytes_with_limits > from_phys_reader_deferred": 0.0093,
+        "from_shared_bytes_with_limits > from_xml": 0.0093,
+        "from_shared_bytes_with_limits > unmarshal_with_payload_donor > is_signed": 0.0092,
+        "from_shared_bytes_with_limits > authorize_shared_owned_source > try_owned_string": 0.0089
+      },
+      "sha256_site_shares_of_phase": {}
+    }
+  }
+}

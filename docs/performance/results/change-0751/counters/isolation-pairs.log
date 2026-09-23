@@ -1,0 +1,39 @@
+pptx_cross_copy_media_rich_lifecycle p0 s0 before: {'cycles': 1189174355.5, 'instructions': 1519969938.5}
+pptx_cross_copy_media_rich_lifecycle p0 s1 after: {'cycles': 762860461.6, 'instructions': 951437630.0}
+pptx_cross_copy_media_rich_lifecycle p0 s2 after: {'cycles': 881308899.0, 'instructions': 1116732824.7}
+pptx_cross_copy_media_rich_lifecycle p0 s3 before: {'cycles': 1223419589.8, 'instructions': 1556555705.6}
+pptx_cross_copy_media_rich_lifecycle p1 s0 before: {'cycles': 1210305609.9, 'instructions': 1534339510.6}
+pptx_cross_copy_media_rich_lifecycle p1 s1 after: {'cycles': 901887437.2, 'instructions': 1141435903.8}
+pptx_cross_copy_media_rich_lifecycle p1 s2 after: {'cycles': 880414826.8, 'instructions': 1130942710.1}
+pptx_cross_copy_media_rich_lifecycle p1 s3 before: {'cycles': 1279816559.9, 'instructions': 1601262019.1}
+pptx_cross_copy_plain_lifecycle p0 s0 before: {'cycles': 45074787.8, 'instructions': 156759102.8}
+pptx_cross_copy_plain_lifecycle p0 s1 after: {'cycles': 44925386.4, 'instructions': 155498327.6}
+pptx_cross_copy_plain_lifecycle p0 s2 after: {'cycles': 44534849.2, 'instructions': 155609167.5}
+pptx_cross_copy_plain_lifecycle p0 s3 before: {'cycles': 48438071.9, 'instructions': 156801766.4}
+pptx_cross_copy_plain_lifecycle p1 s0 before: {'cycles': 46819363.8, 'instructions': 156768362.5}
+pptx_cross_copy_plain_lifecycle p1 s1 after: {'cycles': 51433056.7, 'instructions': 155631330.5}
+pptx_cross_copy_plain_lifecycle p1 s2 after: {'cycles': 43980305.7, 'instructions': 155171433.6}
+pptx_cross_copy_plain_lifecycle p1 s3 before: {'cycles': 46544452.5, 'instructions': 156759962.4}
+pptx_semantic_one_edit_save p0 s0 before: {'cycles': 902652925.5, 'instructions': 3761293662.8}
+pptx_semantic_one_edit_save p0 s1 after: {'cycles': 911326709.9, 'instructions': 3758459600.8}
+pptx_semantic_one_edit_save p0 s2 after: {'cycles': 913483971.0, 'instructions': 3757883720.6}
+pptx_semantic_one_edit_save p0 s3 before: {'cycles': 896273428.2, 'instructions': 3759521762.7}
+pptx_semantic_one_edit_save p1 s0 before: {'cycles': 890600023.8, 'instructions': 3760193765.2}
+pptx_semantic_one_edit_save p1 s1 after: {'cycles': 902810020.4, 'instructions': 3758125714.0}
+pptx_semantic_one_edit_save p1 s2 after: {'cycles': 904032183.0, 'instructions': 3754484597.0}
+pptx_semantic_one_edit_save p1 s3 before: {'cycles': 905684616.0, 'instructions': 3760106077.2}
+{
+  "pptx_cross_copy_media_rich_lifecycle": {
+    "cycles_ratio_after_over_before": 0.7238794774435355,
+    "instructions_ratio_after_over_before": 0.7271924078886541
+  },
+  "pptx_cross_copy_plain_lifecycle": {
+    "cycles_ratio_after_over_before": 0.9581895764901375,
+    "instructions_ratio_after_over_before": 0.9922787524834572
+  },
+  "pptx_semantic_one_edit_save": {
+    "cycles_ratio_after_over_before": 1.0091346369828882,
+    "instructions_ratio_after_over_before": 0.9994294897956316
+  }
+}
+isolation exit 0

@@ -1,0 +1,104 @@
+{
+  "binaries": [
+    {
+      "name": "after-alloc",
+      "sha256": "ba94f26436b2e0647a675552d0914692de18eadce3d47efd355f1aff832cc4da",
+      "bytes": 63492152
+    },
+    {
+      "name": "after-fp",
+      "sha256": "3a7554d02c21141e762fb422411440bb1f1f8bac5e3646437da7591c437f4efe",
+      "bytes": 62208128
+    },
+    {
+      "name": "after-native",
+      "sha256": "568207422863e86a9629418ff99f5a8e7db7fc63dc6e2bc5c4bc5b1ff162bb4b",
+      "bytes": 63603960
+    },
+    {
+      "name": "before-alloc",
+      "sha256": "67a211a3b8f0aa886c3cf08da51196ff085e075e61c00ac4d1e72f910cfa3321",
+      "bytes": 63549744
+    },
+    {
+      "name": "before-fp",
+      "sha256": "454f70fa0fdd2f27aefd9e05bda19b027a51613ff5cdde47873c719043f7e56f",
+      "bytes": 62436880
+    },
+    {
+      "name": "before-native",
+      "sha256": "736ab51487e3201ccfac5a7033618f1edb39d1c412db18e6a4c956d1f062f446",
+      "bytes": 63833664
+    }
+  ],
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0751",
+      "files": 75814,
+      "bytes": 109126424874
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0751-before",
+      "files": 4453,
+      "bytes": 2960523582
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0751-before-fp",
+      "files": 1767,
+      "bytes": 1125738100
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0751-fp",
+      "files": 1767,
+      "bytes": 1125721820
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/scratch/0751",
+      "files": 421,
+      "bytes": 441473907,
+      "entries": [
+        "analysis",
+        "bin",
+        "build-after-final.log",
+        "build-after-fp.log",
+        "build-after-native-wip.log",
+        "build-before-alloc.log",
+        "build-before-fp.log",
+        "build-before-native.log",
+        "gates",
+        "golden-after.log",
+        "golden-after.txt",
+        "golden-base.log",
+        "golden-base.txt",
+        "isolation",
+        "isolation.log",
+        "matrix",
+        "model.rs.bak",
+        "nativeonly",
+        "prelim",
+        "profile",
+        "record-draft-sections.md",
+        "sanity",
+        "test-opc-pptx-wip.log",
+        "tiny"
+      ]
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0751-before-src",
+      "files": 139937,
+      "bytes": 10194916235,
+      "note": "detached worktree of 6d989cad63 for the before leg, removed with git worktree remove --force"
+    }
+  ],
+  "kept": [
+    "/home/zhuhe/code/litchi-worktrees/0751-pptx-cross-copy-apply-digest-reuse",
+    "branch perf/0751-pptx-cross-copy-apply-digest-reuse",
+    "/home/zhuhe/code/litchi-worktrees/scratch/0751 (empty directory)",
+    "the packet's raw reports (gzipped), counters, analyses, attribution summaries and golden transcripts"
+  ],
+  "not_retained": [
+    "perf.data and perf script text of both frame-pointer profiles (53 MB); attribution/*.json summarize them",
+    "the gate command outputs; gates.txt summarizes them"
+  ],
+  "dry_run": false
+}
