@@ -1,0 +1,6 @@
+Large streaming DOCX written by the real writer (diffprobe DOCX_LARGE_OUT mode) on each leg,
+and the CRC/Deflate probe model of the same write sequence.
+base: archive 376848 bytes sha256 adf297d18b6dfcee2da6a1fd07b129879c184a1aeec5b76dadcaf9e86e86891b; word/document.xml compressed 376031 uncompressed 14418099 crc 0xd4049a99; raw member sha256 a29c49124034674091f24721dc9469cf5b41c9303b89d277351e4ca45534b8f3
+after: archive 376848 bytes sha256 adf297d18b6dfcee2da6a1fd07b129879c184a1aeec5b76dadcaf9e86e86891b; word/document.xml compressed 376031 uncompressed 14418099 crc 0xd4049a99; raw member sha256 a29c49124034674091f24721dc9469cf5b41c9303b89d277351e4ca45534b8f3
+model: 376031 bytes sha256 a29c49124034674091f24721dc9469cf5b41c9303b89d277351e4ca45534b8f3
+model identical to both legs' raw member: True

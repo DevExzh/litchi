@@ -1,0 +1,19 @@
+payload 14418099 bytes, 655362 writes, mean write 22.0 bytes
+deflate writer split: 376031 bytes, inflates to the payload: true
+deflate chunk         1: 375431 bytes, identical to write pattern: false, inflates to the payload: true
+deflate chunk         7: 375545 bytes, identical to write pattern: false, inflates to the payload: true
+deflate chunk        64: 375126 bytes, identical to write pattern: false, inflates to the payload: true
+deflate chunk      4096: 375276 bytes, identical to write pattern: false, inflates to the payload: true
+deflate chunk     16384: 375255 bytes, identical to write pattern: false, inflates to the payload: true
+deflate chunk     65536: 375250 bytes, identical to write pattern: false, inflates to the payload: true
+deflate chunk  14418099: 375250 bytes, identical to write pattern: false, inflates to the payload: true
+crc per write (current)                          p50   26.365 ms  min   26.341 ms  (sink 53356072695)
+crc staged 256                                   p50    3.744 ms  min    3.740 ms  (sink 53356072695)
+crc staged 1024                                  p50    2.694 ms  min    2.683 ms  (sink 53356072695)
+crc staged 4096                                  p50    2.271 ms  min    2.246 ms  (sink 53356072695)
+crc staged 16384                                 p50    2.382 ms  min    2.372 ms  (sink 53356072695)
+crc one buffer                                   p50    0.806 ms  min    0.799 ms  (sink 53356072695)
+deflate per write (current)                      p50   21.759 ms  min   21.557 ms  (sink 5640465)
+deflate chunks 4096                              p50   11.522 ms  min   11.313 ms  (sink 5629140)
+deflate chunks 16384                             p50   11.329 ms  min   11.208 ms  (sink 5628825)
+deflate chunks 65536                             p50   11.458 ms  min   11.189 ms  (sink 5628750)

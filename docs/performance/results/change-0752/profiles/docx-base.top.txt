@@ -1,0 +1,41 @@
+perf report --no-children --sort symbol of docx-base.data (whole process: timed loop plus untimed corpus construction and reopen gates); top 40
+    18.57%  [.] litchi_core::execution::ExecutionContext::consume
+    17.30%  [.] crc32fast::baseline::update_fast_16
+     7.24%  [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+     7.09%  [.] litchi_docx::streaming::StreamingDocumentWriter<W>::emit_escaped_text
+     4.58%  [.] litchi_docx::streaming::StreamingDocumentWriter<W>::write_text
+     4.13%  [.] litchi_core::budget::Reservation::commit
+     2.55%  [.] litchi_core::budget::Budget::reserve
+     2.42%  [.] <core::fmt::Formatter>::pad_integral
+     2.25%  [.] litchi_docx::streaming::append_character
+     2.22%  [.] __memmove_avx512_unaligned_erms
+     1.60%  [.] crc32fast::Hasher::update
+     1.36%  [.] sha2::sha256::x86_sha::compress
+     1.31%  [.] quick_xml::reader::ns_reader::NsReader<R>::process_event
+     1.16%  [.] litchi_ooxml_common::binding_tracker::BindingTracker::resolve_element
+     1.13%  [.] <soapberry_zip::writer::ZipOwnedEntryWriter<W> as std::io::Write>::write
+     1.07%  [.] litchi_docx::paragraph::codec::text::extract_word_text
+     0.73%  [.] flate2::mem::Compress::compress
+     0.73%  [k] 0xffffffff9f124131
+     0.64%  [.] soapberry_zip::writer::ReusableDeflateState::compress_once
+     0.56%  [.] alloc::fmt::format::format_inner
+     0.55%  [.] zlib_rs::deflate::flush_block_only
+     0.55%  [.] litchi_docx::streaming::StreamingDocumentWriter<W>::start_paragraph
+     0.51%  [k] 0xffffffff9f4acb5c
+     0.51%  [.] zlib_rs::stable::Deflate::compress
+     0.50%  [.] litchi_docx::streaming::StreamingDocumentWriter<W>::start_run
+     0.48%  [.] quick_xml::name::NamespaceResolver::resolve_event
+     0.47%  [.] crc32fast::Hasher::new_with_initial
+     0.47%  [k] 0xffffffff9f1119eb
+     0.46%  [.] litchi_docx::paragraph::codec::runs::<impl litchi_docx::paragraph::model::Paragraph>::runs
+     0.44%  [.] <usize as core::fmt::Display>::fmt
+     0.41%  [k] 0xffffffff9f218f02
+     0.41%  [k] 0xffffffff9f3abcc8
+     0.39%  [.] zlib_rs::deflate::slide_hash::avx2::slide_hash_chain
+     0.39%  [.] litchi_docx::streaming::StreamingDocumentWriter<W>::emit_document
+     0.38%  [k] 0xffffffff9f1119a7
+     0.37%  [.] quick_xml::encoding::Decoder::decode_cow
+     0.36%  [.] litchi_core::execution::ExecutionContext::check
+     0.35%  [k] 0xffffffff9e800ef0
+     0.34%  [.] __GI___readdir64
+     0.32%  [.] litchi_docx::streaming::StreamingDocumentWriter<W>::preflight_document_and_paragraph

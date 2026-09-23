@@ -1,0 +1,76 @@
+Outcome categories of the 28,266 scenario lines (identical in both transcripts)
+docx  finish -> Cancelled                                                46
+docx  finish -> IncompleteOutput                                        159
+docx  finish -> LimitExceeded (document XML bytes)                        5
+docx  finish -> LimitExceeded (output bytes)                           1237
+docx  finish ok                                                        2579
+docx  finish_paragraph -> Cancelled                                      10
+docx  finish_paragraph -> LimitExceeded (document XML bytes)              9
+docx  finish_paragraph -> LimitExceeded (paragraph XML bytes)             3
+docx  finish_paragraph -> LimitExceeded (work)                           20
+docx  finish_run -> Cancelled                                            10
+docx  finish_run -> LimitExceeded (document XML bytes)                   17
+docx  finish_run -> LimitExceeded (paragraph XML bytes)                   5
+docx  finish_run -> LimitExceeded (work)                                 20
+docx  refused at new                                                    233
+docx  refused at new (memory)                                           128
+docx  refused at new (objects)                                           10
+docx  refused at new (output bytes)                                    1273
+docx  refused at new (work)                                               4
+docx  start_paragraph -> Cancelled                                       11
+docx  start_paragraph -> LimitExceeded (document XML bytes)               7
+docx  start_paragraph -> LimitExceeded (objects)                         20
+docx  start_paragraph -> LimitExceeded (work)                            20
+docx  start_run -> Cancelled                                             10
+docx  start_run -> LimitExceeded (document XML bytes)                    39
+docx  start_run -> LimitExceeded (objects)                               20
+docx  start_run -> LimitExceeded (paragraph XML bytes)                    6
+docx  start_run -> LimitExceeded (runs per paragraph)                   161
+docx  start_run -> LimitExceeded (work)                                  20
+docx  write_text -> Cancelled                                            15
+docx  write_text -> InvalidInput                                        813
+docx  write_text -> LimitExceeded (document XML bytes)                  229
+docx  write_text -> LimitExceeded (input bytes)                        3048
+docx  write_text -> LimitExceeded (paragraph XML bytes)                  50
+docx  write_text -> LimitExceeded (run text bytes)                       56
+docx  write_text -> LimitExceeded (work)                               2550
+pptx  finish -> Opc                                                      93
+pptx  finish ok                                                         778
+pptx  refused at new                                                    352
+pptx  refused at new (streaming PPTX structural ZIP metadata bytes)      63
+pptx  start_slide0 -> Opc                                                 1
+pptx  start_slide1 -> Opc                                                 1
+pptx  start_slide2 -> Opc                                                 1
+xlsx  finish -> Package                                                 206
+xlsx  finish -> Package (ResourceLimit Objects)                           2
+xlsx  finish -> Package (ResourceLimit OutputBytes)                    1802
+xlsx  finish ok                                                         388
+xlsx  refused at new                                                    346
+xlsx  refused at new (Memory)                                          8192
+xlsx  refused at new (Objects)                                           12
+xlsx  refused at new (OutputBytes)                                     3016
+xlsx  refused at new (Work)                                               2
+xlsx  row1 -> Package (ResourceLimit Objects)                             4
+xlsx  row1 -> Package (ResourceLimit Work)                                4
+xlsx  row11 -> Package (ResourceLimit Objects)                            6
+xlsx  row11 -> Package (ResourceLimit Work)                               6
+xlsx  row13 -> Package (ResourceLimit Objects)                            8
+xlsx  row13 -> Package (ResourceLimit Work)                               8
+xlsx  row15 -> Package (ResourceLimit Objects)                           10
+xlsx  row15 -> Package (ResourceLimit Work)                              10
+xlsx  row17 -> Package (ResourceLimit Objects)                            4
+xlsx  row17 -> Package (ResourceLimit Work)                               4
+xlsx  row19 -> Package (ResourceLimit Objects)                            6
+xlsx  row19 -> Package (ResourceLimit Work)                               6
+xlsx  row21 -> Package (ResourceLimit Objects)                            8
+xlsx  row21 -> Package (ResourceLimit Work)                               8
+xlsx  row23 -> Package (ResourceLimit Objects)                           10
+xlsx  row23 -> Package (ResourceLimit Work)                              10
+xlsx  row3 -> Package (ResourceLimit Objects)                             6
+xlsx  row3 -> Package (ResourceLimit Work)                                6
+xlsx  row5 -> Package (ResourceLimit Objects)                             8
+xlsx  row5 -> Package (ResourceLimit Work)                                8
+xlsx  row7 -> Package (ResourceLimit Objects)                            10
+xlsx  row7 -> Package (ResourceLimit Work)                               10
+xlsx  row9 -> Package (ResourceLimit Objects)                             4
+xlsx  row9 -> Package (ResourceLimit Work)                                4
