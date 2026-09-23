@@ -186,6 +186,22 @@ fn build_document_summary_information_stream() -> Vec<u8> {
     s
 }
 
+/// The largest up-front reservation of the `PowerPoint Document` stream: the
+/// 4 GiB its 32-bit record offsets address. A larger estimate only belongs to
+/// a presentation whose stream grows past the reservation, as streams always
+/// could, or that its offset checks refuse.
+const MAX_DOCUMENT_STREAM_RESERVATION: usize = u32::MAX as usize;
+
+/// A new buffer with room for exactly `bytes`, or a typed refusal when that
+/// much cannot be reserved.
+fn reserved_bytes(bytes: usize) -> Result<Vec<u8>, WriteError> {
+    let mut buffer = Vec::new();
+    buffer.try_reserve_exact(bytes).map_err(|_error| {
+        WriteError::InvalidData("PPT document stream allocation is too large".to_string())
+    })?;
+    Ok(buffer)
+}
+
 /// Convert an in-memory element count or index to its bounded wire value.
 fn wire_index(value: usize) -> Result<u32, WriteError> {
     u32::try_from(value).map_err(|_err| {
@@ -252,6 +268,20 @@ impl Writer {
             .saturating_add(16 * 1024)
     }
 
+    /// The empty `PowerPoint Document` stream, reserved to
+    /// [`Self::document_stream_capacity_hint`] once the presentation-wide
+    /// checks have passed.
+    ///
+    /// The reservation is capped at [`MAX_DOCUMENT_STREAM_RESERVATION`] and is
+    /// fallible: a reservation that cannot be made is a typed error rather
+    /// than an abort.
+    fn reserved_document_stream(&self) -> Result<Vec<u8>, WriteError> {
+        reserved_bytes(
+            self.document_stream_capacity_hint()
+                .min(MAX_DOCUMENT_STREAM_RESERVATION),
+        )
+    }
+
     /// Save the presentation to a file
     ///
     /// # Arguments
@@ -279,7 +309,7 @@ impl Writer {
         let modify_password_atom = self.build_modify_password_atom()?;
         let header_footers = self.serialize_header_footers()?;
         // 1) We'll write DocumentContainer at stream offset 0
-        let mut ppt_stream = Vec::with_capacity(self.document_stream_capacity_hint());
+        let mut ppt_stream = self.reserved_document_stream()?;
         let mut persist_builder = PersistPtrBuilder::new();
 
         // Allocate a persist ID for the Document itself and set its offset to 0
@@ -439,108 +469,106 @@ impl Writer {
             // Build the Slide container in place: its children are appended
             // straight into the stream and its length is patched at the end.
             let slide_start = ppt_stream.len();
-            let slide_container =
-                InPlaceRecord::begin(&mut ppt_stream, 0x0F, 0, record_type::SLIDE);
-            // SlideAtom (MS-PPT 2.4.7)
-            let mut slide_atom = RecordBuilder::new(0x02, 0, record_type::SLIDE_ATOM);
-            let mut atom_data = Vec::with_capacity(24);
-            // SSlideLayoutAtom: geometry + placeholder types
-            atom_data.extend_from_slice(&(SlideLayoutType::Blank as u32).to_le_bytes());
-            atom_data.extend_from_slice(&[0u8; 8]); // rgPlaceholderTypes
-            // masterIdRef (0x80000000 = reference to master)
-            atom_data.extend_from_slice(&0x8000_0000u32.to_le_bytes());
-            // notesIdRef: Per POI, this equals NotesAtom.slideID = slideIdentifier
-            // Set to the slide's own identifier if notes exist, 0 otherwise
-            let notes_id_ref = if notes_persist_ids[i].is_some() {
-                slide_identifier // Same value as NotesAtom.slideID
-            } else {
-                0
-            };
-            atom_data.extend_from_slice(&notes_id_ref.to_le_bytes());
-            // slideFlags: follow master objects/scheme/background
-            atom_data.extend_from_slice(&slide_flags::DEFAULT.to_le_bytes());
-            atom_data.extend_from_slice(&0u16.to_le_bytes()); // reserved
-            slide_atom.write_data(&atom_data);
-            ppt_stream.extend_from_slice(&slide_atom.build()?);
+            InPlaceRecord::write(&mut ppt_stream, 0x0F, 0, record_type::SLIDE, |ppt_stream| {
+                // SlideAtom (MS-PPT 2.4.7)
+                let mut slide_atom = RecordBuilder::new(0x02, 0, record_type::SLIDE_ATOM);
+                let mut atom_data = Vec::with_capacity(24);
+                // SSlideLayoutAtom: geometry + placeholder types
+                atom_data.extend_from_slice(&(SlideLayoutType::Blank as u32).to_le_bytes());
+                atom_data.extend_from_slice(&[0u8; 8]); // rgPlaceholderTypes
+                // masterIdRef (0x80000000 = reference to master)
+                atom_data.extend_from_slice(&0x8000_0000u32.to_le_bytes());
+                // notesIdRef: Per POI, this equals NotesAtom.slideID = slideIdentifier
+                // Set to the slide's own identifier if notes exist, 0 otherwise
+                let notes_id_ref = if notes_persist_ids[i].is_some() {
+                    slide_identifier // Same value as NotesAtom.slideID
+                } else {
+                    0
+                };
+                atom_data.extend_from_slice(&notes_id_ref.to_le_bytes());
+                // slideFlags: follow master objects/scheme/background
+                atom_data.extend_from_slice(&slide_flags::DEFAULT.to_le_bytes());
+                atom_data.extend_from_slice(&0u16.to_le_bytes()); // reserved
+                slide_atom.write_data(&atom_data);
+                ppt_stream.extend_from_slice(&slide_atom.build()?);
 
-            // PPDrawing with Escher DgContainer (including user shapes)
-            let escher_shapes: Vec<UserShapeData> = slide
-                .shapes
-                .iter()
-                .map(|s| {
-                    convert_shape_to_escher_with_sound_mapping(
-                        s,
-                        &self.hyperlinks,
-                        &sound_id_mapping,
+                // PPDrawing with Escher DgContainer (including user shapes)
+                let escher_shapes: Vec<UserShapeData> = slide
+                    .shapes
+                    .iter()
+                    .map(|s| {
+                        convert_shape_to_escher_with_sound_mapping(
+                            s,
+                            &self.hyperlinks,
+                            &sound_id_mapping,
+                        )
+                    })
+                    .collect();
+                // Chart frames referencing this slide's embedded chart objects
+                let chart_frames: Vec<super::super::chart::ChartFrame> = chart_plans
+                    .iter()
+                    .filter(|plan| plan.slide == i)
+                    .map(|plan| {
+                        let chart = &slide.charts[plan.chart];
+                        super::super::chart::ChartFrame::new(
+                            chart.x,
+                            chart.y,
+                            chart.width,
+                            chart.height,
+                            plan.ex_obj_id,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                InPlaceRecord::write(ppt_stream, 0x0F, 0, record_type::PP_DRAWING, |ppt_stream| {
+                    append_dg_container_with_charts(
+                        ppt_stream,
+                        drawing_id,
+                        &escher_shapes,
+                        &slide.tables,
+                        &chart_frames,
                     )
-                })
-                .collect();
-            // Chart frames referencing this slide's embedded chart objects
-            let chart_frames: Vec<super::super::chart::ChartFrame> = chart_plans
-                .iter()
-                .filter(|plan| plan.slide == i)
-                .map(|plan| {
-                    let chart = &slide.charts[plan.chart];
-                    super::super::chart::ChartFrame::new(
-                        chart.x,
-                        chart.y,
-                        chart.width,
-                        chart.height,
-                        plan.ex_obj_id,
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            let pp_drawing =
-                InPlaceRecord::begin(&mut ppt_stream, 0x0F, 0, record_type::PP_DRAWING);
-            append_dg_container_with_charts(
-                &mut ppt_stream,
-                drawing_id,
-                &escher_shapes,
-                &slide.tables,
-                &chart_frames,
-            )?;
-            pp_drawing.finish(&mut ppt_stream)?;
+                })?;
 
-            // ColorSchemeAtom (MS-PPT 2.4.17)
-            let mut color = RecordBuilder::new(0x00, 1, record_type::COLOR_SCHEME_ATOM);
-            color.write_data(&ColorScheme::POI_DEFAULT.to_bytes());
-            ppt_stream.extend_from_slice(&color.build()?);
+                // ColorSchemeAtom (MS-PPT 2.4.17)
+                let mut color = RecordBuilder::new(0x00, 1, record_type::COLOR_SCHEME_ATOM);
+                color.write_data(&ColorScheme::POI_DEFAULT.to_bytes());
+                ppt_stream.extend_from_slice(&color.build()?);
 
-            // SSSlideInfoAtom (MS-PPT 2.6.6) for the transition and/or per-slide timing
-            if let Some(record) = build_slide_info_atom(slide)? {
-                ppt_stream.extend_from_slice(&record);
-            }
+                // SSSlideInfoAtom (MS-PPT 2.6.6) for the transition and/or per-slide timing
+                if let Some(record) = build_slide_info_atom(slide)? {
+                    ppt_stream.extend_from_slice(&record);
+                }
 
-            if let Some(value) = &header_footers.slides[i] {
-                ppt_stream.extend_from_slice(value);
-            }
+                if let Some(value) = &header_footers.slides[i] {
+                    ppt_stream.extend_from_slice(value);
+                }
 
-            // ProgTags with PPT10 binary tag (PowerPoint 2002+ features)
-            let mut prog_tags = RecordBuilder::new(0x0F, 0, record_type::PROG_TAGS);
-            let mut prog_bin = RecordBuilder::new(0x0F, 0, record_type::PROG_BINARY_TAG);
-            let mut cstr = RecordBuilder::new(0x00, 0, record_type::CSTRING);
-            cstr.write_data(&Tag10::to_bytes());
-            prog_bin.write_child(&cstr.build()?);
-            // BinaryTagData: slide defaults + comments
-            let comment_bytes = super::super::comments::build_slide_comments(&slide.comments)?;
-            let mut tag_data = BinaryTagData::SLIDE.to_bytes().to_vec();
-            tag_data.extend_from_slice(&comment_bytes);
-            let mut bin = RecordBuilder::new(0x00, 0, record_type::BINARY_TAG_DATA);
-            bin.write_data(&tag_data);
-            prog_bin.write_child(&bin.build()?);
-            prog_tags.write_child(&prog_bin.build()?);
-            ppt_stream.extend_from_slice(&prog_tags.build()?);
+                // ProgTags with PPT10 binary tag (PowerPoint 2002+ features)
+                let mut prog_tags = RecordBuilder::new(0x0F, 0, record_type::PROG_TAGS);
+                let mut prog_bin = RecordBuilder::new(0x0F, 0, record_type::PROG_BINARY_TAG);
+                let mut cstr = RecordBuilder::new(0x00, 0, record_type::CSTRING);
+                cstr.write_data(&Tag10::to_bytes());
+                prog_bin.write_child(&cstr.build()?);
+                // BinaryTagData: slide defaults + comments
+                let comment_bytes = super::super::comments::build_slide_comments(&slide.comments)?;
+                let mut tag_data = BinaryTagData::SLIDE.to_bytes().to_vec();
+                tag_data.extend_from_slice(&comment_bytes);
+                let mut bin = RecordBuilder::new(0x00, 0, record_type::BINARY_TAG_DATA);
+                bin.write_data(&tag_data);
+                prog_bin.write_child(&bin.build()?);
+                prog_tags.write_child(&prog_bin.build()?);
+                ppt_stream.extend_from_slice(&prog_tags.build()?);
 
-            // This slide's offset in the stream is where its record starts,
-            // checked after its children as before.
-            let slide_offset = stream_offset(&ppt_stream[..slide_start])?;
+                // This slide's offset in the stream is where its record starts,
+                // checked after its children as before.
+                let slide_offset = stream_offset(&ppt_stream[..slide_start])?;
 
-            // Track persist pointer (allocate new persist id per slide)
-            let persist_id = slide_persist_ids[i];
-            persist_builder.set_offset(persist_id, slide_offset);
+                // Track persist pointer (allocate new persist id per slide)
+                let persist_id = slide_persist_ids[i];
+                persist_builder.set_offset(persist_id, slide_offset);
 
-            // Close the top-level slide record
-            slide_container.finish(&mut ppt_stream)?;
+                Ok::<_, WriteError>(())
+            })?;
         }
 
         // 3.3) Notes containers for slides with notes
@@ -716,7 +744,7 @@ impl Writer {
         let modify_password_atom = self.build_modify_password_atom()?;
         let header_footers = self.serialize_header_footers()?;
         // Same logic as save(), but writing to provided writer
-        let mut ppt_stream = Vec::with_capacity(self.document_stream_capacity_hint());
+        let mut ppt_stream = self.reserved_document_stream()?;
         let mut persist_builder = PersistPtrBuilder::new();
 
         let doc_persist_id = persist_builder.allocate_id();
@@ -847,93 +875,92 @@ impl Writer {
             // Build the Slide container in place: its children are appended
             // straight into the stream and its length is patched at the end.
             let slide_start = ppt_stream.len();
-            let slide_container =
-                InPlaceRecord::begin(&mut ppt_stream, 0x0F, 0, record_type::SLIDE);
-            // SlideAtom (MS-PPT 2.4.7)
-            let mut slide_atom = RecordBuilder::new(0x02, 0, record_type::SLIDE_ATOM);
-            let mut atom_data = Vec::with_capacity(24);
-            atom_data.extend_from_slice(&(SlideLayoutType::Blank as u32).to_le_bytes());
-            atom_data.extend_from_slice(&[0u8; 8]); // rgPlaceholderTypes
-            atom_data.extend_from_slice(&0x8000_0000u32.to_le_bytes()); // masterIdRef
-            atom_data.extend_from_slice(&0u32.to_le_bytes()); // notesIdRef
-            atom_data.extend_from_slice(&slide_flags::DEFAULT.to_le_bytes());
-            atom_data.extend_from_slice(&0u16.to_le_bytes()); // reserved
-            slide_atom.write_data(&atom_data);
-            ppt_stream.extend_from_slice(&slide_atom.build()?);
+            InPlaceRecord::write(&mut ppt_stream, 0x0F, 0, record_type::SLIDE, |ppt_stream| {
+                // SlideAtom (MS-PPT 2.4.7)
+                let mut slide_atom = RecordBuilder::new(0x02, 0, record_type::SLIDE_ATOM);
+                let mut atom_data = Vec::with_capacity(24);
+                atom_data.extend_from_slice(&(SlideLayoutType::Blank as u32).to_le_bytes());
+                atom_data.extend_from_slice(&[0u8; 8]); // rgPlaceholderTypes
+                atom_data.extend_from_slice(&0x8000_0000u32.to_le_bytes()); // masterIdRef
+                atom_data.extend_from_slice(&0u32.to_le_bytes()); // notesIdRef
+                atom_data.extend_from_slice(&slide_flags::DEFAULT.to_le_bytes());
+                atom_data.extend_from_slice(&0u16.to_le_bytes()); // reserved
+                slide_atom.write_data(&atom_data);
+                ppt_stream.extend_from_slice(&slide_atom.build()?);
 
-            // PPDrawing with Escher DgContainer (including user shapes)
-            let escher_shapes: Vec<UserShapeData> = slide
-                .shapes
-                .iter()
-                .map(|s| {
-                    convert_shape_to_escher_with_sound_mapping(
-                        s,
-                        &self.hyperlinks,
-                        &sound_id_mapping,
+                // PPDrawing with Escher DgContainer (including user shapes)
+                let escher_shapes: Vec<UserShapeData> = slide
+                    .shapes
+                    .iter()
+                    .map(|s| {
+                        convert_shape_to_escher_with_sound_mapping(
+                            s,
+                            &self.hyperlinks,
+                            &sound_id_mapping,
+                        )
+                    })
+                    .collect();
+                // Chart frames referencing this slide's embedded chart objects
+                let chart_frames: Vec<super::super::chart::ChartFrame> = chart_plans
+                    .iter()
+                    .filter(|plan| plan.slide == i)
+                    .map(|plan| {
+                        let chart = &slide.charts[plan.chart];
+                        super::super::chart::ChartFrame::new(
+                            chart.x,
+                            chart.y,
+                            chart.width,
+                            chart.height,
+                            plan.ex_obj_id,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                InPlaceRecord::write(ppt_stream, 0x0F, 0, record_type::PP_DRAWING, |ppt_stream| {
+                    append_dg_container_with_charts(
+                        ppt_stream,
+                        drawing_id,
+                        &escher_shapes,
+                        &slide.tables,
+                        &chart_frames,
                     )
-                })
-                .collect();
-            // Chart frames referencing this slide's embedded chart objects
-            let chart_frames: Vec<super::super::chart::ChartFrame> = chart_plans
-                .iter()
-                .filter(|plan| plan.slide == i)
-                .map(|plan| {
-                    let chart = &slide.charts[plan.chart];
-                    super::super::chart::ChartFrame::new(
-                        chart.x,
-                        chart.y,
-                        chart.width,
-                        chart.height,
-                        plan.ex_obj_id,
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            let pp_drawing =
-                InPlaceRecord::begin(&mut ppt_stream, 0x0F, 0, record_type::PP_DRAWING);
-            append_dg_container_with_charts(
-                &mut ppt_stream,
-                drawing_id,
-                &escher_shapes,
-                &slide.tables,
-                &chart_frames,
-            )?;
-            pp_drawing.finish(&mut ppt_stream)?;
+                })?;
 
-            // ColorSchemeAtom (MS-PPT 2.4.17)
-            let mut color = RecordBuilder::new(0x00, 1, record_type::COLOR_SCHEME_ATOM);
-            color.write_data(&ColorScheme::POI_DEFAULT.to_bytes());
-            ppt_stream.extend_from_slice(&color.build()?);
+                // ColorSchemeAtom (MS-PPT 2.4.17)
+                let mut color = RecordBuilder::new(0x00, 1, record_type::COLOR_SCHEME_ATOM);
+                color.write_data(&ColorScheme::POI_DEFAULT.to_bytes());
+                ppt_stream.extend_from_slice(&color.build()?);
 
-            // SSSlideInfoAtom (MS-PPT 2.6.6) for the transition and/or per-slide timing
-            if let Some(record) = build_slide_info_atom(slide)? {
-                ppt_stream.extend_from_slice(&record);
-            }
+                // SSSlideInfoAtom (MS-PPT 2.6.6) for the transition and/or per-slide timing
+                if let Some(record) = build_slide_info_atom(slide)? {
+                    ppt_stream.extend_from_slice(&record);
+                }
 
-            if let Some(value) = &header_footers.slides[i] {
-                ppt_stream.extend_from_slice(value);
-            }
+                if let Some(value) = &header_footers.slides[i] {
+                    ppt_stream.extend_from_slice(value);
+                }
 
-            // ProgTags with PPT10 binary tag
-            let mut prog_tags = RecordBuilder::new(0x0F, 0, record_type::PROG_TAGS);
-            let mut prog_bin = RecordBuilder::new(0x0F, 0, record_type::PROG_BINARY_TAG);
-            let mut cstr = RecordBuilder::new(0x00, 0, record_type::CSTRING);
-            cstr.write_data(&Tag10::to_bytes());
-            prog_bin.write_child(&cstr.build()?);
-            // BinaryTagData: slide defaults + comments
-            let comment_bytes = super::super::comments::build_slide_comments(&slide.comments)?;
-            let mut tag_data = BinaryTagData::SLIDE.to_bytes().to_vec();
-            tag_data.extend_from_slice(&comment_bytes);
-            let mut bin = RecordBuilder::new(0x00, 0, record_type::BINARY_TAG_DATA);
-            bin.write_data(&tag_data);
-            prog_bin.write_child(&bin.build()?);
-            prog_tags.write_child(&prog_bin.build()?);
-            ppt_stream.extend_from_slice(&prog_tags.build()?);
+                // ProgTags with PPT10 binary tag
+                let mut prog_tags = RecordBuilder::new(0x0F, 0, record_type::PROG_TAGS);
+                let mut prog_bin = RecordBuilder::new(0x0F, 0, record_type::PROG_BINARY_TAG);
+                let mut cstr = RecordBuilder::new(0x00, 0, record_type::CSTRING);
+                cstr.write_data(&Tag10::to_bytes());
+                prog_bin.write_child(&cstr.build()?);
+                // BinaryTagData: slide defaults + comments
+                let comment_bytes = super::super::comments::build_slide_comments(&slide.comments)?;
+                let mut tag_data = BinaryTagData::SLIDE.to_bytes().to_vec();
+                tag_data.extend_from_slice(&comment_bytes);
+                let mut bin = RecordBuilder::new(0x00, 0, record_type::BINARY_TAG_DATA);
+                bin.write_data(&tag_data);
+                prog_bin.write_child(&bin.build()?);
+                prog_tags.write_child(&prog_bin.build()?);
+                ppt_stream.extend_from_slice(&prog_tags.build()?);
 
-            let slide_offset = stream_offset(&ppt_stream[..slide_start])?;
-            let persist_id = slide_persist_ids[i];
-            persist_builder.set_offset(persist_id, slide_offset);
+                let slide_offset = stream_offset(&ppt_stream[..slide_start])?;
+                let persist_id = slide_persist_ids[i];
+                persist_builder.set_offset(persist_id, slide_offset);
 
-            slide_container.finish(&mut ppt_stream)?;
+                Ok::<_, WriteError>(())
+            })?;
         }
 
         // 3.3) Notes containers - DISABLED for testing
@@ -1081,6 +1108,21 @@ impl Writer {
 )]
 mod font_plan_tests {
     use super::*;
+
+    #[test]
+    fn a_document_stream_reservation_that_cannot_be_made_is_refused_not_aborted() {
+        assert!(matches!(
+            reserved_bytes(usize::MAX),
+            Err(WriteError::InvalidData(message)) if message.contains("allocation is too large")
+        ));
+        assert!(reserved_bytes(0).unwrap().is_empty());
+        assert!(reserved_bytes(4_096).unwrap().capacity() >= 4_096);
+        // A presentation with little text reserves nothing up front.
+        assert_eq!(
+            Writer::new().reserved_document_stream().unwrap().capacity(),
+            0
+        );
+    }
 
     #[test]
     fn default_catalog_preserves_the_historical_environment_bytes() {

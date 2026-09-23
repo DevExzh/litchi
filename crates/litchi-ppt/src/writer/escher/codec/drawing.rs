@@ -150,13 +150,26 @@ pub(crate) fn append_dg_container_with_charts(
     tables: &[crate::writer::table::PositionedTable],
     charts: &[crate::writer::chart::ChartFrame],
 ) -> Result<(), Error> {
-    let table_shape_count: u32 = tables.iter().map(|table| table.table.shape_count()).sum();
-    let container = InPlaceRecord::begin(
+    InPlaceRecord::write(
         output,
         header_version::CONTAINER,
         0,
         record_type::DG_CONTAINER,
-    );
+        |output| append_dg_container_children(output, drawing_id, shapes, tables, charts),
+    )
+}
+
+/// Appends the children of the `DgContainer` [`append_dg_container_with_charts`]
+/// writes: the `Dg`, the root `SpgrContainer` in place, then the background
+/// shape.
+fn append_dg_container_children(
+    output: &mut Vec<u8>,
+    drawing_id: u32,
+    shapes: &[UserShapeData],
+    tables: &[crate::writer::table::PositionedTable],
+    charts: &[crate::writer::chart::ChartFrame],
+) -> Result<(), Error> {
+    let table_shape_count: u32 = tables.iter().map(|table| table.table.shape_count()).sum();
     let shape_count = u32::try_from(shapes.len()).unwrap_or(u32::MAX);
     let total_shapes = shape_count
         .saturating_add(table_shape_count)
@@ -171,46 +184,49 @@ pub(crate) fn append_dg_container_with_charts(
     dg.add_data(EscherDgData::new(total_shapes, drawing_id).as_bytes());
     output.extend_from_slice(&dg.build()?);
 
-    let spgr_container = InPlaceRecord::begin(
+    let group_spid = drawing_id << 10;
+    let bg_spid = group_spid + 1;
+    InPlaceRecord::write(
         output,
         header_version::CONTAINER,
         0,
         record_type::SPGR_CONTAINER,
-    );
-    let mut group_sp_container =
-        EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
-    let mut spgr = EscherBuilder::new(header_version::SPGR, 0, record_type::SPGR);
-    spgr.add_data(EscherSpgrData::ZERO.as_bytes());
-    group_sp_container.add_data(&spgr.build()?);
+        |output| {
+            let mut group_sp_container =
+                EscherBuilder::new(header_version::CONTAINER, 0, record_type::SP_CONTAINER);
+            let mut spgr = EscherBuilder::new(header_version::SPGR, 0, record_type::SPGR);
+            spgr.add_data(EscherSpgrData::ZERO.as_bytes());
+            group_sp_container.add_data(&spgr.build()?);
 
-    let group_spid = drawing_id << 10;
-    let mut sp = EscherBuilder::new(
-        header_version::SP,
-        shape_type::NOT_PRIMITIVE,
-        record_type::SP,
-    );
-    sp.add_data(Sp::group_patriarch(group_spid).as_bytes());
-    group_sp_container.add_data(&sp.build()?);
-    output.extend_from_slice(&group_sp_container.build()?);
+            let mut sp = EscherBuilder::new(
+                header_version::SP,
+                shape_type::NOT_PRIMITIVE,
+                record_type::SP,
+            );
+            sp.add_data(Sp::group_patriarch(group_spid).as_bytes());
+            group_sp_container.add_data(&sp.build()?);
+            output.extend_from_slice(&group_sp_container.build()?);
 
-    let bg_spid = group_spid + 1;
-    for (shape_spid, shape) in (bg_spid + 1..).zip(shapes) {
-        append_user_shape_container(output, shape_spid, shape)?;
-    }
+            for (shape_spid, shape) in (bg_spid + 1..).zip(shapes) {
+                append_user_shape_container(output, shape_spid, shape)?;
+            }
 
-    let mut table_group_spid = bg_spid + 1 + shape_count;
-    for table in tables {
-        let table_container =
-            crate::writer::table::build_table_spgr_container(table, table_group_spid)?;
-        output.extend_from_slice(&table_container);
-        table_group_spid += table.table.shape_count();
-    }
+            let mut table_group_spid = bg_spid + 1 + shape_count;
+            for table in tables {
+                let table_container =
+                    crate::writer::table::build_table_spgr_container(table, table_group_spid)?;
+                output.extend_from_slice(&table_container);
+                table_group_spid += table.table.shape_count();
+            }
 
-    for (chart_spid, frame) in (table_group_spid..).zip(charts) {
-        let chart_container = crate::writer::chart::build_chart_sp_container(frame, chart_spid)?;
-        output.extend_from_slice(&chart_container);
-    }
-    spgr_container.finish(output)?;
+            for (chart_spid, frame) in (table_group_spid..).zip(charts) {
+                let chart_container =
+                    crate::writer::chart::build_chart_sp_container(frame, chart_spid)?;
+                output.extend_from_slice(&chart_container);
+            }
+            Ok::<_, Error>(())
+        },
+    )?;
 
     // PowerPoint keeps the background shape outside the root SpgrContainer.
     let mut background_container =
@@ -233,6 +249,5 @@ pub(crate) fn append_dg_container_with_charts(
     }
     background_container.add_data(&opt.build()?);
     output.extend_from_slice(&background_container.build()?);
-
-    container.finish(output)
+    Ok(())
 }

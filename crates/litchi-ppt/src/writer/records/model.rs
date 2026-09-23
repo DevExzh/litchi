@@ -188,22 +188,42 @@ impl RecordBuilder {
 /// instead of being built separately and copied in. The header bytes are those
 /// [`RecordBuilder::build`] writes for the same version, instance, type and
 /// body, which are also the `OfficeArt` header bytes of the PPT drawing
-/// builders. When a step between [`Self::begin`] and [`Self::finish`] fails,
-/// the output holds a partial record and must be discarded, as every writer
-/// that uses this type does on error.
+/// builders.
+///
+/// Only [`Self::write`] creates one, and it patches the header whenever the
+/// body succeeds, so a record whose header is never patched cannot be
+/// written. When the body fails, the output holds a partial record and must be
+/// discarded, as every writer that uses this type does on error.
+#[must_use = "an in-place record's length is only patched by `finish`"]
 pub(crate) struct InPlaceRecord {
     start: usize,
     header: RecordHeader,
 }
 
 impl InPlaceRecord {
-    /// Appends a placeholder header for a record whose body follows.
-    pub(crate) fn begin(
+    /// Appends the record `version`, `instance`, `record_type` to `output`:
+    /// a placeholder header, the body `body` appends, then the header patched
+    /// with the body's length. Returns what `body` returns.
+    ///
+    /// # Errors
+    ///
+    /// Returns the body's error, leaving the partial record in `output`, or an
+    /// error if the header cannot be serialized.
+    pub(crate) fn write<T, E: From<Error>>(
         output: &mut Vec<u8>,
         version: u8,
         instance: u16,
         record_type: u16,
-    ) -> Self {
+        body: impl FnOnce(&mut Vec<u8>) -> Result<T, E>,
+    ) -> Result<T, E> {
+        let record = Self::begin(output, version, instance, record_type);
+        let value = body(output)?;
+        record.finish(output)?;
+        Ok(value)
+    }
+
+    /// Appends a placeholder header for a record whose body follows.
+    fn begin(output: &mut Vec<u8>, version: u8, instance: u16, record_type: u16) -> Self {
         let start = output.len();
         output.extend_from_slice(&[0; 8]);
         Self {
@@ -222,7 +242,7 @@ impl InPlaceRecord {
         clippy::cast_possible_truncation,
         reason = "the length keeps RecordBuilder's truncating 32-bit conversion; a stream that large is still refused by the writers' later stream-offset checks"
     )]
-    pub(crate) fn finish(mut self, output: &mut [u8]) -> Result<(), Error> {
+    fn finish(mut self, output: &mut [u8]) -> Result<(), Error> {
         let body_start = self.start + 8;
         self.header.length = output.len().saturating_sub(body_start) as u32;
         let slot = output

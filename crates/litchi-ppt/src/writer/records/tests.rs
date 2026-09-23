@@ -232,3 +232,76 @@ fn test_record_builder_with_large_data() {
     let record = builder.build().unwrap();
     assert_eq!(record.len(), 8 + large_data.len());
 }
+
+/// The bytes `RecordBuilder` builds for one record around `body`.
+fn built(version: u8, instance: u16, record_type: u16, body: &[u8]) -> Vec<u8> {
+    let mut builder = RecordBuilder::new(version, instance, record_type);
+    builder.write_data(body);
+    builder.build().unwrap()
+}
+
+#[test]
+fn in_place_records_match_built_records() {
+    for (version, instance, record_type, body) in [
+        (0x0F, 0, record_type::SLIDE, Vec::new()),
+        (0x00, 0, record_type::TEXT_BYTES_ATOM, b"Hello".to_vec()),
+        (0x02, 0x0ABC, record_type::SLIDE_ATOM, vec![0x5A; 24]),
+        (0x00, 0, record_type::TEXT_CHARS_ATOM, vec![0xA5; 70_001]),
+    ] {
+        // Written after unrelated bytes, as a child of a stream in progress.
+        let mut output = b"prefix".to_vec();
+        let length = InPlaceRecord::write(&mut output, version, instance, record_type, |output| {
+            output.extend_from_slice(&body);
+            Ok::<_, Error>(body.len())
+        })
+        .unwrap();
+        assert_eq!(length, body.len());
+        assert_eq!(&output[..6], b"prefix");
+        assert_eq!(&output[6..], built(version, instance, record_type, &body));
+    }
+}
+
+#[test]
+fn nested_in_place_records_match_built_containers() {
+    let mut output = Vec::new();
+    InPlaceRecord::write(&mut output, 0x0F, 0, record_type::SLIDE, |output| {
+        InPlaceRecord::write(output, 0x00, 0, record_type::TEXT_BYTES_ATOM, |output| {
+            output.extend_from_slice(b"first");
+            Ok::<_, Error>(())
+        })?;
+        output.extend_from_slice(&built(0x00, 1, record_type::COLOR_SCHEME_ATOM, &[7; 32]));
+        InPlaceRecord::write(output, 0x0F, 0, record_type::PP_DRAWING, |output| {
+            InPlaceRecord::write(output, 0x00, 0, record_type::TEXT_CHARS_ATOM, |output| {
+                output.extend_from_slice(&[0x41, 0x00, 0x42, 0x00]);
+                Ok::<_, Error>(())
+            })
+        })
+    })
+    .unwrap();
+
+    let mut drawing = RecordBuilder::new(0x0F, 0, record_type::PP_DRAWING);
+    drawing.write_child(&built(
+        0x00,
+        0,
+        record_type::TEXT_CHARS_ATOM,
+        &[0x41, 0x00, 0x42, 0x00],
+    ));
+    let mut slide = RecordBuilder::new(0x0F, 0, record_type::SLIDE);
+    slide.write_child(&built(0x00, 0, record_type::TEXT_BYTES_ATOM, b"first"));
+    slide.write_child(&built(0x00, 1, record_type::COLOR_SCHEME_ATOM, &[7; 32]));
+    slide.write_child(&drawing.build().unwrap());
+    assert_eq!(output, slide.build().unwrap());
+}
+
+/// A failed body leaves its partial record, header unpatched, for the caller
+/// to discard; every writer using `InPlaceRecord` drops its output on error.
+#[test]
+fn a_failed_body_returns_its_error_and_leaves_the_record_unpatched() {
+    let mut output = b"kept".to_vec();
+    let result = InPlaceRecord::write(&mut output, 0x0F, 0, record_type::SLIDE, |output| {
+        output.extend_from_slice(b"partial");
+        Err::<(), _>(std::io::Error::other("refused mid-record"))
+    });
+    assert_eq!(result.unwrap_err().to_string(), "refused mid-record");
+    assert_eq!(output, b"kept\0\0\0\0\0\0\0\0partial");
+}
