@@ -53,6 +53,59 @@ const MAX_CELL_TRANSFER: u64 = 65_536;
 const MAX_CELL_DEPENDENCY_SCAN: usize = 1_048_576;
 const MAX_VALIDATED_STORE_HANDOFF_CELLS: usize = 4_096;
 const MAX_VALIDATED_STORE_HANDOFF_BYTES: usize = 1_048_576;
+
+/// The post-write readback that verifies one changed worksheet.
+#[derive(Debug)]
+enum VerifiedStore {
+    /// The complete published worksheet was parsed.
+    Complete(crate::cell::Store),
+    /// Only the worksheet envelope, every row shell and every changed cell
+    /// were parsed; every omitted cell record is a verbatim source record.
+    Reduced(crate::cell::Store),
+}
+
+impl VerifiedStore {
+    fn store(&self) -> &crate::cell::Store {
+        match self {
+            Self::Complete(store) | Self::Reduced(store) => store,
+        }
+    }
+}
+
+/// Whether a value-only rewrite may verify through the reduced readback.
+///
+/// Change 0525 admitted this readback for the source-backed route. The
+/// eager route admits it only where the argument is local to cell records:
+///
+/// * the rewrite recorded which cell spans it copied verbatim from the
+///   source, whose complete parse already validated them (with their styles)
+///   in the same row, namespace and shared-string context;
+/// * compaction left the rewrite unchanged, so those spans index the bytes
+///   that will be published;
+/// * the published `<sheetData>` body lies wholly in the benign lane subset
+///   (rows of cells with at most one plain value: no formula, inline string,
+///   foreign or markup-compatibility content), and the part does not mention
+///   the markup-compatibility namespace, so no preprocessing can relate an
+///   omitted record to a retained one;
+/// * the complete store would exceed the validated-store handoff bounds, so
+///   the reduced store never reaches a published snapshot.
+///
+/// Anything else, and any refusal of the reduced readback itself, takes the
+/// complete parse, whose result and error remain authoritative.
+fn reduced_readback_admitted(
+    after: &[u8],
+    compacted: &raw::compact::WorksheetOutput,
+    omitted: &[raw::worksheet::edit::OmittedCells],
+    source_cells: usize,
+    changed_cells: usize,
+) -> bool {
+    !omitted.is_empty()
+        && compacted.body_admitted()
+        && compacted.bytes() == after
+        && (after.len() > MAX_VALIDATED_STORE_HANDOFF_BYTES
+            || source_cells.saturating_sub(changed_cells) > MAX_VALIDATED_STORE_HANDOFF_CELLS)
+        && memchr::memmem::find(after, litchi_ooxml_common::mce::NAMESPACE.as_bytes()).is_none()
+}
 const MAX_HYPERLINK_EDITS: usize = 4_096;
 
 #[derive(Clone, Copy)]
@@ -1584,7 +1637,35 @@ impl Edit {
             // and merge edits retain the full post-write store verification.
             let requires_store_verification =
                 !ordinary.is_empty() || !add.is_empty() || has_merge_removes;
-            if !ordinary.is_empty() {
+            // A value-only rewrite that is the worksheet's only byte change
+            // may record the cell spans it copies verbatim from the source;
+            // those records can narrow the post-write readback below. The
+            // provenance writer emits exactly the ordinary writer's bytes.
+            let value_only = after.is_none()
+                && ordinary.defaults.is_none()
+                && ordinary.rows.is_empty()
+                && ordinary.columns.is_empty()
+                && !ordinary.cells.is_empty()
+                && add.is_empty()
+                && effective_web.is_none()
+                && effective_page_breaks.is_none()
+                && effective_page_margins.is_none()
+                && effective_page_setup.is_none()
+                && effective_print_options.is_none()
+                && effective_hyperlinks.is_none()
+                && drawing.is_none();
+            let changed_cells = ordinary.cells.len();
+            let mut omitted: Box<[raw::worksheet::edit::OmittedCells]> = Box::new([]);
+            if value_only {
+                let rewrite = raw::worksheet::edit::rewrite_value_only_with_provenance(
+                    &before,
+                    &data.name,
+                    ordinary.cells,
+                    None,
+                )?;
+                omitted = rewrite.omitted;
+                after = Some(rewrite.bytes);
+            } else if !ordinary.is_empty() {
                 let input = after.as_deref().unwrap_or(&before);
                 after = Some(raw::worksheet::edit::rewrite(input, &data.name, ordinary)?);
             }
@@ -1670,14 +1751,47 @@ impl Edit {
                 after.ok_or_else(|| invalid("effective worksheet edit produced no bytes"))?;
             let compacted =
                 raw::compact::changed_worksheet(&after, "compact changed worksheet output")?;
-            let parsed = requires_store_verification
-                .then(|| raw::worksheet::parse(compacted.bytes(), || base.inner.shared_strings()))
-                .transpose()?;
+            let reduced = (requires_store_verification
+                && reduced_readback_admitted(
+                    &after,
+                    &compacted,
+                    &omitted,
+                    store.stored_cell_count(),
+                    changed_cells,
+                ))
+            .then(|| raw::worksheet::edit::reduced_readback(&after, &omitted).ok())
+            .flatten();
+            let parsed = if requires_store_verification {
+                let strings = || base.inner.shared_strings();
+                Some(
+                    match reduced
+                        .as_deref()
+                        .map(|reduced| raw::worksheet::parse(reduced, strings))
+                    {
+                        Some(Ok(reduced)) => {
+                            #[cfg(test)]
+                            raw::worksheet::lane::route::note_admitted(
+                                raw::worksheet::lane::route::Pass::Readback,
+                            );
+                            VerifiedStore::Reduced(reduced)
+                        },
+                        // A refused reduced readback falls back to the complete
+                        // parse, whose result and error stay authoritative.
+                        Some(Err(_)) | None => VerifiedStore::Complete(raw::worksheet::parse(
+                            compacted.bytes(),
+                            strings,
+                        )?),
+                    },
+                )
+            } else {
+                None
+            };
+            drop(reduced);
             // Resolve web validation after grid parsing to preserve error order.
             // Compaction may already prove that an ordinary worksheet has no bindings.
             let (after, parsed_web) = compacted.into_bytes_and_web()?;
             if let Some(parsed) = parsed.as_ref() {
-                base.inner.validate_styles(parsed)?;
+                base.inner.validate_styles(parsed.store())?;
             }
             for change in &changes[change_start..] {
                 match change {
@@ -1704,9 +1818,10 @@ impl Edit {
                         change,
                         ..
                     } => {
-                        let parsed = parsed.as_ref().ok_or_else(|| {
-                            invalid("worksheet merge verification lost the parsed store")
-                        })?;
+                        let parsed =
+                            parsed.as_ref().map(VerifiedStore::store).ok_or_else(|| {
+                                invalid("worksheet merge verification lost the parsed store")
+                            })?;
                         if parsed.merge_ranges().contains(range) != change.after() {
                             return Err(invalid(format!(
                                 "worksheet merged-range verification failed at {sheet}!{range}"
@@ -1714,9 +1829,10 @@ impl Edit {
                         }
                     },
                     Change::Defaults { sheet, after, .. } => {
-                        let parsed = parsed.as_ref().ok_or_else(|| {
-                            invalid("worksheet defaults verification lost the parsed store")
-                        })?;
+                        let parsed =
+                            parsed.as_ref().map(VerifiedStore::store).ok_or_else(|| {
+                                invalid("worksheet defaults verification lost the parsed store")
+                            })?;
                         if parsed.defaults() != after.as_ref() {
                             return Err(invalid(format!(
                                 "worksheet defaults edit verification failed at {sheet}"
@@ -1729,9 +1845,10 @@ impl Edit {
                         after,
                         ..
                     } => {
-                        let parsed = parsed.as_ref().ok_or_else(|| {
-                            invalid("worksheet cell verification lost the parsed store")
-                        })?;
+                        let parsed =
+                            parsed.as_ref().map(VerifiedStore::store).ok_or_else(|| {
+                                invalid("worksheet cell verification lost the parsed store")
+                            })?;
                         let actual = State::read(parsed.entry(*address), &base);
                         if actual != *after {
                             return Err(invalid(format!(
@@ -1742,9 +1859,10 @@ impl Edit {
                     Change::Row {
                         sheet, row, after, ..
                     } => {
-                        let parsed = parsed.as_ref().ok_or_else(|| {
-                            invalid("worksheet row verification lost the parsed store")
-                        })?;
+                        let parsed =
+                            parsed.as_ref().map(VerifiedStore::store).ok_or_else(|| {
+                                invalid("worksheet row verification lost the parsed store")
+                            })?;
                         let actual = RowState::read(parsed.row_entry(*row), &base);
                         if actual != *after {
                             return Err(invalid(format!(
@@ -1759,9 +1877,10 @@ impl Edit {
                         after,
                         ..
                     } => {
-                        let parsed = parsed.as_ref().ok_or_else(|| {
-                            invalid("worksheet column verification lost the parsed store")
-                        })?;
+                        let parsed =
+                            parsed.as_ref().map(VerifiedStore::store).ok_or_else(|| {
+                                invalid("worksheet column verification lost the parsed store")
+                            })?;
                         let actual = ColumnState::read(parsed.column_entry(*column), &base);
                         if actual != *after {
                             return Err(invalid(format!(
@@ -1822,7 +1941,9 @@ impl Edit {
                 }
             }
             let after = Arc::new(after);
-            if let Some(parsed) = parsed {
+            // Only a complete readback describes the published worksheet; a
+            // reduced one is used exclusively above the handoff bounds.
+            if let Some(VerifiedStore::Complete(parsed)) = parsed {
                 if parsed.stored_cell_count() <= MAX_VALIDATED_STORE_HANDOFF_CELLS
                     && after.len() <= MAX_VALIDATED_STORE_HANDOFF_BYTES
                 {

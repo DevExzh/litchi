@@ -13,7 +13,7 @@ use crate::error::{Error, Result, allocation};
 /// retained. Callers must compare with the exact source before invoking this
 /// function so unchanged producer XML keeps its OPC source provenance.
 pub(crate) fn changed(input: &[u8], resource: &'static str) -> Result<Vec<u8>> {
-    changed_observed(input, resource, &mut Unobserved)
+    changed_observed(input, resource, &mut Unobserved).map(|(bytes, _admitted)| bytes)
 }
 
 /// A consumer of the events compaction emits.
@@ -90,11 +90,18 @@ impl AdmittedBody<'_> {
 pub(crate) struct WorksheetOutput {
     bytes: Vec<u8>,
     web: super::web::check::Probe,
+    admitted: bool,
 }
 
 impl WorksheetOutput {
     pub(crate) fn bytes(&self) -> &[u8] {
         &self.bytes
+    }
+
+    /// Whether the `<sheetData>` body was admitted by the benign lane, so
+    /// every row and cell of the compacted output lies in its subset.
+    pub(crate) fn body_admitted(&self) -> bool {
+        self.admitted
     }
 
     pub(crate) fn into_bytes_and_web(self) -> Result<(Vec<u8>, crate::web::Bindings)> {
@@ -105,15 +112,20 @@ impl WorksheetOutput {
 
 pub(crate) fn changed_worksheet(input: &[u8], resource: &'static str) -> Result<WorksheetOutput> {
     let mut web = super::web::check::Probe::default();
-    let bytes = changed_observed(input, resource, &mut web)?;
-    Ok(WorksheetOutput { bytes, web })
+    let (bytes, admitted) = changed_observed(input, resource, &mut web)?;
+    Ok(WorksheetOutput {
+        bytes,
+        web,
+        admitted,
+    })
 }
 
+/// Compact `input`, reporting whether a `<sheetData>` body took the lane.
 fn changed_observed(
     input: &[u8],
     resource: &'static str,
     observer: &mut impl Observer,
-) -> Result<Vec<u8>> {
+) -> Result<(Vec<u8>, bool)> {
     let mut reader = NsReader::from_reader(input);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
@@ -123,6 +135,7 @@ fn changed_observed(
         .map_err(|source| allocation(resource, source))?;
     let mut writer = Writer::new(bytes);
     let mut preserve = Vec::new();
+    let mut admitted = false;
     #[cfg(not(test))]
     let lane_enabled = true;
     #[cfg(test)]
@@ -137,6 +150,7 @@ fn changed_observed(
         let preserved = preserve.last().copied().unwrap_or(false);
         match compact_body(input, entry, preserved, writer.get_mut(), observer)? {
             Some(resume) => {
+                admitted = true;
                 let spliced = lane::splice_without_body(input, entry.position, resume)?;
                 let mut tail = NsReader::from_reader(spliced.as_slice());
                 tail.config_mut().trim_text(false);
@@ -156,7 +170,7 @@ fn changed_observed(
             },
         }
     }
-    Ok(writer.into_inner())
+    Ok((writer.into_inner(), admitted))
 }
 
 /// Compact reader events until end of file.
