@@ -11,8 +11,8 @@ use super::super::{
     codec,
     model::{
         CharacterFormatting, FloatingAnchorKind, MainReferenceKind, ParagraphFormatting,
-        VBA_PROJECT_STORAGE_NAME, WORD_DOCUMENT_CLSID, WriteError, Writer, WriterShape, pack_dttm,
-        utf16_code_unit_len,
+        TextStream, VBA_PROJECT_STORAGE_NAME, WORD_DOCUMENT_CLSID, WriteError, Writer, WriterShape,
+        contains_field_character, pack_dttm, utf16_code_unit_len, utf16_units,
     },
 };
 
@@ -76,25 +76,30 @@ impl Writer {
         .map_err(WriteError::InvalidData)
     }
 
+    /// Hands the finished streams to the compound-file writer by value, so no
+    /// stream payload is copied between assembly and serialization.
     fn populate_compound_document(
         &self,
         ole_writer: &mut OleWriter,
-        word_document_stream: &[u8],
-        table_stream: &[u8],
-        data_stream: &[u8],
+        streams: DocOutputStreams,
     ) -> Result<(), WriteError> {
         ole_writer.set_root_clsid(WORD_DOCUMENT_CLSID);
 
         // Preserve the conventional stream order so WordDocument occupies the
         // first regular FAT sector, followed by the table and Data streams.
-        ole_writer.create_stream(&["WordDocument"], word_document_stream)?;
-        ole_writer.create_stream(&["1Table"], table_stream)?;
-        ole_writer.create_stream(&["Data"], data_stream)?;
+        let DocOutputStreams {
+            word_document,
+            table,
+            data,
+        } = streams;
+        ole_writer.create_stream_owned(&["WordDocument"], word_document)?;
+        ole_writer.create_stream_owned(&["1Table"], table)?;
+        ole_writer.create_stream_owned(&["Data"], data)?;
 
         let compobj_data = crate::writer::ole_metadata::generate_compobj_stream();
         let ole_data = crate::writer::ole_metadata::generate_ole_stream();
-        ole_writer.create_stream(&["\x01CompObj"], &compobj_data)?;
-        ole_writer.create_stream(&["\x01Ole"], &ole_data)?;
+        ole_writer.create_stream_owned(&["\x01CompObj"], compobj_data)?;
+        ole_writer.create_stream_owned(&["\x01Ole"], ole_data)?;
 
         if let Some(project) = &self.vba_project {
             ole_writer.create_storage(&[VBA_PROJECT_STORAGE_NAME])?;
@@ -107,6 +112,96 @@ impl Writer {
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), WriteError> {
         self.build_ole_writer()?.save(path)?;
         Ok(())
+    }
+
+    /// Capacity for the `WordDocument` stream, used only to allocate it once
+    /// instead of growing it by doubling: the FIB placeholder of
+    /// `text_start` bytes, an upper bound of the text, and room for the FKP
+    /// pages, the SEPX and the final 4 KiB padding.
+    ///
+    /// Every story writes its text as UTF-16 plus structural marks: paragraph,
+    /// cell and row marks, reference and annotation markers, and text-box
+    /// paragraph breaks. Text is counted in UTF-16 code units (a text box's
+    /// line breaks are single characters of its text that each become one
+    /// mark), and each paragraph, run, cell, row, note, comment and text box
+    /// is allowed four marks, more than any story writes for it. An FKP page
+    /// holds at most 101 CHPX or 29 PAPX entries and usually dozens, so one
+    /// page per eight such items, plus a few, covers ordinary formatting. A
+    /// short estimate only means the stream grows as it always did.
+    fn word_document_capacity_hint(&self, text_start: usize) -> usize {
+        fn paragraphs_bound<'a>(
+            paragraphs: impl IntoIterator<Item = &'a super::super::model::WritableParagraph>,
+        ) -> (usize, usize) {
+            paragraphs
+                .into_iter()
+                .fold((0usize, 0usize), |(units, items), paragraph| {
+                    let text = paragraph
+                        .runs
+                        .iter()
+                        .map(|run| utf16_units(&run.text))
+                        .fold(0usize, usize::saturating_add);
+                    (
+                        units.saturating_add(text),
+                        items.saturating_add(1).saturating_add(paragraph.runs.len()),
+                    )
+                })
+        }
+        let (mut units, mut items) = paragraphs_bound(&self.paragraphs);
+        for row in self.tables.iter().flat_map(|table| &table.rows) {
+            items = items.saturating_add(1);
+            for cell in &row.cells {
+                let (cell_units, cell_items) = paragraphs_bound(&cell.paragraphs);
+                units = units.saturating_add(cell_units);
+                items = items.saturating_add(1).saturating_add(cell_items);
+            }
+        }
+        for text in self
+            .footnotes
+            .iter()
+            .chain(&self.endnotes)
+            .map(|note| note.text.as_str())
+            .chain(self.comments.iter().map(|comment| comment.text.as_str()))
+            .chain(
+                self.shapes
+                    .iter()
+                    .chain(&self.header_shapes)
+                    .filter_map(|shape| shape.text.as_deref()),
+            )
+        {
+            units = units.saturating_add(utf16_units(text));
+            items = items.saturating_add(1);
+        }
+        for paragraphs in [
+            &self.header_even,
+            &self.header_odd,
+            &self.header_first,
+            &self.footer_even,
+            &self.footer_odd,
+            &self.footer_first,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            for paragraph in paragraphs {
+                let text = paragraph
+                    .runs
+                    .iter()
+                    .map(|(text, _)| utf16_units(text))
+                    .fold(0usize, usize::saturating_add);
+                units = units.saturating_add(text);
+                items = items.saturating_add(1).saturating_add(paragraph.runs.len());
+            }
+            items = items.saturating_add(1);
+        }
+        let text = units
+            .saturating_add(items.saturating_mul(4))
+            .saturating_add(64)
+            .saturating_mul(2);
+        let fkp_pages = (items / 8).saturating_add(4);
+        text_start
+            .saturating_add(text)
+            .saturating_add(fkp_pages.saturating_mul(512))
+            .saturating_add(8192)
     }
 
     /// Build and validate the three core DOC streams.
@@ -130,17 +225,18 @@ impl Writer {
 
         // Based on Apache POI's HWPFDocument.write() implementation
 
-        let mut word_document_stream = Vec::new();
         let mut table_stream = vec![0u8; table_header_len];
 
-        // Reserve space for FIB (Word 2007+ format = 1248 bytes, includes cswNew)
-        let fib_placeholder = vec![0u8; 1248];
-        word_document_stream.extend_from_slice(&fib_placeholder);
+        // Reserve space for FIB (Word 2007+ format = 1248 bytes, includes
+        // cswNew); fcMin is the padded start of the text, at the next 512-byte
+        // boundary.
+        const FIB_PLACEHOLDER_BYTES: usize = 1248;
+        let text_start = FIB_PLACEHOLDER_BYTES + (512 - (FIB_PLACEHOLDER_BYTES % 512)) % 512;
 
-        // fcMin will be set to padded start of text (after 512 alignment below)
-
-        // Build text stream and piece table
-        let mut text_stream = Vec::new();
+        // Build the WordDocument stream (the zeroed placeholder, then the text
+        // every story appends) and the piece table.
+        let mut text_stream =
+            TextStream::new(text_start, self.word_document_capacity_hint(text_start));
         let mut data_stream = data_prefix;
         let mut floating_anchors: Vec<(u32, FloatingAnchorKind)> = Vec::new();
         let mut current_cp = 0u32;
@@ -150,12 +246,7 @@ impl Writer {
         let mut font_builder = FontTableBuilder::new();
         let revision_data = self.build_revision_writer_data()?;
 
-        // Pad to 512-byte boundary before text
-        let current_size = word_document_stream.len();
-        let padding_needed = (512 - (current_size % 512)) % 512;
-        word_document_stream.resize(current_size + padding_needed, 0);
-
-        let text_fc_start = word_document_stream.len() as u32;
+        let text_fc_start = text_start as u32;
         let fc_min: u32 = text_fc_start;
 
         // Build one sorted list for all main-story reference characters.
@@ -178,11 +269,11 @@ impl Writer {
         let mut reference_inject_idx: usize = 0;
 
         for paragraph in &self.paragraphs {
-            let fc_para_start = text_fc_start + text_stream.len() as u32;
+            let fc_para_start = text_fc_start + text_stream.text_len() as u32;
             let mut para_chars: u32 = 0;
             let mut last_run_index_for_para: Option<usize> = None;
             for run in &paragraph.runs {
-                let run_fc_start = text_fc_start + text_stream.len() as u32;
+                let run_fc_start = text_fc_start + text_stream.text_len() as u32;
                 let run_text = &run.text;
                 let run_len_chars = utf16_code_unit_len(run_text)?;
                 let grpprl = codec::build_revision_chpx_grpprl(
@@ -230,22 +321,24 @@ impl Writer {
                     ));
                 }
 
-                let mut utf16_offset = 0u32;
-                for ch in run_text.chars() {
-                    let cp = current_cp + para_chars + utf16_offset;
-                    match ch as u32 {
-                        0x0013 => field_char_cps.push((cp, 0x13)),
-                        0x0014 => field_char_cps.push((cp, 0x14)),
-                        0x0015 => field_char_cps.push((cp, 0x15)),
-                        _ => {},
+                // Field characters are rare; a run without any skips the
+                // per-character CP walk, which records nothing for it.
+                if contains_field_character(run_text) {
+                    let mut utf16_offset = 0u32;
+                    for ch in run_text.chars() {
+                        let cp = current_cp + para_chars + utf16_offset;
+                        match ch as u32 {
+                            0x0013 => field_char_cps.push((cp, 0x13)),
+                            0x0014 => field_char_cps.push((cp, 0x14)),
+                            0x0015 => field_char_cps.push((cp, 0x15)),
+                            _ => {},
+                        }
+                        utf16_offset += ch.len_utf16() as u32;
                     }
-                    utf16_offset += ch.len_utf16() as u32;
+                    debug_assert_eq!(utf16_offset, run_len_chars);
                 }
-                debug_assert_eq!(utf16_offset, run_len_chars);
 
-                for u in run_text.encode_utf16() {
-                    text_stream.extend_from_slice(&u.to_le_bytes());
-                }
+                text_stream.push_utf16le(run_text, run_len_chars);
                 let run_fc_end = run_fc_start + run_len_chars * 2;
                 chpx_entries.push((run_fc_start, run_fc_end, grpprl));
                 para_chars += run_len_chars;
@@ -256,7 +349,7 @@ impl Writer {
                 let (ref_cp, kind, entry_idx) = main_refs[reference_inject_idx];
                 if ref_cp <= current_cp + para_chars {
                     let actual_cp = current_cp + para_chars;
-                    let fc_ref = text_fc_start + text_stream.len() as u32;
+                    let fc_ref = text_fc_start + text_stream.text_len() as u32;
                     let marker = match kind {
                         MainReferenceKind::Footnote | MainReferenceKind::Endnote => 0x0002u16,
                         MainReferenceKind::Comment => 0x0005u16,
@@ -294,7 +387,7 @@ impl Writer {
             if let Some(last_idx) = last_run_index_for_para {
                 chpx_entries[last_idx].1 += 2;
             }
-            let fc_para_end = text_fc_start + text_stream.len() as u32;
+            let fc_para_end = text_fc_start + text_stream.text_len() as u32;
             let pap_grpprl =
                 codec::build_revision_papx_grpprl(&paragraph.formatting, revision_data.as_ref())?;
             papx_entries.push((fc_para_start, fc_para_end, pap_grpprl));
@@ -422,16 +515,13 @@ impl Writer {
         let mut ccp_txbx = 0u32;
         if !textbox_shapes.is_empty() {
             let txbx_story_start_cp = current_cp;
-            let fc_story_start = text_fc_start + text_stream.len() as u32;
+            let fc_story_start = text_fc_start + text_stream.text_len() as u32;
             for entry in &textbox_shapes {
                 let text = entry.text.as_deref().expect("filtered on text presence");
                 txbx_start_cps.push(current_cp - txbx_story_start_cp);
                 // '\n' (and '\r' / "\r\n") separate plain-text paragraphs.
                 for paragraph in text.replace("\r\n", "\n").replace('\r', "\n").split('\n') {
-                    let para_len = utf16_code_unit_len(paragraph)?;
-                    for unit in paragraph.encode_utf16() {
-                        text_stream.extend_from_slice(&unit.to_le_bytes());
-                    }
+                    let para_len = text_stream.append_utf16le(paragraph)?;
                     text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
                     current_cp += para_len + 1;
                 }
@@ -443,7 +533,7 @@ impl Writer {
             text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
             current_cp += 1;
             ccp_txbx = current_cp - txbx_story_start_cp;
-            let fc_story_end = text_fc_start + text_stream.len() as u32;
+            let fc_story_end = text_fc_start + text_stream.text_len() as u32;
             chpx_entries.push((fc_story_start, fc_story_end, Vec::new()));
             papx_entries.push((
                 fc_story_start,
@@ -495,12 +585,12 @@ impl Writer {
         let mut ccp_hdr_txbx = 0u32;
         if !header_texts.is_empty() {
             let hdr_story_start_cp = current_cp;
-            let fc_story_start = text_fc_start + text_stream.len() as u32;
+            let fc_story_start = text_fc_start + text_stream.text_len() as u32;
             let (start_cps, ccp) =
                 codec::write_textbox_story_text(&header_texts, &mut text_stream, &mut current_cp)?;
             hdr_txbx_start_cps = start_cps;
             ccp_hdr_txbx = ccp;
-            let fc_story_end = text_fc_start + text_stream.len() as u32;
+            let fc_story_end = text_fc_start + text_stream.text_len() as u32;
             chpx_entries.push((fc_story_start, fc_story_end, Vec::new()));
             papx_entries.push((
                 fc_story_start,
@@ -529,7 +619,7 @@ impl Writer {
             || endnote_plcfs.is_some()
             || ccp_txbx > 0;
         if has_subdocs {
-            let fc_trailing = text_fc_start + text_stream.len() as u32;
+            let fc_trailing = text_fc_start + text_stream.text_len() as u32;
             text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
             let fc_trailing_end = fc_trailing + 2;
             chpx_entries.push((fc_trailing, fc_trailing_end, Vec::new()));
@@ -630,7 +720,7 @@ impl Writer {
             self.glossary_metadata.as_ref(),
             table_offset,
             text_length,
-            &text_stream,
+            text_stream.text(),
         )?;
 
         // Write PlcfHdd if present
@@ -696,7 +786,7 @@ impl Writer {
             let main_text_bytes = usize::try_from(text_length)
                 .ok()
                 .and_then(|value| value.checked_mul(2))
-                .and_then(|length| text_stream.get(..length))
+                .and_then(|length| text_stream.text().get(..length))
                 .ok_or_else(|| {
                     WriteError::InvalidData(
                         "DOC main field story exceeds the text stream".to_string(),
@@ -745,38 +835,36 @@ impl Writer {
         fib.set_sttbfffn(table_offset, font_table.len() as u32);
         table_stream.extend_from_slice(&font_table);
 
-        // Append text and write FKPs
-        word_document_stream.extend_from_slice(&text_stream);
+        // The WordDocument stream is the FIB placeholder and its padding, the
+        // text, padding to a 512-byte page, the CHPX and PAPX FKP pages, and
+        // the SEPX. The placeholder and the text are already in place; the
+        // remaining parts are built first, in the order the stream used to be
+        // appended, and then appended to the text where it was written.
+        let text_end = text_start + text_stream.text_len();
 
         // Capture fcMac AFTER text, BEFORE FKPs (POI line 703)
-        let fc_mac_value = word_document_stream.len() as u32;
+        let fc_mac_value = text_end as u32;
 
-        // Write FKPs to WordDocument stream at 512-byte aligned offsets
-        let current_size = word_document_stream.len();
-        let padding_needed = (512 - (current_size % 512)) % 512;
-        word_document_stream.resize(current_size + padding_needed, 0);
+        // FKPs start at the next 512-byte aligned offset.
+        let fkp_start = text_end + (512 - (text_end % 512)) % 512;
 
         // ── CHPX FKPs (multi-page) ──
-        let chpx_first_page = (word_document_stream.len() / 512) as u32;
+        let chpx_first_page = (fkp_start / 512) as u32;
         let mut chpx_builder = crate::writer::fkp::ChpxFkpBuilder::new();
-        for (fc_s, fc_e, grpprl) in &chpx_entries {
-            chpx_builder.add_entry(*fc_s, *fc_e, grpprl.clone());
+        for (fc_s, fc_e, grpprl) in chpx_entries {
+            chpx_builder.add_entry(fc_s, fc_e, grpprl);
         }
         let chpx_pages = chpx_builder.generate_pages()?;
-        for page in &chpx_pages.pages {
-            word_document_stream.extend_from_slice(page);
-        }
+        let papx_start = fkp_start + chpx_pages.pages.iter().map(Vec::len).sum::<usize>();
 
         // ── PAPX FKPs (multi-page) ──
-        let papx_first_page = (word_document_stream.len() / 512) as u32;
+        let papx_first_page = (papx_start / 512) as u32;
         let mut papx_builder = crate::writer::fkp::PapxFkpBuilder::new();
-        for (fc_s, fc_e, grpprl) in &papx_entries {
-            papx_builder.add_entry(*fc_s, *fc_e, grpprl.clone());
+        for (fc_s, fc_e, grpprl) in papx_entries {
+            papx_builder.add_entry(fc_s, fc_e, grpprl);
         }
         let papx_pages = papx_builder.generate_pages()?;
-        for page in &papx_pages.pages {
-            word_document_stream.extend_from_slice(page);
-        }
+        let sepx_start = papx_start + papx_pages.pages.iter().map(Vec::len).sum::<usize>();
 
         // ── Write bin tables to table stream ──
         let chpx_bin_table = crate::writer::bin_table::generate_bin_table_from_pages(
@@ -796,7 +884,7 @@ impl Writer {
         table_stream.extend_from_slice(&papx_bin_table);
 
         // Write SEPX to WordDocument stream (after text and FKPs)
-        let sepx_offset = word_document_stream.len() as u32;
+        let sepx_offset = sepx_start as u32;
         let mut grpf_ihdt: u8 = 0;
         if self.header_even.is_some() {
             grpf_ihdt |= 0x01;
@@ -840,7 +928,21 @@ impl Writer {
             self.section_page_borders.as_ref(),
         )
         .map_err(|error| WriteError::InvalidData(error.clone()))?;
+
+        let word_document_len = sepx_start + sepx_data.len();
+        let mut word_document_stream = text_stream.into_stream();
+        // Within the capacity reserved up front unless the estimate was short.
+        word_document_stream.reserve_exact(
+            word_document_len
+                .next_multiple_of(4096)
+                .saturating_sub(word_document_stream.len()),
+        );
+        word_document_stream.resize(fkp_start, 0);
+        for page in chpx_pages.pages.iter().chain(&papx_pages.pages) {
+            word_document_stream.extend_from_slice(page);
+        }
         word_document_stream.extend_from_slice(&sepx_data);
+        debug_assert_eq!(word_document_stream.len(), word_document_len);
 
         // Write section table to table stream
         let total_cp = current_cp;
@@ -1037,12 +1139,7 @@ impl Writer {
     fn build_ole_writer(&mut self) -> Result<OleWriter, WriteError> {
         let streams = self.build_output_streams()?;
         let mut ole_writer = OleWriter::new();
-        self.populate_compound_document(
-            &mut ole_writer,
-            &streams.word_document,
-            &streams.table,
-            &streams.data,
-        )?;
+        self.populate_compound_document(&mut ole_writer, streams)?;
         Ok(ole_writer)
     }
 

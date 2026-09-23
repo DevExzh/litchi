@@ -35,12 +35,11 @@ use crate::writer::font_table::FontTableBuilder;
 use crate::writer::revisions::TextRevision;
 
 use super::model::{
-    CharacterFormatting, ParagraphFormatting, RevisionWriterData, WriteError, pack_dttm,
-    utf16_code_unit_len,
+    CharacterFormatting, ParagraphFormatting, RevisionWriterData, TextStream, WriteError, pack_dttm,
 };
 pub(super) fn write_textbox_story_text(
     texts: &[&str],
-    text_stream: &mut Vec<u8>,
+    text_stream: &mut TextStream,
     current_cp: &mut u32,
 ) -> Result<(Vec<u32>, u32), WriteError> {
     let story_start_cp = *current_cp;
@@ -48,10 +47,7 @@ pub(super) fn write_textbox_story_text(
     for text in texts {
         start_cps.push(*current_cp - story_start_cp);
         for paragraph in text.replace("\r\n", "\n").replace('\r', "\n").split('\n') {
-            let para_len = utf16_code_unit_len(paragraph)?;
-            for unit in paragraph.encode_utf16() {
-                text_stream.extend_from_slice(&unit.to_le_bytes());
-            }
+            let para_len = text_stream.append_utf16le(paragraph)?;
             text_stream.extend_from_slice(&0x000Du16.to_le_bytes());
             *current_cp += para_len + 1;
         }
