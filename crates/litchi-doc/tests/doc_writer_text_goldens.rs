@@ -356,3 +356,19 @@ fn fresh_doc_writer_text_paths_match_the_pre_0753_goldens() {
         mismatches.join("\n")
     );
 }
+
+/// Writing the same writer twice gives the same bytes: the text stream is
+/// built per write and nothing is left behind in the writer.
+#[test]
+fn a_writer_written_twice_writes_the_same_bytes() {
+    let mut writer = Writer::new();
+    writer.add_paragraph("once 😀").unwrap();
+    writer
+        .add_paragraph(&repeat_to("twice payload ", 40_000))
+        .unwrap();
+    let mut first = Cursor::new(Vec::new());
+    writer.write_to(&mut first).unwrap();
+    let mut second = Cursor::new(Vec::new());
+    writer.write_to(&mut second).unwrap();
+    assert_eq!(first.into_inner(), second.into_inner());
+}

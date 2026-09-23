@@ -220,3 +220,44 @@ fn many_distinct_and_repeated_strings_read_back_cell_by_cell() {
         );
     }
 }
+
+/// The shared-string table is staged per write: writing the same writer twice
+/// gives the same bytes, and strings added between writes are staged too.
+#[test]
+fn a_writer_written_twice_and_extended_restages_its_strings() {
+    use litchi_core::sheet::{Cell as _, CellValue};
+
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Reused").unwrap();
+    for row in 0..50u32 {
+        writer
+            .write_string(sheet, row, 0, &format!("value {} ✓", row % 17))
+            .unwrap();
+    }
+    let mut first = Cursor::new(Vec::new());
+    writer.write_to(&mut first).unwrap();
+    let mut second = Cursor::new(Vec::new());
+    writer.write_to(&mut second).unwrap();
+    assert_eq!(first.get_ref(), second.get_ref());
+
+    writer.write_string(sheet, 0, 1, "added later 😀").unwrap();
+    writer.write_string(sheet, 1, 1, "value 3 ✓").unwrap();
+    let mut third = Cursor::new(Vec::new());
+    writer.write_to(&mut third).unwrap();
+    let workbook = litchi_xls::Workbook::new(Cursor::new(third.into_inner())).unwrap();
+    let worksheet = workbook.xls_worksheet(0).unwrap();
+    for row in 0..50u32 {
+        assert_eq!(
+            worksheet.get_cell(row, 0).unwrap().value(),
+            &CellValue::String(format!("value {} ✓", row % 17))
+        );
+    }
+    assert_eq!(
+        worksheet.get_cell(0, 1).unwrap().value(),
+        &CellValue::String("added later 😀".to_string())
+    );
+    assert_eq!(
+        worksheet.get_cell(1, 1).unwrap().value(),
+        &CellValue::String("value 3 ✓".to_string())
+    );
+}

@@ -355,3 +355,34 @@ fn fresh_ppt_writer_text_paths_match_the_pre_0753_goldens() {
         mismatches.join("\n")
     );
 }
+
+/// Writing the same writer twice gives the same bytes, and a refused write
+/// leaves the destination untouched even though slide records are now
+/// assembled in place.
+#[test]
+fn a_writer_written_twice_writes_the_same_bytes_and_a_refusal_writes_nothing() {
+    let mut writer = Writer::new();
+    let slide = writer.add_slide().unwrap();
+    writer
+        .add_textbox(slide, 10, 10, 300, 40, &repeat_to("twice ✓ ", 50_000))
+        .unwrap();
+    let mut first = Cursor::new(Vec::new());
+    writer.write_to(&mut first).unwrap();
+    let mut second = Cursor::new(Vec::new());
+    writer.write_to(&mut second).unwrap();
+    assert_eq!(first.get_ref(), second.get_ref());
+
+    // A later slide is refused while it is being assembled: its drawing is
+    // already in the stream when the over-long comment author is rejected.
+    let refused = writer.add_slide().unwrap();
+    writer
+        .add_textbox(refused, 10, 10, 100, 40, &repeat_to("in place ", 20_000))
+        .unwrap();
+    writer
+        .add_comment(refused, SlideComment::new(&"a".repeat(60), "text", 1, 1))
+        .unwrap();
+    let mut output = Cursor::new(vec![0xA5; 16]);
+    let error = writer.write_to(&mut output).unwrap_err();
+    assert!(error.to_string().contains("comment"), "{error}");
+    assert_eq!(output.into_inner(), vec![0xA5; 16]);
+}
