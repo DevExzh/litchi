@@ -57,5 +57,24 @@
    "/home/zhuhe/code/litchi-worktrees/0757-before-src": "absent",
    "/home/zhuhe/code/litchi-worktrees/scratch/0757/*": "empty"
   }
+ },
+ "review_round": {
+  "date": "2026-09-23",
+  "removed": [
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0757",
+    "bytes": 64632749026,
+    "contents": "the fresh target directory of the review round (6cebd664e6): check, clippy, rustdoc and test builds of litchi-xls, litchi-doc, litchi-ppt, the facade and a check of tools/perf-baseline"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/scratch/0757/*",
+    "bytes": 515399,
+    "contents": "test and gate logs of the review round and the findings probe output, copied into gates.txt and behaviour/findings-probe-review.txt"
+   }
+  ],
+  "verified_after_removal": {
+   "/home/zhuhe/code/litchi-worktrees/targets/0757": "absent",
+   "/home/zhuhe/code/litchi-worktrees/scratch/0757/*": "empty"
+  }
  }
 }
