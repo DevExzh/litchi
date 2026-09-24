@@ -312,3 +312,92 @@ fn closure_enforces_aggregate_decoded_string_quota() {
         9,
     );
 }
+
+/// A package holding `custom/web.xml` whose payload cannot be decoded: the
+/// deferred open admits the member and its first decode refuses it.
+fn package_with_corrupt_part() -> OpcPackage {
+    let name = PackURI::new("/custom/web.xml").unwrap();
+    let mut source = OpcPackage::new();
+    source.add_part(Box::new(BlobPart::new(
+        name.clone(),
+        "application/xml".to_owned(),
+        b"<webextension-payload-that-will-not-decode/>".to_vec(),
+    )));
+    let mut bytes = litchi_opc::PackageWriter::to_bytes(&source).unwrap();
+    // Damage the first byte of the member's data, found through its local
+    // header, so the payload fails to inflate or fails its CRC.
+    let member = b"custom/web.xml";
+    let header = bytes
+        .windows(4)
+        .enumerate()
+        .find_map(|(offset, window)| {
+            (window == b"PK\x03\x04"
+                && bytes.get(offset + 30..offset + 30 + member.len()) == Some(member.as_slice()))
+            .then_some(offset)
+        })
+        .expect("member local header");
+    let name_length = usize::from(u16::from_le_bytes([bytes[header + 26], bytes[header + 27]]));
+    let extra_length = usize::from(u16::from_le_bytes([bytes[header + 28], bytes[header + 29]]));
+    bytes[header + 30 + name_length + extra_length] ^= 0xff;
+    let package = OpcPackage::from_vec(bytes).expect("the deferred open admits the member");
+    assert!(
+        package.get_part(&name).is_err(),
+        "the fixture's payload must fail to decode"
+    );
+    package
+}
+
+fn present_part_member(output: &mut Vec<u8>) {
+    member(
+        output,
+        2,
+        1,
+        Some(b"application/xml"),
+        b"<a/>",
+        Some((0, b"")),
+    );
+}
+
+#[test]
+fn a_closure_expecting_absence_refuses_a_present_part_that_fails_to_decode() {
+    let package = package_with_corrupt_part();
+    let limits = Limits::standard();
+    let records = decode_closure(
+        &single_record(2, "/custom/web.xml", absent_member, present_part_member),
+        &limits,
+    )
+    .unwrap();
+    let error = validate_closure_source(&package, &records, &limits)
+        .expect_err("a present part is not absent because its payload cannot decode");
+    assert!(
+        matches!(&error, Error::Invalid(message) if message == "unexpected Web Extensions source part"),
+        "{error:?}"
+    );
+}
+
+#[test]
+fn a_closure_expecting_a_part_reports_its_decode_failure_not_absence() {
+    let package = package_with_corrupt_part();
+    let limits = Limits::standard();
+    let records = decode_closure(
+        &single_record(2, "/custom/web.xml", present_part_member, absent_member),
+        &limits,
+    )
+    .unwrap();
+    let error = validate_closure_source(&package, &records, &limits)
+        .expect_err("the payload cannot be compared");
+    assert!(
+        matches!(
+            error,
+            Error::Opc(litchi_opc::OpcError::ZipError(_) | litchi_opc::OpcError::IoError(_))
+        ),
+        "{error:?}"
+    );
+}
+
+#[test]
+fn source_reconstruction_sees_a_present_part_whose_payload_fails_to_decode() {
+    let package = package_with_corrupt_part();
+    assert!(package_has_part(&package, "/custom/web.xml").unwrap());
+    assert!(!package_has_part(&package, "/custom/absent.xml").unwrap());
+}

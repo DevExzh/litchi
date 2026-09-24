@@ -2394,7 +2394,10 @@ fn validate_closure_source(
                 },
                 2 => {
                     let name = PackURI::new(record.name.clone()).map_err(Error::Uri)?;
-                    if package.get_part(&name).is_ok() {
+                    // Presence is a question about names. `get_part` decodes,
+                    // so a present part whose payload fails to decode would
+                    // read as absent and later be silently replaced.
+                    if package.part_metadata(&name).is_some() {
                         return invalid("unexpected Web Extensions source part".into());
                     }
                 },
@@ -2426,9 +2429,15 @@ fn validate_closure_source(
             },
             2 => {
                 let name = PackURI::new(record.name.clone()).map_err(Error::Uri)?;
-                let part = package.get_part(&name).map_err(|_| {
-                    Error::Missing(format!("Web Extensions source part '{}'", name.as_str()))
-                })?;
+                if package.part_metadata(&name).is_none() {
+                    return Err(Error::Missing(format!(
+                        "Web Extensions source part '{}'",
+                        name.as_str()
+                    )));
+                }
+                // The part is present: a decode failure is its own refusal,
+                // not absence.
+                let part = package.get_part(&name)?;
                 if expected.content_type.as_deref() != Some(part.content_type())
                     || expected.payload.as_slice() != part.blob()
                 {
@@ -2592,7 +2601,9 @@ fn reconstruct_source(
 
 fn package_has_part(package: &OpcPackage, name: &str) -> Result<bool> {
     let name = PackURI::new(name.to_owned()).map_err(Error::Uri)?;
-    Ok(package.get_part(&name).is_ok())
+    // Without decoding: a present part whose payload fails to decode is still
+    // present.
+    Ok(package.part_metadata(&name).is_some())
 }
 
 fn is_xml_content(content_type: &str, name: &PackURI) -> bool {
