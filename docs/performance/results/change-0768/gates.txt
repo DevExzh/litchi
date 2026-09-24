@@ -44,3 +44,41 @@ python3 tools/non_iwork_gate.py verify                                    exit 1
 # CARGO_INCREMENTAL=0 target: cargo fmt --all --check exit 0; RUSTDOCFLAGS="-D warnings"
 # cargo doc -p litchi-doc --no-deps exit 0; cargo clippy -p litchi-doc --lib --no-deps
 # -- -D warnings exit 0; cargo test -p litchi-doc --lib -- parts::protection 23 passed.
+
+# ---------------------------------------------------------------------------
+# Review follow-ups (after the independent review, merge-after-fixes).
+# Gates run on 83fa8563d716de58ae73e0ccd46141152867d471 (the last code commit)
+# with a fresh CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0768,
+# CARGO_INCREMENTAL=0, CARGO_BUILD_JOBS=6, TMPDIR under the scratch directory,
+# Rust 1.95.0, the same lockfile.
+
+cargo fmt --all --check                                                   exit 0
+RUSTDOCFLAGS="-D warnings" cargo doc -p litchi-doc --no-deps --locked --offline
+                                                                          exit 0
+cargo check -p litchi-doc --all-targets --locked --offline                exit 0
+cargo clippy -p litchi-doc --lib --no-deps --locked --offline -- -D warnings
+                                                                          exit 0
+cargo clippy -p litchi-doc --all-targets --no-deps --locked --offline -- -D warnings
+                                                                          exit 0
+cargo test -p litchi-doc --locked --offline                               exit 0
+    1326 passed, 0 failed, 13 ignored
+cargo check -p litchi --all-targets --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+                                                                          exit 0
+cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+                                                                          exit 0
+    382 passed, 0 failed, 7 ignored
+python3 tools/check_crate_boundaries.py                                   exit 0
+python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+                                                                          exit 0
+python3 tools/non_iwork_gate.py verify                                    exit 1  KNOWN at base
+    ("workspace package inventory mismatch (unexpected: litchi-xldm)").
+
+# Each follow-up commit, checked out and tested with `cargo test -p litchi-doc`:
+#   95b485a290 (object selections)               1311 passed, 0 failed
+#   de2df97e1f (+ final paragraph mark)          1312 passed, 0 failed
+#   0792812830 (+ FKP builders)                  1315 passed, 0 failed
+#   83fa8563d7 (+ one classifier)                1326 passed, 0 failed
+# Before the FKP fix, a throwaway probe (not kept) wrote Writer::add_table(1, n)
+# for n = 1..=63: 1..=21 read back; 22 failed to read ("malformed SPRM sequence:
+# truncated operand"); 23..=63 panicked at writer/fkp.rs:353:13 "attempt to
+# subtract with overflow".

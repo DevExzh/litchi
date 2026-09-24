@@ -20,15 +20,24 @@ must hold its generation's protection fields (≥ 84 bytes, ≥ 600 from Word 20
 still `Unrecognized`. The 24 of 38 fixtures the strict classifier refused
 (none protected) now classify as `None`, and all 35 readable fixtures accept a
 tracked insertion at CP 0 after `Selsf` keeps a recorded CP in place for an
-insertion there (the one uniform choice MS-DOC 2.9.244's row and line-start MUSTs
-allow). Testing it exposed a pre-existing FKP builder overflow (the first
-property placed below offset 511 can take one byte more than the even-rounded
-estimate, overwriting the last BX), now trimmed; three real documents'
-edited output reopens again. Timed-region instructions change by −0.83% to
+insertion there, except that a selected inline picture or shape moves after the
+text (its 0x0001 or 0x0008 character does) and a non-empty list-prefix selection
+is refused (MS-DOC 2.9.244). Testing it exposed a pre-existing FKP builder
+overflow (the first property placed below offset 511 can take one byte more than
+the even-rounded estimate, overwriting the last BX), now trimmed; three real
+documents' edited output reopens again. After the review, the positional
+body-text source uses the same classifier (identical verdicts on the 57 DOC
+files and 1,708 of the review's 1,730 crafted records; the rest are refused by
+its encryption and structure gates), the public FKP builders refuse a property
+no page can hold (the fresh writer panicked on a table of 23 or more columns and
+wrote an unreadable file at 22), and `add_text` refuses text after the final
+paragraph mark. Timed-region instructions change by −0.83% to
 +0.27% on the DOC controls (`classify` −81%); the harness `large` shape swings
 −20% to +31% in wall clock with glibc heap state and is 1.000 with malloc
 thresholds pinned. Open: `fStyleLockEnforced` is not an editing restriction for
-the classifier; `validate_fib_shape`'s `FibRgCswNew` bound is two bytes short.
+the classifier; `validate_fib_shape`'s `FibRgCswNew` bound is two bytes short;
+the fresh writer cannot write table rows of 22 or more cells without
+`sprmPHugePapx`.
 
 ---
 
@@ -45,7 +54,13 @@ SPRM sequence, an out-of-range `Selsf`). Protected states remain refused by
 default and malformed protection records under every policy; the tests cover each
 `DopBase` lock, the password hash, enforced `Dop2003` modes in a LibreOffice
 610-byte DOP, the SHOULD-level `fProtEnabled` combinations (now `Document`) and
-the protection-field MUSTs (still `Unrecognized`). Exact instructions of the
+the protection-field MUSTs (still `Unrecognized`). An independent review
+(1,730 crafted documents, 148 `Selsf` scenarios, 600,000 FKP configurations)
+found the boundary holds; its follow-ups move a selected picture or shape with
+its character, give the positional body-text source the same classifier, make
+the public FKP builders refuse properties no page can hold instead of panicking
+(reachable through `Writer::add_table` with 23 or more columns), and refuse a
+tracked insertion after the final paragraph mark. Exact instructions of the
 controls' timed regions (NoHeadFoot.doc and FloatingPictures.doc public
 lifecycle, harness `doc_semantic_one_edit_save` tiny and large) change by −0.83%
 to +0.27%. Wall clock: `docnohf` 0.990/0.992, `docfloat` 1.072 (batch 1, load
@@ -72,5 +87,10 @@ fixtures, including every LibreOffice-written DOC. The `Selsf` remap now treats 
 insertion at a recorded CP as the empty-range case of its existing start-boundary
 rule; genuinely ambiguous CPs (inside replaced or removed text) stay refused. The
 FKP fix changes output only where the builders previously wrote a page their own
-parser refuses; every golden is unchanged. Gates pass except the known
-`non_iwork_gate` `litchi-xldm` inventory failure, identical at the base.
+parser refuses; every golden is unchanged. After the review, the positional
+body-text source classifies with the same function (one grammar, identical
+verdicts where it reads protection), the FKP builders return a typed refusal
+where they overlapped or panicked, and `add_text` refuses the CP after the final
+paragraph mark (MS-DOC 2.3.1). Gates pass except the known `non_iwork_gate`
+`litchi-xldm` inventory failure, identical at the base (1326 litchi-doc and 382
+facade tests).

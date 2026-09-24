@@ -38,5 +38,23 @@
   "the worktree /home/zhuhe/code/litchi-worktrees/0768-doc-protection-classification and branch perf/0768-doc-protection-classification",
   "this packet (raw JSON reports gzipped; no binaries, profiles or corpora)"
  ],
- "not_created": "no files under /tmp; TMPDIR pointed into the scratch directory"
+ "not_created": "no files under /tmp; TMPDIR pointed into the scratch directory",
+ "review_follow_ups": {
+  "date": "2026-09-24",
+  "removed_immediately_after_the_review_record_commit": [
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/targets/0768",
+    "bytes": 30938950011,
+    "contents": "fresh CARGO_INCREMENTAL=0 debug builds for the review follow-ups: litchi-doc and facade test, check, clippy and rustdoc builds"
+   },
+   {
+    "path": "/home/zhuhe/code/litchi-worktrees/scratch/0768/*",
+    "contents": "gate logs (exit codes copied to gates.txt), exploratory agreement outputs (their counts are in the record), a pre-edit copy of body_text/source.rs, and TMPDIR"
+   }
+  ],
+  "kept": [
+   "the worktree and branch perf/0768-doc-protection-classification",
+   "/home/zhuhe/code/litchi-worktrees/scratch/review-0768 (the reviewer's NOTES.md and review_probe.rs, not created by this change)"
+  ]
+ }
 }
