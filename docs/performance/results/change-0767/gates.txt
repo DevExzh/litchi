@@ -1,0 +1,73 @@
+# Change 0767 gates
+
+worktree /home/zhuhe/code/litchi-worktrees/0767-cfb-reparse-linear at 573554acfe7604b72892ec20ebbee2f7f0510957; CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0767/dev; CARGO_BUILD_JOBS=6; RUST_TEST_THREADS=6; TMPDIR=/home/zhuhe/code/litchi-worktrees/scratch/0767/tmp; rustc 1.95.0 (59807616e 2026-04-14)
+Each command ran sequentially from the repository root (scripts/gates.sh), after all measurement; exit codes as recorded.
+
+== fmt: cargo fmt --all --check
+exit=0
+== check-cfb-dependents: cargo check -p litchi-cfb -p litchi-ole-common -p litchi-doc -p litchi-ppt -p litchi-xls -p litchi-vba -p litchi-ograph -p litchi-crypto -p litchi-sign --all-targets --locked --offline
+exit=0
+== check-ooxml-transitive: cargo check -p litchi-opc -p litchi-ooxml-common -p litchi-drawingml -p litchi-spreadsheet-drawing -p litchi-docx -p litchi-pptx -p litchi-xlsx -p litchi-xlsb --all-targets --locked --offline
+exit=0
+== check-facade: cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked --offline
+exit=0
+== clippy-cfb-lib: cargo clippy -p litchi-cfb --lib --no-deps --locked --offline -- -D warnings
+exit=0
+== clippy-cfb-all: cargo clippy -p litchi-cfb --all-targets --no-deps --locked --offline -- -D warnings
+exit=0
+== doc-cfb: env RUSTDOCFLAGS=-D warnings cargo doc -p litchi-cfb --no-deps --locked --offline
+exit=0
+== boundaries: python3 tools/check_crate_boundaries.py
+exit=0
+== non-iwork: python3 tools/non_iwork_gate.py verify
+exit=1
+== perf-claims: python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+exit=0
+== test-litchi-cfb: cargo test -p litchi-cfb --locked --offline
+exit=0
+== test-litchi-ole-common: cargo test -p litchi-ole-common --locked --offline
+exit=0
+== test-litchi-doc: cargo test -p litchi-doc --locked --offline
+exit=0
+== test-litchi-ppt: cargo test -p litchi-ppt --locked --offline
+exit=0
+== test-litchi-xls: cargo test -p litchi-xls --locked --offline
+exit=0
+== test-litchi-vba: cargo test -p litchi-vba --locked --offline
+exit=0
+== test-litchi-ograph: cargo test -p litchi-ograph --locked --offline
+exit=0
+== test-litchi-crypto: cargo test -p litchi-crypto --locked --offline
+exit=0
+== test-litchi-sign: cargo test -p litchi-sign --locked --offline
+exit=0
+== test-facade: cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+exit=0
+done
+
+Test totals (sum over all test binaries and doctests):
+  test-litchi-cfb: passed=501 failed=0 ignored=1
+  test-litchi-ole-common: passed=255 failed=0 ignored=1
+  test-litchi-doc: passed=1293 failed=0 ignored=13
+  test-litchi-ppt: passed=1249 failed=0 ignored=11
+  test-litchi-xls: passed=1611 failed=0 ignored=1
+  test-litchi-vba: passed=47 failed=0 ignored=0
+  test-litchi-ograph: passed=70 failed=0 ignored=0
+  test-litchi-crypto: passed=43 failed=0 ignored=0
+  test-litchi-sign: passed=25 failed=0 ignored=0
+  test-facade: passed=382 failed=0 ignored=7
+  boundaries: crate boundaries valid for 65 workspace packages and 244 internal dependency declarations (11 explicit debt items)
+  non-iwork: non-iWork release gate: workspace package inventory mismatch (unexpected: litchi-xldm) (known failure at base 1d1044e3ac: the merged litchi-xldm crate is not yet registered; being fixed on another branch per the wave briefing)
+  perf-claims: OK: 10 performance claims validated (structural)
+
+Not run: the harness tests and the coverage validator (the harness is unchanged); workspace-wide --all-targets (iWork crates do not compile under it at this base).
+
+Rerun on 866229144e (a doc-comment-only follow-up to 573554acfe; the rebuilt probe's .text, .rodata and .data.rel.ro are byte-identical to the measured binary's):
+== fmt: cargo fmt --all --check
+exit=0
+== clippy-cfb-all: cargo clippy -p litchi-cfb --all-targets --no-deps --locked --offline -- -D warnings
+exit=0
+== doc-cfb: RUSTDOCFLAGS="-D warnings" cargo doc -p litchi-cfb --no-deps --locked --offline (also with --document-private-items)
+exit=0
+== test-litchi-cfb: cargo test -p litchi-cfb --locked --offline
+exit=0 (passed=501 failed=0 ignored=1)
