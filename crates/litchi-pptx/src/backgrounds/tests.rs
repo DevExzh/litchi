@@ -190,3 +190,149 @@ fn malformed_background_xml_is_rejected() {
         Err(crate::Error::Xml(_))
     ));
 }
+
+/// The number of distinct attribute names in an adversarial start tag, and
+/// the number of times its last name then repeats.
+const CROWDED: usize = 20_000;
+
+/// `CROWDED - 1` distinct filler attributes, then `name="first"`, then
+/// `CROWDED` repeats of `name="repeat"`: a checked attribute iterator that
+/// skips its duplicate errors scans every earlier name for each repeat.
+fn crowded(name: &str, first: &str, repeat: &str) -> String {
+    let mut attributes = String::new();
+    for index in 0..CROWDED - 1 {
+        attributes.push_str(&format!(" n{index}=\"{index}\""));
+    }
+    attributes.push_str(&format!(" {name}=\"{first}\""));
+    let repeated = format!(" {name}=\"{repeat}\"");
+    for _ in 0..CROWDED {
+        attributes.push_str(&repeated);
+    }
+    attributes
+}
+
+fn background(fill: &str) -> Option<SlideBackground> {
+    SlideBackground::from_xml(format!("<p:bg><p:bgPr>{fill}</p:bgPr></p:bg>").as_bytes()).unwrap()
+}
+
+fn gradient(stop: &str, descriptor: &str) -> Option<SlideBackground> {
+    background(&format!(
+        "<a:gradFill><a:gsLst><a:gs{stop}><a:srgbClr val=\"112233\"/></a:gs></a:gsLst>{descriptor}</a:gradFill>"
+    ))
+}
+
+fn solid(color: &str) -> Option<SlideBackground> {
+    Some(SlideBackground::solid(color))
+}
+
+fn pattern(prst: &str) -> Option<SlideBackground> {
+    background(&format!(
+        "<a:pattFill{prst}><a:fgClr><a:srgbClr val=\"111111\"/></a:fgClr><a:bgClr><a:srgbClr val=\"222222\"/></a:bgClr></a:pattFill>"
+    ))
+}
+
+fn patterned(pattern_type: PatternType) -> Option<SlideBackground> {
+    Some(SlideBackground::Pattern {
+        pattern_type,
+        fg_color: "111111".to_string(),
+        bg_color: "222222".to_string(),
+    })
+}
+
+fn graded(
+    gradient_type: GradientType,
+    angle: Option<f64>,
+    position: f64,
+) -> Option<SlideBackground> {
+    Some(SlideBackground::Gradient {
+        gradient_type,
+        angle,
+        stops: vec![GradientStop {
+            position,
+            color: "112233".to_string(),
+        }],
+    })
+}
+
+#[test]
+fn duplicate_background_attributes_keep_their_first_occurrence() {
+    // One occurrence of each attribute reads as before.
+    let single = background("<a:solidFill><a:srgbClr val=\"112233\"/></a:solidFill>");
+    assert_eq!(single, solid("112233"));
+    assert_eq!(
+        gradient(" pos=\"25000\"", "<a:path path=\"rect\"/>"),
+        graded(GradientType::Rectangular, None, 0.25)
+    );
+
+    // A later occurrence of a name never replaces the first one.
+    assert_eq!(
+        background("<a:solidFill><a:srgbClr val=\"112233\" val=\"445566\"/></a:solidFill>"),
+        solid("112233")
+    );
+    assert_eq!(
+        background("<a:solidFill><a:schemeClr val=\"accent1\" val=\"accent2\"/></a:solidFill>"),
+        solid("accent1")
+    );
+    assert_eq!(
+        pattern(" prst=\"dkVert\" prst=\"cross\""),
+        patterned(PatternType::DarkVertical)
+    );
+    assert_eq!(
+        gradient(
+            " pos=\"25000\" pos=\"75000\"",
+            "<a:lin ang=\"5400000\" ang=\"10800000\" scaled=\"0\"/>"
+        ),
+        graded(GradientType::Linear, Some(90.0), 0.25)
+    );
+    assert_eq!(
+        gradient(" pos=\"0\"", "<a:path path=\"circle\" path=\"rect\"/>"),
+        graded(GradientType::Radial, None, 0.0)
+    );
+    // Even when the first occurrence's value is unusable.
+    assert_eq!(
+        gradient(
+            " pos=\"x\" pos=\"75000\"",
+            "<a:lin ang=\"x\" ang=\"5400000\"/>"
+        ),
+        graded(GradientType::Linear, None, 0.0)
+    );
+}
+
+#[test]
+fn crowded_background_attributes_are_read_first_wins() {
+    // The attribute read comes after every repeated name, or never comes.
+    let filler = crowded("x", "first", "repeat");
+    assert_eq!(
+        background(&format!(
+            "<a:solidFill><a:srgbClr{filler} val=\"112233\"/></a:solidFill>"
+        )),
+        solid("112233")
+    );
+    assert_eq!(
+        background(&format!(
+            "<a:solidFill><a:schemeClr{filler} val=\"accent2\"/></a:solidFill>"
+        )),
+        solid("accent2")
+    );
+    assert_eq!(
+        pattern(&format!("{filler} prst=\"dkVert\"")),
+        patterned(PatternType::DarkVertical)
+    );
+    assert_eq!(pattern(&filler), patterned(PatternType::Pct50));
+
+    // The attribute read is the name that repeats.
+    assert_eq!(
+        gradient(
+            &crowded("pos", "25000", "75000"),
+            &format!("<a:lin{}/>", crowded("ang", "5400000", "10800000"))
+        ),
+        graded(GradientType::Linear, Some(90.0), 0.25)
+    );
+    assert_eq!(
+        gradient(
+            " pos=\"0\"",
+            &format!("<a:path{}/>", crowded("path", "circle", "rect"))
+        ),
+        graded(GradientType::Radial, None, 0.0)
+    );
+}

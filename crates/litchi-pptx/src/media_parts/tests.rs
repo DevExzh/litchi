@@ -413,3 +413,45 @@ fn media_output_budget_is_aggregate_across_pictures() {
     assert!(output.bytes.len() >= single_len);
     assert!(output.bytes.len() <= maximum);
 }
+
+#[test]
+fn many_distinct_attributes_parse_and_expanded_duplicates_stay_refused() {
+    fn slide(attributes: &str) -> Vec<u8> {
+        format!(
+            "<p:sld xmlns:p=\"{PML}\" xmlns:a=\"{DML}\" xmlns:r=\"{REL}\"><p:cSld{attributes}><p:spTree/></p:cSld></p:sld>"
+        )
+        .into_bytes()
+    }
+    fn is_expanded_duplicate(result: Result<List>) -> bool {
+        matches!(
+            result,
+            Err(Error::Invalid(message)) if message == "duplicate expanded XML attribute"
+        )
+    }
+    let same_namespace = " xmlns:x=\"urn:same\" xmlns:y=\"urn:same\"";
+
+    // Distinct expanded names are accepted however many one element has.
+    let distinct = (0..50_000)
+        .map(|index| format!(" n{index}=\"\""))
+        .collect::<String>();
+    assert!(parse(&slide(&distinct)).unwrap().pictures.is_empty());
+    assert!(
+        parse(&slide(&format!("{same_namespace} n=\"1\" x:n=\"2\"")))
+            .unwrap()
+            .pictures
+            .is_empty()
+    );
+
+    // Two prefixes bound to one namespace name one attribute twice.
+    assert!(is_expanded_duplicate(parse(&slide(&format!(
+        "{same_namespace} x:n=\"1\" y:n=\"2\""
+    )))));
+    assert!(is_expanded_duplicate(parse(&slide(&format!(
+        "{distinct}{same_namespace} x:n=\"1\" y:n=\"2\""
+    )))));
+    // A repeated qualified name is refused by the XML reader, as before.
+    assert!(matches!(
+        parse(&slide(" n=\"1\" n=\"2\"")),
+        Err(Error::Xml(_))
+    ));
+}

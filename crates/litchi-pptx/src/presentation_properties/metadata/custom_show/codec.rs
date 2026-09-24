@@ -5,6 +5,7 @@
 use super::model::{List, Show};
 use crate::presentation_properties::metadata::escape_xml;
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::first_wins;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::collections::HashMap;
@@ -28,7 +29,7 @@ impl List {
                 Ok(Event::Start(e)) if e.local_name().as_ref() == b"custShow" => {
                     let mut name = String::new();
                     let mut id = 0u32;
-                    for attr in e.attributes().flatten() {
+                    for attr in first_wins(&e).flatten() {
                         match attr.key.as_ref() {
                             b"name" => {
                                 name = std::str::from_utf8(&attr.value).unwrap_or("").to_string();
@@ -48,7 +49,7 @@ impl List {
                     if e.local_name().as_ref() == b"sld"
                         && let Some(ref mut show) = current_show
                     {
-                        for attr in e.attributes().flatten() {
+                        for attr in first_wins(&e).flatten() {
                             if attr.key.as_ref() == b"r:id" || attr.key.as_ref() == b"id" {
                                 // Extract slide relationship ID or actual ID
                                 if let Ok(id_str) = std::str::from_utf8(&attr.value) {
@@ -174,5 +175,56 @@ mod tests {
         let xml = list.to_xml();
         assert!(xml.contains("Demo"));
         assert!(xml.contains("custShow"));
+    }
+
+    /// `19_999` distinct filler attributes, then `name="first"`, then `20_000`
+    /// repeats of `name="repeat"`: a checked attribute iterator that skips its
+    /// duplicate errors scans every earlier name for each repeat.
+    fn crowded(name: &str, first: &str, repeat: &str) -> String {
+        const DISTINCT: usize = 20_000;
+        let mut attributes = String::new();
+        for index in 0..DISTINCT - 1 {
+            attributes.push_str(&format!(" n{index}=\"{index}\""));
+        }
+        attributes.push_str(&format!(" {name}=\"{first}\""));
+        let repeated = format!(" {name}=\"{repeat}\"");
+        for _ in 0..DISTINCT {
+            attributes.push_str(&repeated);
+        }
+        attributes
+    }
+
+    #[test]
+    fn parsed_custom_show_attributes_keep_their_first_occurrence() {
+        let single = List::parse_xml(
+            r#"<p:custShowLst><p:custShow name="Recap" id="8"><p:sldLst><p:sld r:id="rId2"/></p:sldLst></p:custShow></p:custShowLst>"#,
+        )
+        .unwrap();
+        assert_eq!(
+            single.shows,
+            vec![Show::new(8, "Recap").with_slides(vec![2])]
+        );
+
+        // `id` and `r:id` are distinct names, so a slide reference may carry
+        // both; a repeated name is read once, at its first occurrence.
+        let repeated = List::parse_xml(
+            r#"<p:custShowLst><p:custShow name="First" id="7" name="Second" id="9"><p:sldLst><p:sld r:id="rId3" r:id="rId4"/><p:sld id="5" r:id="rId6" id="10"/></p:sldLst></p:custShow></p:custShowLst>"#,
+        )
+        .unwrap();
+        assert_eq!(
+            repeated.shows,
+            vec![Show::new(7, "First").with_slides(vec![3, 5, 6])]
+        );
+    }
+
+    #[test]
+    fn crowded_custom_show_attributes_are_read_first_wins() {
+        let xml = format!(
+            r#"<p:custShowLst><p:custShow{} id="9"><p:sldLst><p:sld{}/></p:sldLst></p:custShow></p:custShowLst>"#,
+            crowded("name", "First", "Later"),
+            crowded("r:id", "rId3", "rId4"),
+        );
+        let list = List::parse_xml(&xml).unwrap();
+        assert_eq!(list.shows, vec![Show::new(9, "First").with_slides(vec![3])]);
     }
 }

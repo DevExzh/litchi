@@ -1,5 +1,6 @@
 use super::model::{GraphicBuildMode, Sequence};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::count_up_to;
 use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{QName, ResolveResult};
@@ -386,7 +387,7 @@ fn inspect_start(
     frame: &mut Option<FrameState>,
     alternate: &mut Option<AlternateState>,
 ) -> Result<()> {
-    if element.attributes().with_checks(true).count() > MAX_ATTRIBUTES {
+    if count_up_to(element, MAX_ATTRIBUTES) > MAX_ATTRIBUTES {
         return invalid_relationship(
             "slide element exceeds animation relationship attribute limit",
         );
@@ -787,5 +788,43 @@ mod tests {
         let parsed = parse_package_slide(&package, &slide_name).unwrap();
         assert_eq!(parsed.graphic_builds.len(), 1);
         assert_eq!(parsed.animations.len(), 1);
+    }
+
+    #[test]
+    fn host_scan_attribute_limit_counts_every_attribute() {
+        let slide = |attributes: &str| {
+            format!(
+                r#"<p:sld xmlns:p="{P}"><p:cSld{attributes}/></p:sld>"#,
+                P = std::str::from_utf8(P_NS).unwrap(),
+            )
+        };
+        let distinct = |count: usize| -> String {
+            (0..count)
+                .map(|index| format!(" x{index}=\"{index}\""))
+                .collect()
+        };
+        let is_attribute_limit = |result: Result<HashMap<u32, HostReference>>| {
+            matches!(
+                result,
+                Err(Error::Invalid(message))
+                    if message == "slide element exceeds animation relationship attribute limit"
+            )
+        };
+
+        assert!(
+            scan_hosts(slide(&distinct(MAX_ATTRIBUTES)).as_bytes())
+                .unwrap()
+                .is_empty()
+        );
+        assert!(is_attribute_limit(scan_hosts(
+            slide(&distinct(MAX_ATTRIBUTES + 1)).as_bytes()
+        )));
+
+        // 20,000 distinct names followed by 20,000 repeats of the last one.
+        let mut crowded = distinct(20_000);
+        for _ in 0..20_000 {
+            crowded.push_str(" x19999=\"repeat\"");
+        }
+        assert!(is_attribute_limit(scan_hosts(slide(&crowded).as_bytes())));
     }
 }

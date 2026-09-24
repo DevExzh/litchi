@@ -9,6 +9,7 @@ use super::{
 use litchi_ooxml_common::mce::{
     Capabilities, Limits, NAMESPACE, Name, process_markup_compatibility,
 };
+use litchi_ooxml_common::xml::attributes::SeenNames;
 
 #[derive(Clone)]
 struct Attribute {
@@ -575,6 +576,9 @@ fn make_node(
     add_strings(strings, namespace.len() + prefix.len() + name.len())?;
     let mut attributes = Vec::new();
     let mut namespace_declarations = Vec::new();
+    // The expanded names in `attributes`, so that checking each attribute for
+    // a duplicate costs O(log n) instead of a scan of the attributes so far.
+    let mut expanded_names = SeenNames::new();
     for item in element.attributes().with_checks(true) {
         let item = item.map_err(xml_error)?;
         let value = item
@@ -593,6 +597,12 @@ fn make_node(
             continue;
         }
         let (namespace, local) = reader.resolver().resolve_attribute(item.key);
+        // `resolved` turns an unbound name into the empty namespace, so the
+        // key's namespace bytes are equal exactly when the strings are.
+        let namespace_key: &[u8] = match &namespace {
+            ResolveResult::Bound(Namespace(value)) => value,
+            ResolveResult::Unbound | ResolveResult::Unknown(_) => b"",
+        };
         let namespace = resolved(namespace)?;
         let prefix = item
             .key
@@ -608,10 +618,7 @@ fn make_node(
             strings,
             namespace.len() + prefix.len() + name.len() + value.len(),
         )?;
-        if attributes
-            .iter()
-            .any(|attribute: &Attribute| attribute.namespace == namespace && attribute.name == name)
-        {
+        if !expanded_names.insert((namespace_key, local.into_inner())) {
             return Err(invalid("duplicate expanded XML attribute"));
         }
         attributes.push(Attribute {

@@ -3,6 +3,8 @@
 //! This layer serializes and parses the semantic background model without
 //! resolving package relationships or loading image parts.
 
+use litchi_ooxml_common::xml::attributes::first_wins;
+
 use super::model::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
 use crate::error::{Error, Result};
 
@@ -57,8 +59,7 @@ impl SlideBackground {
                         }
                         // Parse pattern fill
                         else if tag_name.as_ref() == b"pattFill" {
-                            let pattern_type = e
-                                .attributes()
+                            let pattern_type = first_wins(e)
                                 .flatten()
                                 .find_map(|attr| {
                                     (attr.key.as_ref() == b"prst")
@@ -98,7 +99,7 @@ impl SlideBackground {
                     let tag_name = e.local_name();
                     if tag_name.as_ref() == b"srgbClr" {
                         // RGB color
-                        for attr in e.attributes().flatten() {
+                        for attr in first_wins(e).flatten() {
                             if attr.key.as_ref() == b"val" {
                                 return Ok(Some(
                                     std::str::from_utf8(&attr.value).unwrap_or("").to_string(),
@@ -107,7 +108,7 @@ impl SlideBackground {
                         }
                     } else if tag_name.as_ref() == b"schemeClr" {
                         // Scheme color - return the scheme name
-                        for attr in e.attributes().flatten() {
+                        for attr in first_wins(e).flatten() {
                             if attr.key.as_ref() == b"val" {
                                 return Ok(Some(
                                     std::str::from_utf8(&attr.value).unwrap_or("").to_string(),
@@ -140,7 +141,7 @@ impl SlideBackground {
                     // Parse gradient stops
                     if tag_name.as_ref() == b"gs" {
                         let mut position = 0.0;
-                        for attr in e.attributes().flatten() {
+                        for attr in first_wins(e).flatten() {
                             if attr.key.as_ref() == b"pos" {
                                 // Position is in percentage * 1000
                                 if let Ok(pos_str) = std::str::from_utf8(&attr.value)
@@ -190,7 +191,7 @@ impl SlideBackground {
         match element.local_name().as_ref() {
             b"lin" => {
                 *gradient_type = GradientType::Linear;
-                for attr in element.attributes().flatten() {
+                for attr in first_wins(element).flatten() {
                     if attr.key.as_ref() == b"ang"
                         && let Ok(value) = std::str::from_utf8(&attr.value)
                         && let Ok(value) = value.parse::<f64>()
@@ -202,7 +203,7 @@ impl SlideBackground {
                 }
             },
             b"path" => {
-                for attr in element.attributes().flatten() {
+                for attr in first_wins(element).flatten() {
                     if attr.key.as_ref() == b"path"
                         && let Ok(value) = std::str::from_utf8(&attr.value)
                     {

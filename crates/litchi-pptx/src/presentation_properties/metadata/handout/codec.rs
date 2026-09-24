@@ -6,6 +6,7 @@
 use super::model::Master;
 use crate::presentation_properties::metadata::new_guid;
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::first_wins;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
@@ -25,7 +26,7 @@ impl Master {
             match reader.read_event() {
                 Ok(Event::Start(e) | Event::Empty(e)) => match e.local_name().as_ref() {
                     b"hf" => {
-                        for attr in e.attributes().flatten() {
+                        for attr in first_wins(&e).flatten() {
                             match attr.key.as_ref() {
                                 b"hdr" => {
                                     master.header_footer.show_header = attr.value.as_ref() == b"1";
@@ -46,7 +47,7 @@ impl Master {
                         }
                     },
                     b"srgbClr" => {
-                        for attr in e.attributes().flatten() {
+                        for attr in first_wins(&e).flatten() {
                             if attr.key.as_ref() == b"val"
                                 && let Ok(color) = std::str::from_utf8(&attr.value)
                             {
@@ -145,5 +146,59 @@ mod tests {
         assert_eq!(master.layout, Layout::ThreeSlides);
         assert!(master.header_footer.show_header);
         assert!(master.header_footer.show_slide_number);
+    }
+
+    /// `19_999` distinct filler attributes, then `name="first"`, then `20_000`
+    /// repeats of `name="repeat"`: a checked attribute iterator that skips its
+    /// duplicate errors scans every earlier name for each repeat.
+    fn crowded(name: &str, first: &str, repeat: &str) -> String {
+        const DISTINCT: usize = 20_000;
+        let mut attributes = String::new();
+        for index in 0..DISTINCT - 1 {
+            attributes.push_str(&format!(" n{index}=\"{index}\""));
+        }
+        attributes.push_str(&format!(" {name}=\"{first}\""));
+        let repeated = format!(" {name}=\"{repeat}\"");
+        for _ in 0..DISTINCT {
+            attributes.push_str(&repeated);
+        }
+        attributes
+    }
+
+    #[test]
+    fn parsed_handout_attributes_keep_their_first_occurrence() {
+        let single = Master::parse_xml(
+            r#"<p:handoutMaster><p:hf hdr="0" ftr="1" sldNum="1" dt="0"/><a:srgbClr val="112233"/></p:handoutMaster>"#,
+        )
+        .unwrap();
+        assert!(!single.header_footer.show_header);
+        assert!(single.header_footer.show_footer);
+        assert!(single.header_footer.show_slide_number);
+        assert!(!single.header_footer.show_date_time);
+        assert_eq!(single.background_color.as_deref(), Some("112233"));
+
+        let repeated = Master::parse_xml(
+            r#"<p:handoutMaster><p:hf hdr="0" ftr="1" hdr="1" ftr="0" sldNum="1" dt="0" dt="1" sldNum="0"/><a:srgbClr val="112233" val="445566"/></p:handoutMaster>"#,
+        )
+        .unwrap();
+        assert!(!repeated.header_footer.show_header);
+        assert!(repeated.header_footer.show_footer);
+        assert!(repeated.header_footer.show_slide_number);
+        assert!(!repeated.header_footer.show_date_time);
+        assert_eq!(repeated.background_color.as_deref(), Some("112233"));
+    }
+
+    #[test]
+    fn crowded_handout_attributes_are_read_first_wins() {
+        let xml = format!(
+            "<p:handoutMaster><p:hf{} ftr=\"1\"/><a:srgbClr{}/></p:handoutMaster>",
+            crowded("hdr", "1", "0"),
+            crowded("val", "112233", "445566"),
+        );
+        let master = Master::parse_xml(&xml).unwrap();
+        assert!(master.header_footer.show_header);
+        assert!(master.header_footer.show_footer);
+        assert!(!master.header_footer.show_slide_number);
+        assert_eq!(master.background_color.as_deref(), Some("112233"));
     }
 }
