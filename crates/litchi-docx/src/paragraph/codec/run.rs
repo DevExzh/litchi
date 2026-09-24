@@ -13,6 +13,7 @@ use crate::error::{Error, Result};
 use crate::font::{OpenType, Snapshot as OpenTypeSnapshot};
 use crate::run_effects::Effects;
 use litchi_core::VerticalPosition;
+use litchi_ooxml_common::xml::attributes::first_wins;
 use litchi_ooxml_common::xml::{decode_xml_reference, extract_omml_formulas};
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
@@ -459,7 +460,7 @@ impl Run {
                     if name.as_ref() == b"rPr" {
                         in_r_pr = true;
                     } else if in_r_pr && name.as_ref() == b"vertAlign" {
-                        for attr in e.attributes().flatten() {
+                        for attr in first_wins(&e).flatten() {
                             if attr.key.local_name().as_ref() == b"val" {
                                 let value = attr.value.as_ref();
                                 match value {
@@ -506,7 +507,7 @@ impl Run {
                     if name.as_ref() == b"rPr" {
                         in_r_pr = true;
                     } else if in_r_pr && name.as_ref() == b"rFonts" {
-                        for attr in e.attributes().flatten() {
+                        for attr in first_wins(&e).flatten() {
                             if attr.key.local_name().as_ref() == b"ascii" {
                                 let value = attr
                                     .decoded_and_normalized_value(
@@ -553,7 +554,7 @@ impl Run {
                     if name.as_ref() == b"rPr" {
                         in_r_pr = true;
                     } else if in_r_pr && name.as_ref() == b"sz" {
-                        for attr in e.attributes().flatten() {
+                        for attr in first_wins(&e).flatten() {
                             if attr.key.local_name().as_ref() == b"val"
                                 && let Ok(value) = std::str::from_utf8(&attr.value)
                                 && let Ok(size) = value.parse::<u32>()
@@ -608,7 +609,7 @@ impl Run {
                         in_r_pr = true;
                     } else if in_r_pr && name.as_ref() == property_name {
                         // Check for w:val attribute
-                        for attr in e.attributes().flatten() {
+                        for attr in first_wins(&e).flatten() {
                             if attr.key.local_name().as_ref() == b"val" {
                                 let value = attr.value.as_ref();
                                 return Ok(Some(is_on(value)));

@@ -39,6 +39,7 @@ use crate::error::{Error, Result};
 /// ```
 use crate::format::ImageFormat;
 use litchi_core::unit::{emu_to_pt_f64, emu_to_px_96};
+use litchi_ooxml_common::xml::attributes::first_wins;
 use litchi_opc::OpcPackage;
 use litchi_opc::rel::Relationships;
 use quick_xml::Reader;
@@ -305,7 +306,7 @@ pub(crate) fn parse_inline_images(xml_bytes: &[u8]) -> Result<SmallVec<[InlineIm
                     b"extent" if in_inline => {
                         // Parse width and height from extent element
                         // <wp:extent cx="914_400" cy="914_400"/>
-                        for attr in e.attributes().flatten() {
+                        for attr in first_wins(&e).flatten() {
                             match attr.key.as_ref() {
                                 b"cx" => {
                                     if let Ok(s) = std::str::from_utf8(&attr.value) {
@@ -324,7 +325,7 @@ pub(crate) fn parse_inline_images(xml_bytes: &[u8]) -> Result<SmallVec<[InlineIm
                     b"docPr" if in_inline => {
                         // Parse name and description from docPr element
                         // <wp:docPr id="1" name="Picture" descr="Description"/>
-                        for attr in e.attributes().flatten() {
+                        for attr in first_wins(&e).flatten() {
                             match attr.key.as_ref() {
                                 b"name" => {
                                     if let Ok(s) = std::str::from_utf8(&attr.value) {
@@ -346,7 +347,7 @@ pub(crate) fn parse_inline_images(xml_bytes: &[u8]) -> Result<SmallVec<[InlineIm
                     b"blip" if in_blip_fill => {
                         // Parse r:embed attribute from blip element
                         // <a:blip r:embed="rId5"/>
-                        for attr in e.attributes().flatten() {
+                        for attr in first_wins(&e).flatten() {
                             let key = attr.key.as_ref();
                             // Check for r:embed (with namespace prefix)
                             if (key == b"r:embed" || key.ends_with(b":embed"))
@@ -486,5 +487,70 @@ mod tests {
         assert_eq!(images.len(), 2);
         assert_eq!(images[0].r_embed(), "rId1");
         assert_eq!(images[1].r_embed(), "rId2");
+    }
+
+    /// ` n00000=""` to ` n19999=""`, then 20,000 repeats of the last name: a
+    /// tag quick-xml's checked iterator reads in `O(n²)` when every item is read.
+    fn repeated_attributes() -> String {
+        let mut attributes = String::new();
+        for index in 0..20_000 {
+            attributes.push_str(&format!(" n{index:05}=\"\""));
+        }
+        for _ in 0..20_000 {
+            attributes.push_str(" n19999=\"\"");
+        }
+        attributes
+    }
+
+    fn image(extent: &str, doc_pr: &str, blip: &str) -> (String, i64, i64, String, String) {
+        let xml = format!(
+            r#"<w:p><w:r><w:drawing><wp:inline><wp:extent{extent}/><wp:docPr{doc_pr}/><pic:blipFill><a:blip{blip}/></pic:blipFill></wp:inline></w:drawing></w:r></w:p>"#
+        );
+        let images = parse_inline_images(xml.as_bytes()).unwrap();
+        assert_eq!(images.len(), 1);
+        let image = &images[0];
+        (
+            image.r_embed().to_owned(),
+            image.width_emu(),
+            image.height_emu(),
+            image.name().to_owned(),
+            image.description().to_owned(),
+        )
+    }
+
+    #[test]
+    fn repeated_inline_image_attributes_keep_their_first_value() {
+        let expected = (
+            "rId5".to_owned(),
+            1000,
+            2000,
+            "first".to_owned(),
+            "kept".to_owned(),
+        );
+        assert_eq!(
+            image(
+                r#" cx="1000" cy="2000""#,
+                r#" name="first" descr="kept""#,
+                r#" r:embed="rId5""#,
+            ),
+            expected
+        );
+        assert_eq!(
+            image(
+                r#" cx="1000" cy="2000" cx="3000" cy="4000""#,
+                r#" name="first" descr="kept" name="second" descr="dropped""#,
+                r#" r:embed="rId5" r:embed="rId6""#,
+            ),
+            expected
+        );
+        let names = repeated_attributes();
+        assert_eq!(
+            image(
+                &format!(r#" cx="1000"{names} cy="2000" cx="3000""#),
+                &format!(r#" name="first"{names} descr="kept" name="second""#),
+                &format!(r#" r:embed="rId5"{names} r:embed="rId6""#),
+            ),
+            expected
+        );
     }
 }

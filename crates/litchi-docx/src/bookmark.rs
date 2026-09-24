@@ -3,6 +3,7 @@
 /// This module provides types and methods for accessing bookmarks in Word documents.
 /// Bookmarks mark locations or regions in a document.
 use crate::error::{Error, Result};
+use litchi_ooxml_common::xml::attributes::first_wins;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
@@ -81,8 +82,8 @@ impl Bookmark {
                     let mut id: Option<u32> = None;
                     let mut name = String::new();
 
-                    // Parse attributes
-                    for attr in e.attributes().flatten() {
+                    // Parse attributes; a repeated name keeps its first value.
+                    for attr in first_wins(&e).flatten() {
                         match attr.key.local_name().as_ref() {
                             b"id" => {
                                 let id_str = String::from_utf8_lossy(&attr.value);
@@ -122,5 +123,46 @@ mod tests {
         let bookmark = Bookmark::new(1, "Section1".to_string());
         assert_eq!(bookmark.id(), 1);
         assert_eq!(bookmark.name(), "Section1");
+    }
+
+    /// ` n00000=""` to ` n19999=""`, then 20,000 repeats of the last name: a
+    /// tag quick-xml's checked iterator reads in `O(n²)` when every item is read.
+    fn repeated_attributes() -> String {
+        let mut attributes = String::new();
+        for index in 0..20_000 {
+            attributes.push_str(&format!(" n{index:05}=\"\""));
+        }
+        for _ in 0..20_000 {
+            attributes.push_str(" n19999=\"\"");
+        }
+        attributes
+    }
+
+    fn bookmarks(start: &str) -> Vec<(u32, String)> {
+        let xml = format!(r#"<w:document xmlns:w="urn:w"><w:body>{start}</w:body></w:document>"#);
+        Bookmark::extract_from_document(xml.as_bytes())
+            .unwrap()
+            .into_iter()
+            .map(|bookmark| (bookmark.id(), bookmark.name().to_owned()))
+            .collect()
+    }
+
+    #[test]
+    fn repeated_bookmark_attributes_keep_their_first_value() {
+        assert_eq!(
+            bookmarks(r#"<w:bookmarkStart w:id="3" w:name="single"/>"#),
+            [(3, "single".to_owned())]
+        );
+        assert_eq!(
+            bookmarks(r#"<w:bookmarkStart w:id="4" w:name="first" w:id="5" w:name="second"/>"#),
+            [(4, "first".to_owned())]
+        );
+        let repeated = repeated_attributes();
+        assert_eq!(
+            bookmarks(&format!(
+                r#"<w:bookmarkStart w:id="6" w:name="mark"{repeated} w:name="late" w:id="7"/>"#
+            )),
+            [(6, "mark".to_owned())]
+        );
     }
 }

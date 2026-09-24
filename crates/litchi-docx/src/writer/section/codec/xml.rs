@@ -14,6 +14,7 @@ use crate::error::{Error, Result};
 use crate::header_footer::Kind;
 use crate::section::Start;
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::first_wins;
 use litchi_ooxml_common::xml_name::is_ncname;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
@@ -1486,7 +1487,7 @@ fn is_word_element_at(
     if child
         && root_default_namespace
         && element.name().prefix().is_none()
-        && element.attributes().any(|attribute| {
+        && first_wins(element).any(|attribute| {
             attribute.ok().is_some_and(|attribute| {
                 attribute.key.as_ref() == b"xmlns" && attribute.value.as_ref().is_empty()
             })
@@ -1936,6 +1937,57 @@ mod tests {
         )
         .expect("foreign explicitly unbound child is preserved");
         assert_eq!(section.page_width, 12240);
+    }
+
+    /// ` n00000=""` to ` n19999=""`, then 20,000 repeats of the last name: a
+    /// tag quick-xml's checked iterator reads in `O(n²)` when every item is read.
+    fn repeated_attributes() -> String {
+        let mut attributes = String::new();
+        for index in 0..20_000 {
+            attributes.push_str(&format!(" n{index:05}=\"\""));
+        }
+        for _ in 0..20_000 {
+            attributes.push_str(" n19999=\"\"");
+        }
+        attributes
+    }
+
+    /// Whether an unprefixed direct child under a default Word namespace
+    /// counts as a Word element, given its attributes.
+    fn unprefixed_child_is_word(attributes: &str) -> bool {
+        let word = quick_xml::name::ResolveResult::Bound(quick_xml::name::Namespace(
+            b"http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+        ));
+        let element =
+            quick_xml::events::BytesStart::from_content(format!("pgSz{attributes}"), "pgSz".len());
+        super::is_word_element_at(&word, None, true, &element, true)
+    }
+
+    #[test]
+    fn default_namespace_reset_is_read_from_its_first_occurrence() {
+        assert!(unprefixed_child_is_word(r#" w="1""#));
+        assert!(!unprefixed_child_is_word(r#" xmlns="" w="1""#));
+        assert!(unprefixed_child_is_word(r#" xmlns="urn:x" xmlns="""#));
+        assert!(!unprefixed_child_is_word(r#" xmlns="" xmlns="urn:x""#));
+        let names = repeated_attributes();
+        assert!(unprefixed_child_is_word(&names));
+        assert!(!unprefixed_child_is_word(&format!(r#"{names} xmlns="""#)));
+        assert!(unprefixed_child_is_word(&format!(
+            r#" xmlns="urn:x"{names} xmlns="""#
+        )));
+    }
+
+    #[test]
+    fn repeated_child_attribute_names_are_refused_as_before() {
+        let names = repeated_attributes();
+        let error = SectionProperties::from_xml(&format!(
+            r#"<sectPr xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><pgSz w="1000" h="2000"{names}/></sectPr>"#
+        ))
+        .expect_err("a repeated attribute name is refused");
+        assert!(
+            matches!(&error, crate::Error::Xml(message) if message.contains("duplicated attribute")),
+            "{error}"
+        );
     }
 }
 

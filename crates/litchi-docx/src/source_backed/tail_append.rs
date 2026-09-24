@@ -35,7 +35,7 @@ use litchi_opc::{
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesDecl, BytesStart, Event};
-use quick_xml::name::{Namespace, PrefixDeclaration, ResolveResult};
+use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
@@ -48,6 +48,8 @@ use crate::streaming::{append_character, escaped_character_len, is_plain_text_ch
 
 use super::Package;
 
+#[cfg(test)]
+mod attribute_tests;
 mod mce_workspace;
 mod settings_workspace;
 
@@ -1800,6 +1802,7 @@ fn settings_mce_directive_facts(
 ) -> Result<(usize, usize)> {
     let mut tokens = 0usize;
     let mut owned = 0usize;
+    let mut qualified_prefix = Vec::new();
     for attribute in element.attributes() {
         let attribute =
             attribute.map_err(|_| Error::Scan("settings XML attribute is invalid".into()))?;
@@ -1834,12 +1837,7 @@ fn settings_mce_directive_facts(
             let prefix = separator.map_or(token, |separator| &token[..separator]);
             let local = separator.and_then(|separator| token.get(separator + 1..));
             let matching_namespace =
-                resolver
-                    .bindings()
-                    .find_map(|(candidate, namespace)| match candidate {
-                        PrefixDeclaration::Named(value) if value == prefix => Some(namespace),
-                        PrefixDeclaration::Default | PrefixDeclaration::Named(_) => None,
-                    });
+                settings_prefix_namespace(resolver, prefix, &mut qualified_prefix)?;
             if let Some(namespace) = matching_namespace {
                 owned = owned
                     .checked_add(settings_lossy_len(namespace.as_ref()))
@@ -1857,6 +1855,39 @@ fn settings_mce_directive_facts(
         }
     }
     Ok((tokens, owned))
+}
+
+/// The namespace `NamespaceResolver::bindings` reports for the named prefix
+/// `prefix`: its innermost declaration, unless that one undeclares it.
+///
+/// `bindings` never reports the predefined `xml` and `xmlns` prefixes or a
+/// default-namespace binding, so neither does this. It finds the declaration
+/// with one reverse scan of the `B` bindings in scope, where a search through
+/// `bindings` costs `O(B²)`: each of its steps rescans the later bindings.
+/// `scratch` holds the `prefix:` name quick-xml needs to form a prefix.
+fn settings_prefix_namespace<'r>(
+    resolver: &'r quick_xml::name::NamespaceResolver,
+    prefix: &[u8],
+    scratch: &mut Vec<u8>,
+) -> Result<Option<Namespace<'r>>> {
+    if prefix.is_empty() || prefix == b"xml" || prefix == b"xmlns" {
+        return Ok(None);
+    }
+    scratch.clear();
+    scratch
+        .try_reserve(prefix.len().saturating_add(1))
+        .map_err(|source| Error::Allocation {
+            resource: "settings XML MCE directive prefix",
+            source,
+        })?;
+    scratch.extend_from_slice(prefix);
+    scratch.push(b':');
+    Ok(
+        match resolver.resolve_prefix(QName(scratch.as_slice()).prefix(), false) {
+            ResolveResult::Bound(namespace) => Some(namespace),
+            ResolveResult::Unbound | ResolveResult::Unknown(_) => None,
+        },
+    )
 }
 
 /// Consume one settings source pass through the guarded reader before MCE or
@@ -3487,12 +3518,10 @@ fn validate_opaque_attributes<R>(
     parser: &NsReader<R>,
     element: &BytesStart<'_>,
 ) -> std::result::Result<(), ScanError> {
+    // The scratch grows as names are read rather than from a pre-count:
+    // counting through quick-xml's checked iterator rescans the earlier names
+    // at every repeated name, `O(n²)` on a tag of repeats.
     let mut seen = Vec::<(&[u8], &[u8])>::new();
-    seen.try_reserve(element.attributes().count())
-        .map_err(|source| ScanError::Allocation {
-            resource: "opaque section attribute names",
-            source,
-        })?;
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|_| ScanError::Parser)?;
         validate_qname(attribute.key.as_ref())?;
@@ -3522,6 +3551,11 @@ fn validate_opaque_attributes<R>(
             },
         };
         let local = attribute.key.local_name().into_inner();
+        seen.try_reserve(1)
+            .map_err(|source| ScanError::Allocation {
+                resource: "opaque section attribute names",
+                source,
+            })?;
         seen.push((namespace, local));
     }
     seen.sort_unstable();

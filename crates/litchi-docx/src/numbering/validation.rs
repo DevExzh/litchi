@@ -4,6 +4,8 @@
 )]
 //! Bounded lexical and namespace validation for `WordprocessingML` numbering.
 
+use litchi_ooxml_common::xml::attributes::SeenNames;
+
 use crate::{Error, Result};
 
 /// Word 2012 `WordprocessingML` namespace used by the numbering extension.
@@ -49,14 +51,15 @@ pub(crate) fn has_ignorable_prefix(value: &[Vec<u8>], prefix: &[u8]) -> bool {
 
 pub(crate) fn parse_ignorable(value: &str) -> Result<Vec<Vec<u8>>> {
     let mut prefixes = Vec::new();
+    // The prefixes in `prefixes`, so that each duplicate check costs
+    // `O(log n)` rather than a scan of `prefixes`.
+    let mut seen = SeenNames::new();
     for prefix in value.split_ascii_whitespace() {
         if prefix.is_empty()
             || !prefix
                 .bytes()
                 .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
-            || prefixes
-                .iter()
-                .any(|candidate: &Vec<u8>| candidate == prefix.as_bytes())
+            || !seen.insert(prefix)
         {
             return Err(Error::InvalidFormat(
                 "invalid or duplicate numbering mc:Ignorable prefix".into(),

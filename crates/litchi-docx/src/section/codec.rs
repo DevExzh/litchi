@@ -45,6 +45,7 @@ use crate::header_footer::Kind;
 use crate::namespace::is_wordprocessing_namespace;
 use litchi_core::xml::ReaderOrigin;
 use litchi_drawingml::coordinate::{Coordinate, Unit};
+use litchi_ooxml_common::xml::attributes::SeenNames;
 use litchi_ooxml_common::xml_name::{is_ncname, is_qualified_name};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -1407,9 +1408,14 @@ fn attributes(raw: &Raw, xml: &[u8], family: AttributeFamily) -> Result<Vec<(Str
     validate_element_qname(element.name().as_ref(), "section")?;
     validate_attribute_qnames(&element, decoder, "section")?;
     let mut result = Vec::new();
+    // The local names in `result`, so that each duplicate check costs
+    // `O(log n)` rather than a scan of `result`. The names were validated as
+    // UTF-8 above, so their bytes compare as the lossy strings in `result` do.
+    let mut names = SeenNames::new();
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-        let name = String::from_utf8_lossy(attribute.key.local_name().as_ref()).into_owned();
+        let local_name = attribute.key.local_name().into_inner();
+        let name = String::from_utf8_lossy(local_name).into_owned();
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         let same_fragment_prefix = matches!(
             &namespace,
@@ -1436,7 +1442,7 @@ fn attributes(raw: &Raw, xml: &[u8], family: AttributeFamily) -> Result<Vec<(Str
         if !relevant {
             continue;
         }
-        if result.iter().any(|(candidate, _)| candidate == &name) {
+        if !names.insert(local_name) {
             return Err(Error::InvalidFormat(format!(
                 "duplicate section property attribute '{name}'"
             )));
@@ -1938,5 +1944,44 @@ mod tests {
         let page_size = output.find("<w:pgSz").expect("inserted page size");
         let margins = output.find("<w:pgMar").expect("existing margins");
         assert!(page_size < margins);
+    }
+
+    /// ` a00000=""` onwards: `count` distinct unprefixed names.
+    fn distinct_attributes(count: usize) -> String {
+        (0..count)
+            .map(|index| format!(" a{index:05}=\"\""))
+            .collect()
+    }
+
+    fn page_width(page_size: &str) -> super::Result<Option<super::Emu>> {
+        decode(&section_xml(page_size))
+            .map(|snapshot| snapshot.state.page_size.and_then(|size| size.width))
+    }
+
+    #[test]
+    fn repeated_section_attribute_names_are_refused_at_the_same_attribute() {
+        let width = Some(super::Emu::from_twips(12240));
+        let is_repeat_refusal = |result: super::Result<Option<super::Emu>>| matches!(result, Err(Error::InvalidFormat(message)) if message == "duplicate section property attribute 'w'");
+        assert_eq!(
+            page_width(r#"<w:pgSz w:w="12240" w:h="15840"/>"#).unwrap(),
+            width
+        );
+        assert!(is_repeat_refusal(page_width(
+            r#"<w:pgSz w:w="12240" x:w="1" xmlns:x="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
+        )));
+        assert!(is_repeat_refusal(page_width(
+            r#"<w:pgSz w:w="12240" w="1"/>"#
+        )));
+
+        // Distinct unprefixed names are all Word section attributes, so each
+        // is checked against the names before it.
+        let names = distinct_attributes(50_000);
+        assert_eq!(
+            page_width(&format!(r#"<w:pgSz w:w="12240"{names} w:h="15840"/>"#)).unwrap(),
+            width
+        );
+        assert!(is_repeat_refusal(page_width(&format!(
+            r#"<w:pgSz w:w="12240"{names} w="1"/>"#
+        ))));
     }
 }

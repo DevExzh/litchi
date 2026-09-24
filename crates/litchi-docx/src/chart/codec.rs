@@ -15,6 +15,7 @@ use super::model::{
 };
 use crate::error::{Error, Result};
 use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::xml::attributes::SeenNames;
 use litchi_opc::PackURI;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::Part;
@@ -377,6 +378,9 @@ fn element_info(
         .map_err(xml_error)?
         .to_owned();
     let mut values = Vec::new();
+    // The expanded names in `values`, as `(namespace, local name)` bytes, so
+    // that each duplicate check costs `O(log n)` rather than a scan of `values`.
+    let mut expanded_names = SeenNames::new();
     for item in element.attributes().with_checks(true) {
         let item = item.map_err(xml_error)?;
         let raw = item.key.as_ref();
@@ -388,6 +392,12 @@ fn element_info(
             return Err(limit("XML attribute count"));
         }
         let (namespace, name) = reader.resolver().resolve_attribute(item.key);
+        // `resolved` maps an unbound name to the empty namespace, and a bound
+        // namespace is never empty, so equal keys mean equal resolved names.
+        let expanded_name: (&[u8], &[u8]) = match &namespace {
+            ResolveResult::Bound(Namespace(value)) => (*value, name.into_inner()),
+            ResolveResult::Unbound | ResolveResult::Unknown(_) => (&[], name.into_inner()),
+        };
         let namespace = resolved(namespace)?;
         let name = std::str::from_utf8(name.as_ref())
             .map_err(xml_error)?
@@ -403,10 +413,7 @@ fn element_info(
         if limits.attribute_bytes > MAX_ATTRIBUTE_BYTES {
             return Err(limit("XML attribute bytes"));
         }
-        if values
-            .iter()
-            .any(|(ns, n, _): &ResolvedAttribute| ns == &namespace && n == &name)
-        {
+        if !expanded_names.insert(expanded_name) {
             return Err(invalid("duplicate expanded XML attribute"));
         }
         values.push((namespace, name, value));
@@ -567,4 +574,71 @@ pub(crate) fn invalid(message: impl Into<String>) -> Error {
 
 pub(crate) fn limit(label: &str) -> Error {
     invalid(format!("DOCX chart {label} limit exceeded"))
+}
+
+#[cfg(test)]
+mod attribute_tests {
+    use super::{Limits, ResolvedAttribute, element_info};
+    use crate::error::{Error, Result};
+    use quick_xml::events::Event;
+    use quick_xml::reader::NsReader;
+
+    /// The attributes `element_info` resolves on the first start tag of `xml`.
+    fn attributes(xml: &str) -> Result<Vec<ResolvedAttribute>> {
+        let mut reader = NsReader::from_reader(xml.as_bytes());
+        let mut limits = Limits::default();
+        loop {
+            match reader
+                .read_event()
+                .map_err(|error| Error::Xml(error.to_string()))?
+            {
+                Event::Start(element) | Event::Empty(element) => {
+                    return element_info(&reader, &element, &mut limits)
+                        .map(|(_, _, attributes)| attributes);
+                },
+                Event::Eof => panic!("the fixture has a start tag"),
+                _ => {},
+            }
+        }
+    }
+
+    /// ` a00000=""` onwards: `count` distinct unprefixed names.
+    fn distinct_attributes(count: usize) -> String {
+        (0..count)
+            .map(|index| format!(" a{index:05}=\"\""))
+            .collect()
+    }
+
+    fn is_duplicate_refusal(result: &Result<Vec<ResolvedAttribute>>) -> bool {
+        matches!(result, Err(Error::InvalidFormat(message)) if message == "duplicate expanded XML attribute")
+    }
+
+    #[test]
+    fn expanded_attribute_names_are_refused_once_repeated() {
+        assert_eq!(
+            attributes(r#"<e xmlns:c="urn:c" c:a="1" a="2"/>"#).unwrap(),
+            [
+                ("urn:c".to_owned(), "a".to_owned(), "1".to_owned()),
+                (String::new(), "a".to_owned(), "2".to_owned()),
+            ]
+        );
+        assert!(is_duplicate_refusal(&attributes(
+            r#"<e xmlns:c="urn:c" xmlns:d="urn:c" c:a="1" d:a="2"/>"#
+        )));
+        assert!(matches!(
+            attributes(r#"<e a="1" a="2"/>"#),
+            Err(Error::Xml(message)) if message.contains("duplicated attribute")
+        ));
+
+        let names = distinct_attributes(50_000);
+        let read = attributes(&format!(r#"<e xmlns:c="urn:c"{names} c:a00000="1"/>"#)).unwrap();
+        assert_eq!(read.len(), 50_001);
+        assert_eq!(
+            read.last().unwrap(),
+            &("urn:c".to_owned(), "a00000".to_owned(), "1".to_owned())
+        );
+        assert!(is_duplicate_refusal(&attributes(&format!(
+            r#"<e xmlns:c="urn:c" xmlns:d="urn:c"{names} c:a="1" d:a="2"/>"#
+        ))));
+    }
 }
