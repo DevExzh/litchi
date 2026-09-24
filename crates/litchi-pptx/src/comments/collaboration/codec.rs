@@ -2,7 +2,7 @@
 //! collaboration extensions.
 
 use std::borrow::Cow;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::ops::Range;
 
 use litchi_core::xml::ReaderOrigin;
@@ -994,7 +994,7 @@ fn make_node(
             )));
         },
     };
-    let raw = element.as_ref();
+    let mut spans = AttributeSpans::new(element.as_ref());
     let mut attrs = Vec::new();
     let mut seen = HashSet::new();
     for attribute in element.attributes().with_checks(true) {
@@ -1022,12 +1022,10 @@ fn make_node(
             .map_err(xml_error)?
             .into_owned();
         if key != "xmlns" && !key.starts_with("xmlns:") {
-            let value_range =
-                attribute_value_span(raw, attribute.key.as_ref())?.ok_or_else(|| {
+            let (full_range, value_range) =
+                spans.find(attribute.key.as_ref())?.ok_or_else(|| {
                     invalid("legacy comment collaboration attribute value span is missing")
                 })?;
-            let full_range = attribute_full_span(raw, attribute.key.as_ref())?
-                .ok_or_else(|| invalid("legacy comment collaboration attribute span is missing"))?;
             attrs.push(Attr {
                 key,
                 value,
@@ -2191,78 +2189,146 @@ fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Resu
     Ok(output)
 }
 
-fn attribute_value_span(raw: &[u8], key: &[u8]) -> Result<Option<Range<usize>>> {
-    Ok(attribute_ranges(raw, key)?.map(|(_, value)| value))
+/// The full span and value span of one attribute in a raw start tag.
+type AttributeRanges = (Range<usize>, Range<usize>);
+
+/// The source spans of one raw start tag's attributes, found by a single
+/// forward scan of the tag.
+///
+/// [`Self::find`] answers exactly what scanning the tag from its start for the
+/// first attribute named `key` answers: that attribute's spans, the refusal of
+/// the first malformed attribute before it, or nothing once the attributes
+/// end. It keeps the spans of each name's first occurrence it has passed, so
+/// finding each of a tag's `n` attributes costs one pass over the tag and
+/// `O(n log n)` name comparisons instead of one pass over the tag per
+/// attribute.
+struct AttributeSpans<'a> {
+    raw: &'a [u8],
+    /// Where the scan stands.
+    scan: SpanScan,
+    /// The spans of each name's first occurrence scanned so far.
+    first: BTreeMap<&'a [u8], AttributeRanges>,
 }
 
-fn attribute_full_span(raw: &[u8], key: &[u8]) -> Result<Option<Range<usize>>> {
-    Ok(attribute_ranges(raw, key)?.map(|(full, _)| full))
+#[derive(Clone, Copy)]
+enum SpanScan {
+    /// The next attribute, if any, starts at or after this offset.
+    At(usize),
+    /// The tag has no further attributes.
+    Finished,
+    /// The attribute at the scan position is malformed.
+    Failed(&'static str),
 }
 
-fn attribute_ranges(raw: &[u8], key: &[u8]) -> Result<Option<(Range<usize>, Range<usize>)>> {
-    let mut index = 0usize;
-    while index < raw.len()
-        && raw[index] != b' '
-        && raw[index] != b'\t'
-        && raw[index] != b'\n'
-        && raw[index] != b'\r'
-        && raw[index] != b'>'
-        && raw[index] != b'/'
-    {
-        index += 1;
-    }
-    while index < raw.len() {
-        while index < raw.len() && raw[index].is_ascii_whitespace() {
-            index += 1;
-        }
-        if index >= raw.len() || raw[index] == b'>' || raw[index] == b'/' {
-            break;
-        }
-        let full_start = index;
+impl<'a> AttributeSpans<'a> {
+    fn new(raw: &'a [u8]) -> Self {
+        // The attributes start after the element name.
+        let mut index = 0usize;
         while index < raw.len()
-            && !raw[index].is_ascii_whitespace()
-            && !matches!(raw[index], b'=' | b'>' | b'/')
+            && raw[index] != b' '
+            && raw[index] != b'\t'
+            && raw[index] != b'\n'
+            && raw[index] != b'\r'
+            && raw[index] != b'>'
+            && raw[index] != b'/'
         {
             index += 1;
         }
-        let name = &raw[full_start..index];
-        while index < raw.len() && raw[index].is_ascii_whitespace() {
-            index += 1;
-        }
-        if index >= raw.len() || raw[index] != b'=' {
-            return Err(invalid(
-                "legacy comment collaboration attribute has no value",
-            ));
-        }
-        index += 1;
-        while index < raw.len() && raw[index].is_ascii_whitespace() {
-            index += 1;
-        }
-        let quote = *raw
-            .get(index)
-            .ok_or_else(|| invalid("legacy comment collaboration attribute value is missing"))?;
-        if quote != b'\'' && quote != b'"' {
-            return Err(invalid(
-                "legacy comment collaboration attribute value is not quoted",
-            ));
-        }
-        index += 1;
-        let value_start = index;
-        while index < raw.len() && raw[index] != quote {
-            index += 1;
-        }
-        if index >= raw.len() {
-            return Err(invalid(
-                "legacy comment collaboration attribute value is unterminated",
-            ));
-        }
-        let value_end = index;
-        index += 1;
-        if name == key {
-            return Ok(Some((full_start..index, value_start..value_end)));
+        Self {
+            raw,
+            scan: SpanScan::At(index),
+            first: BTreeMap::new(),
         }
     }
-    Ok(None)
+
+    /// The spans of the first attribute named `key`, relative to the start of
+    /// the raw tag.
+    fn find(&mut self, key: &[u8]) -> Result<Option<AttributeRanges>> {
+        if let Some(ranges) = self.first.get(key) {
+            return Ok(Some(ranges.clone()));
+        }
+        while let Some((name, ranges)) = self.next_attribute()? {
+            self.first.entry(name).or_insert_with(|| ranges.clone());
+            if name == key {
+                return Ok(Some(ranges));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Scan the attribute at the scan position and move past it.
+    fn next_attribute(&mut self) -> Result<Option<(&'a [u8], AttributeRanges)>> {
+        let start = match self.scan {
+            SpanScan::At(start) => start,
+            SpanScan::Finished => return Ok(None),
+            SpanScan::Failed(message) => return Err(invalid(message)),
+        };
+        let raw = self.raw;
+        match scan_attribute(raw, start) {
+            Ok(Some((name, full, value))) => {
+                self.scan = SpanScan::At(full.end);
+                Ok(Some((&raw[name], (full, value))))
+            },
+            Ok(None) => {
+                self.scan = SpanScan::Finished;
+                Ok(None)
+            },
+            Err(message) => {
+                self.scan = SpanScan::Failed(message);
+                Err(invalid(message))
+            },
+        }
+    }
+}
+
+/// Scan one attribute of a raw start tag from `index`: the spans of its name,
+/// of the whole attribute and of its value, `None` when the attributes end,
+/// or the reason it is malformed.
+fn scan_attribute(
+    raw: &[u8],
+    mut index: usize,
+) -> std::result::Result<Option<(Range<usize>, Range<usize>, Range<usize>)>, &'static str> {
+    while index < raw.len() && raw[index].is_ascii_whitespace() {
+        index += 1;
+    }
+    if index >= raw.len() || raw[index] == b'>' || raw[index] == b'/' {
+        return Ok(None);
+    }
+    let full_start = index;
+    while index < raw.len()
+        && !raw[index].is_ascii_whitespace()
+        && !matches!(raw[index], b'=' | b'>' | b'/')
+    {
+        index += 1;
+    }
+    let name = full_start..index;
+    while index < raw.len() && raw[index].is_ascii_whitespace() {
+        index += 1;
+    }
+    if index >= raw.len() || raw[index] != b'=' {
+        return Err("legacy comment collaboration attribute has no value");
+    }
+    index += 1;
+    while index < raw.len() && raw[index].is_ascii_whitespace() {
+        index += 1;
+    }
+    let Some(&quote) = raw.get(index) else {
+        return Err("legacy comment collaboration attribute value is missing");
+    };
+    if quote != b'\'' && quote != b'"' {
+        return Err("legacy comment collaboration attribute value is not quoted");
+    }
+    index += 1;
+    let value_start = index;
+    while index < raw.len() && raw[index] != quote {
+        index += 1;
+    }
+    if index >= raw.len() {
+        return Err("legacy comment collaboration attribute value is unterminated");
+    }
+    let value_end = index;
+    index += 1;
+    Ok(Some((name, full_start..index, value_start..value_end)))
 }
 
 fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
@@ -2284,4 +2350,192 @@ fn invalid(message: impl Into<String>) -> Error {
 
 fn xml_error(error: impl std::fmt::Display) -> Error {
     Error::Xml(error.to_string())
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+mod tests {
+    use super::*;
+
+    /// The per-attribute lookup `make_node` used before `AttributeSpans`:
+    /// a scan of the raw tag from its start for the first attribute named
+    /// `key`.
+    fn rescan(raw: &[u8], key: &[u8]) -> Result<Option<AttributeRanges>> {
+        let mut index = 0usize;
+        while index < raw.len()
+            && raw[index] != b' '
+            && raw[index] != b'\t'
+            && raw[index] != b'\n'
+            && raw[index] != b'\r'
+            && raw[index] != b'>'
+            && raw[index] != b'/'
+        {
+            index += 1;
+        }
+        while index < raw.len() {
+            while index < raw.len() && raw[index].is_ascii_whitespace() {
+                index += 1;
+            }
+            if index >= raw.len() || raw[index] == b'>' || raw[index] == b'/' {
+                break;
+            }
+            let full_start = index;
+            while index < raw.len()
+                && !raw[index].is_ascii_whitespace()
+                && !matches!(raw[index], b'=' | b'>' | b'/')
+            {
+                index += 1;
+            }
+            let name = &raw[full_start..index];
+            while index < raw.len() && raw[index].is_ascii_whitespace() {
+                index += 1;
+            }
+            if index >= raw.len() || raw[index] != b'=' {
+                return Err(invalid(
+                    "legacy comment collaboration attribute has no value",
+                ));
+            }
+            index += 1;
+            while index < raw.len() && raw[index].is_ascii_whitespace() {
+                index += 1;
+            }
+            let quote = *raw.get(index).ok_or_else(|| {
+                invalid("legacy comment collaboration attribute value is missing")
+            })?;
+            if quote != b'\'' && quote != b'"' {
+                return Err(invalid(
+                    "legacy comment collaboration attribute value is not quoted",
+                ));
+            }
+            index += 1;
+            let value_start = index;
+            while index < raw.len() && raw[index] != quote {
+                index += 1;
+            }
+            if index >= raw.len() {
+                return Err(invalid(
+                    "legacy comment collaboration attribute value is unterminated",
+                ));
+            }
+            let value_end = index;
+            index += 1;
+            if name == key {
+                return Ok(Some((full_start..index, value_start..value_end)));
+            }
+        }
+        Ok(None)
+    }
+
+    fn comparable(
+        result: Result<Option<AttributeRanges>>,
+    ) -> std::result::Result<Option<AttributeRanges>, String> {
+        result.map_err(|error| error.to_string())
+    }
+
+    #[test]
+    fn attribute_spans_answer_what_a_scan_from_the_tag_start_answers() {
+        let mut crowded = b"p:cm".to_vec();
+        for index in 0..100 {
+            crowded.extend_from_slice(format!(" k{index}='{index}'").as_bytes());
+        }
+        crowded.extend_from_slice(b" k7=\"again\" tail");
+        let tags: Vec<&[u8]> = vec![
+            b"",
+            b"p:cm",
+            b"p:cm/",
+            b" a=\"1\"",
+            b"p:cm authorId=\"7\" idx='2'",
+            b"p:cm  authorId = \"7\"\t\nidx\r=\r'2' ",
+            b"p:cm a=\"1\" b=\"2\" a=\"3\"",
+            b"p:cm a=\"x/y>z\" b='\"' c=\"'\"",
+            b"p:cm =\"1\" a=\"2\"",
+            b"p:cm a=\"1\" /",
+            b"p:cm a=\"1\" > b=\"2\"",
+            b"p:cm a/b=\"1\" c=\"2\"",
+            b"p:cm a\x0cb=\"1\" c=\"2\"",
+            b"p:cm\x0ca=\"1\" b=\"2\"",
+            b"p:cm a=1 b=\"2\"",
+            b"p:cm a b=\"2\"",
+            b"p:cm a=\"1\" b",
+            b"p:cm a=\"1\" b=",
+            b"p:cm a=\"1\" b=\"2",
+            b"p:cm a=\"1\"b=\"2\" c='3'",
+            b"p:cm xmlns:p=\"urn:p\" p:a=\"1\" a=\"2\" xmlns=\"urn:d\"",
+            b"p:cm a=\"1\" b=\"2\" c=\"3\" d=\"4\" e=\"5\" junk f=\"6\"",
+            &crowded,
+        ];
+        let keys: Vec<&[u8]> = vec![
+            b"",
+            b"a",
+            b"b",
+            b"c",
+            b"d",
+            b"e",
+            b"f",
+            b"p:a",
+            b"a/b",
+            b"a\x0cb",
+            b"authorId",
+            b"idx",
+            b"xmlns",
+            b"xmlns:p",
+            b"junk",
+            b"missing",
+            b"k0",
+            b"k7",
+            b"k50",
+            b"k99",
+            b"tail",
+        ];
+        for tag in &tags {
+            let forward = keys.clone();
+            let backward = keys.iter().rev().copied().collect::<Vec<_>>();
+            let twice = keys.iter().flat_map(|key| [*key, *key]).collect::<Vec<_>>();
+            let spread = (0..keys.len())
+                .map(|index| keys[index * 7 % keys.len()])
+                .collect::<Vec<_>>();
+            for order in [forward, backward, twice, spread] {
+                let mut spans = AttributeSpans::new(tag);
+                for key in order {
+                    assert_eq!(
+                        comparable(spans.find(key)),
+                        comparable(rescan(tag, key)),
+                        "tag {:?}, key {:?}",
+                        String::from_utf8_lossy(tag),
+                        String::from_utf8_lossy(key),
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_start_tag_with_many_attributes_is_scanned_in_one_pass() {
+        // Each attribute used to rescan the tag from its start, so a tag of
+        // `n` attributes cost `n` passes over the tag.
+        let count = 50_000;
+        let mut source = format!(r#"<p:cmLst xmlns:p="{PML}"><p:cm"#);
+        for index in 0..count {
+            source.push_str(&format!(" a{index}=\"{index}\""));
+            if index == count / 2 {
+                source.push_str(" xmlns:x=\"urn:x\" x:a=\"'\"");
+            }
+        }
+        source.push_str("/></p:cmLst>");
+        let scan = scan_raw(source.as_bytes()).unwrap();
+        let attributes = &scan.nodes[1].attrs;
+        assert_eq!(attributes.len(), count + 1);
+        for attribute in attributes {
+            let full = &source[attribute.full_range.clone()];
+            let value = &source[attribute.value_range.clone()];
+            assert_eq!(full, format!("{}=\"{}\"", attribute.key, attribute.value));
+            assert_eq!(value, attribute.value);
+        }
+        assert_eq!(attributes[count / 2 + 1].key, "x:a");
+        assert_eq!(attributes[count].key, format!("a{}", count - 1));
+    }
 }
