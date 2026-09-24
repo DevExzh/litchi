@@ -1,0 +1,32 @@
+== pa large repeat 1
+noop total calls 83487 bytes 19656097 | capture calls 75071 bytes 18755734 | commit calls 2226 bytes 149979
+one total calls 166942 bytes 26623356 | capture calls 75071 bytes 18755734 | commit calls 78727 bytes 5301054
+pct total calls 624921 bytes 111504228 | capture calls 75071 bytes 18755734 | commit calls 199111 bytes 16771880
+== pb large repeat 1
+noop total calls 83491 bytes 19662577 | capture calls 75073 bytes 18758974 | commit calls 2226 bytes 149979
+one total calls 105964 bytes 22694361 | capture calls 75073 bytes 18758974 | commit calls 17745 bytes 1365579
+pct total calls 624927 bytes 111513948 | capture calls 75073 bytes 18758974 | commit calls 199113 bytes 16775120
+== pa large repeat 2
+noop total calls 83487 bytes 19656097 | capture calls 75071 bytes 18755734 | commit calls 2226 bytes 149979
+one total calls 166942 bytes 26623356 | capture calls 75071 bytes 18755734 | commit calls 78727 bytes 5301054
+pct total calls 624921 bytes 111504228 | capture calls 75071 bytes 18755734 | commit calls 199111 bytes 16771880
+== pb large repeat 2
+noop total calls 83491 bytes 19662577 | capture calls 75073 bytes 18758974 | commit calls 2226 bytes 149979
+one total calls 105964 bytes 22694361 | capture calls 75073 bytes 18758974 | commit calls 17745 bytes 1365579
+pct total calls 624927 bytes 111513948 | capture calls 75073 bytes 18758974 | commit calls 199113 bytes 16775120
+== pa medium repeat 1
+noop total calls 5450 bytes 3208567 | capture calls 3458 bytes 2997909 | commit calls 554 bytes 38351
+one total calls 10410 bytes 4218013 | capture calls 3458 bytes 2997909 | commit calls 4162 bytes 326564
+pct total calls 10410 bytes 4218013 | capture calls 3458 bytes 2997909 | commit calls 4162 bytes 326564
+== pb medium repeat 1
+noop total calls 5454 bytes 3209415 | capture calls 3460 bytes 2998333 | commit calls 554 bytes 38351
+one total calls 9712 bytes 4170258 | capture calls 3460 bytes 2998333 | commit calls 3460 bytes 277961
+pct total calls 9712 bytes 4170258 | capture calls 3460 bytes 2998333 | commit calls 3460 bytes 277961
+== pa medium repeat 2
+noop total calls 5450 bytes 3208567 | capture calls 3458 bytes 2997909 | commit calls 554 bytes 38351
+one total calls 10410 bytes 4218013 | capture calls 3458 bytes 2997909 | commit calls 4162 bytes 326564
+pct total calls 10410 bytes 4218013 | capture calls 3458 bytes 2997909 | commit calls 4162 bytes 326564
+== pb medium repeat 2
+noop total calls 5454 bytes 3209415 | capture calls 3460 bytes 2998333 | commit calls 554 bytes 38351
+one total calls 9712 bytes 4170258 | capture calls 3460 bytes 2998333 | commit calls 3460 bytes 277961
+pct total calls 9712 bytes 4170258 | capture calls 3460 bytes 2998333 | commit calls 3460 bytes 277961

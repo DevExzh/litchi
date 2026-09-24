@@ -1,0 +1,692 @@
+{
+ "records": [
+  {
+   "mode": "setup-large",
+   "block": 0,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 21646817.62,
+    "cycles:u": 5587035.77
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "setup-large",
+   "block": 0,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 21651608.96,
+    "cycles:u": 5745368.88
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "setup-large",
+   "block": 0,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 21652847.96,
+    "cycles:u": 5824534.87
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "setup-large",
+   "block": 0,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 21653131.81,
+    "cycles:u": 5592976.1
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "setup-large",
+   "block": 1,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 21648648.44,
+    "cycles:u": 5623424.11
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "setup-large",
+   "block": 1,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 21653316.97,
+    "cycles:u": 5780711.37
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "setup-large",
+   "block": 1,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 21650249.24,
+    "cycles:u": 5806328.07
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "setup-large",
+   "block": 1,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 21649694.32,
+    "cycles:u": 5613840.62
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "setup-medium",
+   "block": 0,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 5436230.43,
+    "cycles:u": 1445939.55
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "setup-medium",
+   "block": 0,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 5440097.986,
+    "cycles:u": 1496313.764
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "setup-medium",
+   "block": 0,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 5441278.36,
+    "cycles:u": 1496421.278
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "setup-medium",
+   "block": 0,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 5442814.624,
+    "cycles:u": 1441453.16
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "setup-medium",
+   "block": 1,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 5440156.246,
+    "cycles:u": 1450096.55
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "setup-medium",
+   "block": 1,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 5444979.418,
+    "cycles:u": 1495508.504
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "setup-medium",
+   "block": 1,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 5441668.254,
+    "cycles:u": 1492089.974
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "setup-medium",
+   "block": 1,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 5442879.512,
+    "cycles:u": 1447468.222
+   },
+   "stdout_high": "setup done"
+  },
+  {
+   "mode": "noop-large",
+   "block": 0,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 435090668.8,
+    "cycles:u": 109751029.8
+   },
+   "stdout_high": "capture    median_ns 22818973\nedit       median_ns 43221\nset_text   median_ns 30\ncommit     median_ns 150421\napply      median_ns 105120\nto_bytes   median_ns 4500\ntotal      median_ns 23129845\noutput bytes 215220 text bytes 529999"
+  },
+  {
+   "mode": "noop-large",
+   "block": 0,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 435187913.7,
+    "cycles:u": 115119665.5
+   },
+   "stdout_high": "capture    median_ns 23863029\nedit       median_ns 43510\nset_text   median_ns 20\ncommit     median_ns 149851\napply      median_ns 107581\nto_bytes   median_ns 4560\ntotal      median_ns 24168001\noutput bytes 215220 text bytes 529999"
+  },
+  {
+   "mode": "noop-large",
+   "block": 0,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 435177434.7,
+    "cycles:u": 114233029.5
+   },
+   "stdout_high": "capture    median_ns 23840159\nedit       median_ns 44371\nset_text   median_ns 30\ncommit     median_ns 151361\napply      median_ns 107850\nto_bytes   median_ns 3870\ntotal      median_ns 24153530\noutput bytes 215220 text bytes 529999"
+  },
+  {
+   "mode": "noop-large",
+   "block": 0,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 435081123.6,
+    "cycles:u": 109721449.8
+   },
+   "stdout_high": "capture    median_ns 22859943\nedit       median_ns 44131\nset_text   median_ns 20\ncommit     median_ns 151020\napply      median_ns 105531\nto_bytes   median_ns 4370\ntotal      median_ns 23167035\noutput bytes 215220 text bytes 529999"
+  },
+  {
+   "mode": "noop-large",
+   "block": 1,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 435097999.4,
+    "cycles:u": 109452885.7
+   },
+   "stdout_high": "capture    median_ns 22837164\nedit       median_ns 43680\nset_text   median_ns 20\ncommit     median_ns 150110\napply      median_ns 104410\nto_bytes   median_ns 4370\ntotal      median_ns 23139855\noutput bytes 215220 text bytes 529999"
+  },
+  {
+   "mode": "noop-large",
+   "block": 1,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 435169576.6,
+    "cycles:u": 115016233.7
+   },
+   "stdout_high": "capture    median_ns 23894399\nedit       median_ns 43810\nset_text   median_ns 20\ncommit     median_ns 153021\napply      median_ns 107651\nto_bytes   median_ns 4740\ntotal      median_ns 24205801\noutput bytes 215220 text bytes 529999"
+  },
+  {
+   "mode": "noop-large",
+   "block": 1,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 435155247.1,
+    "cycles:u": 112436139.3
+   },
+   "stdout_high": "capture    median_ns 23364327\nedit       median_ns 44610\nset_text   median_ns 20\ncommit     median_ns 150640\napply      median_ns 107270\nto_bytes   median_ns 3960\ntotal      median_ns 23683608\noutput bytes 215220 text bytes 529999"
+  },
+  {
+   "mode": "noop-large",
+   "block": 1,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 435086148.5,
+    "cycles:u": 112771873.4
+   },
+   "stdout_high": "capture    median_ns 23295756\nedit       median_ns 47721\nset_text   median_ns 30\ncommit     median_ns 159511\napply      median_ns 116971\nto_bytes   median_ns 6870\ntotal      median_ns 23646558\noutput bytes 215220 text bytes 529999"
+  },
+  {
+   "mode": "one-large",
+   "block": 0,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 844464025.3,
+    "cycles:u": 209484449.9
+   },
+   "stdout_high": "capture    median_ns 23134505\nedit       median_ns 49480\nset_text   median_ns 775824\ncommit     median_ns 20675550\napply      median_ns 225421\nto_bytes   median_ns 384212\ntotal      median_ns 45261424\noutput bytes 215228 text bytes 530000"
+  },
+  {
+   "mode": "one-large",
+   "block": 0,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 479212175.4,
+    "cycles:u": 124537282.1
+   },
+   "stdout_high": "capture    median_ns 23581978\nedit       median_ns 51350\nset_text   median_ns 772984\ncommit     median_ns 1548209\napply      median_ns 230272\nto_bytes   median_ns 387822\ntotal      median_ns 26522535\noutput bytes 215228 text bytes 530000"
+  },
+  {
+   "mode": "one-large",
+   "block": 0,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 479192761.6,
+    "cycles:u": 125523972.6
+   },
+   "stdout_high": "capture    median_ns 23700588\nedit       median_ns 48881\nset_text   median_ns 773325\ncommit     median_ns 1543199\napply      median_ns 236571\nto_bytes   median_ns 396312\ntotal      median_ns 26697585\noutput bytes 215228 text bytes 530000"
+  },
+  {
+   "mode": "one-large",
+   "block": 0,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 844419076.0,
+    "cycles:u": 209913667.6
+   },
+   "stdout_high": "capture    median_ns 23199625\nedit       median_ns 54890\nset_text   median_ns 781724\ncommit     median_ns 20701591\napply      median_ns 281951\nto_bytes   median_ns 447762\ntotal      median_ns 45460505\noutput bytes 215228 text bytes 530000"
+  },
+  {
+   "mode": "one-large",
+   "block": 1,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 844417246.5,
+    "cycles:u": 203860638.4
+   },
+   "stdout_high": "capture    median_ns 22759093\nedit       median_ns 43870\nset_text   median_ns 762245\ncommit     median_ns 20284458\napply      median_ns 206101\nto_bytes   median_ns 338401\ntotal      median_ns 44448850\noutput bytes 215228 text bytes 530000"
+  },
+  {
+   "mode": "one-large",
+   "block": 1,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 479222094.4,
+    "cycles:u": 124135451.1
+   },
+   "stdout_high": "capture    median_ns 23488848\nedit       median_ns 44880\nset_text   median_ns 769674\ncommit     median_ns 1513329\napply      median_ns 208881\nto_bytes   median_ns 346253\ntotal      median_ns 26405554\noutput bytes 215228 text bytes 530000"
+  },
+  {
+   "mode": "one-large",
+   "block": 1,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 479205721.1,
+    "cycles:u": 124546584.6
+   },
+   "stdout_high": "capture    median_ns 23483987\nedit       median_ns 44520\nset_text   median_ns 761095\ncommit     median_ns 1507588\napply      median_ns 208222\nto_bytes   median_ns 338602\ntotal      median_ns 26344224\noutput bytes 215228 text bytes 530000"
+  },
+  {
+   "mode": "one-large",
+   "block": 1,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 844382835.4,
+    "cycles:u": 208019130.5
+   },
+   "stdout_high": "capture    median_ns 23027075\nedit       median_ns 45930\nset_text   median_ns 768154\ncommit     median_ns 20653891\napply      median_ns 231321\nto_bytes   median_ns 383722\ntotal      median_ns 45107004\noutput bytes 215228 text bytes 530000"
+  },
+  {
+   "mode": "pct-large",
+   "block": 0,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 2837553821.4,
+    "cycles:u": 669440747.4
+   },
+   "stdout_high": "capture    median_ns 22893823\nedit       median_ns 45901\nset_text   median_ns 73561429\ncommit     median_ns 34948854\napply      median_ns 890525\nto_bytes   median_ns 16188905\ntotal      median_ns 148351766\noutput bytes 215933 text bytes 530099"
+  },
+  {
+   "mode": "pct-large",
+   "block": 0,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 2838630307.6,
+    "cycles:u": 674781299.4
+   },
+   "stdout_high": "capture    median_ns 23538577\nedit       median_ns 49901\nset_text   median_ns 73890061\ncommit     median_ns 35881409\napply      median_ns 988256\nto_bytes   median_ns 15313930\ntotal      median_ns 149658224\noutput bytes 215933 text bytes 530099"
+  },
+  {
+   "mode": "pct-large",
+   "block": 0,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 2838781896.6,
+    "cycles:u": 672417709.6
+   },
+   "stdout_high": "capture    median_ns 23570147\nedit       median_ns 46241\nset_text   median_ns 73722160\ncommit     median_ns 35465157\napply      median_ns 877585\nto_bytes   median_ns 15077778\ntotal      median_ns 148543715\noutput bytes 215933 text bytes 530099"
+  },
+  {
+   "mode": "pct-large",
+   "block": 0,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 2837575086.4,
+    "cycles:u": 681757020.8
+   },
+   "stdout_high": "capture    median_ns 23302890\nedit       median_ns 51670\nset_text   median_ns 74280665\ncommit     median_ns 35376818\napply      median_ns 1067126\nto_bytes   median_ns 17319587\ntotal      median_ns 151514876\noutput bytes 215933 text bytes 530099"
+  },
+  {
+   "mode": "pct-large",
+   "block": 1,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 2837513813.8,
+    "cycles:u": 682061817.2
+   },
+   "stdout_high": "capture    median_ns 23319080\nedit       median_ns 50841\nset_text   median_ns 74115744\ncommit     median_ns 35367448\napply      median_ns 1050406\nto_bytes   median_ns 16639733\ntotal      median_ns 150686421\noutput bytes 215933 text bytes 530099"
+  },
+  {
+   "mode": "pct-large",
+   "block": 1,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 2838814978.6,
+    "cycles:u": 680447094.2
+   },
+   "stdout_high": "capture    median_ns 24068964\nedit       median_ns 50881\nset_text   median_ns 73942833\ncommit     median_ns 35939280\napply      median_ns 1046416\nto_bytes   median_ns 15494839\ntotal      median_ns 151165104\noutput bytes 215933 text bytes 530099"
+  },
+  {
+   "mode": "pct-large",
+   "block": 1,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 2838776430.4,
+    "cycles:u": 694317791.4
+   },
+   "stdout_high": "capture    median_ns 23962633\nedit       median_ns 54240\nset_text   median_ns 76280879\ncommit     median_ns 36326375\napply      median_ns 1046845\nto_bytes   median_ns 15790560\ntotal      median_ns 152791949\noutput bytes 215933 text bytes 530099"
+  },
+  {
+   "mode": "pct-large",
+   "block": 1,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 2837523928.8,
+    "cycles:u": 684585034.0
+   },
+   "stdout_high": "capture    median_ns 23705381\nedit       median_ns 89501\nset_text   median_ns 75012412\ncommit     median_ns 35906663\napply      median_ns 1172085\nto_bytes   median_ns 16966506\ntotal      median_ns 154717230\noutput bytes 215933 text bytes 530099"
+  },
+  {
+   "mode": "noop-medium",
+   "block": 0,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 16518242.73,
+    "cycles:u": 5144465.21
+   },
+   "stdout_high": "capture    median_ns 691443\nedit       median_ns 12650\nset_text   median_ns 20\ncommit     median_ns 39780\napply      median_ns 32790\nto_bytes   median_ns 730\ntotal      median_ns 777494\noutput bytes 40788 text bytes 5087"
+  },
+  {
+   "mode": "noop-medium",
+   "block": 0,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 16531798.465,
+    "cycles:u": 5303228.35
+   },
+   "stdout_high": "capture    median_ns 706614\nedit       median_ns 12720\nset_text   median_ns 20\ncommit     median_ns 40210\napply      median_ns 33150\nto_bytes   median_ns 770\ntotal      median_ns 793925\noutput bytes 40788 text bytes 5087"
+  },
+  {
+   "mode": "noop-medium",
+   "block": 0,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 16528013.95,
+    "cycles:u": 5252594.265
+   },
+   "stdout_high": "capture    median_ns 704424\nedit       median_ns 12820\nset_text   median_ns 20\ncommit     median_ns 40520\napply      median_ns 33270\nto_bytes   median_ns 790\ntotal      median_ns 792584\noutput bytes 40788 text bytes 5087"
+  },
+  {
+   "mode": "noop-medium",
+   "block": 0,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 16518283.94,
+    "cycles:u": 5103398.31
+   },
+   "stdout_high": "capture    median_ns 687254\nedit       median_ns 12730\nset_text   median_ns 20\ncommit     median_ns 40470\napply      median_ns 32720\nto_bytes   median_ns 740\ntotal      median_ns 774543\noutput bytes 40788 text bytes 5087"
+  },
+  {
+   "mode": "noop-medium",
+   "block": 1,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 16514903.835,
+    "cycles:u": 5121475.165
+   },
+   "stdout_high": "capture    median_ns 688114\nedit       median_ns 12880\nset_text   median_ns 20\ncommit     median_ns 39900\napply      median_ns 32870\nto_bytes   median_ns 730\ntotal      median_ns 775234\noutput bytes 40788 text bytes 5087"
+  },
+  {
+   "mode": "noop-medium",
+   "block": 1,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 16530517.83,
+    "cycles:u": 5291989.98
+   },
+   "stdout_high": "capture    median_ns 704123\nedit       median_ns 12880\nset_text   median_ns 20\ncommit     median_ns 40341\napply      median_ns 33230\nto_bytes   median_ns 760\ntotal      median_ns 791504\noutput bytes 40788 text bytes 5087"
+  },
+  {
+   "mode": "noop-medium",
+   "block": 1,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 16528131.49,
+    "cycles:u": 5288895.365
+   },
+   "stdout_high": "capture    median_ns 706974\nedit       median_ns 12881\nset_text   median_ns 20\ncommit     median_ns 40170\napply      median_ns 33120\nto_bytes   median_ns 690\ntotal      median_ns 794525\noutput bytes 40788 text bytes 5087"
+  },
+  {
+   "mode": "noop-medium",
+   "block": 1,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 16520801.495,
+    "cycles:u": 5158566.32
+   },
+   "stdout_high": "capture    median_ns 689984\nedit       median_ns 12880\nset_text   median_ns 20\ncommit     median_ns 40040\napply      median_ns 32880\nto_bytes   median_ns 760\ntotal      median_ns 776674\noutput bytes 40788 text bytes 5087"
+  },
+  {
+   "mode": "one-medium",
+   "block": 0,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 27167733.675,
+    "cycles:u": 8243209.26
+   },
+   "stdout_high": "capture    median_ns 691664\nedit       median_ns 12810\nset_text   median_ns 85141\ncommit     median_ns 514042\napply      median_ns 60330\nto_bytes   median_ns 88640\ntotal      median_ns 1453038\noutput bytes 40794 text bytes 5088"
+  },
+  {
+   "mode": "one-medium",
+   "block": 0,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 23649286.225,
+    "cycles:u": 7632298.945
+   },
+   "stdout_high": "capture    median_ns 709654\nedit       median_ns 12990\nset_text   median_ns 84871\ncommit     median_ns 338222\napply      median_ns 60960\nto_bytes   median_ns 89450\ntotal      median_ns 1299126\noutput bytes 40794 text bytes 5088"
+  },
+  {
+   "mode": "one-medium",
+   "block": 0,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 23648926.355,
+    "cycles:u": 7640042.47
+   },
+   "stdout_high": "capture    median_ns 713174\nedit       median_ns 13050\nset_text   median_ns 84990\ncommit     median_ns 338301\napply      median_ns 61170\nto_bytes   median_ns 88760\ntotal      median_ns 1301806\noutput bytes 40794 text bytes 5088"
+  },
+  {
+   "mode": "one-medium",
+   "block": 0,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 27167036.26,
+    "cycles:u": 8314888.315
+   },
+   "stdout_high": "capture    median_ns 698004\nedit       median_ns 12930\nset_text   median_ns 85451\ncommit     median_ns 520782\napply      median_ns 60331\nto_bytes   median_ns 89321\ntotal      median_ns 1466598\noutput bytes 40794 text bytes 5088"
+  },
+  {
+   "mode": "one-medium",
+   "block": 1,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 27171705.08,
+    "cycles:u": 8287044.675
+   },
+   "stdout_high": "capture    median_ns 695034\nedit       median_ns 12800\nset_text   median_ns 85451\ncommit     median_ns 517492\napply      median_ns 60431\nto_bytes   median_ns 88791\ntotal      median_ns 1460087\noutput bytes 40794 text bytes 5088"
+  },
+  {
+   "mode": "one-medium",
+   "block": 1,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 23648368.22,
+    "cycles:u": 7623867.975
+   },
+   "stdout_high": "capture    median_ns 712894\nedit       median_ns 13200\nset_text   median_ns 85190\ncommit     median_ns 337651\napply      median_ns 61360\nto_bytes   median_ns 88921\ntotal      median_ns 1301497\noutput bytes 40794 text bytes 5088"
+  },
+  {
+   "mode": "one-medium",
+   "block": 1,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 23652546.15,
+    "cycles:u": 7634091.685
+   },
+   "stdout_high": "capture    median_ns 711114\nedit       median_ns 12920\nset_text   median_ns 84920\ncommit     median_ns 337562\napply      median_ns 60720\nto_bytes   median_ns 88810\ntotal      median_ns 1298597\noutput bytes 40794 text bytes 5088"
+  },
+  {
+   "mode": "one-medium",
+   "block": 1,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 27166612.275,
+    "cycles:u": 8285204.37
+   },
+   "stdout_high": "capture    median_ns 692284\nedit       median_ns 12720\nset_text   median_ns 85630\ncommit     median_ns 524623\napply      median_ns 60930\nto_bytes   median_ns 89600\ntotal      median_ns 1466907\noutput bytes 40794 text bytes 5088"
+  }
+ ],
+ "summary": {
+  "setup-large": {
+   "a": {
+    "instructions:u": 21649171.380000003,
+    "cycles:u": 5603408.359999999
+   },
+   "b": {
+    "instructions:u": 21652228.46,
+    "cycles:u": 5793519.720000001
+   }
+  },
+  "setup-medium": {
+   "a": {
+    "instructions:u": 5441485.4350000005,
+    "cycles:u": 1446703.886
+   },
+   "b": {
+    "instructions:u": 5441473.307,
+    "cycles:u": 1495911.134
+   }
+  },
+  "noop-large": {
+   "a": {
+    "instructions:u": 435088408.65,
+    "cycles:u": 109736239.8
+   },
+   "b": {
+    "instructions:u": 435173505.65,
+    "cycles:u": 114624631.6
+   }
+  },
+  "one-large": {
+   "a": {
+    "instructions:u": 844418161.25,
+    "cycles:u": 208751790.2
+   },
+   "b": {
+    "instructions:u": 479208948.25,
+    "cycles:u": 124541933.35
+   }
+  },
+  "pct-large": {
+   "a": {
+    "instructions:u": 2837538875.1000004,
+    "cycles:u": 681909419.0
+   },
+   "b": {
+    "instructions:u": 2838779163.5,
+    "cycles:u": 677614196.8
+   }
+  },
+  "noop-medium": {
+   "a": {
+    "instructions:u": 16518263.335,
+    "cycles:u": 5132970.1875
+   },
+   "b": {
+    "instructions:u": 16529324.66,
+    "cycles:u": 5290442.6725
+   }
+  },
+  "one-medium": {
+   "a": {
+    "instructions:u": 27167384.9675,
+    "cycles:u": 8286124.5225
+   },
+   "b": {
+    "instructions:u": 23649106.29,
+    "cycles:u": 7633195.3149999995
+   }
+  }
+ }
+}

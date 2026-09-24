@@ -1,0 +1,207 @@
+# gates for change 0760 at dfde1e43bbbcd3c2b843d336092173160b7381ae (2026-09-24T20:29Z)
+
+## cargo fmt --all --check
+exit: 0
+```
+```
+
+## cargo check -p litchi-pptx --all-targets --locked --offline
+exit: 0
+```
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.26s
+```
+
+## cargo check -p litchi-pptx --all-targets --all-features --locked --offline
+exit: 0
+```
+    Checking icu_normalizer v1.5.0
+    Checking idna_adapter v1.2.0
+    Checking idna v1.1.0
+    Checking url v2.5.8
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-vba)
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-fonts)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-crypto)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-drawingml)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.49s
+```
+
+## cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked --offline
+exit: 0
+```
+    Checking proptest v1.7.0
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-xls)
+    Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-doc)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-drawingml)
+    Checking clap v4.4.18
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-spreadsheet-drawing)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-docx)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-xlsb)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-xlsx)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-pptx)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 27.05s
+```
+
+## cargo clippy -p litchi-pptx --lib --no-deps --locked --offline -- -D warnings
+exit: 0
+```
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
+```
+
+## cargo clippy -p litchi-pptx --all-targets --no-deps --locked --offline -- -D warnings
+exit: 101
+```
+
+error: called `.err().expect()` on a `Result` value
+   --> crates/litchi-pptx/src/opened/tests.rs:557:10
+    |
+557 |           .err()
+    |  __________^
+558 | |         .expect("the 64 MiB part limit must refuse capture");
+    | |_______________^ help: try: `expect_err`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#err_expect
+
+error: could not compile `litchi-pptx` (lib test) due to 3 previous errors
+```
+
+## cargo test -p litchi-pptx --locked --offline
+exit: 0
+test totals: 1189 passed, 0 failed, 3 ignored (83 test binaries)
+```
+test crates/litchi-pptx/src/transition/mod.rs - transition (line 6) ... ok
+test crates/litchi-pptx/src/shape/mod.rs - shape (line 7) ... ok
+
+test result: ok. 5 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test crates/litchi-pptx/src/transition/mod.rs - transition (line 17) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+all doctests ran in 0.66s; merged doctests compilation took 0.55s
+```
+
+## cargo test -p litchi-pptx --all-features --locked --offline
+exit: 101
+test totals: 794 passed, 3 failed, 1 ignored (1 test binaries)
+```
+  left: "media.plan.bytes=f5bfc1bc0de67f036c30d93df20917c021b5df5bacf344f22e5ef9c7429647fb"
+ right: "media.plan.bytes=4c853fc0835f77df95e345626d80c529505083c2814f5859766929925de007aa"
+
+
+failures:
+    opened::cross_copy_plan::digest_reuse_tests::every_patch_revision_output_and_refusal_matches_the_base
+    opened::cross_copy_plan::media_transfer_tests::captures_that_do_not_fit_record_the_recompressing_route
+    opened::cross_copy_plan::media_transfer_tests::legacy_lpcp0003_patches_are_refused_by_name
+
+test result: FAILED. 794 passed; 3 failed; 1 ignored; 0 measured; 0 filtered out; finished in 24.91s
+
+error: test failed, to rerun pass `-p litchi-pptx --lib`
+```
+
+## cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+exit: 0
+test totals: 382 passed, 0 failed, 7 ignored (29 test binaries)
+```
+test crates/litchi/src/presentation/slide.rs - presentation::slide::Slide::text (line 38) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook (line 219) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::from_bytes (line 385) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::metadata (line 849) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::open (line 304) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::text (line 722) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::worksheet_count (line 675) - compile ... ok
+test crates/litchi/src/sheet/workbook.rs - sheet::workbook::Workbook::worksheet_names (line 614) - compile ... ok
+
+test result: ok. 35 passed; 0 failed; 7 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.93s; merged doctests compilation took 0.93s
+```
+
+## env RUSTDOCFLAGS=-D warnings cargo doc -p litchi-pptx --no-deps --locked --offline
+exit: 0
+```
+ Documenting litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.08s
+   Generated /home/zhuhe/code/litchi-worktrees/targets/0760/doc/litchi_pptx/index.html
+```
+
+## python3 tools/check_crate_boundaries.py
+exit: 0
+```
+ordered migration debt:
+  [001] litchi-iwa -> litchi-core
+  [002] litchi-iwa -> litchi-iwa-archive
+  [004] litchi-iwa -> litchi-iwa-common
+  [008] litchi-iwa -> litchi-iwa-index
+  [010] litchi-iwa -> litchi-iwa-protos
+  [012] litchi-iwa -> litchi-iwa-text
+  [013] litchi-iwa -> litchi-iwa-text-wire
+  [014] litchi-iwa -> litchi-keynote
+  [015] litchi-iwa -> litchi-numbers
+  [016] litchi-iwa -> litchi-numbers-wire
+  [017] litchi-iwa -> litchi-pages
+```
+
+## python3 tools/non_iwork_gate.py verify
+exit: 1
+```
+non-iWork release gate: workspace package inventory mismatch (unexpected: litchi-xldm)
+```
+
+## python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+exit: 0
+```
+OK: 10 performance claims validated (structural)
+```
+done
+
+# Supplementary runs (same worktree, target directory and environment)
+
+## cargo test -p litchi-pptx --all-features --locked --offline --no-fail-fast
+exit: 101
+test totals: 1200 passed, 3 failed, 3 ignored (83 test binaries)
+The same three lib tests as above fail, and every other all-features test
+binary passes:
+    opened::cross_copy_plan::digest_reuse_tests::every_patch_revision_output_and_refusal_matches_the_base
+    opened::cross_copy_plan::media_transfer_tests::captures_that_do_not_fit_record_the_recompressing_route
+    opened::cross_copy_plan::media_transfer_tests::legacy_lpcp0003_patches_are_refused_by_name
+
+# Base comparisons (0760-before-src at 1d1044e3ac, target targets/0760-before)
+
+## cargo clippy -p litchi-pptx --all-targets --no-deps --locked --offline -- -D warnings
+exit: 101 at the base too: the same three clippy::err_expect lints in
+crates/litchi-pptx/src/opened/tests.rs (lines 464, 538, 557), a file this change
+does not touch. The lib gate (--lib) passes at the head.
+
+## cargo test -p litchi-pptx --all-features --locked --offline --lib -- opened::cross_copy_plan
+exit: 101 at the base too: 53 passed, 3 failed, 1 ignored; the same three tests
+fail with byte-identical assertion values at base and head:
+  media_transfer_tests.rs:748   left "ac52166b..." right "204bfc1b..."
+  media_transfer_tests.rs:1037  left 219477 right 219573 ("the bound of the review's example")
+  digest_reuse_tests.rs:823     left "media.plan.bytes=f5bfc1bc..." right "media.plan.bytes=4c853fc0..."
+These golden values pin compressed cross-copy output, which moves under
+--all-features at this base; the default-feature run passes all 56 cross-copy
+tests at the head. Not in the briefing's known-failure list; reported, not fixed.
+
+# Known gate failures at this base (per the wave briefing)
+
+python3 tools/non_iwork_gate.py verify exits 1 (litchi-xldm registration), as
+listed in the briefing. The harness is unchanged by this change, so its own
+suite and the coverage validator were not required (the briefing's known harness
+failures do not apply).
+
+# Toolchain note
+
+The root Cargo.lock copied into the worktree from the main checkout predates
+the spec-gap merge (0759) and failed --locked. `cargo metadata --offline`
+resolved it minimally (the new litchi-xldm member and dependency edges between
+workspace packages; no external package version changed), after which every
+gate above ran with --locked --offline. The lockfile is gitignored and not
+committed. The harness builds use tools/perf-baseline/Cargo.lock (tracked) and
+were unaffected.

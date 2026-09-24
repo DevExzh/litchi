@@ -1,0 +1,692 @@
+{
+ "records": [
+  {
+   "mode": "commit-one-large",
+   "block": 0,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 391616219.55,
+    "cycles:u": 93851689.05
+   },
+   "stdout_high": "commit median_ns 21107623"
+  },
+  {
+   "mode": "commit-one-large",
+   "block": 0,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 26321452.35,
+    "cycles:u": 7017136.2
+   },
+   "stdout_high": "commit median_ns 1509028"
+  },
+  {
+   "mode": "commit-one-large",
+   "block": 0,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 26360310.9,
+    "cycles:u": 6820574.55
+   },
+   "stdout_high": "commit median_ns 1506568"
+  },
+  {
+   "mode": "commit-one-large",
+   "block": 0,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 391627454.8,
+    "cycles:u": 95103560.85
+   },
+   "stdout_high": "commit median_ns 21140933"
+  },
+  {
+   "mode": "commit-one-large",
+   "block": 1,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 391625764.15,
+    "cycles:u": 94806340.25
+   },
+   "stdout_high": "commit median_ns 21079913"
+  },
+  {
+   "mode": "commit-one-large",
+   "block": 1,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 26344736.75,
+    "cycles:u": 6955930.05
+   },
+   "stdout_high": "commit median_ns 1493688"
+  },
+  {
+   "mode": "commit-one-large",
+   "block": 1,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 26344162.65,
+    "cycles:u": 7099543.25
+   },
+   "stdout_high": "commit median_ns 1496658"
+  },
+  {
+   "mode": "commit-one-large",
+   "block": 1,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 391623992.1,
+    "cycles:u": 92863291.4
+   },
+   "stdout_high": "commit median_ns 20648790"
+  },
+  {
+   "mode": "commit-pct-large",
+   "block": 0,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 687453605.8,
+    "cycles:u": 159054676.6
+   },
+   "stdout_high": "commit median_ns 35559471"
+  },
+  {
+   "mode": "commit-pct-large",
+   "block": 0,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 687533264.5,
+    "cycles:u": 160790255.8
+   },
+   "stdout_high": "commit median_ns 35815212"
+  },
+  {
+   "mode": "commit-pct-large",
+   "block": 0,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 687496127.4,
+    "cycles:u": 160421541.3
+   },
+   "stdout_high": "commit median_ns 35992653"
+  },
+  {
+   "mode": "commit-pct-large",
+   "block": 0,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 687445963.6,
+    "cycles:u": 156262826.6
+   },
+   "stdout_high": "commit median_ns 34928727"
+  },
+  {
+   "mode": "commit-pct-large",
+   "block": 1,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 687424385.8,
+    "cycles:u": 157651881.1
+   },
+   "stdout_high": "commit median_ns 35275859"
+  },
+  {
+   "mode": "commit-pct-large",
+   "block": 1,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 687487363.5,
+    "cycles:u": 165255848.2
+   },
+   "stdout_high": "commit median_ns 36274525"
+  },
+  {
+   "mode": "commit-pct-large",
+   "block": 1,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 687499454.8,
+    "cycles:u": 160443203.3
+   },
+   "stdout_high": "commit median_ns 35781875"
+  },
+  {
+   "mode": "commit-pct-large",
+   "block": 1,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 687424114.0,
+    "cycles:u": 159439914.2
+   },
+   "stdout_high": "commit median_ns 35650554"
+  },
+  {
+   "mode": "commit-one-medium",
+   "block": 0,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 8617289.808,
+    "cycles:u": 2224003.358
+   },
+   "stdout_high": "commit median_ns 477323"
+  },
+  {
+   "mode": "commit-one-medium",
+   "block": 0,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 5087302.72,
+    "cycles:u": 1439106.418
+   },
+   "stdout_high": "commit median_ns 299132"
+  },
+  {
+   "mode": "commit-one-medium",
+   "block": 0,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 5081074.822,
+    "cycles:u": 1429933.866
+   },
+   "stdout_high": "commit median_ns 298602"
+  },
+  {
+   "mode": "commit-one-medium",
+   "block": 0,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 8616149.212,
+    "cycles:u": 2223121.68
+   },
+   "stdout_high": "commit median_ns 475033"
+  },
+  {
+   "mode": "commit-one-medium",
+   "block": 1,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 8619529.084,
+    "cycles:u": 2231629.044
+   },
+   "stdout_high": "commit median_ns 475853"
+  },
+  {
+   "mode": "commit-one-medium",
+   "block": 1,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 5078176.214,
+    "cycles:u": 1421584.802
+   },
+   "stdout_high": "commit median_ns 296512"
+  },
+  {
+   "mode": "commit-one-medium",
+   "block": 1,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 5083612.128,
+    "cycles:u": 1431282.082
+   },
+   "stdout_high": "commit median_ns 297932"
+  },
+  {
+   "mode": "commit-one-medium",
+   "block": 1,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 8617441.212,
+    "cycles:u": 2218228.008
+   },
+   "stdout_high": "commit median_ns 475732"
+  },
+  {
+   "mode": "capture-large",
+   "block": 0,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 384065249.1,
+    "cycles:u": 89947098.05
+   },
+   "stdout_high": "capture median_ns 20160720"
+  },
+  {
+   "mode": "capture-large",
+   "block": 0,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 384127894.55,
+    "cycles:u": 97109043.85
+   },
+   "stdout_high": "capture median_ns 21496947"
+  },
+  {
+   "mode": "capture-large",
+   "block": 0,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 384114981.2,
+    "cycles:u": 93419639.15
+   },
+   "stdout_high": "capture median_ns 21054835"
+  },
+  {
+   "mode": "capture-large",
+   "block": 0,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 384102898.75,
+    "cycles:u": 92235843.85
+   },
+   "stdout_high": "capture median_ns 20483652"
+  },
+  {
+   "mode": "capture-large",
+   "block": 1,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 384115380.1,
+    "cycles:u": 91089253.5
+   },
+   "stdout_high": "capture median_ns 20304880"
+  },
+  {
+   "mode": "capture-large",
+   "block": 1,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 384136425.95,
+    "cycles:u": 94342408.45
+   },
+   "stdout_high": "capture median_ns 20983114"
+  },
+  {
+   "mode": "capture-large",
+   "block": 1,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 384139664.35,
+    "cycles:u": 92231930.2
+   },
+   "stdout_high": "capture median_ns 20632602"
+  },
+  {
+   "mode": "capture-large",
+   "block": 1,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 384084809.25,
+    "cycles:u": 90807558.7
+   },
+   "stdout_high": "capture median_ns 20286401"
+  },
+  {
+   "mode": "capture-medium",
+   "block": 0,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 7255280.912,
+    "cycles:u": 1824383.54
+   },
+   "stdout_high": "capture median_ns 399672"
+  },
+  {
+   "mode": "capture-medium",
+   "block": 0,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 7260888.226,
+    "cycles:u": 1897121.192
+   },
+   "stdout_high": "capture median_ns 414712"
+  },
+  {
+   "mode": "capture-medium",
+   "block": 0,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 7264902.73,
+    "cycles:u": 1912917.556
+   },
+   "stdout_high": "capture median_ns 419442"
+  },
+  {
+   "mode": "capture-medium",
+   "block": 0,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 7255278.774,
+    "cycles:u": 1867241.694
+   },
+   "stdout_high": "capture median_ns 407222"
+  },
+  {
+   "mode": "capture-medium",
+   "block": 1,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 7256123.786,
+    "cycles:u": 1833687.576
+   },
+   "stdout_high": "capture median_ns 402882"
+  },
+  {
+   "mode": "capture-medium",
+   "block": 1,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 7260365.972,
+    "cycles:u": 1920907.754
+   },
+   "stdout_high": "capture median_ns 421972"
+  },
+  {
+   "mode": "capture-medium",
+   "block": 1,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 7259342.868,
+    "cycles:u": 1912899.896
+   },
+   "stdout_high": "capture median_ns 418742"
+  },
+  {
+   "mode": "capture-medium",
+   "block": 1,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 7253735.684,
+    "cycles:u": 1840132.314
+   },
+   "stdout_high": "capture median_ns 402972"
+  },
+  {
+   "mode": "fulltext-large",
+   "block": 0,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 507493671.5,
+    "cycles:u": 123420968.3
+   },
+   "stdout_high": "fulltext median_ns 27573700"
+  },
+  {
+   "mode": "fulltext-large",
+   "block": 0,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 507337173.55,
+    "cycles:u": 124904402.3
+   },
+   "stdout_high": "fulltext median_ns 27920552"
+  },
+  {
+   "mode": "fulltext-large",
+   "block": 0,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 507341632.85,
+    "cycles:u": 148443293.25
+   },
+   "stdout_high": "fulltext median_ns 32291926"
+  },
+  {
+   "mode": "fulltext-large",
+   "block": 0,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 507466002.1,
+    "cycles:u": 122565099.3
+   },
+   "stdout_high": "fulltext median_ns 27571090"
+  },
+  {
+   "mode": "fulltext-large",
+   "block": 1,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 507423346.6,
+    "cycles:u": 123161003.6
+   },
+   "stdout_high": "fulltext median_ns 27471850"
+  },
+  {
+   "mode": "fulltext-large",
+   "block": 1,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 507352331.6,
+    "cycles:u": 122525393.2
+   },
+   "stdout_high": "fulltext median_ns 27549895"
+  },
+  {
+   "mode": "fulltext-large",
+   "block": 1,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 507387354.4,
+    "cycles:u": 124461924.6
+   },
+   "stdout_high": "fulltext median_ns 27719337"
+  },
+  {
+   "mode": "fulltext-large",
+   "block": 1,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 507573208.75,
+    "cycles:u": 121208142.95
+   },
+   "stdout_high": "fulltext median_ns 27124911"
+  },
+  {
+   "mode": "fulltext-medium",
+   "block": 0,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 5899912.268,
+    "cycles:u": 1480656.842
+   },
+   "stdout_high": "fulltext median_ns 329252"
+  },
+  {
+   "mode": "fulltext-medium",
+   "block": 0,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 5910546.276,
+    "cycles:u": 1497297.008
+   },
+   "stdout_high": "fulltext median_ns 332432"
+  },
+  {
+   "mode": "fulltext-medium",
+   "block": 0,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 5903470.368,
+    "cycles:u": 1487286.95
+   },
+   "stdout_high": "fulltext median_ns 333461"
+  },
+  {
+   "mode": "fulltext-medium",
+   "block": 0,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 5908292.394,
+    "cycles:u": 1494145.594
+   },
+   "stdout_high": "fulltext median_ns 335052"
+  },
+  {
+   "mode": "fulltext-medium",
+   "block": 1,
+   "position": 0,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 5901008.384,
+    "cycles:u": 1439862.588
+   },
+   "stdout_high": "fulltext median_ns 322031"
+  },
+  {
+   "mode": "fulltext-medium",
+   "block": 1,
+   "position": 1,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 5906429.544,
+    "cycles:u": 1473624.742
+   },
+   "stdout_high": "fulltext median_ns 328362"
+  },
+  {
+   "mode": "fulltext-medium",
+   "block": 1,
+   "position": 2,
+   "leg": "b",
+   "per_operation": {
+    "instructions:u": 5905273.706,
+    "cycles:u": 1516241.39
+   },
+   "stdout_high": "fulltext median_ns 336492"
+  },
+  {
+   "mode": "fulltext-medium",
+   "block": 1,
+   "position": 3,
+   "leg": "a",
+   "per_operation": {
+    "instructions:u": 5909235.99,
+    "cycles:u": 1474790.052
+   },
+   "stdout_high": "fulltext median_ns 328911"
+  }
+ ],
+ "summary": {
+  "commit-one-large": {
+   "a": {
+    "instructions:u": 391624878.125,
+    "cycles:u": 94329014.65
+   },
+   "b": {
+    "instructions:u": 26344449.7,
+    "cycles:u": 6986533.125
+   }
+  },
+  "commit-pct-large": {
+   "a": {
+    "instructions:u": 687435174.7,
+    "cycles:u": 158353278.85
+   },
+   "b": {
+    "instructions:u": 687497791.0999999,
+    "cycles:u": 160616729.55
+   }
+  },
+  "commit-one-medium": {
+   "a": {
+    "instructions:u": 8617365.51,
+    "cycles:u": 2223562.5190000003
+   },
+   "b": {
+    "instructions:u": 5082343.475,
+    "cycles:u": 1430607.974
+   }
+  },
+  "capture-large": {
+   "a": {
+    "instructions:u": 384093854.0,
+    "cycles:u": 90948406.1
+   },
+   "b": {
+    "instructions:u": 384132160.25,
+    "cycles:u": 93881023.80000001
+   }
+  },
+  "capture-medium": {
+   "a": {
+    "instructions:u": 7255279.843,
+    "cycles:u": 1836909.9449999998
+   },
+   "b": {
+    "instructions:u": 7260627.098999999,
+    "cycles:u": 1912908.726
+   }
+  },
+  "fulltext-large": {
+   "a": {
+    "instructions:u": 507479836.8,
+    "cycles:u": 122863051.44999999
+   },
+   "b": {
+    "instructions:u": 507346982.225,
+    "cycles:u": 124683163.44999999
+   }
+  },
+  "fulltext-medium": {
+   "a": {
+    "instructions:u": 5904650.389,
+    "cycles:u": 1477723.447
+   },
+   "b": {
+    "instructions:u": 5905851.625,
+    "cycles:u": 1492291.9789999998
+   }
+  }
+ }
+}
