@@ -330,6 +330,84 @@ fn managed_exact_memory_budget_succeeds_and_one_under_fails_before_publication()
     assert_eq!(budget.used(Resource::Memory), 0);
 }
 
+fn is_memory_limit(error: &Error) -> bool {
+    matches!(
+        error,
+        Error::Opc(OpcError::Execution(ExecutionError::ResourceLimit(limit)))
+            if limit.resource == Resource::Memory
+    )
+}
+
+// Review of the 0759 merge: the incoming `revisions()` parsed the whole
+// managed document without the parser admission that `extract_text` and the
+// other document queries reserve, so it succeeded where they were refused.
+#[test]
+fn managed_revisions_query_is_admitted_and_charged_like_extract_text() {
+    let mut body = String::new();
+    for index in 0..8 {
+        body.push_str(&format!(
+            r#"<w:p><w:r><w:t>paragraph {index}</w:t></w:r><w:ins w:id="{index}" w:author="A"><w:r><w:t>x</w:t></w:r></w:ins></w:p>"#
+        ));
+    }
+    let document_bytes =
+        format!(r#"<w:document xmlns:w="{W}"><w:body>{body}</w:body></w:document>"#).into_bytes();
+    let mut opc = OpcPackage::new();
+    opc.try_add_part(Box::new(BlobPart::new(
+        PackURI::new("/word/document.xml").unwrap(),
+        ct::WML_DOCUMENT_MAIN.to_owned(),
+        document_bytes.clone(),
+    )))
+    .unwrap();
+    opc.relate_to("word/document.xml", rt::OFFICE_DOCUMENT);
+    let (budget, _cancellation_source, context) = context(1 << 20);
+    let package = source_backed::Package::from_read_at_with_execution_context(
+        Arc::new(OwnedSource::new(PackageWriter::to_bytes(&opc).unwrap())),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let document = package.document().unwrap();
+
+    // Leave exactly one parser workspace free: both queries are admitted and
+    // release their admission when they return.
+    let workspace = source_document_scan_workspace(document_bytes.len());
+    let free = budget
+        .limit(Resource::Memory)
+        .saturating_sub(budget.used(Resource::Memory));
+    assert!(free > workspace);
+    let hold = budget.reserve(Resource::Memory, free - workspace).unwrap();
+    let held = budget.used(Resource::Memory);
+    assert_eq!(document.extract_text().unwrap().matches('x').count(), 8);
+    assert_eq!(budget.used(Resource::Memory), held);
+    assert_eq!(document.revisions().unwrap().len(), 8);
+    assert_eq!(budget.used(Resource::Memory), held);
+
+    // One byte short of that workspace: both are refused, identically.
+    let short = budget.reserve(Resource::Memory, 1).unwrap();
+    let text = document.extract_text().unwrap_err();
+    assert!(is_memory_limit(&text), "{text:?}");
+    let revisions = match document.revisions() {
+        Ok(revisions) => panic!(
+            "revisions() parsed {} revisions without the parser admission extract_text was refused",
+            revisions.len()
+        ),
+        Err(error) => error,
+    };
+    assert!(is_memory_limit(&revisions), "{revisions:?}");
+    assert_eq!(revisions.to_string(), text.to_string());
+    let with_limits = document
+        .revisions_with_limits(litchi_docx::revision::Limits::default())
+        .unwrap_err();
+    assert_eq!(with_limits.to_string(), text.to_string());
+
+    drop(short);
+    assert_eq!(document.revisions().unwrap().len(), 8);
+    drop(hold);
+    drop(document);
+    drop(package);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
 #[test]
 fn managed_cancellation_is_checked_at_open_and_before_lazy_read() {
     let (budget, cancellation_source, open_context) = context(fixture().len() as u64);

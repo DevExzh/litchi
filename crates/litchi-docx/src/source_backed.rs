@@ -3151,7 +3151,13 @@ impl Document {
         limits: crate::revision::Limits,
     ) -> Result<SmallVec<[crate::revision::Revision; 4]>> {
         self.check_execution()?;
-        crate::revision::parse_revisions_with_limits(self.xml.as_bytes(), &[], limits)
+        // The revision limits bound the parse itself; a managed view still
+        // admits and charges the same parser workspace as every other
+        // whole-document query before it parses.
+        let _parser = self.admit_query_parser(self.xml.as_bytes().len())?;
+        let result = crate::revision::parse_revisions_with_limits(self.xml.as_bytes(), &[], limits);
+        self.check_execution()?;
+        result
     }
 
     /// Count visible paragraphs in the pinned document.
