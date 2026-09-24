@@ -2293,7 +2293,9 @@ fn relationship_graph_nodes(package: &OpcPackage) -> Result<usize> {
         enqueue_relationship_graph_target(target, &mut visited, &mut work_queue, limits)?;
     }
     while let Some(owner) = work_queue.pop() {
-        let Ok(part) = package.get_part(&owner) else {
+        // Relationships are metadata: reading them never decodes the owner's
+        // payload (ADR 0030), and only a truly absent target ends the walk.
+        let Some(part) = package.part_metadata(&owner) else {
             continue;
         };
         for relationship in part.rels().iter().filter(|value| !value.is_external()) {
@@ -3189,5 +3191,62 @@ mod tests {
             Error::Invalid(message) if message.contains("package-bound current snapshot")
         ));
         assert_eq!(package.part_count(), 0);
+    }
+
+    /// A lazily opened chain `/` -> `/word/owner.xml` -> `/word/leaf.xml`,
+    /// optionally with the owner's stored payload corrupted so that only a
+    /// decode of that payload fails (ADR 0030).
+    fn lazy_relationship_chain(corrupt_owner: bool) -> OpcPackage {
+        const MANIFEST: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
+        const ROOT_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rOwner" Type="urn:litchi:test" Target="word/owner.xml"/></Relationships>"#;
+        const OWNER_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rLeaf" Type="urn:litchi:test" Target="leaf.xml"/></Relationships>"#;
+        const OWNER_PAYLOAD: &[u8] = b"<effects-graph-owner/>";
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored("[Content_Types].xml", MANIFEST)
+            .expect("manifest");
+        writer
+            .write_stored("_rels/.rels", ROOT_RELATIONSHIPS)
+            .expect("root relationships");
+        writer
+            .write_stored("word/owner.xml", OWNER_PAYLOAD)
+            .expect("owner");
+        writer
+            .write_stored("word/_rels/owner.xml.rels", OWNER_RELATIONSHIPS)
+            .expect("owner relationships");
+        writer
+            .write_deflated_sized("word/leaf.xml", b"<effects-graph-leaf/>")
+            .expect("leaf");
+        let mut bytes = writer.finish_to_bytes().expect("archive");
+        if corrupt_owner {
+            let offset = bytes
+                .windows(OWNER_PAYLOAD.len())
+                .position(|window| window == OWNER_PAYLOAD)
+                .expect("stored owner payload");
+            bytes[offset] ^= 1;
+        }
+        OpcPackage::from_vec(bytes).expect("corruption is deferred to first decode")
+    }
+
+    // Review of the 0759 merge: the graph walk decoded every owner only to
+    // read its relationships, and skipped an owner whose payload failed to
+    // decode, losing the parts reachable through it.
+    #[test]
+    fn relationship_graph_walk_reads_metadata_without_decoding_payloads() {
+        for corrupt_owner in [false, true] {
+            let package = lazy_relationship_chain(corrupt_owner);
+            assert_eq!(
+                relationship_graph_nodes(&package).expect("graph walk"),
+                2,
+                "corrupt owner = {corrupt_owner}"
+            );
+            assert_eq!(package.deferred_decode_counters(), Some((0, 0)));
+        }
+        // The corrupt payload is still refused when it is actually read.
+        let owner = PackURI::new("/word/owner.xml").expect("owner name");
+        assert!(matches!(
+            lazy_relationship_chain(true).get_part(&owner),
+            Err(litchi_opc::OpcError::ZipError(_))
+        ));
     }
 }
