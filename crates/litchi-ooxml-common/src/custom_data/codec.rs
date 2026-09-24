@@ -5,6 +5,7 @@
 //! particular, extension descendants are never rebuilt from a lossy tree.
 
 use super::model::{ExtensionList, Properties};
+use crate::xml::attributes::count_up_to;
 use crate::{Error, Result, XmlError};
 use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
@@ -353,7 +354,7 @@ impl NamespaceState {
         element: &BytesStart<'_>,
         limits: &Limits,
     ) -> Result<()> {
-        let attribute_count = element.attributes().count();
+        let attribute_count = count_up_to(element, limits.attributes);
         check_limit(
             limits,
             "XML attribute count",
@@ -587,7 +588,7 @@ fn extension_root_opening(xml: &[u8], limits: &Limits) -> Result<(Range<usize>, 
             Event::Eof => return Err(invalid("missing extension XML root")),
             _ => return Err(invalid("invalid extension XML root opening")),
         };
-        let attribute_count = element.attributes().count();
+        let attribute_count = count_up_to(element, limits.attributes);
         check_limit(
             limits,
             "XML attribute count",
@@ -2343,5 +2344,131 @@ mod tests {
             "<x14:datastoreItem xmlns:x14=\"{XML}\" xmlns:s=\"{STRICT_SML}\" id=\"x\"><x14:extLst><s:ext><opaque/></s:ext></x14:extLst></x14:datastoreItem>"
         );
         assert!(parse_properties(source.as_bytes()).is_err());
+    }
+
+    /// ` n000000="" ...`: `distinct` names of 11 bytes each, then as many
+    /// repeats of the last.
+    fn repeated_names(distinct: usize) -> String {
+        let mut attributes = String::new();
+        for index in 0..distinct {
+            attributes.push_str(&format!(" n{index:06}=\"\""));
+        }
+        let last = format!(" n{:06}=\"\"", distinct - 1);
+        for _ in 0..distinct {
+            attributes.push_str(&last);
+        }
+        attributes
+    }
+
+    /// quick-xml's report of a repeated attribute name; a position in a tag
+    /// that opens its document is its byte offset in the document less one.
+    fn duplicated_at(position: usize, first: usize) -> String {
+        format!(
+            "position {position}: duplicated attribute, previous declaration at position {first}"
+        )
+    }
+
+    #[test]
+    fn attribute_count_limits_refuse_the_same_tags() {
+        let xml = format!("<x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\"/>");
+        let exact = Limits::standard().with_attributes(2);
+        let under = Limits::standard().with_attributes(1);
+        assert!(parse_properties_with_limits(xml.as_bytes(), &exact).is_ok());
+        let error = parse_properties_with_limits(xml.as_bytes(), &under).unwrap_err();
+        assert!(
+            matches!(
+                error,
+                Error::Limit {
+                    resource: "XML attribute count",
+                    max: 1,
+                    actual: 2,
+                }
+            ),
+            "{error}"
+        );
+
+        let extension = format!("<x14:extLst xmlns:x14=\"{XML}\" xmlns:s=\"{SML}\"/>");
+        let (opening, declared) = extension_root_opening(extension.as_bytes(), &exact).unwrap();
+        assert_eq!(opening, 0..extension.len());
+        assert_eq!(declared, ["x14", "s"]);
+        let error = extension_root_opening(extension.as_bytes(), &under).unwrap_err();
+        assert!(
+            matches!(
+                error,
+                Error::Limit {
+                    resource: "XML attribute count",
+                    max: 1,
+                    actual: 2,
+                }
+            ),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn repeated_attribute_names_are_refused_where_quick_xml_reports_them() {
+        let xml = format!("<x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\" id=\"y\"/>");
+        let expected = duplicated_at(xml.rfind(" id=").unwrap(), xml.find(" id=").unwrap());
+        let error = parse_properties(xml.as_bytes()).unwrap_err();
+        assert!(
+            matches!(&error, Error::Decode(XmlError::Malformed(message)) if *message == expected),
+            "{error}"
+        );
+
+        let extension = format!("<x14:extLst xmlns:x14=\"{XML}\" xmlns:x14=\"{XML}\"/>");
+        let expected = duplicated_at(
+            extension.rfind(" xmlns:x14=").unwrap(),
+            extension.find(" xmlns:x14=").unwrap(),
+        );
+        let error = extension_root_opening(extension.as_bytes(), &Limits::standard()).unwrap_err();
+        assert!(
+            matches!(&error, Error::Decode(XmlError::Malformed(message)) if *message == expected),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn tags_of_many_repeated_names_are_refused_as_before() {
+        // 20,000 names and 20,000 repeats of the last, within the limit: the
+        // first repeat is refused where quick-xml reports it.
+        let names = repeated_names(20_000);
+        let head = format!("<x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\"");
+        let xml = format!("{head}{names}/>");
+        let expected = duplicated_at(head.len() + 20_000 * 11, head.len() + 19_999 * 11);
+        let error = parse_properties(xml.as_bytes()).unwrap_err();
+        assert!(
+            matches!(&error, Error::Decode(XmlError::Malformed(message)) if *message == expected),
+            "{error}"
+        );
+        let head = format!("<x14:extLst xmlns:x14=\"{XML}\"");
+        let extension = format!("{head}{names}/>");
+        let expected = duplicated_at(head.len() + 20_000 * 11, head.len() + 19_999 * 11);
+        let error = extension_root_opening(extension.as_bytes(), &Limits::standard()).unwrap_err();
+        assert!(
+            matches!(&error, Error::Decode(XmlError::Malformed(message)) if *message == expected),
+            "{error}"
+        );
+
+        // 60,000 names and 60,000 repeats, over the 100,000 limit: refused by
+        // the count, which stops at the first attribute past the limit.
+        let names = repeated_names(60_000);
+        let xml = format!("<x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\"{names}/>");
+        let extension = format!("<x14:extLst xmlns:x14=\"{XML}\"{names}/>");
+        for error in [
+            parse_properties(xml.as_bytes()).unwrap_err(),
+            extension_root_opening(extension.as_bytes(), &Limits::standard()).unwrap_err(),
+        ] {
+            assert!(
+                matches!(
+                    error,
+                    Error::Limit {
+                        resource: "XML attribute count",
+                        max: MAX_ATTRIBUTES,
+                        actual,
+                    } if actual == MAX_ATTRIBUTES + 1
+                ),
+                "{error}"
+            );
+        }
     }
 }
