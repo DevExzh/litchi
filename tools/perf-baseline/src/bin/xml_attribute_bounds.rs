@@ -146,6 +146,36 @@ fn build_case(name: &str) -> Result<Case, Box<dyn Error>> {
             input: attribute_flood(200_000).into_bytes(),
             run: run_audit_source,
         },
+        // 1,000 attributes in a namespace whose URI is 4 MiB long, declared on
+        // the root: plain, ignorable, and ignorable with a preservation
+        // wildcard; and 4 x 1,000 such attributes under a 1 MiB URI (the
+        // stream's name limit) through the MCE stream.
+        "mce_long_uri_plain" => Case {
+            input: long_uri(4 << 20, "", 1, 1_000).into_bytes(),
+            run: run_mce_codec,
+        },
+        "mce_long_uri_ignorable" => Case {
+            input: long_uri(4 << 20, r#" mc:Ignorable="z""#, 1, 1_000).into_bytes(),
+            run: run_mce_codec,
+        },
+        "mce_long_uri_preserved" => Case {
+            input: long_uri(
+                4 << 20,
+                r#" mc:Ignorable="z" mc:PreserveAttributes="z:*""#,
+                1,
+                1_000,
+            )
+            .into_bytes(),
+            run: run_mce_codec,
+        },
+        "mce_stream_long_uri" => Case {
+            input: long_uri((1 << 20) - 64, "", 4, 1_000).into_bytes(),
+            run: run_mce_stream_count,
+        },
+        "mce_stream_long_uri_ignorable" => Case {
+            input: long_uri((1 << 20) - 64, r#" mc:Ignorable="z""#, 4, 1_000).into_bytes(),
+            run: run_mce_stream_count,
+        },
         // Benign controls: real producer parts that name the MCE namespace,
         // read from the repository's fixtures (run from the worktree root).
         "mce_benign_worksheet" => Case {
@@ -182,6 +212,21 @@ fn fixture_member(package: &str, member: &str) -> Result<Vec<u8>, Box<dyn Error>
     let bytes = std::fs::read(package)?;
     let archive = ArchiveReader::new(&bytes)?;
     Ok(archive.read(member)?)
+}
+
+/// A root declaring `z` with a URI of `uri_bytes` bytes and `directives`,
+/// around `elements` elements of `attributes` attributes in `z` each.
+fn long_uri(uri_bytes: usize, directives: &str, elements: usize, attributes: usize) -> String {
+    let uri = format!("urn:{}", "u".repeat(uri_bytes.saturating_sub(4)));
+    let mut element = String::from("<e");
+    for index in 0..attributes {
+        let _ = write!(element, r#" z:a{index}="""#);
+    }
+    element.push_str("/>");
+    format!(
+        r#"<r xmlns:mc="{MC}" xmlns:z="{uri}"{directives}>{}</r>"#,
+        element.repeat(elements)
+    )
 }
 
 fn declaration_flood(count: usize) -> String {
@@ -282,6 +327,35 @@ fn run_mce_codec(input: &[u8]) -> String {
 
 fn run_mce_stream(input: &[u8]) -> String {
     stream_digest(input, &Capabilities::new())
+}
+
+/// The MCE stream with observers that count events and attributes without
+/// reading any name, so the timing is the stream's own work.
+fn run_mce_stream_count(input: &[u8]) -> String {
+    let mut raw = (0usize, 0usize);
+    let mut semantic = (0usize, 0usize);
+    let mut cursor = Cursor::new(input);
+    let result = process_markup_compatibility_stream_with_observers(
+        &mut cursor,
+        &Capabilities::new(),
+        &StreamLimits::default(),
+        |element| {
+            raw.0 += 1;
+            raw.1 += element.attrs().len();
+            Ok::<(), Infallible>(())
+        },
+        |event| {
+            semantic.0 += 1;
+            if let SemanticEvent::Start(element) | SemanticEvent::Empty(element) = &event {
+                semantic.1 += element.attrs().len();
+            }
+            Ok::<(), Infallible>(())
+        },
+    );
+    match result {
+        Ok(report) => format!("ok:{raw:?}:{semantic:?}:{report:?}"),
+        Err(error) => format!("err:{error}:{raw:?}:{semantic:?}"),
+    }
 }
 
 fn run_mce_codec_baseline(input: &[u8]) -> String {
