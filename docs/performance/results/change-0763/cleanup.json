@@ -1,5 +1,8 @@
 {
-  "records": ["0762", "0763"],
+  "records": [
+    "0762",
+    "0763"
+  ],
   "performed": "2026-09-24, after every cited artifact was copied into the two packets and the record and packet of 0763 were committed; the verification below is committed afterwards",
   "removed_earlier": [
     {
@@ -47,5 +50,12 @@
     "/home/zhuhe/code/litchi-worktrees/0762-streaming-compression-and-leases (worktree) and branch perf/0762-streaming-compression-and-leases"
   ],
   "not_created": "TMPDIR pointed into scratch/0762; no build, measurement or evidence artifact was written to /tmp or to the main checkout, apart from the session tool's own command-output capture and the git metadata of the detached worktree, which its removal prunes",
-  "verified_after_removal": "pending: filled in by the follow-up commit"
+  "verified_after_removal": {
+    "targets/0762, targets/0762-diff-before, targets/0762-diff-after, targets/0763, targets/0763-before (and change 0762's targets/0762-before, 0762-probe, 0762-probe-before, 0762-probe-after)": "absent",
+    "0762-before-src": "absent and not listed by git worktree list (after git worktree prune)",
+    "scratch/0762": "0 entries",
+    "git worktree list": "only the branch worktree 0762-streaming-compression-and-leases remains for these records",
+    "df -h /home after the removals": "1022 GB available"
+  },
+  "order": "record and packet of 0763 committed (e1050573d5) before the removals above; this verification committed afterwards"
 }
