@@ -1,0 +1,62 @@
+# Part lookups that may treat a decode failure as absence, left after the 0759 review follow-up
+#
+# Under ADR 0030 an owned-source package decodes a part's payload on first
+# access, so `get_part(..)` also fails for a present part whose payload cannot
+# be decoded. The follow-up fixed fifteen such sites (record 0759, "Post-merge
+# fixes"). The sites below were found but not changed. Each needs its own
+# review of whether the decode is needed, and its own regression test.
+# Line numbers are at integration/spec-gap-merge fc68c07f62.
+
+## Pattern sweep outside litchi-docx
+## (`get_part(..).ok()`, `.is_ok()`, `.is_ok_and(..)`, `let Ok(..) = ..get_part(..)`, `map_or*`)
+crates/litchi-ooxml-common/src/custom_xml/snapshot.rs:111
+crates/litchi-pptx/src/notes/package.rs:286
+crates/litchi-pptx/src/opened/model.rs:1178
+crates/litchi-pptx/src/opened/transaction.rs:56
+crates/litchi-pptx/src/opened/transaction.rs:1355
+crates/litchi-xlsx/src/auto_filter/snapshot.rs:568
+crates/litchi-xlsx/src/cell_values/snapshot.rs:1239
+crates/litchi-xlsx/src/cell_values/snapshot.rs:1251
+crates/litchi-xlsx/src/cell_values/snapshot.rs:1562
+crates/litchi-xlsx/src/workbook/model.rs:337
+crates/litchi-xlsx/src/workbook/source_merge.rs:859
+crates/litchi-xlsx/src/workbook/source_merge.rs:1005
+
+## litchi-docx, as classified by the implementer of its fixes
+
+### A decode failure is reported as a missing part (the operation is still refused)
+crates/litchi-docx/src/vba_project.rs:357
+crates/litchi-docx/src/vba_project.rs:417
+crates/litchi-docx/src/document/package/validation.rs:44
+crates/litchi-docx/src/package/codec.rs:761
+crates/litchi-docx/src/package/codec.rs:793
+crates/litchi-docx/src/package/package/alternatives.rs:240
+crates/litchi-docx/src/package/story.rs:639
+crates/litchi-docx/src/image.rs:209
+
+### Presence checks that decode (still refused, but blocked by a corrupt part they do not need)
+crates/litchi-docx/src/content_control/package.rs:1602
+crates/litchi-docx/src/package/package/transfer.rs:390
+crates/litchi-docx/src/package/package/alternatives.rs:172
+crates/litchi-docx/src/package/codec.rs:740
+crates/litchi-docx/src/package/codec.rs:937
+crates/litchi-docx/src/ink/graph/add.rs:444
+crates/litchi-docx/src/glossary/graph.rs:1456
+crates/litchi-docx/src/glossary/graph.rs:1464
+
+### Decodes only to read the stored name or the relationships (performance)
+crates/litchi-docx/src/glossary/graph.rs:680
+crates/litchi-docx/src/glossary/graph.rs:1327
+crates/litchi-docx/src/glossary/graph.rs:1371
+crates/litchi-docx/src/glossary/graph.rs:1418
+crates/litchi-docx/src/glossary/graph.rs:1433
+crates/litchi-docx/src/ink/graph.rs:517
+crates/litchi-docx/src/ink/graph.rs:525
+crates/litchi-docx/src/ink/graph.rs:626
+crates/litchi-docx/src/styles/effects.rs:2513
+crates/litchi-docx/src/styles/effects.rs:2595
+crates/litchi-docx/src/ink/transaction.rs:493
+crates/litchi-docx/src/ink/transaction.rs:815
+crates/litchi-docx/src/ink/transaction/authoring.rs:128
+crates/litchi-docx/src/ink/transaction/authoring.rs:386
+crates/litchi-docx/src/package/codec.rs:824
