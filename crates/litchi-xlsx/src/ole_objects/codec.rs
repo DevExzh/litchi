@@ -3,6 +3,7 @@
 use crate::error::Result;
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::SeenNames;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -750,6 +751,11 @@ fn raw_attributes(
                 .to_owned(),
         ));
     }
+    // Order the parsed attributes by qualified name, so that matching each
+    // attribute the byte scan below finds costs O(log n) comparisons rather
+    // than a scan of the whole list. The sort is stable, so the lower bound
+    // is the first match in document order, as a linear search returns.
+    expanded.sort_by(|left, right| left.0.cmp(&right.0));
 
     let mut cursor = start
         .checked_add(1)
@@ -819,7 +825,11 @@ fn raw_attributes(
         if qname == b"xmlns" || qname.starts_with(b"xmlns:") {
             continue;
         }
-        let Some((_, namespace, name)) = expanded.iter().find(|(name, _, _)| name == qname) else {
+        let first = expanded.partition_point(|(name, _, _)| name.as_slice() < qname);
+        let Some((_, namespace, name)) = expanded
+            .get(first)
+            .filter(|(name, _, _)| name.as_slice() == qname)
+        else {
             return Err(invalid(
                 "worksheet XML attribute scan disagrees with parser",
             ));
@@ -1219,6 +1229,9 @@ fn make_node(
         .to_owned();
     add_strings(strings, namespace.len() + name.len())?;
     let mut attributes = Vec::new();
+    // Expanded names borrowed from the resolver and the tag: checking each
+    // one costs O(log n), where scanning `attributes` would cost O(n).
+    let mut expanded = SeenNames::new();
     for item in element.attributes().with_checks(true) {
         let item = item.map_err(xml_error)?;
         let qname = item.key.as_ref();
@@ -1226,6 +1239,7 @@ fn make_node(
             continue;
         }
         let (namespace, local) = reader.resolver().resolve_attribute(item.key);
+        let key = (resolved_bytes(&namespace), local.into_inner());
         let namespace = resolved(namespace)?;
         let name = std::str::from_utf8(local.as_ref())
             .map_err(xml_error)?
@@ -1235,10 +1249,7 @@ fn make_node(
             .map_err(xml_error)?
             .into_owned();
         add_strings(strings, namespace.len() + name.len() + value.len())?;
-        if attributes
-            .iter()
-            .any(|attribute: &Attribute| attribute.namespace == namespace && attribute.name == name)
-        {
+        if !expanded.insert(key) {
             return Err(invalid("duplicate expanded XML attribute"));
         }
         attributes.push(Attribute {
@@ -1431,6 +1442,14 @@ fn resolved(value: ResolveResult<'_>) -> Result<String> {
         ))),
     }
 }
+/// The bytes of the namespace [`resolved`] returns: the URI when bound and
+/// empty when unbound. An unknown prefix, which `resolved` refuses, is empty.
+fn resolved_bytes<'a>(value: &ResolveResult<'a>) -> &'a [u8] {
+    match value {
+        ResolveResult::Bound(Namespace(value)) => value,
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => &[],
+    }
+}
 fn bool_attr(output: &mut Vec<u8>, name: &str, value: bool) {
     attr(output, name, if value { "1" } else { "0" });
 }
@@ -1454,6 +1473,145 @@ fn escape(output: &mut Vec<u8>, value: &str) {
                 let mut bytes = [0; 4];
                 output.extend_from_slice(character.encode_utf8(&mut bytes).as_bytes());
             },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::Error;
+
+    /// ` a00000="0" a00001="1" ...`: `count` distinct attribute names.
+    fn distinct_attributes(count: usize) -> String {
+        (0..count)
+            .map(|index| format!(" a{index:05}=\"{index}\""))
+            .collect()
+    }
+
+    /// The node `make_node` builds for `xml`'s first start tag. The document
+    /// parser runs MCE preprocessing first, which caps a tag's attributes;
+    /// this reads the tag directly to reach `make_node` with any number.
+    fn first_node(xml: &str) -> Result<Node> {
+        let mut reader = NsReader::from_reader(xml.as_bytes());
+        loop {
+            match reader.read_event().map_err(xml_error)? {
+                Event::Start(element) | Event::Empty(element) => {
+                    return make_node(&reader, &element, reader.decoder(), &mut 0);
+                },
+                Event::Eof => return Err(invalid("missing start tag")),
+                _ => {},
+            }
+        }
+    }
+
+    fn parsed(xml: &str) -> Node {
+        first_node(xml).unwrap_or_else(|error| panic!("{error}"))
+    }
+
+    fn raw_source(xml: &str) -> RawSource {
+        collect_raw_source(xml.as_bytes(), OleObjectConformance::Transitional)
+            .unwrap_or_else(|error| panic!("{error}"))
+    }
+
+    fn is_duplicate_qualified_name<T>(result: &Result<T>) -> bool {
+        matches!(
+            result,
+            Err(Error::Xml(litchi_ooxml_common::XmlError::Malformed(message)))
+                if message.contains("duplicated attribute")
+        )
+    }
+
+    #[test]
+    fn duplicate_attribute_names_are_refused_as_before() {
+        let node = parsed("<e xmlns:p='urn:p' xmlns:q='urn:q' p:a='1' q:a='2' a='3'/>");
+        let attributes: Vec<_> = node
+            .attributes
+            .iter()
+            .map(|attribute| {
+                (
+                    attribute.namespace.as_str(),
+                    attribute.name.as_str(),
+                    attribute.value.as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            attributes,
+            [("urn:p", "a", "1"), ("urn:q", "a", "2"), ("", "a", "3")]
+        );
+        assert!(matches!(
+            first_node("<e xmlns:p='urn:p' xmlns:q='urn:p' p:a='1' q:a='2'/>"),
+            Err(Error::Invalid(message)) if message == "duplicate expanded XML attribute"
+        ));
+        assert!(is_duplicate_qualified_name(&first_node("<e a='1' a='2'/>")));
+        // A value is checked before its name, as before.
+        assert!(matches!(
+            first_node("<e xmlns:p='urn:p' xmlns:q='urn:p' p:a='1' q:a='&bogus;'/>"),
+            Err(Error::Xml(_))
+        ));
+    }
+
+    #[test]
+    fn many_distinct_attribute_names_are_read_in_order() {
+        // Scanning the attributes read so far compared ~1.25e9 pairs here.
+        let node = parsed(&format!("<e{}/>", distinct_attributes(50_000)));
+        assert_eq!(node.attributes.len(), 50_000);
+        for (index, attribute) in node.attributes.iter().enumerate() {
+            assert_eq!(attribute.name, format!("a{index:05}"));
+            assert_eq!(attribute.value, index.to_string());
+        }
+    }
+
+    #[test]
+    fn raw_attributes_keep_document_order_and_spans() {
+        let xml = format!(
+            "<worksheet xmlns='{SML}'><e z='1' xmlns:p='urn:p' p:a='2' a=\"3\"/></worksheet>"
+        );
+        let raw = raw_source(&xml);
+        let spans: Vec<_> = raw.elements[1]
+            .attributes
+            .iter()
+            .map(|attribute| {
+                (
+                    attribute.namespace.as_str(),
+                    attribute.name.as_str(),
+                    &xml[attribute.value_start..attribute.value_end],
+                    &xml[attribute.remove_start..attribute.end],
+                )
+            })
+            .collect();
+        assert_eq!(
+            spans,
+            [
+                ("", "z", "1", " z='1'"),
+                ("urn:p", "a", "2", " p:a='2'"),
+                ("", "a", "3", " a=\"3\""),
+            ]
+        );
+        assert!(is_duplicate_qualified_name(&collect_raw_source(
+            format!("<worksheet xmlns='{SML}'><e a='1' a='2'/></worksheet>").as_bytes(),
+            OleObjectConformance::Transitional,
+        )));
+    }
+
+    #[test]
+    fn raw_attributes_of_a_large_tag_are_matched_in_order() {
+        // Finding each scanned attribute by a linear search of the parsed
+        // ones compared ~1.25e9 pairs here.
+        let xml = format!(
+            "<worksheet xmlns='{SML}'><e{}/></worksheet>",
+            distinct_attributes(50_000)
+        );
+        let raw = raw_source(&xml);
+        let attributes = &raw.elements[1].attributes;
+        assert_eq!(attributes.len(), 50_000);
+        for (index, attribute) in attributes.iter().enumerate() {
+            assert_eq!(attribute.name, format!("a{index:05}"));
+            assert_eq!(
+                &xml[attribute.value_start..attribute.value_end],
+                index.to_string()
+            );
         }
     }
 }

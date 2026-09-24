@@ -1,6 +1,7 @@
 //! Small namespace-aware XML DOM used only at the rich-values boundary.
 
 use crate::error::Result;
+use litchi_ooxml_common::xml::attributes::SeenNames;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -246,6 +247,9 @@ fn make_node(
         .to_owned();
     add_string(strings, namespace.len() + name.len())?;
     let mut attributes = Vec::new();
+    // Expanded names borrowed from the resolver and the tag: checking each
+    // one costs O(log n), where scanning `attributes` would cost O(n).
+    let mut expanded = SeenNames::new();
     for item in element.attributes().with_checks(true) {
         let item = item.map_err(xml_error)?;
         let qname = item.key.as_ref();
@@ -253,6 +257,7 @@ fn make_node(
             continue;
         }
         let (namespace, local) = reader.resolver().resolve_attribute(item.key);
+        let key = (resolved_bytes(&namespace), local.into_inner());
         let namespace = resolved(namespace)?;
         let name = std::str::from_utf8(local.as_ref())
             .map_err(xml_error)?
@@ -262,10 +267,7 @@ fn make_node(
             .map_err(xml_error)?
             .into_owned();
         add_string(strings, namespace.len() + name.len() + value.len())?;
-        if attributes
-            .iter()
-            .any(|attribute: &Attribute| attribute.namespace == namespace && attribute.name == name)
-        {
+        if !expanded.insert(key) {
             return Err(invalid("duplicate expanded XML attribute"));
         }
         attributes.push(Attribute {
@@ -362,6 +364,15 @@ fn resolved(value: ResolveResult<'_>) -> Result<String> {
     }
 }
 
+/// The bytes of the namespace [`resolved`] returns: the URI when bound and
+/// empty when unbound. An unknown prefix, which `resolved` refuses, is empty.
+fn resolved_bytes<'a>(value: &ResolveResult<'a>) -> &'a [u8] {
+    match value {
+        ResolveResult::Bound(Namespace(value)) => value,
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => &[],
+    }
+}
+
 fn attribute<'a>(node: &'a Node, namespace: &str, name: &str) -> Option<&'a str> {
     node.attributes
         .iter()
@@ -375,5 +386,69 @@ fn add_string(total: &mut usize, size: usize) -> Result<()> {
         Err(limit("XML string"))
     } else {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::Error;
+
+    /// ` a00000="0" a00001="1" ...`: `count` distinct attribute names.
+    fn distinct_attributes(count: usize) -> String {
+        (0..count)
+            .map(|index| format!(" a{index:05}=\"{index}\""))
+            .collect()
+    }
+
+    fn parse(xml: &str) -> Result<Node> {
+        parse_document(xml.as_bytes())
+    }
+
+    fn attributes(node: &Node) -> Vec<(&str, &str, &str)> {
+        node.attributes
+            .iter()
+            .map(|attribute| {
+                (
+                    attribute.namespace.as_str(),
+                    attribute.name.as_str(),
+                    attribute.value.as_str(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn duplicate_attribute_names_are_refused_as_before() {
+        let node = parse("<e xmlns:p='urn:p' xmlns:q='urn:q' p:a='1' q:a='2' a='3'/>").unwrap();
+        assert_eq!(
+            attributes(&node),
+            [("urn:p", "a", "1"), ("urn:q", "a", "2"), ("", "a", "3")]
+        );
+        assert!(matches!(
+            parse("<e xmlns:p='urn:p' xmlns:q='urn:p' p:a='1' q:a='2'/>"),
+            Err(Error::Invalid(message)) if message == "duplicate expanded XML attribute"
+        ));
+        assert!(matches!(
+            parse("<e a='1' a='2'/>"),
+            Err(Error::Xml(litchi_ooxml_common::XmlError::Malformed(message)))
+                if message.contains("duplicated attribute")
+        ));
+        // A value is checked before its name, as before.
+        assert!(matches!(
+            parse("<e xmlns:p='urn:p' xmlns:q='urn:p' p:a='1' q:a='&bogus;'/>"),
+            Err(Error::Xml(_))
+        ));
+    }
+
+    #[test]
+    fn many_distinct_attribute_names_are_read_in_order() {
+        // Scanning the attributes read so far compared ~1.25e9 pairs here.
+        let node = parse(&format!("<e{}/>", distinct_attributes(50_000))).unwrap();
+        assert_eq!(node.attributes.len(), 50_000);
+        for (index, attribute) in node.attributes.iter().enumerate() {
+            assert_eq!(attribute.name, format!("a{index:05}"));
+            assert_eq!(attribute.value, index.to_string());
+        }
     }
 }

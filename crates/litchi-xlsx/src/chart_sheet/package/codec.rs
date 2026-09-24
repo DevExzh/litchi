@@ -10,6 +10,7 @@ use super::{
 };
 use crate::{Error, Result};
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::SeenNames;
 use litchi_opc::{OpcPackage, PackURI, Part, TargetMode};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -416,6 +417,9 @@ pub(super) fn make_node(
         .to_owned();
     add_strings(strings, namespace.len() + name.len())?;
     let mut attributes = Vec::new();
+    // Expanded names borrowed from the resolver and the tag: checking each
+    // one costs O(log n), where scanning `attributes` would cost O(n).
+    let mut expanded = SeenNames::new();
     for item in element.attributes().with_checks(true) {
         let item = item.map_err(xml_error)?;
         let qname = item.key.as_ref();
@@ -423,6 +427,7 @@ pub(super) fn make_node(
             continue;
         }
         let (namespace, local) = reader.resolver().resolve_attribute(item.key);
+        let key = (resolved_bytes(&namespace), local.into_inner());
         let namespace = resolved(namespace)?;
         let name = std::str::from_utf8(local.as_ref())
             .map_err(xml_error)?
@@ -432,10 +437,7 @@ pub(super) fn make_node(
             .map_err(xml_error)?
             .into_owned();
         add_strings(strings, namespace.len() + name.len() + value.len())?;
-        if attributes
-            .iter()
-            .any(|a: &Attribute| a.namespace == namespace && a.name == name)
-        {
+        if !expanded.insert(key) {
             return Err(invalid("duplicate expanded XML attribute"));
         }
         attributes.push(Attribute {
@@ -592,6 +594,14 @@ pub(super) fn resolved(value: ResolveResult<'_>) -> Result<String> {
         ))),
     }
 }
+/// The bytes of the namespace [`resolved`] returns: the URI when bound and
+/// empty when unbound. An unknown prefix, which `resolved` refuses, is empty.
+fn resolved_bytes<'a>(value: &ResolveResult<'a>) -> &'a [u8] {
+    match value {
+        ResolveResult::Bound(Namespace(value)) => value,
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => &[],
+    }
+}
 pub(super) fn internal_relationship<'a>(
     part: &'a dyn Part,
     id: &str,
@@ -714,4 +724,83 @@ pub(super) fn escape(out: &mut Vec<u8>, value: &str) {
 }
 pub(super) fn xml_error(error: impl std::fmt::Display) -> Error {
     Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// ` a00000="0" a00001="1" ...`: `count` distinct attribute names.
+    fn distinct_attributes(count: usize) -> String {
+        (0..count)
+            .map(|index| format!(" a{index:05}=\"{index}\""))
+            .collect()
+    }
+
+    /// The node `make_node` builds for `xml`'s first start tag. The document
+    /// parser runs MCE preprocessing first, which caps a tag's attributes;
+    /// this reads the tag directly to reach `make_node` with any number.
+    fn first_node(xml: &str) -> Result<Node> {
+        let mut reader = NsReader::from_reader(xml.as_bytes());
+        loop {
+            match reader.read_event().map_err(xml_error)? {
+                Event::Start(element) | Event::Empty(element) => {
+                    return make_node(&reader, &element, reader.decoder(), &mut 0);
+                },
+                Event::Eof => return Err(invalid("missing start tag")),
+                _ => {},
+            }
+        }
+    }
+
+    fn parsed(xml: &str) -> Node {
+        first_node(xml).unwrap_or_else(|error| panic!("{error}"))
+    }
+
+    fn attributes(node: &Node) -> Vec<(&str, &str, &str)> {
+        node.attributes
+            .iter()
+            .map(|attribute| {
+                (
+                    attribute.namespace.as_str(),
+                    attribute.name.as_str(),
+                    attribute.value.as_str(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn duplicate_attribute_names_are_refused_as_before() {
+        let node = parsed("<e xmlns:p='urn:p' xmlns:q='urn:q' p:a='1' q:a='2' a='3'/>");
+        assert_eq!(
+            attributes(&node),
+            [("urn:p", "a", "1"), ("urn:q", "a", "2"), ("", "a", "3")]
+        );
+        assert!(matches!(
+            first_node("<e xmlns:p='urn:p' xmlns:q='urn:p' p:a='1' q:a='2'/>"),
+            Err(Error::Invalid(message)) if message == "duplicate expanded XML attribute"
+        ));
+        assert!(matches!(
+            first_node("<e a='1' a='2'/>"),
+            Err(Error::Xml(litchi_ooxml_common::XmlError::Malformed(message)))
+                if message.contains("duplicated attribute")
+        ));
+        // A value is checked before its name, as before.
+        assert!(matches!(
+            first_node("<e xmlns:p='urn:p' xmlns:q='urn:p' p:a='1' q:a='&bogus;'/>"),
+            Err(Error::Xml(_))
+        ));
+    }
+
+    #[test]
+    fn many_distinct_attribute_names_are_read_in_order() {
+        // Scanning the attributes read so far compared ~1.25e9 pairs here.
+        let node = parsed(&format!("<e{}/>", distinct_attributes(50_000)));
+        assert_eq!(node.attributes.len(), 50_000);
+        for (index, attribute) in node.attributes.iter().enumerate() {
+            assert_eq!(attribute.name, format!("a{index:05}"));
+            assert_eq!(attribute.value, index.to_string());
+        }
+    }
 }
