@@ -77,6 +77,9 @@ impl Transaction {
     }
 
     /// Inserts inert plain text and marks it as an insertion or move target.
+    ///
+    /// `cp` must lie before the main story's final paragraph mark (MS-DOC
+    /// 2.3.1); see [`RevisionEditor::add_text`].
     pub fn add_text(
         &mut self,
         cp: u32,

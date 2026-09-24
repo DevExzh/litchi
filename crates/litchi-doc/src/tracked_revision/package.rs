@@ -2443,6 +2443,11 @@ impl RevisionEditor {
     /// Inserts inert plain text and marks it as an insertion or move destination.
     /// Field delimiters, object markers, paragraph marks, and macro characters
     /// are rejected rather than interpreted.
+    ///
+    /// `cp` must lie before the main story's final paragraph mark, that is
+    /// below `ccpText`: MS-DOC 2.3.1 requires the last character of the main
+    /// document to be a paragraph mark, so text cannot follow it. To extend the
+    /// last paragraph, insert at `ccpText - 1`, in front of its mark.
     pub fn add_text(
         &mut self,
         cp: u32,
@@ -2466,6 +2471,11 @@ impl RevisionEditor {
         }
         if cp > self.main_ccp {
             return Err(corrupted("tracked insertion CP exceeds main story"));
+        }
+        if cp == self.main_ccp {
+            return Err(corrupted(
+                "tracked insertion CP follows the main story's final paragraph mark (MS-DOC 2.3.1)",
+            ));
         }
         validate_metadata(kind, &metadata)?;
         let length =

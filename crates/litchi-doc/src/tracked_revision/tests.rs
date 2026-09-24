@@ -471,3 +471,55 @@ fn tracked_insertion_at_a_selected_object_moves_the_selection_with_the_object() 
         assert!(tested > 0, "no fixture has a main-story {unit:#06x}");
     }
 }
+
+/// Change 0768 review: MS-DOC 2.3.1 requires the main document's last
+/// character to be a paragraph mark, so a tracked insertion at `ccpText`
+/// (after that mark) is refused, and one in front of the mark extends the last
+/// paragraph.
+#[test]
+fn tracked_insertion_after_the_final_paragraph_mark_is_refused() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/ole/doc/NoHeadFoot.doc");
+    let source = std::fs::read(path).unwrap();
+    let mut editor = RevisionEditor::open(source.clone(), Limits::default()).unwrap();
+    assert_eq!(editor.main_story_cp_len(), 180);
+    assert!(editor.main_story_text().unwrap().ends_with('\r'));
+    for cp in [180, 181] {
+        let error = editor
+            .add_text(
+                cp,
+                "x",
+                RevisionKind::Insertion,
+                RevisionMetadata::new("0768"),
+            )
+            .unwrap_err();
+        assert!(matches!(error, PackageError::Corrupted(_)), "{cp}: {error}");
+    }
+    assert!(
+        editor
+            .add_text(
+                180,
+                "x",
+                RevisionKind::Insertion,
+                RevisionMetadata::new("0768"),
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("final paragraph mark")
+    );
+    assert_eq!(editor.clone().finish().unwrap(), source);
+
+    let inserted = editor
+        .add_text(
+            179,
+            "x",
+            RevisionKind::Insertion,
+            RevisionMetadata::new("0768"),
+        )
+        .unwrap();
+    assert_eq!((inserted.start_cp, inserted.end_cp), (179, 180));
+    assert_eq!(editor.main_story_cp_len(), 181);
+    assert!(editor.main_story_text().unwrap().ends_with("x\r"));
+    let reopened = RevisionEditor::open(editor.finish().unwrap(), Limits::default()).unwrap();
+    assert!(reopened.main_story_text().unwrap().ends_with("x\r"));
+}
