@@ -363,11 +363,11 @@ pub struct OleFile<R: Read + Seek> {
     sector_roles: Vec<PhysicalSectorRole>,
     /// Chain buffers [`Self::open_stream`] reuses, so a read collects its
     /// chain in time proportional to the chain rather than allocating and
-    /// clearing a map the size of the FAT or MiniFAT for every stream. They
-    /// are empty until the first read and then retain one bit per entry of
-    /// the larger table read so far and one `u32` per sector of the longest
-    /// chain read so far, 1/128 (512-byte sectors) or 1/1024 (4096-byte
-    /// sectors) of that stream's bytes.
+    /// clearing a map the size of the FAT or MiniFAT for every stream. Empty
+    /// until the first read, they then retain one bit per entry of the larger
+    /// table read and one `u32` per sector of the longest chain read: 1/128
+    /// (512-byte sectors) or 1/1024 (4096-byte sectors) of a FAT-chained
+    /// stream's bytes, and at most 64 for a validated mini stream's chain.
     stream_chain: EndChainScratch,
 }
 
