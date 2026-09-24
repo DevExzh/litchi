@@ -49,9 +49,12 @@ likely reason, not measured here.
     and `used + need` — for the lease's own holder, exactly the value exact
     accounting of the whole charge reports.
   * `Lease::refund(amount)` takes back units handed out whose work did not
-    happen (bounded by what the lease handed out); `Lease::release` returns
-    what the lease holds to the budget; `Drop` releases, on every path. `held`,
-    `consumed`, `chunk` and `resource` report the lease's state.
+    happen (bounded by what the lease handed out) and returns whatever the
+    lease would then hold beyond one chunk to the budget at once, so a lease
+    never holds more than one chunk (added after review, below);
+    `Lease::release` returns what the lease holds to the budget; `Drop`
+    releases, on every path. `held`, `consumed`, `chunk` and `resource`
+    report the lease's state.
 * `crates/litchi-core/src/execution.rs`: `ExecutionContext::lease` and
   `ExecutionLease`, whose `consume` checks the context's cancellation token
   first, exactly as `ExecutionContext::consume` does, so replacing `consume`
@@ -107,11 +110,13 @@ admission-time reservations and are untouched), ADR 0002 (no new dependency;
 resource budget supplied by an execution context". Read strictly, that could
 require each operation to charge exactly what it uses when it uses it, so a
 dated clarification under decision 6 is added: charging through a lease is
-charging; what stays exact (limits never exceeded, even transiently; the
-holder's refusals and their values; refused claims change nothing; unspent
-units return on release, drop, error, cancellation and poison, so counters
-settle exactly) and what becomes rough (other holders see pre-claimed units
-and can be refused up to one chunk early). ADR 0031 has no sentence requiring
+charging, and a lease never holds more than one chunk; what stays exact
+(limits never exceeded, even transiently; the refusals of a holder whose
+charges of a resource all go through one lease, and their values; refused
+claims change nothing; unspent units return on release, drop, error,
+cancellation and poison, so counters settle exactly) and what becomes rough
+(other holders see pre-claimed units and can be refused early by up to one
+chunk per other open lease). ADR 0031 has no sentence requiring
 exact per-operation charging; its `Workers` and `IoConcurrency` permits are
 reservations, not charges, and are not leased. Its paragraph is left as is.
 
@@ -148,21 +153,27 @@ so a sole holder never needs more than its charge.
 
 ## What stays exact and what becomes rough
 
-For the lease's own holder, nothing moves. A charge the lease covers touches
-no shared state. A charge it cannot cover needs `need = amount − held` more;
-every level already holds the lease's `held` units, so a level with room
-`limit − used ≥ need` is exactly a level where exact accounting has room for
-`amount`, the refusing level is the innermost one exact accounting would name,
-and the refusal's `used + need` equals exact accounting's `used_exact +
-amount`. When the writer is poisoned or finishes, it releases what it holds,
-so every counter then equals exactly what was handed out.
+For the lease's own holder, nothing moves, provided every charge it makes of
+the resource goes through that one lease; a charge it made outside the lease
+would see the lease's unspent units as used. Both writers meet this: their
+construction charges are made before their leases open, and every later
+charge of a leased resource goes through its lease. A charge the lease covers
+touches no shared state. A charge it cannot cover needs `need = amount −
+held` more; every level already holds the lease's `held` units, so a level
+with room `limit − used ≥ need` is exactly a level where exact accounting has
+room for `amount`, the refusing level is the innermost one exact accounting
+would name, and the refusal's `used + need` equals exact accounting's
+`used_exact + amount`. When the writer is poisoned or finishes, it releases
+what it holds, so every counter then equals exactly what was handed out.
 
 For other holders of a shared budget (sibling budgets under a common parent,
 or several operations on one budget), the units a lease holds and has not
-handed out count as used: a sibling can be refused up to one chunk earlier
-than exact accounting would refuse it, and its refusal reports usage that
-includes the pre-claim. No level is ever over its limit: every claim is a
-check-and-add, and a shrinking claim only gives back.
+handed out count as used: a sibling can be refused earlier than exact
+accounting would refuse it, by up to one chunk per open lease of another
+holder, and its refusal reports usage that includes the pre-claims. A lease
+never holds more than one chunk: a claim leaves it less than one chunk, and a
+refund returns whatever would exceed one chunk. No level is ever over its
+limit: every claim is a check-and-add, and a shrinking claim only gives back.
 
 ## Measured
 
@@ -310,8 +321,8 @@ this host and CPU 12. They do not establish:
 * anything about budget users other than the two streaming writers, which
   still charge exactly;
 * the effect of the pre-claim on a caller that shares a small budget between
-  writers; such a caller can be refused up to one chunk early, as decision 6
-  accepts.
+  writers; such a caller can be refused early by up to one chunk per other
+  open lease, as decision 6 accepts.
 
 ## Verification
 
@@ -363,6 +374,49 @@ poisoned writer returned its leases),
 `streaming.rs`: `a_sole_writer_is_refused_exactly_at_every_objects_and_work_limit`,
 `a_sibling_sees_the_writers_pre_claimed_objects_until_it_finishes`, and
 `leases_are_returned_when_the_writer_is_poisoned`.
+
+## Review corrections
+
+An independent review (its probes are not part of this packet) confirmed the
+differential and the limits: 16 threads on a seven-node tree with 342,812
+refusals never saw a level over its limit, 3,000 random sole-holder cases
+matched exact accounting, and base-against-branch refusal transcripts of both
+writers (11,386 DOCX and 1,247 XLSX scenarios) were identical. It found one defect, fixed in `3f4e7f5d71`:
+
+* **A refund was not capped.** `Lease::refund` returned the units to the
+  lease whatever their amount. The XLSX writer refunds a row's objects when
+  the worksheet-XML limit refuses the row, which does not poison the writer,
+  so after a refused 12,000-cell row the lease held 12,001 objects — about
+  three chunks — until `finish` or drop (the base held none). No limit was
+  exceeded, but decision 6 grants a lease of up to one chunk. A refund now
+  returns whatever the lease would hold beyond its chunk to the budget and
+  every ancestor at once; `consume` already kept the lease within one chunk.
+  New tests: `a_refund_wider_than_a_chunk_returns_the_excess_at_once`;
+  `a_lease_never_holds_more_than_one_chunk` (20,000 random calls per chunk
+  size of 1, 3, 64, 4,096 and `u64::MAX` — charges, charges wider than a
+  chunk, accepted and refused refunds, releases — with refusals under a
+  three-level limit: after every call the lease holds at most one chunk and
+  every level shows exactly what was handed out plus what the lease holds); the concurrency test now
+  checks the cap after every step; and the XLSX
+  `a_refused_row_leaves_at_most_one_chunk_pre_claimed` (rows of 150 to 12,000
+  cells refused by a 4 KiB worksheet-XML limit, each leaving the writer
+  usable, at most one chunk held and the budget exact, then settling exactly
+  at `finish`). Without the cap three `litchi-core` tests and the XLSX test
+  fail; the XLSX test then shows 12,001 objects held.
+* **Wording.** The `Lease` rustdoc, the ADR 0005 clarification and this
+  record now state that a holder's refusals are exact when all its charges of
+  the resource go through one lease, and that another holder can be refused
+  early by up to one chunk per other open lease.
+
+The fix touches only refund paths, which the measured runs never take; the
+timings, counts and transcripts above stand and were not re-measured. After
+the fix (and 0762's review corrections in `7b0bd40c02`), with a fresh target
+directory: `cargo fmt --all --check`; warning-denied Clippy on the library
+and all targets and warning-denied rustdoc of `litchi-core`, `soapberry-zip`,
+`litchi-docx` and `litchi-xlsx`; `cargo test` of `litchi-core` (240),
+`soapberry-zip` (654), `litchi-docx` (1,881), `litchi-xlsx` (2,040) and, as an
+extra, `litchi-opc` (918) and `litchi-pptx` (1,167) — all pass
+(`results/change-0763/gates.txt`).
 
 ## Cleanup
 

@@ -41,7 +41,11 @@ as `consume`, shrinks to the room left but never below the charge's need, and
 rolls back on refusal. No level is ever over its limit (a monitor thread
 checks this under eight concurrent threads mixing leases and reservations).
 The holder's refusals are those of exact accounting, and unspent units return
-on release, drop, error, cancellation and poison. A 28,860-scenario differential
-against the base proves the sole-holder behaviour identical. Other holders of a
-shared budget see up to one chunk per writer and resource pre-claimed, as
-decision 6 accepts. Cancellation is still checked before every charge.
+on release, drop, error, cancellation and poison. A lease never holds more
+than one chunk: after review, a refund returns the excess at once (an XLSX
+row refused by the worksheet-XML limit had left 12,001 objects pre-claimed). A
+28,860-scenario differential against the base proves the sole-holder
+behaviour identical, for a holder whose charges of a resource all go through
+one lease. Other holders of a shared budget see up to one chunk per writer and
+resource pre-claimed, as decision 6 accepts. Cancellation is still checked
+before every charge.
