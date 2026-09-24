@@ -1,0 +1,62 @@
+[
+ {
+  "path": "before-cfb-open-v3-mini-1000.inclusive.txt",
+  "sha256": "849775e09f87aa817d82971ce992e4eab8df3510b8d230870506136b2c5596f6",
+  "bytes": 6699
+ },
+ {
+  "path": "before-cfb-open-v3-mini-10000.inclusive.txt",
+  "sha256": "7e6b0930c8be5bb291c874084a42399c0e9dbbe679f24a38a463b28fa8c091f1",
+  "bytes": 6741
+ },
+ {
+  "path": "before-cfb-open-v3-mini-3000.inclusive.txt",
+  "sha256": "0755aebb53d212ee2225d03907a9eacafc8c59672d67997788d81f1bf10d4306",
+  "bytes": 6700
+ },
+ {
+  "path": "before-cfb-open-v3-regular-1000.inclusive.txt",
+  "sha256": "3cd228df9695f5482d9a587e86e8c972cee59da0b2e92bd680811262233177d1",
+  "bytes": 6500
+ },
+ {
+  "path": "before-cfb-open-v3-regular-10000.inclusive.txt",
+  "sha256": "d423ca29bf55be7dc1a15bce32a2d5975815064541c34177d5ef70f7b09d95ff",
+  "bytes": 6586
+ },
+ {
+  "path": "before-cfb-open-v3-regular-3000.inclusive.txt",
+  "sha256": "3d4efbb23bea9b3ed42064123b8d320bef391d0770c0ebe064a0ba83c7ed9879",
+  "bytes": 6596
+ },
+ {
+  "path": "before-cfb-read-all-v3-mini-1000.inclusive.txt",
+  "sha256": "d5975547e2e5976c23887c518c11b0979495653bbd7af9d9285d501c9156d29f",
+  "bytes": 6159
+ },
+ {
+  "path": "before-cfb-read-all-v3-mini-10000.inclusive.txt",
+  "sha256": "1163f3f8242002c6eb18dda8eff0c141d70054182f0965c45228b1799a5a8646",
+  "bytes": 6197
+ },
+ {
+  "path": "before-cfb-read-all-v3-mini-3000.inclusive.txt",
+  "sha256": "1eb339181661964be4cd253651e0d38084dde738325c9f54b79a99d22678ca14",
+  "bytes": 6156
+ },
+ {
+  "path": "before-cfb-read-all-v3-regular-1000.inclusive.txt",
+  "sha256": "c1e750e998a4393585f2dd6fa9618c73e8005a753de1d62b16eaf47e39ef9436",
+  "bytes": 6319
+ },
+ {
+  "path": "before-cfb-read-all-v3-regular-10000.inclusive.txt",
+  "sha256": "7122aa3979f1f898176b4a812b1822f8bcfc23e6c72e5058eb231f6db5fddb2b",
+  "bytes": 6405
+ },
+ {
+  "path": "before-cfb-read-all-v3-regular-3000.inclusive.txt",
+  "sha256": "8f8812b3d287d4221760daadd86a2ba0d20685a8b06d6a2d151a71808a2aab97",
+  "bytes": 6364
+ }
+]

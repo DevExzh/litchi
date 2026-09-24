@@ -1,0 +1,67 @@
+{
+ "schema": "0767-binaries-v1",
+ "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+ "arms": {
+  "base": {
+   "source": "1d1044e3ac (detached checkout /home/zhuhe/code/litchi-worktrees/0767-before-src)",
+   "binaries": {
+    "litchi-perf-baseline": {
+     "sha256": "11f77d34f1516a6e351f3591033075b9dbe413d941155a4da1deb6a3507bc79f",
+     "bytes": 68311880
+    },
+    "probe": {
+     "sha256": "ca80d7ef02083d069431f5bbcfeba58dd9266750a5f3a2fff7f869c3d84179f8",
+     "bytes": 89443184
+    },
+    "probe_alloc": {
+     "sha256": "2a5c60337f9e074041f495d7ee145285cde931e307362a5b334cfc097d840c27",
+     "bytes": 89446816
+    }
+   }
+  },
+  "cand": {
+   "source": "573554acfe (branch perf/0767-cfb-reparse-linear)",
+   "binaries": {
+    "litchi-perf-baseline": {
+     "sha256": "784486e10cd958f67bf8955e2d6f4d9f4377bfc454cf72d34798a05584b36ad6",
+     "bytes": 68311816
+    },
+    "probe": {
+     "sha256": "733049d1671deec7e22d1fa961233ea09ddd3e6e5a4955b87e6533d2f9ed0ad4",
+     "bytes": 89546520
+    },
+    "probe_alloc": {
+     "sha256": "57f77482ff533d2a0d94609af4d065ec63da7656b847aca70835cdfa7a091a5e",
+     "bytes": 89550128
+    }
+   }
+  },
+  "cand-v1-superseded": {
+   "source": "af72192785 (first version; timing matrix-v1 and counters-v1 only)",
+   "binaries": {
+    "litchi-perf-baseline": {
+     "sha256": "457afd33a52bd3272fa6ac5022924d65c28e022e8a9ef40bddeff938afc0554c",
+     "bytes": 68313328
+    },
+    "probe": {
+     "sha256": "8f33b6644b10213193e0d6d7f3f4290f228cb124438f7c077ef054f41f6b9e5d",
+     "bytes": 89546112
+    },
+    "probe_alloc": {
+     "sha256": "74c1cbf1f8edcfaf18e2de6534236e3624c5abc9109d83c75f9b17dbbcceb867",
+     "bytes": 89549728
+    }
+   }
+  }
+ },
+ "root_cargo_lock_sha256": "6932fcc0995ea550ef973d9636cf386c3be8bb9c5070ea23e39d91accefb99ba",
+ "root_cargo_lock_note": "The gitignored root Cargo.lock copied into the worktree predates the spec-gap merge; `cargo metadata --offline` refreshed it once (adding litchi-xldm and the merged crates' dependency edges, no version change), and both legs used this identical file.",
+ "probe_cargo_lock_sha256": "b206e766f303dbb015b09ae66bf4b940f33d3e4b7a424cdf5c8bc5876f987572",
+ "harness_cargo_lock": "tools/perf-baseline/Cargo.lock as tracked at the base (unchanged)",
+ "build_commands": {
+  "probe": "scripts/build-probe.sh ARM: RUSTUP_TOOLCHAIN=1.95.0 CARGO_BUILD_JOBS=6 CARGO_TARGET_DIR=<target>/probe RUSTFLAGS='--remap-path-prefix=<tree>=/litchi --remap-path-prefix=<scratch>/probe=/probe' cargo build --release --locked --offline --bins (in probe/manifests/ARM, with manifests/Cargo.lock copied in)",
+  "harness": "scripts/build-harness.sh ARM: RUSTUP_TOOLCHAIN=1.95.0 CARGO_BUILD_JOBS=6 CARGO_TARGET_DIR=<target>/harness cargo build --release --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline (in the arm's tree)",
+  "repeat_build_check": "a repeated build of each binary compiled nothing in either arm (Finished in < 1 s)"
+ },
+ "staging": "each arm's binaries were copied to scratch/0767/bin/ARM/ (equal path lengths); the matrix starts them through argv0/ARM/NAME-p<q * 8r> symlinks"
+}

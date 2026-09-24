@@ -1,0 +1,8311 @@
+{
+ "events": "instructions:u,cycles:u,instructions,cycles,page-faults",
+ "layouts_argv0_extra_bytes": [
+  0,
+  16,
+  40
+ ],
+ "rows": [
+  {
+   "case": "open-v3-mini-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 7180801.74,
+    "cycles:u": 1452442.96,
+    "instructions": 7430575.78,
+    "cycles": 1528013.48,
+    "page-faults": 46.0
+   }
+  },
+  {
+   "case": "open-v3-mini-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 7295865.08,
+    "cycles:u": 1425524.8,
+    "instructions": 7561953.78,
+    "cycles": 1534113.78,
+    "page-faults": 45.98
+   }
+  },
+  {
+   "case": "readall-v3-mini-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 15993059.62,
+    "cycles:u": 3274898.06,
+    "instructions": 16001756.62,
+    "cycles": 3278235.64,
+    "page-faults": 0.04
+   }
+  },
+  {
+   "case": "readall-v3-mini-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 14270491.5,
+    "cycles:u": 2934238.48,
+    "instructions": 14275788.72,
+    "cycles": 2920884.16,
+    "page-faults": 0.06
+   }
+  },
+  {
+   "case": "open-v3-mini-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 22138185.4,
+    "cycles:u": 4592905.2,
+    "instructions": 22133223.8,
+    "cycles": 4560259.6,
+    "page-faults": -0.15
+   }
+  },
+  {
+   "case": "open-v3-mini-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 21854231.75,
+    "cycles:u": 3912632.7,
+    "instructions": 21862142.3,
+    "cycles": 3911239.7,
+    "page-faults": -0.15
+   }
+  },
+  {
+   "case": "readall-v3-mini-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 49971188.15,
+    "cycles:u": 10716405.75,
+    "instructions": 49972668.45,
+    "cycles": 10694409.75,
+    "page-faults": -0.05
+   }
+  },
+  {
+   "case": "readall-v3-mini-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 43231736.95,
+    "cycles:u": 8773581.8,
+    "instructions": 43246629.55,
+    "cycles": 8770151.6,
+    "page-faults": 0.0
+   }
+  },
+  {
+   "case": "open-v3-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 81580053.3,
+    "cycles:u": 20169455.2,
+    "instructions": 81546903.0,
+    "cycles": 20205649.3,
+    "page-faults": 0.5
+   }
+  },
+  {
+   "case": "open-v3-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 72860080.2,
+    "cycles:u": 14660335.7,
+    "instructions": 72859824.2,
+    "cycles": 14644220.3,
+    "page-faults": 0.4
+   }
+  },
+  {
+   "case": "readall-v3-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 182435832.9,
+    "cycles:u": 52011827.9,
+    "instructions": 182327432.5,
+    "cycles": 51997834.5,
+    "page-faults": -31.2
+   }
+  },
+  {
+   "case": "readall-v3-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 146203299.0,
+    "cycles:u": 33130425.2,
+    "instructions": 146174534.1,
+    "cycles": 33214166.6,
+    "page-faults": -23.2
+   }
+  },
+  {
+   "case": "open-v3-regular-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 3845745.04,
+    "cycles:u": 826238.24,
+    "instructions": 4124246.0,
+    "cycles": 929390.66,
+    "page-faults": 46.08
+   }
+  },
+  {
+   "case": "open-v3-regular-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 3876783.22,
+    "cycles:u": 824595.8,
+    "instructions": 4135516.3,
+    "cycles": 913972.1,
+    "page-faults": 45.94
+   }
+  },
+  {
+   "case": "readall-v3-regular-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 9881577.04,
+    "cycles:u": 2417305.04,
+    "instructions": 10543340.46,
+    "cycles": 2647439.14,
+    "page-faults": 121.02
+   }
+  },
+  {
+   "case": "readall-v3-regular-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 8424639.52,
+    "cycles:u": 2139613.84,
+    "instructions": 9077649.64,
+    "cycles": 2363322.2,
+    "page-faults": 120.98
+   }
+  },
+  {
+   "case": "open-v3-regular-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 11740766.75,
+    "cycles:u": 2651465.2,
+    "instructions": 11746650.3,
+    "cycles": 2618874.8,
+    "page-faults": -0.1
+   }
+  },
+  {
+   "case": "open-v3-regular-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 11623779.0,
+    "cycles:u": 2512352.75,
+    "instructions": 11629758.05,
+    "cycles": 2500745.8,
+    "page-faults": 0.2
+   }
+  },
+  {
+   "case": "readall-v3-regular-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 30331792.75,
+    "cycles:u": 7685103.75,
+    "instructions": 32611919.95,
+    "cycles": 8555698.6,
+    "page-faults": 425.55
+   }
+  },
+  {
+   "case": "readall-v3-regular-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 25809631.55,
+    "cycles:u": 6711113.3,
+    "instructions": 28055891.85,
+    "cycles": 7502279.35,
+    "page-faults": 423.7
+   }
+  },
+  {
+   "case": "open-v3-regular-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 41558605.9,
+    "cycles:u": 10869868.8,
+    "instructions": 42071780.2,
+    "cycles": 11007944.6,
+    "page-faults": 99.6
+   }
+  },
+  {
+   "case": "open-v3-regular-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 38718528.4,
+    "cycles:u": 8546018.9,
+    "instructions": 39251624.7,
+    "cycles": 8780869.0,
+    "page-faults": 98.9
+   }
+  },
+  {
+   "case": "readall-v3-regular-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 107865817.3,
+    "cycles:u": 38628680.6,
+    "instructions": 115785296.6,
+    "cycles": 41758132.2,
+    "page-faults": 1492.4
+   }
+  },
+  {
+   "case": "readall-v3-regular-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 87720278.2,
+    "cycles:u": 31975454.5,
+    "instructions": 95609524.0,
+    "cycles": 35672258.6,
+    "page-faults": 1490.0
+   }
+  },
+  {
+   "case": "open-v4-mini-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 6984449.28,
+    "cycles:u": 1541561.02,
+    "instructions": 7251097.96,
+    "cycles": 1620399.94,
+    "page-faults": 48.94
+   }
+  },
+  {
+   "case": "open-v4-mini-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 7092466.46,
+    "cycles:u": 1390974.8,
+    "instructions": 7370157.42,
+    "cycles": 1484458.44,
+    "page-faults": 48.9
+   }
+  },
+  {
+   "case": "readall-v4-mini-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 15549746.84,
+    "cycles:u": 3219607.3,
+    "instructions": 15555398.98,
+    "cycles": 3215342.28,
+    "page-faults": 0.04
+   }
+  },
+  {
+   "case": "readall-v4-mini-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 13886223.2,
+    "cycles:u": 2796509.6,
+    "instructions": 13889258.82,
+    "cycles": 2801656.3,
+    "page-faults": -0.02
+   }
+  },
+  {
+   "case": "open-v4-mini-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 21442583.25,
+    "cycles:u": 4091480.95,
+    "instructions": 21449943.05,
+    "cycles": 4086336.75,
+    "page-faults": -0.05
+   }
+  },
+  {
+   "case": "open-v4-mini-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 21157597.1,
+    "cycles:u": 3896502.45,
+    "instructions": 21151705.4,
+    "cycles": 3929116.65,
+    "page-faults": -0.25
+   }
+  },
+  {
+   "case": "readall-v4-mini-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 47795927.35,
+    "cycles:u": 10331136.95,
+    "instructions": 47813498.5,
+    "cycles": 10343779.6,
+    "page-faults": -0.05
+   }
+  },
+  {
+   "case": "readall-v4-mini-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 41951508.45,
+    "cycles:u": 8690152.95,
+    "instructions": 41961143.95,
+    "cycles": 8705148.8,
+    "page-faults": -0.1
+   }
+  },
+  {
+   "case": "open-v4-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 79322457.8,
+    "cycles:u": 21036538.0,
+    "instructions": 84542601.7,
+    "cycles": 22869636.6,
+    "page-faults": 968.5
+   }
+  },
+  {
+   "case": "open-v4-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 70602428.8,
+    "cycles:u": 14626963.5,
+    "instructions": 75793371.5,
+    "cycles": 16595678.5,
+    "page-faults": 968.8
+   }
+  },
+  {
+   "case": "readall-v4-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 178408091.0,
+    "cycles:u": 51241675.4,
+    "instructions": 178503529.1,
+    "cycles": 51387251.2,
+    "page-faults": -0.2
+   }
+  },
+  {
+   "case": "readall-v4-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 142208203.6,
+    "cycles:u": 33377064.4,
+    "instructions": 142542280.1,
+    "cycles": 33829797.6,
+    "page-faults": 23.2
+   }
+  },
+  {
+   "case": "open-v4-regular-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 3328576.14,
+    "cycles:u": 767092.0,
+    "instructions": 3593784.46,
+    "cycles": 845127.92,
+    "page-faults": 48.14
+   }
+  },
+  {
+   "case": "open-v4-regular-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 3340629.54,
+    "cycles:u": 797721.8,
+    "instructions": 3620670.88,
+    "cycles": 899286.7,
+    "page-faults": 48.06
+   }
+  },
+  {
+   "case": "readall-v4-regular-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 7688616.2,
+    "cycles:u": 2242222.36,
+    "instructions": 8355376.42,
+    "cycles": 2518546.84,
+    "page-faults": 123.84
+   }
+  },
+  {
+   "case": "readall-v4-regular-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 7472240.9,
+    "cycles:u": 2029217.26,
+    "instructions": 8066654.32,
+    "cycles": 2218733.82,
+    "page-faults": 109.34
+   }
+  },
+  {
+   "case": "open-v4-regular-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 10032539.65,
+    "cycles:u": 2273887.8,
+    "instructions": 10096518.65,
+    "cycles": 2288740.6,
+    "page-faults": 0.0
+   }
+  },
+  {
+   "case": "open-v4-regular-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 9999543.6,
+    "cycles:u": 2065555.2,
+    "instructions": 10021403.2,
+    "cycles": 2075150.4,
+    "page-faults": 0.1
+   }
+  },
+  {
+   "case": "readall-v4-regular-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 23662891.35,
+    "cycles:u": 6810375.15,
+    "instructions": 25890178.35,
+    "cycles": 7416919.0,
+    "page-faults": 426.2
+   }
+  },
+  {
+   "case": "readall-v4-regular-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 22849265.35,
+    "cycles:u": 6254181.25,
+    "instructions": 24922640.9,
+    "cycles": 6913144.55,
+    "page-faults": 389.0
+   }
+  },
+  {
+   "case": "open-v4-regular-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 33981727.9,
+    "cycles:u": 8496352.9,
+    "instructions": 34429415.0,
+    "cycles": 8608786.0,
+    "page-faults": 0.2
+   }
+  },
+  {
+   "case": "open-v4-regular-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 33339822.0,
+    "cycles:u": 7288548.8,
+    "instructions": 33014985.0,
+    "cycles": 7195784.9,
+    "page-faults": 0.5
+   }
+  },
+  {
+   "case": "readall-v4-regular-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 85417004.5,
+    "cycles:u": 34631885.7,
+    "instructions": 94738627.3,
+    "cycles": 39545979.0,
+    "page-faults": 1477.6
+   }
+  },
+  {
+   "case": "readall-v4-regular-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 78113584.2,
+    "cycles:u": 30596064.0,
+    "instructions": 78141391.5,
+    "cycles": 29300840.4,
+    "page-faults": 0.5
+   }
+  },
+  {
+   "case": "shared-open-v3-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 66595925.8,
+    "cycles:u": 17128819.6,
+    "instructions": 66111069.8,
+    "cycles": 17681587.3,
+    "page-faults": -0.2
+   }
+  },
+  {
+   "case": "shared-open-v3-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 57875777.9,
+    "cycles:u": 11849941.0,
+    "instructions": 57817242.3,
+    "cycles": 11430538.4,
+    "page-faults": 0.0
+   }
+  },
+  {
+   "case": "shared-open-v3-regular-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 41378504.6,
+    "cycles:u": 10688986.0,
+    "instructions": 41092836.0,
+    "cycles": 10199193.1,
+    "page-faults": -0.6
+   }
+  },
+  {
+   "case": "shared-open-v3-regular-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 38538683.9,
+    "cycles:u": 9093666.5,
+    "instructions": 39336939.4,
+    "cycles": 5861251.0,
+    "page-faults": 0.4
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 18518322.04,
+    "cycles:u": 4315841.32,
+    "instructions": 18516439.62,
+    "cycles": 4288509.36,
+    "page-faults": 0.1
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 16344979.86,
+    "cycles:u": 3795912.56,
+    "instructions": 16353209.48,
+    "cycles": 3790287.36,
+    "page-faults": -0.02
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 55779476.55,
+    "cycles:u": 16916873.9,
+    "instructions": 55766813.6,
+    "cycles": 16935373.15,
+    "page-faults": 0.4
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 49412985.55,
+    "cycles:u": 12774903.95,
+    "instructions": 49437776.1,
+    "cycles": 12738771.45,
+    "page-faults": 0.15
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 207928631.6,
+    "cycles:u": 79815284.2,
+    "instructions": 207882469.8,
+    "cycles": 79342370.3,
+    "page-faults": 0.7
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 166821662.6,
+    "cycles:u": 56828978.8,
+    "instructions": 166930527.3,
+    "cycles": 57220956.2,
+    "page-faults": -0.3
+   }
+  },
+  {
+   "case": "write-reuse-45543",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 383867.345,
+    "cycles:u": 104785.8845,
+    "instructions": 384078.8815,
+    "cycles": 104752.525,
+    "page-faults": -0.0035
+   }
+  },
+  {
+   "case": "write-reuse-45543",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 379868.482,
+    "cycles:u": 102567.9825,
+    "instructions": 380078.193,
+    "cycles": 102827.107,
+    "page-faults": 0.0005
+   }
+  },
+  {
+   "case": "write-reuse-v3-mini-3000-grow",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    7
+   ],
+   "per_owner": {
+    "instructions:u": 81127345.2,
+    "cycles:u": 25348215.2,
+    "instructions": 96212002.4,
+    "cycles": 15776756.2,
+    "page-faults": 3171.4
+   }
+  },
+  {
+   "case": "write-reuse-v3-mini-3000-grow",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    2,
+    7
+   ],
+   "per_owner": {
+    "instructions:u": 79686908.4,
+    "cycles:u": 20159198.6,
+    "instructions": 96142779.8,
+    "cycles": 26619131.6,
+    "page-faults": 3172.0
+   }
+  },
+  {
+   "case": "open-45543",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 74712.1795,
+    "cycles:u": 14728.835,
+    "instructions": 74936.1435,
+    "cycles": 14938.2045,
+    "page-faults": 0.02
+   }
+  },
+  {
+   "case": "open-45543",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 74786.093,
+    "cycles:u": 14749.4525,
+    "instructions": 74912.9585,
+    "cycles": 14823.1965,
+    "page-faults": 0.018
+   }
+  },
+  {
+   "case": "open-floating",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 114045.8725,
+    "cycles:u": 24253.969,
+    "instructions": 114306.401,
+    "cycles": 24450.565,
+    "page-faults": 0.02
+   }
+  },
+  {
+   "case": "open-floating",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 114204.0625,
+    "cycles:u": 24667.3205,
+    "instructions": 114402.164,
+    "cycles": 24809.978,
+    "page-faults": 0.0205
+   }
+  },
+  {
+   "case": "open-checkboxes",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 89375.7535,
+    "cycles:u": 20288.214,
+    "instructions": 89696.43,
+    "cycles": 20545.569,
+    "page-faults": 0.02
+   }
+  },
+  {
+   "case": "open-checkboxes",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 89518.9945,
+    "cycles:u": 20583.8325,
+    "instructions": 89630.836,
+    "cycles": 20680.814,
+    "page-faults": 0.02
+   }
+  },
+  {
+   "case": "openread-45543",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 161057.9325,
+    "cycles:u": 46670.113,
+    "instructions": 161188.8265,
+    "cycles": 46772.352,
+    "page-faults": 0.0035
+   }
+  },
+  {
+   "case": "openread-45543",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 154569.006,
+    "cycles:u": 47529.3205,
+    "instructions": 154763.359,
+    "cycles": 47711.609,
+    "page-faults": 0.0045
+   }
+  },
+  {
+   "case": "editor-open-45543",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 208465.983,
+    "cycles:u": 217548.354,
+    "instructions": 999605.793,
+    "cycles": 554629.9505,
+    "page-faults": 142.001
+   }
+  },
+  {
+   "case": "editor-open-45543",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 202163.851,
+    "cycles:u": 213671.081,
+    "instructions": 950552.686,
+    "cycles": 450868.2535,
+    "page-faults": 140.0035
+   }
+  },
+  {
+   "case": "ctl-write-rewrite-45543",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 96793.0955,
+    "cycles:u": 43718.3535,
+    "instructions": 96950.8755,
+    "cycles": 43554.534,
+    "page-faults": 0.001
+   }
+  },
+  {
+   "case": "ctl-write-rewrite-45543",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 94566.682,
+    "cycles:u": 38561.9985,
+    "instructions": 94566.4555,
+    "cycles": 38514.662,
+    "page-faults": -0.0005
+   }
+  },
+  {
+   "case": "cfb_open/tiny",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    100,
+    5100
+   ],
+   "per_owner": {
+    "instructions:u": 34802.4554,
+    "cycles:u": -3952.2364,
+    "instructions": 86762.8676,
+    "cycles": 10652.1196,
+    "page-faults": 0.9078
+   }
+  },
+  {
+   "case": "cfb_open/tiny",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    100,
+    5100
+   ],
+   "per_owner": {
+    "instructions:u": 34847.4182,
+    "cycles:u": 3516.2648,
+    "instructions": 81925.4418,
+    "cycles": 15101.8314,
+    "page-faults": 0.91
+   }
+  },
+  {
+   "case": "cfb_open/many-small",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 1938886.643,
+    "cycles:u": 238633.364,
+    "instructions": 1961635.924,
+    "cycles": 146456.136,
+    "page-faults": 0.823
+   }
+  },
+  {
+   "case": "cfb_open/many-small",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 1942075.978,
+    "cycles:u": 324284.993,
+    "instructions": 1996974.687,
+    "cycles": 333516.776,
+    "page-faults": 0.825
+   }
+  },
+  {
+   "case": "cfb_open/few-large",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 1944858.346,
+    "cycles:u": 348047.222,
+    "instructions": 1996354.427,
+    "cycles": 360041.047,
+    "page-faults": 0.883
+   }
+  },
+  {
+   "case": "cfb_open/few-large",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 1944917.18,
+    "cycles:u": 323592.386,
+    "instructions": 2022658.029,
+    "cycles": 436268.823,
+    "page-faults": 0.878
+   }
+  },
+  {
+   "case": "cfb_open/wide-root",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    210
+   ],
+   "per_owner": {
+    "instructions:u": 11707758.905,
+    "cycles:u": 2578745.51,
+    "instructions": 11709368.375,
+    "cycles": 2697402.83,
+    "page-faults": 0.045
+   }
+  },
+  {
+   "case": "cfb_open/wide-root",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    10,
+    210
+   ],
+   "per_owner": {
+    "instructions:u": 11712560.2,
+    "cycles:u": 2518270.765,
+    "instructions": 11641488.9,
+    "cycles": 2555116.79,
+    "page-faults": 0.015
+   }
+  },
+  {
+   "case": "cfb_list_streams/tiny",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    100,
+    10100
+   ],
+   "per_owner": {
+    "instructions:u": 4982.0623,
+    "cycles:u": -550.9387,
+    "instructions": 38631.0442,
+    "cycles": 8333.0825,
+    "page-faults": 0.0873
+   }
+  },
+  {
+   "case": "cfb_list_streams/tiny",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    100,
+    10100
+   ],
+   "per_owner": {
+    "instructions:u": 4982.4041,
+    "cycles:u": 555.2361,
+    "instructions": 37264.7647,
+    "cycles": 7865.0924,
+    "page-faults": 0.0897
+   }
+  },
+  {
+   "case": "cfb_list_streams/many-small",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    100,
+    5100
+   ],
+   "per_owner": {
+    "instructions:u": 289245.943,
+    "cycles:u": 58627.0826,
+    "instructions": 318300.6238,
+    "cycles": 58602.6374,
+    "page-faults": 0.079
+   }
+  },
+  {
+   "case": "cfb_list_streams/many-small",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    100,
+    5100
+   ],
+   "per_owner": {
+    "instructions:u": 288351.6138,
+    "cycles:u": 50106.5354,
+    "instructions": 318579.4628,
+    "cycles": 58620.5884,
+    "page-faults": 0.0808
+   }
+  },
+  {
+   "case": "cfb_list_streams/few-large",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    100,
+    10100
+   ],
+   "per_owner": {
+    "instructions:u": 5755.7063,
+    "cycles:u": -1615.7197,
+    "instructions": 36867.7904,
+    "cycles": 2429.9625,
+    "page-faults": 0.0877
+   }
+  },
+  {
+   "case": "cfb_list_streams/few-large",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    100,
+    10100
+   ],
+   "per_owner": {
+    "instructions:u": 5753.6102,
+    "cycles:u": -4755.5504,
+    "instructions": 37858.2023,
+    "cycles": 3983.5054,
+    "page-faults": 0.0849
+   }
+  },
+  {
+   "case": "cfb_list_streams/wide-root",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 2305137.189,
+    "cycles:u": 629964.706,
+    "instructions": 2348351.75,
+    "cycles": 747881.845,
+    "page-faults": 0.01
+   }
+  },
+  {
+   "case": "cfb_list_streams/wide-root",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 2305859.076,
+    "cycles:u": 444453.667,
+    "instructions": 2339876.394,
+    "cycles": 431853.61,
+    "page-faults": -0.004
+   }
+  },
+  {
+   "case": "doc_semantic_open/tiny",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 28781614.79,
+    "cycles:u": 7219002.682,
+    "instructions": 28698204.82,
+    "cycles": 7262576.576,
+    "page-faults": -26.016
+   }
+  },
+  {
+   "case": "doc_semantic_open/tiny",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 28814416.196,
+    "cycles:u": 7351721.416,
+    "instructions": 31651299.118,
+    "cycles": 8339276.042,
+    "page-faults": 523.068
+   }
+  },
+  {
+   "case": "doc_semantic_open/large",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 28805643.3,
+    "cycles:u": 7653658.91,
+    "instructions": 31999426.71,
+    "cycles": 8887575.58,
+    "page-faults": 583.33
+   }
+  },
+  {
+   "case": "doc_semantic_open/large",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 28813207.63,
+    "cycles:u": 8012687.29,
+    "instructions": 31397731.43,
+    "cycles": 10199010.87,
+    "page-faults": 419.1
+   }
+  },
+  {
+   "case": "xls_semantic_open/tiny",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 130577906.814,
+    "cycles:u": 42780445.372,
+    "instructions": 130803156.59,
+    "cycles": 42973305.394,
+    "page-faults": 0.1
+   }
+  },
+  {
+   "case": "xls_semantic_open/tiny",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 130541478.896,
+    "cycles:u": 36479839.684,
+    "instructions": 130639022.712,
+    "cycles": 36494966.674,
+    "page-faults": 0.096
+   }
+  },
+  {
+   "case": "xls_semantic_open/large",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 130577455.4,
+    "cycles:u": 45021880.15,
+    "instructions": 130517318.42,
+    "cycles": 45029393.65,
+    "page-faults": 0.64
+   }
+  },
+  {
+   "case": "xls_semantic_open/large",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 130538791.47,
+    "cycles:u": 36583735.88,
+    "instructions": 130878922.26,
+    "cycles": 36884987.52,
+    "page-faults": 0.5
+   }
+  },
+  {
+   "case": "ppt_semantic_open/tiny",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 5845660.586,
+    "cycles:u": 1457326.774,
+    "instructions": 5875318.42,
+    "cycles": 1357375.772,
+    "page-faults": 0.006
+   }
+  },
+  {
+   "case": "ppt_semantic_open/tiny",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 5847337.53,
+    "cycles:u": 1400327.178,
+    "instructions": 5901371.22,
+    "cycles": 1412462.792,
+    "page-faults": 0.022
+   }
+  },
+  {
+   "case": "ppt_semantic_open/large",
+   "arm": "base",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 5846644.35,
+    "cycles:u": 2245092.61,
+    "instructions": 5778460.15,
+    "cycles": 2297024.76,
+    "page-faults": 0.0
+   }
+  },
+  {
+   "case": "ppt_semantic_open/large",
+   "arm": "cand",
+   "argv0_extra_bytes": 0,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 5837896.06,
+    "cycles:u": 1097686.33,
+    "instructions": 5884461.53,
+    "cycles": 1065582.24,
+    "page-faults": -0.05
+   }
+  },
+  {
+   "case": "open-v3-mini-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 7181129.2,
+    "cycles:u": 1446939.7,
+    "instructions": 7576342.1,
+    "cycles": 1851579.08,
+    "page-faults": 47.96
+   }
+  },
+  {
+   "case": "open-v3-mini-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 7296169.52,
+    "cycles:u": 1428526.48,
+    "instructions": 7563355.46,
+    "cycles": 1517891.04,
+    "page-faults": 48.02
+   }
+  },
+  {
+   "case": "readall-v3-mini-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 16021817.9,
+    "cycles:u": 3265280.6,
+    "instructions": 16027552.74,
+    "cycles": 3264059.18,
+    "page-faults": 0.08
+   }
+  },
+  {
+   "case": "readall-v3-mini-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 14267494.9,
+    "cycles:u": 2932474.38,
+    "instructions": 14274107.56,
+    "cycles": 2946912.06,
+    "page-faults": 0.04
+   }
+  },
+  {
+   "case": "open-v3-mini-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 22161941.0,
+    "cycles:u": 4607264.0,
+    "instructions": 22171251.95,
+    "cycles": 4600169.05,
+    "page-faults": -0.15
+   }
+  },
+  {
+   "case": "open-v3-mini-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 21855949.85,
+    "cycles:u": 4275184.8,
+    "instructions": 21894612.85,
+    "cycles": 4364508.4,
+    "page-faults": 0.05
+   }
+  },
+  {
+   "case": "readall-v3-mini-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 49687350.0,
+    "cycles:u": 10827552.45,
+    "instructions": 49700434.45,
+    "cycles": 10892149.8,
+    "page-faults": 0.0
+   }
+  },
+  {
+   "case": "readall-v3-mini-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 43367135.55,
+    "cycles:u": 8805687.75,
+    "instructions": 43421538.25,
+    "cycles": 8868346.25,
+    "page-faults": 0.15
+   }
+  },
+  {
+   "case": "open-v3-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 81572931.9,
+    "cycles:u": 20128340.0,
+    "instructions": 81261946.6,
+    "cycles": 19235988.0,
+    "page-faults": 0.7
+   }
+  },
+  {
+   "case": "open-v3-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 72852788.5,
+    "cycles:u": 13907165.4,
+    "instructions": 72862955.3,
+    "cycles": 13792140.9,
+    "page-faults": -0.2
+   }
+  },
+  {
+   "case": "readall-v3-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 182667445.8,
+    "cycles:u": 52249778.7,
+    "instructions": 182718524.3,
+    "cycles": 52300821.9,
+    "page-faults": 0.1
+   }
+  },
+  {
+   "case": "readall-v3-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 146346786.6,
+    "cycles:u": 32653632.9,
+    "instructions": 146320837.6,
+    "cycles": 33015775.0,
+    "page-faults": -43.2
+   }
+  },
+  {
+   "case": "open-v3-regular-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 3846461.44,
+    "cycles:u": 848922.46,
+    "instructions": 4113373.3,
+    "cycles": 927829.88,
+    "page-faults": 45.92
+   }
+  },
+  {
+   "case": "open-v3-regular-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 3877492.04,
+    "cycles:u": 863243.96,
+    "instructions": 4133188.26,
+    "cycles": 939242.46,
+    "page-faults": 46.08
+   }
+  },
+  {
+   "case": "readall-v3-regular-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 9786774.38,
+    "cycles:u": 2390989.64,
+    "instructions": 10405116.92,
+    "cycles": 2495838.32,
+    "page-faults": 121.04
+   }
+  },
+  {
+   "case": "readall-v3-regular-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 8420096.28,
+    "cycles:u": 2151012.84,
+    "instructions": 9065517.56,
+    "cycles": 2367580.86,
+    "page-faults": 121.02
+   }
+  },
+  {
+   "case": "open-v3-regular-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 11727982.7,
+    "cycles:u": 2658196.05,
+    "instructions": 11791519.7,
+    "cycles": 2726095.7,
+    "page-faults": -0.15
+   }
+  },
+  {
+   "case": "open-v3-regular-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 11611020.65,
+    "cycles:u": 2575899.55,
+    "instructions": 11593375.25,
+    "cycles": 2543545.5,
+    "page-faults": -0.1
+   }
+  },
+  {
+   "case": "readall-v3-regular-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 30480166.55,
+    "cycles:u": 7466648.4,
+    "instructions": 32672148.95,
+    "cycles": 8311006.7,
+    "page-faults": 425.6
+   }
+  },
+  {
+   "case": "readall-v3-regular-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 25781698.55,
+    "cycles:u": 6834327.0,
+    "instructions": 27841111.5,
+    "cycles": 7458706.0,
+    "page-faults": 423.95
+   }
+  },
+  {
+   "case": "open-v3-regular-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 41548637.4,
+    "cycles:u": 10669226.0,
+    "instructions": 42317673.0,
+    "cycles": 11177969.5,
+    "page-faults": 99.3
+   }
+  },
+  {
+   "case": "open-v3-regular-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 38708765.9,
+    "cycles:u": 8375271.0,
+    "instructions": 39031396.7,
+    "cycles": 8585982.5,
+    "page-faults": 99.0
+   }
+  },
+  {
+   "case": "readall-v3-regular-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 107980643.1,
+    "cycles:u": 38864179.6,
+    "instructions": 115858107.4,
+    "cycles": 42129848.6,
+    "page-faults": 1492.2
+   }
+  },
+  {
+   "case": "readall-v3-regular-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 87720345.9,
+    "cycles:u": 32971805.2,
+    "instructions": 96306767.5,
+    "cycles": 38745495.2,
+    "page-faults": 1489.7
+   }
+  },
+  {
+   "case": "open-v4-mini-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 6978479.76,
+    "cycles:u": 1388292.22,
+    "instructions": 7268079.6,
+    "cycles": 1475935.58,
+    "page-faults": 48.88
+   }
+  },
+  {
+   "case": "open-v4-mini-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 7092954.72,
+    "cycles:u": 1396705.28,
+    "instructions": 7366179.18,
+    "cycles": 1504934.68,
+    "page-faults": 49.0
+   }
+  },
+  {
+   "case": "readall-v4-mini-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 15544459.32,
+    "cycles:u": 3166956.22,
+    "instructions": 15549814.7,
+    "cycles": 3167706.08,
+    "page-faults": -0.06
+   }
+  },
+  {
+   "case": "readall-v4-mini-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 13874850.74,
+    "cycles:u": 2869935.6,
+    "instructions": 13880117.86,
+    "cycles": 2869589.74,
+    "page-faults": -0.08
+   }
+  },
+  {
+   "case": "open-v4-mini-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 21486099.7,
+    "cycles:u": 4490104.7,
+    "instructions": 21495566.4,
+    "cycles": 4475377.6,
+    "page-faults": -0.1
+   }
+  },
+  {
+   "case": "open-v4-mini-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 21159109.25,
+    "cycles:u": 4282365.4,
+    "instructions": 21162664.15,
+    "cycles": 4250568.55,
+    "page-faults": -0.05
+   }
+  },
+  {
+   "case": "readall-v4-mini-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 48543975.45,
+    "cycles:u": 10910177.6,
+    "instructions": 48552874.95,
+    "cycles": 10933577.3,
+    "page-faults": 0.0
+   }
+  },
+  {
+   "case": "readall-v4-mini-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 42119776.4,
+    "cycles:u": 8543140.8,
+    "instructions": 42137789.3,
+    "cycles": 8531345.95,
+    "page-faults": 0.1
+   }
+  },
+  {
+   "case": "open-v4-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 79271835.0,
+    "cycles:u": 19723299.4,
+    "instructions": 79254528.8,
+    "cycles": 19673939.3,
+    "page-faults": -0.4
+   }
+  },
+  {
+   "case": "open-v4-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 70551772.8,
+    "cycles:u": 13652799.7,
+    "instructions": 71195506.6,
+    "cycles": 14931004.4,
+    "page-faults": 0.4
+   }
+  },
+  {
+   "case": "readall-v4-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 178983808.4,
+    "cycles:u": 51001788.8,
+    "instructions": 178930758.1,
+    "cycles": 50848881.7,
+    "page-faults": 0.1
+   }
+  },
+  {
+   "case": "readall-v4-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 142175830.3,
+    "cycles:u": 34172247.7,
+    "instructions": 142323369.4,
+    "cycles": 34554746.7,
+    "page-faults": 23.5
+   }
+  },
+  {
+   "case": "open-v4-regular-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 3328787.12,
+    "cycles:u": 785842.72,
+    "instructions": 3592897.08,
+    "cycles": 859601.08,
+    "page-faults": 47.9
+   }
+  },
+  {
+   "case": "open-v4-regular-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 3340782.2,
+    "cycles:u": 762318.84,
+    "instructions": 3607531.24,
+    "cycles": 860484.04,
+    "page-faults": 47.88
+   }
+  },
+  {
+   "case": "readall-v4-regular-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 7693091.14,
+    "cycles:u": 2088206.0,
+    "instructions": 8357980.64,
+    "cycles": 2325413.86,
+    "page-faults": 123.82
+   }
+  },
+  {
+   "case": "readall-v4-regular-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 7462151.48,
+    "cycles:u": 2099763.78,
+    "instructions": 8053941.08,
+    "cycles": 2290538.16,
+    "page-faults": 109.86
+   }
+  },
+  {
+   "case": "open-v4-regular-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 10018578.65,
+    "cycles:u": 2330652.95,
+    "instructions": 10022273.55,
+    "cycles": 2244898.15,
+    "page-faults": -0.25
+   }
+  },
+  {
+   "case": "open-v4-regular-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 9985583.8,
+    "cycles:u": 2207651.85,
+    "instructions": 9990981.75,
+    "cycles": 2205914.0,
+    "page-faults": -0.05
+   }
+  },
+  {
+   "case": "readall-v4-regular-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 23665552.55,
+    "cycles:u": 6492616.05,
+    "instructions": 25921009.25,
+    "cycles": 7396367.8,
+    "page-faults": 424.8
+   }
+  },
+  {
+   "case": "readall-v4-regular-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 22850885.65,
+    "cycles:u": 6430307.05,
+    "instructions": 24905149.85,
+    "cycles": 7117125.4,
+    "page-faults": 387.95
+   }
+  },
+  {
+   "case": "open-v4-regular-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 33880639.5,
+    "cycles:u": 8953985.7,
+    "instructions": 39934678.4,
+    "cycles": 10783303.8,
+    "page-faults": 1180.2
+   }
+  },
+  {
+   "case": "open-v4-regular-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 33392577.9,
+    "cycles:u": 8282143.0,
+    "instructions": 39607282.4,
+    "cycles": 10489822.3,
+    "page-faults": 1180.5
+   }
+  },
+  {
+   "case": "readall-v4-regular-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 85197627.6,
+    "cycles:u": 34498549.2,
+    "instructions": 94015523.7,
+    "cycles": 39587369.0,
+    "page-faults": 1483.1
+   }
+  },
+  {
+   "case": "readall-v4-regular-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 78110623.1,
+    "cycles:u": 32193954.9,
+    "instructions": 77979718.7,
+    "cycles": 31205682.8,
+    "page-faults": 23.4
+   }
+  },
+  {
+   "case": "shared-open-v3-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 66595468.3,
+    "cycles:u": 17765746.2,
+    "instructions": 66904055.8,
+    "cycles": 18696943.1,
+    "page-faults": -0.2
+   }
+  },
+  {
+   "case": "shared-open-v3-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 57875317.1,
+    "cycles:u": 11500963.4,
+    "instructions": 57675509.3,
+    "cycles": 10697352.0,
+    "page-faults": -0.1
+   }
+  },
+  {
+   "case": "shared-open-v3-regular-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 41389896.0,
+    "cycles:u": 9870053.3,
+    "instructions": 41067919.1,
+    "cycles": 8334698.2,
+    "page-faults": -0.1
+   }
+  },
+  {
+   "case": "shared-open-v3-regular-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 38550034.7,
+    "cycles:u": 7907603.4,
+    "instructions": 38568324.3,
+    "cycles": 7696676.1,
+    "page-faults": -0.3
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 18498618.08,
+    "cycles:u": 4210779.02,
+    "instructions": 18508148.86,
+    "cycles": 4207301.24,
+    "page-faults": 0.0
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 16310374.52,
+    "cycles:u": 3576145.44,
+    "instructions": 16323531.14,
+    "cycles": 3587954.94,
+    "page-faults": 0.06
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 55766721.5,
+    "cycles:u": 14702051.9,
+    "instructions": 55805438.85,
+    "cycles": 14757287.4,
+    "page-faults": 0.25
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 49410201.7,
+    "cycles:u": 11643782.3,
+    "instructions": 49434065.0,
+    "cycles": 11754866.95,
+    "page-faults": 0.15
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 208002464.1,
+    "cycles:u": 77780548.7,
+    "instructions": 208666011.1,
+    "cycles": 79125392.8,
+    "page-faults": 0.0
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 166823303.9,
+    "cycles:u": 52556971.4,
+    "instructions": 166642713.2,
+    "cycles": 52166725.1,
+    "page-faults": 0.2
+   }
+  },
+  {
+   "case": "write-reuse-45543",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 380019.989,
+    "cycles:u": 101009.394,
+    "instructions": 380211.855,
+    "cycles": 101133.0915,
+    "page-faults": -0.0045
+   }
+  },
+  {
+   "case": "write-reuse-45543",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 379716.7495,
+    "cycles:u": 102354.819,
+    "instructions": 379944.107,
+    "cycles": 102619.6365,
+    "page-faults": -0.001
+   }
+  },
+  {
+   "case": "write-reuse-v3-mini-3000-grow",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    7
+   ],
+   "per_owner": {
+    "instructions:u": 81049454.6,
+    "cycles:u": 20232408.4,
+    "instructions": 97676030.2,
+    "cycles": 26846117.4,
+    "page-faults": 3172.8
+   }
+  },
+  {
+   "case": "write-reuse-v3-mini-3000-grow",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    2,
+    7
+   ],
+   "per_owner": {
+    "instructions:u": 79809029.0,
+    "cycles:u": 20602286.4,
+    "instructions": 96396206.8,
+    "cycles": 28212629.2,
+    "page-faults": 3172.0
+   }
+  },
+  {
+   "case": "open-45543",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 74729.1655,
+    "cycles:u": 15208.9405,
+    "instructions": 74254.2565,
+    "cycles": 14150.843,
+    "page-faults": 0.0195
+   }
+  },
+  {
+   "case": "open-45543",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 74804.0555,
+    "cycles:u": 15008.3035,
+    "instructions": 74878.1935,
+    "cycles": 15042.79,
+    "page-faults": 0.0195
+   }
+  },
+  {
+   "case": "open-floating",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 113982.306,
+    "cycles:u": 24001.379,
+    "instructions": 114194.9585,
+    "cycles": 24229.11,
+    "page-faults": 0.0205
+   }
+  },
+  {
+   "case": "open-floating",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 114139.781,
+    "cycles:u": 24334.27,
+    "instructions": 114319.5265,
+    "cycles": 24465.2105,
+    "page-faults": 0.02
+   }
+  },
+  {
+   "case": "open-checkboxes",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 89376.3315,
+    "cycles:u": 20324.5655,
+    "instructions": 89577.906,
+    "cycles": 20544.932,
+    "page-faults": 0.022
+   }
+  },
+  {
+   "case": "open-checkboxes",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 89519.6725,
+    "cycles:u": 20704.4555,
+    "instructions": 89688.041,
+    "cycles": 20854.9015,
+    "page-faults": 0.0205
+   }
+  },
+  {
+   "case": "openread-45543",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 161638.876,
+    "cycles:u": 51224.076,
+    "instructions": 161919.55,
+    "cycles": 51461.8975,
+    "page-faults": 0.0045
+   }
+  },
+  {
+   "case": "openread-45543",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 154489.4485,
+    "cycles:u": 48183.37,
+    "instructions": 154701.4495,
+    "cycles": 48578.3045,
+    "page-faults": 0.0035
+   }
+  },
+  {
+   "case": "editor-open-45543",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 207273.2455,
+    "cycles:u": 214029.9255,
+    "instructions": 957487.838,
+    "cycles": 452926.3195,
+    "page-faults": 141.0055
+   }
+  },
+  {
+   "case": "editor-open-45543",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 202152.9925,
+    "cycles:u": 211670.959,
+    "instructions": 945924.7295,
+    "cycles": 449468.9815,
+    "page-faults": 140.0075
+   }
+  },
+  {
+   "case": "ctl-write-rewrite-45543",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 94136.715,
+    "cycles:u": 39578.87,
+    "instructions": 94308.596,
+    "cycles": 39474.384,
+    "page-faults": -0.001
+   }
+  },
+  {
+   "case": "ctl-write-rewrite-45543",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 94483.014,
+    "cycles:u": 39241.686,
+    "instructions": 94736.5655,
+    "cycles": 39461.301,
+    "page-faults": -0.0005
+   }
+  },
+  {
+   "case": "cfb_open/tiny",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    100,
+    5100
+   ],
+   "per_owner": {
+    "instructions:u": 34801.0886,
+    "cycles:u": 13598.7876,
+    "instructions": 82692.3196,
+    "cycles": 25959.8952,
+    "page-faults": 0.9122
+   }
+  },
+  {
+   "case": "cfb_open/tiny",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    100,
+    5100
+   ],
+   "per_owner": {
+    "instructions:u": 34855.5648,
+    "cycles:u": 11448.5704,
+    "instructions": -116262.983,
+    "cycles": -115891.8016,
+    "page-faults": 0.9078
+   }
+  },
+  {
+   "case": "cfb_open/many-small",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 1938903.065,
+    "cycles:u": 398942.186,
+    "instructions": 2009294.249,
+    "cycles": 461762.131,
+    "page-faults": 0.83
+   }
+  },
+  {
+   "case": "cfb_open/many-small",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 1942067.581,
+    "cycles:u": 383742.857,
+    "instructions": 2004356.577,
+    "cycles": 396928.07,
+    "page-faults": 0.835
+   }
+  },
+  {
+   "case": "cfb_open/few-large",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 1944860.061,
+    "cycles:u": 416892.241,
+    "instructions": 2005147.337,
+    "cycles": 560982.768,
+    "page-faults": 0.862
+   }
+  },
+  {
+   "case": "cfb_open/few-large",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 1944914.875,
+    "cycles:u": 391083.087,
+    "instructions": 1960660.069,
+    "cycles": 352174.955,
+    "page-faults": 0.881
+   }
+  },
+  {
+   "case": "cfb_open/wide-root",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    210
+   ],
+   "per_owner": {
+    "instructions:u": 11707772.615,
+    "cycles:u": 2014780.985,
+    "instructions": 11738787.245,
+    "cycles": 2532979.955,
+    "page-faults": 0.135
+   }
+  },
+  {
+   "case": "cfb_open/wide-root",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    10,
+    210
+   ],
+   "per_owner": {
+    "instructions:u": 11712521.995,
+    "cycles:u": 2093073.97,
+    "instructions": 11681733.65,
+    "cycles": 2108596.955,
+    "page-faults": -0.045
+   }
+  },
+  {
+   "case": "cfb_list_streams/tiny",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    100,
+    10100
+   ],
+   "per_owner": {
+    "instructions:u": 4984.0187,
+    "cycles:u": -2826.6949,
+    "instructions": 38147.1394,
+    "cycles": 7570.4301,
+    "page-faults": 0.0884
+   }
+  },
+  {
+   "case": "cfb_list_streams/tiny",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    100,
+    10100
+   ],
+   "per_owner": {
+    "instructions:u": 4982.0078,
+    "cycles:u": -4948.936,
+    "instructions": 38825.9598,
+    "cycles": 4805.7819,
+    "page-faults": 0.0904
+   }
+  },
+  {
+   "case": "cfb_list_streams/many-small",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    100,
+    5100
+   ],
+   "per_owner": {
+    "instructions:u": 289242.3482,
+    "cycles:u": 48883.1122,
+    "instructions": 322159.383,
+    "cycles": 58345.3142,
+    "page-faults": 0.0812
+   }
+  },
+  {
+   "case": "cfb_list_streams/many-small",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    100,
+    5100
+   ],
+   "per_owner": {
+    "instructions:u": 287763.1806,
+    "cycles:u": 65590.165,
+    "instructions": 324098.7652,
+    "cycles": 81999.4126,
+    "page-faults": 0.0814
+   }
+  },
+  {
+   "case": "cfb_list_streams/few-large",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    100,
+    10100
+   ],
+   "per_owner": {
+    "instructions:u": 5755.1862,
+    "cycles:u": 2118.4342,
+    "instructions": 39157.9611,
+    "cycles": 11688.5106,
+    "page-faults": 0.0875
+   }
+  },
+  {
+   "case": "cfb_list_streams/few-large",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    100,
+    10100
+   ],
+   "per_owner": {
+    "instructions:u": 5751.1698,
+    "cycles:u": 195.8515,
+    "instructions": 39786.2847,
+    "cycles": 10669.0975,
+    "page-faults": 0.0873
+   }
+  },
+  {
+   "case": "cfb_list_streams/wide-root",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 2305142.766,
+    "cycles:u": 513420.37,
+    "instructions": 2357762.724,
+    "cycles": 607852.048,
+    "page-faults": -0.003
+   }
+  },
+  {
+   "case": "cfb_list_streams/wide-root",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 2305849.489,
+    "cycles:u": 511967.826,
+    "instructions": 2322137.996,
+    "cycles": 504979.282,
+    "page-faults": 0.004
+   }
+  },
+  {
+   "case": "doc_semantic_open/tiny",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 28774540.45,
+    "cycles:u": 7727873.812,
+    "instructions": 32867592.736,
+    "cycles": 12996061.0,
+    "page-faults": 638.798
+   }
+  },
+  {
+   "case": "doc_semantic_open/tiny",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 28750382.526,
+    "cycles:u": 7182036.01,
+    "instructions": 30018967.268,
+    "cycles": 7299473.714,
+    "page-faults": 228.59
+   }
+  },
+  {
+   "case": "doc_semantic_open/large",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 28826467.72,
+    "cycles:u": 8094320.77,
+    "instructions": 33432125.78,
+    "cycles": 17585611.21,
+    "page-faults": 592.09
+   }
+  },
+  {
+   "case": "doc_semantic_open/large",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 28774895.18,
+    "cycles:u": 7102224.27,
+    "instructions": 29936236.28,
+    "cycles": 6321306.39,
+    "page-faults": 267.21
+   }
+  },
+  {
+   "case": "xls_semantic_open/tiny",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 130578316.552,
+    "cycles:u": 43733267.882,
+    "instructions": 128995545.376,
+    "cycles": 42662411.074,
+    "page-faults": 0.092
+   }
+  },
+  {
+   "case": "xls_semantic_open/tiny",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 130537383.514,
+    "cycles:u": 36800592.864,
+    "instructions": 128652221.688,
+    "cycles": 35760159.924,
+    "page-faults": 0.176
+   }
+  },
+  {
+   "case": "xls_semantic_open/large",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 130582899.03,
+    "cycles:u": 45047674.31,
+    "instructions": 130498197.81,
+    "cycles": 45222438.98,
+    "page-faults": 0.45
+   }
+  },
+  {
+   "case": "xls_semantic_open/large",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 130525773.83,
+    "cycles:u": 36935248.18,
+    "instructions": 130705137.18,
+    "cycles": 37221948.14,
+    "page-faults": 0.7
+   }
+  },
+  {
+   "case": "ppt_semantic_open/tiny",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 5850416.716,
+    "cycles:u": 1684126.368,
+    "instructions": 5898380.188,
+    "cycles": 1723649.664,
+    "page-faults": 0.034
+   }
+  },
+  {
+   "case": "ppt_semantic_open/tiny",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 5846051.21,
+    "cycles:u": 1363626.092,
+    "instructions": 5914520.172,
+    "cycles": 1359738.574,
+    "page-faults": 0.008
+   }
+  },
+  {
+   "case": "ppt_semantic_open/large",
+   "arm": "base",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 5844914.03,
+    "cycles:u": 1430484.22,
+    "instructions": 5896505.86,
+    "cycles": 1577527.11,
+    "page-faults": 0.16
+   }
+  },
+  {
+   "case": "ppt_semantic_open/large",
+   "arm": "cand",
+   "argv0_extra_bytes": 16,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 5839106.02,
+    "cycles:u": 1919060.86,
+    "instructions": 5894581.82,
+    "cycles": 1952428.32,
+    "page-faults": 0.1
+   }
+  },
+  {
+   "case": "open-v3-mini-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 7296164.56,
+    "cycles:u": 1394153.64,
+    "instructions": 7559948.06,
+    "cycles": 1470502.04,
+    "page-faults": 47.96
+   }
+  },
+  {
+   "case": "open-v3-mini-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 7181144.56,
+    "cycles:u": 1378897.94,
+    "instructions": 7459613.5,
+    "cycles": 1481582.64,
+    "page-faults": 47.98
+   }
+  },
+  {
+   "case": "readall-v3-mini-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 14267513.12,
+    "cycles:u": 2906620.16,
+    "instructions": 14271902.68,
+    "cycles": 2921172.18,
+    "page-faults": -0.04
+   }
+  },
+  {
+   "case": "readall-v3-mini-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 16021821.5,
+    "cycles:u": 3316524.82,
+    "instructions": 16026021.06,
+    "cycles": 3323746.3,
+    "page-faults": 0.04
+   }
+  },
+  {
+   "case": "open-v3-mini-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 21856025.75,
+    "cycles:u": 4103276.4,
+    "instructions": 21865525.9,
+    "cycles": 4139029.85,
+    "page-faults": -0.05
+   }
+  },
+  {
+   "case": "open-v3-mini-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 22182992.95,
+    "cycles:u": 4668745.45,
+    "instructions": 22192536.3,
+    "cycles": 4680765.45,
+    "page-faults": 0.1
+   }
+  },
+  {
+   "case": "readall-v3-mini-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 43367224.6,
+    "cycles:u": 8609962.2,
+    "instructions": 43378354.15,
+    "cycles": 8580302.15,
+    "page-faults": 0.15
+   }
+  },
+  {
+   "case": "readall-v3-mini-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 49687307.6,
+    "cycles:u": 10887170.65,
+    "instructions": 49706140.25,
+    "cycles": 10896559.9,
+    "page-faults": 0.2
+   }
+  },
+  {
+   "case": "open-v3-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 72852817.3,
+    "cycles:u": 13982542.7,
+    "instructions": 72885032.1,
+    "cycles": 13963489.2,
+    "page-faults": 0.2
+   }
+  },
+  {
+   "case": "open-v3-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 81572963.2,
+    "cycles:u": 20297819.0,
+    "instructions": 81438399.3,
+    "cycles": 19883790.0,
+    "page-faults": -0.2
+   }
+  },
+  {
+   "case": "readall-v3-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 146346847.0,
+    "cycles:u": 35524334.5,
+    "instructions": 146167424.4,
+    "cycles": 35185158.9,
+    "page-faults": -42.9
+   }
+  },
+  {
+   "case": "readall-v3-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 182667715.0,
+    "cycles:u": 52952678.9,
+    "instructions": 182764488.4,
+    "cycles": 52915252.0,
+    "page-faults": 0.1
+   }
+  },
+  {
+   "case": "open-v3-regular-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 3877565.7,
+    "cycles:u": 879545.48,
+    "instructions": 4137998.78,
+    "cycles": 975777.84,
+    "page-faults": 45.96
+   }
+  },
+  {
+   "case": "open-v3-regular-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 3846547.22,
+    "cycles:u": 860554.02,
+    "instructions": 4117713.5,
+    "cycles": 960579.8,
+    "page-faults": 46.02
+   }
+  },
+  {
+   "case": "readall-v3-regular-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 8420093.66,
+    "cycles:u": 2087369.06,
+    "instructions": 9071422.98,
+    "cycles": 2306252.16,
+    "page-faults": 121.1
+   }
+  },
+  {
+   "case": "readall-v3-regular-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 9805726.28,
+    "cycles:u": 2266402.7,
+    "instructions": 10470299.04,
+    "cycles": 2514023.3,
+    "page-faults": 121.04
+   }
+  },
+  {
+   "case": "open-v3-regular-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 11611108.75,
+    "cycles:u": 2395349.0,
+    "instructions": 11619430.5,
+    "cycles": 2286208.45,
+    "page-faults": 0.0
+   }
+  },
+  {
+   "case": "open-v3-regular-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 11727978.95,
+    "cycles:u": 2590068.5,
+    "instructions": 11725841.4,
+    "cycles": 2584262.9,
+    "page-faults": 0.0
+   }
+  },
+  {
+   "case": "readall-v3-regular-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 25782041.75,
+    "cycles:u": 7433635.35,
+    "instructions": 28026950.8,
+    "cycles": 8534174.1,
+    "page-faults": 423.75
+   }
+  },
+  {
+   "case": "readall-v3-regular-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 30423541.55,
+    "cycles:u": 7668259.65,
+    "instructions": 32703696.55,
+    "cycles": 8472757.05,
+    "page-faults": 426.25
+   }
+  },
+  {
+   "case": "open-v3-regular-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 38708715.1,
+    "cycles:u": 8527589.9,
+    "instructions": 39178736.2,
+    "cycles": 8737491.6,
+    "page-faults": 99.1
+   }
+  },
+  {
+   "case": "open-v3-regular-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 41548578.7,
+    "cycles:u": 10350488.7,
+    "instructions": 42090474.9,
+    "cycles": 10721003.2,
+    "page-faults": 99.3
+   }
+  },
+  {
+   "case": "readall-v3-regular-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 87720087.1,
+    "cycles:u": 34690114.6,
+    "instructions": 95541566.4,
+    "cycles": 38739305.7,
+    "page-faults": 1489.1
+   }
+  },
+  {
+   "case": "readall-v3-regular-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 108188360.8,
+    "cycles:u": 39972029.3,
+    "instructions": 116071006.0,
+    "cycles": 44237576.9,
+    "page-faults": 1492.3
+   }
+  },
+  {
+   "case": "open-v4-mini-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 7092966.58,
+    "cycles:u": 1391404.06,
+    "instructions": 7369381.84,
+    "cycles": 1502141.8,
+    "page-faults": 48.98
+   }
+  },
+  {
+   "case": "open-v4-mini-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 6984790.72,
+    "cycles:u": 1403284.42,
+    "instructions": 7262535.12,
+    "cycles": 1511247.84,
+    "page-faults": 48.98
+   }
+  },
+  {
+   "case": "readall-v4-mini-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 13874759.78,
+    "cycles:u": 2864304.7,
+    "instructions": 13880765.8,
+    "cycles": 2879134.18,
+    "page-faults": 0.0
+   }
+  },
+  {
+   "case": "readall-v4-mini-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 15558368.42,
+    "cycles:u": 3265787.8,
+    "instructions": 15561477.44,
+    "cycles": 3274931.72,
+    "page-faults": 0.02
+   }
+  },
+  {
+   "case": "open-v4-mini-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 21159145.35,
+    "cycles:u": 4137228.4,
+    "instructions": 21162134.85,
+    "cycles": 4132581.6,
+    "page-faults": -0.2
+   }
+  },
+  {
+   "case": "open-v4-mini-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 21486094.6,
+    "cycles:u": 4456909.95,
+    "instructions": 21491745.4,
+    "cycles": 4488957.5,
+    "page-faults": -0.1
+   }
+  },
+  {
+   "case": "readall-v4-mini-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 42119821.7,
+    "cycles:u": 8531133.15,
+    "instructions": 42135613.25,
+    "cycles": 8540844.95,
+    "page-faults": 0.15
+   }
+  },
+  {
+   "case": "readall-v4-mini-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 48526997.05,
+    "cycles:u": 10745183.8,
+    "instructions": 48548079.7,
+    "cycles": 10784077.55,
+    "page-faults": -0.1
+   }
+  },
+  {
+   "case": "open-v4-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 70551593.4,
+    "cycles:u": 13825072.2,
+    "instructions": 70591588.0,
+    "cycles": 13844284.5,
+    "page-faults": -0.1
+   }
+  },
+  {
+   "case": "open-v4-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 79271465.6,
+    "cycles:u": 20017420.4,
+    "instructions": 79294680.8,
+    "cycles": 20076063.5,
+    "page-faults": 0.1
+   }
+  },
+  {
+   "case": "readall-v4-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 142176084.4,
+    "cycles:u": 36703075.1,
+    "instructions": 142313100.6,
+    "cycles": 36953607.0,
+    "page-faults": 23.4
+   }
+  },
+  {
+   "case": "readall-v4-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 178983549.5,
+    "cycles:u": 53181465.5,
+    "instructions": 179085611.7,
+    "cycles": 53796878.0,
+    "page-faults": 0.3
+   }
+  },
+  {
+   "case": "open-v4-regular-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 3340768.84,
+    "cycles:u": 829827.52,
+    "instructions": 3607249.98,
+    "cycles": 922196.88,
+    "page-faults": 47.94
+   }
+  },
+  {
+   "case": "open-v4-regular-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 3328723.62,
+    "cycles:u": 830583.96,
+    "instructions": 3589283.84,
+    "cycles": 920195.82,
+    "page-faults": 47.96
+   }
+  },
+  {
+   "case": "readall-v4-regular-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 7462169.2,
+    "cycles:u": 1934930.98,
+    "instructions": 8055966.92,
+    "cycles": 2159584.08,
+    "page-faults": 109.86
+   }
+  },
+  {
+   "case": "readall-v4-regular-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 7693109.48,
+    "cycles:u": 2061185.62,
+    "instructions": 8357896.32,
+    "cycles": 2261629.14,
+    "page-faults": 123.88
+   }
+  },
+  {
+   "case": "open-v4-regular-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 9985521.35,
+    "cycles:u": 2402959.85,
+    "instructions": 9986667.9,
+    "cycles": 2362452.0,
+    "page-faults": -0.05
+   }
+  },
+  {
+   "case": "open-v4-regular-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 10018447.4,
+    "cycles:u": 2318096.2,
+    "instructions": 10566712.25,
+    "cycles": 6370219.45,
+    "page-faults": 0.1
+   }
+  },
+  {
+   "case": "readall-v4-regular-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 22850911.35,
+    "cycles:u": 6229226.45,
+    "instructions": 24803099.45,
+    "cycles": 6641720.4,
+    "page-faults": 387.75
+   }
+  },
+  {
+   "case": "readall-v4-regular-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 23665514.35,
+    "cycles:u": 6817510.45,
+    "instructions": 25921656.95,
+    "cycles": 7635408.9,
+    "page-faults": 424.9
+   }
+  },
+  {
+   "case": "open-v4-regular-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 33368315.0,
+    "cycles:u": 8532976.7,
+    "instructions": 39337204.4,
+    "cycles": 10204603.4,
+    "page-faults": 1180.0
+   }
+  },
+  {
+   "case": "open-v4-regular-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 33968402.5,
+    "cycles:u": 10523840.0,
+    "instructions": 40220774.5,
+    "cycles": 12698965.4,
+    "page-faults": 1179.8
+   }
+  },
+  {
+   "case": "readall-v4-regular-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 78118954.3,
+    "cycles:u": 32387174.1,
+    "instructions": 78843997.6,
+    "cycles": 33438419.8,
+    "page-faults": 23.7
+   }
+  },
+  {
+   "case": "readall-v4-regular-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 85104895.3,
+    "cycles:u": 34289230.5,
+    "instructions": 92625762.4,
+    "cycles": 37362079.9,
+    "page-faults": 1477.7
+   }
+  },
+  {
+   "case": "shared-open-v3-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 57875163.3,
+    "cycles:u": 11669306.8,
+    "instructions": 57909417.8,
+    "cycles": 12034749.6,
+    "page-faults": 0.2
+   }
+  },
+  {
+   "case": "shared-open-v3-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 66595113.0,
+    "cycles:u": 17604032.5,
+    "instructions": 66647746.5,
+    "cycles": 17471866.7,
+    "page-faults": 0.2
+   }
+  },
+  {
+   "case": "shared-open-v3-regular-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 38549889.3,
+    "cycles:u": 8196875.5,
+    "instructions": 38310073.4,
+    "cycles": 7219679.8,
+    "page-faults": 0.0
+   }
+  },
+  {
+   "case": "shared-open-v3-regular-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 41390068.2,
+    "cycles:u": 10146946.6,
+    "instructions": 40705945.2,
+    "cycles": 8419394.2,
+    "page-faults": -0.2
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-1000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 16307072.2,
+    "cycles:u": 3563824.94,
+    "instructions": 16331272.46,
+    "cycles": 3606835.84,
+    "page-faults": 0.02
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-1000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    60
+   ],
+   "per_owner": {
+    "instructions:u": 18505957.36,
+    "cycles:u": 4308568.76,
+    "instructions": 18510107.4,
+    "cycles": 4271641.24,
+    "page-faults": -0.1
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-3000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 49412551.4,
+    "cycles:u": 12260548.05,
+    "instructions": 49390276.65,
+    "cycles": 12185697.75,
+    "page-faults": -0.05
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-3000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    4,
+    24
+   ],
+   "per_owner": {
+    "instructions:u": 55957704.85,
+    "cycles:u": 14256615.7,
+    "instructions": 55982213.2,
+    "cycles": 14270881.8,
+    "page-faults": -0.35
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-10000",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 166847785.7,
+    "cycles:u": 62627878.3,
+    "instructions": 166742976.8,
+    "cycles": 62241245.1,
+    "page-faults": 0.0
+   }
+  },
+  {
+   "case": "editor-open-v3-mini-10000",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    12
+   ],
+   "per_owner": {
+    "instructions:u": 207928901.8,
+    "cycles:u": 80646650.2,
+    "instructions": 208094713.7,
+    "cycles": 81039954.1,
+    "page-faults": 0.8
+   }
+  },
+  {
+   "case": "write-reuse-45543",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 381219.232,
+    "cycles:u": 102251.377,
+    "instructions": 381377.149,
+    "cycles": 102563.8705,
+    "page-faults": -0.0005
+   }
+  },
+  {
+   "case": "write-reuse-45543",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 383867.351,
+    "cycles:u": 103930.868,
+    "instructions": 384219.4725,
+    "cycles": 104335.221,
+    "page-faults": -0.0015
+   }
+  },
+  {
+   "case": "write-reuse-v3-mini-3000-grow",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    7
+   ],
+   "per_owner": {
+    "instructions:u": 79479317.8,
+    "cycles:u": 20868259.0,
+    "instructions": 96102499.0,
+    "cycles": 28174544.4,
+    "page-faults": 3172.2
+   }
+  },
+  {
+   "case": "write-reuse-v3-mini-3000-grow",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    2,
+    7
+   ],
+   "per_owner": {
+    "instructions:u": 80366102.6,
+    "cycles:u": 24091330.6,
+    "instructions": 97075179.4,
+    "cycles": 32837007.2,
+    "page-faults": 3171.8
+   }
+  },
+  {
+   "case": "open-45543",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 74800.1335,
+    "cycles:u": 15002.6735,
+    "instructions": 72481.845,
+    "cycles": -5838.2455,
+    "page-faults": 0.022
+   }
+  },
+  {
+   "case": "open-45543",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 74726.5015,
+    "cycles:u": 14874.943,
+    "instructions": 74816.0355,
+    "cycles": 15088.8615,
+    "page-faults": 0.0205
+   }
+  },
+  {
+   "case": "open-floating",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 114139.262,
+    "cycles:u": 24275.319,
+    "instructions": 114289.008,
+    "cycles": 24385.599,
+    "page-faults": 0.0225
+   }
+  },
+  {
+   "case": "open-floating",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 113982.2625,
+    "cycles:u": 24061.2305,
+    "instructions": 114152.283,
+    "cycles": 24221.2415,
+    "page-faults": 0.0195
+   }
+  },
+  {
+   "case": "open-checkboxes",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 89594.8105,
+    "cycles:u": 20505.577,
+    "instructions": 89720.466,
+    "cycles": 20679.113,
+    "page-faults": 0.0185
+   }
+  },
+  {
+   "case": "open-checkboxes",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 89451.9605,
+    "cycles:u": 20605.4435,
+    "instructions": 89711.7355,
+    "cycles": 20941.584,
+    "page-faults": 0.0205
+   }
+  },
+  {
+   "case": "openread-45543",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 154486.52,
+    "cycles:u": 47823.595,
+    "instructions": 154741.745,
+    "cycles": 48165.8295,
+    "page-faults": 0.0045
+   }
+  },
+  {
+   "case": "openread-45543",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 161635.7665,
+    "cycles:u": 48480.7715,
+    "instructions": 161825.1585,
+    "cycles": 48772.317,
+    "page-faults": 0.006
+   }
+  },
+  {
+   "case": "editor-open-45543",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 202153.0435,
+    "cycles:u": 214512.577,
+    "instructions": 947685.644,
+    "cycles": 458776.904,
+    "page-faults": 140.0095
+   }
+  },
+  {
+   "case": "editor-open-45543",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 207273.0075,
+    "cycles:u": 213556.8615,
+    "instructions": 957955.0925,
+    "cycles": 461559.701,
+    "page-faults": 141.0035
+   }
+  },
+  {
+   "case": "ctl-write-rewrite-45543",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 94522.342,
+    "cycles:u": 37577.7865,
+    "instructions": 94614.3065,
+    "cycles": 37579.184,
+    "page-faults": -0.0005
+   }
+  },
+  {
+   "case": "ctl-write-rewrite-45543",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    200,
+    2200
+   ],
+   "per_owner": {
+    "instructions:u": 96782.1315,
+    "cycles:u": 41723.648,
+    "instructions": 96976.1105,
+    "cycles": 41898.8985,
+    "page-faults": 0.0025
+   }
+  },
+  {
+   "case": "cfb_open/tiny",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    100,
+    5100
+   ],
+   "per_owner": {
+    "instructions:u": 34859.0264,
+    "cycles:u": 2109.4954,
+    "instructions": 82760.4424,
+    "cycles": 12697.3748,
+    "page-faults": 0.9106
+   }
+  },
+  {
+   "case": "cfb_open/tiny",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    100,
+    5100
+   ],
+   "per_owner": {
+    "instructions:u": 34810.8016,
+    "cycles:u": -9675.8186,
+    "instructions": 85475.0298,
+    "cycles": -4967.4558,
+    "page-faults": 0.9086
+   }
+  },
+  {
+   "case": "cfb_open/many-small",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 1941230.788,
+    "cycles:u": 421779.643,
+    "instructions": 1992012.939,
+    "cycles": 425887.874,
+    "page-faults": 0.827
+   }
+  },
+  {
+   "case": "cfb_open/many-small",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 1939703.598,
+    "cycles:u": 400762.316,
+    "instructions": 1993111.507,
+    "cycles": 398610.982,
+    "page-faults": 0.799
+   }
+  },
+  {
+   "case": "cfb_open/few-large",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 1944934.321,
+    "cycles:u": 346374.791,
+    "instructions": 1999562.0,
+    "cycles": 376463.722,
+    "page-faults": 0.869
+   }
+  },
+  {
+   "case": "cfb_open/few-large",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 1944882.573,
+    "cycles:u": 286261.745,
+    "instructions": 2000190.759,
+    "cycles": 302001.623,
+    "page-faults": 0.876
+   }
+  },
+  {
+   "case": "cfb_open/wide-root",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    210
+   ],
+   "per_owner": {
+    "instructions:u": 11712686.25,
+    "cycles:u": 2463061.245,
+    "instructions": 11822025.02,
+    "cycles": 2430441.62,
+    "page-faults": 0.02
+   }
+  },
+  {
+   "case": "cfb_open/wide-root",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    10,
+    210
+   ],
+   "per_owner": {
+    "instructions:u": 11708043.785,
+    "cycles:u": 2267274.635,
+    "instructions": 11707624.74,
+    "cycles": 2311468.27,
+    "page-faults": 0.005
+   }
+  },
+  {
+   "case": "cfb_list_streams/tiny",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    100,
+    10100
+   ],
+   "per_owner": {
+    "instructions:u": 4983.1779,
+    "cycles:u": -2399.4215,
+    "instructions": 38627.0539,
+    "cycles": 8530.2459,
+    "page-faults": 0.0887
+   }
+  },
+  {
+   "case": "cfb_list_streams/tiny",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    100,
+    10100
+   ],
+   "per_owner": {
+    "instructions:u": 4985.9102,
+    "cycles:u": 8729.4267,
+    "instructions": 38877.3982,
+    "cycles": 18580.9792,
+    "page-faults": 0.0898
+   }
+  },
+  {
+   "case": "cfb_list_streams/many-small",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    100,
+    5100
+   ],
+   "per_owner": {
+    "instructions:u": 288499.7372,
+    "cycles:u": 64013.6696,
+    "instructions": 322010.3048,
+    "cycles": 74172.6788,
+    "page-faults": 0.0808
+   }
+  },
+  {
+   "case": "cfb_list_streams/many-small",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    100,
+    5100
+   ],
+   "per_owner": {
+    "instructions:u": 288710.6708,
+    "cycles:u": 49256.947,
+    "instructions": 326181.708,
+    "cycles": 65179.2608,
+    "page-faults": 0.0828
+   }
+  },
+  {
+   "case": "cfb_list_streams/few-large",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    100,
+    10100
+   ],
+   "per_owner": {
+    "instructions:u": 5750.3324,
+    "cycles:u": 5700.194,
+    "instructions": 36718.739,
+    "cycles": 11373.5205,
+    "page-faults": 0.0874
+   }
+  },
+  {
+   "case": "cfb_list_streams/few-large",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    100,
+    10100
+   ],
+   "per_owner": {
+    "instructions:u": 5750.5368,
+    "cycles:u": 7525.515,
+    "instructions": 38916.7934,
+    "cycles": 20697.1979,
+    "page-faults": 0.0866
+   }
+  },
+  {
+   "case": "cfb_list_streams/wide-root",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 2305629.682,
+    "cycles:u": 486535.308,
+    "instructions": 2350247.407,
+    "cycles": 553920.559,
+    "page-faults": 0.008
+   }
+  },
+  {
+   "case": "cfb_list_streams/wide-root",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    20,
+    1020
+   ],
+   "per_owner": {
+    "instructions:u": 2305662.286,
+    "cycles:u": 434193.465,
+    "instructions": 2343402.966,
+    "cycles": 482670.19,
+    "page-faults": 0.015
+   }
+  },
+  {
+   "case": "doc_semantic_open/tiny",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 28776352.366,
+    "cycles:u": 6830051.956,
+    "instructions": 30052276.376,
+    "cycles": 7309926.792,
+    "page-faults": 228.55
+   }
+  },
+  {
+   "case": "doc_semantic_open/tiny",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 28775155.728,
+    "cycles:u": 7545914.942,
+    "instructions": 30268075.878,
+    "cycles": 8074153.576,
+    "page-faults": 267.778
+   }
+  },
+  {
+   "case": "doc_semantic_open/large",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 28754495.81,
+    "cycles:u": 7595441.16,
+    "instructions": 30264647.51,
+    "cycles": 8310731.08,
+    "page-faults": 267.44
+   }
+  },
+  {
+   "case": "doc_semantic_open/large",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 28794194.76,
+    "cycles:u": 7339548.45,
+    "instructions": 31993381.38,
+    "cycles": 8453236.29,
+    "page-faults": 591.97
+   }
+  },
+  {
+   "case": "xls_semantic_open/tiny",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 130535163.57,
+    "cycles:u": 36867244.76,
+    "instructions": 130698793.152,
+    "cycles": 37051676.718,
+    "page-faults": 0.086
+   }
+  },
+  {
+   "case": "xls_semantic_open/tiny",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 130580432.138,
+    "cycles:u": 45528908.368,
+    "instructions": 130737962.578,
+    "cycles": 45770928.22,
+    "page-faults": 0.02
+   }
+  },
+  {
+   "case": "xls_semantic_open/large",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 130539785.9,
+    "cycles:u": 36360135.46,
+    "instructions": 130668388.57,
+    "cycles": 36403379.79,
+    "page-faults": 0.58
+   }
+  },
+  {
+   "case": "xls_semantic_open/large",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 130587561.82,
+    "cycles:u": 43699905.36,
+    "instructions": 130705013.99,
+    "cycles": 43747750.28,
+    "page-faults": 0.43
+   }
+  },
+  {
+   "case": "ppt_semantic_open/tiny",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 5839265.918,
+    "cycles:u": 1504450.064,
+    "instructions": 5908601.762,
+    "cycles": 1568849.13,
+    "page-faults": 0.008
+   }
+  },
+  {
+   "case": "ppt_semantic_open/tiny",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    20,
+    520
+   ],
+   "per_owner": {
+    "instructions:u": 5842267.952,
+    "cycles:u": 1585586.994,
+    "instructions": 5914282.288,
+    "cycles": 1631321.73,
+    "page-faults": -0.018
+   }
+  },
+  {
+   "case": "ppt_semantic_open/large",
+   "arm": "cand",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 5840700.78,
+    "cycles:u": 1432380.48,
+    "instructions": 5897213.25,
+    "cycles": 1590760.95,
+    "page-faults": 0.13
+   }
+  },
+  {
+   "case": "ppt_semantic_open/large",
+   "arm": "base",
+   "argv0_extra_bytes": 40,
+   "sizes": [
+    5,
+    105
+   ],
+   "per_owner": {
+    "instructions:u": 5842199.54,
+    "cycles:u": 1221377.9,
+    "instructions": 6176438.55,
+    "cycles": 1358209.36,
+    "page-faults": 0.06
+   }
+  }
+ ],
+ "summary": {
+  "open-v3-mini-1000": {
+   "instructions:u": {
+    "base": [
+     7180801.7,
+     7181129.2,
+     7181144.6
+    ],
+    "cand": [
+     7295865.1,
+     7296169.5,
+     7296164.6
+    ],
+    "median_change_pct": 1.602
+   },
+   "cycles:u": {
+    "base": [
+     1452443.0,
+     1446939.7,
+     1378897.9
+    ],
+    "cand": [
+     1425524.8,
+     1428526.5,
+     1394153.6
+    ],
+    "median_change_pct": -1.48
+   },
+   "instructions": {
+    "base": [
+     7430575.8,
+     7576342.1,
+     7459613.5
+    ],
+    "cand": [
+     7561953.8,
+     7563355.5,
+     7559948.1
+    ],
+    "median_change_pct": 1.372
+   },
+   "cycles": {
+    "base": [
+     1528013.5,
+     1851579.1,
+     1481582.6
+    ],
+    "cand": [
+     1534113.8,
+     1517891.0,
+     1470502.0
+    ],
+    "median_change_pct": -0.662
+   },
+   "page-faults": {
+    "base": [
+     46.0,
+     48.0,
+     48.0
+    ],
+    "cand": [
+     46.0,
+     48.0,
+     48.0
+    ],
+    "median_change_pct": 0.0
+   }
+  },
+  "readall-v3-mini-1000": {
+   "instructions:u": {
+    "base": [
+     15993059.6,
+     16021817.9,
+     16021821.5
+    ],
+    "cand": [
+     14270491.5,
+     14267494.9,
+     14267513.1
+    ],
+    "median_change_pct": -10.949
+   },
+   "cycles:u": {
+    "base": [
+     3274898.1,
+     3265280.6,
+     3316524.8
+    ],
+    "cand": [
+     2934238.5,
+     2932474.4,
+     2906620.2
+    ],
+    "median_change_pct": -10.456
+   },
+   "instructions": {
+    "base": [
+     16001756.6,
+     16027552.7,
+     16026021.1
+    ],
+    "cand": [
+     14275788.7,
+     14274107.6,
+     14271902.7
+    ],
+    "median_change_pct": -10.932
+   },
+   "cycles": {
+    "base": [
+     3278235.6,
+     3264059.2,
+     3323746.3
+    ],
+    "cand": [
+     2920884.2,
+     2946912.1,
+     2921172.2
+    ],
+    "median_change_pct": -10.892
+   },
+   "page-faults": {
+    "base": [
+     0.0,
+     0.1,
+     0.0
+    ],
+    "cand": [
+     0.1,
+     0.0,
+     -0.0
+    ]
+   }
+  },
+  "open-v3-mini-3000": {
+   "instructions:u": {
+    "base": [
+     22138185.4,
+     22161941.0,
+     22182992.9
+    ],
+    "cand": [
+     21854231.8,
+     21855949.9,
+     21856025.8
+    ],
+    "median_change_pct": -1.381
+   },
+   "cycles:u": {
+    "base": [
+     4592905.2,
+     4607264.0,
+     4668745.5
+    ],
+    "cand": [
+     3912632.7,
+     4275184.8,
+     4103276.4
+    ],
+    "median_change_pct": -10.939
+   },
+   "instructions": {
+    "base": [
+     22133223.8,
+     22171251.9,
+     22192536.3
+    ],
+    "cand": [
+     21862142.3,
+     21894612.9,
+     21865525.9
+    ],
+    "median_change_pct": -1.379
+   },
+   "cycles": {
+    "base": [
+     4560259.6,
+     4600169.0,
+     4680765.5
+    ],
+    "cand": [
+     3911239.7,
+     4364508.4,
+     4139029.9
+    ],
+    "median_change_pct": -10.024
+   },
+   "page-faults": {
+    "base": [
+     -0.1,
+     -0.1,
+     0.1
+    ],
+    "cand": [
+     -0.1,
+     0.1,
+     -0.1
+    ],
+    "median_change_pct": 0.0
+   }
+  },
+  "readall-v3-mini-3000": {
+   "instructions:u": {
+    "base": [
+     49971188.1,
+     49687350.0,
+     49687307.6
+    ],
+    "cand": [
+     43231737.0,
+     43367135.5,
+     43367224.6
+    ],
+    "median_change_pct": -12.72
+   },
+   "cycles:u": {
+    "base": [
+     10716405.8,
+     10827552.4,
+     10887170.7
+    ],
+    "cand": [
+     8773581.8,
+     8805687.8,
+     8609962.2
+    ],
+    "median_change_pct": -18.97
+   },
+   "instructions": {
+    "base": [
+     49972668.5,
+     49700434.5,
+     49706140.2
+    ],
+    "cand": [
+     43246629.5,
+     43421538.2,
+     43378354.1
+    ],
+    "median_change_pct": -12.73
+   },
+   "cycles": {
+    "base": [
+     10694409.8,
+     10892149.8,
+     10896559.9
+    ],
+    "cand": [
+     8770151.6,
+     8868346.2,
+     8580302.2
+    ],
+    "median_change_pct": -19.482
+   },
+   "page-faults": {
+    "base": [
+     -0.1,
+     0.0,
+     0.2
+    ],
+    "cand": [
+     0.0,
+     0.1,
+     0.1
+    ]
+   }
+  },
+  "open-v3-mini-10000": {
+   "instructions:u": {
+    "base": [
+     81580053.3,
+     81572931.9,
+     81572963.2
+    ],
+    "cand": [
+     72860080.2,
+     72852788.5,
+     72852817.3
+    ],
+    "median_change_pct": -10.69
+   },
+   "cycles:u": {
+    "base": [
+     20169455.2,
+     20128340.0,
+     20297819.0
+    ],
+    "cand": [
+     14660335.7,
+     13907165.4,
+     13982542.7
+    ],
+    "median_change_pct": -30.675
+   },
+   "instructions": {
+    "base": [
+     81546903.0,
+     81261946.6,
+     81438399.3
+    ],
+    "cand": [
+     72859824.2,
+     72862955.3,
+     72885032.1
+    ],
+    "median_change_pct": -10.53
+   },
+   "cycles": {
+    "base": [
+     20205649.3,
+     19235988.0,
+     19883790.0
+    ],
+    "cand": [
+     14644220.3,
+     13792140.9,
+     13963489.2
+    ],
+    "median_change_pct": -29.775
+   },
+   "page-faults": {
+    "base": [
+     0.5,
+     0.7,
+     -0.2
+    ],
+    "cand": [
+     0.4,
+     -0.2,
+     0.2
+    ],
+    "median_change_pct": -60.0
+   }
+  },
+  "readall-v3-mini-10000": {
+   "instructions:u": {
+    "base": [
+     182435832.9,
+     182667445.8,
+     182667715.0
+    ],
+    "cand": [
+     146203299.0,
+     146346786.6,
+     146346847.0
+    ],
+    "median_change_pct": -19.883
+   },
+   "cycles:u": {
+    "base": [
+     52011827.9,
+     52249778.7,
+     52952678.9
+    ],
+    "cand": [
+     33130425.2,
+     32653632.9,
+     35524334.5
+    ],
+    "median_change_pct": -36.592
+   },
+   "instructions": {
+    "base": [
+     182327432.5,
+     182718524.3,
+     182764488.4
+    ],
+    "cand": [
+     146174534.1,
+     146320837.6,
+     146167424.4
+    ],
+    "median_change_pct": -20.0
+   },
+   "cycles": {
+    "base": [
+     51997834.5,
+     52300821.9,
+     52915252.0
+    ],
+    "cand": [
+     33214166.6,
+     33015775.0,
+     35185158.9
+    ],
+    "median_change_pct": -36.494
+   },
+   "page-faults": {
+    "base": [
+     -31.2,
+     0.1,
+     0.1
+    ],
+    "cand": [
+     -23.2,
+     -43.2,
+     -42.9
+    ],
+    "median_change_pct": -43000.0
+   }
+  },
+  "open-v3-regular-1000": {
+   "instructions:u": {
+    "base": [
+     3845745.0,
+     3846461.4,
+     3846547.2
+    ],
+    "cand": [
+     3876783.2,
+     3877492.0,
+     3877565.7
+    ],
+    "median_change_pct": 0.807
+   },
+   "cycles:u": {
+    "base": [
+     826238.2,
+     848922.5,
+     860554.0
+    ],
+    "cand": [
+     824595.8,
+     863244.0,
+     879545.5
+    ],
+    "median_change_pct": 1.687
+   },
+   "instructions": {
+    "base": [
+     4124246.0,
+     4113373.3,
+     4117713.5
+    ],
+    "cand": [
+     4135516.3,
+     4133188.3,
+     4137998.8
+    ],
+    "median_change_pct": 0.432
+   },
+   "cycles": {
+    "base": [
+     929390.7,
+     927829.9,
+     960579.8
+    ],
+    "cand": [
+     913972.1,
+     939242.5,
+     975777.8
+    ],
+    "median_change_pct": 1.06
+   },
+   "page-faults": {
+    "base": [
+     46.1,
+     45.9,
+     46.0
+    ],
+    "cand": [
+     45.9,
+     46.1,
+     46.0
+    ],
+    "median_change_pct": 0.0
+   }
+  },
+  "readall-v3-regular-1000": {
+   "instructions:u": {
+    "base": [
+     9881577.0,
+     9786774.4,
+     9805726.3
+    ],
+    "cand": [
+     8424639.5,
+     8420096.3,
+     8420093.7
+    ],
+    "median_change_pct": -14.131
+   },
+   "cycles:u": {
+    "base": [
+     2417305.0,
+     2390989.6,
+     2266402.7
+    ],
+    "cand": [
+     2139613.8,
+     2151012.8,
+     2087369.1
+    ],
+    "median_change_pct": -10.513
+   },
+   "instructions": {
+    "base": [
+     10543340.5,
+     10405116.9,
+     10470299.0
+    ],
+    "cand": [
+     9077649.6,
+     9065517.6,
+     9071423.0
+    ],
+    "median_change_pct": -13.36
+   },
+   "cycles": {
+    "base": [
+     2647439.1,
+     2495838.3,
+     2514023.3
+    ],
+    "cand": [
+     2363322.2,
+     2367580.9,
+     2306252.2
+    ],
+    "median_change_pct": -5.994
+   },
+   "page-faults": {
+    "base": [
+     121.0,
+     121.0,
+     121.0
+    ],
+    "cand": [
+     121.0,
+     121.0,
+     121.1
+    ],
+    "median_change_pct": 0.0
+   }
+  },
+  "open-v3-regular-3000": {
+   "instructions:u": {
+    "base": [
+     11740766.8,
+     11727982.7,
+     11727978.9
+    ],
+    "cand": [
+     11623779.0,
+     11611020.7,
+     11611108.8
+    ],
+    "median_change_pct": -0.997
+   },
+   "cycles:u": {
+    "base": [
+     2651465.2,
+     2658196.0,
+     2590068.5
+    ],
+    "cand": [
+     2512352.8,
+     2575899.5,
+     2395349.0
+    ],
+    "median_change_pct": -5.247
+   },
+   "instructions": {
+    "base": [
+     11746650.3,
+     11791519.7,
+     11725841.4
+    ],
+    "cand": [
+     11629758.1,
+     11593375.2,
+     11619430.5
+    ],
+    "median_change_pct": -1.083
+   },
+   "cycles": {
+    "base": [
+     2618874.8,
+     2726095.7,
+     2584262.9
+    ],
+    "cand": [
+     2500745.8,
+     2543545.5,
+     2286208.5
+    ],
+    "median_change_pct": -4.511
+   },
+   "page-faults": {
+    "base": [
+     -0.1,
+     -0.1,
+     0.0
+    ],
+    "cand": [
+     0.2,
+     -0.1,
+     0.0
+    ],
+    "median_change_pct": -100.0
+   }
+  },
+  "readall-v3-regular-3000": {
+   "instructions:u": {
+    "base": [
+     30331792.8,
+     30480166.6,
+     30423541.6
+    ],
+    "cand": [
+     25809631.6,
+     25781698.6,
+     25782041.8
+    ],
+    "median_change_pct": -15.256
+   },
+   "cycles:u": {
+    "base": [
+     7685103.8,
+     7466648.4,
+     7668259.7
+    ],
+    "cand": [
+     6711113.3,
+     6834327.0,
+     7433635.3
+    ],
+    "median_change_pct": -10.875
+   },
+   "instructions": {
+    "base": [
+     32611919.9,
+     32672148.9,
+     32703696.6
+    ],
+    "cand": [
+     28055891.9,
+     27841111.5,
+     28026950.8
+    ],
+    "median_change_pct": -14.218
+   },
+   "cycles": {
+    "base": [
+     8555698.6,
+     8311006.7,
+     8472757.1
+    ],
+    "cand": [
+     7502279.3,
+     7458706.0,
+     8534174.1
+    ],
+    "median_change_pct": -11.454
+   },
+   "page-faults": {
+    "base": [
+     425.6,
+     425.6,
+     426.2
+    ],
+    "cand": [
+     423.7,
+     423.9,
+     423.8
+    ],
+    "median_change_pct": -0.423
+   }
+  },
+  "open-v3-regular-10000": {
+   "instructions:u": {
+    "base": [
+     41558605.9,
+     41548637.4,
+     41548578.7
+    ],
+    "cand": [
+     38718528.4,
+     38708765.9,
+     38708715.1
+    ],
+    "median_change_pct": -6.835
+   },
+   "cycles:u": {
+    "base": [
+     10869868.8,
+     10669226.0,
+     10350488.7
+    ],
+    "cand": [
+     8546018.9,
+     8375271.0,
+     8527589.9
+    ],
+    "median_change_pct": -20.073
+   },
+   "instructions": {
+    "base": [
+     42071780.2,
+     42317673.0,
+     42090474.9
+    ],
+    "cand": [
+     39251624.7,
+     39031396.7,
+     39178736.2
+    ],
+    "median_change_pct": -6.918
+   },
+   "cycles": {
+    "base": [
+     11007944.6,
+     11177969.5,
+     10721003.2
+    ],
+    "cand": [
+     8780869.0,
+     8585982.5,
+     8737491.6
+    ],
+    "median_change_pct": -20.626
+   },
+   "page-faults": {
+    "base": [
+     99.6,
+     99.3,
+     99.3
+    ],
+    "cand": [
+     98.9,
+     99.0,
+     99.1
+    ],
+    "median_change_pct": -0.302
+   }
+  },
+  "readall-v3-regular-10000": {
+   "instructions:u": {
+    "base": [
+     107865817.3,
+     107980643.1,
+     108188360.8
+    ],
+    "cand": [
+     87720278.2,
+     87720345.9,
+     87720087.1
+    ],
+    "median_change_pct": -18.763
+   },
+   "cycles:u": {
+    "base": [
+     38628680.6,
+     38864179.6,
+     39972029.3
+    ],
+    "cand": [
+     31975454.5,
+     32971805.2,
+     34690114.6
+    ],
+    "median_change_pct": -15.161
+   },
+   "instructions": {
+    "base": [
+     115785296.6,
+     115858107.4,
+     116071006.0
+    ],
+    "cand": [
+     95609524.0,
+     96306767.5,
+     95541566.4
+    ],
+    "median_change_pct": -17.477
+   },
+   "cycles": {
+    "base": [
+     41758132.2,
+     42129848.6,
+     44237576.9
+    ],
+    "cand": [
+     35672258.6,
+     38745495.2,
+     38739305.7
+    ],
+    "median_change_pct": -8.048
+   },
+   "page-faults": {
+    "base": [
+     1492.4,
+     1492.2,
+     1492.3
+    ],
+    "cand": [
+     1490.0,
+     1489.7,
+     1489.1
+    ],
+    "median_change_pct": -0.174
+   }
+  },
+  "open-v4-mini-1000": {
+   "instructions:u": {
+    "base": [
+     6984449.3,
+     6978479.8,
+     6984790.7
+    ],
+    "cand": [
+     7092466.5,
+     7092954.7,
+     7092966.6
+    ],
+    "median_change_pct": 1.554
+   },
+   "cycles:u": {
+    "base": [
+     1541561.0,
+     1388292.2,
+     1403284.4
+    ],
+    "cand": [
+     1390974.8,
+     1396705.3,
+     1391404.1
+    ],
+    "median_change_pct": -0.847
+   },
+   "instructions": {
+    "base": [
+     7251098.0,
+     7268079.6,
+     7262535.1
+    ],
+    "cand": [
+     7370157.4,
+     7366179.2,
+     7369381.8
+    ],
+    "median_change_pct": 1.471
+   },
+   "cycles": {
+    "base": [
+     1620399.9,
+     1475935.6,
+     1511247.8
+    ],
+    "cand": [
+     1484458.4,
+     1504934.7,
+     1502141.8
+    ],
+    "median_change_pct": -0.603
+   },
+   "page-faults": {
+    "base": [
+     48.9,
+     48.9,
+     49.0
+    ],
+    "cand": [
+     48.9,
+     49.0,
+     49.0
+    ],
+    "median_change_pct": 0.204
+   }
+  },
+  "readall-v4-mini-1000": {
+   "instructions:u": {
+    "base": [
+     15549746.8,
+     15544459.3,
+     15558368.4
+    ],
+    "cand": [
+     13886223.2,
+     13874850.7,
+     13874759.8
+    ],
+    "median_change_pct": -10.771
+   },
+   "cycles:u": {
+    "base": [
+     3219607.3,
+     3166956.2,
+     3265787.8
+    ],
+    "cand": [
+     2796509.6,
+     2869935.6,
+     2864304.7
+    ],
+    "median_change_pct": -11.036
+   },
+   "instructions": {
+    "base": [
+     15555399.0,
+     15549814.7,
+     15561477.4
+    ],
+    "cand": [
+     13889258.8,
+     13880117.9,
+     13880765.8
+    ],
+    "median_change_pct": -10.766
+   },
+   "cycles": {
+    "base": [
+     3215342.3,
+     3167706.1,
+     3274931.7
+    ],
+    "cand": [
+     2801656.3,
+     2869589.7,
+     2879134.2
+    ],
+    "median_change_pct": -10.753
+   },
+   "page-faults": {
+    "base": [
+     0.0,
+     -0.1,
+     0.0
+    ],
+    "cand": [
+     -0.0,
+     -0.1,
+     0.0
+    ]
+   }
+  },
+  "open-v4-mini-3000": {
+   "instructions:u": {
+    "base": [
+     21442583.2,
+     21486099.7,
+     21486094.6
+    ],
+    "cand": [
+     21157597.1,
+     21159109.2,
+     21159145.4
+    ],
+    "median_change_pct": -1.522
+   },
+   "cycles:u": {
+    "base": [
+     4091481.0,
+     4490104.7,
+     4456910.0
+    ],
+    "cand": [
+     3896502.5,
+     4282365.4,
+     4137228.4
+    ],
+    "median_change_pct": -7.173
+   },
+   "instructions": {
+    "base": [
+     21449943.1,
+     21495566.4,
+     21491745.4
+    ],
+    "cand": [
+     21151705.4,
+     21162664.1,
+     21162134.9
+    ],
+    "median_change_pct": -1.534
+   },
+   "cycles": {
+    "base": [
+     4086336.8,
+     4475377.6,
+     4488957.5
+    ],
+    "cand": [
+     3929116.6,
+     4250568.5,
+     4132581.6
+    ],
+    "median_change_pct": -7.66
+   },
+   "page-faults": {
+    "base": [
+     -0.1,
+     -0.1,
+     -0.1
+    ],
+    "cand": [
+     -0.2,
+     -0.1,
+     -0.2
+    ],
+    "median_change_pct": 100.0
+   }
+  },
+  "readall-v4-mini-3000": {
+   "instructions:u": {
+    "base": [
+     47795927.4,
+     48543975.5,
+     48526997.0
+    ],
+    "cand": [
+     41951508.5,
+     42119776.4,
+     42119821.7
+    ],
+    "median_change_pct": -13.203
+   },
+   "cycles:u": {
+    "base": [
+     10331136.9,
+     10910177.6,
+     10745183.8
+    ],
+    "cand": [
+     8690152.9,
+     8543140.8,
+     8531133.2
+    ],
+    "median_change_pct": -20.493
+   },
+   "instructions": {
+    "base": [
+     47813498.5,
+     48552875.0,
+     48548079.7
+    ],
+    "cand": [
+     41961144.0,
+     42137789.3,
+     42135613.2
+    ],
+    "median_change_pct": -13.208
+   },
+   "cycles": {
+    "base": [
+     10343779.6,
+     10933577.3,
+     10784077.6
+    ],
+    "cand": [
+     8705148.8,
+     8531345.9,
+     8540844.9
+    ],
+    "median_change_pct": -20.801
+   },
+   "page-faults": {
+    "base": [
+     -0.1,
+     0.0,
+     -0.1
+    ],
+    "cand": [
+     -0.1,
+     0.1,
+     0.1
+    ],
+    "median_change_pct": -200.0
+   }
+  },
+  "open-v4-mini-10000": {
+   "instructions:u": {
+    "base": [
+     79322457.8,
+     79271835.0,
+     79271465.6
+    ],
+    "cand": [
+     70602428.8,
+     70551772.8,
+     70551593.4
+    ],
+    "median_change_pct": -11.0
+   },
+   "cycles:u": {
+    "base": [
+     21036538.0,
+     19723299.4,
+     20017420.4
+    ],
+    "cand": [
+     14626963.5,
+     13652799.7,
+     13825072.2
+    ],
+    "median_change_pct": -30.935
+   },
+   "instructions": {
+    "base": [
+     84542601.7,
+     79254528.8,
+     79294680.8
+    ],
+    "cand": [
+     75793371.5,
+     71195506.6,
+     70591588.0
+    ],
+    "median_change_pct": -10.214
+   },
+   "cycles": {
+    "base": [
+     22869636.6,
+     19673939.3,
+     20076063.5
+    ],
+    "cand": [
+     16595678.5,
+     14931004.4,
+     13844284.5
+    ],
+    "median_change_pct": -25.628
+   },
+   "page-faults": {
+    "base": [
+     968.5,
+     -0.4,
+     0.1
+    ],
+    "cand": [
+     968.8,
+     0.4,
+     -0.1
+    ],
+    "median_change_pct": 300.0
+   }
+  },
+  "readall-v4-mini-10000": {
+   "instructions:u": {
+    "base": [
+     178408091.0,
+     178983808.4,
+     178983549.5
+    ],
+    "cand": [
+     142208203.6,
+     142175830.3,
+     142176084.4
+    ],
+    "median_change_pct": -20.565
+   },
+   "cycles:u": {
+    "base": [
+     51241675.4,
+     51001788.8,
+     53181465.5
+    ],
+    "cand": [
+     33377064.4,
+     34172247.7,
+     36703075.1
+    ],
+    "median_change_pct": -33.312
+   },
+   "instructions": {
+    "base": [
+     178503529.1,
+     178930758.1,
+     179085611.7
+    ],
+    "cand": [
+     142542280.1,
+     142323369.4,
+     142313100.6
+    ],
+    "median_change_pct": -20.459
+   },
+   "cycles": {
+    "base": [
+     51387251.2,
+     50848881.7,
+     53796878.0
+    ],
+    "cand": [
+     33829797.6,
+     34554746.7,
+     36953607.0
+    ],
+    "median_change_pct": -32.756
+   },
+   "page-faults": {
+    "base": [
+     -0.2,
+     0.1,
+     0.3
+    ],
+    "cand": [
+     23.2,
+     23.5,
+     23.4
+    ],
+    "median_change_pct": 23300.0
+   }
+  },
+  "open-v4-regular-1000": {
+   "instructions:u": {
+    "base": [
+     3328576.1,
+     3328787.1,
+     3328723.6
+    ],
+    "cand": [
+     3340629.5,
+     3340782.2,
+     3340768.8
+    ],
+    "median_change_pct": 0.362
+   },
+   "cycles:u": {
+    "base": [
+     767092.0,
+     785842.7,
+     830584.0
+    ],
+    "cand": [
+     797721.8,
+     762318.8,
+     829827.5
+    ],
+    "median_change_pct": 1.512
+   },
+   "instructions": {
+    "base": [
+     3593784.5,
+     3592897.1,
+     3589283.8
+    ],
+    "cand": [
+     3620670.9,
+     3607531.2,
+     3607250.0
+    ],
+    "median_change_pct": 0.407
+   },
+   "cycles": {
+    "base": [
+     845127.9,
+     859601.1,
+     920195.8
+    ],
+    "cand": [
+     899286.7,
+     860484.0,
+     922196.9
+    ],
+    "median_change_pct": 4.617
+   },
+   "page-faults": {
+    "base": [
+     48.1,
+     47.9,
+     48.0
+    ],
+    "cand": [
+     48.1,
+     47.9,
+     47.9
+    ],
+    "median_change_pct": -0.208
+   }
+  },
+  "readall-v4-regular-1000": {
+   "instructions:u": {
+    "base": [
+     7688616.2,
+     7693091.1,
+     7693109.5
+    ],
+    "cand": [
+     7472240.9,
+     7462151.5,
+     7462169.2
+    ],
+    "median_change_pct": -3.002
+   },
+   "cycles:u": {
+    "base": [
+     2242222.4,
+     2088206.0,
+     2061185.6
+    ],
+    "cand": [
+     2029217.3,
+     2099763.8,
+     1934931.0
+    ],
+    "median_change_pct": -2.825
+   },
+   "instructions": {
+    "base": [
+     8355376.4,
+     8357980.6,
+     8357896.3
+    ],
+    "cand": [
+     8066654.3,
+     8053941.1,
+     8055966.9
+    ],
+    "median_change_pct": -3.613
+   },
+   "cycles": {
+    "base": [
+     2518546.8,
+     2325413.9,
+     2261629.1
+    ],
+    "cand": [
+     2218733.8,
+     2290538.2,
+     2159584.1
+    ],
+    "median_change_pct": -4.588
+   },
+   "page-faults": {
+    "base": [
+     123.8,
+     123.8,
+     123.9
+    ],
+    "cand": [
+     109.3,
+     109.9,
+     109.9
+    ],
+    "median_change_pct": -11.228
+   }
+  },
+  "open-v4-regular-3000": {
+   "instructions:u": {
+    "base": [
+     10032539.7,
+     10018578.7,
+     10018447.4
+    ],
+    "cand": [
+     9999543.6,
+     9985583.8,
+     9985521.3
+    ],
+    "median_change_pct": -0.329
+   },
+   "cycles:u": {
+    "base": [
+     2273887.8,
+     2330653.0,
+     2318096.2
+    ],
+    "cand": [
+     2065555.2,
+     2207651.9,
+     2402959.9
+    ],
+    "median_change_pct": -4.764
+   },
+   "instructions": {
+    "base": [
+     10096518.7,
+     10022273.6,
+     10566712.2
+    ],
+    "cand": [
+     10021403.2,
+     9990981.8,
+     9986667.9
+    ],
+    "median_change_pct": -1.045
+   },
+   "cycles": {
+    "base": [
+     2288740.6,
+     2244898.1,
+     6370219.5
+    ],
+    "cand": [
+     2075150.4,
+     2205914.0,
+     2362452.0
+    ],
+    "median_change_pct": -3.619
+   },
+   "page-faults": {
+    "base": [
+     0.0,
+     -0.2,
+     0.1
+    ],
+    "cand": [
+     0.1,
+     -0.1,
+     -0.1
+    ]
+   }
+  },
+  "readall-v4-regular-3000": {
+   "instructions:u": {
+    "base": [
+     23662891.4,
+     23665552.6,
+     23665514.4
+    ],
+    "cand": [
+     22849265.4,
+     22850885.6,
+     22850911.4
+    ],
+    "median_change_pct": -3.442
+   },
+   "cycles:u": {
+    "base": [
+     6810375.2,
+     6492616.0,
+     6817510.5
+    ],
+    "cand": [
+     6254181.2,
+     6430307.0,
+     6229226.5
+    ],
+    "median_change_pct": -8.167
+   },
+   "instructions": {
+    "base": [
+     25890178.4,
+     25921009.2,
+     25921656.9
+    ],
+    "cand": [
+     24922640.9,
+     24905149.9,
+     24803099.4
+    ],
+    "median_change_pct": -3.919
+   },
+   "cycles": {
+    "base": [
+     7416919.0,
+     7396367.8,
+     7635408.9
+    ],
+    "cand": [
+     6913144.5,
+     7117125.4,
+     6641720.4
+    ],
+    "median_change_pct": -6.792
+   },
+   "page-faults": {
+    "base": [
+     426.2,
+     424.8,
+     424.9
+    ],
+    "cand": [
+     389.0,
+     387.9,
+     387.8
+    ],
+    "median_change_pct": -8.708
+   }
+  },
+  "open-v4-regular-10000": {
+   "instructions:u": {
+    "base": [
+     33981727.9,
+     33880639.5,
+     33968402.5
+    ],
+    "cand": [
+     33339822.0,
+     33392577.9,
+     33368315.0
+    ],
+    "median_change_pct": -1.767
+   },
+   "cycles:u": {
+    "base": [
+     8496352.9,
+     8953985.7,
+     10523840.0
+    ],
+    "cand": [
+     7288548.8,
+     8282143.0,
+     8532976.7
+    ],
+    "median_change_pct": -7.503
+   },
+   "instructions": {
+    "base": [
+     34429415.0,
+     39934678.4,
+     40220774.5
+    ],
+    "cand": [
+     33014985.0,
+     39607282.4,
+     39337204.4
+    ],
+    "median_change_pct": -1.496
+   },
+   "cycles": {
+    "base": [
+     8608786.0,
+     10783303.8,
+     12698965.4
+    ],
+    "cand": [
+     7195784.9,
+     10489822.3,
+     10204603.4
+    ],
+    "median_change_pct": -5.367
+   },
+   "page-faults": {
+    "base": [
+     0.2,
+     1180.2,
+     1179.8
+    ],
+    "cand": [
+     0.5,
+     1180.5,
+     1180.0
+    ],
+    "median_change_pct": 0.017
+   }
+  },
+  "readall-v4-regular-10000": {
+   "instructions:u": {
+    "base": [
+     85417004.5,
+     85197627.6,
+     85104895.3
+    ],
+    "cand": [
+     78113584.2,
+     78110623.1,
+     78118954.3
+    ],
+    "median_change_pct": -8.315
+   },
+   "cycles:u": {
+    "base": [
+     34631885.7,
+     34498549.2,
+     34289230.5
+    ],
+    "cand": [
+     30596064.0,
+     32193954.9,
+     32387174.1
+    ],
+    "median_change_pct": -6.68
+   },
+   "instructions": {
+    "base": [
+     94738627.3,
+     94015523.7,
+     92625762.4
+    ],
+    "cand": [
+     78141391.5,
+     77979718.7,
+     78843997.6
+    ],
+    "median_change_pct": -16.885
+   },
+   "cycles": {
+    "base": [
+     39545979.0,
+     39587369.0,
+     37362079.9
+    ],
+    "cand": [
+     29300840.4,
+     31205682.8,
+     33438419.8
+    ],
+    "median_change_pct": -21.09
+   },
+   "page-faults": {
+    "base": [
+     1477.6,
+     1483.1,
+     1477.7
+    ],
+    "cand": [
+     0.5,
+     23.4,
+     23.7
+    ],
+    "median_change_pct": -98.416
+   }
+  },
+  "shared-open-v3-mini-10000": {
+   "instructions:u": {
+    "base": [
+     66595925.8,
+     66595468.3,
+     66595113.0
+    ],
+    "cand": [
+     57875777.9,
+     57875317.1,
+     57875163.3
+    ],
+    "median_change_pct": -13.094
+   },
+   "cycles:u": {
+    "base": [
+     17128819.6,
+     17765746.2,
+     17604032.5
+    ],
+    "cand": [
+     11849941.0,
+     11500963.4,
+     11669306.8
+    ],
+    "median_change_pct": -33.712
+   },
+   "instructions": {
+    "base": [
+     66111069.8,
+     66904055.8,
+     66647746.5
+    ],
+    "cand": [
+     57817242.3,
+     57675509.3,
+     57909417.8
+    ],
+    "median_change_pct": -13.25
+   },
+   "cycles": {
+    "base": [
+     17681587.3,
+     18696943.1,
+     17471866.7
+    ],
+    "cand": [
+     11430538.4,
+     10697352.0,
+     12034749.6
+    ],
+    "median_change_pct": -35.353
+   },
+   "page-faults": {
+    "base": [
+     -0.2,
+     -0.2,
+     0.2
+    ],
+    "cand": [
+     0.0,
+     -0.1,
+     0.2
+    ],
+    "median_change_pct": -100.0
+   }
+  },
+  "shared-open-v3-regular-10000": {
+   "instructions:u": {
+    "base": [
+     41378504.6,
+     41389896.0,
+     41390068.2
+    ],
+    "cand": [
+     38538683.9,
+     38550034.7,
+     38549889.3
+    ],
+    "median_change_pct": -6.862
+   },
+   "cycles:u": {
+    "base": [
+     10688986.0,
+     9870053.3,
+     10146946.6
+    ],
+    "cand": [
+     9093666.5,
+     7907603.4,
+     8196875.5
+    ],
+    "median_change_pct": -19.218
+   },
+   "instructions": {
+    "base": [
+     41092836.0,
+     41067919.1,
+     40705945.2
+    ],
+    "cand": [
+     39336939.4,
+     38568324.3,
+     38310073.4
+    ],
+    "median_change_pct": -6.086
+   },
+   "cycles": {
+    "base": [
+     10199193.1,
+     8334698.2,
+     8419394.2
+    ],
+    "cand": [
+     5861251.0,
+     7696676.1,
+     7219679.8
+    ],
+    "median_change_pct": -14.249
+   },
+   "page-faults": {
+    "base": [
+     -0.6,
+     -0.1,
+     -0.2
+    ],
+    "cand": [
+     0.4,
+     -0.3,
+     0.0
+    ],
+    "median_change_pct": -100.0
+   }
+  },
+  "editor-open-v3-mini-1000": {
+   "instructions:u": {
+    "base": [
+     18518322.0,
+     18498618.1,
+     18505957.4
+    ],
+    "cand": [
+     16344979.9,
+     16310374.5,
+     16307072.2
+    ],
+    "median_change_pct": -11.864
+   },
+   "cycles:u": {
+    "base": [
+     4315841.3,
+     4210779.0,
+     4308568.8
+    ],
+    "cand": [
+     3795912.6,
+     3576145.4,
+     3563824.9
+    ],
+    "median_change_pct": -16.999
+   },
+   "instructions": {
+    "base": [
+     18516439.6,
+     18508148.9,
+     18510107.4
+    ],
+    "cand": [
+     16353209.5,
+     16323531.1,
+     16331272.5
+    ],
+    "median_change_pct": -11.771
+   },
+   "cycles": {
+    "base": [
+     4288509.4,
+     4207301.2,
+     4271641.2
+    ],
+    "cand": [
+     3790287.4,
+     3587954.9,
+     3606835.8
+    ],
+    "median_change_pct": -15.563
+   },
+   "page-faults": {
+    "base": [
+     0.1,
+     0.0,
+     -0.1
+    ],
+    "cand": [
+     -0.0,
+     0.1,
+     0.0
+    ]
+   }
+  },
+  "editor-open-v3-mini-3000": {
+   "instructions:u": {
+    "base": [
+     55779476.5,
+     55766721.5,
+     55957704.9
+    ],
+    "cand": [
+     49412985.5,
+     49410201.7,
+     49412551.4
+    ],
+    "median_change_pct": -11.414
+   },
+   "cycles:u": {
+    "base": [
+     16916873.9,
+     14702051.9,
+     14256615.7
+    ],
+    "cand": [
+     12774903.9,
+     11643782.3,
+     12260548.1
+    ],
+    "median_change_pct": -16.607
+   },
+   "instructions": {
+    "base": [
+     55766813.6,
+     55805438.9,
+     55982213.2
+    ],
+    "cand": [
+     49437776.1,
+     49434065.0,
+     49390276.6
+    ],
+    "median_change_pct": -11.417
+   },
+   "cycles": {
+    "base": [
+     16935373.1,
+     14757287.4,
+     14270881.8
+    ],
+    "cand": [
+     12738771.4,
+     11754866.9,
+     12185697.8
+    ],
+    "median_change_pct": -17.426
+   },
+   "page-faults": {
+    "base": [
+     0.4,
+     0.2,
+     -0.3
+    ],
+    "cand": [
+     0.1,
+     0.1,
+     -0.1
+    ],
+    "median_change_pct": -50.0
+   }
+  },
+  "editor-open-v3-mini-10000": {
+   "instructions:u": {
+    "base": [
+     207928631.6,
+     208002464.1,
+     207928901.8
+    ],
+    "cand": [
+     166821662.6,
+     166823303.9,
+     166847785.7
+    ],
+    "median_change_pct": -19.769
+   },
+   "cycles:u": {
+    "base": [
+     79815284.2,
+     77780548.7,
+     80646650.2
+    ],
+    "cand": [
+     56828978.8,
+     52556971.4,
+     62627878.3
+    ],
+    "median_change_pct": -28.799
+   },
+   "instructions": {
+    "base": [
+     207882469.8,
+     208666011.1,
+     208094713.7
+    ],
+    "cand": [
+     166930527.3,
+     166642713.2,
+     166742976.8
+    ],
+    "median_change_pct": -19.872
+   },
+   "cycles": {
+    "base": [
+     79342370.3,
+     79125392.8,
+     81039954.1
+    ],
+    "cand": [
+     57220956.2,
+     52166725.1,
+     62241245.1
+    ],
+    "median_change_pct": -27.881
+   },
+   "page-faults": {
+    "base": [
+     0.7,
+     0.0,
+     0.8
+    ],
+    "cand": [
+     -0.3,
+     0.2,
+     0.0
+    ],
+    "median_change_pct": -100.0
+   }
+  },
+  "write-reuse-45543": {
+   "instructions:u": {
+    "base": [
+     383867.3,
+     380020.0,
+     383867.4
+    ],
+    "cand": [
+     379868.5,
+     379716.7,
+     381219.2
+    ],
+    "median_change_pct": -1.042
+   },
+   "cycles:u": {
+    "base": [
+     104785.9,
+     101009.4,
+     103930.9
+    ],
+    "cand": [
+     102568.0,
+     102354.8,
+     102251.4
+    ],
+    "median_change_pct": -1.516
+   },
+   "instructions": {
+    "base": [
+     384078.9,
+     380211.9,
+     384219.5
+    ],
+    "cand": [
+     380078.2,
+     379944.1,
+     381377.1
+    ],
+    "median_change_pct": -1.042
+   },
+   "cycles": {
+    "base": [
+     104752.5,
+     101133.1,
+     104335.2
+    ],
+    "cand": [
+     102827.1,
+     102619.6,
+     102563.9
+    ],
+    "median_change_pct": -1.644
+   },
+   "page-faults": {
+    "base": [
+     -0.0,
+     -0.0,
+     -0.0
+    ],
+    "cand": [
+     0.0,
+     -0.0,
+     -0.0
+    ]
+   }
+  },
+  "write-reuse-v3-mini-3000-grow": {
+   "instructions:u": {
+    "base": [
+     81127345.2,
+     81049454.6,
+     80366102.6
+    ],
+    "cand": [
+     79686908.4,
+     79809029.0,
+     79479317.8
+    ],
+    "median_change_pct": -1.681
+   },
+   "cycles:u": {
+    "base": [
+     25348215.2,
+     20232408.4,
+     24091330.6
+    ],
+    "cand": [
+     20159198.6,
+     20602286.4,
+     20868259.0
+    ],
+    "median_change_pct": -14.483
+   },
+   "instructions": {
+    "base": [
+     96212002.4,
+     97676030.2,
+     97075179.4
+    ],
+    "cand": [
+     96142779.8,
+     96396206.8,
+     96102499.0
+    ],
+    "median_change_pct": -0.96
+   },
+   "cycles": {
+    "base": [
+     15776756.2,
+     26846117.4,
+     32837007.2
+    ],
+    "cand": [
+     26619131.6,
+     28212629.2,
+     28174544.4
+    ],
+    "median_change_pct": 4.948
+   },
+   "page-faults": {
+    "base": [
+     3171.4,
+     3172.8,
+     3171.8
+    ],
+    "cand": [
+     3172.0,
+     3172.0,
+     3172.2
+    ],
+    "median_change_pct": 0.006
+   }
+  },
+  "open-45543": {
+   "instructions:u": {
+    "base": [
+     74712.2,
+     74729.2,
+     74726.5
+    ],
+    "cand": [
+     74786.1,
+     74804.1,
+     74800.1
+    ],
+    "median_change_pct": 0.098
+   },
+   "cycles:u": {
+    "base": [
+     14728.8,
+     15208.9,
+     14874.9
+    ],
+    "cand": [
+     14749.5,
+     15008.3,
+     15002.7
+    ],
+    "median_change_pct": 0.859
+   },
+   "instructions": {
+    "base": [
+     74936.1,
+     74254.3,
+     74816.0
+    ],
+    "cand": [
+     74913.0,
+     74878.2,
+     72481.8
+    ],
+    "median_change_pct": 0.083
+   },
+   "cycles": {
+    "base": [
+     14938.2,
+     14150.8,
+     15088.9
+    ],
+    "cand": [
+     14823.2,
+     15042.8,
+     -5838.2
+    ],
+    "median_change_pct": -0.77
+   },
+   "page-faults": {
+    "base": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "cand": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "open-floating": {
+   "instructions:u": {
+    "base": [
+     114045.9,
+     113982.3,
+     113982.3
+    ],
+    "cand": [
+     114204.1,
+     114139.8,
+     114139.3
+    ],
+    "median_change_pct": 0.138
+   },
+   "cycles:u": {
+    "base": [
+     24254.0,
+     24001.4,
+     24061.2
+    ],
+    "cand": [
+     24667.3,
+     24334.3,
+     24275.3
+    ],
+    "median_change_pct": 1.135
+   },
+   "instructions": {
+    "base": [
+     114306.4,
+     114195.0,
+     114152.3
+    ],
+    "cand": [
+     114402.2,
+     114319.5,
+     114289.0
+    ],
+    "median_change_pct": 0.109
+   },
+   "cycles": {
+    "base": [
+     24450.6,
+     24229.1,
+     24221.2
+    ],
+    "cand": [
+     24810.0,
+     24465.2,
+     24385.6
+    ],
+    "median_change_pct": 0.974
+   },
+   "page-faults": {
+    "base": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "cand": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "open-checkboxes": {
+   "instructions:u": {
+    "base": [
+     89375.8,
+     89376.3,
+     89452.0
+    ],
+    "cand": [
+     89519.0,
+     89519.7,
+     89594.8
+    ],
+    "median_change_pct": 0.16
+   },
+   "cycles:u": {
+    "base": [
+     20288.2,
+     20324.6,
+     20605.4
+    ],
+    "cand": [
+     20583.8,
+     20704.5,
+     20505.6
+    ],
+    "median_change_pct": 1.275
+   },
+   "instructions": {
+    "base": [
+     89696.4,
+     89577.9,
+     89711.7
+    ],
+    "cand": [
+     89630.8,
+     89688.0,
+     89720.5
+    ],
+    "median_change_pct": -0.009
+   },
+   "cycles": {
+    "base": [
+     20545.6,
+     20544.9,
+     20941.6
+    ],
+    "cand": [
+     20680.8,
+     20854.9,
+     20679.1
+    ],
+    "median_change_pct": 0.658
+   },
+   "page-faults": {
+    "base": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "cand": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "openread-45543": {
+   "instructions:u": {
+    "base": [
+     161057.9,
+     161638.9,
+     161635.8
+    ],
+    "cand": [
+     154569.0,
+     154489.4,
+     154486.5
+    ],
+    "median_change_pct": -4.421
+   },
+   "cycles:u": {
+    "base": [
+     46670.1,
+     51224.1,
+     48480.8
+    ],
+    "cand": [
+     47529.3,
+     48183.4,
+     47823.6
+    ],
+    "median_change_pct": -1.356
+   },
+   "instructions": {
+    "base": [
+     161188.8,
+     161919.5,
+     161825.2
+    ],
+    "cand": [
+     154763.4,
+     154701.4,
+     154741.7
+    ],
+    "median_change_pct": -4.377
+   },
+   "cycles": {
+    "base": [
+     46772.4,
+     51461.9,
+     48772.3
+    ],
+    "cand": [
+     47711.6,
+     48578.3,
+     48165.8
+    ],
+    "median_change_pct": -1.244
+   },
+   "page-faults": {
+    "base": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "cand": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "editor-open-45543": {
+   "instructions:u": {
+    "base": [
+     208466.0,
+     207273.2,
+     207273.0
+    ],
+    "cand": [
+     202163.9,
+     202153.0,
+     202153.0
+    ],
+    "median_change_pct": -2.47
+   },
+   "cycles:u": {
+    "base": [
+     217548.4,
+     214029.9,
+     213556.9
+    ],
+    "cand": [
+     213671.1,
+     211671.0,
+     214512.6
+    ],
+    "median_change_pct": -0.168
+   },
+   "instructions": {
+    "base": [
+     999605.8,
+     957487.8,
+     957955.1
+    ],
+    "cand": [
+     950552.7,
+     945924.7,
+     947685.6
+    ],
+    "median_change_pct": -1.072
+   },
+   "cycles": {
+    "base": [
+     554630.0,
+     452926.3,
+     461559.7
+    ],
+    "cand": [
+     450868.3,
+     449469.0,
+     458776.9
+    ],
+    "median_change_pct": -2.316
+   },
+   "page-faults": {
+    "base": [
+     142.0,
+     141.0,
+     141.0
+    ],
+    "cand": [
+     140.0,
+     140.0,
+     140.0
+    ],
+    "median_change_pct": -0.709
+   }
+  },
+  "ctl-write-rewrite-45543": {
+   "instructions:u": {
+    "base": [
+     96793.1,
+     94136.7,
+     96782.1
+    ],
+    "cand": [
+     94566.7,
+     94483.0,
+     94522.3
+    ],
+    "median_change_pct": -2.335
+   },
+   "cycles:u": {
+    "base": [
+     43718.4,
+     39578.9,
+     41723.6
+    ],
+    "cand": [
+     38562.0,
+     39241.7,
+     37577.8
+    ],
+    "median_change_pct": -7.577
+   },
+   "instructions": {
+    "base": [
+     96950.9,
+     94308.6,
+     96976.1
+    ],
+    "cand": [
+     94566.5,
+     94736.6,
+     94614.3
+    ],
+    "median_change_pct": -2.41
+   },
+   "cycles": {
+    "base": [
+     43554.5,
+     39474.4,
+     41898.9
+    ],
+    "cand": [
+     38514.7,
+     39461.3,
+     37579.2
+    ],
+    "median_change_pct": -8.077
+   },
+   "page-faults": {
+    "base": [
+     0.0,
+     -0.0,
+     0.0
+    ],
+    "cand": [
+     -0.0,
+     -0.0,
+     -0.0
+    ]
+   }
+  },
+  "cfb_open/tiny": {
+   "instructions:u": {
+    "base": [
+     34802.5,
+     34801.1,
+     34810.8
+    ],
+    "cand": [
+     34847.4,
+     34855.6,
+     34859.0
+    ],
+    "median_change_pct": 0.153
+   },
+   "cycles:u": {
+    "base": [
+     -3952.2,
+     13598.8,
+     -9675.8
+    ],
+    "cand": [
+     3516.3,
+     11448.6,
+     2109.5
+    ],
+    "median_change_pct": -188.971
+   },
+   "instructions": {
+    "base": [
+     86762.9,
+     82692.3,
+     85475.0
+    ],
+    "cand": [
+     81925.4,
+     -116263.0,
+     82760.4
+    ],
+    "median_change_pct": -4.153
+   },
+   "cycles": {
+    "base": [
+     10652.1,
+     25959.9,
+     -4967.5
+    ],
+    "cand": [
+     15101.8,
+     -115891.8,
+     12697.4
+    ],
+    "median_change_pct": 19.201
+   },
+   "page-faults": {
+    "base": [
+     0.9,
+     0.9,
+     0.9
+    ],
+    "cand": [
+     0.9,
+     0.9,
+     0.9
+    ],
+    "median_change_pct": 0.0
+   }
+  },
+  "cfb_open/many-small": {
+   "instructions:u": {
+    "base": [
+     1938886.6,
+     1938903.1,
+     1939703.6
+    ],
+    "cand": [
+     1942076.0,
+     1942067.6,
+     1941230.8
+    ],
+    "median_change_pct": 0.163
+   },
+   "cycles:u": {
+    "base": [
+     238633.4,
+     398942.2,
+     400762.3
+    ],
+    "cand": [
+     324285.0,
+     383742.9,
+     421779.6
+    ],
+    "median_change_pct": -3.81
+   },
+   "instructions": {
+    "base": [
+     1961635.9,
+     2009294.2,
+     1993111.5
+    ],
+    "cand": [
+     1996974.7,
+     2004356.6,
+     1992012.9
+    ],
+    "median_change_pct": 0.194
+   },
+   "cycles": {
+    "base": [
+     146456.1,
+     461762.1,
+     398611.0
+    ],
+    "cand": [
+     333516.8,
+     396928.1,
+     425887.9
+    ],
+    "median_change_pct": -0.422
+   },
+   "page-faults": {
+    "base": [
+     0.8,
+     0.8,
+     0.8
+    ],
+    "cand": [
+     0.8,
+     0.8,
+     0.8
+    ],
+    "median_change_pct": 0.0
+   }
+  },
+  "cfb_open/few-large": {
+   "instructions:u": {
+    "base": [
+     1944858.3,
+     1944860.1,
+     1944882.6
+    ],
+    "cand": [
+     1944917.2,
+     1944914.9,
+     1944934.3
+    ],
+    "median_change_pct": 0.003
+   },
+   "cycles:u": {
+    "base": [
+     348047.2,
+     416892.2,
+     286261.7
+    ],
+    "cand": [
+     323592.4,
+     391083.1,
+     346374.8
+    ],
+    "median_change_pct": -0.481
+   },
+   "instructions": {
+    "base": [
+     1996354.4,
+     2005147.3,
+     2000190.8
+    ],
+    "cand": [
+     2022658.0,
+     1960660.1,
+     1999562.0
+    ],
+    "median_change_pct": -0.031
+   },
+   "cycles": {
+    "base": [
+     360041.0,
+     560982.8,
+     302001.6
+    ],
+    "cand": [
+     436268.8,
+     352175.0,
+     376463.7
+    ],
+    "median_change_pct": 4.561
+   },
+   "page-faults": {
+    "base": [
+     0.9,
+     0.9,
+     0.9
+    ],
+    "cand": [
+     0.9,
+     0.9,
+     0.9
+    ],
+    "median_change_pct": 0.0
+   }
+  },
+  "cfb_open/wide-root": {
+   "instructions:u": {
+    "base": [
+     11707758.9,
+     11707772.6,
+     11708043.8
+    ],
+    "cand": [
+     11712560.2,
+     11712522.0,
+     11712686.2
+    ],
+    "median_change_pct": 0.041
+   },
+   "cycles:u": {
+    "base": [
+     2578745.5,
+     2014781.0,
+     2267274.6
+    ],
+    "cand": [
+     2518270.8,
+     2093074.0,
+     2463061.2
+    ],
+    "median_change_pct": 8.635
+   },
+   "instructions": {
+    "base": [
+     11709368.4,
+     11738787.2,
+     11707624.7
+    ],
+    "cand": [
+     11641488.9,
+     11681733.7,
+     11822025.0
+    ],
+    "median_change_pct": -0.236
+   },
+   "cycles": {
+    "base": [
+     2697402.8,
+     2532980.0,
+     2311468.3
+    ],
+    "cand": [
+     2555116.8,
+     2108597.0,
+     2430441.6
+    ],
+    "median_change_pct": -4.048
+   },
+   "page-faults": {
+    "base": [
+     0.0,
+     0.1,
+     0.0
+    ],
+    "cand": [
+     0.0,
+     -0.0,
+     0.0
+    ]
+   }
+  },
+  "cfb_list_streams/tiny": {
+   "instructions:u": {
+    "base": [
+     4982.1,
+     4984.0,
+     4985.9
+    ],
+    "cand": [
+     4982.4,
+     4982.0,
+     4983.2
+    ],
+    "median_change_pct": -0.032
+   },
+   "cycles:u": {
+    "base": [
+     -550.9,
+     -2826.7,
+     8729.4
+    ],
+    "cand": [
+     555.2,
+     -4948.9,
+     -2399.4
+    ],
+    "median_change_pct": 335.542
+   },
+   "instructions": {
+    "base": [
+     38631.0,
+     38147.1,
+     38877.4
+    ],
+    "cand": [
+     37264.8,
+     38826.0,
+     38627.1
+    ],
+    "median_change_pct": -0.01
+   },
+   "cycles": {
+    "base": [
+     8333.1,
+     7570.4,
+     18581.0
+    ],
+    "cand": [
+     7865.1,
+     4805.8,
+     8530.2
+    ],
+    "median_change_pct": -5.616
+   },
+   "page-faults": {
+    "base": [
+     0.1,
+     0.1,
+     0.1
+    ],
+    "cand": [
+     0.1,
+     0.1,
+     0.1
+    ],
+    "median_change_pct": 0.0
+   }
+  },
+  "cfb_list_streams/many-small": {
+   "instructions:u": {
+    "base": [
+     289245.9,
+     289242.3,
+     288710.7
+    ],
+    "cand": [
+     288351.6,
+     287763.2,
+     288499.7
+    ],
+    "median_change_pct": -0.308
+   },
+   "cycles:u": {
+    "base": [
+     58627.1,
+     48883.1,
+     49256.9
+    ],
+    "cand": [
+     50106.5,
+     65590.2,
+     64013.7
+    ],
+    "median_change_pct": 29.959
+   },
+   "instructions": {
+    "base": [
+     318300.6,
+     322159.4,
+     326181.7
+    ],
+    "cand": [
+     318579.5,
+     324098.8,
+     322010.3
+    ],
+    "median_change_pct": -0.046
+   },
+   "cycles": {
+    "base": [
+     58602.6,
+     58345.3,
+     65179.3
+    ],
+    "cand": [
+     58620.6,
+     81999.4,
+     74172.7
+    ],
+    "median_change_pct": 26.569
+   },
+   "page-faults": {
+    "base": [
+     0.1,
+     0.1,
+     0.1
+    ],
+    "cand": [
+     0.1,
+     0.1,
+     0.1
+    ],
+    "median_change_pct": 0.0
+   }
+  },
+  "cfb_list_streams/few-large": {
+   "instructions:u": {
+    "base": [
+     5755.7,
+     5755.2,
+     5750.5
+    ],
+    "cand": [
+     5753.6,
+     5751.2,
+     5750.3
+    ],
+    "median_change_pct": -0.07
+   },
+   "cycles:u": {
+    "base": [
+     -1615.7,
+     2118.4,
+     7525.5
+    ],
+    "cand": [
+     -4755.6,
+     195.9,
+     5700.2
+    ],
+    "median_change_pct": -90.752
+   },
+   "instructions": {
+    "base": [
+     36867.8,
+     39158.0,
+     38916.8
+    ],
+    "cand": [
+     37858.2,
+     39786.3,
+     36718.7
+    ],
+    "median_change_pct": -2.72
+   },
+   "cycles": {
+    "base": [
+     2430.0,
+     11688.5,
+     20697.2
+    ],
+    "cand": [
+     3983.5,
+     10669.1,
+     11373.5
+    ],
+    "median_change_pct": -8.721
+   },
+   "page-faults": {
+    "base": [
+     0.1,
+     0.1,
+     0.1
+    ],
+    "cand": [
+     0.1,
+     0.1,
+     0.1
+    ],
+    "median_change_pct": 0.0
+   }
+  },
+  "cfb_list_streams/wide-root": {
+   "instructions:u": {
+    "base": [
+     2305137.2,
+     2305142.8,
+     2305662.3
+    ],
+    "cand": [
+     2305859.1,
+     2305849.5,
+     2305629.7
+    ],
+    "median_change_pct": 0.031
+   },
+   "cycles:u": {
+    "base": [
+     629964.7,
+     513420.4,
+     434193.5
+    ],
+    "cand": [
+     444453.7,
+     511967.8,
+     486535.3
+    ],
+    "median_change_pct": -5.236
+   },
+   "instructions": {
+    "base": [
+     2348351.8,
+     2357762.7,
+     2343403.0
+    ],
+    "cand": [
+     2339876.4,
+     2322138.0,
+     2350247.4
+    ],
+    "median_change_pct": -0.361
+   },
+   "cycles": {
+    "base": [
+     747881.8,
+     607852.0,
+     482670.2
+    ],
+    "cand": [
+     431853.6,
+     504979.3,
+     553920.6
+    ],
+    "median_change_pct": -16.924
+   },
+   "page-faults": {
+    "base": [
+     0.0,
+     -0.0,
+     0.0
+    ],
+    "cand": [
+     -0.0,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "doc_semantic_open/tiny": {
+   "instructions:u": {
+    "base": [
+     28781614.8,
+     28774540.4,
+     28775155.7
+    ],
+    "cand": [
+     28814416.2,
+     28750382.5,
+     28776352.4
+    ],
+    "median_change_pct": 0.004
+   },
+   "cycles:u": {
+    "base": [
+     7219002.7,
+     7727873.8,
+     7545914.9
+    ],
+    "cand": [
+     7351721.4,
+     7182036.0,
+     6830052.0
+    ],
+    "median_change_pct": -4.822
+   },
+   "instructions": {
+    "base": [
+     28698204.8,
+     32867592.7,
+     30268075.9
+    ],
+    "cand": [
+     31651299.1,
+     30018967.3,
+     30052276.4
+    ],
+    "median_change_pct": -0.713
+   },
+   "cycles": {
+    "base": [
+     7262576.6,
+     12996061.0,
+     8074153.6
+    ],
+    "cand": [
+     8339276.0,
+     7299473.7,
+     7309926.8
+    ],
+    "median_change_pct": -9.465
+   },
+   "page-faults": {
+    "base": [
+     -26.0,
+     638.8,
+     267.8
+    ],
+    "cand": [
+     523.1,
+     228.6,
+     228.6
+    ],
+    "median_change_pct": -14.638
+   }
+  },
+  "doc_semantic_open/large": {
+   "instructions:u": {
+    "base": [
+     28805643.3,
+     28826467.7,
+     28794194.8
+    ],
+    "cand": [
+     28813207.6,
+     28774895.2,
+     28754495.8
+    ],
+    "median_change_pct": -0.107
+   },
+   "cycles:u": {
+    "base": [
+     7653658.9,
+     8094320.8,
+     7339548.5
+    ],
+    "cand": [
+     8012687.3,
+     7102224.3,
+     7595441.2
+    ],
+    "median_change_pct": -0.761
+   },
+   "instructions": {
+    "base": [
+     31999426.7,
+     33432125.8,
+     31993381.4
+    ],
+    "cand": [
+     31397731.4,
+     29936236.3,
+     30264647.5
+    ],
+    "median_change_pct": -5.421
+   },
+   "cycles": {
+    "base": [
+     8887575.6,
+     17585611.2,
+     8453236.3
+    ],
+    "cand": [
+     10199010.9,
+     6321306.4,
+     8310731.1
+    ],
+    "median_change_pct": -6.49
+   },
+   "page-faults": {
+    "base": [
+     583.3,
+     592.1,
+     592.0
+    ],
+    "cand": [
+     419.1,
+     267.2,
+     267.4
+    ],
+    "median_change_pct": -54.831
+   }
+  },
+  "xls_semantic_open/tiny": {
+   "instructions:u": {
+    "base": [
+     130577906.8,
+     130578316.6,
+     130580432.1
+    ],
+    "cand": [
+     130541478.9,
+     130537383.5,
+     130535163.6
+    ],
+    "median_change_pct": -0.031
+   },
+   "cycles:u": {
+    "base": [
+     42780445.4,
+     43733267.9,
+     45528908.4
+    ],
+    "cand": [
+     36479839.7,
+     36800592.9,
+     36867244.8
+    ],
+    "median_change_pct": -15.852
+   },
+   "instructions": {
+    "base": [
+     130803156.6,
+     128995545.4,
+     130737962.6
+    ],
+    "cand": [
+     130639022.7,
+     128652221.7,
+     130698793.2
+    ],
+    "median_change_pct": -0.076
+   },
+   "cycles": {
+    "base": [
+     42973305.4,
+     42662411.1,
+     45770928.2
+    ],
+    "cand": [
+     36494966.7,
+     35760159.9,
+     37051676.7
+    ],
+    "median_change_pct": -15.075
+   },
+   "page-faults": {
+    "base": [
+     0.1,
+     0.1,
+     0.0
+    ],
+    "cand": [
+     0.1,
+     0.2,
+     0.1
+    ],
+    "median_change_pct": 0.0
+   }
+  },
+  "xls_semantic_open/large": {
+   "instructions:u": {
+    "base": [
+     130577455.4,
+     130582899.0,
+     130587561.8
+    ],
+    "cand": [
+     130538791.5,
+     130525773.8,
+     130539785.9
+    ],
+    "median_change_pct": -0.034
+   },
+   "cycles:u": {
+    "base": [
+     45021880.1,
+     45047674.3,
+     43699905.4
+    ],
+    "cand": [
+     36583735.9,
+     36935248.2,
+     36360135.5
+    ],
+    "median_change_pct": -18.742
+   },
+   "instructions": {
+    "base": [
+     130517318.4,
+     130498197.8,
+     130705014.0
+    ],
+    "cand": [
+     130878922.3,
+     130705137.2,
+     130668388.6
+    ],
+    "median_change_pct": 0.144
+   },
+   "cycles": {
+    "base": [
+     45029393.6,
+     45222439.0,
+     43747750.3
+    ],
+    "cand": [
+     36884987.5,
+     37221948.1,
+     36403379.8
+    ],
+    "median_change_pct": -18.087
+   },
+   "page-faults": {
+    "base": [
+     0.6,
+     0.5,
+     0.4
+    ],
+    "cand": [
+     0.5,
+     0.7,
+     0.6
+    ],
+    "median_change_pct": 20.0
+   }
+  },
+  "ppt_semantic_open/tiny": {
+   "instructions:u": {
+    "base": [
+     5845660.6,
+     5850416.7,
+     5842268.0
+    ],
+    "cand": [
+     5847337.5,
+     5846051.2,
+     5839265.9
+    ],
+    "median_change_pct": 0.007
+   },
+   "cycles:u": {
+    "base": [
+     1457326.8,
+     1684126.4,
+     1585587.0
+    ],
+    "cand": [
+     1400327.2,
+     1363626.1,
+     1504450.1
+    ],
+    "median_change_pct": -11.684
+   },
+   "instructions": {
+    "base": [
+     5875318.4,
+     5898380.2,
+     5914282.3
+    ],
+    "cand": [
+     5901371.2,
+     5914520.2,
+     5908601.8
+    ],
+    "median_change_pct": 0.173
+   },
+   "cycles": {
+    "base": [
+     1357375.8,
+     1723649.7,
+     1631321.7
+    ],
+    "cand": [
+     1412462.8,
+     1359738.6,
+     1568849.1
+    ],
+    "median_change_pct": -13.416
+   },
+   "page-faults": {
+    "base": [
+     0.0,
+     0.0,
+     -0.0
+    ],
+    "cand": [
+     0.0,
+     0.0,
+     0.0
+    ]
+   }
+  },
+  "ppt_semantic_open/large": {
+   "instructions:u": {
+    "base": [
+     5846644.3,
+     5844914.0,
+     5842199.5
+    ],
+    "cand": [
+     5837896.1,
+     5839106.0,
+     5840700.8
+    ],
+    "median_change_pct": -0.099
+   },
+   "cycles:u": {
+    "base": [
+     2245092.6,
+     1430484.2,
+     1221377.9
+    ],
+    "cand": [
+     1097686.3,
+     1919060.9,
+     1432380.5
+    ],
+    "median_change_pct": 0.133
+   },
+   "instructions": {
+    "base": [
+     5778460.2,
+     5896505.9,
+     6176438.5
+    ],
+    "cand": [
+     5884461.5,
+     5894581.8,
+     5897213.2
+    ],
+    "median_change_pct": -0.033
+   },
+   "cycles": {
+    "base": [
+     2297024.8,
+     1577527.1,
+     1358209.4
+    ],
+    "cand": [
+     1065582.2,
+     1952428.3,
+     1590760.9
+    ],
+    "median_change_pct": 0.839
+   },
+   "page-faults": {
+    "base": [
+     0.0,
+     0.2,
+     0.1
+    ],
+    "cand": [
+     -0.1,
+     0.1,
+     0.1
+    ],
+    "median_change_pct": 0.0
+   }
+  }
+ }
+}

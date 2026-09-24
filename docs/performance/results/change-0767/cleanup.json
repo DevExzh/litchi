@@ -1,0 +1,39 @@
+{
+ "schema": "0767-cleanup-v1",
+ "performed_by": "the implementer, after committing the record and packet",
+ "planned_removals_measured_before_deletion": [
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0767",
+   "bytes": 69057478389,
+   "size": "65G",
+   "what": "dev (63G: debug check, clippy, doc and test builds for litchi-cfb, its dependents and the facade), probe (928M) and harness (1.1G) release builds of the candidate"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0767-before",
+   "bytes": 2129249648,
+   "size": "2.0G",
+   "what": "probe (928M) and harness (1.1G) release builds of the base"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/0767-before-src",
+   "bytes": 11296076209,
+   "size": "12G",
+   "what": "detached checkout of 1d1044e3ac for the base leg, removed with git worktree remove --force"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/scratch/0767",
+   "bytes": 1061627509,
+   "size": "1024M",
+   "what": "staged binaries (hashes in binaries.json), the superseded first version's binaries, generated inputs (244M; regenerable, digests in inputs.json), argv0 symlinks, raw matrix, counter, Callgrind, allocation and verdict outputs (bundled or summarized in the packet), gate logs (summarized in gates.txt), the probe build tree (copied to the packet) and TMPDIR"
+  }
+ ],
+ "kept": [
+  "the worktree /home/zhuhe/code/litchi-worktrees/0767-cfb-reparse-linear and branch perf/0767-cfb-reparse-linear",
+  "this packet: sources, scripts, compressed raw reports and summaries; no binaries, perf.data, Callgrind outputs or corpora"
+ ],
+ "not_touched": [
+  "/tmp (never used: TMPDIR pointed into scratch/0767/tmp)",
+  "other agents' worktrees, targets and scratch directories",
+  "the main checkout /home/zhuhe/code/litchi"
+ ]
+}
