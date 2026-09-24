@@ -1,0 +1,16 @@
+[package]
+name = "member_probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+sha2 = "0.11"
+litchi-core = { path = "ROOT/crates/litchi-core" }
+litchi-opc = { path = "ROOT/crates/litchi-opc" }
+litchi-docx = { path = "ROOT/crates/litchi-docx" }
+litchi-xlsx = { path = "ROOT/crates/litchi-xlsx" }
+litchi-pptx = { path = "ROOT/crates/litchi-pptx" }
+soapberry-zip = { path = "ROOT/crates/soapberry-zip" }
+
+[workspace]

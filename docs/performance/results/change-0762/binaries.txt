@@ -1,0 +1,24 @@
+Binaries measured by change 0762 (deleted after measurement; digests only).
+
+Build command, identical for both legs, run in each leg's source tree with its own CARGO_TARGET_DIR
+(before: detached worktree 0762-before-src at 1d1044e3ac, targets/0762-before;
+ after: branch worktree at bc18e8abdd, targets/0762), with the root Cargo.lock copied in (regenerated
+offline once, because the lock at this base predates the litchi-xldm package; no dependency version
+changed) and the harness's own tools/perf-baseline/Cargo.lock unchanged:
+  CARGO_BUILD_JOBS=6 cargo build --release --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline
+  CARGO_BUILD_JOBS=6 cargo build --release --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --features allocator-metrics --bin litchi-perf-baseline-alloc
+rustc 1.95.0 (59807616e 2026-04-14); default release profile of the harness workspace; no RUSTFLAGS.
+Both legs' binaries were copied to paths of equal length before measuring:
+  scratch/0762/bin/b/ (before) and scratch/0762/bin/a/ (after).
+
+before  native  0da72b02f0f6ea15def9b08a5048098054262735787aca80e8d8d5c55c6c101a  68,314,672 bytes
+after   native  fbaed86431572c14f12df16de6260c1533c0d89e31247b8582f3ba3a1320804b  68,502,584 bytes
+before  alloc   15ba258c2fcdeafe8147fa3869b40a8572222dacaaf09cd0743c00c4324d7e03  68,188,992 bytes
+after   alloc   2d656ef9e2687acf651340972845fd21d1c87de39ca8e534a0e5aa966de32912  68,383,376 bytes
+
+Probes (sources in probe/; each built with `cargo build --release --offline` and the workspace lock):
+  level_probe       path dependencies into the branch tree; the compression study (probe/level-*.tsv)
+  member_probe      built twice from the same source, with ROOT = each tree (Cargo.toml.template);
+                    the member differential, the split determinism runs and the preservation check
+  chunk_dependence  flate2 1.1.10 over zlib-rs 0.6.7; shows zlib-rs output depends on input splits at
+                    levels 5 and 6 for tiny pieces (the reason the splitter tests use Office-sized writes)

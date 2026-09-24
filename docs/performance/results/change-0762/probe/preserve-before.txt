@@ -1,0 +1,62 @@
+preserve test-data/libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx refused: paragraph 0 edit refused: selected content has no editable Word text
+preserve test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx refused: paragraph 0 edit refused: selected content has no editable Word text
+preserve test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx refused: paragraph 0 edit refused: selected content has no editable Word text
+preserve test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx bytes=4980 sha256=210e7e54a0bb49a13f56558c2e2032660af8d9686c2240c5d574e3e444ce6d61
+preserve test-data/libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx bytes=28871 sha256=a48035f91c2245562b18a8eb41d43570f77705783bb90efd5647f8ecb1fbb849
+preserve test-data/libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx refused: paragraph 0 edit refused: selected content has no editable Word text
+preserve test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx refused: invalid DOCX format: body-final section properties are not the final body child
+preserve test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx bytes=2349 sha256=b88dd5d5e1839df34b7204a9d16772b285a024dc9db6e28e9ad5b4825de2f991
+preserve test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx bytes=22009 sha256=23a950f46794a4b1d0fbfc81a2553ab8f225efbbce9e246ce4752c8872eb64f7
+preserve test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx refused: paragraph 0 edit refused: selected content has no editable Word text
+preserve test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/office-interop/libreoffice-resaved/document-properties-litchi.docx bytes=6831 sha256=67e149bbc820843436941a7f4e95540f46dabb630c3b4f54b068e2cbc1f928b0
+preserve test-data/office-interop/litchi-changed/document-properties-litchi.docx bytes=11150 sha256=21dcf916c976bdc52b390ef3089bb7abdc50caf47e66cbb554d21d9edb6f4b78
+preserve test-data/ooxml/docx/ComplexNumberedLists.docx bytes=14387 sha256=00c430e3f17aff3c8005a1abc2872e50319b3141f7af0adebef1b4d16564f61f
+preserve test-data/ooxml/docx/FancyFoot.docx bytes=12824 sha256=6a8477ebb36e69bb1a46d265f5190e01d3f2eef6f39de17b4d69082307b85cfe
+preserve test-data/ooxml/docx/Headers.docx refused: paragraph 0 edit refused: selected content has no editable Word text
+preserve test-data/ooxml/docx/Hyperlink.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/ooxml/docx/comment.docx refused: paragraph 0 edit refused: selected content has no editable Word text
+preserve test-data/ooxml/docx/documentProperties.docx bytes=23514 sha256=a94eebbb78cef19448ff2445a4be6c02c4ef70ddf02c13b64730c77265f348a4
+preserve test-data/ooxml/docx/documentProtection_comments_no_password.docx bytes=9874 sha256=a0fc903ea3f6ee44ff7e2543b6e8fb6c92b0a94560d0c77083ec408790e9d704
+preserve test-data/ooxml/docx/documentProtection_forms_no_password.docx bytes=9926 sha256=d58dd21ebe4af40898c9f9f6464359d309ba74631301d0788ebc8a058db79161
+preserve test-data/ooxml/docx/documentProtection_no_protection.docx bytes=9896 sha256=5e8326bb423bcc3e678bc6dd080663cfd494f9d4f38012602dbbe6dee335bf66
+preserve test-data/ooxml/docx/documentProtection_readonly_no_password.docx bytes=9862 sha256=2b878608eff438fe3b7d8b8e57f7285acab76ce7785c62f741007f9e1a5f06b0
+preserve test-data/ooxml/docx/drawing.docx bytes=76772 sha256=715d41e21f5fea7562a6b7dd599e7be173fe241276fab7a0e2a3094a1ef10c06
+preserve test-data/ooxml/docx/endnotes.docx bytes=13497 sha256=1edfdeb2f21856e11d0b352cbc603f9c185711c12fd8887004b6babf17fd2239
+preserve test-data/ooxml/docx/footnotes.docx bytes=12805 sha256=f40af1c3a20d8dbb7e7d6458591508b75ee5b3e582a5f810246874da773c826f
+preserve test-data/ooxml/docx/headerFooter.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/ooxml/docx/headerPic.docx refused: paragraph 0 edit refused: selected content has no editable Word text
+preserve test-data/ooxml/docx/table-alignment.docx refused: paragraph 0 edit refused: selected content has no editable Word text
+preserve test-data/ooxml/docx/table-indent.docx refused: shared OOXML error: invalid OOXML relationship: core-properties part '/docProps/core.xml' is orphaned
+preserve test-data/ooxml/docx/table_footnotes.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/ooxml/docx/testComment.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/poi/test-data/document/61745.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/poi/test-data/document/Bug54849.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/poi/test-data/document/ComplexNumberedLists.docx bytes=14387 sha256=00c430e3f17aff3c8005a1abc2872e50319b3141f7af0adebef1b4d16564f61f
+preserve test-data/poi/test-data/document/EmbeddedDocument.docx bytes=13264 sha256=2c46f42a43a3f04f20e733364dec3806fe5d344aa3a9acb26c1a69e9022f350c
+preserve test-data/poi/test-data/document/Numbering.docx bytes=13828 sha256=5cd02d56048172beca143a79e5318350f56793f22c27ebebd6861dfb4cd77f89
+preserve test-data/poi/test-data/document/NumberingWOverrides.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/poi/test-data/document/NumberingWithOutOfOrderId.docx bytes=12971 sha256=2a3a8a2bf2cddc01e72134bd961e32b547b5ff6d48c82a5f39c894de9430c61f
+preserve test-data/poi/test-data/document/heading123.docx bytes=74189 sha256=4ee3739b760cbed32033ae81c78780ab963d0c64fa194abbe3a1fa283242dcf9
+preserve test-data/poi/test-data/document/saut_page.docx bytes=2959648 sha256=9d6d39f1e16b94293cbb92b6888ace7b72ed68142349f84c1e995e1a0701a6f3
+preserve test-data/poi/test-data/document/testComment.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/poi/test-data/integration/test_recursive_embedded.docx bytes=27100 sha256=4776ba63990e60e195e415729972bf2c19ea2b3fd7ae1071a5f369d77fac00d1
+preserve test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx refused: paragraph 0 edit refused: selected content has no editable Word text
+preserve test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx refused: shared OOXML error: invalid OOXML data: OPC M4.3 permits only dcterms:created and dcterms:modified
+preserve test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx refused: shared OOXML error: invalid OOXML data: OPC M4.2 forbids the Markup Compatibility namespace
+preserve test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx refused: shared OOXML error: invalid OOXML data: OPC M4.5 requires xsi:type on created and modified
+preserve test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx refused: shared OOXML error: invalid OOXML data: OPC M4.5 requires xsi:type="dcterms:W3CDTF"
+preserve test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx refused: OPC error: A package cannot contain more than one core-properties relationship
+preserve test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content
+preserve test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx refused: shared OOXML error: invalid OOXML data: OPC M4.4 forbids xml:lang in core properties
+preserve test-data/poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx refused: OPC error: Derived OPC part names coexist: '/word/document.xml' and '/word/document.xml/image1.gif'
+preserve test-data/poi/test-data/xmldsign/hello-world-signed-twice.docx refused: unsafe DOCX edit 'apply_document_patch' rejected: changed signed content requires explicit Package::unsign before publication
+preserve test-data/poi/test-data/xmldsign/hello-world-signed.docx refused: unsafe DOCX edit 'apply_document_patch' rejected: changed signed content requires explicit Package::unsign before publication
+preserve test-data/poi/test-data/xmldsign/ms-office-2010-signed.docx refused: paragraph 0 edit refused: selected owner contains unsupported structural content

@@ -1,0 +1,19 @@
+[package]
+name = "level_probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+flate2 = { version = "1", features = ["zlib-rs"], default-features = false }
+litchi-core = { path = "ROOT/crates/litchi-core" }
+litchi-opc = { path = "ROOT/crates/litchi-opc" }
+litchi-docx = { path = "ROOT/crates/litchi-docx" }
+litchi-xlsx = { path = "ROOT/crates/litchi-xlsx" }
+litchi-pptx = { path = "ROOT/crates/litchi-pptx" }
+soapberry-zip = { path = "ROOT/crates/soapberry-zip" }
+
+[profile.release]
+debug = 1
+
+[workspace]

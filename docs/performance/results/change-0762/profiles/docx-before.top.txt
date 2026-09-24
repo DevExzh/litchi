@@ -1,0 +1,28 @@
+# flat perf profile, whole process (includes untimed corpus build and reopen gates), docx_streaming_create large, 30 samples, CPU 12, binary bin/b
+    21.60%  [.] litchi_core::execution::ExecutionContext::consume                                                     -      -
+    10.23%  [.] zlib_rs::deflate::algorithm::medium::deflate_medium                                                   -      -
+     3.12%  [.] litchi_docx::streaming::StreamingDocumentWriter<W>::finish_run                                        -      -
+     2.30%  [.] <core::fmt::Formatter>::pad_integral                                                                  -      -
+     2.26%  [.] litchi_docx::streaming::StreamingDocumentWriter<W>::write_text                                        -      -
+     2.04%  [.] __memmove_avx512_unaligned_erms                                                                       -      -
+     1.91%  [.] quick_xml::reader::ns_reader::NsReader<R>::process_event                                              -      -
+     1.84%  [.] sha2::sha256::x86_sha::compress                                                                       -      -
+     1.67%  [k] 0xffffffff9f04eeec                                                                                    -      -
+     1.60%  [k] 0xffffffff9ff30b07                                                                                    -      -
+     1.44%  [.] 0x0000000000241c9b                                                                                    -      -
+     1.30%  [.] litchi_docx::streaming::DocumentState<W>::emit_escaped_text                                           -      -
+     1.29%  [.] litchi_docx::paragraph::codec::text::extract_word_text                                                -      -
+     1.13%  [.] litchi_core::execution::ExecutionContext::reserve_scoped                                              -      -
+     0.98%  [.] <usize as core::fmt::Display>::fmt                                                                    -      -
+     0.96%  [k] 0xffffffff9ff30da0                                                                                    -      -
+     0.94%  [.] flate2::mem::Compress::compress                                                                       -      -
+     0.90%  [.] zlib_rs::deflate::slide_hash::avx2::slide_hash_chain                                                  -      -
+     0.89%  [.] quick_xml::encoding::Decoder::decode_cow                                                              -      -
+     0.89%  [.] crc32fast::specialized::pclmulqdq::calculate                                                          -      -
+     0.88%  [k] 0xffffffff9f124131                                                                                    -      -
+     0.87%  [.] soapberry_zip::writer::CrcStage::update                                                               -      -
+     0.82%  [.] litchi_docx::streaming::StreamingDocumentWriter<W>::start_run                                         -      -
+     0.78%  [.] litchi_docx::streaming::StreamingDocumentWriter<W>::start_paragraph                                   -      -
+     0.77%  [.] soapberry_zip::writer::ReusableDeflateState::compress_once                                            -      -
+     0.75%  [.] litchi_docx::streaming::DocumentState<W>::preflight_document_and_paragraph                            -      -
+     0.73%  [.] __GI___readdir64                                                                                      -      -
