@@ -1,0 +1,17 @@
+# Change 0760 measured binaries (SHA-256), recorded before the build
+# directories were deleted. Harness legs were built with the identical command
+#   cargo build --release --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline
+# from detached sparse worktrees of equal path length (0760-before-src at
+# 1d1044e3ac, 0760-branch-src at dfde1e43bb) into target directories of equal
+# length (targets/0760-before, targets/0760-branch), and run from bin/a, bin/b
+# and bin/c (a byte-identical copy of bin/a, the A/A arm).
+5c25958299cc2c92403590bbfd6ff8cda4128b8115e850df20c951caebf7b5df  bin/a/litchi-perf-baseline (before, 1d1044e3ac)
+5905ca2837f2c9d77edf36e670ef1c6adfa1451c0525e6a3a6f5ecb9e3907122  bin/b/litchi-perf-baseline (after, dfde1e43bb)
+5c25958299cc2c92403590bbfd6ff8cda4128b8115e850df20c951caebf7b5df  bin/c/litchi-perf-baseline (A/A copy of before)
+# Probes (probe/, 'cargo build --release --offline' with tools/perf-baseline/Cargo.lock
+# beside the manifest), built against the same two worktrees:
+d3be44e37c52e0691325313df4f634b54af4b36db82e194d241392c60aa2a9ac  bin/pa/pptx-memo-probe (base; counters, dumps, differential)
+a0ecfe0ac3d6910257b01b92645d894021d84b1f3d5c587437286425726af266  bin/pb/pptx-memo-probe (branch; counters, dumps, differential)
+d6b842cee4f6493f39cbc383979921f4bfe1d739dec6edc5a2124c19d36a2a0a  bin/pa-alloc/pptx-memo-probe (base, --features count-alloc)
+693cf21c7a9c23c9b3d0f5ca330e12c4aa68a71c7cc6b2c241bfd3364667ab17  bin/pb-alloc/pptx-memo-probe (branch, --features count-alloc)
+184c3a963625e04006b36a30d17dce0d1d26eefd2f8ad55a22c2719c14000935  probe-pb-fp (branch, RUSTFLAGS='-C force-frame-pointers=yes'; profile only)

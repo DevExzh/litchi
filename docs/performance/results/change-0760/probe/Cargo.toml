@@ -1,0 +1,18 @@
+[package]
+name = "pptx-memo-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-pptx = { path = "LITCHI_ROOT/crates/litchi-pptx" }
+litchi-opc = { path = "LITCHI_ROOT/crates/litchi-opc" }
+sha2 = "0.11"
+
+[features]
+count-alloc = []
+
+[profile.release]
+debug = true
+
+[workspace]
