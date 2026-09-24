@@ -93,6 +93,15 @@ impl Default for Capabilities {
 /// the widest ECMA-376 element types declare about 70 attributes.
 pub const DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT: usize = 1024;
 
+/// Immutable ceiling for [`Limits::max_attributes_per_element`] and for the
+/// stream's per-event attribute limit, matching the publication audit's.
+///
+/// quick-xml's duplicate-name check costs up to quadratic time in a tag's
+/// attributes when their names are chosen to collide, so no configuration may
+/// admit more. The in-memory processor applies at most this many whatever the
+/// field holds; the stream's `validate` refuses a larger value.
+pub const ATTRIBUTES_PER_ELEMENT_CEILING: usize = 4096;
+
 /// Bounds for one markup-compatibility preprocessing operation.
 #[derive(Debug, Clone)]
 pub struct Limits {
@@ -108,7 +117,8 @@ pub struct Limits {
     /// Checked as each attribute is read, so a larger tag is refused at its
     /// first surplus attribute. The parser's duplicate-name check costs up to
     /// quadratic time in a tag's attribute count when the names are chosen
-    /// to collide, and this bound caps that cost per tag.
+    /// to collide, and this bound caps that cost per tag. A value above
+    /// [`ATTRIBUTES_PER_ELEMENT_CEILING`] acts as the ceiling.
     pub max_attributes_per_element: usize,
 }
 

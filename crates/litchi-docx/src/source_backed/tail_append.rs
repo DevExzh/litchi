@@ -1857,14 +1857,17 @@ fn settings_mce_directive_facts(
     Ok((tokens, owned))
 }
 
-/// The namespace `NamespaceResolver::bindings` reports for the named prefix
-/// `prefix`: its innermost declaration, unless that one undeclares it.
+/// The namespace the earlier search of `NamespaceResolver::bindings` found
+/// for the named prefix `prefix`: the namespace of its innermost declaration,
+/// or `None` when that declaration undeclares it or there is none.
 ///
-/// `bindings` never reports the predefined `xml` and `xmlns` prefixes or a
-/// default-namespace binding, so neither does this. It finds the declaration
-/// with one reverse scan of the `B` bindings in scope, where a search through
-/// `bindings` costs `O(B²)`: each of its steps rescans the later bindings.
-/// `scratch` holds the `prefix:` name quick-xml needs to form a prefix.
+/// That search matched named bindings only, and the resolver keeps no binding
+/// for the predefined `xml` and `xmlns` prefixes, so an empty prefix, `xml`
+/// and `xmlns` give `None` here without a lookup. The declaration is found by
+/// one reverse scan of the `B` bindings in scope, where the search through
+/// `bindings` cost `O(B²)`: each of its steps rescans the later bindings to
+/// skip overridden ones. `scratch` holds the `prefix:` name quick-xml needs to
+/// form a prefix.
 fn settings_prefix_namespace<'r>(
     resolver: &'r quick_xml::name::NamespaceResolver,
     prefix: &[u8],

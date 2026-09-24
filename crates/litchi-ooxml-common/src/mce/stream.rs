@@ -19,7 +19,9 @@ use std::{
     sync::Arc,
 };
 
-use super::model::{Capabilities, Error, Limits, NAMESPACE, Name, Report, XML_NS};
+use super::model::{
+    ATTRIBUTES_PER_ELEMENT_CEILING, Capabilities, Error, Limits, NAMESPACE, Name, Report, XML_NS,
+};
 use super::patterns::{NamePattern, Patterns};
 use super::scope::{Scope, has_duplicate_prefix};
 use crate::xml_name::{self, QualifiedName};
@@ -36,7 +38,7 @@ const DEFAULT_MAX_NAME_BYTES: usize = 1024 * 1024;
 
 const HARD_MAX_EVENTS: usize = 16 * 1024 * 1024;
 const HARD_MAX_EVENT_BYTES: usize = 256 * 1024 * 1024;
-const HARD_MAX_ATTRIBUTES_PER_EVENT: usize = 1 << 20;
+const HARD_MAX_ATTRIBUTES_PER_EVENT: usize = ATTRIBUTES_PER_ELEMENT_CEILING;
 const HARD_MAX_ATTRIBUTE_BYTES_PER_EVENT: usize = 256 * 1024 * 1024;
 const HARD_MAX_CONTEXT_BYTES: usize = 512 * 1024 * 1024;
 const HARD_MAX_NAME_BYTES: usize = 16 * 1024 * 1024;
@@ -64,7 +66,9 @@ pub struct StreamLimits {
     /// optional UTF-8 BOM is treated as a separate three-byte preamble on the
     /// first read.
     pub max_event_bytes: usize,
-    /// Maximum attributes on one start or empty event.
+    /// Maximum attributes on one start or empty event, at most
+    /// [`ATTRIBUTES_PER_ELEMENT_CEILING`]; the tighter of this and
+    /// [`Limits::max_attributes_per_element`] applies.
     pub max_attributes_per_event: usize,
     /// Maximum combined raw attribute-name and value bytes on one event.
     pub max_attribute_bytes_per_event: usize,
@@ -188,6 +192,11 @@ impl StreamLimits {
             self.processing.max_depth,
             HARD_MAX_DEPTH,
             "MCE processing depth",
+        )?;
+        check_bound(
+            self.processing.max_attributes_per_element,
+            ATTRIBUTES_PER_ELEMENT_CEILING,
+            "MCE attributes per element",
         )?;
         Ok(())
     }
@@ -2685,6 +2694,9 @@ impl<'a> Processor<'a> {
         // The processing profile's per-element limit applies here as it does
         // in the in-memory processor; the stream's own per-event limit may be
         // tighter.
+        // `validate` refused either limit above the ceiling before processing
+        // began; the clamp keeps the bound if a caller changed a public field
+        // since.
         let (max_attributes, attribute_limit) = if self.limits.max_attributes_per_event
             <= self.limits.processing.max_attributes_per_element
         {
@@ -2698,6 +2710,7 @@ impl<'a> Processor<'a> {
                 "attributes per element",
             )
         };
+        let max_attributes = max_attributes.min(ATTRIBUTES_PER_ELEMENT_CEILING);
         for attribute in element.attributes().with_checks(false) {
             let attribute = attribute.map_err(xml_error)?;
             check_name_bytes(attribute.key.as_ref(), self.limits)?;

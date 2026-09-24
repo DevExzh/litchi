@@ -2464,6 +2464,11 @@ pub mod codec {
             } else {
                 continue;
             };
+            // `Namespace::new` keeps an empty prefix (`xmlns:`) as the default
+            // namespace, so the duplicate check must treat it as one: two
+            // default declarations would be written as two `xmlns`
+            // attributes.
+            let prefix = prefix.filter(|value| !value.is_empty());
             if result.len() >= maximum {
                 return Err(limit("SVG blip namespace declarations", maximum));
             }

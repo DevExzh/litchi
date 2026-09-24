@@ -449,3 +449,40 @@ fn repeated_namespace_declarations_are_refused_as_before() {
     assert_eq!(value.namespaces().len(), 1);
     assert_eq!(value.namespaces()[0].prefix(), Some("p"));
 }
+
+#[test]
+fn an_empty_prefix_declaration_is_the_default_namespace_for_the_duplicate_check() {
+    // `xmlns:` declares the default namespace as `Namespace` stores it, so it
+    // and `xmlns` together are two default declarations, which the writers
+    // would emit as two `xmlns` attributes. Both orders are refused.
+    let is_duplicate = |error: &litchi_drawingml::Error| {
+        matches!(
+            error,
+            litchi_drawingml::Error::Invalid(message)
+                if message == "SVG blip has duplicate namespace declarations"
+        )
+    };
+    for declarations in [
+        r#"xmlns:="urn:one" xmlns="urn:two""#,
+        r#"xmlns="urn:two" xmlns:="urn:one""#,
+    ] {
+        let standalone = format!(r#"<asvg:svgBlip xmlns:asvg="{NAMESPACE}" {declarations}/>"#);
+        let error = read(standalone.as_bytes()).unwrap_err();
+        assert!(is_duplicate(&error), "{declarations}: {error}");
+
+        let contextual = format!("<asvg:svgBlip {declarations}/>");
+        let error = read_contextual(contextual.as_bytes(), &host_scope()).unwrap_err();
+        assert!(is_duplicate(&error), "{declarations}: {error}");
+    }
+    // Either declaration alone is still one default namespace.
+    for declaration in [r#"xmlns:="urn:one""#, r#"xmlns="urn:two""#] {
+        let standalone = format!(r#"<asvg:svgBlip xmlns:asvg="{NAMESPACE}" {declaration}/>"#);
+        let value = read(standalone.as_bytes()).expect("one default declaration");
+        let defaults = value
+            .namespaces()
+            .iter()
+            .filter(|namespace| namespace.prefix().is_none())
+            .count();
+        assert_eq!(defaults, 1, "{declaration}");
+    }
+}

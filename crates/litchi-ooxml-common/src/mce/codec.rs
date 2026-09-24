@@ -8,7 +8,8 @@ use quick_xml::{
 use std::{borrow::Cow, collections::HashSet, rc::Rc, str, sync::Arc};
 
 use super::model::{
-    Capabilities, Error, Limits, NAMESPACE, Name, OffsetLimits, Output, Report, XML_NS,
+    ATTRIBUTES_PER_ELEMENT_CEILING, Capabilities, Error, Limits, NAMESPACE, Name, OffsetLimits,
+    Output, Report, XML_NS,
 };
 use super::patterns::{NamePattern, Patterns};
 use super::scope::{Scope, has_duplicate_prefix, sorted_prefixes};
@@ -888,6 +889,9 @@ fn start(
     let depth = st.len() + 1;
     let q = str::from_utf8(e.name().into_inner()).map_err(xerr)?;
     let mut raw = Vec::new();
+    let max_attributes = lim
+        .max_attributes_per_element
+        .min(ATTRIBUTES_PER_ELEMENT_CEILING);
     let mut attributes = 0usize;
     for a in e.attributes().with_checks(true) {
         // Counted before the item is inspected: quick-xml has checked this
@@ -896,7 +900,7 @@ fn start(
         attributes = attributes
             .checked_add(1)
             .ok_or_else(|| limit("attributes per element"))?;
-        if attributes > lim.max_attributes_per_element {
+        if attributes > max_attributes {
             return Err(limit("attributes per element"));
         }
         let a = a.map_err(xerr)?;
