@@ -262,9 +262,9 @@ impl Budget {
     /// Opens a rough, chunked lease on one resource of this budget.
     ///
     /// Opening claims nothing. The lease claims up to `chunk` units at a time,
-    /// the first time it is charged and whenever it runs out, and hands them
-    /// out locally; see [`Lease`] for what stays exact and what becomes rough.
-    /// A `chunk` of zero behaves as one.
+    /// the first time it is charged and whenever it runs out, hands them out
+    /// locally and never holds more than `chunk` units; see [`Lease`] for what
+    /// stays exact and what becomes rough. A `chunk` of zero behaves as one.
     #[must_use]
     pub fn lease(&self, resource: Resource, chunk: u64) -> Lease {
         Lease {
@@ -522,23 +522,29 @@ impl Drop for ScopedReservation<'_> {
 ///
 /// A lease claims budget a chunk at a time and hands it out locally, so an
 /// operation that charges many small amounts pays one atomic update per
-/// hierarchy level per chunk instead of one per charge. Every claim is the
-/// check-and-add [`Budget::consume`] makes: no level is ever observed above
-/// its limit, even transiently, and a refused claim leaves every level as it
-/// found it.
+/// hierarchy level per chunk instead of one per charge. It never holds more
+/// than one chunk: a claim near a limit shrinks, and a refund that would take
+/// it past one chunk returns the excess to the budget at once. Every claim is
+/// the check-and-add [`Budget::consume`] makes: no level is ever observed
+/// above its limit, even transiently, and a refused claim leaves every level
+/// as it found it.
 ///
-/// What stays exact: the lease's own holder is refused on the same charge, at
-/// the same level and with the same [`ResourceLimit`] values as exact
-/// accounting would give it, because a claim near a limit shrinks to the room
-/// left (never below what the charge needs) and a refusal reports the value
-/// the level would have reached had the charge been exact. Releasing or
-/// dropping the lease returns every unit it holds but has not handed out,
-/// so once it is released every counter shows exactly what was handed out.
+/// What stays exact: when every charge its holder makes of the resource goes
+/// through this one lease, the holder is refused on the same charge, at the
+/// same level and with the same [`ResourceLimit`] values as exact accounting
+/// would give it, because a claim near a limit shrinks to the room left
+/// (never below what the charge needs) and a refusal reports the value the
+/// level would have reached had the charge been exact. A charge the holder
+/// makes outside the lease, directly or through another lease, sees this
+/// lease's unspent units as used. Releasing or dropping the lease returns
+/// every unit it holds but has not handed out, so once it is released every
+/// counter shows exactly what was handed out.
 ///
 /// What becomes rough: units the lease holds but has not handed out count as
 /// used for every other holder of the budget and its ancestors
-/// ("pre-claimed"), so another holder can be refused up to one chunk earlier
-/// than exact accounting would refuse it, and observes that much more usage.
+/// ("pre-claimed"), so another holder can be refused earlier than exact
+/// accounting would refuse it, by up to one chunk per other open lease, and
+/// observes that much more usage.
 ///
 /// [`Self::refund`] takes back units whose work did not happen, where exact
 /// accounting would have dropped a reservation. Dropping the lease releases
@@ -581,8 +587,12 @@ impl Lease {
     }
 
     /// Takes back `amount` units handed out earlier whose work did not
-    /// happen. They return to the lease, not to the budget; releasing or
-    /// dropping the lease returns them.
+    /// happen.
+    ///
+    /// The units return to the lease, up to one chunk: whatever the lease
+    /// would then hold beyond its chunk goes back to this budget and every
+    /// ancestor at once, so a refund never leaves more than one chunk
+    /// pre-claimed. Releasing or dropping the lease returns the rest.
     ///
     /// Returns `false`, and changes nothing, when `amount` exceeds what the
     /// lease has handed out and not yet taken back.
@@ -595,7 +605,13 @@ impl Lease {
             return false;
         };
         self.consumed -= amount;
-        self.held = held;
+        // A refunded charge can be many chunks wide; keeping all of it would
+        // leave it pre-claimed until the lease is released.
+        let excess = held.saturating_sub(self.chunk);
+        if excess != 0 {
+            release_chain(&self.node, self.resource, excess);
+        }
+        self.held = held - excess;
         true
     }
 
@@ -1581,6 +1597,93 @@ mod tests {
     }
 
     #[test]
+    fn a_refund_wider_than_a_chunk_returns_the_excess_at_once() {
+        let [root, middle, leaf] = work_levels(100_000, 100_000, 100_000);
+        let mut lease = leaf.lease(Resource::Work, 64);
+        lease.consume(3).expect("claim a chunk");
+        // A charge wider than the chunk uses what the lease holds and claims
+        // exactly the rest.
+        lease.consume(12_001).expect("wide charge");
+        assert_eq!((lease.held(), lease.consumed()), (0, 12_004));
+        assert_eq!(root.used(Resource::Work), 12_004);
+        // Its work did not happen: the lease keeps one chunk and the budget
+        // gets the rest back now, not at release.
+        assert!(lease.refund(12_001));
+        assert_eq!((lease.held(), lease.consumed()), (64, 3));
+        for budget in [&root, &middle, &leaf] {
+            assert_eq!(budget.used(Resource::Work), 3 + 64);
+        }
+        lease.release();
+        for budget in [&root, &middle, &leaf] {
+            assert_eq!(budget.used(Resource::Work), 3);
+        }
+    }
+
+    #[test]
+    fn a_lease_never_holds_more_than_one_chunk() {
+        // Random charges (some wider than a chunk), refunds (some refused),
+        // releases and refusals near a three-level limit. After every call
+        // the lease holds at most one chunk and every level shows exactly
+        // what was handed out plus what the lease holds.
+        for (index, chunk) in [1_u64, 3, 64, 4_096, u64::MAX].into_iter().enumerate() {
+            let levels = work_levels(50_000, 40_000, 30_000);
+            let mut lease = levels[2].lease(Resource::Work, chunk);
+            let mut handed_out = 0_u64;
+            let (mut refusals, mut refunds) = (0_u32, 0_u32);
+            let mut state = 0x9E37_79B9_7F4A_7C15_u64 ^ (u64::try_from(index).expect("index") + 1);
+            for _ in 0..20_000 {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                let roll = state % 100;
+                let size = (state >> 16) % 13_000;
+                match roll {
+                    0..=59 => {
+                        let amount = 1 + size % 9;
+                        match lease.consume(amount) {
+                            Ok(()) => handed_out += amount,
+                            Err(error) => {
+                                assert_eq!(error.limit, 30_000);
+                                refusals += 1;
+                            },
+                        }
+                    },
+                    60..=74 => {
+                        let amount = 1 + size;
+                        match lease.consume(amount) {
+                            Ok(()) => handed_out += amount,
+                            Err(error) => {
+                                assert_eq!(error.observed, handed_out + amount);
+                                refusals += 1;
+                            },
+                        }
+                    },
+                    75..=94 => {
+                        let amount = size.min(lease.consumed() + (state >> 40) % 2);
+                        if lease.refund(amount) {
+                            handed_out -= amount;
+                            refunds += 1;
+                        } else {
+                            assert!(amount > lease.consumed());
+                        }
+                    },
+                    _ => lease.release(),
+                }
+                assert!(lease.held() <= lease.chunk(), "chunk {chunk}");
+                assert_eq!(lease.consumed(), handed_out);
+                for level in &levels {
+                    assert_eq!(level.used(Resource::Work), handed_out + lease.held());
+                }
+            }
+            assert!(refusals > 0 && refunds > 0, "chunk {chunk}");
+            drop(lease);
+            for level in &levels {
+                assert_eq!(level.used(Resource::Work), handed_out);
+            }
+        }
+    }
+
+    #[test]
     fn a_lease_releases_when_dropped_even_while_unwinding() {
         let [root, middle, leaf] = work_levels(1_000, 1_000, 1_000);
         let unwound = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -1673,6 +1776,7 @@ mod tests {
             if owned.len() == 3 && (state >> 24) % 2 == 0 {
                 owned.clear();
             }
+            assert!(lease.held() <= lease.chunk());
         }
         drop(owned);
         drop(lease);

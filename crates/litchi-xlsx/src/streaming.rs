@@ -1937,6 +1937,55 @@ mod tests {
         assert_eq!(budget.used(Resource::Work), 1 + 3);
     }
 
+    #[test]
+    fn a_refused_row_leaves_at_most_one_chunk_pre_claimed() {
+        // The worksheet-XML limit refuses a row after its objects were
+        // charged, and does not poison the writer. The refund must not leave
+        // a wide row's objects pre-claimed until the writer finishes: the
+        // objects lease keeps at most one chunk, and the budget shows exactly
+        // what was handed out plus that.
+        let context = context_with_objects_and_work(1 << 40, 1 << 40);
+        let budget = context.budget().clone();
+        let limits = StreamingWorkbookLimits {
+            max_sheet_xml_bytes: 4 * 1024,
+            ..StreamingWorkbookLimits::default()
+        };
+        let mut writer = StreamingWorkbookWriter::new(Vec::new(), context, limits).unwrap();
+        writer.write_row(1, lease_row(1)).unwrap();
+        // Six construction objects, then row 1's two cells and its row.
+        let handed_out = 6 + 3;
+        for (row, width) in [
+            (2_u32, 12_000_u32),
+            (3, 4_095),
+            (4, 4_096),
+            (5, 5_000),
+            (6, 150),
+        ] {
+            let wide: Vec<StreamingCell<'static>> = (1..=width)
+                .map(|column| StreamingCell::new(column, StreamingCellValue::Bool(true)))
+                .collect();
+            let error = writer.write_row(row, wide).unwrap_err();
+            assert!(
+                error.to_string().contains("worksheet XML limit"),
+                "row {row}: {error}"
+            );
+            assert!(!writer.is_poisoned());
+            for lease in [writer.leases.objects.lease(), writer.leases.work.lease()] {
+                assert!(lease.held() <= lease.chunk(), "row {row}: {lease:?}");
+            }
+            let held = writer.leases.objects.lease().held();
+            assert_eq!(
+                budget.used(Resource::Objects),
+                handed_out + held,
+                "row {row}"
+            );
+        }
+        writer.write_row(7, lease_row(3)).unwrap();
+        writer.finish().unwrap();
+        // Row 7's four cells and its row, and the final part.
+        assert_eq!(budget.used(Resource::Objects), handed_out + 5 + 1);
+    }
+
     struct NonSeekSink(Vec<u8>);
     impl Write for NonSeekSink {
         fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
