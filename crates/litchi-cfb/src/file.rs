@@ -24,6 +24,28 @@ const BITSET_WORD_BITS: usize = u64::BITS as usize;
 /// writes per sector of its chain.
 const CLEAR_BY_SECTOR_RATIO: usize = 8;
 
+/// Capacity, in bytes, above which a reader frees its retained chain buffer
+/// after a read instead of keeping it for the next read (record 0769,
+/// following the review of record 0767).
+///
+/// An [`OleFile`] keeps the buffers its reads collect chains into, so that
+/// reading many streams costs time proportional to their chains (record
+/// 0767). Kept for the reader's lifetime, the chain buffer would pin one
+/// `u32` per sector of the longest chain ever read, about 8 MiB after one
+/// 1 GiB stream of 512-byte sectors. The chain buffer grows by doubling, so a
+/// capacity above 1 MiB follows a chain of more than 131,072 sectors: a
+/// stream of more than 64 MiB even at 512-byte sectors, whose own buffer
+/// that read allocated anyway. The next such read allocates the chain buffer
+/// again; reads of shorter chains keep theirs, so the common small-file path
+/// is unchanged.
+///
+/// The visited map is kept whatever its size. It holds one bit per entry of
+/// the larger table read, a thirty-second of the memory that table's `u32`
+/// entries already take in the reader for its lifetime, and freeing it would
+/// make every later read allocate and zero a table-sized map again, the cost
+/// record 0767 removed.
+const RETAINED_CHAIN_SCRATCH_BYTES: usize = 1 << 20;
+
 /// Upper bound, in bytes, on the scratch buffer the FAT and MiniFAT loaders
 /// use to batch physically contiguous sector reads.
 ///
@@ -138,6 +160,12 @@ impl CheckedBitSet {
         } else {
             self.clear_table(bit_len);
         }
+    }
+
+    /// Whether every bit of the map is clear: the invariant a reusable chain
+    /// map keeps between walks, which the walks assert in debug builds.
+    fn is_clear(&self) -> bool {
+        self.words.iter().all(|&word| word == 0)
     }
 
     /// Clears every word covering the first `bit_len` bits: the restoration
@@ -368,6 +396,9 @@ pub struct OleFile<R: Read + Seek> {
     /// table read and one `u32` per sector of the longest chain read: 1/128
     /// (512-byte sectors) or 1/1024 (4096-byte sectors) of a FAT-chained
     /// stream's bytes, and at most 64 for a validated mini stream's chain.
+    /// A read frees either buffer once its capacity exceeds
+    /// [`RETAINED_CHAIN_SCRATCH_BYTES`], so a long-lived reader never pins
+    /// more than that per buffer after its reads.
     stream_chain: EndChainScratch,
 }
 
@@ -2456,9 +2487,12 @@ impl<R: Read + Seek> OleFile<R> {
     ) -> Result<Vec<u8>, OleError> {
         // The chain buffers are moved out while the batched read borrows the
         // reader, and put back whatever the outcome: `collect` leaves every
-        // visited bit clear on success and on error alike.
+        // visited bit clear on success and on error alike. Until they are put
+        // back, the reader holds an empty scratch, so a panic in between
+        // leaves it an all-clear one.
         let mut chain = std::mem::take(&mut self.stream_chain);
         let result = self.read_fat_chain(&mut chain, start_sector, declared_size);
+        chain.release_oversized();
         self.stream_chain = chain;
         result
     }
@@ -2550,15 +2584,32 @@ impl<R: Read + Seek> OleFile<R> {
             self.ministream = Some(ministream_data);
         }
 
+        // The chain buffers are moved out for the collection and the copy,
+        // and put back whatever the outcome, as `read_stream_from_fat` does.
+        // The load above has already put back the buffers it used.
+        let mut chain = std::mem::take(&mut self.stream_chain);
+        let result = self.read_minifat_chain(&mut chain, start_sector, size);
+        chain.release_oversized();
+        self.stream_chain = chain;
+        result
+    }
+
+    /// [`Self::read_stream_from_minifat`] after the root mini stream's load,
+    /// with the chain collected into `chain`.
+    fn read_minifat_chain(
+        &self,
+        chain: &mut EndChainScratch,
+        start_sector: u32,
+        size: u64,
+    ) -> Result<Vec<u8>, OleError> {
         let ministream = self
             .ministream
             .as_ref()
             .ok_or_else(|| OleError::CorruptedFile("No mini stream".to_string()))?;
         // The same checks and errors as `collect_sector_chain`, into the
         // retained buffers.
-        self.stream_chain
-            .collect(&self.minifat, start_sector, "MiniFAT")?;
-        let sectors = self.stream_chain.sectors();
+        chain.collect(&self.minifat, start_sector, "MiniFAT")?;
+        let sectors = chain.sectors();
         let stream_len = usize::try_from(size)
             .map_err(|_err| OleError::CorruptedFile("MiniFAT stream is too large".to_string()))?;
         let chain_capacity = sectors
@@ -3945,6 +3996,10 @@ impl SectorChainScratch {
         expected_count: usize,
         table_name: &str,
     ) -> Result<(), OleError> {
+        debug_assert!(
+            self.visited.is_clear(),
+            "a reusable chain map must be all-clear when a walk starts"
+        );
         self.reset();
         let result = (|| {
             if expected_count == 0 {
@@ -4070,6 +4125,10 @@ impl EndChainScratch {
         start_sector: u32,
         table_name: &str,
     ) -> Result<(), OleError> {
+        debug_assert!(
+            self.visited.is_clear(),
+            "a reusable chain map must be all-clear when a walk starts"
+        );
         self.sectors.clear();
         if start_sector == ENDOFCHAIN {
             return Ok(());
@@ -4096,6 +4155,17 @@ impl EndChainScratch {
             self.sectors.clear();
         }
         result
+    }
+
+    /// Frees the chain buffer when its capacity exceeds
+    /// [`RETAINED_CHAIN_SCRATCH_BYTES`]; a reader calls this after each read
+    /// it collected a chain for. The recorded chain is then empty, as it is
+    /// after a failed collection, and the next collection allocates again.
+    /// The visited map is kept (see the constant).
+    fn release_oversized(&mut self) {
+        if self.sectors.capacity() > RETAINED_CHAIN_SCRATCH_BYTES / size_of::<u32>() {
+            self.sectors = Vec::new();
+        }
     }
 }
 
