@@ -165,6 +165,19 @@ changes.
   - the DOCX mutable writer's `word/_rels/document.xml.rels`;
   - `[Content_Types].xml` and a master's relationships after `add_slide_layout`;
   - a PPTX tag part rewritten by `put_shape_tags`.
+
+  The independent review found more regenerated parts that drop the mark, all
+  rebuilt from the model and none a preserved part:
+  - `put_shape_tags` adding a tag part also drops it from `[Content_Types].xml`
+    and the slide's relationships (28 decks);
+  - XLSX eager cell edits that remove the calculation chain drop it from
+    `[Content_Types].xml` and `xl/_rels/workbook.xml.rels` (45 workbooks);
+  - DOCX settings edits drop it from the settings, document relationships and
+    content types;
+  - edits to a signed deck drop it from `_rels/.rels` when the signature is
+    stripped.
+
+  Every save without an edit kept every mark.
 * The rule behind keeping marks through compaction is 0650's: under ADR 0006's
   preservation default, the mark is a byte the producer wrote, not formatting.
 
@@ -188,8 +201,20 @@ changes.
   pass. The publication proof is exercised by the DOCX semantic-edit
   differential: the marked edit publishes the unmarked bytes behind the mark.
 * **A doubled mark** is character data before the root, as XML says. It is now
-  located exactly and refused wherever text before the root is refused,
-  including publication.
+  located exactly, and the publication audit refuses it at physical byte 3. It
+  is not refused on every route (review correction):
+  - on the DOCX package routes, the semantic edit (`edit_document`,
+    `replace_paragraph_text`, `publish_document_edit`) and the mutable append
+    both succeed and save the part with one mark, because compaction drops the
+    second (`document/transaction.rs:5766`, `writer/doc/model.rs:1706`). The base
+    does the same on the semantic route;
+  - an XLSX worksheet with a doubled mark now passes `commit()` and is refused at
+    `to_bytes()` by the publication audit, where the base refused it at
+    `commit()`.
+  Nothing is corrupted. Refusing a doubled mark on every route is a follow-up.
+* **UTF-16 parts** (pre-existing, not changed): a DOCX main part encoded as
+  UTF-16 reports `paragraph_count() == Ok(0)` while `text()` returns an error.
+  Every edit route refuses such parts with a typed error.
 
 ## Evidence
 
