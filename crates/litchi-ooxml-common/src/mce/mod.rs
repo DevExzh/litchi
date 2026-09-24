@@ -6,8 +6,11 @@ pub mod stream;
 mod codec;
 mod fragment;
 mod model;
+mod patterns;
 mod scope;
 
+#[cfg(test)]
+mod bounds_tests;
 #[cfg(test)]
 mod tests;
 

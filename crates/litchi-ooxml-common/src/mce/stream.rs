@@ -20,6 +20,8 @@ use std::{
 };
 
 use super::model::{Capabilities, Error, Limits, NAMESPACE, Name, Report, XML_NS};
+use super::patterns::{NamePattern, Patterns};
+use super::scope::{Scope, has_duplicate_prefix};
 use crate::xml_name::{self, QualifiedName};
 
 /// XML namespace used by namespace declaration attributes.
@@ -1544,43 +1546,59 @@ impl Namespaces {
         }
     }
 
-    fn get(&self, prefix: &str) -> Option<&str> {
+    /// Resolve `prefix` by walking the declaration chain, or `None` when
+    /// `budget` declarations were visited first.
+    ///
+    /// The walk costs one comparison per declaration in scope, which an input
+    /// controls; production lookups use [`Scope`], and this walk only checks
+    /// it in debug builds.
+    fn walk(&self, prefix: &str, mut budget: usize) -> Option<Option<&str>> {
         if prefix == "xml" {
-            return Some(XML_NS);
+            return Some(Some(XML_NS));
         }
         let mut layer = self.head.as_deref();
         while let Some(current) = layer {
-            if let Some((_, namespace)) = current
-                .local
-                .iter()
-                .rev()
-                .find(|(candidate, _)| candidate == prefix)
-            {
-                return Some(namespace);
+            for (candidate, namespace) in current.local.iter().rev() {
+                budget = budget.checked_sub(1)?;
+                if candidate == prefix {
+                    return Some(Some(namespace));
+                }
             }
             layer = current.parent.as_deref();
         }
-        None
+        Some(None)
     }
 
+    /// Add the declarations `local` of the element at `depth` to this chain,
+    /// the chain of its parent.
+    ///
+    /// `scope` must hold the bindings of this chain; whether it already holds
+    /// the element's own does not matter. Each prefix is compared with the
+    /// others once through a sort and resolved once through `scope`, so an
+    /// element's declarations cost `O(n log n)` whatever their number.
     fn with_local(
         &self,
         local: Vec<(String, String)>,
         limits: &StreamLimits,
+        scope: &Scope,
+        depth: usize,
     ) -> Result<Self, Error> {
         if local.is_empty() {
             return Ok(self.clone());
         }
+        if has_duplicate_prefix(&local)? {
+            return Err(bad("duplicate namespace declaration"));
+        }
         let mut bindings = self.bindings;
         let mut bytes = self.bytes;
-        for (index, (prefix, namespace)) in local.iter().enumerate() {
-            if local[..index]
-                .iter()
-                .any(|(candidate, _)| candidate == prefix)
-            {
-                return Err(bad("duplicate namespace declaration"));
-            }
-            if self.get(prefix).is_none() {
+        for (prefix, namespace) in &local {
+            let bound = scope.get_outside(prefix, depth);
+            debug_assert!(
+                self.walk(prefix, CROSS_CHECKED_DECLARATIONS)
+                    .is_none_or(|walked| walked == bound),
+                "the prefix index disagrees with the declaration chain for {prefix:?}"
+            );
+            if bound.is_none() {
                 bindings = bindings
                     .checked_add(1)
                     .ok_or_else(|| limit("namespace bindings"))?;
@@ -1608,18 +1626,44 @@ impl Namespaces {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-enum NamePattern {
-    Exact(Name),
-    Namespace(String),
+/// Namespace declarations one element's lookup may walk before the debug
+/// cross-check of [`Scope`] against the declaration chain gives up.
+const CROSS_CHECKED_DECLARATIONS: usize = 256;
+
+/// Prefix resolution at the element being processed: [`Scope`] answers, and
+/// debug builds cross-check its answer against the element's declaration
+/// chain while that walk stays short.
+#[derive(Clone, Copy)]
+struct Resolver<'s, 'c> {
+    scope: &'s Scope,
+    chain: &'c Namespaces,
+}
+
+impl<'s> Resolver<'s, '_> {
+    fn get(self, prefix: &str) -> Option<&'s str> {
+        let bound = self.scope.get(prefix);
+        debug_assert!(
+            self.chain
+                .walk(prefix, CROSS_CHECKED_DECLARATIONS)
+                .is_none_or(|walked| walked == bound),
+            "the prefix index disagrees with the declaration chain for {prefix:?}"
+        );
+        bound
+    }
+}
+
+/// Resolve prefixes against `scope`, cross-checked against the element's
+/// declaration chain `chain` in debug builds.
+const fn resolver<'s, 'c>(scope: &'s Scope, chain: &'c Namespaces) -> Resolver<'s, 'c> {
+    Resolver { scope, chain }
 }
 
 struct DirectiveLayer {
     parent: Option<Arc<DirectiveLayer>>,
     ignorable: HashSet<String>,
-    process: HashSet<NamePattern>,
-    preserve_elements: HashSet<NamePattern>,
-    preserve_attributes: HashSet<NamePattern>,
+    process: Patterns,
+    preserve_elements: Patterns,
+    preserve_attributes: Patterns,
 }
 
 #[derive(Clone)]
@@ -1651,14 +1695,10 @@ impl Context {
         false
     }
 
-    fn matches(
-        &self,
-        name: &Name,
-        select: impl Fn(&DirectiveLayer) -> &HashSet<NamePattern>,
-    ) -> bool {
+    fn matches(&self, name: &Name, select: impl Fn(&DirectiveLayer) -> &Patterns) -> bool {
         let mut layer = self.directives.as_deref();
         while let Some(current) = layer {
-            if matches_pattern(select(current), name) {
+            if select(current).matches(name) {
                 return true;
             }
             if current.ignorable.contains(&name.namespace) {
@@ -1738,6 +1778,10 @@ struct Processor<'a> {
     raw_state_valid: bool,
     finished: bool,
     report: StreamReport,
+    /// The bindings in scope at the element being processed; it follows the
+    /// raw element stack, which the semantic stack mirrors until recovery
+    /// abandons the semantic flow.
+    scope: Scope,
 }
 
 impl<'a> Processor<'a> {
@@ -1756,6 +1800,7 @@ impl<'a> Processor<'a> {
             raw_state_valid: false,
             finished: false,
             report: StreamReport::default(),
+            scope: Scope::default(),
         }
     }
 
@@ -1781,6 +1826,48 @@ impl<'a> Processor<'a> {
         element: &BytesStart<'_>,
         decoder: Decoder,
         empty: bool,
+        raw_callback: &mut Raw,
+        raw_enabled: &mut bool,
+        raw_error: &mut Option<RawE>,
+        active_callback: &mut Active,
+        active_enabled: &mut bool,
+        active_error: &mut Option<ActiveE>,
+        active_stop: &mut bool,
+    ) -> Result<(), Error>
+    where
+        Raw: for<'b> FnMut(RawElement<'b>) -> Result<(), RawE>,
+        Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<ActiveFlow, ActiveE>,
+    {
+        let depth = self.raw_stack.len().saturating_add(1);
+        let result = self.start_element(
+            element,
+            decoder,
+            empty,
+            depth,
+            raw_callback,
+            raw_enabled,
+            raw_error,
+            active_callback,
+            active_enabled,
+            active_error,
+            active_stop,
+        );
+        if empty {
+            // An empty element closes at once: its declarations leave the
+            // scope whether or not its semantic processing succeeded, since
+            // the raw flow may recover and read on.
+            self.scope.truncate(depth);
+        }
+        result
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn start_element<RawE, ActiveE, Raw, Active>(
+        &mut self,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        empty: bool,
+        depth: usize,
         raw_callback: &mut Raw,
         raw_enabled: &mut bool,
         raw_error: &mut Option<RawE>,
@@ -1836,7 +1923,9 @@ impl<'a> Processor<'a> {
         let local_namespaces = local_namespaces(&data.attrs, self.limits)?;
         let inherited_namespace_bytes = context.ns.bytes;
         let inherited_context_bytes = context.bytes;
-        context.ns = context.ns.with_local(local_namespaces, self.limits)?;
+        context.ns = context
+            .ns
+            .with_local(local_namespaces, self.limits, &self.scope, depth)?;
         let namespace_bytes = context
             .ns
             .bytes
@@ -1879,7 +1968,13 @@ impl<'a> Processor<'a> {
 
         let directives = collect_directives(&data.attrs, self.limits)?;
         let directive_tokens = directives.tokens;
-        apply_directives(&mut context, directives, self.capabilities, self.limits)?;
+        apply_directives(
+            &mut context,
+            directives,
+            self.capabilities,
+            self.limits,
+            &self.scope,
+        )?;
         let is_extension = self.capabilities.extensions.contains(&data.expanded_name);
         context.opaque = is_extension;
 
@@ -1931,8 +2026,7 @@ impl<'a> Processor<'a> {
                         }) {
                             return Err(limit("directive tokens"));
                         }
-                        let namespace = context
-                            .ns
+                        let namespace = resolver(&self.scope, &context.ns)
                             .get(prefix)
                             .ok_or_else(|| bad("unbound Requires prefix"))?;
                         supported &= self.capabilities.understands(namespace);
@@ -2359,7 +2453,12 @@ impl<'a> Processor<'a> {
             }
         }
         validate_duplicate_attributes(&data.attrs, self.limits)?;
-        self.raw_start_commit(&data, empty)
+        let depth = self.raw_stack.len().saturating_add(1);
+        self.raw_start_commit(&data, empty)?;
+        if empty {
+            self.scope.truncate(depth);
+        }
+        Ok(())
     }
 
     fn raw_start_commit(&mut self, data: &ElementData<'_>, empty: bool) -> Result<(), Error> {
@@ -2424,6 +2523,8 @@ impl<'a> Processor<'a> {
             return Err(bad("mismatched end tag"));
         }
         self.raw_stack.pop();
+        // The frame was at depth `raw_stack.len() + 1`.
+        self.scope.truncate(self.raw_stack.len().saturating_add(1));
         Ok(())
     }
 
@@ -2551,6 +2652,22 @@ impl<'a> Processor<'a> {
         let qualified = str::from_utf8(qualified_name).map_err(xml_error)?;
         let mut preliminary = Vec::new();
         let mut attr_bytes = 0usize;
+        // The processing profile's per-element limit applies here as it does
+        // in the in-memory processor; the stream's own per-event limit may be
+        // tighter.
+        let (max_attributes, attribute_limit) = if self.limits.max_attributes_per_event
+            <= self.limits.processing.max_attributes_per_element
+        {
+            (
+                self.limits.max_attributes_per_event,
+                "stream attributes per event",
+            )
+        } else {
+            (
+                self.limits.processing.max_attributes_per_element,
+                "attributes per element",
+            )
+        };
         for attribute in element.attributes().with_checks(false) {
             let attribute = attribute.map_err(xml_error)?;
             check_name_bytes(attribute.key.as_ref(), self.limits)?;
@@ -2561,13 +2678,13 @@ impl<'a> Processor<'a> {
             if attr_bytes > self.limits.max_attribute_bytes_per_event {
                 return Err(limit("stream attribute bytes"));
             }
-            if preliminary.len() >= self.limits.max_attributes_per_event {
-                return Err(limit("stream attributes per event"));
+            if preliminary.len() >= max_attributes {
+                return Err(limit(attribute_limit));
             }
             let decoded = attribute
                 .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
                 .map_err(xml_error)?;
-            reserve_vec(&mut preliminary, 1, "MCE stream attributes")?;
+            reserve_amortized(&mut preliminary, 1, "MCE stream attributes")?;
             preliminary.push(RawAttribute {
                 qualified_name: clone_bounded_bytes(
                     attribute.key.as_ref(),
@@ -2591,12 +2708,20 @@ impl<'a> Processor<'a> {
             });
         }
         let local = local_namespaces(&preliminary, self.limits)?;
-        let namespace = parent_ns.with_local(local, self.limits)?;
-        let expanded_name = expand(qualified, &namespace, true, self.limits)?;
+        let declares = !local.is_empty();
+        let depth = self.raw_stack.len().saturating_add(1);
+        let namespace = parent_ns.with_local(local, self.limits, &self.scope, depth)?;
+        if declares && let Some(layer) = namespace.head.as_ref() {
+            // Removed when the element's raw frame closes, or at once for an
+            // empty element.
+            self.scope.push(depth, &layer.local)?;
+        }
+        let names = resolver(&self.scope, &namespace);
+        let expanded_name = expand(qualified, names, true, self.limits)?;
         check_expanded_name(&expanded_name, self.limits)?;
         for attribute in &mut preliminary {
             attribute.expanded_name =
-                expand_attribute(attribute.qualified_name.as_ref(), &namespace, self.limits)?;
+                expand_attribute(attribute.qualified_name.as_ref(), names, self.limits)?;
             check_expanded_name(&attribute.expanded_name, self.limits)?;
         }
         Ok(ElementData {
@@ -2823,7 +2948,7 @@ fn local_namespaces(
         if qualified == "xmlns" {
             check_name_bytes(attr.raw_value.as_ref(), limits)?;
             check_name_bytes(attr.decoded_value.as_bytes(), limits)?;
-            reserve_vec(&mut local, 1, "MCE stream namespace declarations")?;
+            reserve_amortized(&mut local, 1, "MCE stream namespace declarations")?;
             let value = clone_bounded_name_part(
                 attr.decoded_value.as_ref(),
                 limits,
@@ -2840,7 +2965,7 @@ fn local_namespaces(
                 return Err(bad("invalid namespace"));
             }
             check_name_bytes(value.as_bytes(), limits)?;
-            reserve_vec(&mut local, 1, "MCE stream namespace declarations")?;
+            reserve_amortized(&mut local, 1, "MCE stream namespace declarations")?;
             let prefix = clone_bounded_name_part(prefix, limits, "stream namespace prefix")?;
             let value = clone_bounded_name_part(value, limits, "stream namespace URI")?;
             local.push((prefix, value));
@@ -2894,7 +3019,7 @@ fn collect_directives(
         if tokens > limits.processing.max_directive_tokens {
             return Err(limit("directive tokens"));
         }
-        reserve_vec(&mut values, 1, "MCE stream directives")?;
+        reserve_amortized(&mut values, 1, "MCE stream directives")?;
         values.push(DirectiveValue {
             kind,
             value: clone_bounded_string(
@@ -2912,6 +3037,7 @@ fn apply_directives(
     values: DirectiveValues,
     capabilities: &Capabilities,
     limits: &StreamLimits,
+    scope: &Scope,
 ) -> Result<(), Error> {
     let additional_context_bytes = directive_bytes(&values)?;
     if context
@@ -2936,8 +3062,7 @@ fn apply_directives(
                 return Err(bad("invalid or duplicate Ignorable prefix"));
             }
             check_name_bytes(prefix.as_bytes(), limits)?;
-            let uri = context
-                .ns
+            let uri = resolver(scope, &context.ns)
                 .get(prefix)
                 .ok_or_else(|| bad("unbound Ignorable prefix"))?;
             if uri == NAMESPACE {
@@ -2967,54 +3092,47 @@ fn apply_directives(
         }
     }
 
-    let mut process = HashSet::new();
-    let mut preserve_elements = HashSet::new();
-    let mut preserve_attributes = HashSet::new();
+    let mut process = Patterns::default();
+    let mut preserve_elements = Patterns::default();
+    let mut preserve_attributes = Patterns::default();
     for directive in &values.values {
         match directive.kind {
             DirectiveKind::Ignorable => {},
             DirectiveKind::ProcessContent => {
                 for token in directive.value.split_whitespace() {
-                    let target = parse_target(token, &context.ns, true, limits)?;
-                    if !local_ignorable.contains(pattern_namespace(&target))
-                        && !context.is_ignorable(pattern_namespace(&target))
+                    let target = parse_target(token, resolver(scope, &context.ns), true, limits)?;
+                    if !local_ignorable.contains(target.namespace())
+                        && !context.is_ignorable(target.namespace())
                     {
                         return Err(bad("ProcessContent target is not effectively ignorable"));
                     }
-                    try_reserve_set(&mut process, 1, "MCE stream ProcessContent directives")?;
-                    if !process.insert(target) {
+                    if !process.insert(target, "MCE stream ProcessContent directives")? {
                         return Err(bad("duplicate ProcessContent target"));
                     }
                 }
             },
             DirectiveKind::PreserveElements => {
                 for token in directive.value.split_whitespace() {
-                    let target = parse_target(token, &context.ns, true, limits)?;
-                    if !local_ignorable.contains(pattern_namespace(&target)) {
+                    let target = parse_target(token, resolver(scope, &context.ns), true, limits)?;
+                    if !local_ignorable.contains(target.namespace()) {
                         return Err(bad("PreserveElements target is not locally ignorable"));
                     }
-                    try_reserve_set(
-                        &mut preserve_elements,
-                        1,
-                        "MCE stream PreserveElements directives",
-                    )?;
-                    if !preserve_elements.insert(target) {
+                    if !preserve_elements
+                        .insert(target, "MCE stream PreserveElements directives")?
+                    {
                         return Err(bad("duplicate PreserveElements target"));
                     }
                 }
             },
             DirectiveKind::PreserveAttributes => {
                 for token in directive.value.split_whitespace() {
-                    let target = parse_target(token, &context.ns, true, limits)?;
-                    if !local_ignorable.contains(pattern_namespace(&target)) {
+                    let target = parse_target(token, resolver(scope, &context.ns), true, limits)?;
+                    if !local_ignorable.contains(target.namespace()) {
                         return Err(bad("PreserveAttributes target is not locally ignorable"));
                     }
-                    try_reserve_set(
-                        &mut preserve_attributes,
-                        1,
-                        "MCE stream PreserveAttributes directives",
-                    )?;
-                    if !preserve_attributes.insert(target) {
+                    if !preserve_attributes
+                        .insert(target, "MCE stream PreserveAttributes directives")?
+                    {
                         return Err(bad("duplicate PreserveAttributes target"));
                     }
                 }
@@ -3030,8 +3148,7 @@ fn apply_directives(
                         return Err(bad("invalid or duplicate MustUnderstand prefix"));
                     }
                     check_name_bytes(prefix.as_bytes(), limits)?;
-                    let namespace = context
-                        .ns
+                    let namespace = resolver(scope, &context.ns)
                         .get(prefix)
                         .ok_or_else(|| bad("unbound MustUnderstand prefix"))?;
                     if !capabilities.understands(namespace) {
@@ -3134,7 +3251,7 @@ fn is_namespace_attribute(name: &[u8]) -> bool {
     name == b"xmlns" || name.starts_with(b"xmlns:")
 }
 
-fn expand_attribute(q: &[u8], ns: &Namespaces, limits: &StreamLimits) -> Result<Name, Error> {
+fn expand_attribute(q: &[u8], ns: Resolver<'_, '_>, limits: &StreamLimits) -> Result<Name, Error> {
     let lexical = str::from_utf8(q).map_err(xml_error)?;
     if lexical == "xmlns" {
         return Ok(Name {
@@ -3161,7 +3278,7 @@ fn expand_attribute(q: &[u8], ns: &Namespaces, limits: &StreamLimits) -> Result<
 
 fn expand(
     q: &str,
-    namespaces: &Namespaces,
+    namespaces: Resolver<'_, '_>,
     element: bool,
     limits: &StreamLimits,
 ) -> Result<Name, Error> {
@@ -3193,7 +3310,7 @@ fn expand(
 
 fn parse_target(
     token: &str,
-    namespaces: &Namespaces,
+    namespaces: Resolver<'_, '_>,
     wildcard: bool,
     limits: &StreamLimits,
 ) -> Result<NamePattern, Error> {
@@ -3226,20 +3343,6 @@ fn parse_target(
         namespace,
         local_name: clone_bounded_name_part(local, limits, "MCE stream target local name")?,
     }))
-}
-
-fn pattern_namespace(pattern: &NamePattern) -> &str {
-    match pattern {
-        NamePattern::Exact(name) => &name.namespace,
-        NamePattern::Namespace(namespace) => namespace,
-    }
-}
-
-fn matches_pattern(patterns: &HashSet<NamePattern>, name: &Name) -> bool {
-    patterns.iter().any(|pattern| match pattern {
-        NamePattern::Exact(candidate) => candidate == name,
-        NamePattern::Namespace(namespace) => namespace == &name.namespace,
-    })
 }
 
 fn check_name_bytes(name: &[u8], limits: &StreamLimits) -> Result<(), Error> {
@@ -3352,6 +3455,21 @@ fn reserve_vec<T>(
 ) -> Result<(), Error> {
     values
         .try_reserve_exact(additional)
+        .map_err(|source| Error::Allocation { resource, source })
+}
+
+/// Reserve with the standard amortized growth policy.
+///
+/// The per-element buffers grow one entry at a time; an exact reservation
+/// would reallocate, and copy every entry, on each push, which costs time
+/// quadratic in the element's attributes.
+fn reserve_amortized<T>(
+    values: &mut Vec<T>,
+    additional: usize,
+    resource: &'static str,
+) -> Result<(), Error> {
+    values
+        .try_reserve(additional)
         .map_err(|source| Error::Allocation { resource, source })
 }
 

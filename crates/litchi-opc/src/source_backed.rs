@@ -732,8 +732,10 @@ fn inspect_relationship_append_root_attributes(
     member_name: &str,
 ) -> Result<()> {
     let mut attribute_count = 0usize;
-    let mut seen_keys: Vec<&[u8]> = Vec::new();
-    let mut seen_expanded: Vec<(Option<&[u8]>, &[u8])> = Vec::new();
+    // A keyed set: a list scanned per attribute costs time quadratic in
+    // the element's attributes.
+    let mut seen_keys: HashSet<&[u8]> = HashSet::new();
+    let mut seen_expanded: HashSet<(Option<&[u8]>, &[u8])> = HashSet::new();
     for attribute_result in element.attributes() {
         attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
             relationship_manifest_append_error(
@@ -755,7 +757,7 @@ fn inspect_relationship_append_root_attributes(
         })?;
         let value = decode_relationship_attribute(&attribute, decoder, limits, member_name)?;
         let key = attribute.key.0;
-        if seen_keys.contains(&key) {
+        if seen_keys.contains(key) {
             return Err(relationship_manifest_append_error(
                 member_name,
                 "the Relationships root repeats an attribute",
@@ -767,7 +769,7 @@ fn inspect_relationship_append_root_attributes(
                 resource: "source-backed OPC relationship root attributes",
                 source,
             })?;
-        seen_keys.push(key);
+        seen_keys.insert(key);
         let key_name = decoder.decode(key).map_err(|error| {
             relationship_manifest_append_error(
                 member_name,
@@ -808,9 +810,7 @@ fn inspect_relationship_append_root_attributes(
                     ));
                 },
             };
-            if seen_expanded.iter().any(|(known_namespace, known_local)| {
-                *known_namespace == namespace && *known_local == local.as_ref()
-            }) {
+            if seen_expanded.contains(&(namespace, local.as_ref())) {
                 return Err(relationship_manifest_append_error(
                     member_name,
                     "the Relationships root repeats an expanded attribute",
@@ -822,7 +822,7 @@ fn inspect_relationship_append_root_attributes(
                     resource: "source-backed OPC expanded root attributes",
                     source,
                 })?;
-            seen_expanded.push((namespace, local.into_inner()));
+            seen_expanded.insert((namespace, local.into_inner()));
         }
     }
     Ok(())
@@ -854,7 +854,9 @@ fn inspect_relationship_append_child(
     let mut target_mode = TargetMode::Internal;
     let mut target_mode_seen = false;
     let mut attribute_count = 0usize;
-    let mut seen_keys: Vec<&[u8]> = Vec::new();
+    // A keyed set: a list scanned per attribute costs time quadratic in
+    // the element's attributes.
+    let mut seen_keys: HashSet<&[u8]> = HashSet::new();
     for attribute_result in element.attributes() {
         attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
             relationship_manifest_append_error(
@@ -875,7 +877,7 @@ fn inspect_relationship_append_child(
             )
         })?;
         let key = attribute.key.0;
-        if seen_keys.contains(&key) {
+        if seen_keys.contains(key) {
             return Err(relationship_manifest_append_error(
                 member_name,
                 "a Relationship repeats an attribute",
@@ -887,7 +889,7 @@ fn inspect_relationship_append_child(
                 resource: "source-backed OPC Relationship attributes",
                 source,
             })?;
-        seen_keys.push(key);
+        seen_keys.insert(key);
         let value = decode_relationship_attribute(&attribute, decoder, limits, member_name)?;
         match key {
             b"Id" if id_attribute.is_none() => id_attribute = Some(value),

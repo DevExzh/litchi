@@ -1172,8 +1172,11 @@ fn validate_source_element(
 ) -> Result<()> {
     validate_source_qname(reader, element.name().as_ref(), "element")?;
     let mut attribute_count = 0usize;
-    let mut seen_keys: Vec<&[u8]> = Vec::new();
-    let mut seen_expanded: Vec<(Option<&[u8]>, &[u8])> = Vec::new();
+    // A keyed set: a list scanned per attribute costs time quadratic in
+    // the element's attributes.
+    let mut seen_keys: std::collections::HashSet<&[u8]> = std::collections::HashSet::new();
+    let mut seen_expanded: std::collections::HashSet<(Option<&[u8]>, &[u8])> =
+        std::collections::HashSet::new();
     for attribute_result in element.attributes().with_checks(true) {
         attribute_count = attribute_count
             .checked_add(1)
@@ -1188,7 +1191,7 @@ fn validate_source_element(
             invalid_source(format!("source XML attribute is malformed: {error}"))
         })?;
         let key = attribute.key.0;
-        if seen_keys.contains(&key) {
+        if seen_keys.contains(key) {
             return Err(invalid_source("source XML contains duplicate attributes"));
         }
         seen_keys
@@ -1197,7 +1200,7 @@ fn validate_source_element(
                 resource: "source-backed OPC XML attribute names",
                 source,
             })?;
-        seen_keys.push(key);
+        seen_keys.insert(key);
         let raw_attribute_bytes = key
             .len()
             .checked_add(attribute.value.as_ref().len())
@@ -1248,9 +1251,7 @@ fn validate_source_element(
                     ));
                 },
             };
-            if seen_expanded.iter().any(|(known_namespace, known_local)| {
-                *known_namespace == namespace && *known_local == local.as_ref()
-            }) {
+            if seen_expanded.contains(&(namespace, local.as_ref())) {
                 return Err(invalid_source(
                     "source XML contains duplicate expanded attributes",
                 ));
@@ -1261,7 +1262,7 @@ fn validate_source_element(
                     resource: "source-backed OPC expanded attribute names",
                     source,
                 })?;
-            seen_expanded.push((namespace, local.into_inner()));
+            seen_expanded.insert((namespace, local.into_inner()));
         }
     }
     Ok(())

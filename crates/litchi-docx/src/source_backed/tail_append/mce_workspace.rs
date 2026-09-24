@@ -15,7 +15,12 @@ use crate::settings::{WORD_2010_NAMESPACE, WORD_2012_NAMESPACE};
 
 const INITIAL_NAMESPACE_BYTES: usize = 73;
 const ARC_HEADER_WORDS: usize = 2;
-const FRAME_LAYOUT_WORDS: usize = 12;
+// Record 0764 added a declaration flag and a hoisted-declaration list (a fat
+// `Rc` pointer) to each frame.
+const FRAME_LAYOUT_WORDS: usize = 15;
+// A B-tree node holds up to eleven entries with its keys, values, lengths and
+// child links; four entry slots per entry bound its node storage generously.
+const ORDERED_INDEX_SLOTS_PER_ENTRY: u64 = 4;
 const DIAGNOSTIC_OVERHEAD_BYTES: usize = 128;
 
 // This is the exact fixed namespace set installed by
@@ -146,8 +151,10 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
 
     let arc_header = usize_bytes.checked_mul(ARC_HEADER_WORDS as u64)?;
     let namespace_layer_object = option_arc_bytes.checked_add(vector_pair_bytes)?;
+    // The ignorable set and, since record 0764, two sets (exact names and
+    // namespace wildcards) for each of the three pattern directives.
     let directive_layer_object =
-        option_arc_bytes.checked_add(hash_string_wrapper.max(hash_name_wrapper).checked_mul(4)?)?;
+        option_arc_bytes.checked_add(hash_string_wrapper.max(hash_name_wrapper).checked_mul(7)?)?;
     let namespace_layer_owner = arc_header.checked_add(namespace_layer_object)?;
     let directive_layer_owner = arc_header.checked_add(directive_layer_object)?;
 
@@ -176,6 +183,34 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
             )?)?
             .checked_add(namespace_layer_owner.checked_mul(namespace_layers)?)?;
 
+    // Record 0764: the prefix index copies every live declaration's prefix
+    // (as a key and in its log) and namespace, keeps one binding vector per
+    // prefix and a log of every binding, and one element's declarations are
+    // sorted once as borrowed prefixes.
+    let index_binding_bytes = u64::try_from(size_of::<(usize, String)>()).ok()?;
+    let index_entry_bytes = string_bytes.checked_add(vector_pair_bytes)?;
+    let namespace_index = string_capacity(namespace_bytes, namespace_declarations.checked_mul(3)?)?
+        .checked_add(vec_sum_capacity(
+            namespace_declarations,
+            namespace_declarations,
+            index_binding_bytes,
+        )?)?
+        .checked_add(vec_capacity(namespace_declarations, index_binding_bytes)?)?
+        .checked_add(
+            namespace_declarations
+                .checked_mul(index_entry_bytes)?
+                .checked_mul(ORDERED_INDEX_SLOTS_PER_ENTRY)?,
+        )?
+        .checked_add(vec_capacity(attributes, reference_bytes)?.checked_mul(2)?)?;
+    // A frame that declares namespaces and has an emitted child builds one
+    // list of the effective declarations its children re-declare: at most
+    // every live declaration, once per declaring layer.
+    let hoisted_lists = namespace_layers.checked_mul(
+        string_capacity(namespace_bytes, namespace_declarations.checked_mul(2)?)?
+            .checked_add(vec_capacity(namespace_declarations, pair_bytes)?)?
+            .checked_add(arc_header)?,
+    )?;
+
     let directive_vector = string_capacity(token, attributes)?
         .checked_add(vec_capacity(attributes, directive_pair_bytes)?)?;
 
@@ -199,7 +234,7 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
             string_bytes,
         )?)?
         .checked_add(
-            hash_sum_capacity(directive_tokens, directive_layers, pattern_slot)?.checked_mul(3)?,
+            hash_sum_capacity(directive_tokens, directive_layers, pattern_slot)?.checked_mul(6)?,
         )?
         .checked_add(directive_layer_owner.checked_mul(directive_layers)?)?;
 
@@ -227,6 +262,8 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
         raw_attributes,
         quickxml_attributes,
         namespace_storage,
+        namespace_index,
+        hoisted_lists,
         directive_vector,
         directive_payload,
         directive_tables,
