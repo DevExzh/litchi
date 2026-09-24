@@ -268,7 +268,8 @@ fn before_allocation_validation(file: &mut OleFile<Cursor<Vec<u8>>>) {
 
 /// `validate_stream_allocations` as it was before this change: a fresh
 /// table-sized map for every stream, through the owned exact helper, which
-/// the base's scratch was tested to match.
+/// the base's scratch was tested to match. Record 0769 changed the bound on
+/// mini sectors (`MiniStreamEnd`) in both, identically.
 fn fresh_map_allocation_validation(file: &mut OleFile<Cursor<Vec<u8>>>) -> Result<(), OleError> {
     let root = file
         .root
@@ -289,6 +290,7 @@ fn fresh_map_allocation_validation(file: &mut OleFile<Cursor<Vec<u8>>>) -> Resul
     file.root_chain = root_chain;
     let mini_sector_capacity = usize::try_from(root_size.div_ceil(file.mini_sector_size as u64))
         .map_err(|_err| OleError::CorruptedFile("Root mini stream is too large".to_string()))?;
+    let mini_end = MiniStreamEnd::new(root_size, file.mini_sector_size)?;
     let mut claimed_mini_sectors =
         CheckedBitSet::try_with_capacity(mini_sector_capacity, "mini-sector ownership map")?;
     for index in 0..file.dir_entries.len() {
@@ -320,7 +322,9 @@ fn fresh_map_allocation_validation(file: &mut OleFile<Cursor<Vec<u8>>>) -> Resul
                         "mini stream sector index does not fit usize".to_string(),
                     )
                 })?;
-                if sector_index >= mini_sector_capacity {
+                if sector_index >= mini_end.full_sectors
+                    && !mini_end.admits_partial_sector(sector_index, sector, &chain, size)
+                {
                     return Err(OleError::CorruptedFile(
                         "Mini stream references storage outside the root mini stream".to_string(),
                     ));

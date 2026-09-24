@@ -355,6 +355,72 @@ fn claim_sector_conflict_error(
     ))
 }
 
+/// Where the root mini stream ends, in mini sectors: the bound every byte of
+/// a mini stream must lie within (record 0769).
+///
+/// The root entry's stream size is the size of the mini stream in bytes
+/// (MS-CFB 2.6.1), and MS-CFB does not require it to be a whole number of
+/// 64-byte mini sectors. A mini stream's bytes are the first `size` bytes of
+/// its chain's mini sectors (MS-CFB 2.7): all of each sector but the last,
+/// and the rest of the stream in its last. Each of those bytes must lie
+/// inside the mini stream. The unused tail of a stream's last sector holds
+/// none of them, so it may extend past the root size. That can happen only
+/// at the partial mini sector a root size that is not a multiple of 64 ends
+/// in, and only for the sector that ends a stream. A real producer writes
+/// exactly that: POI's `BlockSize512.zvi` ends its root mini stream at the
+/// last byte of the stream in its partial last mini sector.
+#[derive(Clone, Copy, Debug)]
+struct MiniStreamEnd {
+    /// Mini sectors wholly inside the mini stream.
+    full_sectors: usize,
+    /// Bytes of mini sector `full_sectors` inside the mini stream: zero when
+    /// the root size is a whole number of mini sectors.
+    partial_bytes: u64,
+    /// The mini sector size, nonzero.
+    mini_sector_size: u64,
+}
+
+impl MiniStreamEnd {
+    fn new(root_size: u64, mini_sector_size: usize) -> Result<Self, OleError> {
+        let mini_sector_size = u64::try_from(mini_sector_size)
+            .ok()
+            .filter(|&size| size > 0)
+            .ok_or_else(|| OleError::CorruptedFile("Invalid mini sector size".to_string()))?;
+        Ok(Self {
+            full_sectors: usize::try_from(root_size / mini_sector_size).map_err(|_err| {
+                OleError::CorruptedFile("Root mini stream is too large".to_string())
+            })?,
+            partial_bytes: root_size % mini_sector_size,
+            mini_sector_size,
+        })
+    }
+
+    /// Whether a mini stream of `size` bytes whose chain is `chain` may use
+    /// its mini sector `sector`, at index `sector_index`, which is not wholly
+    /// inside the mini stream (`sector_index >= full_sectors`).
+    ///
+    /// Only the partial mini sector qualifies, and only as the chain's last
+    /// sector holding no more of the stream than the root size covers. A
+    /// validated chain holds each sector once, so `sector` is its last sector
+    /// exactly when it equals the chain's last element.
+    #[cold]
+    fn admits_partial_sector(
+        self,
+        sector_index: usize,
+        sector: u32,
+        chain: &[u32],
+        size: u64,
+    ) -> bool {
+        // The bytes of the stream in its last mini sector, 1 to 64.
+        let last_sector_bytes = size
+            .checked_sub(1)
+            .map(|bytes| bytes % self.mini_sector_size + 1);
+        sector_index == self.full_sectors
+            && chain.last() == Some(&sector)
+            && last_sector_bytes.is_some_and(|bytes| bytes <= self.partial_bytes)
+    }
+}
+
 /// Main OLE file parser structure
 ///
 /// This struct represents an OLE2 structured storage file and provides
@@ -1482,6 +1548,7 @@ impl<R: Read + Seek> OleFile<R> {
             usize::try_from(root_size.div_ceil(self.mini_sector_size as u64)).map_err(|_err| {
                 OleError::CorruptedFile("Root mini stream is too large".to_string())
             })?;
+        let mini_end = MiniStreamEnd::new(root_size, self.mini_sector_size)?;
         let mut claimed_mini_sectors =
             CheckedBitSet::try_with_capacity(mini_sector_capacity, "mini-sector ownership map")?;
         // MiniFAT and FAT normally have different table lengths. Separate
@@ -1525,7 +1592,19 @@ impl<R: Read + Seek> OleFile<R> {
                             "mini stream sector index does not fit usize".to_string(),
                         )
                     })?;
-                    if sector_index >= mini_sector_capacity {
+                    // Every byte the stream takes from this sector must lie
+                    // inside the root mini stream, as every reader requires:
+                    // a sector wholly inside it always qualifies, and the
+                    // partial last one only as the end of a stream the root
+                    // size covers (see `MiniStreamEnd`).
+                    if sector_index >= mini_end.full_sectors
+                        && !mini_end.admits_partial_sector(
+                            sector_index,
+                            sector,
+                            mini_scratch.sectors(),
+                            size,
+                        )
+                    {
                         return Err(OleError::CorruptedFile(
                             "Mini stream references storage outside the root mini stream"
                                 .to_string(),
@@ -2625,8 +2704,18 @@ impl<R: Read + Seek> OleFile<R> {
         // Pre-allocate result buffer with exact size needed
         let mut data = try_vec_with_capacity(stream_len, "MiniFAT stream data")?;
 
-        // Copy all mini sectors
+        // Copy the stream's bytes from each mini sector in chain order. Only
+        // those bytes must lie inside the loaded mini stream, which holds
+        // exactly the root size: the unused tail of the stream's last sector
+        // may extend past it, as open-time validation admits (see
+        // `MiniStreamEnd`). Sectors after the stream's last byte are not read.
         for &sector in sectors {
+            let copy_len = self
+                .mini_sector_size
+                .min(stream_len.saturating_sub(data.len()));
+            if copy_len == 0 {
+                break;
+            }
             let position = usize::try_from(sector)
                 .ok()
                 .and_then(|sector_id| sector_id.checked_mul(self.mini_sector_size))
@@ -2634,21 +2723,12 @@ impl<R: Read + Seek> OleFile<R> {
                     OleError::CorruptedFile("Mini sector offset overflow".to_string())
                 })?;
             let end = position
-                .checked_add(self.mini_sector_size)
+                .checked_add(copy_len)
                 .ok_or_else(|| OleError::CorruptedFile("Mini sector end overflow".to_string()))?;
-            if end > ministream.len() {
-                return Err(OleError::CorruptedFile(
-                    "Mini sector out of bounds".to_string(),
-                ));
-            }
-
-            let copy_len = self
-                .mini_sector_size
-                .min(stream_len.saturating_sub(data.len()));
-            if copy_len == 0 {
-                break;
-            }
-            data.extend_from_slice(&ministream[position..position + copy_len]);
+            let bytes = ministream
+                .get(position..end)
+                .ok_or_else(|| OleError::CorruptedFile("Mini sector out of bounds".to_string()))?;
+            data.extend_from_slice(bytes);
         }
 
         // Truncate to actual size
@@ -3509,13 +3589,18 @@ impl<R: Read + Seek, C: CandidateBytes> StreamComparer<'_, R, C> {
 
         // Copying from the loaded mini stream cannot fail a read: every byte
         // it holds was read by the load. Only the bounds checks remain, and
-        // they run for every sector `open_stream` visits, matched or not.
+        // they run for every sector `open_stream` copies from, matched or
+        // not, over the bytes it copies.
         let mut equal = stream_len == expected.len();
         let mut copied = 0usize;
         // Bytes still to compare: a physically contiguous file range and the
         // range of `expected` it must hold.
         let mut pending: Option<(u64, Range<usize>)> = None;
         for &sector in self.chain.sectors() {
+            let copy_len = file.mini_sector_size.min(stream_len.saturating_sub(copied));
+            if copy_len == 0 {
+                break;
+            }
             let position = usize::try_from(sector)
                 .ok()
                 .and_then(|sector_id| sector_id.checked_mul(file.mini_sector_size))
@@ -3523,16 +3608,12 @@ impl<R: Read + Seek, C: CandidateBytes> StreamComparer<'_, R, C> {
                     OleError::CorruptedFile("Mini sector offset overflow".to_string())
                 })?;
             let end = position
-                .checked_add(file.mini_sector_size)
+                .checked_add(copy_len)
                 .ok_or_else(|| OleError::CorruptedFile("Mini sector end overflow".to_string()))?;
             if end > ministream_len {
                 return Err(OleError::CorruptedFile(
                     "Mini sector out of bounds".to_string(),
                 ));
-            }
-            let copy_len = file.mini_sector_size.min(stream_len.saturating_sub(copied));
-            if copy_len == 0 {
-                break;
             }
             if equal {
                 let physical = file.ministream_physical_offset(root_sectors, position)?;
@@ -4356,6 +4437,10 @@ pub fn is_ole_file(data: &[u8]) -> bool {
 #[cfg(test)]
 #[path = "chain_work_tests.rs"]
 mod chain_work_tests;
+
+#[cfg(test)]
+#[path = "mini_stream_end_tests.rs"]
+mod mini_stream_end_tests;
 
 #[cfg(test)]
 mod tests {
