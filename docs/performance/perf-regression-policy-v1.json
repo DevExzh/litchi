@@ -1,9 +1,9 @@
 {
   "schema_version": 2,
-  "policy_id": "litchi-hosted-default-matrix-v4",
+  "policy_id": "litchi-hosted-default-matrix-v5",
   "minimum_samples": 15,
   "expected_result_count": 213,
-  "expected_result_keys_sha256": "63cdfaaf094b744baf9a6bb770c676c7752671a3d08a711fa0e2c98538efc8cd",
+  "expected_result_keys_sha256": "b57c5131fca1d96527a6f1b44e9185242d801f0de22bb99c714e1d381a963d22",
   "required_cases": [
     "zip_index",
     "zip_read_one",

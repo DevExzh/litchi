@@ -70413,7 +70413,7 @@ mod tests {
                 Case::DocFreshWriteTo,
                 "DOC/CFB",
                 "WordDocument",
-                "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+                "c9e22d55e3478ef25a7dd232f181ec0c30368c50bd988c151617d3884d4192f3",
             ),
             (
                 Case::XlsFreshWriteTo,

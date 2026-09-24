@@ -22,10 +22,10 @@ V1_PATH = ROOT / "docs/performance/results/perf-regression-default-manifest-v1.j
 V2_PATH = ROOT / "docs/performance/results/perf-corpus-manifest-v2.json"
 SCHEMA_PATH = ROOT / "docs/performance/schemas/corpus-manifest-v2.schema.json"
 EXPECTED_RESULT_KEYS_SHA256 = (
-    "63cdfaaf094b744baf9a6bb770c676c7752671a3d08a711fa0e2c98538efc8cd"
+    "b57c5131fca1d96527a6f1b44e9185242d801f0de22bb99c714e1d381a963d22"
 )
 EXPECTED_CONTENT_SET_SHA256 = (
-    "8e629fef89f7eccf023ebc6a6e8b8aebdbcf91207f6d6dfedd2e2fe59c3452a5"
+    "3f6e10552959c76cb230ec38222bb9363bceecc4a70cd1d62e22ba5d7535975f"
 )
 
 

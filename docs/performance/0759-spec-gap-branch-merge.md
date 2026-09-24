@@ -414,6 +414,38 @@ None was fixed here:
 - Re-baselining the DOC fresh-writer corpus.
 - Fixes to the pre-existing failures above.
 
+## Follow-up: DOC fresh-writer corpus identity
+
+Pre-existing failure 2 is resolved by re-pinning, under owner decision 4
+(record 0758), which accepts new deterministic bytes from creation writers.
+
+- **What changed.** The Dop2002 fix (`581711a4c4`) changed all three
+  `doc_fresh_write_to` corpora. Only their archive and `WordDocument`
+  digests moved; the sizes did not.
+
+  | Corpus | Before | After |
+  |---|---|---|
+  | `doc-tiny` | `ec7824ca…` | `c9e22d55…` |
+  | `doc-large` | `3d96764f…` | `346cb6e8…` |
+  | `doc-payload-heavy` | `707137ee…` | `fb899f2c…` |
+
+- **Where it is pinned.** The harness test, the V1 identity artifact
+  (result keys `63cdfaaf…` → `b57c5131…`), the checked catalog (`f03c9f56…` →
+  `6cae8e94…`, content set `8e629fef…` → `3f6e1055…`), the policy
+  (`litchi-hosted-default-matrix-v5`, bumped as every earlier key change
+  was) and both coverage indexes.
+- **How.** A one-sample default-matrix preflight from a clean tree derived the
+  identity. The Python generator reproduces the harness's catalog exactly.
+  The other 40 corpora, the case mapping and the configuration are unchanged.
+  The 0508 invariant test still recovers the pre-0508 keys, with the three
+  DOC digests substituted back. Evidence:
+  [doc-fresh-writer-repin/](results/change-0759/doc-fresh-writer-repin/receipt.json).
+- **Consequence.** `doc_fresh_write_to` rows measured from now on are **not
+  comparable** with pre-merge DOC fresh-writer measurements.
+  `tools/perf_abba_summary.py` still pins 0274's `doc_owner_public_phases`
+  contract, the old DOC identities included. It is unchanged, so a new ABBA
+  run of that selector would need its own re-pin.
+
 ## Cleanup
 
 [cleanup.json](results/change-0759/cleanup.json) lists what was removed once
