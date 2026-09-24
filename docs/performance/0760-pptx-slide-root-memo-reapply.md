@@ -1,6 +1,7 @@
 # 0760: the snapshot slide-root memo re-applied under ADR 0032 — a one-edit commit on the 100 × 100 deck stops rescanning its 99 untouched slides: commit 21.19 → 1.61 ms (−92.4%), one-edit edit/save 45.88 → 26.77 ms (−41.8%), with every value, refusal, patch and published byte unchanged
 
-Status: retained, implemented in `crates/litchi-pptx` (`dfde1e43bb`).
+Status: retained, implemented in `crates/litchi-pptx` (`dfde1e43bb`, with the
+review fixes of `daa38cffe3`).
 `performance_claim: none` — the paired medians, instruction, cycle and
 allocation counts below are reported as evidence beside an A/A floor measured
 in the same session, not registered as claims.
@@ -9,7 +10,9 @@ OLE2 and OOXML remain the active priority. ODF optimization stays deferred until
 that goal completes; iWork is excluded and untouched.
 
 Base `1d1044e3ac`; branch `perf/0760-pptx-slide-root-memo-reapply`. The
-measured head is the production commit `dfde1e43bb`.
+measured head is the production commit `dfde1e43bb`; the review fixes
+(`daa38cffe3`, see *Review*) change how the memo's entries are admitted, not the
+work any measured case does, and were not re-measured.
 
 ## Result
 
@@ -114,7 +117,7 @@ base and changed where ADR 0032 requires:
 
 | file | change |
 | --- | --- |
-| `notes/package.rs` | `SlideRootRecord`, `SlideRootEntry`, `SlideRootMemo` (`from_records`, `project`, `lookup`); `SlideRootProof::record`; a test-only reservation-refusal hook |
+| `notes/package.rs` | `SlideRootEntry`, `SlideRootMemo` (`from_records` over the capture's borrowed `SlideRootProof`s, `project`, `lookup`); a test-only reservation-refusal hook |
 | `notes/mod.rs` | exports |
 | `parts/slide.rs` | `finish_from_processed` consults the memo for the exact raw observation MCE just read; a hit is re-derived by `debug_assert_eq!`; test-only hit and scan counters |
 | `parts/mod.rs` | test-only exports |
@@ -123,27 +126,35 @@ base and changed where ADR 0032 requires:
 | `opened/transaction.rs` | `Transaction::commit` passes its source snapshot's memo |
 | `opened/cross_copy_plan.rs` | the four cross-slide copy captures pass no parent memo, as before |
 | `opened/mce_retention_tests.rs` | its commit-shaped capture helper passes the memo, as a commit does |
-| `opened/slide_root_memo_tests.rs` | 22 tests (below) |
+| `opened/slide_root_memo_tests.rs` | 23 tests (below) |
 
 Differences from `99ce9c5e34`:
 
 1. **Typed reservation refusal (ADR 0032 section 3).**
    `SlideRootMemo::from_records` returns `Result<Self>`; a refused table
    reservation is `Error::Allocation { resource: "opened-presentation
-   slide-root memo", .. }`, raised by the capture after every validation has
-   passed, so it can only replace a success and never another refusal. The
-   original built an intermediate record vector that also became empty when it
-   could not be reserved; that vector is gone. The memo is built directly from
-   the capture's proofs (an `ExactSizeIterator` of records), which now live
-   until then.
+   slide-root memo", .. }`, raised by the capture after every capture
+   validation has passed, so within a capture it can only replace a success.
+   It is not last in every operation: steps that run after a capture — the
+   publication's `validate_after` and result-revision check
+   (`opened/patch.rs`) and the cross-slide copy's archive-revision checks —
+   could, under memory exhaustion, now meet this allocation error before the
+   refusal they would have reported. The original built an intermediate
+   record vector that also became empty when it could not be reserved; that
+   vector is gone. After review (`daa38cffe3`) the memo is built directly from
+   the capture's borrowed proofs, `&[SlideRootProof<'_>]`, which live until
+   then, and the table is reserved once for one entry per proof.
 2. **Only returned classifications are memoized (ADR 0032 section 1).** The
    original kept `Option<Conformance>`, so a scan's `None` — the notes graph's
    refusal "invalid sld root or namespace" — could in principle be kept. Entries
    now hold `Conformance`; a slide the scan refuses is rescanned every time.
-3. **An owner `Arc` must alias its key.** `from_records` and `project` admit an
-   entry only when the `Arc` the owner hands over has the entry's address and
-   length. The digest memo's owner already guarantees this; the check makes the
-   admission independent of that guarantee.
+3. **An entry is admitted only for the live allocation that was classified.**
+   Each proof borrows the slice the capture classified, so the compiler proves
+   that allocation alive — and its address not reusable by other bytes — while
+   `from_records` admits it, and the `Arc` the owner hands over must be that
+   very slice (`std::ptr::eq`). `project` likewise compares each owner `Arc`
+   with the allocation the entry itself keeps alive. The memo is not `Clone`,
+   so it reaches another snapshot only through `project`.
 4. **The rebind projection is unchanged:** `project` keeps the empty-memo
    degradation of the part-digest projection beside it, since a rebind is
    infallible (ADR 0032 section 3).
@@ -189,7 +200,7 @@ All in `crates/litchi-pptx/src/opened/slide_root_memo_tests.rs`.
 
 | condition | proven by |
 | --- | --- |
-| `f` is a function of the payload bytes alone | `a_new_allocation_with_equal_bytes_is_a_miss_not_a_hit` (equal bytes, new allocation: miss, same result); `memo_assisted_recaptures_equal_plain_ones_over_the_pptx_corpus`; the differential below |
+| `f` is a function of the payload bytes alone | `a_shared_allocation_hits_under_another_part_name_and_equals_plain_and_cold` (a slide made to share another slide's allocation hits that slide's entry under its own part name; assisted, plain and cold captures agree); `a_new_allocation_with_equal_bytes_is_a_miss_not_a_hit` (equal bytes, new allocation: miss, same result); `memo_assisted_recaptures_equal_plain_ones_over_the_pptx_corpus`; the differential below |
 | keyed on allocation identity with a strong reference | `an_entry_holds_its_allocation_strongly_so_its_key_cannot_be_recycled` (the entry's own strong count keeps the allocation, and so its address, alive after every other owner is gone; equal bytes elsewhere and sub-slices miss; dropping the memo releases it) |
 | entries only for allocations the owning snapshot's package holds | `every_entry_names_an_allocation_its_snapshots_package_holds` (capture, commit, publication, rebind); `from_records_admits_only_owned_aliasing_successful_classifications`; `a_foreign_arc_that_does_not_alias_its_payload_is_never_memoized_or_pinned`; `a_published_snapshot_keeps_classifications_only_for_its_own_allocations` |
 | a failure of `f` is never memoized | `from_records_admits_only_owned_aliasing_successful_classifications` (a `None` record is not admitted); `the_memo_never_turns_a_refusal_into_a_success` (CDATA in the first and middle slide, an unbound prefix in the last: assisted, plain and cold captures refuse identically) |
@@ -232,7 +243,10 @@ call accounts for about 7.5%.
 ## Measurements
 
 Host AMD EPYC 9R45, 32 cores, 123 GiB, Linux 7.0.0-1012-aws, toolchain 1.95.0
-(the worktree's `rust-toolchain.toml`); every measured process `taskset -c 4`;
+(the worktree's `rust-toolchain.toml`; the harness reports' `rustc 1.98.1`
+field is a runtime `rustc --version` of the ambient toolchain in the process's
+working directory, not the compiler that built them); every measured process
+`taskset -c 4`;
 other agents built and measured concurrently (one-minute load average 11–29
 before the processes, logged per process). Large-deck processes take 15 samples
 after 3 warmups, medium ones 60 after 10, the phase case 15 after 3 on both
@@ -277,8 +291,8 @@ The A/B run has seven; the A/A floor has none.
 
 ## Correctness evidence
 
-* **Focused tests.** The 22 tests above; the whole `litchi-pptx` suite passes
-  (1,189 tests), and so does the facade's (382).
+* **Focused tests.** The 23 tests above; the whole `litchi-pptx` suite passes
+  (1,190 tests at `daa38cffe3`), and so does the facade's (382).
 * **Differential.** A probe built against the base and the head ran the same
   public flows over the repository's 78 PPTX fixtures and 67,712 mutated
   packages (18 structured mutations of the first, middle and last slide —
@@ -312,8 +326,11 @@ The A/B run has seven; the A/A floor has none.
 * That the capture, no-op or full-text cases moved: their wall-clock changes are
   within the A/A floor, and their cycle changes in the probes are matched by an
   untouched region of the same binaries.
-* A cross-slide copy, removal-plan, patch or history result: those captures pass
-  no parent memo and are unchanged.
+* A cross-slide copy, removal-plan, patch or history result. Those captures
+  consult no parent memo, but, like every capture, they now build one: two more
+  allocations per capture (3,240 bytes on the 100-slide deck) and the new
+  `Error::Allocation` failure mode under memory exhaustion. Nothing else in
+  them changes.
 * An RSS, cold-cache, concurrency, facade (`litchi::Presentation`), source-backed
   or range-source result. Allocation counts are requested calls and bytes on the
   probe's system allocator, not RSS.
@@ -331,12 +348,51 @@ The A/B run has seven; the A/A floor has none.
 * Under `--all-features`, three golden cross-copy tests fail identically at this
   base and at the head (see Verification).
 
+## Review
+
+An independent review found no path where a memo entry describes other bytes
+or a stale classification reaches a rewritten slide: a caller-defined part that
+alternates its bytes gave 900 commit pairs identical with and without the memo,
+a shared-allocation probe matched, and the numbers reproduced exactly. Verdict:
+merge after fixes, applied as `daa38cffe3` without rewriting history:
+
+* **Should-fix.** `from_records` took lifetime-free, `Copy` records, so a record
+  could outlive the allocation it named: the reviewer took a record from an
+  `Arc`, dropped it, obtained a new same-size `Arc` at the same address, and
+  `from_records` admitted it, after which `lookup` answered `Strict` for bytes
+  never classified. Production could not reach this — `capture_internal` kept
+  the proofs alive — and it can no longer be written: `from_records` takes
+  `&[SlideRootProof<'_>]`, whose slices the compiler proves alive, and admits an
+  entry only for that very slice. `SlideRootRecord` and `SlideRootProof::record`
+  are gone.
+* The unused `Clone` derives on the memo and its entry are removed, so a memo
+  cannot be copied onto another snapshot without projection; the unreachable
+  re-reservation inside the admission loop is removed (one reservation covers
+  one entry per proof, stated by a debug assertion).
+* A test of ADR 0032 section 1's purity: a slide sharing another slide's
+  allocation hits under its own part name and equals the plain and cold
+  captures.
+* Record wording: the typed error's position relative to post-capture checks,
+  the memo every capture now builds, and the harness's toolchain field.
+
 ## Verification
 
 Gates run in the worktree at `dfde1e43bb` with its own target directory, every
 Cargo command with `--locked --offline` and `TMPDIR` under the change's scratch
 directory; commands, exit codes and output tails are in
-[`gates.txt`](results/change-0760/gates.txt):
+[`gates.txt`](results/change-0760/gates.txt), which also holds the review
+round's re-run at `daa38cffe3` (a fresh target directory of its own):
+
+| gate at `daa38cffe3` | exit |
+| --- | --- |
+| `cargo fmt --all --check` | 0 |
+| `cargo clippy -p litchi-pptx --lib --no-deps -- -D warnings` | 0 |
+| `cargo clippy -p litchi-pptx --all-targets --no-deps -- -D warnings` | 101 — only the same three pre-existing `err_expect` lints in `opened/tests.rs` |
+| `RUSTDOCFLAGS="-D warnings" cargo doc -p litchi-pptx --no-deps` | 0 |
+| `cargo test -p litchi-pptx` | 0 — 1,190 passed, 0 failed, 3 ignored |
+| `cargo test -p litchi-pptx --all-features --no-fail-fast` | 101 — 1,201 passed, 3 failed, 3 ignored; only the three pre-existing cross-copy golden failures below, with the same values |
+
+At `dfde1e43bb`:
 
 | gate | exit |
 | --- | --- |
@@ -371,7 +427,10 @@ the target directories `targets/0760`, `targets/0760-before` and
 `targets/0760-branch`, the scratch contents (binaries, raw outputs of the
 differential and the dumps, logs, `TMPDIR`) and the two detached source
 worktrees `0760-before-src` and `0760-branch-src` (`git worktree remove
---force`) are removed. The worktree and branch are kept.
+--force`) are removed. The worktree and branch are kept. The review round used
+a fresh target directory of its own, `targets/0760/review`, and `TMPDIR` under
+`scratch/0760`; both are removed after the review commits, as `cleanup.json`
+records.
 
 ## Retained evidence
 

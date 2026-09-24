@@ -45,5 +45,24 @@
     "/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply (worktree, including its untracked, ignored root Cargo.lock)",
     "branch perf/0760-pptx-slide-root-memo-reapply"
   ],
-  "verified": "2026-09-24, after commit 4bc847adbc: listing targets/0760* reports no such file; git worktree list shows only the implementation worktree for this change (0760-before-src and 0760-branch-src removed with git worktree remove --force); scratch/0760 is empty; no .build-id link under ~/.debug points into a 0760 path and ~/.debug/home/zhuhe/code/litchi-worktrees/{scratch,targets}/0760 no longer exist (the other changes' entries there were left untouched)"
+  "verified": "2026-09-24, after commit 4bc847adbc: listing targets/0760* reports no such file; git worktree list shows only the implementation worktree for this change (0760-before-src and 0760-branch-src removed with git worktree remove --force); scratch/0760 is empty; no .build-id link under ~/.debug points into a 0760 path and ~/.debug/home/zhuhe/code/litchi-worktrees/{scratch,targets}/0760 no longer exist (the other changes' entries there were left untouched)",
+  "review_round": {
+    "recorded": "2026-09-24",
+    "commits": [
+      "daa38cffe3 (review fixes)",
+      "the record and packet update that adds this entry"
+    ],
+    "removed_by": "the implementer, after the review commits, each deletion run in the foreground",
+    "removed": [
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/targets/0760/review",
+        "what": "fresh, separate target directory of the review round: fmt, clippy, rustdoc and the default and all-features test builds at daa38cffe3"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/scratch/0760 (contents)",
+        "what": "the review round's gate logs (summarized in gates.txt) and TMPDIR"
+      }
+    ],
+    "no_binaries_measured": "the review round measured nothing, so it has no binary digests"
+  }
 }
