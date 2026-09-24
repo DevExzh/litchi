@@ -184,10 +184,15 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
             .checked_add(namespace_layer_owner.checked_mul(namespace_layers)?)?;
 
     // Record 0764: the prefix index copies every live declaration's prefix
-    // (as a key and in its log) and namespace, keeps one binding vector per
-    // prefix and a log of every binding, and one element's declarations are
+    // (as a key and in its log) and keeps one binding vector per prefix and a
+    // log entry (depth, prefix, packed key, identity) per binding; each
+    // distinct live URI is copied once into the identity table, with its
+    // entry and keyed-hash index slot; and one element's declarations are
     // sorted once as borrowed prefixes.
-    let index_binding_bytes = u64::try_from(size_of::<(usize, String)>()).ok()?;
+    let index_binding_bytes = u64::try_from(size_of::<(usize, usize)>()).ok()?;
+    let log_entry_bytes = u64::try_from(size_of::<(usize, String, u64, usize)>()).ok()?;
+    let identity_entry_bytes =
+        u64::try_from(size_of::<(String, u64, usize, usize, [bool; 4])>()).ok()?;
     let index_entry_bytes = string_bytes.checked_add(vector_pair_bytes)?;
     let namespace_index = string_capacity(namespace_bytes, namespace_declarations.checked_mul(3)?)?
         .checked_add(vec_sum_capacity(
@@ -195,12 +200,17 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
             namespace_declarations,
             index_binding_bytes,
         )?)?
-        .checked_add(vec_capacity(namespace_declarations, index_binding_bytes)?)?
+        .checked_add(vec_capacity(namespace_declarations, log_entry_bytes)?)?
         .checked_add(
             namespace_declarations
                 .checked_mul(index_entry_bytes)?
                 .checked_mul(ORDERED_INDEX_SLOTS_PER_ENTRY)?,
         )?
+        .checked_add(vec_capacity(namespace_declarations, identity_entry_bytes)?)?
+        .checked_add(hash_capacity(
+            namespace_declarations,
+            u64::try_from(size_of::<(u64, usize)>()).ok()?,
+        )?)?
         .checked_add(vec_capacity(attributes, reference_bytes)?.checked_mul(2)?)?;
     // A frame that declares namespaces and has an emitted child builds one
     // list of the effective declarations its children re-declare: at most
@@ -236,6 +246,13 @@ pub(super) fn memory_requirement(profile: Profile) -> Option<u64> {
         .checked_add(
             hash_sum_capacity(directive_tokens, directive_layers, pattern_slot)?.checked_mul(6)?,
         )?
+        // Record 0764: an exact pattern's local names are kept in one set per
+        // namespace, so every target may open a set of its own.
+        .checked_add(hash_sum_capacity(
+            directive_tokens,
+            directive_tokens,
+            string_bytes,
+        )?)?
         .checked_add(directive_layer_owner.checked_mul(directive_layers)?)?;
 
     let transient_names = string_capacity(namespace_bytes.checked_add(qualified_name_bytes)?, 2)?

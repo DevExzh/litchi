@@ -8,9 +8,10 @@
 
 use std::{convert::Infallible, io::Cursor};
 
-use super::codec::{WALKED_DECLARATIONS, process_markup_compatibility};
+use super::codec::process_markup_compatibility;
 use super::model::{Capabilities, DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT, Error, Limits, Report};
-use super::scope::counter::counted;
+use super::scope::WALKED_DECLARATIONS;
+use super::scope::counter::{counted, counted_uri_bytes};
 use super::stream::{
     SemanticEvent, StreamError, StreamLimits, process_markup_compatibility_stream,
     process_markup_compatibility_stream_with_observers,
@@ -356,4 +357,51 @@ fn no_configuration_admits_more_than_the_ceiling() {
         &widest,
     )
     .expect("the ceiling is admitted by the stream");
+}
+
+/// A root binding `z` to a URI of `uri_bytes` bytes, ignorable when
+/// `directives` says so, around one element of `attributes` attributes in
+/// `z`.
+fn long_uri(uri_bytes: usize, directives: &str, attributes: usize) -> String {
+    let uri = format!("urn:{}", "u".repeat(uri_bytes - 4));
+    let names: String = (0..attributes)
+        .map(|index| format!(r#" z:a{index}="""#))
+        .collect();
+    format!(r#"<r xmlns:mc="{MC}" xmlns:z="{uri}"{directives}><e{names}/></r>"#)
+}
+
+#[test]
+fn a_long_namespace_uri_is_read_once_per_declaration_not_per_name() {
+    // Before namespace identities, an attribute in an ignorable namespace
+    // hashed its URI in each directive and capability check: 1,000
+    // attributes under a 4 MiB URI took 1.4 s. Now the URI is hashed and its
+    // facts computed once, when it is declared.
+    let attributes = 1_000;
+    for directives in [
+        "",
+        r#" mc:Ignorable="z""#,
+        r#" mc:Ignorable="z" mc:PreserveAttributes="z:*""#,
+    ] {
+        let mut outputs = Vec::new();
+        let mut operations = Vec::new();
+        for uri_bytes in [64, 64 * 1024] {
+            let xml = long_uri(uri_bytes, directives, attributes);
+            let ((result, lookups), uri_read) =
+                counted_uri_bytes(|| counted(|| codec(&xml, &Limits::default())));
+            let (output, report) = result.expect("the document is valid");
+            // The declaration of `z` is interned (hashed, compared with the
+            // same-hash URIs in scope, of which there are none) and its facts
+            // computed: a constant number of passes over the URI, whatever
+            // the number of attributes in its namespace.
+            assert!(
+                uri_read <= 4 * uri_bytes + 1024,
+                "{directives}: {uri_read} bytes"
+            );
+            outputs.push((output.replace(&"u".repeat(uri_bytes - 4), "U"), report));
+            operations.push(lookups);
+        }
+        // The same work and the same output, the URI aside.
+        assert_eq!(operations[0], operations[1], "{directives}");
+        assert_eq!(outputs[0], outputs[1], "{directives}");
+    }
 }
