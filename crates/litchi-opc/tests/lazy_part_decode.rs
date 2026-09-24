@@ -93,6 +93,31 @@ fn fallible_access_decodes_only_the_selected_owned_part() {
 }
 
 #[test]
+fn part_metadata_separates_absence_from_a_failed_decode_without_decoding() {
+    let package =
+        OpcPackage::from_vec(corrupt_bad_member(archive())).expect("corruption is deferred");
+
+    let bad = package
+        .part_metadata(&uri(BAD_URI))
+        .expect("a corrupt member is still present");
+    assert_eq!(bad.partname().as_str(), BAD_URI);
+    assert_eq!(bad.content_type(), "application/octet-stream");
+    assert!(!bad.payload_is_decoded());
+    let good = package
+        .part_metadata(&uri("/CUSTOM/Good.XML"))
+        .expect("name resolution matches get_part");
+    assert_eq!(good.partname().as_str(), GOOD_URI);
+    assert!(package.part_metadata(&uri("/custom/absent.xml")).is_none());
+    assert_eq!(package.deferred_decode_counters(), Some((0, 0)));
+
+    // The decode refusal is still there for a reader, and is not absence.
+    assert!(matches!(
+        package.get_part(&uri(BAD_URI)),
+        Err(OpcError::ZipError(_))
+    ));
+}
+
+#[test]
 fn failed_first_access_is_stable_and_never_becomes_an_empty_generated_part() {
     let source = corrupt_bad_member(archive());
     let bad = uri(BAD_URI);

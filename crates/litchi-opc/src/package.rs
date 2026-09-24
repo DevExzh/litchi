@@ -1496,6 +1496,24 @@ impl OpcPackage {
         Ok(part)
     }
 
+    /// Look up a part's name and metadata without decoding its payload.
+    ///
+    /// Names resolve exactly as in [`Self::get_part`]: exact match first,
+    /// then ASCII case-insensitive. `None` therefore means exactly "no such
+    /// part". Do not use `get_part(..).is_err()` as an absence test: an
+    /// owned-source package decodes a payload on first access (ADR 0030), so
+    /// that error also covers a present part whose payload fails to decode.
+    /// The returned [`PartMetadata`] gives the stored name, content type and
+    /// relationships, and cannot reach the payload.
+    #[must_use]
+    pub fn part_metadata(&self, partname: &PackURI) -> Option<PartMetadata<'_>> {
+        let part: &dyn Part = match self.parts.get(partname) {
+            Some(part) => &**part,
+            None => self.find_case_insensitive(partname)?.1,
+        };
+        Some(PartMetadata::new(part))
+    }
+
     /// Locate a part whose name matches `partname` ignoring ASCII case.
     ///
     /// OPC compares part names case-insensitively, which is why a package
