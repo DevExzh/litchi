@@ -13,8 +13,12 @@ use litchi_doc as doc;
 #[cfg(all(feature = "docx", feature = "markdown"))]
 type DocxSourceCache = OnceLock<Box<crate::docx::Package>>;
 
+/// Without `markdown` a source-backed DOCX caches nothing. This is a named
+/// zero-sized type rather than `()` so that `Default::default()` at the
+/// construction sites is not a unit argument (`clippy::unit_arg`).
 #[cfg(all(feature = "docx", not(feature = "markdown")))]
-type DocxSourceCache = ();
+#[derive(Default)]
+pub(super) struct DocxSourceCache;
 
 /// A Word document implementation that can be .doc, .docx, .pages, .rtf, or .odt format.
 ///
