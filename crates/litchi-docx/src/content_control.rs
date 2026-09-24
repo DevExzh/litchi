@@ -746,6 +746,7 @@ pub(crate) fn parse_inventory(doc_xml: &[u8], limits: &Limits) -> Result<Invento
         max_namespace_bindings: limits.max_bindings,
         max_directive_tokens: limits.max_bindings,
         max_choices_per_alternate: limits.max_content_controls,
+        max_attributes_per_element: mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     };
     let selected = mce::process_markup_compatibility(doc_xml, &capabilities, &mce_limits)?.xml;
     if selected.len() > limits.max_mce_output_bytes {

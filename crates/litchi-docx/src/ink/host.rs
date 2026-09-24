@@ -841,6 +841,7 @@ pub(crate) fn select_active_offsets(
         max_namespace_bindings: MAX_NAMESPACE_DECLARATIONS,
         max_directive_tokens: limits.max_xml_nodes,
         max_choices_per_alternate: limits.max_xml_nodes.max(1),
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     };
     active_offsets(
         xml,

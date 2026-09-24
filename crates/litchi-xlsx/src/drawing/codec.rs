@@ -949,6 +949,7 @@ pub(crate) fn parse_with_limits(
         max_namespace_bindings: defaults.max_namespace_bindings.min(max_events),
         max_directive_tokens: defaults.max_directive_tokens.min(max_events),
         max_choices_per_alternate: defaults.max_choices_per_alternate.min(max_events),
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     };
     let processed = litchi_ooxml_common::mce::process_markup_compatibility(
         xml.as_bytes(),

@@ -511,6 +511,7 @@ fn parse_mce_dom(xml: &[u8]) -> Result<Node> {
         max_namespace_bindings: 4096,
         max_directive_tokens: 4096,
         max_choices_per_alternate: 1024,
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     };
     let processed = process_markup_compatibility(xml, &capabilities, &limits)?;
     parse_dom(processed.xml.as_ref())

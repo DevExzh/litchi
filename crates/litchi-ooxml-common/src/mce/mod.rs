@@ -6,6 +6,7 @@ pub mod stream;
 mod codec;
 mod fragment;
 mod model;
+mod scope;
 
 #[cfg(test)]
 mod tests;
@@ -15,7 +16,10 @@ pub use codec::{
     process_str,
 };
 pub use fragment::{InScopeNamespaces, self_contained_fragment};
-pub use model::{Capabilities, Error, Limits, NAMESPACE, Name, OffsetLimits, Output, Report};
+pub use model::{
+    Capabilities, DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT, Error, Limits, NAMESPACE, Name, OffsetLimits,
+    Output, Report,
+};
 pub use stream::{
     ActiveFlow, EventLimitExceeded, InputLimitExceeded, RawAttribute, RawElement, RawElementKind,
     SemanticAttribute, SemanticDecl, SemanticElement, SemanticEnd, SemanticEvent,

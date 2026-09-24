@@ -86,6 +86,13 @@ impl Default for Capabilities {
     }
 }
 
+/// Default for [`Limits::max_attributes_per_element`].
+///
+/// The largest element in the repository's real OOXML and ODF packages
+/// carries 43 attributes, and Word's roots about 40 namespace declarations;
+/// the widest ECMA-376 element types declare about 70 attributes.
+pub const DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT: usize = 1024;
+
 /// Bounds for one markup-compatibility preprocessing operation.
 #[derive(Debug, Clone)]
 pub struct Limits {
@@ -95,6 +102,14 @@ pub struct Limits {
     pub max_namespace_bindings: usize,
     pub max_directive_tokens: usize,
     pub max_choices_per_alternate: usize,
+    /// Maximum attributes on one start or empty-element tag, namespace
+    /// declarations included.
+    ///
+    /// Checked as each attribute is read, so a larger tag is refused at its
+    /// first surplus attribute. The parser's duplicate-name check costs up to
+    /// quadratic time in a tag's attribute count when the names are chosen
+    /// to collide, and this bound caps that cost per tag.
+    pub max_attributes_per_element: usize,
 }
 
 /// Resource policy for retaining source offsets through MCE preprocessing.
@@ -135,6 +150,7 @@ impl Default for Limits {
             max_namespace_bindings: 4096,
             max_directive_tokens: 4096,
             max_choices_per_alternate: 1024,
+            max_attributes_per_element: DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
         }
     }
 }

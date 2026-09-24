@@ -35,6 +35,7 @@ pub fn read(xml: &[u8]) -> Result<(Catalog, Conformance)> {
         max_namespace_bindings: MAX_VALUES,
         max_directive_tokens: MAX_VALUES,
         max_choices_per_alternate: MAX_VALUES,
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     };
     // Glossary entries can carry the same tracked-change attributes as the
     // main document.  Keep Word 2023's dateUtc namespace understood in this

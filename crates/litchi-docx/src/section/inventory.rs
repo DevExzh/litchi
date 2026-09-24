@@ -643,6 +643,8 @@ fn parse_inventory(xml: &[u8], limits: &Limits) -> Result<Inventory> {
             max_namespace_bindings: limits.max_mce_bindings,
             max_directive_tokens: limits.max_mce_bindings,
             max_choices_per_alternate: limits.max_mce_choices,
+            max_attributes_per_element:
+                litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
         },
     )?;
     scan_visible_document(processed.xml.as_ref(), limits)
