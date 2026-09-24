@@ -2324,6 +2324,18 @@ This amendment does not weaken the eviction rules for semantic payload caches,
 does not permit ambient process-wide state, and changes no other sentence of
 this ADR.
 
+> **Clarified 2026-09-24** by the owner's decision recorded in
+> [change 0758](../performance/0758-owner-decisions-2026-09-24.md) (decision 2),
+> confirming the reading of change
+> [0751](../performance/0751-pptx-cross-copy-apply-digest-reuse.md): the
+> adoption sentence above names when a facade must refresh its memo, not the only
+> point at which it may take one. A facade holding no memo may fill the slot
+> from a capture of its current, unmutated graph, provided every kept entry is
+> re-projected onto the facade's own allocations (entries naming allocations
+> the facade's package does not hold are dropped). Every other condition of
+> this amendment applies unchanged. [ADR 0032](0032-snapshot-derived-value-memos.md)
+> widens the values such a memo may hold.
+
 ## 2026-09-16 amendment: retained state that is not a cache, and its ceiling
 
 Authorized by [change 0652](../performance/0652-owner-decisions-for-the-third-wave.md)
