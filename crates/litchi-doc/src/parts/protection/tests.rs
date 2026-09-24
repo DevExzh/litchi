@@ -7,6 +7,7 @@ use super::model::{Mode, Ranges, Role, Selector, User};
 use super::policy::{EditProtection, ProtectionAuthorization, ProtectionPolicy, classify};
 use crate::package::Error as PackageError;
 use crate::package::Result;
+use crate::parts::document_properties::DocumentProperties;
 use crate::parts::fib::FileInformationBlock;
 use litchi_cfb::OleFile;
 use std::io::Cursor;
@@ -45,12 +46,26 @@ fn utf16(text: &str) -> Vec<u8> {
     text.encode_utf16().flat_map(u16::to_le_bytes).collect()
 }
 
-fn valid_modern_dop() -> Vec<u8> {
+/// The `WordDocument` and selected table streams of a checked-in DOC fixture.
+fn fixture_streams(name: &str) -> (Vec<u8>, Vec<u8>) {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../test-data/ole/doc/NoHeadFoot.doc");
-    let bytes = std::fs::read(path).expect("modern DOC fixture");
-    let mut ole = OleFile::open(Cursor::new(bytes)).expect("modern DOC CFB");
+        .join("../../test-data/ole/doc")
+        .join(name);
+    let bytes = std::fs::read(path).expect("DOC fixture");
+    let mut ole = OleFile::open(Cursor::new(bytes)).expect("DOC fixture CFB");
     let word = ole.open_stream(&["WordDocument"]).expect("WordDocument");
+    let table_name = if u16::from_le_bytes([word[10], word[11]]) & 0x0200 != 0 {
+        "1Table"
+    } else {
+        "0Table"
+    };
+    let table = ole.open_stream(&[table_name]).expect("table stream");
+    (word, table)
+}
+
+/// The exact DOP bytes a checked-in DOC fixture carries.
+fn fixture_dop(name: &str) -> Vec<u8> {
+    let (word, table) = fixture_streams(name);
     let count = usize::from(u16::from_le_bytes([word[152], word[153]]));
     let pointer = 154 + 31 * 8;
     assert!(count > 31);
@@ -64,13 +79,46 @@ fn valid_modern_dop() -> Vec<u8> {
             .expect("DOP length"),
     ))
     .expect("DOP length");
-    let table_name = if u16::from_le_bytes([word[10], word[11]]) & 0x0200 != 0 {
-        "1Table"
-    } else {
-        "0Table"
-    };
-    let table = ole.open_stream(&[table_name]).expect("table stream");
     table[offset..offset + length].to_vec()
+}
+
+fn valid_modern_dop() -> Vec<u8> {
+    fixture_dop("NoHeadFoot.doc")
+}
+
+/// A counted FIB with the given `FibBase.nFib`, `cbRgFcLcb` and `cswNew`
+/// (followed by `nFibNew` and a complete `FibRgCswNew` when `cswNew` is
+/// nonzero), whose DOP pointer covers `dop_length` bytes at table offset 0.
+fn counted_fib(
+    base_nfib: u16,
+    pointer_count: usize,
+    csw_new: u16,
+    nfib_new: u16,
+    dop_length: usize,
+) -> Vec<u8> {
+    let pointer_end = 154 + pointer_count * 8;
+    let mut fib = vec![0u8; pointer_end + 2 + usize::from(csw_new) * 2];
+    fib[..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
+    fib[2..4].copy_from_slice(&base_nfib.to_le_bytes());
+    fib[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    fib[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
+    fib[152..154].copy_from_slice(&u16::try_from(pointer_count).unwrap().to_le_bytes());
+    fib[pointer_end..pointer_end + 2].copy_from_slice(&csw_new.to_le_bytes());
+    if csw_new != 0 {
+        fib[pointer_end + 2..pointer_end + 4].copy_from_slice(&nfib_new.to_le_bytes());
+    }
+    set_pointer(&mut fib, 31, 0, u32::try_from(dop_length).unwrap());
+    fib
+}
+
+fn classify_bytes(fib: &[u8], table: &[u8]) -> EditProtection {
+    classify(&FileInformationBlock::parse(fib).unwrap(), table).unwrap()
+}
+
+/// Sets `Dop2003.fEnforceDocProt` and `iDocProtCur` in byte 598.
+fn enforced(mut dop: Vec<u8>, mode: u8) -> Vec<u8> {
+    dop[598] = (dop[598] & !0x78) | 0x08 | (mode << 4);
+    dop
 }
 
 fn sttb_users(users: &[(&str, u16)]) -> Vec<u8> {
@@ -455,60 +503,276 @@ fn classifies_document_and_range_protection_independently() {
     );
 }
 
+/// Word 2002 FIB and DOP shapes are classified by the protection fields they
+/// carry (MS-DOC 2.5.14, 2.7.2, 2.7.7), not by an exact producer length.
 #[test]
-fn word_2002_requires_its_counted_fib_and_dop_shapes() {
-    const POINTER_COUNT: usize = 136;
-    let pointer_end = 154 + POINTER_COUNT * 8;
-    let mut fib = vec![0u8; pointer_end + 4];
-    fib[..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
-    fib[2..4].copy_from_slice(&0x0101u16.to_le_bytes());
-    fib[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
-    fib[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
-    fib[152..154].copy_from_slice(&(POINTER_COUNT as u16).to_le_bytes());
-    fib[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
-    fib[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
-    let mut dop = crate::parts::document_properties::DocumentProperties::word97_writer_bytes(
-        false, false, false,
-    );
-    dop.resize(594, 0);
-    set_pointer(&mut fib, 31, 0, dop.len() as u32);
-    let parsed = FileInformationBlock::parse(&fib).unwrap();
-    assert_eq!(classify(&parsed, &dop).unwrap(), EditProtection::None);
-
+fn word_2002_shapes_are_classified_by_their_protection_fields() {
     let authorization =
-        ProtectionAuthorization::audited("test-suite", "reject malformed Word 2002 shape").unwrap();
+        ProtectionAuthorization::audited("test-suite", "classify Word 2002 shapes").unwrap();
     let allow = ProtectionPolicy::allow_protected(authorization);
 
-    let mut wrong_csw_new = fib.clone();
-    wrong_csw_new[pointer_end..pointer_end + 2].copy_from_slice(&0u16.to_le_bytes());
-    let word97_dop = &dop[..500];
-    set_pointer(&mut wrong_csw_new, 31, 0, word97_dop.len() as u32);
-    let wrong_csw_new = FileInformationBlock::parse(&wrong_csw_new).unwrap();
+    // The conforming Word 2002 FIB (cbRgFcLcb 0x88, cswNew 2, nFibNew 0x0101)
+    // with the complete 594-byte Dop2002 the writer emits.
+    let mut dop2002 = DocumentProperties::word97_writer_bytes(false, false, false);
+    dop2002.resize(594, 0);
+    let word2002 = counted_fib(0x00C1, 0x88, 2, 0x0101, 594);
+    assert_eq!(classify_bytes(&word2002, &dop2002), EditProtection::None);
+
+    // The same FIB with the 500-byte DOP the pre-0759 writer emitted. The
+    // DopBase is complete and Dop2000/Dop2002 add no protection field.
+    let short_writer = counted_fib(0x00C1, 0x88, 2, 0x0101, 500);
     assert_eq!(
-        classify(&wrong_csw_new, word97_dop).unwrap(),
-        EditProtection::Unknown
+        classify_bytes(&short_writer, &dop2002[..500]),
+        EditProtection::None
     );
+
+    // LibreOffice's shape: FibBase.nFib 0x0101 with a zero cswNew, so 2.5.14
+    // selects FibBase.nFib, which cbRgFcLcb 0x88 confirms; its 610-byte DOP
+    // carries wvkoSaved 7 and 0x0080 in the Dop2003 word at 598.
+    let libreoffice = fixture_dop("documentProperties.doc");
+    assert_eq!(libreoffice.len(), 610);
+    assert_eq!(libreoffice[82] & 0x07, 7);
+    assert_eq!(&libreoffice[598..600], &[0x80, 0x00]);
+    let libreoffice_fib = counted_fib(0x0101, 0x88, 0, 0, 610);
+    assert_eq!(
+        classify_bytes(&libreoffice_fib, &libreoffice),
+        EditProtection::None
+    );
+
+    // An enforced restriction in that 610-byte DOP is found at byte 598.
+    for mode in 0..=3 {
+        assert_eq!(
+            classify_bytes(&libreoffice_fib, &enforced(libreoffice.clone(), mode)),
+            EditProtection::Document,
+            "enforced iDocProtCur {mode}"
+        );
+    }
     assert!(
         ProtectionPolicy::default()
-            .authorize(EditProtection::Unknown)
+            .authorize(EditProtection::Document)
             .is_err()
     );
-    assert!(allow.authorize(EditProtection::Unknown).is_err());
-
-    let mut wrong_dop_length = fib;
-    let word97_dop = &dop[..500];
-    set_pointer(&mut wrong_dop_length, 31, 0, word97_dop.len() as u32);
-    let wrong_dop_length = FileInformationBlock::parse(&wrong_dop_length).unwrap();
+    assert!(allow.authorize(EditProtection::Document).is_ok());
     assert_eq!(
-        classify(&wrong_dop_length, word97_dop).unwrap(),
+        classify_bytes(&libreoffice_fib, &enforced(libreoffice.clone(), 7)),
+        EditProtection::None
+    );
+    for mode in 4..=6 {
+        assert_eq!(
+            classify_bytes(&libreoffice_fib, &enforced(libreoffice.clone(), mode)),
+            EditProtection::Unrecognized
+        );
+        let mut reserved = libreoffice.clone();
+        reserved[598] = (reserved[598] & !0x78) | (mode << 4);
+        assert_eq!(
+            classify_bytes(&libreoffice_fib, &reserved),
+            EditProtection::Unrecognized,
+            "reserved iDocProtCur {mode} without enforcement"
+        );
+    }
+    assert!(allow.authorize(EditProtection::Unrecognized).is_err());
+
+    // A DopBase lock in the LibreOffice DOP is a document restriction.
+    let mut forms = libreoffice.clone();
+    forms[7] |= 0x02;
+    forms[78..82].copy_from_slice(&0x0BAD_F00Du32.to_le_bytes());
+    assert_eq!(
+        classify_bytes(&libreoffice_fib, &forms),
+        EditProtection::Document
+    );
+
+    // A DOP that ends inside DopBase cannot be classified.
+    let truncated_base = counted_fib(0x0101, 0x88, 0, 0, 83);
+    assert_eq!(
+        classify_bytes(&truncated_base, &libreoffice[..83]),
         EditProtection::Unrecognized
     );
-    assert!(
-        ProtectionPolicy::default()
-            .authorize(EditProtection::Unrecognized)
-            .is_err()
+
+    // The counted FIB must still describe the generation 2.5.14 selects.
+    assert_eq!(
+        classify_bytes(&counted_fib(0x0101, 0x6C, 0, 0, 610), &libreoffice),
+        EditProtection::Unknown,
+        "cbRgFcLcb of another generation"
     );
-    assert!(allow.authorize(EditProtection::Unrecognized).is_err());
+    assert_eq!(
+        classify_bytes(&counted_fib(0x00C1, 0x88, 5, 0x0101, 610), &libreoffice),
+        EditProtection::Unknown,
+        "nonzero cswNew that is wrong for nFibNew"
+    );
+    let mut truncated_nfib_new = counted_fib(0x00C1, 0x88, 2, 0x0101, 594);
+    truncated_nfib_new.truncate(truncated_nfib_new.len() - 3);
+    assert_eq!(
+        classify_bytes(&truncated_nfib_new, &dop2002),
+        EditProtection::Unknown,
+        "nFibNew truncated"
+    );
+    let mut missing_csw_new = counted_fib(0x0101, 0x88, 0, 0, 610);
+    missing_csw_new.truncate(missing_csw_new.len() - 1);
+    assert_eq!(
+        classify_bytes(&missing_csw_new, &libreoffice),
+        EditProtection::Unknown,
+        "cswNew truncated"
+    );
+    assert!(allow.authorize(EditProtection::Unknown).is_err());
+}
+
+/// Appendix A note <11>: `FibBase.nFib` 0x00C0 (the shell's empty document)
+/// and 0x00C2 (the BiDi build of Word 97) are read as 0x00C1.
+#[test]
+fn note_11_reads_shell_and_bidi_nfib_values_as_word_97() {
+    let word97 = DocumentProperties::word97_writer_bytes(false, false, false);
+    assert_eq!(word97.len(), 500);
+    for nfib in [0x00C0, 0x00C1, 0x00C2] {
+        assert_eq!(
+            classify_bytes(&counted_fib(nfib, 0x5D, 0, 0, 500), &word97),
+            EditProtection::None,
+            "nFib 0x{nfib:04X}"
+        );
+        assert_eq!(
+            classify_bytes(&counted_fib(nfib, 0x88, 0, 0, 500), &word97),
+            EditProtection::Unknown,
+            "nFib 0x{nfib:04X} with a Word 2002 pointer count"
+        );
+    }
+    for nfib in [0x00BF, 0x00C3, 0x00D8, 0x0100, 0x0113] {
+        assert_eq!(
+            classify_bytes(&counted_fib(nfib, 0x5D, 0, 0, 500), &word97),
+            EditProtection::Unknown,
+            "unknown nFib 0x{nfib:04X}"
+        );
+    }
+    // A nonzero cswNew supersedes FibBase.nFib, and note <11> does not make
+    // 0x00C0 a valid nFibNew.
+    assert_eq!(
+        classify_bytes(&counted_fib(0x00C1, 0x5D, 2, 0x00C0, 500), &word97),
+        EditProtection::Unknown
+    );
+}
+
+/// From Word 2003 on the DOP must reach the enforcement unit at 598..600;
+/// shorter DOPs of that generation cannot be proven unprotected.
+#[test]
+fn word_2003_dops_must_reach_the_enforcement_unit() {
+    let dop = fixture_dop("FloatingPictures.doc");
+    assert_eq!(dop.len(), 616);
+    for length in 84..600 {
+        let fib = counted_fib(0x00C1, 0xA4, 2, 0x010C, length);
+        assert_eq!(
+            classify_bytes(&fib, &dop[..length]),
+            EditProtection::Unrecognized,
+            "Word 2003 DOP of {length} bytes"
+        );
+    }
+    for length in 600..=616 {
+        let fib = counted_fib(0x00C1, 0xA4, 2, 0x010C, length);
+        assert_eq!(
+            classify_bytes(&fib, &dop[..length]),
+            EditProtection::None,
+            "Word 2003 DOP of {length} bytes"
+        );
+        let protected = enforced(dop[..length].to_vec(), 1);
+        assert_eq!(
+            classify_bytes(&fib, &protected),
+            EditProtection::Document,
+            "enforced Word 2003 DOP of {length} bytes"
+        );
+    }
+    // A longer DOP under the Word 2003 FIB is read the same way.
+    let mut longer = dop.clone();
+    longer.resize(674, 0);
+    let fib = counted_fib(0x00C1, 0xA4, 2, 0x010C, 674);
+    assert_eq!(classify_bytes(&fib, &longer), EditProtection::None);
+    assert_eq!(
+        classify_bytes(&fib, &enforced(longer, 2)),
+        EditProtection::Document
+    );
+}
+
+/// Only the protection-bearing DOP fields decide the verdict; MS-DOC's
+/// requirements on those fields stay enforced.
+#[test]
+fn dop_protection_fields_decide_the_document_verdict() {
+    let classify_word2007 = |dop: &[u8]| {
+        let mut fib = fib_bytes(10);
+        set_pointer(&mut fib, 31, 0, u32::try_from(dop.len()).unwrap());
+        classify_bytes(&fib, dop)
+    };
+    let base = valid_modern_dop();
+    assert_eq!(base.len(), 674);
+    assert_eq!(classify_word2007(&base), EditProtection::None);
+    let with = |bits: &[(usize, u8)]| {
+        let mut dop = base.clone();
+        for &(byte, mask) in bits {
+            dop[byte] |= mask;
+        }
+        dop
+    };
+    const REVISION_MARKING: (usize, u8) = (5, 0x80);
+    const FORM_NO_FIELDS: (usize, u8) = (5, 0x20);
+    const LOCK_ANNOTATIONS: (usize, u8) = (6, 0x10);
+    const PROTECT_FORMS: (usize, u8) = (7, 0x02);
+    const LOCK_VBA_PROJECT: (usize, u8) = (7, 0x20);
+    const LOCK_REVISIONS: (usize, u8) = (7, 0x40);
+
+    // Each DopBase lock, and a password hash, restricts editing.
+    for bits in [
+        &[LOCK_ANNOTATIONS][..],
+        &[PROTECT_FORMS],
+        &[LOCK_REVISIONS, REVISION_MARKING],
+        &[PROTECT_FORMS, FORM_NO_FIELDS],
+        // SHOULD-level combinations that Word 97-2003 writes (Appendix A
+        // notes <164>, <165> and <167>) are protected, not malformed.
+        &[PROTECT_FORMS, LOCK_ANNOTATIONS],
+        &[PROTECT_FORMS, LOCK_REVISIONS, REVISION_MARKING],
+    ] {
+        assert_eq!(
+            classify_word2007(&with(bits)),
+            EditProtection::Document,
+            "{bits:?}"
+        );
+    }
+    let mut keyed = base.clone();
+    keyed[78..82].copy_from_slice(&0x1234_5678u32.to_le_bytes());
+    assert_eq!(classify_word2007(&keyed), EditProtection::Document);
+    assert_eq!(
+        classify_word2007(&enforced(base.clone(), 0)),
+        EditProtection::Document
+    );
+
+    // MS-DOC MUSTs on the protection fields themselves.
+    for bits in [
+        &[LOCK_ANNOTATIONS, LOCK_REVISIONS, REVISION_MARKING][..],
+        &[LOCK_REVISIONS],
+        &[FORM_NO_FIELDS],
+    ] {
+        assert_eq!(
+            classify_word2007(&with(bits)),
+            EditProtection::Unrecognized,
+            "{bits:?}"
+        );
+    }
+
+    // Revision tracking and a locked VBA project are not editing restrictions.
+    assert_eq!(
+        classify_word2007(&with(&[REVISION_MARKING])),
+        EditProtection::None
+    );
+    assert_eq!(
+        classify_word2007(&with(&[LOCK_VBA_PROJECT])),
+        EditProtection::None
+    );
+
+    // Fields without protection meaning are not validated by the classifier,
+    // including those MS-DOC says to ignore.
+    let mut unrelated = base.clone();
+    unrelated[0] |= 0x60; // DopBase.fpc reserved value 3
+    unrelated[18..20].copy_from_slice(&0xFFFFu16.to_le_bytes()); // wSpare2
+    unrelated[20..24].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes()); // dttmCreated
+    unrelated[54..56].copy_from_slice(&0x4000u16.to_le_bytes()); // reserved2
+    unrelated[82..84].copy_from_slice(&(0x0007u16 | (9 << 3)).to_le_bytes()); // wvkoSaved 7, pctWwdSaved 9
+    unrelated[0x190..0x19A].fill(0); // Dop97.dogrid display multiples 0
+    unrelated[599] = 0xFF; // Dop2003.empty2
+    assert_eq!(classify_word2007(&unrelated), EditProtection::None);
 }
 
 #[test]
@@ -632,6 +896,21 @@ fn malformed_dops_and_incomplete_fibs_fail_closed_for_both_policies() {
     );
     assert!(allow.authorize(EditProtection::Unknown).is_err());
 
+    // A DOP that does not lie inside the table stream is never read as
+    // unprotected.
+    let dop = valid_modern_dop();
+    for offset in [1, 16, u32::MAX - 673, u32::MAX] {
+        let mut outside = fib_bytes(10);
+        set_pointer(&mut outside, 31, offset, 674);
+        let outside = FileInformationBlock::parse(&outside).unwrap();
+        assert_eq!(
+            classify(&outside, &dop).unwrap(),
+            EditProtection::Unrecognized,
+            "DOP at offset {offset}"
+        );
+        assert!(allow.authorize(EditProtection::Unrecognized).is_err());
+    }
+
     let mut truncated_fib = fib_bytes(10);
     truncated_fib.truncate(154 + 136 * 8);
     let truncated_fib = FileInformationBlock::parse(&truncated_fib).unwrap();
@@ -649,6 +928,60 @@ fn malformed_dops_and_incomplete_fibs_fail_closed_for_both_policies() {
         EditProtection::Unknown
     );
     assert!(allow.authorize(EditProtection::Unknown).is_err());
+}
+
+/// The 35 readable DOC fixtures. None carries a DopBase lock, a password
+/// hash, an enforced Dop2003 mode or range-protection tables, although 24 of
+/// them were refused as `Unknown` or `Unrecognized` before change 0768.
+const UNPROTECTED_FIXTURES: [&str; 35] = [
+    "3endnotes.doc",
+    "DiffFirstPageHeadFoot.doc",
+    "FancyFoot.doc",
+    "FloatingPictures.doc",
+    "HeaderFooterProblematic.doc",
+    "HeaderFooterUnicode.doc",
+    "Lists.doc",
+    "NoHeadFoot.doc",
+    "PngPicture.doc",
+    "ThreeColFoot.doc",
+    "ThreeColHead.doc",
+    "ThreeColHeadFoot.doc",
+    "cfb-truncated-final-sector.doc",
+    "cjklist30.doc",
+    "cjklist31.doc",
+    "cjklist34.doc",
+    "cjklist35.doc",
+    "commented-table.doc",
+    "documentProperties.doc",
+    "duplicate-style-names.doc",
+    "empty.doc",
+    "endingnote.doc",
+    "equation.doc",
+    "first-header-footer.doc",
+    "footnote.doc",
+    "hyperlink.doc",
+    "image-comment-at-char.doc",
+    "inline-endnote-and-footnote.doc",
+    "lists-margins.doc",
+    "picture.doc",
+    "pictures_escher.doc",
+    "table-merged-cells.doc",
+    "tdf71749_with_footnote.doc",
+    "testPictures.doc",
+    "watermark.doc",
+];
+
+#[test]
+fn every_readable_fixture_classifies_as_unprotected() {
+    for name in UNPROTECTED_FIXTURES {
+        let (word, table) = fixture_streams(name);
+        let fib = FileInformationBlock::parse(&word).unwrap();
+        assert_eq!(
+            classify(&fib, &table).unwrap(),
+            EditProtection::None,
+            "{name}"
+        );
+    }
 }
 
 #[test]

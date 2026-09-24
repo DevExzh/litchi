@@ -24,8 +24,6 @@ use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-mod common;
-
 const HANDOFF_REPLACEMENT: &str = "litchi copy-through baseline replacement text";
 
 fn transaction_policy(
@@ -614,14 +612,11 @@ fn multi_generation_and_writer_producer_candidates_reopen() {
     let generated = writer_document(&["alpha", "bravo 😀", "charlie"]);
     let cases = [
         ("word97", fixture_bytes("test-data/ole/doc/NoHeadFoot.doc")),
-        // The Word 2002 producer fixture carries a nonconforming FIB and DOP
-        // length that the protection classifier refuses to edit; normalize
-        // them as the other edit tests do.
+        // LibreOffice's Word 2002 producer shape: nFib 0x0101 with cswNew 0
+        // and a 610-byte DOP, edited as checked in.
         (
             "word0101",
-            common::with_valid_word97_dop(fixture_bytes(
-                "test-data/ole/doc/documentProperties.doc",
-            )),
+            fixture_bytes("test-data/ole/doc/documentProperties.doc"),
         ),
         ("litchi-writer", generated),
     ];

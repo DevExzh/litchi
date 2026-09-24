@@ -625,10 +625,10 @@ fn classify_host(bytes: &[u8]) -> Result<EditProtection> {
         Err(error) => return Err(error.into()),
     };
     // Property-set callers may still inspect a structurally valid legacy host
-    // whose DOP uses an observed producer-specific length. Keep that source
-    // readable, but do not turn an unparseable protection record into `None`:
-    // changed publication remains fail-closed as `Unrecognized`, including
-    // when a caller supplies the protected-edit capability.
+    // whose protection record the classifier cannot interpret. Keep that
+    // source readable, but do not turn an unparseable protection record into
+    // `None`: changed publication remains fail-closed as `Unrecognized`,
+    // including when a caller supplies the protected-edit capability.
     match classify(&fib, &table) {
         Ok(protection) => Ok(protection),
         Err(Error::Corrupted(_)) => Ok(EditProtection::Unrecognized),
