@@ -15,6 +15,7 @@ use super::super::generated::{SystemGeneratedData, SystemGeneratedFile, SystemGe
 use super::super::native::{
     DictionaryBody, DictionaryType, NativeData, NativeFile, StringPageData,
 };
+use super::super::seen_names::SeenNames;
 use super::super::{GeneratedNameKind, Storage, classify_generated_path};
 use super::model::{
     ColumnPolicy, DictionaryPolicy, HierarchyPolicy, MetadataClass, MetadataCollection,
@@ -260,6 +261,9 @@ fn make_xml_node(
         ));
     }
     let mut attributes = Vec::new();
+    // Names borrowed from the tag: checking each one costs O(log n), where
+    // scanning `attributes` would cost O(n).
+    let mut seen = SeenNames::default();
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(xml_error)?;
         let key = std::str::from_utf8(attribute.key.as_ref())
@@ -268,7 +272,7 @@ fn make_xml_node(
         if key == "xmlns" || key.contains(':') {
             return Err(MetadataError::new("metadata namespaces are not allowed"));
         }
-        if attributes.iter().any(|(name, _)| name == &key) {
+        if !seen.insert(attribute.key.into_inner()) {
             return Err(MetadataError::new("duplicate metadata attribute"));
         }
         let value = attribute
@@ -1602,4 +1606,51 @@ fn string_property(name: &str) -> bool {
 }
 fn xml_error(error: impl fmt::Display) -> MetadataError {
     MetadataError::new(format!("invalid metadata XML: {error}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// ` a00000="0" a00001="1" ...`: `count` distinct attribute names.
+    fn distinct_attributes(count: usize) -> String {
+        (0..count)
+            .map(|index| format!(" a{index:05}=\"{index}\""))
+            .collect()
+    }
+
+    #[test]
+    fn duplicate_attribute_names_are_refused_as_before() {
+        let node = parse_xml(b"<e a='1' b='2'/>").unwrap();
+        assert_eq!(
+            node.attributes,
+            [
+                ("a".to_owned(), "1".to_owned()),
+                ("b".to_owned(), "2".to_owned())
+            ]
+        );
+        let error = parse_xml(b"<e a='1' b='2' a='3'/>")
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.starts_with("invalid metadata XML: ") && error.contains("duplicated attribute"),
+            "{error}"
+        );
+        assert_eq!(
+            parse_xml(b"<e a='1' p:b='2'/>").unwrap_err().to_string(),
+            "metadata namespaces are not allowed"
+        );
+    }
+
+    #[test]
+    fn many_distinct_attribute_names_are_read_in_order() {
+        // Scanning the attributes read so far compared ~1.25e9 pairs here.
+        let xml = format!("<e{}/>", distinct_attributes(50_000));
+        let node = parse_xml(xml.as_bytes()).unwrap();
+        assert_eq!(node.attributes.len(), 50_000);
+        for (index, (name, value)) in node.attributes.iter().enumerate() {
+            assert_eq!(*name, format!("a{index:05}"));
+            assert_eq!(*value, index.to_string());
+        }
+    }
 }
