@@ -73,10 +73,10 @@ pub enum EditProtection {
     /// MS-DOC protection grammar, so its protection state is not known
     /// precisely.
     ///
-    /// This covers a DOP too short to hold the protection fields of its
-    /// generation, DOP protection fields that break an MS-DOC requirement
-    /// (for example `fLockAtn` together with `fLockRev`, or a reserved
-    /// `iDocProtCur`), and a malformed range-protection table. It remains
+    /// This covers a DOP outside the table stream or too short to hold the
+    /// protection fields of its generation, DOP protection fields that break
+    /// an MS-DOC requirement (for example `fLockAtn` together with `fLockRev`,
+    /// or a reserved `iDocProtCur`), and a malformed range-protection table. It remains
     /// distinct from [`Self::None`]. It is retained for inspection and exact
     /// no-op publication only; an authorization cannot turn an unrecognized
     /// protection record into a known safe state.

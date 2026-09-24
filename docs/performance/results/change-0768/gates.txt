@@ -38,3 +38,9 @@ python3 tools/non_iwork_gate.py verify                                    exit 1
 #   ac63852fc3 (+ FKP)                      1306 passed, 0 failed
 # The FKP real-file regression test fails on 6b340fe0e9's code
 # ("saved-by-table.doc output should reopen: Corrupted file: malformed CHPX FKP").
+
+# After the record commit, a documentation-only fix to EditProtection::Unrecognized
+# (it also covers a DOP outside the table stream) was checked with a fresh
+# CARGO_INCREMENTAL=0 target: cargo fmt --all --check exit 0; RUSTDOCFLAGS="-D warnings"
+# cargo doc -p litchi-doc --no-deps exit 0; cargo clippy -p litchi-doc --lib --no-deps
+# -- -D warnings exit 0; cargo test -p litchi-doc --lib -- parts::protection 23 passed.
