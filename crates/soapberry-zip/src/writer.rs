@@ -2857,10 +2857,42 @@ impl ReusableDeflateState {
     /// Unlike [`Self::flush_to`] followed by [`Self::finish_to`], no sync
     /// flush precedes the final block, which saves its empty stored block and
     /// the block boundary it forces.
+    ///
+    /// A sink call that fails with [`io::ErrorKind::Interrupted`] is retried
+    /// where it stopped, as `Write::write_all` retries an interrupted write:
+    /// the caller cannot retry a finish, which consumes the entry. Every codec
+    /// call still follows a complete drain, so none is repeated or changed
+    /// and the member's bytes do not depend on interruptions. Any other error
+    /// ends the member.
     pub(crate) fn finish_owned<W: Write + ?Sized>(&mut self, entry: &mut W) -> io::Result<()> {
-        self.compress_stage(entry)?;
-        entry.flush()?;
-        self.finish_to(entry)
+        retry_interrupted(|| self.compress_stage(entry))?;
+        retry_interrupted(|| entry.flush())?;
+        loop {
+            retry_interrupted(|| self.drain_pending(entry))?;
+            let before_out = self.compressor.total_out();
+            let (status, consumed, _) = self.compress_once(&[], FlushCompress::Finish)?;
+            if consumed != 0 {
+                return Err(reusable_deflate_progress_error());
+            }
+            if status == Status::StreamEnd {
+                return retry_interrupted(|| self.drain_pending(entry));
+            }
+            if self.compressor.total_out() == before_out {
+                return Err(reusable_deflate_progress_error());
+            }
+        }
+    }
+}
+
+/// Repeats `step` while it fails with [`io::ErrorKind::Interrupted`], as
+/// `Write::write_all` repeats an interrupted write. Only steps that resume
+/// where an interruption stopped them are retried this way.
+fn retry_interrupted<T>(mut step: impl FnMut() -> io::Result<T>) -> io::Result<T> {
+    loop {
+        match step() {
+            Err(error) if io_error_is_interrupted(&error) => {},
+            result => return result,
+        }
     }
 }
 
@@ -2970,6 +3002,26 @@ enum OwnedCompressor<W: Write> {
 }
 
 impl<W: Write> OwnedCompressor<W> {
+    fn archive(&self) -> &ZipArchiveWriter<W> {
+        match self {
+            Self::Store(entry) => &entry.archive,
+            Self::Deflate(compressor) => &compressor.entry.archive,
+        }
+    }
+
+    /// Refuses a `write` or `flush` once a failure has poisoned the archive,
+    /// before any byte (such as a chunk the failed call left staged) can
+    /// reach a sink that has since recovered.
+    fn ensure_writable(&self) -> io::Result<()> {
+        if self.archive().poisoned {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ZIP archive is poisoned after a prior failure",
+            ));
+        }
+        Ok(())
+    }
+
     fn compressed_bytes(&self) -> u64 {
         match self {
             Self::Store(entry) => entry.compressed_bytes(),
@@ -2987,16 +3039,20 @@ impl<W: Write> OwnedCompressor<W> {
     /// Flushes the sink, ends the payload and publishes the entry's
     /// descriptor and central record.
     ///
-    /// A Store entry flushes its sink exactly as its `flush` does. A Deflate
+    /// A poisoned archive is refused before its sink sees another byte. A
+    /// Store entry flushes its sink exactly as its `flush` does. A Deflate
     /// entry ends its staged stream with [`ReusableDeflateState::finish_owned`],
     /// which flushes the sink before the final block and never sync-flushes.
+    /// Either retries a sink call interrupted with
+    /// [`io::ErrorKind::Interrupted`] where it stopped.
     fn finish(self, output: DataDescriptorOutput) -> Result<ZipArchiveWriter<W>, Error>
     where
         W: Write,
     {
+        self.archive().ensure_usable()?;
         match self {
             Self::Store(mut entry) => {
-                entry.flush()?;
+                retry_interrupted(|| entry.flush())?;
                 entry.finish(output)
             },
             Self::Deflate(mut compressor) => {
@@ -3011,6 +3067,7 @@ impl<W: Write> OwnedCompressor<W> {
 
 impl<W: Write> Write for OwnedCompressor<W> {
     fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        self.ensure_writable()?;
         match self {
             Self::Store(entry) => entry.write(buffer),
             Self::Deflate(compressor) => {
@@ -3026,6 +3083,7 @@ impl<W: Write> Write for OwnedCompressor<W> {
     }
 
     fn flush(&mut self) -> io::Result<()> {
+        self.ensure_writable()?;
         match self {
             Self::Store(entry) => entry.flush(),
             Self::Deflate(compressor) => {
@@ -3191,11 +3249,21 @@ impl<W: Write> Write for OwnedCompressedEntry<W> {
 /// complete chunk at a time, so the compressed bytes depend only on the
 /// member's bytes and on where [`Write::flush`] was called, never on how the
 /// caller split its writes. A write accepts at most up to the next chunk
-/// boundary, and compressed output (and any sink failure or compressed-limit
-/// refusal it meets) follows the input by up to one chunk; the output never
-/// exceeds a limit. Calling [`Self::finish`] consumes the entry and returns
-/// the archive writer so another entry can be started without a borrow tied
-/// to the original archive value.
+/// boundary. Compressed output reaches the sink only as the codec releases
+/// it, so a sink failure or a compressed-limit refusal surfaces when that
+/// output is written: after the codec's own buffering, which on highly
+/// compressible input holds back megabytes of input, and batching adds up
+/// to one more 16 KiB chunk. The output never exceeds a limit.
+///
+/// A failure of a Deflate `write` or `flush`, or a sink failure of a Store
+/// entry, other than [`io::ErrorKind::Interrupted`] poisons the archive:
+/// every later `write`, `flush` and [`Self::finish`] is refused before a byte
+/// reaches the sink. An interrupted `write` or `flush` accepts nothing and
+/// can be retried; [`Self::finish`] retries interruptions itself.
+///
+/// Calling [`Self::finish`] consumes the entry and returns the archive writer
+/// so another entry can be started without a borrow tied to the original
+/// archive value.
 #[derive(Debug)]
 pub struct ZipOwnedEntryWriter<W: Write> {
     inner: Option<ZipDataWriter<OwnedCompressor<W>>>,
@@ -3237,7 +3305,12 @@ impl<W: Write> ZipOwnedEntryWriter<W> {
     /// Finishes the entry and recovers the parent archive writer.
     ///
     /// The sink is flushed once, as by [`Write::flush`]; a Deflate entry then
-    /// ends its stream with one final block and no sync flush before it.
+    /// ends its stream with one final block and no sync flush before it. A
+    /// sink call that fails with [`io::ErrorKind::Interrupted`] is retried
+    /// where it stopped, as [`Write::write_all`] retries an interrupted
+    /// write, so an interruption neither ends the entry nor changes its
+    /// bytes. Any other failure consumes the entry and its archive, and a
+    /// poisoned archive is refused before its sink sees another byte.
     pub fn finish(mut self) -> Result<ZipArchiveWriter<W>, Error>
     where
         W: Write,
