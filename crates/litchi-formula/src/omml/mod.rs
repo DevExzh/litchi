@@ -38,6 +38,11 @@ mod utils;
 /// This module serializes the formula AST back to OMML XML (the reverse of
 /// the parser), enabling round-trips and authoring math into OOXML documents.
 mod writer;
+/// Bounded-cost attribute iteration
+///
+/// This module reads each attribute name's first occurrence without the
+/// quadratic cost of quick-xml's duplicate check on repeated names.
+mod xml_attributes;
 
 use crate::ast::MathNode;
 
@@ -1162,6 +1167,71 @@ mod tests {
                 assert_eq!(font.as_deref(), Some("Times New Roman"));
             },
             _ => panic!("Expected run node"),
+        }
+    }
+
+    #[test]
+    fn test_parse_repeated_attributes_keep_their_first_value() {
+        let formula = Formula::new();
+        let parser = OmmlParser::new(formula.arena());
+
+        for (chr, expected) in [
+            (r#"<m:chr m:val="¯"/>"#, AccentType::Bar),
+            (r#"<m:chr m:val="¯" m:val="→"/>"#, AccentType::Bar),
+            (r#"<m:chr m:val="→" m:val="¯"/>"#, AccentType::Vec),
+            (r#"<m:chr m:val="¯" m:val="→"></m:chr>"#, AccentType::Bar),
+        ] {
+            let xml = format!(
+                r#"<m:oMath><m:acc><m:accPr>{chr}</m:accPr><m:e><m:r><m:t>x</m:t></m:r></m:e></m:acc></m:oMath>"#
+            );
+            let nodes = parser.parse(&xml).unwrap();
+            match &nodes[0] {
+                MathNode::Accent { accent, .. } => assert_eq!(*accent, expected, "{chr}"),
+                _ => panic!("Expected accent node"),
+            }
+        }
+
+        // A handler reads its own element's repeated attributes the same way.
+        for (nary, expected) in [
+            (r#"<m:nary m:chr="∫">"#, LargeOperator::Integral),
+            (r#"<m:nary m:chr="∫" m:chr="∑">"#, LargeOperator::Integral),
+            (r#"<m:nary m:chr="∑" m:chr="∫">"#, LargeOperator::Sum),
+        ] {
+            let xml = format!(
+                r#"<m:oMath>{nary}<m:sub><m:r><m:t>0</m:t></m:r></m:sub><m:sup><m:r><m:t>1</m:t></m:r></m:sup><m:e><m:r><m:t>x</m:t></m:r></m:e></m:nary></m:oMath>"#
+            );
+            let nodes = parser.parse(&xml).unwrap();
+            match &nodes[0] {
+                MathNode::LargeOp { operator, .. } => assert_eq!(*operator, expected, "{nary}"),
+                _ => panic!("Expected large operator node"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_tags_of_many_repeated_attribute_names() {
+        let formula = Formula::new();
+        let parser = OmmlParser::new(formula.arena());
+
+        // 20,000 names and 20,000 repeats of the last, on a handled start tag,
+        // plain start tags and an empty property tag.
+        let mut names = String::new();
+        for index in 0..20_000 {
+            names.push_str(&format!(" n{index:05}=\"\""));
+        }
+        for _ in 0..20_000 {
+            names.push_str(" n19999=\"\"");
+        }
+        let xml = format!(
+            r#"<m:oMath><m:acc{names}><m:accPr{names}><m:chr{names} m:val="¯" m:val="→"/></m:accPr><m:e{names}><m:r><m:t>x</m:t></m:r></m:e></m:acc></m:oMath>"#
+        );
+        let nodes = parser.parse(&xml).unwrap();
+        match &nodes[0] {
+            MathNode::Accent { accent, base, .. } => {
+                assert_eq!(*accent, AccentType::Bar);
+                assert!(!base.is_empty());
+            },
+            _ => panic!("Expected accent node"),
         }
     }
 }

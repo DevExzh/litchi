@@ -4,6 +4,7 @@ use crate::ast::*;
 use crate::omml::attributes::{get_attribute_value, parse_large_operator};
 use crate::omml::elements::ElementContext;
 use crate::omml::properties::parse_nary_properties;
+use crate::omml::xml_attributes::first_wins;
 use quick_xml::events::BytesStart;
 
 /// Handler for n-ary operator elements
@@ -15,7 +16,7 @@ impl NaryHandler {
         context: &mut ElementContext<'arena>,
         _arena: &'arena bumpalo::Bump, // Unused: properties stored in context, no string allocation
     ) {
-        let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
+        let attrs: Vec<_> = first_wins(elem).filter_map(|a| a.ok()).collect();
 
         // Parse n-ary properties
         context.properties = parse_nary_properties(&attrs);
