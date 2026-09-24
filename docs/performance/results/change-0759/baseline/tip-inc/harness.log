@@ -1,0 +1,7 @@
+HEAD a67a38abf26119b445ae2b7964810f49aa17a0f7
+$ cargo test --manifest-path tools/perf-baseline/Cargo.toml --locked
+    Updating crates.io index
+error: cannot update the lock file /home/zhuhe/code/litchi-worktrees/tip-inc/tools/perf-baseline/Cargo.lock because --locked was passed to prevent this
+help: to generate the lock file without accessing the network, remove the --locked flag and use --offline instead.
+
+exit 101

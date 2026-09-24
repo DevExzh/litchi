@@ -1,0 +1,137 @@
+TREE c3c076acd0a3dde1b5b9575fe120156a5de2d83a
+$ cargo test --manifest-path tools/perf-baseline/Cargo.toml --locked --no-fail-fast --bin docx_bounded_tail_append_compare --bin docx_plain_paragraph_tail_append --bin docx_replayable_tail_append --bin docx_source_selected_paragraph --bin litchi-perf-baseline --bin odp_native_tail_append_probe --bin pptx_external_cross_copy --bin pptx_metadata_spool --bin pptx_native_copy_probe --bin pptx_semantic_inventory --bin security_corpus --bin xlsx_cell_values_abba --bin xlsx_merge_source_abba --bin xlsx_planning_guard --bin xml_stream_audit --bin zip_directory_spool --test xlsx_filesystem --test xlsx_planning_allocations
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.40s
+     Running unittests src/bin/docx_bounded_tail_append_compare.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/docx_bounded_tail_append_compare-40b0d9ddc8ce199c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/docx_plain_paragraph_tail_append.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/docx_plain_paragraph_tail_append-402c31e404f5b50b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/docx_replayable_tail_append.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/docx_replayable_tail_append-9949f4a7e095584b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/docx_source_selected_paragraph.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/docx_source_selected_paragraph-7a77a26f8b796756)
+
+running 12 tests
+test tests::checked_read_delta_rejects_counter_regression ... ok
+test tests::cargo_lock_path_is_package_local ... ok
+test tests::non_authoritative_modes_cannot_authorize_claims ... ok
+test tests::overlap_is_bounded_and_empty_at_edges ... ok
+test tests::schema_and_scope_are_statistics_free ... ok
+test tests::toolchain_pin_mismatch_is_not_authorized ... ok
+test tests::git_status_parser_reports_actual_dirtiness ... ok
+test tests::owned_temp_file_is_removed_only_after_successful_creation ... ok
+test tests::pinned_identity_rejects_archive_mismatch ... ok
+test tests::byte_accounting_reconciles_structural_residual_ranges ... ok
+test tests::bounded_streaming_hash_counts_and_enforces_limits ... ok
+test tests::deterministic_corpus_shape_is_pinned_without_hashes ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src/main.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/litchi_perf_baseline-8bf3c443fb8af20a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/odp_native_tail_append_probe.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/odp_native_tail_append_probe-01b544f97a303688)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/pptx_external_cross_copy.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/pptx_external_cross_copy-ea19eb6175bfefe2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/pptx_metadata_spool.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/pptx_metadata_spool-56535bdc9aeb53cc)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/pptx_native_copy_probe.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/pptx_native_copy_probe-d7df7d40671a4ffa)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/pptx_semantic_inventory.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/pptx_semantic_inventory-7a7df2b9319c43ca)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/security_corpus.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/security_corpus-ecd2913f7c8a038e)
+
+running 7 tests
+test tests::all_rows_are_guarded_against_execution_and_resolution ... ok
+test tests::input_bound_is_checked_at_the_admission_boundary ... ok
+test tests::catalog_has_all_twenty_two_unique_fixture_bindings ... ok
+test tests::declared_zip_member_size_refuses_before_payload_read ... ok
+test tests::total_zip_entry_admission_includes_directory_records ... ok
+test tests::malformed_rows_refuse_before_preservation_output ... ok
+test tests::zero_block_crypto_oracle_matches_strict_and_compatibility_paths ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+
+     Running unittests src/bin/xlsx_cell_values_abba.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/xlsx_cell_values_abba-e0e96ee366687f40)
+
+running 2 tests
+test xlsx_cell_values_abba_identity_tests::pinned_current_shape_untouched_counts_are_exact ... ok
+test xlsx_cell_values_abba_identity_tests::pinned_current_shape_identities_are_exact ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xlsx_merge_source_abba.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/xlsx_merge_source_abba-95b09f2743d17f76)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xlsx_planning_guard.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/xlsx_planning_guard-2104a1ce7be30005)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/xml_stream_audit.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/xml_stream_audit-bb8abe7f5406de97)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/zip_directory_spool.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/zip_directory_spool-cba0dd39d0e3bc4c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xlsx_filesystem.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/xlsx_filesystem-90cd46dca8c46916)
+
+running 4 tests
+test xlsx_file_cold_verified_is_eligible_or_explicitly_ineligible ... ok
+test xlsx_file_selectors_run_as_two_samples_in_distinct_fresh_children ... ok
+test xlsx_repeated_store_reacquisition_controls_report_structural_scope ... ok
+test xlsx_file_selected_cell_runs_in_fresh_child_and_marks_cold_ineligible ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 46.91s
+
+     Running tests/xlsx_planning_allocations.rs (/home/zhuhe/code/litchi-worktrees/targets/merge-harness/debug/deps/xlsx_planning_allocations-973a3aa74c8fcd18)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+exit 0

@@ -1,0 +1,381 @@
+HEAD a67a38abf26119b445ae2b7964810f49aa17a0f7
+$ cargo clippy --workspace --lib --no-deps --locked -- -D warnings
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-core)
+   Compiling getrandom v0.3.4
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/soapberry-zip)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/xml-minifier-macros)
+    Checking rand v0.8.8
+   Compiling regex-syntax v0.8.11
+   Compiling indexmap v2.11.4
+    Checking tempfile v3.27.0
+    Checking litchi-iwa-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-iwa-common)
+   Compiling buffa-build v0.9.1
+    Checking num-bigint-dig v0.8.6
+   Compiling petgraph v0.8.3
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/xml-minifier)
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-codepage)
+    Checking litchi-iwa-package v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-iwa-package)
+    Checking litchi-iwa-cache v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-iwa-cache)
+    Checking litchi-odraw v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-odraw)
+    Checking litchi-xldm v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-xldm)
+    Checking rsa v0.9.10
+   Compiling regex-automata v0.4.18
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-cfb)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-sheet)
+    Checking litchi-formula v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-formula)
+    Checking rand_distr v0.4.3
+    Checking litchi-iwa-text v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-iwa-text)
+    Checking litchi-numbers-wire v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-numbers-wire)
+    Checking litchi-biff v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-biff)
+    Checking litchi-imgconv v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-imgconv)
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-odf-common)
+   Compiling regex v1.13.1
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-opc)
+   Compiling prost-build v0.14.4
+    Checking nalgebra v0.33.3
+    Checking litchi-rtf v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-rtf)
+   Compiling litchi-iwa-protos v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-iwa-protos)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-vba)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-sign)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-ograph)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-ooxml-common)
+    Checking litchi-iwa-graph v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-iwa-graph)
+    Checking litchi-iwa-index v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-iwa-index)
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-fonts)
+    Checking statrs v0.18.0
+    Checking litchi-markdown v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-markdown)
+    Checking litchi-slide v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-slide)
+    Checking litchi-word v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-word)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-crypto)
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-ppt)
+    Checking litchi-eval v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-eval)
+    Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-doc)
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-xls)
+    Checking litchi-ods v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-ods)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-drawingml)
+    Checking litchi-odt v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-odt)
+    Checking litchi-odp v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-odp)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-xlsb)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-xlsx)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-docx)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-pptx)
+    Checking litchi-odg v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-odg)
+    Checking litchi-odb v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-odb)
+    Checking litchi-odi v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-odi)
+    Checking litchi-odm v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-odm)
+    Checking litchi-oth v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-oth)
+    Checking litchi-odc v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-odc)
+    Checking litchi-odf-formula v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-odf-formula)
+    Checking litchi-odf v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-odf)
+    Checking litchi-iwa-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-iwa-core)
+    Checking litchi-iwa-text-wire v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-iwa-text-wire)
+    Checking litchi-iwa-archive v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-iwa-archive)
+    Checking litchi-iwa-detect v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-iwa-detect)
+    Checking litchi-keynote v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-keynote)
+    Checking litchi-pages v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-pages)
+    Checking litchi-numbers v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-numbers)
+    Checking litchi-iwa-structured v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-iwa-structured)
+    Checking litchi-iwa v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi-iwa)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-inc/crates/litchi)
+error: unneeded `return` statement
+   --> crates/litchi/src/detection_smart/detected.rs:165:9
+    |
+165 |         return try_ooxml_probe_wins(bytes, limits);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_return
+    = note: `-D clippy::needless-return` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_return)]`
+help: remove `return`
+    |
+165 -         return try_ooxml_probe_wins(bytes, limits);
+165 +         try_ooxml_probe_wins(bytes, limits)
+    |
+
+error: unneeded `return` statement
+    --> crates/litchi/src/detection_smart/detected.rs:1580:9
+     |
+1580 | /         return match detect_prepared_odp_with_limits(bytes, crate::opc::ReadLimits::default()) {
+1581 | |             Ok(result) => result,
+1582 | |             Err(error) => Err(error.bytes),
+1583 | |         };
+     | |_________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_return
+help: remove `return`
+     |
+1580 ~         match detect_prepared_odp_with_limits(bytes, crate::opc::ReadLimits::default()) {
+1581 +             Ok(result) => result,
+1582 +             Err(error) => Err(error.bytes),
+1583 ~         }
+     |
+
+error: large size difference between variants
+    --> crates/litchi/src/detection_smart/detected.rs:1993:1
+     |
+1993 | / pub(crate) enum PptxSourcePathDetection {
+1994 | |     /// A validated, source-retaining PPTX owner.
+1995 | |     Pptx(crate::pptx::SourceBackedPresentation),
+1996 | |     /// A validated, source-retaining ODP owner.
+1997 | |     #[cfg(feature = "odp")]
+1998 | |     Odp(litchi_odp::SourceBackedPresentation),
+     | |     ----------------------------------------- the largest variant contains at least 1328 bytes
+...    |
+2010 | |     Bytes(Vec<u8>),
+     | |     -------------- the second-largest variant contains at least 24 bytes
+2011 | | }
+     | |_^ the entire enum is at least 1328 bytes
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#large_enum_variant
+     = note: `-D clippy::large-enum-variant` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::large_enum_variant)]`
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+     |
+1998 -     Odp(litchi_odp::SourceBackedPresentation),
+1998 +     Odp(Box<litchi_odp::SourceBackedPresentation>),
+     |
+
+error: large size difference between variants
+    --> crates/litchi/src/detection_smart/detected.rs:2082:1
+     |
+2082 | / pub(crate) enum DocumentSourcePathDetection {
+2083 | |     #[cfg(feature = "odt")]
+2084 | |     Odt(OdtSourcePathCandidate),
+     | |     --------------------------- the second-largest variant contains at least 32 bytes
+2085 | |     Docx(DocxSourcePathDetection),
+     | |     ----------------------------- the largest variant contains at least 1520 bytes
+2086 | | }
+     | |_^ the entire enum is at least 1520 bytes
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#large_enum_variant
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+     |
+2085 -     Docx(DocxSourcePathDetection),
+2085 +     Docx(Box<DocxSourcePathDetection>),
+     |
+
+error: useless conversion to the same type: `litchi_core::Error`
+    --> crates/litchi/src/detection_smart/detected.rs:2800:58
+     |
+2800 |             .map_err(|error| PptxSourcePathError::Source(litchi_core::Error::from(error)))?;
+     |                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider removing `litchi_core::Error::from()`: `error`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#useless_conversion
+     = note: `-D clippy::useless-conversion` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::useless_conversion)]`
+
+error: unneeded `return` statement
+   --> crates/litchi/src/document/doc.rs:764:13
+    |
+764 | /             return match detected {
+765 | |                 #[cfg(feature = "odt")]
+766 | |                 crate::detection_smart::detected::DocumentSourcePathDetection::Odt(candidate) => {
+767 | |                     Ok(Self {
+...   |
+797 | |                 },
+798 | |             };
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_return
+help: remove `return`
+    |
+764 ~             match detected {
+765 +                 #[cfg(feature = "odt")]
+766 +                 crate::detection_smart::detected::DocumentSourcePathDetection::Odt(candidate) => {
+767 +                     Ok(Self {
+768 +                         inner: DocumentImpl::OdtSource(candidate.into_document()?),
+769 +                     })
+770 +                 },
+771 +                 crate::detection_smart::detected::DocumentSourcePathDetection::Docx(detected) => {
+772 +                     match detected {
+773 +                         crate::detection_smart::detected::DocxSourcePathDetection::Docx(package) => {
+774 +                             Ok(Self {
+775 +                                 inner: DocumentImpl::DocxSource(package, Default::default()),
+776 +                             })
+777 +                         },
+778 +                         crate::detection_smart::detected::DocxSourcePathDetection::OtherOoxml(
+779 +                             format,
+780 +                         ) => {
+781 +                             let _ = format;
+782 +                             Err(Error::InvalidFormat(
+783 +                                 "Detected format is not a document format or feature not enabled"
+784 +                                     .to_owned(),
+785 +                             ))
+786 +                         },
+787 +                         crate::detection_smart::detected::DocxSourcePathDetection::DisabledOtherOoxml(
+788 +                             format,
+789 +                         ) => {
+790 +                             let _ = format;
+791 +                             Err(Error::NotOfficeFile)
+792 +                         },
+793 +                         crate::detection_smart::detected::DocxSourcePathDetection::Bytes(bytes) => {
+794 +                             Self::from_bytes_with_limits(bytes, limits)
+795 +                         },
+796 +                     }
+797 +                 },
+798 ~             }
+    |
+
+error: passing a unit value to a function
+   --> crates/litchi/src/document/doc.rs:775:40
+    |
+775 | ...                   inner: DocumentImpl::DocxSource(package, Default::default()),
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unit_arg
+    = note: `-D clippy::unit-arg` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unit_arg)]`
+help: use a unit literal instead
+    |
+775 -                                 inner: DocumentImpl::DocxSource(package, Default::default()),
+775 +                                 inner: DocumentImpl::DocxSource(package, ()),
+    |
+
+error: passing a unit value to a function
+   --> crates/litchi/src/document/doc.rs:903:20
+    |
+903 |             inner: DocumentImpl::DocxSource(package, Default::default()),
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unit_arg
+help: use a unit literal instead
+    |
+903 -             inner: DocumentImpl::DocxSource(package, Default::default()),
+903 +             inner: DocumentImpl::DocxSource(package, ()),
+    |
+
+error: this match expression is unnecessary
+   --> crates/litchi/src/presentation/prs.rs:113:5
+    |
+113 | /     match error {
+114 | |         error @ (Error::Io(_)
+115 | |         | Error::Allocation { .. }
+116 | |         | Error::ResourceLimit(_)
+...   |
+120 | |         other => other,
+121 | |     }
+    | |_____^ help: replace it with: `error`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_match
+    = note: `-D clippy::needless-match` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_match)]`
+
+error: unneeded `return` statement
+   --> crates/litchi/src/presentation/prs.rs:697:13
+    |
+697 | /             return match detected {
+698 | |                 crate::detection_smart::detected::PptxSourcePathDetection::Pptx(presentation) => {
+699 | |                     Self::from_source_backed_pptx(presentation)
+700 | |                 },
+...   |
+727 | |                 },
+728 | |             };
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_return
+help: remove `return`
+    |
+697 ~             match detected {
+698 +                 crate::detection_smart::detected::PptxSourcePathDetection::Pptx(presentation) => {
+699 +                     Self::from_source_backed_pptx(presentation)
+700 +                 },
+701 +                 #[cfg(feature = "odp")]
+702 +                 crate::detection_smart::detected::PptxSourcePathDetection::Odp(presentation) => {
+703 +                     Ok(Self {
+704 +                         inner: PresentationImpl::OdpSource(presentation),
+705 +                         cached_metadata: OnceLock::from(Some(litchi_core::Metadata::default())),
+706 +                     })
+707 +                 },
+708 +                 #[cfg(feature = "ppt")]
+709 +                 crate::detection_smart::detected::PptxSourcePathDetection::Ppt(package) => {
+710 +                     Self::from_native_ppt_package(package)
+711 +                 },
+712 +                 crate::detection_smart::detected::PptxSourcePathDetection::OtherOoxml(format) => {
+713 +                     let _ = format;
+714 +                     Err(Error::InvalidFormat(
+715 +                         "Detected format is not a presentation format or feature not enabled"
+716 +                             .to_owned(),
+717 +                     ))
+718 +                 },
+719 +                 crate::detection_smart::detected::PptxSourcePathDetection::DisabledOtherOoxml(
+720 +                     format,
+721 +                 ) => {
+722 +                     let _ = format;
+723 +                     Err(Error::NotOfficeFile)
+724 +                 },
+725 +                 crate::detection_smart::detected::PptxSourcePathDetection::Bytes(bytes) => {
+726 +                     Self::from_bytes_with_limits(bytes, limits)
+727 +                 },
+728 ~             }
+    |
+
+error: unneeded `return` statement
+   --> crates/litchi/src/sheet/functions.rs:265:17
+    |
+265 |                 return Ok(Box::new(workbook));
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_return
+help: remove `return`
+    |
+265 -                 return Ok(Box::new(workbook));
+265 +                 Ok(Box::new(workbook))
+    |
+
+error: unneeded `return` statement
+   --> crates/litchi/src/sheet/functions.rs:268:17
+    |
+268 |                 return open_xlsb_workbook_from_owned_bytes_dyn_with_limits(bytes, limits);
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_return
+help: remove `return`
+    |
+268 -                 return open_xlsb_workbook_from_owned_bytes_dyn_with_limits(bytes, limits);
+268 +                 open_xlsb_workbook_from_owned_bytes_dyn_with_limits(bytes, limits)
+    |
+
+error: unneeded `return` statement
+   --> crates/litchi/src/sheet/functions.rs:272:17
+    |
+272 |                 return Err(Box::new(litchi_core::Error::NotOfficeFile));
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_return
+help: remove `return`
+    |
+272 -                 return Err(Box::new(litchi_core::Error::NotOfficeFile));
+272 +                 Err(Box::new(litchi_core::Error::NotOfficeFile))
+    |
+
+error: unneeded `return` statement
+   --> crates/litchi/src/sheet/functions.rs:276:17
+    |
+276 |                 return Err(Box::new(litchi_core::Error::NotOfficeFile));
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_return
+help: remove `return`
+    |
+276 -                 return Err(Box::new(litchi_core::Error::NotOfficeFile));
+276 +                 Err(Box::new(litchi_core::Error::NotOfficeFile))
+    |
+
+error: unneeded `return` statement
+   --> crates/litchi/src/sheet/functions.rs:286:17
+    |
+286 |                 return Err(Box::new(litchi_core::Error::NotOfficeFile));
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_return
+help: remove `return`
+    |
+286 -                 return Err(Box::new(litchi_core::Error::NotOfficeFile));
+286 +                 Err(Box::new(litchi_core::Error::NotOfficeFile))
+    |
+
+error: could not compile `litchi` (lib) due to 15 previous errors
+warning: build failed, waiting for other jobs to finish...
+exit 101

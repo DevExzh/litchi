@@ -1,0 +1,35 @@
+HEAD f592ecc1b078698de3eb2a35bcf94b59746a9c36
+TREE c3c076acd0a3dde1b5b9575fe120156a5de2d83a
+UNSTAGED 0 UNTRACKED 1
+$ cargo clippy --workspace --lib --no-deps --locked --keep-going -- -D warnings
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi)
+error: passing a unit value to a function
+   --> crates/litchi/src/document/doc.rs:775:40
+    |
+775 | ...                   inner: DocumentImpl::DocxSource(package, Default::default()),
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unit_arg
+    = note: `-D clippy::unit-arg` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unit_arg)]`
+help: use a unit literal instead
+    |
+775 -                                 inner: DocumentImpl::DocxSource(package, Default::default()),
+775 +                                 inner: DocumentImpl::DocxSource(package, ()),
+    |
+
+error: passing a unit value to a function
+   --> crates/litchi/src/document/doc.rs:952:20
+    |
+952 |             inner: DocumentImpl::DocxSource(package, Default::default()),
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unit_arg
+help: use a unit literal instead
+    |
+952 -             inner: DocumentImpl::DocxSource(package, Default::default()),
+952 +             inner: DocumentImpl::DocxSource(package, ()),
+    |
+
+error: could not compile `litchi` (lib) due to 2 previous errors
+exit 101

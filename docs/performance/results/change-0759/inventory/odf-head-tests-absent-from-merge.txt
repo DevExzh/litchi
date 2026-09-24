@@ -1,0 +1,1 @@
+page_transitions:tests/page_transitions.rs :: rejects_non_3d_dr3d_scene_children

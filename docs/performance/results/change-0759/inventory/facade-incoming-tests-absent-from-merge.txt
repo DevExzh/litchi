@@ -1,0 +1,3 @@
+test document::doc::tests::filesystem_odt_keeps_source_owner_with_malformed_ooxml_catalog
+test document::doc::tests::owned_odt_bytes_keep_odt_owner_with_malformed_ooxml_catalog
+test sheet::workbook_types::tests::refinement_restores_a_nonzero_cursor

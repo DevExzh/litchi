@@ -1,0 +1,111 @@
+HEAD e6cca92db2b0d62047bd2a4fb09a1d3d6ea9bf85
+$ cargo clippy --workspace --lib --no-deps --locked -- -D warnings
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-core)
+   Compiling getrandom v0.3.4
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/soapberry-zip)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/xml-minifier-macros)
+    Checking rand v0.8.8
+   Compiling regex-syntax v0.8.11
+   Compiling indexmap v2.11.4
+    Checking tempfile v3.27.0
+    Checking litchi-iwa-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-iwa-common)
+   Compiling buffa-build v0.9.1
+    Checking num-bigint-dig v0.8.6
+   Compiling petgraph v0.8.3
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/xml-minifier)
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-codepage)
+    Checking litchi-iwa-package v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-iwa-package)
+    Checking litchi-iwa-cache v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-iwa-cache)
+    Checking rsa v0.9.10
+   Compiling regex-automata v0.4.18
+    Checking litchi-odraw v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-odraw)
+    Checking litchi-formula v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-formula)
+    Checking rand_distr v0.4.3
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-cfb)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-sheet)
+    Checking litchi-biff v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-biff)
+    Checking nalgebra v0.33.3
+    Checking litchi-rtf v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-rtf)
+   Compiling regex v1.13.1
+    Checking litchi-iwa-text v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-iwa-text)
+   Compiling prost-build v0.14.4
+    Checking litchi-imgconv v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-imgconv)
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-odf-common)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-opc)
+    Checking litchi-iwa-graph v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-iwa-graph)
+    Checking litchi-iwa-index v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-iwa-index)
+   Compiling litchi-iwa-protos v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-iwa-protos)
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-fonts)
+    Checking litchi-markdown v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-markdown)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-vba)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-sign)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-ograph)
+    Checking statrs v0.18.0
+    Checking litchi-eval v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-eval)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-ooxml-common)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-crypto)
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-ppt)
+    Checking litchi-word v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-word)
+    Checking litchi-slide v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-slide)
+    Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-doc)
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-xls)
+    Checking litchi-ods v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-ods)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-drawingml)
+    Checking litchi-odp v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-odp)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-spreadsheet-drawing)
+    Checking litchi-odt v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-odt)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-xlsx)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-xlsb)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-docx)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-pptx)
+    Checking litchi-odg v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-odg)
+    Checking litchi-oth v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-oth)
+    Checking litchi-odf-formula v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-odf-formula)
+    Checking litchi-odm v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-odm)
+    Checking litchi-odc v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-odc)
+    Checking litchi-odb v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-odb)
+    Checking litchi-odi v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-odi)
+    Checking litchi-odf v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-odf)
+    Checking litchi-iwa-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-iwa-core)
+    Checking litchi-iwa-text-wire v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-iwa-text-wire)
+    Checking litchi-numbers-wire v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-numbers-wire)
+    Checking litchi-iwa-archive v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-iwa-archive)
+    Checking litchi-iwa-detect v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-iwa-detect)
+    Checking litchi-pages v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-pages)
+    Checking litchi-numbers v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-numbers)
+    Checking litchi-keynote v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-keynote)
+    Checking litchi-iwa-structured v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-iwa-structured)
+    Checking litchi-iwa v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi-iwa)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/tip-head/crates/litchi)
+error: passing a unit value to a function
+   --> crates/litchi/src/document/doc.rs:775:40
+    |
+775 | ...                   inner: DocumentImpl::DocxSource(package, Default::default()),
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unit_arg
+    = note: `-D clippy::unit-arg` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unit_arg)]`
+help: use a unit literal instead
+    |
+775 -                                 inner: DocumentImpl::DocxSource(package, Default::default()),
+775 +                                 inner: DocumentImpl::DocxSource(package, ()),
+    |
+
+error: passing a unit value to a function
+   --> crates/litchi/src/document/doc.rs:952:20
+    |
+952 |             inner: DocumentImpl::DocxSource(package, Default::default()),
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#unit_arg
+help: use a unit literal instead
+    |
+952 -             inner: DocumentImpl::DocxSource(package, Default::default()),
+952 +             inner: DocumentImpl::DocxSource(package, ()),
+    |
+
+error: could not compile `litchi` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+exit 101

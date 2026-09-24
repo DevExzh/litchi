@@ -1,0 +1,5 @@
+HEAD a67a38abf26119b445ae2b7964810f49aa17a0f7
+$ python3 tools/non_iwork_gate.py verify
+non-iWork release gate: workspace package inventory mismatch (unexpected: litchi-xldm)
+
+exit 1

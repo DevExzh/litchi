@@ -1,0 +1,21 @@
+[
+  {
+    "name": "gate-tests",
+    "command": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tools",
+      "-p",
+      "test_perf_claims.py"
+    ],
+    "head": "f592ecc1b078698de3eb2a35bcf94b59746a9c36",
+    "tree": "c3c076acd0a3dde1b5b9575fe120156a5de2d83a",
+    "unstaged": 0,
+    "untracked": 0,
+    "exit_code": 0,
+    "seconds": 75.97
+  }
+]

@@ -1,0 +1,16 @@
+HEAD e6cca92db2b0d62047bd2a4fb09a1d3d6ea9bf85
+$ cd tools/perf-baseline && cargo test --locked --lib -- tests::fresh_writer_corpora_are_deterministic_and_identify_the_packaged_stream pptx_native_image::tests
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-worktrees/targets/tip-head/debug/deps/litchi_perf_baseline-6024564e0a1f27cc)
+
+running 6 tests
+test pptx_native_image::tests::config_rejects_range_controls_for_direct_providers ... ok
+test pptx_native_image::tests::config_rejects_duplicates_bounds_and_invalid_revision ... ok
+test pptx_native_image::tests::config_accepts_each_provider_and_requires_range_controls ... ok
+test pptx_native_image::tests::shapes_original_and_resaved_keep_their_typed_refusals ... ok
+test pptx_native_image::tests::native_image_payload_survives_owner_drops_across_providers ... ok
+test tests::fresh_writer_corpora_are_deterministic_and_identify_the_packaged_stream ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 530 filtered out; finished in 0.20s
+
+exit 0

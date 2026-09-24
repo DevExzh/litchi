@@ -1,0 +1,10 @@
+HEAD f592ecc1b078698de3eb2a35bcf94b59746a9c36
+$ cargo check -p litchi-numbers --test table_relocation --locked
+error: function `with_missing_parent` is never used
+   --> crates/litchi-numbers/tests/table_relocation.rs:346:4
+error: function `with_projection_unsupported_model` is never used
+   --> crates/litchi-numbers/tests/table_relocation.rs:400:4
+error: function `optional_table_parent` is never used
+   --> crates/litchi-numbers/tests/table_relocation.rs:520:4
+error: could not compile `litchi-numbers` (test "table_relocation") due to 3 previous errors
+exit 101

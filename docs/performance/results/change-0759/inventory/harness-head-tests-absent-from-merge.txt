@@ -1,0 +1,1 @@
+test pptx_native_image::tests::shapes_original_and_resaved_keep_their_typed_refusals

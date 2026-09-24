@@ -1,0 +1,34 @@
+HEAD a67a38abf26119b445ae2b7964810f49aa17a0f7
+# tools/perf-baseline/Cargo.lock is stale at this tip (the harness and allocator gates fail --locked, see gates/harness.log); for this proof only it is refreshed offline and restored afterwards
+$ cd tools/perf-baseline && cargo test --offline --lib -- tests::fresh_writer_corpora_are_deterministic_and_identify_the_packaged_stream pptx_native_image::tests::shapes_original_and_resaved_keep_their_typed_behavior
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.31s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-worktrees/targets/tip-inc/debug/deps/litchi_perf_baseline-cbbec3fc14fa1cbf)
+
+running 2 tests
+test tests::fresh_writer_corpora_are_deterministic_and_identify_the_packaged_stream ... FAILED
+test pptx_native_image::tests::shapes_original_and_resaved_keep_their_typed_behavior ... FAILED
+
+failures:
+
+---- tests::fresh_writer_corpora_are_deterministic_and_identify_the_packaged_stream stdout ----
+
+thread 'tests::fresh_writer_corpora_are_deterministic_and_identify_the_packaged_stream' (1823229) panicked at src/lib.rs:67565:13:
+assertion `left == right` failed
+  left: "c9e22d55e3478ef25a7dd232f181ec0c30368c50bd988c151617d3884d4192f3"
+ right: "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- pptx_native_image::tests::shapes_original_and_resaved_keep_their_typed_behavior stdout ----
+
+thread 'pptx_native_image::tests::shapes_original_and_resaved_keep_their_typed_behavior' (1823228) panicked at src/pptx_native_image.rs:1298:17:
+Invalid("picture blipFill stretch must contain one fillRect")
+
+
+failures:
+    pptx_native_image::tests::shapes_original_and_resaved_keep_their_typed_behavior
+    tests::fresh_writer_corpora_are_deterministic_and_identify_the_packaged_stream
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 370 filtered out; finished in 0.23s
+
+error: test failed, to rerun pass `--lib`
+exit 101

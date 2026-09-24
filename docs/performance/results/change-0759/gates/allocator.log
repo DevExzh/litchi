@@ -1,0 +1,18 @@
+HEAD f592ecc1b078698de3eb2a35bcf94b59746a9c36
+TREE c3c076acd0a3dde1b5b9575fe120156a5de2d83a
+UNSTAGED 0 UNTRACKED 0
+$ cargo test --manifest-path tools/perf-baseline/Cargo.toml --locked --features allocator-metrics --bin docx_bounded_tail_append_compare -- --test-threads=1
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.26s
+     Running unittests src/bin/docx_bounded_tail_append_compare.rs (/home/zhuhe/code/litchi-worktrees/targets/merge/debug/deps/docx_bounded_tail_append_compare-bbb1df254f513d8c)
+
+running 5 tests
+test allocator::tests::global_allocator_records_a_failed_allocation ... ok
+test allocator::tests::global_allocator_records_a_failed_realloc_without_losing_old_allocation ... ok
+test allocator::tests::global_allocator_records_realloc_grow_and_shrink ... ok
+test allocator::tests::global_allocator_records_successful_alloc_and_dealloc_with_live_peak ... ok
+test allocator::tests::global_allocator_records_zeroed_alloc_and_zeroes_memory ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+exit 0
