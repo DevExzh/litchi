@@ -187,6 +187,7 @@ fn configuration_ceiling_is_inclusive_and_ceiling_plus_one_fails() {
         Resource::Attributes,
         Resource::Bytes,
         Resource::Depth,
+        Resource::ElementAttributes,
         Resource::Events,
         Resource::TextBytes,
         Resource::TokenBytes,

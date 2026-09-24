@@ -642,7 +642,8 @@ mod tests {
     use core::cell::Cell;
 
     use crate::audit::{
-        Error, Limits, ReplacementError, ReplacementProof, verify_source, verify_source_replacement,
+        Error, Limits, ReplacementError, ReplacementProof, Resource, verify_source,
+        verify_source_replacement,
     };
 
     thread_local! {
@@ -693,12 +694,38 @@ mod tests {
 
     #[test]
     fn a_tag_never_reads_the_namespace_names_its_ancestors_declared() {
-        // The reviewer's input: one tag with 249,990 attributes under three
-        // 3.9 MB namespace names that differ only in their last byte.
+        // The reviewer's input was one tag with 249,990 attributes under
+        // three 3.9 MB namespace names that differ only in their last byte.
+        // The per-element attribute limit now refuses that tag at its first
+        // surplus attribute, before any namespace work for it, so the cost
+        // property is checked on the largest tag a configuration can admit.
         let length = 3_900_000;
-        let attributes = 249_990;
-        let (document, declared) = nested(length, false, &many_attributes(attributes));
+        let reviewer = 249_990;
+        let (document, declared) = nested(length, false, &many_attributes(reviewer));
         let (result, name_bytes, steps) = counted(|| verify_source(&document, Limits::default()));
+        let limit = Limits::DEFAULT_ELEMENT_ATTRIBUTES;
+        assert!(
+            matches!(
+                result,
+                Err(Error::Limit {
+                    resource: Resource::ElementAttributes,
+                    limit: refused_at,
+                    actual,
+                    ..
+                }) if refused_at == limit && actual == limit + 1
+            ),
+            "{result:?}"
+        );
+        assert!(name_bytes <= declared, "{name_bytes} name bytes read");
+        assert!(steps <= limit, "{steps} expanded-name steps");
+
+        let attributes = Limits::ELEMENT_ATTRIBUTE_CEILING;
+        let widest = Limits::builder()
+            .element_attributes(attributes)
+            .expect("the ceiling is a valid per-element limit")
+            .build();
+        let (document, declared) = nested(length, false, &many_attributes(attributes));
+        let (result, name_bytes, steps) = counted(|| verify_source(&document, widest));
         assert!(result.is_ok(), "{result:?}");
         // Each declaration is hashed once; none is compared, being new.
         assert!(name_bytes <= declared, "{name_bytes} name bytes read");
@@ -708,7 +735,7 @@ mod tests {
         // compared with the first once, and the tag, which now has two
         // prefixes bound to one name, hashes each attribute once more.
         let (document, declared) = nested(length, true, &many_attributes(attributes));
-        let (result, name_bytes, steps) = counted(|| verify_source(&document, Limits::default()));
+        let (result, name_bytes, steps) = counted(|| verify_source(&document, widest));
         assert!(result.is_ok(), "{result:?}");
         assert!(name_bytes <= 2 * declared, "{name_bytes} name bytes read");
         assert!(steps <= 2 * attributes, "{steps} expanded-name steps");

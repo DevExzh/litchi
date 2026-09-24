@@ -28,6 +28,7 @@ pub struct Limits {
     attributes: usize,
     bytes: usize,
     depth: usize,
+    element_attributes: usize,
     events: usize,
     text_bytes: usize,
     token_bytes: usize,
@@ -40,6 +41,21 @@ impl Limits {
     pub const BYTE_CEILING: usize = 256 * 1024 * 1024;
     /// Hard ceiling for element nesting.
     pub const DEPTH_CEILING: usize = 4_096;
+    /// Default limit for the attributes of one start or empty-element tag.
+    ///
+    /// The largest element in the repository's 7,162 real OOXML members
+    /// carries 37 attributes (36 of them namespace declarations), and the
+    /// widest ECMA-376 element types declare about 70. The default leaves a
+    /// wide margin above both while keeping the worst case of the parser's
+    /// per-tag duplicate check small.
+    pub const DEFAULT_ELEMENT_ATTRIBUTES: usize = 1_024;
+    /// Hard ceiling for the attributes of one start or empty-element tag.
+    ///
+    /// quick-xml checks a tag's attribute names for duplicates with an
+    /// unkeyed hash pre-filter, so a tag whose names were chosen to collide
+    /// costs time quadratic in its attribute count. The ceiling bounds that
+    /// worst case for any configuration.
+    pub const ELEMENT_ATTRIBUTE_CEILING: usize = 4_096;
     /// Hard ceiling for parser events.
     pub const EVENT_CEILING: usize = 4_000_000;
     /// Hard ceiling for aggregate character-data bytes.
@@ -48,6 +64,11 @@ impl Limits {
     pub const TOKEN_BYTE_CEILING: usize = 64 * 1024 * 1024;
 
     /// Creates an explicit limit profile.
+    ///
+    /// The per-element attribute limit takes its default,
+    /// [`Self::DEFAULT_ELEMENT_ATTRIBUTES`]; set it with [`Builder::limit`]
+    /// or narrow it with [`Self::narrow`] and
+    /// [`Resource::ElementAttributes`].
     ///
     /// # Errors
     ///
@@ -65,6 +86,7 @@ impl Limits {
             attributes: max_attributes,
             bytes: max_bytes,
             depth: max_depth,
+            element_attributes: Self::DEFAULT_ELEMENT_ATTRIBUTES,
             events: max_events,
             text_bytes: max_text_bytes,
             token_bytes: max_token_bytes,
@@ -86,6 +108,7 @@ impl Limits {
             Resource::Attributes => Self::ATTRIBUTE_CEILING,
             Resource::Bytes => Self::BYTE_CEILING,
             Resource::Depth => Self::DEPTH_CEILING,
+            Resource::ElementAttributes => Self::ELEMENT_ATTRIBUTE_CEILING,
             Resource::Events => Self::EVENT_CEILING,
             Resource::TextBytes => Self::TEXT_BYTE_CEILING,
             Resource::TokenBytes => Self::TOKEN_BYTE_CEILING,
@@ -99,6 +122,9 @@ impl Limits {
             Resource::Attributes => self.attributes = minimum(self.attributes, maximum),
             Resource::Bytes => self.bytes = minimum(self.bytes, maximum),
             Resource::Depth => self.depth = minimum(self.depth, maximum),
+            Resource::ElementAttributes => {
+                self.element_attributes = minimum(self.element_attributes, maximum);
+            },
             Resource::Events => self.events = minimum(self.events, maximum),
             Resource::TextBytes => self.text_bytes = minimum(self.text_bytes, maximum),
             Resource::TokenBytes => self.token_bytes = minimum(self.token_bytes, maximum),
@@ -118,6 +144,7 @@ impl Limits {
             attributes,
             bytes,
             depth,
+            element_attributes: Self::DEFAULT_ELEMENT_ATTRIBUTES,
             events,
             text_bytes,
             token_bytes,
@@ -130,6 +157,7 @@ impl Limits {
             Resource::Depth,
             Resource::Events,
             Resource::Attributes,
+            Resource::ElementAttributes,
             Resource::TokenBytes,
             Resource::TextBytes,
         ] {
@@ -151,6 +179,7 @@ impl Limits {
             Resource::Attributes => self.attributes,
             Resource::Bytes => self.bytes,
             Resource::Depth => self.depth,
+            Resource::ElementAttributes => self.element_attributes,
             Resource::Events => self.events,
             Resource::TextBytes => self.text_bytes,
             Resource::TokenBytes => self.token_bytes,
@@ -173,6 +202,13 @@ impl Limits {
     #[must_use]
     pub const fn max_depth(self) -> usize {
         self.depth
+    }
+
+    /// Maximum number of attributes on one start or empty-element tag,
+    /// namespace declarations included.
+    #[must_use]
+    pub const fn max_element_attributes(self) -> usize {
+        self.element_attributes
     }
 
     /// Maximum number of parser events.
@@ -312,6 +348,15 @@ impl Builder {
         self.setting(Resource::Depth, maximum)
     }
 
+    /// Sets the limit on the attributes of one start or empty-element tag.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConfigError`] when `maximum` exceeds the immutable ceiling.
+    pub fn element_attributes(self, maximum: usize) -> Result<Self, ConfigError> {
+        self.setting(Resource::ElementAttributes, maximum)
+    }
+
     /// Sets the parser-event limit.
     ///
     /// # Errors
@@ -362,6 +407,7 @@ impl Builder {
             Resource::Attributes => self.limits.attributes = maximum,
             Resource::Bytes => self.limits.bytes = maximum,
             Resource::Depth => self.limits.depth = maximum,
+            Resource::ElementAttributes => self.limits.element_attributes = maximum,
             Resource::Events => self.limits.events = maximum,
             Resource::TextBytes => self.limits.text_bytes = maximum,
             Resource::TokenBytes => self.limits.token_bytes = maximum,
@@ -420,6 +466,10 @@ pub enum Resource {
     Bytes,
     /// Element nesting depth.
     Depth,
+    /// Attributes on one start or empty-element tag, namespace declarations
+    /// included. Checked as each attribute is read, so a tag over the limit
+    /// is refused at its first surplus attribute.
+    ElementAttributes,
     /// Parser event count.
     Events,
     /// Aggregate character-data bytes.
@@ -1260,7 +1310,8 @@ fn verify_reader_with_policy<R: BufRead>(
             Event::Start(tag) => {
                 finish_text_run(&mut state, policy.reject_ambiguous_space)
                     .map_err(StreamError::Audit)?;
-                check_start(raw, false, start, policy, &mut state).map_err(StreamError::Audit)?;
+                check_start(raw, false, start, policy, &mut state, limits)
+                    .map_err(StreamError::Audit)?;
                 let space = inspect_attributes(
                     &tag,
                     reader.decoder(),
@@ -1280,7 +1331,8 @@ fn verify_reader_with_policy<R: BufRead>(
             Event::Empty(tag) => {
                 finish_text_run(&mut state, policy.reject_ambiguous_space)
                     .map_err(StreamError::Audit)?;
-                check_start(raw, true, start, policy, &mut state).map_err(StreamError::Audit)?;
+                check_start(raw, true, start, policy, &mut state, limits)
+                    .map_err(StreamError::Audit)?;
                 inspect_attributes(
                     &tag,
                     reader.decoder(),
@@ -1892,7 +1944,7 @@ fn scan<O: Observer>(
         let token = match event {
             Event::Start(tag) => {
                 finish_text_run(state, policy.reject_ambiguous_space)?;
-                check_start(raw, false, start, policy, state)?;
+                check_start(raw, false, start, policy, state, limits)?;
                 let space = inspect_attributes(
                     &tag,
                     reader.decoder(),
@@ -1911,7 +1963,7 @@ fn scan<O: Observer>(
             },
             Event::Empty(tag) => {
                 finish_text_run(state, policy.reject_ambiguous_space)?;
-                check_start(raw, true, start, policy, state)?;
+                check_start(raw, true, start, policy, state, limits)?;
                 inspect_attributes(
                     &tag,
                     reader.decoder(),
@@ -2512,7 +2564,18 @@ fn inspect_attributes(
     offset: usize,
 ) -> Result<Space, Error> {
     let mut space = inherited;
+    // `check_start` has already refused a tag over the per-element limit;
+    // this counter keeps quick-xml's duplicate check, whose cost grows with
+    // the names already seen in the tag, bounded by that limit on its own.
+    let mut element_attributes = 0usize;
     for attribute_result in tag.attributes() {
+        element_attributes = checked_add(
+            element_attributes,
+            1,
+            Resource::ElementAttributes,
+            limits.element_attributes,
+            offset,
+        )?;
         let attribute =
             attribute_result.map_err(|error| Error::malformed(offset, error.to_string()))?;
         state.attributes = checked_add(
@@ -2565,7 +2628,16 @@ fn check_declaration(
         .iter()
         .position(|byte| is_space(*byte))
         .unwrap_or(inner.len());
-    check_attribute_layout(inner, names_end, offset + 2, policy, |_attribute| Ok(()))?;
+    // A declaration's pseudo-attributes are not element attributes; the
+    // per-element limit does not apply to them.
+    check_attribute_layout(
+        inner,
+        names_end,
+        offset + 2,
+        policy,
+        usize::MAX,
+        |_attribute| Ok(()),
+    )?;
     if policy.well_formed {
         wellformed::check_declaration_grammar(raw)
             .map_err(|(at, detail)| Error::malformed(offset + at, detail))?;
@@ -2606,16 +2678,18 @@ fn check_end(raw: &[u8], offset: usize, compact: bool) -> Result<(), Error> {
     Ok(())
 }
 
-/// Checks one start or empty-element tag: its layout, and under a
-/// well-formed policy its element and attribute names, its attribute values,
-/// and its namespace declarations and prefixes, which it binds for the
-/// element at `state.depth + 1`.
+/// Checks one start or empty-element tag: its layout and its attribute count
+/// against [`Resource::ElementAttributes`], and under a well-formed policy its
+/// element and attribute names, its attribute values, and its namespace
+/// declarations and prefixes, which it binds for the element at
+/// `state.depth + 1`.
 fn check_start(
     raw: &[u8],
     empty: bool,
     offset: usize,
     policy: Policy,
     state: &mut State,
+    limits: Limits,
 ) -> Result<(), Error> {
     let Some(without_open) = raw.strip_prefix(b"<") else {
         return Err(Error::malformed(offset, "invalid start-tag boundary"));
@@ -2632,7 +2706,14 @@ fn check_start(
             .iter()
             .position(|byte| is_space(*byte))
             .unwrap_or(inner.len());
-        return check_attribute_layout(inner, name_end, inner_offset, policy, |_attribute| Ok(()));
+        return check_attribute_layout(
+            inner,
+            name_end,
+            inner_offset,
+            policy,
+            limits.element_attributes,
+            |_attribute| Ok(()),
+        );
     }
 
     let (name_end, colon) = wellformed::scan_qname(inner, 0, false);
@@ -2645,38 +2726,45 @@ fn check_start(
     } = state;
     let namespaces = namespaces.get_or_insert_with(Namespaces::new);
     prefixed.clear();
-    check_attribute_layout(inner, name_end, inner_offset, policy, |attribute| {
-        let name = &inner[attribute.name.clone()];
-        let value = &inner[attribute.value];
-        let at = inner_offset + attribute.name.start;
-        match attribute.colon {
-            None if name == b"xmlns" => namespaces.declare(None, value, depth, at),
-            None => Ok(()),
-            Some(colon) => match &inner[attribute.name.start..colon] {
-                b"xmlns" => namespaces.declare(
-                    Some(&inner[colon + 1..attribute.name.end]),
-                    value,
-                    depth,
-                    at,
-                ),
-                // `xml` is bound by definition and no other prefix may share
-                // its namespace name, so an `xml:` attribute needs neither
-                // resolution nor an expanded-name comparison.
-                b"xml" => Ok(()),
-                _ => {
-                    prefixed
-                        .try_reserve(1)
-                        .map_err(|_allocation| Error::Allocation)?;
-                    prefixed.push(Prefixed::new(
-                        attribute.name.start,
-                        colon,
-                        attribute.name.end,
-                    ));
-                    Ok(())
+    check_attribute_layout(
+        inner,
+        name_end,
+        inner_offset,
+        policy,
+        limits.element_attributes,
+        |attribute| {
+            let name = &inner[attribute.name.clone()];
+            let value = &inner[attribute.value];
+            let at = inner_offset + attribute.name.start;
+            match attribute.colon {
+                None if name == b"xmlns" => namespaces.declare(None, value, depth, at),
+                None => Ok(()),
+                Some(colon) => match &inner[attribute.name.start..colon] {
+                    b"xmlns" => namespaces.declare(
+                        Some(&inner[colon + 1..attribute.name.end]),
+                        value,
+                        depth,
+                        at,
+                    ),
+                    // `xml` is bound by definition and no other prefix may share
+                    // its namespace name, so an `xml:` attribute needs neither
+                    // resolution nor an expanded-name comparison.
+                    b"xml" => Ok(()),
+                    _ => {
+                        prefixed
+                            .try_reserve(1)
+                            .map_err(|_allocation| Error::Allocation)?;
+                        prefixed.push(Prefixed::new(
+                            attribute.name.start,
+                            colon,
+                            attribute.name.end,
+                        ));
+                        Ok(())
+                    },
                 },
-            },
-        }
-    })?;
+            }
+        },
+    )?;
     namespaces.check_tag(inner, colon, prefixed, inner_offset)
 }
 
@@ -2701,14 +2789,19 @@ struct AttributeSpan {
 }
 
 /// Checks the attributes of a tag or declaration, `inner`, whose name ends at
-/// `names_end`: their separation and layout, and under a well-formed policy
-/// that each name is a qualified name and each value is well-formed; then
-/// passes each to `visit`, in order.
+/// `names_end`: their separation and layout, their number against
+/// `max_attributes`, and under a well-formed policy that each name is a
+/// qualified name and each value is well-formed; then passes each to `visit`,
+/// in order.
+///
+/// The count is checked as each attribute starts, before its name is read, so
+/// a tag over the limit costs no more than the attributes the limit admits.
 fn check_attribute_layout<F>(
     inner: &[u8],
     names_end: usize,
     offset: usize,
     policy: Policy,
+    max_attributes: usize,
     mut visit: F,
 ) -> Result<(), Error>
 where
@@ -2719,6 +2812,7 @@ where
         return Ok(());
     }
     let mut cursor = names_end;
+    let mut attributes = 0usize;
 
     loop {
         let separator = cursor;
@@ -2741,6 +2835,13 @@ where
                 offset: offset + separator,
             }));
         }
+        attributes = checked_add(
+            attributes,
+            1,
+            Resource::ElementAttributes,
+            max_attributes,
+            offset + cursor,
+        )?;
 
         let name_start = cursor;
         let mut name = Ok(None);
