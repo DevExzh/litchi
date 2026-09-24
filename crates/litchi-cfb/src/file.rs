@@ -395,28 +395,32 @@ impl MiniStreamEnd {
         })
     }
 
-    /// Whether a mini stream of `size` bytes whose chain is `chain` may use
-    /// its mini sector `sector`, at index `sector_index`, which is not wholly
-    /// inside the mini stream (`sector_index >= full_sectors`).
+    /// Whether the root size ends inside a mini sector, which a capacity
+    /// rounded up to whole mini sectors counts whole.
+    #[inline]
+    fn has_partial_sector(self) -> bool {
+        self.partial_bytes != 0
+    }
+
+    /// Whether a mini stream of `size` bytes whose `chain` lies below the
+    /// rounded-up capacity takes only bytes inside the mini stream from the
+    /// partial mini sector.
     ///
-    /// Only the partial mini sector qualifies, and only as the chain's last
-    /// sector holding no more of the stream than the root size covers. A
-    /// validated chain holds each sector once, so `sector` is its last sector
-    /// exactly when it equals the chain's last element.
+    /// The chain may use that sector only as its last one, holding no more of
+    /// the stream than the root size covers; a chain that does not use it
+    /// qualifies. A validated chain holds each sector once.
     #[cold]
-    fn admits_partial_sector(
-        self,
-        sector_index: usize,
-        sector: u32,
-        chain: &[u32],
-        size: u64,
-    ) -> bool {
+    fn admits_chain_end(self, chain: &[u32], size: u64) -> bool {
+        let Some(position) = chain.iter().position(|&sector| {
+            usize::try_from(sector).is_ok_and(|index| index == self.full_sectors)
+        }) else {
+            return true;
+        };
         // The bytes of the stream in its last mini sector, 1 to 64.
         let last_sector_bytes = size
             .checked_sub(1)
             .map(|bytes| bytes % self.mini_sector_size + 1);
-        sector_index == self.full_sectors
-            && chain.last() == Some(&sector)
+        position + 1 == chain.len()
             && last_sector_bytes.is_some_and(|bytes| bytes <= self.partial_bytes)
     }
 }
@@ -1592,19 +1596,7 @@ impl<R: Read + Seek> OleFile<R> {
                             "mini stream sector index does not fit usize".to_string(),
                         )
                     })?;
-                    // Every byte the stream takes from this sector must lie
-                    // inside the root mini stream, as every reader requires:
-                    // a sector wholly inside it always qualifies, and the
-                    // partial last one only as the end of a stream the root
-                    // size covers (see `MiniStreamEnd`).
-                    if sector_index >= mini_end.full_sectors
-                        && !mini_end.admits_partial_sector(
-                            sector_index,
-                            sector,
-                            mini_scratch.sectors(),
-                            size,
-                        )
-                    {
+                    if sector_index >= mini_sector_capacity {
                         return Err(OleError::CorruptedFile(
                             "Mini stream references storage outside the root mini stream"
                                 .to_string(),
@@ -1616,6 +1608,20 @@ impl<R: Read + Seek> OleFile<R> {
                         )));
                     }
                     claimed_mini_sectors.insert(sector_index)?;
+                }
+                // Every byte the stream takes from its mini sectors must lie
+                // inside the root mini stream, as every reader requires. The
+                // capacity above counts a partial last mini sector whole;
+                // only the end of a stream may lie there, and only as far as
+                // the root size reaches (see `MiniStreamEnd`). Checked once
+                // per stream, and only for a root size that is not a whole
+                // number of mini sectors, so the loop above is unchanged.
+                if mini_end.has_partial_sector()
+                    && !mini_end.admits_chain_end(mini_scratch.sectors(), size)
+                {
+                    return Err(OleError::CorruptedFile(
+                        "Mini stream references storage outside the root mini stream".to_string(),
+                    ));
                 }
             } else {
                 let sector_count = usize::try_from(size.div_ceil(self.sector_size as u64))

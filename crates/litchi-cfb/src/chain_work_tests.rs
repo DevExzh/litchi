@@ -322,9 +322,7 @@ fn fresh_map_allocation_validation(file: &mut OleFile<Cursor<Vec<u8>>>) -> Resul
                         "mini stream sector index does not fit usize".to_string(),
                     )
                 })?;
-                if sector_index >= mini_end.full_sectors
-                    && !mini_end.admits_partial_sector(sector_index, sector, &chain, size)
-                {
+                if sector_index >= mini_sector_capacity {
                     return Err(OleError::CorruptedFile(
                         "Mini stream references storage outside the root mini stream".to_string(),
                     ));
@@ -335,6 +333,11 @@ fn fresh_map_allocation_validation(file: &mut OleFile<Cursor<Vec<u8>>>) -> Resul
                     )));
                 }
                 claimed_mini_sectors.insert(sector_index)?;
+            }
+            if mini_end.has_partial_sector() && !mini_end.admits_chain_end(&chain, size) {
+                return Err(OleError::CorruptedFile(
+                    "Mini stream references storage outside the root mini stream".to_string(),
+                ));
             }
         } else {
             let sector_count =
