@@ -301,24 +301,30 @@ impl PartPayload {
         }
     }
 
-    /// The payload bytes when they are already available.
+    /// The payload bytes, or **an empty slice** while a deferred payload has
+    /// not been decoded (or its decode failed).
     ///
-    /// This infallible observation never performs I/O or decompression. A
-    /// deferred payload therefore reads as empty until the owning package has
-    /// forced it through a fallible accessor. The package invariant is that a
-    /// `&dyn Part` is handed to code outside this crate only after that force;
-    /// keeping this method observation-only also means a recorded decode
-    /// failure can never be swallowed by a hidden retry.
-    pub(crate) fn bytes(&self) -> &[u8] {
+    /// This infallible observation never performs I/O or decompression, so it
+    /// cannot tell "empty" from "not decoded yet": never use it to decide what
+    /// a part contains. It exists only to back the infallible `Part::blob`,
+    /// which is sound because the package hands a `&dyn Part` to code outside
+    /// this crate only after forcing its payload ([`Self::force`]). Code inside
+    /// the crate that holds an undecoded part, for example through
+    /// `OpcPackage::iter_parts_undecoded`, must use [`Self::force`] or
+    /// [`Self::decoded`] instead. Keeping this observation-only also means a
+    /// recorded decode failure can never be swallowed by a hidden retry.
+    pub(crate) fn decoded_or_empty(&self) -> &[u8] {
         self.decoded().map_or(&[], |bytes| bytes.as_slice())
     }
 
-    /// The payload as a shared allocation when it is already available.
+    /// The payload as a shared allocation, or **a shared empty allocation**
+    /// while a deferred payload has not been decoded.
     ///
-    /// Like [`Self::bytes`], this method is observation-only. Internal callers
-    /// that need a payload use [`Self::force`] first or arrive through a
-    /// package accessor that performed the same fallible check.
-    pub(crate) fn arc(&self) -> Arc<Vec<u8>> {
+    /// The same contract as [`Self::decoded_or_empty`]: it backs the
+    /// infallible `Part::blob_arc` only. Internal callers that need a payload
+    /// use [`Self::force`] first or arrive through a package accessor that
+    /// performed the same fallible check.
+    pub(crate) fn decoded_arc_or_empty(&self) -> Arc<Vec<u8>> {
         self.decoded()
             .map_or_else(|| Arc::clone(empty_payload()), Arc::clone)
     }

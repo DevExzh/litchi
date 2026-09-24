@@ -342,11 +342,11 @@ impl Part for BlobPart {
     }
 
     fn blob(&self) -> &[u8] {
-        self.blob.bytes()
+        self.blob.decoded_or_empty()
     }
 
     fn blob_arc(&self) -> Arc<Vec<u8>> {
-        self.blob.arc()
+        self.blob.decoded_arc_or_empty()
     }
 
     fn ensure_payload(&self) -> Result<()> {
@@ -481,7 +481,7 @@ impl XmlPart {
     /// The reader uses zero-copy parsing where possible.
     #[must_use]
     pub fn reader(&self) -> Reader<&[u8]> {
-        let mut reader = Reader::from_reader(self.xml_bytes.bytes());
+        let mut reader = Reader::from_reader(self.xml_bytes.decoded_or_empty());
         reader.config_mut().trim_text(true);
         reader
     }
@@ -597,7 +597,7 @@ impl XmlPart {
     ///
     /// Returns an error if the XML content is not valid UTF-8.
     pub fn xml_str(&self) -> Result<&str> {
-        std::str::from_utf8(self.xml_bytes.bytes()).map_err(Into::into)
+        std::str::from_utf8(self.xml_bytes.decoded_or_empty()).map_err(Into::into)
     }
 }
 
@@ -620,11 +620,11 @@ impl Part for XmlPart {
     }
 
     fn blob(&self) -> &[u8] {
-        self.xml_bytes.bytes()
+        self.xml_bytes.decoded_or_empty()
     }
 
     fn blob_arc(&self) -> Arc<Vec<u8>> {
-        self.xml_bytes.arc()
+        self.xml_bytes.decoded_arc_or_empty()
     }
 
     fn ensure_payload(&self) -> Result<()> {
