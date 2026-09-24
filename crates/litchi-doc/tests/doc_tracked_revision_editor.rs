@@ -38,8 +38,6 @@ use litchi_doc::tracked_revision::{Limits, RevisionEditor, RevisionKind, Revisio
 use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting, TextRevision, Writer};
 use std::io::Cursor;
 
-mod common;
-
 fn base_doc() -> Vec<u8> {
     let mut writer = Writer::new();
     writer
@@ -234,13 +232,9 @@ fn bundled_word_and_libreoffice_redline_fixtures_are_strictly_gated() {
 fn ordinary_tracked_revision_save_reuses_the_opened_doc_layout() {
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let source_path = root.join("test-data/ole/doc/picture.doc");
-    // The producer fixture's Word 2002 FIB and DOP lengths are nonconforming,
-    // which the protection classifier reports as unknown protection and so
-    // refuses to edit. Normalize them as the other edit tests do; the layout
-    // assertion below is taken against the normalized source.
-    let source = common::with_valid_word97_dop(
-        std::fs::read(source_path).expect("DOC fixture should exist"),
-    );
+    // LibreOffice's Word 2002 FIB (cswNew 0) and 610-byte DOP carry no
+    // protection, so the producer fixture is edited as checked in.
+    let source = std::fs::read(source_path).expect("DOC fixture should exist");
     let table_name = {
         let ole = OleFile::open(Cursor::new(source.clone())).expect("DOC CFB should open");
         ole.list_directory_entries(&[])
