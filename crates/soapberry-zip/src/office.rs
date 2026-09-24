@@ -6677,9 +6677,11 @@ pub struct StreamingArchiveWriter<W: Write> {
 /// [`crate::ZipOwnedEntryWriter`]: the member's compressed bytes depend on its
 /// bytes and explicit flushes, not on the caller's write sizes. The
 /// uncompressed entry and total size limits are checked on every write,
-/// exactly; a compressed-size or output limit is enforced before any byte
-/// reaches the sink, but its refusal, like a sink failure, can surface up to
-/// one 16 KiB chunk of input later than the write that caused it.
+/// exactly. A compressed-size or output limit is enforced before any byte
+/// reaches the sink, but its refusal, like a sink failure, surfaces only
+/// when compressed output is written: after the codec's own buffering, which
+/// on highly compressible input holds back megabytes of input, and batching
+/// adds up to one more 16 KiB chunk.
 pub struct StreamingArchiveEntry<W: Write> {
     entry: Option<crate::ZipOwnedEntryWriter<BoundedOutput<W>>>,
     limits: StreamingArchiveLimits,

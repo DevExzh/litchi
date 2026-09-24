@@ -517,8 +517,8 @@ impl Write for ShortSink {
     }
 }
 
-/// A sink that interrupts every `period`-th call while armed, accepting at
-/// most seven bytes per call otherwise.
+/// A sink that interrupts every `period`-th call, writes and flushes alike,
+/// while armed, accepting at most seven bytes per write otherwise.
 #[derive(Debug)]
 struct InterruptingSink {
     bytes: Vec<u8>,
@@ -526,13 +526,35 @@ struct InterruptingSink {
     period: usize,
     armed: Rc<Cell<bool>>,
     interruptions: Rc<Cell<usize>>,
+    flush_interruptions: Rc<Cell<usize>>,
+}
+
+impl InterruptingSink {
+    fn new(period: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            calls: 0,
+            period,
+            armed: Rc::new(Cell::new(false)),
+            interruptions: Rc::new(Cell::new(0)),
+            flush_interruptions: Rc::new(Cell::new(0)),
+        }
+    }
+
+    /// Counts a call and reports whether it is interrupted.
+    fn interrupts(&mut self) -> bool {
+        self.calls += 1;
+        let interrupted = self.armed.get() && self.calls % self.period == 0;
+        if interrupted {
+            self.interruptions.set(self.interruptions.get() + 1);
+        }
+        interrupted
+    }
 }
 
 impl Write for InterruptingSink {
     fn write(&mut self, input: &[u8]) -> io::Result<usize> {
-        self.calls += 1;
-        if self.armed.get() && self.calls % self.period == 0 {
-            self.interruptions.set(self.interruptions.get() + 1);
+        if self.interrupts() {
             return Err(io::ErrorKind::Interrupted.into());
         }
         let amount = input.len().min(7);
@@ -541,7 +563,44 @@ impl Write for InterruptingSink {
     }
 
     fn flush(&mut self) -> io::Result<()> {
+        if self.interrupts() {
+            self.flush_interruptions
+                .set(self.flush_interruptions.get() + 1);
+            return Err(io::ErrorKind::Interrupted.into());
+        }
         Ok(())
+    }
+}
+
+/// A sink that fails with `BrokenPipe` once it holds `fail_at` bytes, until
+/// the test heals it by clearing `fail_at`.
+#[derive(Debug)]
+struct FailingSink {
+    bytes: Rc<RefCell<Vec<u8>>>,
+    fail_at: Rc<Cell<Option<usize>>>,
+}
+
+impl Write for FailingSink {
+    fn write(&mut self, input: &[u8]) -> io::Result<usize> {
+        let held = self.bytes.borrow().len();
+        let mut amount = input.len();
+        if let Some(limit) = self.fail_at.get() {
+            if held >= limit {
+                return Err(io::ErrorKind::BrokenPipe.into());
+            }
+            amount = amount.min(limit - held);
+        }
+        self.bytes.borrow_mut().extend_from_slice(&input[..amount]);
+        Ok(amount)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self.fail_at.get() {
+            Some(limit) if self.bytes.borrow().len() >= limit => {
+                Err(io::ErrorKind::BrokenPipe.into())
+            },
+            _ => Ok(()),
+        }
     }
 }
 
@@ -591,25 +650,20 @@ fn owned_deflate_bytes_do_not_depend_on_write_sizes_or_sink_behaviour() {
         );
     }
     for (seed, period) in [(21_u64, 2_usize), (22, 3), (23, 7)] {
-        let armed = Rc::new(Cell::new(true));
-        let interruptions = Rc::new(Cell::new(0));
-        let sink = InterruptingSink {
-            bytes: Vec::new(),
-            calls: 0,
-            period,
-            armed: Rc::clone(&armed),
-            interruptions: Rc::clone(&interruptions),
-        };
-        // `write_all` retries an interrupted write; the entry's `finish` does
-        // not, so the sink stops interrupting before the members finish.
+        let sink = InterruptingSink::new(period);
+        let armed = Rc::clone(&sink.armed);
+        let interruptions = Rc::clone(&sink.interruptions);
+        // `write_all` retries an interrupted write and the entry's `finish`
+        // retries an interrupted sink call itself, so the sink interrupts
+        // until the archive finishes, whose own flush does not retry.
         let mut splitter = Splitter::new(seed);
         let mut archive = ZipArchiveWriter::new(sink);
         for member in &members {
             let mut entry = start_owned(archive, member);
             armed.set(true);
             write_split(&mut entry, &member.payload, &[], &mut splitter).expect("interrupted");
-            armed.set(false);
             archive = entry.finish().expect("interrupted entry finish");
+            armed.set(false);
         }
         let sink = archive.finish().expect("interrupted archive finish");
         assert!(interruptions.get() > 0);
@@ -617,6 +671,88 @@ fn owned_deflate_bytes_do_not_depend_on_write_sizes_or_sink_behaviour() {
             sink.bytes, reference,
             "interrupting sink of period {period}"
         );
+    }
+}
+
+#[test]
+fn owned_entry_finish_retries_interrupted_sink_calls_without_changing_bytes() {
+    // `finish` consumes the entry, so the caller cannot retry it; batching
+    // moves up to a chunk's output into it. The sink here interrupts only
+    // while an entry finishes, writes and flushes alike.
+    let members = corpus();
+    let (reference, _) = build_owned(
+        &members,
+        FeedPlan {
+            chunk_sizes: &[usize::MAX],
+            flush_every: None,
+        },
+    );
+    let mut flush_interruptions = 0;
+    for period in [2_usize, 3, 5] {
+        let sink = InterruptingSink::new(period);
+        let armed = Rc::clone(&sink.armed);
+        let interruptions = Rc::clone(&sink.interruptions);
+        let flushes = Rc::clone(&sink.flush_interruptions);
+        let mut archive = ZipArchiveWriter::new(sink);
+        for member in &members {
+            let mut entry = start_owned(archive, member);
+            entry.write_all(&member.payload).expect("payload");
+            armed.set(true);
+            archive = entry.finish().expect("finish retries interruptions");
+            armed.set(false);
+        }
+        let sink = archive.finish().expect("archive finish");
+        assert!(interruptions.get() > 0, "period {period}");
+        assert_eq!(sink.bytes, reference, "period {period}");
+        flush_interruptions += flushes.get();
+    }
+    assert!(flush_interruptions > 0);
+}
+
+#[test]
+fn a_poisoned_owned_entry_refuses_later_calls_before_its_sink() {
+    // After a sink failure the archive is poisoned. A later call must not
+    // hand the sink, which has since recovered, the rest of a failed member:
+    // not a chunk the failed write left staged, and not the final block.
+    let payload = random_payload(200_000, 0x0b0e);
+    for method in [CompressionMethod::Deflate, CompressionMethod::Store] {
+        for fail_at in [100_usize, 5_000, 20_000, 40_000] {
+            let bytes = Rc::new(RefCell::new(Vec::new()));
+            let fail = Rc::new(Cell::new(Some(fail_at)));
+            let sink = FailingSink {
+                bytes: Rc::clone(&bytes),
+                fail_at: Rc::clone(&fail),
+            };
+            let mut entry = ZipArchiveWriter::new(sink)
+                .start_file_owned("failing.bin", method)
+                .expect("start");
+            let mut offset = 0;
+            let error = loop {
+                assert!(
+                    offset < payload.len(),
+                    "{method:?} failing at {fail_at}: the sink never failed"
+                );
+                let end = (offset + 4096).min(payload.len());
+                match entry.write(&payload[offset..end]) {
+                    Ok(written) => offset += written,
+                    Err(error) => break error,
+                }
+            };
+            assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
+            fail.set(None);
+            let sent = bytes.borrow().len();
+            let accepted = entry.uncompressed_bytes();
+            assert!(entry.write(&payload[offset..offset + 10]).is_err());
+            assert!(entry.write(&[]).is_err());
+            assert!(entry.flush().is_err());
+            assert_eq!(entry.uncompressed_bytes(), accepted);
+            assert!(entry.finish().is_err());
+            assert_eq!(
+                bytes.borrow().len(),
+                sent,
+                "{method:?} failing at {fail_at}: bytes after the failure"
+            );
+        }
     }
 }
 
