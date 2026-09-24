@@ -1,0 +1,736 @@
+{
+ "case": "xlsx_first_cell",
+ "kind": "harness",
+ "binaries": {
+  "before": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/a/litchi-perf-baseline",
+  "after": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/b/litchi-perf-baseline"
+ },
+ "core": 16,
+ "rounds": 4,
+ "samples_per_process": 15,
+ "warmup_per_process": 3,
+ "process_counters": [
+  {
+   "round": 1,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 9845155022,
+   "cycles": 3201097213
+  },
+  {
+   "round": 1,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 9878072498,
+   "cycles": 3162701835
+  },
+  {
+   "round": 1,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 9877549858,
+   "cycles": 3187701613
+  },
+  {
+   "round": 1,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 9846452998,
+   "cycles": 3155374864
+  },
+  {
+   "round": 2,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 9846780729,
+   "cycles": 3147990090
+  },
+  {
+   "round": 2,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 9878507076,
+   "cycles": 3146234566
+  },
+  {
+   "round": 2,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 9877369368,
+   "cycles": 3131849671
+  },
+  {
+   "round": 2,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 9846552280,
+   "cycles": 3146753863
+  },
+  {
+   "round": 3,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 9846954871,
+   "cycles": 3163442738
+  },
+  {
+   "round": 3,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 9878919065,
+   "cycles": 3214337171
+  },
+  {
+   "round": 3,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 9878193539,
+   "cycles": 3171768197
+  },
+  {
+   "round": 3,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 9847436735,
+   "cycles": 3126833877
+  },
+  {
+   "round": 4,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 9847011377,
+   "cycles": 3181088427
+  },
+  {
+   "round": 4,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 9878982967,
+   "cycles": 3207031127
+  },
+  {
+   "round": 4,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 9878060238,
+   "cycles": 3190028849
+  },
+  {
+   "round": 4,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 9845188296,
+   "cycles": 3203918049
+  }
+ ],
+ "median_process_instructions": {
+  "before": 9846666504.5,
+  "after": 9878133018.5
+ },
+ "median_process_cycles": {
+  "before": 3159408801.0,
+  "after": 3179734905.0
+ },
+ "series": [
+  {
+   "series": "tiny",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_first_cell-r1-A1.json",
+     "samples": 15,
+     "p50_ns": 13910,
+     "p95_ns": 14190,
+     "mean_ns": 13942.0,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_first_cell-r1-B1.json",
+     "samples": 15,
+     "p50_ns": 14750,
+     "p95_ns": 15060,
+     "mean_ns": 14782.066666666668,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_first_cell-r1-B2.json",
+     "samples": 15,
+     "p50_ns": 14580,
+     "p95_ns": 14840,
+     "mean_ns": 14604.133333333333,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_first_cell-r1-A2.json",
+     "samples": 15,
+     "p50_ns": 13820,
+     "p95_ns": 13960,
+     "mean_ns": 13814.0,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_first_cell-r2-A1.json",
+     "samples": 15,
+     "p50_ns": 13820,
+     "p95_ns": 14050,
+     "mean_ns": 14706.666666666666,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_first_cell-r2-B1.json",
+     "samples": 15,
+     "p50_ns": 14520,
+     "p95_ns": 15000,
+     "mean_ns": 14560.0,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_first_cell-r2-B2.json",
+     "samples": 15,
+     "p50_ns": 14530,
+     "p95_ns": 14780,
+     "mean_ns": 14533.466666666667,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_first_cell-r2-A2.json",
+     "samples": 15,
+     "p50_ns": 13670,
+     "p95_ns": 13990,
+     "mean_ns": 13723.4,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_first_cell-r3-A1.json",
+     "samples": 15,
+     "p50_ns": 13820,
+     "p95_ns": 13990,
+     "mean_ns": 13798.8,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_first_cell-r3-B1.json",
+     "samples": 15,
+     "p50_ns": 14320,
+     "p95_ns": 14570,
+     "mean_ns": 14342.666666666666,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_first_cell-r3-B2.json",
+     "samples": 15,
+     "p50_ns": 14440,
+     "p95_ns": 14780,
+     "mean_ns": 14452.666666666666,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_first_cell-r3-A2.json",
+     "samples": 15,
+     "p50_ns": 13771,
+     "p95_ns": 14250,
+     "mean_ns": 14459.4,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_first_cell-r4-A1.json",
+     "samples": 15,
+     "p50_ns": 13850,
+     "p95_ns": 14070,
+     "mean_ns": 13875.333333333334,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_first_cell-r4-B1.json",
+     "samples": 15,
+     "p50_ns": 14590,
+     "p95_ns": 14900,
+     "mean_ns": 14626.733333333334,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_first_cell-r4-B2.json",
+     "samples": 15,
+     "p50_ns": 14380,
+     "p95_ns": 14550,
+     "mean_ns": 15770.0,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_first_cell-r4-A2.json",
+     "samples": 15,
+     "p50_ns": 13740,
+     "p95_ns": 14180,
+     "mean_ns": 14796.0,
+     "outcomes": null
+    }
+   ],
+   "median_p50_ns": {
+    "before": 13820.0,
+    "after": 14525.0
+   },
+   "paired_ratios_after_over_before": [
+    1.0603882099209203,
+    1.0549927641099854,
+    1.0506512301013025,
+    1.0629114850036576,
+    1.036179450072359,
+    1.0485803500108926,
+    1.0534296028880867,
+    1.0465793304221251
+   ],
+   "paired_ratio_median": 1.0520404164946946,
+   "paired_ratio_bootstrap_95": [
+    1.0465793304221251,
+    1.0603882099209203
+   ]
+  },
+  {
+   "series": "medium",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_first_cell-r1-A1.json",
+     "samples": 15,
+     "p50_ns": 132150,
+     "p95_ns": 132720,
+     "mean_ns": 132581.26666666666,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_first_cell-r1-B1.json",
+     "samples": 15,
+     "p50_ns": 134011,
+     "p95_ns": 139301,
+     "mean_ns": 134756.53333333333,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_first_cell-r1-B2.json",
+     "samples": 15,
+     "p50_ns": 134151,
+     "p95_ns": 143410,
+     "mean_ns": 136364.66666666666,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_first_cell-r1-A2.json",
+     "samples": 15,
+     "p50_ns": 131121,
+     "p95_ns": 131980,
+     "mean_ns": 131191.26666666666,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_first_cell-r2-A1.json",
+     "samples": 15,
+     "p50_ns": 131211,
+     "p95_ns": 140971,
+     "mean_ns": 132770.06666666668,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_first_cell-r2-B1.json",
+     "samples": 15,
+     "p50_ns": 132911,
+     "p95_ns": 142480,
+     "mean_ns": 135020.0,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_first_cell-r2-B2.json",
+     "samples": 15,
+     "p50_ns": 132611,
+     "p95_ns": 139030,
+     "mean_ns": 133639.33333333334,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_first_cell-r2-A2.json",
+     "samples": 15,
+     "p50_ns": 128290,
+     "p95_ns": 132661,
+     "mean_ns": 129318.0,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_first_cell-r3-A1.json",
+     "samples": 15,
+     "p50_ns": 131531,
+     "p95_ns": 138630,
+     "mean_ns": 132424.06666666668,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_first_cell-r3-B1.json",
+     "samples": 15,
+     "p50_ns": 132281,
+     "p95_ns": 139911,
+     "mean_ns": 134032.73333333334,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_first_cell-r3-B2.json",
+     "samples": 15,
+     "p50_ns": 132671,
+     "p95_ns": 139900,
+     "mean_ns": 133899.26666666666,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_first_cell-r3-A2.json",
+     "samples": 15,
+     "p50_ns": 128921,
+     "p95_ns": 133341,
+     "mean_ns": 129940.6,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_first_cell-r4-A1.json",
+     "samples": 15,
+     "p50_ns": 130741,
+     "p95_ns": 140691,
+     "mean_ns": 132587.4,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_first_cell-r4-B1.json",
+     "samples": 15,
+     "p50_ns": 134071,
+     "p95_ns": 135770,
+     "mean_ns": 134311.4,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_first_cell-r4-B2.json",
+     "samples": 15,
+     "p50_ns": 131900,
+     "p95_ns": 138791,
+     "mean_ns": 132867.2,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_first_cell-r4-A2.json",
+     "samples": 15,
+     "p50_ns": 130610,
+     "p95_ns": 141911,
+     "mean_ns": 133499.86666666667,
+     "outcomes": null
+    }
+   ],
+   "median_p50_ns": {
+    "before": 130931.0,
+    "after": 132791.0
+   },
+   "paired_ratios_after_over_before": [
+    1.0140824820279986,
+    1.0231084265678267,
+    1.0129562308038198,
+    1.0336815028451165,
+    1.005702077837164,
+    1.0290875807665159,
+    1.0254702044500195,
+    1.0098767322563356
+   ],
+   "paired_ratio_median": 1.0185954542979125,
+   "paired_ratio_bootstrap_95": [
+    1.0098767322563356,
+    1.0290875807665159
+   ]
+  },
+  {
+   "series": "dense-wide",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_first_cell-r1-A1.json",
+     "samples": 15,
+     "p50_ns": 8072119,
+     "p95_ns": 8169409,
+     "mean_ns": 8077082.533333333,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_first_cell-r1-B1.json",
+     "samples": 15,
+     "p50_ns": 7862578,
+     "p95_ns": 7964229,
+     "mean_ns": 7872507.6,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_first_cell-r1-B2.json",
+     "samples": 15,
+     "p50_ns": 7874708,
+     "p95_ns": 7932908,
+     "mean_ns": 7885739.466666667,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_first_cell-r1-A2.json",
+     "samples": 15,
+     "p50_ns": 7877608,
+     "p95_ns": 7925738,
+     "mean_ns": 7880532.266666667,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_first_cell-r2-A1.json",
+     "samples": 15,
+     "p50_ns": 7875628,
+     "p95_ns": 7945968,
+     "mean_ns": 7897106.2,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_first_cell-r2-B1.json",
+     "samples": 15,
+     "p50_ns": 7810518,
+     "p95_ns": 7877178,
+     "mean_ns": 7816067.133333334,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_first_cell-r2-B2.json",
+     "samples": 15,
+     "p50_ns": 7830998,
+     "p95_ns": 7855888,
+     "mean_ns": 7834758.066666666,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_first_cell-r2-A2.json",
+     "samples": 15,
+     "p50_ns": 7673817,
+     "p95_ns": 7723357,
+     "mean_ns": 7680176.066666666,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_first_cell-r3-A1.json",
+     "samples": 15,
+     "p50_ns": 7911028,
+     "p95_ns": 7961309,
+     "mean_ns": 7909022.933333334,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_first_cell-r3-B1.json",
+     "samples": 15,
+     "p50_ns": 7772847,
+     "p95_ns": 7842238,
+     "mean_ns": 7797687.733333333,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_first_cell-r3-B2.json",
+     "samples": 15,
+     "p50_ns": 7851878,
+     "p95_ns": 7909548,
+     "mean_ns": 7853494.933333334,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_first_cell-r3-A2.json",
+     "samples": 15,
+     "p50_ns": 7666487,
+     "p95_ns": 7725618,
+     "mean_ns": 7680200.733333333,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_first_cell-r4-A1.json",
+     "samples": 15,
+     "p50_ns": 7839169,
+     "p95_ns": 7903548,
+     "mean_ns": 7852514.866666666,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_first_cell-r4-B1.json",
+     "samples": 15,
+     "p50_ns": 7888629,
+     "p95_ns": 7967019,
+     "mean_ns": 7890777.4,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_first_cell-r4-B2.json",
+     "samples": 15,
+     "p50_ns": 7730808,
+     "p95_ns": 7793808,
+     "mean_ns": 7740005.0,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_first_cell-r4-A2.json",
+     "samples": 15,
+     "p50_ns": 7858798,
+     "p95_ns": 7873698,
+     "mean_ns": 7857416.866666666,
+     "outcomes": null
+    }
+   ],
+   "median_p50_ns": {
+    "before": 7867213.0,
+    "after": 7841438.0
+   },
+   "paired_ratios_after_over_before": [
+    0.9740413886366145,
+    0.9996318679477324,
+    0.9917327227746155,
+    1.020482766268729,
+    0.9825331170613983,
+    1.0241820014825564,
+    1.0063093422274734,
+    0.9837137943996016
+   ],
+   "paired_ratio_median": 0.9956822953611739,
+   "paired_ratio_bootstrap_95": [
+    0.9825331170613983,
+    1.020482766268729
+   ]
+  }
+ ]
+}

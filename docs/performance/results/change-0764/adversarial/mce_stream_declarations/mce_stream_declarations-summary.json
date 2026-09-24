@@ -1,0 +1,368 @@
+{
+ "case": "mce_stream_declarations",
+ "kind": "bounds",
+ "binaries": {
+  "before": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/a/xml_attribute_bounds",
+  "after": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/b/xml_attribute_bounds"
+ },
+ "core": 16,
+ "rounds": 4,
+ "samples_per_process": 15,
+ "warmup_per_process": 3,
+ "process_counters": [
+  {
+   "round": 1,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 316616520535,
+   "cycles": 63351980752
+  },
+  {
+   "round": 1,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 137311296154,
+   "cycles": 34053469669
+  },
+  {
+   "round": 1,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 137311294528,
+   "cycles": 34041703563
+  },
+  {
+   "round": 1,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 316616521926,
+   "cycles": 64908540280
+  },
+  {
+   "round": 2,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 316616521224,
+   "cycles": 64364152649
+  },
+  {
+   "round": 2,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 137311295635,
+   "cycles": 33966661842
+  },
+  {
+   "round": 2,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 137311294839,
+   "cycles": 34284489539
+  },
+  {
+   "round": 2,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 316616521779,
+   "cycles": 65834670610
+  },
+  {
+   "round": 3,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 316616522161,
+   "cycles": 67634945780
+  },
+  {
+   "round": 3,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 137311294484,
+   "cycles": 33865388879
+  },
+  {
+   "round": 3,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 137311292127,
+   "cycles": 34165967291
+  },
+  {
+   "round": 3,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 316616521031,
+   "cycles": 65831526299
+  },
+  {
+   "round": 4,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 316616521817,
+   "cycles": 65495462784
+  },
+  {
+   "round": 4,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 137311294618,
+   "cycles": 34039437535
+  },
+  {
+   "round": 4,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 137311295015,
+   "cycles": 34066445232
+  },
+  {
+   "round": 4,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 316616521859,
+   "cycles": 64562544359
+  }
+ ],
+ "median_process_instructions": {
+  "before": 316616521798.0,
+  "after": 137311294728.5
+ },
+ "median_process_cycles": {
+  "before": 65202001532.0,
+  "after": 34047586616.0
+ },
+ "series": [
+  {
+   "series": "default",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_stream_declarations-r1-A1.json",
+     "samples": 15,
+     "p50_ns": 778991066,
+     "p95_ns": 843339216,
+     "mean_ns": 797601867.1333333,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_stream_declarations-r1-B1.json",
+     "samples": 15,
+     "p50_ns": 429842397,
+     "p95_ns": 432293151,
+     "mean_ns": 429343874.6666667,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_stream_declarations-r1-B2.json",
+     "samples": 15,
+     "p50_ns": 427596154,
+     "p95_ns": 433380427,
+     "mean_ns": 429873199.06666666,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_stream_declarations-r1-A2.json",
+     "samples": 15,
+     "p50_ns": 784010928,
+     "p95_ns": 863016113,
+     "mean_ns": 812167907.2,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_stream_declarations-r2-A1.json",
+     "samples": 15,
+     "p50_ns": 781543444,
+     "p95_ns": 840243518,
+     "mean_ns": 806146363.5333333,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_stream_declarations-r2-B1.json",
+     "samples": 15,
+     "p50_ns": 422732296,
+     "p95_ns": 424456915,
+     "mean_ns": 422718381.3333333,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_stream_declarations-r2-B2.json",
+     "samples": 15,
+     "p50_ns": 429425902,
+     "p95_ns": 431992466,
+     "mean_ns": 428954094.8,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_stream_declarations-r2-A2.json",
+     "samples": 15,
+     "p50_ns": 789359354,
+     "p95_ns": 938049837,
+     "mean_ns": 826107072.4666667,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_stream_declarations-r3-A1.json",
+     "samples": 15,
+     "p50_ns": 847839734,
+     "p95_ns": 936799629,
+     "mean_ns": 855261860.8,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_stream_declarations-r3-B1.json",
+     "samples": 15,
+     "p50_ns": 424939388,
+     "p95_ns": 426264225,
+     "mean_ns": 424564292.26666665,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_stream_declarations-r3-B2.json",
+     "samples": 15,
+     "p50_ns": 428164957,
+     "p95_ns": 429936917,
+     "mean_ns": 428148454.8,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_stream_declarations-r3-A2.json",
+     "samples": 15,
+     "p50_ns": 821064550,
+     "p95_ns": 939108120,
+     "mean_ns": 833599435.6,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_stream_declarations-r4-A1.json",
+     "samples": 15,
+     "p50_ns": 803330225,
+     "p95_ns": 869651933,
+     "mean_ns": 819463684.8,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_stream_declarations-r4-B1.json",
+     "samples": 15,
+     "p50_ns": 426329067,
+     "p95_ns": 428295147,
+     "mean_ns": 426283472.93333334,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_stream_declarations-r4-B2.json",
+     "samples": 15,
+     "p50_ns": 426818369,
+     "p95_ns": 427816184,
+     "mean_ns": 426537647.2,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_stream_declarations-r4-A2.json",
+     "samples": 15,
+     "p50_ns": 802519896,
+     "p95_ns": 844424488,
+     "mean_ns": 808516353.4,
+     "outcomes": [
+      "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+     ]
+    }
+   ],
+   "median_p50_ns": {
+    "before": 795939625.0,
+    "after": 427207261.5
+   },
+   "paired_ratios_after_over_before": [
+    0.5517937441916696,
+    0.5453956555054549,
+    0.5408941745278079,
+    0.5440182596480639,
+    0.5012024925927805,
+    0.5214753906985754,
+    0.530702136845405,
+    0.5318477101033767
+   ],
+   "paired_ratio_median": 0.5363709423155922,
+   "paired_ratio_bootstrap_95": [
+    0.5214753906985754,
+    0.5453956555054549
+   ]
+  }
+ ]
+}

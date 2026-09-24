@@ -1,0 +1,41 @@
+{"case": "mce_declaration_flood", "series": "default", "median_p50_ns": {"before": 163548599.5, "after": 312116.5}, "ratio": 0.0019, "ci95": [0.0017, 0.0021]}
+{"case": "mce_declaration_flood", "instructions": {"before": 60128316118.5, "after": 95162795.0}}
+{"case": "mce_shadowed_chain", "series": "default", "median_p50_ns": {"before": 1408296284.0, "after": 22508855.0}, "ratio": 0.016, "ci95": [0.0159, 0.0162]}
+{"case": "mce_shadowed_chain", "instructions": {"before": 248280476161.5, "after": 8610154015.5}}
+{"case": "mce_hoisting", "series": "default", "median_p50_ns": {"before": 172901012.5, "after": 15837243.0}, "ratio": 0.0916, "ci95": [0.0914, 0.1222]}
+{"case": "mce_hoisting", "instructions": {"before": 42644349399.5, "after": 5305267248.5}}
+{"case": "mce_declarations_admitted", "series": "default", "median_p50_ns": {"before": 1417771324.5, "after": 1015366886.0}, "ratio": 0.7173, "ci95": [0.708, 0.7208]}
+{"case": "mce_declarations_admitted", "instructions": {"before": 539639897853.0, "after": 296609635038.5}}
+{"case": "mce_stream_declarations", "series": "default", "median_p50_ns": {"before": 795939625.0, "after": 427207261.5}, "ratio": 0.5364, "ci95": [0.5215, 0.5454]}
+{"case": "mce_stream_declarations", "instructions": {"before": 316616521798.0, "after": 137311294728.5}}
+{"case": "docx_styles_duplicates", "series": "default", "median_p50_ns": {"before": 2174715297.0, "after": 8945205.0}, "ratio": 0.0041, "ci95": [0.0041, 0.0042]}
+{"case": "docx_styles_duplicates", "instructions": {"before": 980263994508.0, "after": 3329256427.0}}
+{"case": "audit_attribute_flood", "series": "default", "median_p50_ns": {"before": 9621128.5, "after": 2025610.0}, "ratio": 0.21, "ci95": [0.2086, 0.212]}
+{"case": "audit_attribute_flood", "instructions": {"before": 3338644033.5, "after": 765284448.5}}
+{"case": "mce_benign_worksheet", "series": "default", "median_p50_ns": {"before": 14335787.0, "after": 14083666.5}, "ratio": 0.9821, "ci95": [0.97, 0.9889]}
+{"case": "mce_benign_worksheet", "instructions": {"before": 10083247229.5, "after": 9847897298.0}}
+{"case": "mce_benign_document", "series": "default", "median_p50_ns": {"before": 1787644.0, "after": 1744794.0}, "ratio": 0.9761, "ci95": [0.9657, 0.9782]}
+{"case": "mce_benign_document", "instructions": {"before": 1230974942.5, "after": 1214710973.5}}
+{"case": "mce_stream_benign_worksheet", "series": "default", "median_p50_ns": {"before": 82438570.5, "after": 81003084.5}, "ratio": 0.9837, "ci95": [0.979, 0.9881]}
+{"case": "mce_stream_benign_worksheet", "instructions": {"before": 43647188691.0, "after": 43384879168.5}}
+{"case": "audit_benign_worksheet", "series": "default", "median_p50_ns": {"before": 4774988.5, "after": 4845924.5}, "ratio": 1.0145, "ci95": [1.0007, 1.0214]}
+{"case": "audit_benign_worksheet", "instructions": {"before": 3951904898.0, "after": 3971432075.5}}
+{"case": "docx_styles_benign", "series": "default", "median_p50_ns": {"before": 1804684.0, "after": 1726683.5}, "ratio": 0.957, "ci95": [0.9529, 0.9609]}
+{"case": "docx_styles_benign", "instructions": {"before": 1259206669.0, "after": 1247565047.5}}
+{"case": "docx_semantic_full_text", "series": "tiny", "median_p50_ns": {"before": 6280.0, "after": 6610.0}, "ratio": 1.0444, "ci95": [1.0334, 1.0686]}
+{"case": "docx_semantic_full_text", "series": "medium", "median_p50_ns": {"before": 39080.5, "after": 41525.0}, "ratio": 1.0546, "ci95": [1.0415, 1.0792]}
+{"case": "docx_semantic_full_text", "series": "large", "median_p50_ns": {"before": 1898729.0, "after": 1983220.0}, "ratio": 1.0439, "ci95": [1.0307, 1.0643]}
+{"case": "docx_semantic_full_text", "instructions": {"before": 8272965067.0, "after": 8273071875.5}}
+{"case": "xlsx_first_cell", "series": "tiny", "median_p50_ns": {"before": 13820.0, "after": 14525.0}, "ratio": 1.052, "ci95": [1.0466, 1.0604]}
+{"case": "xlsx_first_cell", "series": "medium", "median_p50_ns": {"before": 130931.0, "after": 132791.0}, "ratio": 1.0186, "ci95": [1.0099, 1.0291]}
+{"case": "xlsx_first_cell", "series": "dense-wide", "median_p50_ns": {"before": 7867213.0, "after": 7841438.0}, "ratio": 0.9957, "ci95": [0.9825, 1.0205]}
+{"case": "xlsx_first_cell", "instructions": {"before": 9846666504.5, "after": 9878133018.5}}
+{"case": "pptx_semantic_full_text", "series": "tiny", "median_p50_ns": {"before": 56635.0, "after": 57505.0}, "ratio": 1.0193, "ci95": [1.0051, 1.0303]}
+{"case": "pptx_semantic_full_text", "series": "medium", "median_p50_ns": {"before": 345306.5, "after": 353301.0}, "ratio": 1.0283, "ci95": [1.01, 1.0341]}
+{"case": "pptx_semantic_full_text", "series": "large", "median_p50_ns": {"before": 27372435.0, "after": 27832346.5}, "ratio": 1.0225, "ci95": [1.0064, 1.0295]}
+{"case": "pptx_semantic_full_text", "instructions": {"before": 41185443284.0, "after": 41288174440.0}}
+{"case": "xlsx_source_backed_cell_values_one_edit_save", "series": "medium", "median_p50_ns": {"before": 4132329.5, "after": 4152587.0}, "ratio": 1.0049, "ci95": [1.001, 1.0172]}
+{"case": "xlsx_source_backed_cell_values_one_edit_save", "series": "dense-sparse", "median_p50_ns": {"before": 26826553.5, "after": 26936804.5}, "ratio": 1.0037, "ci95": [0.9807, 1.0106]}
+{"case": "xlsx_source_backed_cell_values_one_edit_save", "instructions": {"before": 34149000426.0, "after": 34218363063.0}}
+{"case": "docx_source_backed_one_edit_save", "series": "media-rich", "median_p50_ns": {"before": 1796884.0, "after": 1818984.0}, "ratio": 1.0044, "ci95": [0.9656, 2.2629]}
+{"case": "docx_source_backed_one_edit_save", "instructions": {"before": 16986545108.0, "after": 16993104559.5}}

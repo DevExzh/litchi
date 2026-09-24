@@ -1,0 +1,28 @@
+{
+  "case": "audit_attribute_flood",
+  "elapsed_ns": [
+    1921499,
+    1926100,
+    1910210,
+    1919660,
+    1863589,
+    1910100,
+    1896719,
+    1944640,
+    1873800,
+    1919229,
+    1871760,
+    1865479,
+    1912370,
+    1858679,
+    1903710
+  ],
+  "input_bytes": 2088897,
+  "input_sha256": "51d835947bbcaf73d32ca4ffda6738555b079aed90847fc895b0b1f20c18cb77",
+  "outcomes": [
+    "err:XML ElementAttributes limit 1024 exceeded by 1025 at byte 8112"
+  ],
+  "p50_ns": 1910100,
+  "samples": 15,
+  "warmup": 3
+}

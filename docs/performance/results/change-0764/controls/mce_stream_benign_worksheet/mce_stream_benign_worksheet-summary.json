@@ -1,0 +1,368 @@
+{
+ "case": "mce_stream_benign_worksheet",
+ "kind": "bounds",
+ "binaries": {
+  "before": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/a/xml_attribute_bounds",
+  "after": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/b/xml_attribute_bounds"
+ },
+ "core": 16,
+ "rounds": 4,
+ "samples_per_process": 31,
+ "warmup_per_process": 3,
+ "process_counters": [
+  {
+   "round": 1,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 43667582362,
+   "cycles": 12539919697
+  },
+  {
+   "round": 1,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 43252528843,
+   "cycles": 12226276062
+  },
+  {
+   "round": 1,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 43455716780,
+   "cycles": 12345659432
+  },
+  {
+   "round": 1,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 43699467089,
+   "cycles": 12538433293
+  },
+  {
+   "round": 2,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 43569558194,
+   "cycles": 12479333585
+  },
+  {
+   "round": 2,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 43608778920,
+   "cycles": 12428822508
+  },
+  {
+   "round": 2,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 43605326769,
+   "cycles": 12311299078
+  },
+  {
+   "round": 2,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 43666515647,
+   "cycles": 12488940850
+  },
+  {
+   "round": 3,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 43770179813,
+   "cycles": 12573897183
+  },
+  {
+   "round": 3,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 43350961159,
+   "cycles": 12349590015
+  },
+  {
+   "round": 3,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 43293034996,
+   "cycles": 12236430823
+  },
+  {
+   "round": 3,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 43626433795,
+   "cycles": 12488494125
+  },
+  {
+   "round": 4,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 43569293287,
+   "cycles": 12579216653
+  },
+  {
+   "round": 4,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 43418797178,
+   "cycles": 12345762162
+  },
+  {
+   "round": 4,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 43331120063,
+   "cycles": 12296345694
+  },
+  {
+   "round": 4,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 43627861735,
+   "cycles": 12520464792
+  }
+ ],
+ "median_process_instructions": {
+  "before": 43647188691.0,
+  "after": 43384879168.5
+ },
+ "median_process_cycles": {
+  "before": 12529449042.5,
+  "after": 12328479255.0
+ },
+ "series": [
+  {
+   "series": "default",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_stream_benign_worksheet-r1-A1.json",
+     "samples": 31,
+     "p50_ns": 82385457,
+     "p95_ns": 83264202,
+     "mean_ns": 82450016.58064516,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_stream_benign_worksheet-r1-B1.json",
+     "samples": 31,
+     "p50_ns": 80191232,
+     "p95_ns": 80946366,
+     "mean_ns": 80272436.48387097,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_stream_benign_worksheet-r1-B2.json",
+     "samples": 31,
+     "p50_ns": 81072546,
+     "p95_ns": 82721494,
+     "mean_ns": 81165276.96774194,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_stream_benign_worksheet-r1-A2.json",
+     "samples": 31,
+     "p50_ns": 82491684,
+     "p95_ns": 83592458,
+     "mean_ns": 82518451.67741935,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_stream_benign_worksheet-r2-A1.json",
+     "samples": 31,
+     "p50_ns": 82600654,
+     "p95_ns": 83390117,
+     "mean_ns": 82453011.0,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_stream_benign_worksheet-r2-B1.json",
+     "samples": 31,
+     "p50_ns": 81615718,
+     "p95_ns": 83781450,
+     "mean_ns": 81987850.67741935,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_stream_benign_worksheet-r2-B2.json",
+     "samples": 31,
+     "p50_ns": 81169697,
+     "p95_ns": 82411923,
+     "mean_ns": 81192606.29032259,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_stream_benign_worksheet-r2-A2.json",
+     "samples": 31,
+     "p50_ns": 82032305,
+     "p95_ns": 83326961,
+     "mean_ns": 82134566.06451613,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_stream_benign_worksheet-r3-A1.json",
+     "samples": 31,
+     "p50_ns": 82655818,
+     "p95_ns": 83888604,
+     "mean_ns": 82652637.96774194,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_stream_benign_worksheet-r3-B1.json",
+     "samples": 31,
+     "p50_ns": 81439882,
+     "p95_ns": 82466087,
+     "mean_ns": 81540096.35483871,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_stream_benign_worksheet-r3-B2.json",
+     "samples": 31,
+     "p50_ns": 80226486,
+     "p95_ns": 82095925,
+     "mean_ns": 80506240.93548387,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_stream_benign_worksheet-r3-A2.json",
+     "samples": 31,
+     "p50_ns": 81944564,
+     "p95_ns": 83576702,
+     "mean_ns": 82150360.32258065,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_stream_benign_worksheet-r4-A1.json",
+     "samples": 31,
+     "p50_ns": 82562150,
+     "p95_ns": 84104225,
+     "mean_ns": 82695838.93548387,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_stream_benign_worksheet-r4-B1.json",
+     "samples": 31,
+     "p50_ns": 80933623,
+     "p95_ns": 82842121,
+     "mean_ns": 81227554.12903225,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_stream_benign_worksheet-r4-B2.json",
+     "samples": 31,
+     "p50_ns": 80876242,
+     "p95_ns": 81949197,
+     "mean_ns": 80903134.41935484,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_stream_benign_worksheet-r4-A2.json",
+     "samples": 31,
+     "p50_ns": 82145729,
+     "p95_ns": 84241318,
+     "mean_ns": 82351320.96774194,
+     "outcomes": [
+      "ok:4013837528e2d5d8b630594e4091ef8cef43f7eaa4d14865ca39ad437dffaee0:4f658ca1e6d270d94db6d2cd6f58015c00cc9c7fb329f4ed7ade9325227090ca:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 3801, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 159587 }"
+     ]
+    }
+   ],
+   "median_p50_ns": {
+    "before": 82438570.5,
+    "after": 81003084.5
+   },
+   "paired_ratios_after_over_before": [
+    0.9733663551808664,
+    0.9827965931693188,
+    0.9880759297620089,
+    0.9894845329532067,
+    0.9852891662145307,
+    0.9790336549963217,
+    0.9802751381837803,
+    0.9845459159538288
+   ],
+   "paired_ratio_median": 0.9836712545615738,
+   "paired_ratio_bootstrap_95": [
+    0.9790336549963217,
+    0.9880759297620089
+   ]
+  }
+ ]
+}

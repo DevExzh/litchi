@@ -1,0 +1,368 @@
+{
+ "case": "audit_attribute_flood",
+ "kind": "bounds",
+ "binaries": {
+  "before": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/a/xml_attribute_bounds",
+  "after": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/b/xml_attribute_bounds"
+ },
+ "core": 16,
+ "rounds": 4,
+ "samples_per_process": 15,
+ "warmup_per_process": 3,
+ "process_counters": [
+  {
+   "round": 1,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 3338644282,
+   "cycles": 717988085
+  },
+  {
+   "round": 1,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 765284405,
+   "cycles": 180564561
+  },
+  {
+   "round": 1,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 765283856,
+   "cycles": 181174434
+  },
+  {
+   "round": 1,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 3338644039,
+   "cycles": 709367776
+  },
+  {
+   "round": 2,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 3338643624,
+   "cycles": 709028649
+  },
+  {
+   "round": 2,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 765284492,
+   "cycles": 178958542
+  },
+  {
+   "round": 2,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 765285215,
+   "cycles": 169829088
+  },
+  {
+   "round": 2,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 3338644774,
+   "cycles": 712753481
+  },
+  {
+   "round": 3,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 3338645177,
+   "cycles": 705738297
+  },
+  {
+   "round": 3,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 765284513,
+   "cycles": 179325692
+  },
+  {
+   "round": 3,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 765284253,
+   "cycles": 180212418
+  },
+  {
+   "round": 3,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 3338644007,
+   "cycles": 708441355
+  },
+  {
+   "round": 4,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 3338643751,
+   "cycles": 707380521
+  },
+  {
+   "round": 4,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 765284552,
+   "cycles": 179843290
+  },
+  {
+   "round": 4,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 765284265,
+   "cycles": 180529068
+  },
+  {
+   "round": 4,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 3338644028,
+   "cycles": 710032379
+  }
+ ],
+ "median_process_instructions": {
+  "before": 3338644033.5,
+  "after": 765284448.5
+ },
+ "median_process_cycles": {
+  "before": 709198212.5,
+  "after": 180027854.0
+ },
+ "series": [
+  {
+   "series": "default",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "audit_attribute_flood-r1-A1.json",
+     "samples": 15,
+     "p50_ns": 9772799,
+     "p95_ns": 9824669,
+     "mean_ns": 9772130.8,
+     "outcomes": [
+      "ok:Report { attributes: 200000, bytes: 2088897, events: 2, max_depth: 1, text_bytes: 0 }"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "audit_attribute_flood-r1-B1.json",
+     "samples": 15,
+     "p50_ns": 2039020,
+     "p95_ns": 2050681,
+     "mean_ns": 2034295.6666666667,
+     "outcomes": [
+      "err:XML ElementAttributes limit 1024 exceeded by 1025 at byte 8112"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "audit_attribute_flood-r1-B2.json",
+     "samples": 15,
+     "p50_ns": 2027390,
+     "p95_ns": 2151261,
+     "mean_ns": 2049254.4,
+     "outcomes": [
+      "err:XML ElementAttributes limit 1024 exceeded by 1025 at byte 8112"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "audit_attribute_flood-r1-A2.json",
+     "samples": 15,
+     "p50_ns": 9645959,
+     "p95_ns": 9704409,
+     "mean_ns": 9639393.466666667,
+     "outcomes": [
+      "ok:Report { attributes: 200000, bytes: 2088897, events: 2, max_depth: 1, text_bytes: 0 }"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "audit_attribute_flood-r2-A1.json",
+     "samples": 15,
+     "p50_ns": 9652639,
+     "p95_ns": 9784590,
+     "mean_ns": 9678269.666666666,
+     "outcomes": [
+      "ok:Report { attributes: 200000, bytes: 2088897, events: 2, max_depth: 1, text_bytes: 0 }"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "audit_attribute_flood-r2-B1.json",
+     "samples": 15,
+     "p50_ns": 2019600,
+     "p95_ns": 2065381,
+     "mean_ns": 2019107.5333333334,
+     "outcomes": [
+      "err:XML ElementAttributes limit 1024 exceeded by 1025 at byte 8112"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "audit_attribute_flood-r2-B2.json",
+     "samples": 15,
+     "p50_ns": 1910100,
+     "p95_ns": 1926100,
+     "mean_ns": 1899836.2666666666,
+     "outcomes": [
+      "err:XML ElementAttributes limit 1024 exceeded by 1025 at byte 8112"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "audit_attribute_flood-r2-A2.json",
+     "samples": 15,
+     "p50_ns": 9691529,
+     "p95_ns": 9913390,
+     "mean_ns": 9724825.866666667,
+     "outcomes": [
+      "ok:Report { attributes: 200000, bytes: 2088897, events: 2, max_depth: 1, text_bytes: 0 }"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "audit_attribute_flood-r3-A1.json",
+     "samples": 15,
+     "p50_ns": 9577958,
+     "p95_ns": 9659949,
+     "mean_ns": 9591217.866666667,
+     "outcomes": [
+      "ok:Report { attributes: 200000, bytes: 2088897, events: 2, max_depth: 1, text_bytes: 0 }"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "audit_attribute_flood-r3-B1.json",
+     "samples": 15,
+     "p50_ns": 2010320,
+     "p95_ns": 2047181,
+     "mean_ns": 2012265.5333333334,
+     "outcomes": [
+      "err:XML ElementAttributes limit 1024 exceeded by 1025 at byte 8112"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "audit_attribute_flood-r3-B2.json",
+     "samples": 15,
+     "p50_ns": 2034800,
+     "p95_ns": 2051840,
+     "mean_ns": 2032012.2666666666,
+     "outcomes": [
+      "err:XML ElementAttributes limit 1024 exceeded by 1025 at byte 8112"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "audit_attribute_flood-r3-A2.json",
+     "samples": 15,
+     "p50_ns": 9596298,
+     "p95_ns": 9810210,
+     "mean_ns": 9632351.466666667,
+     "outcomes": [
+      "ok:Report { attributes: 200000, bytes: 2088897, events: 2, max_depth: 1, text_bytes: 0 }"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "audit_attribute_flood-r4-A1.json",
+     "samples": 15,
+     "p50_ns": 9586679,
+     "p95_ns": 9665779,
+     "mean_ns": 9596087.933333334,
+     "outcomes": [
+      "ok:Report { attributes: 200000, bytes: 2088897, events: 2, max_depth: 1, text_bytes: 0 }"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "audit_attribute_flood-r4-B1.json",
+     "samples": 15,
+     "p50_ns": 2023830,
+     "p95_ns": 2042311,
+     "mean_ns": 2025274.9333333333,
+     "outcomes": [
+      "err:XML ElementAttributes limit 1024 exceeded by 1025 at byte 8112"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "audit_attribute_flood-r4-B2.json",
+     "samples": 15,
+     "p50_ns": 2036461,
+     "p95_ns": 2050020,
+     "mean_ns": 2033939.6,
+     "outcomes": [
+      "err:XML ElementAttributes limit 1024 exceeded by 1025 at byte 8112"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "audit_attribute_flood-r4-A2.json",
+     "samples": 15,
+     "p50_ns": 9582628,
+     "p95_ns": 9679539,
+     "mean_ns": 9600313.933333334,
+     "outcomes": [
+      "ok:Report { attributes: 200000, bytes: 2088897, events: 2, max_depth: 1, text_bytes: 0 }"
+     ]
+    }
+   ],
+   "median_p50_ns": {
+    "before": 9621128.5,
+    "after": 2025610.0
+   },
+   "paired_ratios_after_over_before": [
+    0.20864237563874996,
+    0.21018024231701588,
+    0.20922775626437495,
+    0.19708964395607753,
+    0.20989025009297388,
+    0.21204010129739614,
+    0.21110856011763823,
+    0.2125159194325398
+   ],
+   "paired_ratio_median": 0.21003524620499486,
+   "paired_ratio_bootstrap_95": [
+    0.20864237563874996,
+    0.21204010129739614
+   ]
+  }
+ ]
+}

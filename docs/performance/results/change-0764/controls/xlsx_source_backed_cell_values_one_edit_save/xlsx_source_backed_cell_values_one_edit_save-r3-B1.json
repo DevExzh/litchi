@@ -1,0 +1,3995 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "none"
+  },
+  "binary_identity": {
+    "path": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/b/litchi-perf-baseline",
+    "binary_sha256": "76df861365785f20fce46036e2b70e42e793e29fb4cb9a1c6760c034e9e6717e",
+    "binary_bytes": 68475656,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "bcf67f07c8ef15f0c8e32276a15b9e595c802772",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "16",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 15,
+    "warmup_iterations_per_case": 3,
+    "filesystem_cache_states": [
+      "warm",
+      "cold-requested"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "xlsx_source_backed_cell_values_one_edit_save"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "xlsb_shapes": [
+      "tiny",
+      "medium",
+      "large",
+      "sparse"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "medium",
+      "large"
+    ],
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ],
+    "opc_cache_lock_diagnostics": false,
+    "xlsx_cell_values_range_accounting": "compressed-member-intersections-v1"
+  },
+  "parallel_metrics": {
+    "schema_version": 1,
+    "scope": "explicit_local_execution_only",
+    "claim": "descriptive",
+    "configured_worker_budget": {
+      "status": "measured",
+      "value": [
+        1
+      ],
+      "scope": "configuration.execution_workers"
+    },
+    "observed_process_thread_count": {
+      "status": "unavailable",
+      "scope": "process_thread_count",
+      "reason": "no process-global thread counter is collected; local worker boundaries only"
+    },
+    "cases": [
+      {
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "corpus_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      },
+      {
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "corpus_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "corpus": {
+        "name": "xlsx-cell-values-medium",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 9216,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4231168,
+        "archive_bytes": 4226429,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 48,
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          4131099,
+          4131739,
+          4134769,
+          4144139,
+          4144309,
+          4145279,
+          4146799,
+          4147249,
+          4148669,
+          4149109,
+          4152149,
+          4152219,
+          4161029,
+          4237479,
+          4291389
+        ],
+        "sample_order": [
+          6,
+          7,
+          3,
+          12,
+          8,
+          11,
+          5,
+          14,
+          9,
+          4,
+          10,
+          13,
+          1,
+          0,
+          2
+        ],
+        "min": 4131099,
+        "p50": 4147249,
+        "p95": 4291389,
+        "p99": 4291389,
+        "max": 4291389,
+        "mean": 4161161.666666667,
+        "standard_deviation": 43865.02470512178,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 4136867.6097132275,
+          "upper": 4185455.7236201065
+        }
+      },
+      "sink": {
+        "accepted_bytes": 4226480,
+        "write_calls": 137,
+        "largest_write": 65536,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 69,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 4,
+          "bytes_16385_to_65536": 64,
+          "bytes_over_65536": 0
+        }
+      },
+      "source": {
+        "read_calls": [
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180
+        ],
+        "read_bytes": [
+          4233122,
+          4233122,
+          4233122,
+          4233122,
+          4233122,
+          4233122,
+          4233122,
+          4233122,
+          4233122,
+          4233122,
+          4233122,
+          4233122,
+          4233122,
+          4233122,
+          4233122
+        ],
+        "ordinary_payload_read_calls": [
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79
+        ],
+        "ordinary_payload_read_bytes": [
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551,
+          4223551
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "xlsx_cell_values": {
+          "implementation": "source-backed",
+          "cache_mode": "unmanaged-control",
+          "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+          "update_count": 1,
+          "selected_worksheet_count": 1,
+          "open_ns": [
+            92850,
+            82740,
+            99880,
+            84080,
+            83341,
+            84050,
+            81070,
+            81440,
+            81630,
+            82760,
+            81370,
+            79291,
+            78221,
+            81540,
+            80640
+          ],
+          "plan_ns": [
+            1565198,
+            1543727,
+            1573547,
+            1545257,
+            1561537,
+            1553897,
+            1550817,
+            1540877,
+            1535238,
+            1541968,
+            1555637,
+            1545697,
+            1554227,
+            1543957,
+            1537508
+          ],
+          "plan_allocation_metrics": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "staging_allocation_metrics": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "commit_ns": [
+            820933,
+            809114,
+            814704,
+            803834,
+            800804,
+            811304,
+            799734,
+            790904,
+            796863,
+            793433,
+            802994,
+            805124,
+            797264,
+            809174,
+            805523
+          ],
+          "commit_allocation_metrics": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "commit_core_allocation_metrics": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "publication_ns": [
+            1758498,
+            1725448,
+            1803258,
+            1701598,
+            1703427,
+            1697548,
+            1699478,
+            1718518,
+            1730578,
+            1730508,
+            1712148,
+            1715167,
+            1714427,
+            1717548,
+            1723578
+          ],
+          "publication_allocation_metrics": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "reopen_ns": [
+            24200711,
+            23679779,
+            24224811,
+            23655879,
+            23741879,
+            23754149,
+            23551528,
+            23595069,
+            23939831,
+            24033461,
+            23900070,
+            23744359,
+            24017140,
+            23795710,
+            23912830
+          ],
+          "source_read_calls": [
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180
+          ],
+          "source_read_bytes": [
+            4233122,
+            4233122,
+            4233122,
+            4233122,
+            4233122,
+            4233122,
+            4233122,
+            4233122,
+            4233122,
+            4233122,
+            4233122,
+            4233122,
+            4233122,
+            4233122,
+            4233122
+          ],
+          "workbook_read_calls": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "workbook_read_bytes": [
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226
+          ],
+          "selected_worksheet_read_calls": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "selected_worksheet_read_bytes": [
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816,
+            6816
+          ],
+          "unselected_worksheet_read_calls": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "unselected_worksheet_read_bytes": [
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330,
+            20330
+          ],
+          "payload_materializations": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "cache_hits": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_cold_loads": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "cache_waiter_joins": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_successful_loads": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "cache_failed_loads": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_evictions": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_bypasses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_oversized_bypasses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_allocation_bypasses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_in_flight_loads": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_retained_entries": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "cache_retained_bytes": [
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321,
+            64321
+          ],
+          "cache_budget_managed": false,
+          "payload_memory_limit": null,
+          "publication_planning_memory_headroom": null,
+          "cache_budget_memory_limit": null,
+          "cache_budget_memory_used": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_budget_reserved_bytes": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_budget_reservation_failures": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "pre_publication_budget": [
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            }
+          ],
+          "post_publication_budget": [
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            }
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "budget_objects_used_after_handles_drop": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "output_sha256": [
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1"
+          ],
+          "semantic_sha256": [
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de"
+          ],
+          "untouched_member_count": 15,
+          "untouched_member_sha256": [
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d"
+          ],
+          "output_budget_refusal": {
+            "successful_output_ceiling": 0,
+            "first_output_request_bytes": 0,
+            "one_under_output_limit": 0,
+            "accepted_output_bytes": 0,
+            "source_read_calls": 0,
+            "source_read_bytes": 0,
+            "output_bytes_used": 0,
+            "typed_output_resource_refusal": false,
+            "zero_output_verified": false,
+            "source_identity_preserved": false
+          }
+        }
+      },
+      "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+      "operation_metrics": {
+        "sample_count": 15,
+        "sample_indices": [
+          6,
+          7,
+          3,
+          12,
+          8,
+          11,
+          5,
+          14,
+          9,
+          4,
+          10,
+          13,
+          1,
+          0,
+          2
+        ],
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "latency_claim": "comparable_timed_operation",
+        "source": {
+          "status": "not_applicable",
+          "counter_scope": "not_applicable_in_process_sink",
+          "logical_read_calls": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_pattern": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at_range_order_not_physical_io"
+          },
+          "compressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary"
+          },
+          "decompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary"
+          },
+          "recompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary"
+          },
+          "max_concurrent_reads": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          }
+        },
+        "process": {
+          "status": "not_applicable",
+          "user_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "system_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "clock_ticks_per_second": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "minor_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "major_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "voluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "nonvoluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "rss_delta_bytes": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta_not_peak"
+          },
+          "peak_rss_bytes": {
+            "status": "not_applicable",
+            "scope": "process_lifetime_high_water_after_not_operation_peak"
+          },
+          "rchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "wchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "read_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "cancelled_write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscr": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscw": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          }
+        },
+        "sink": {
+          "status": "not_applicable",
+          "output_bytes": {
+            "status": "not_applicable",
+            "scope": "post_operation_output_length_not_sink_write_volume"
+          },
+          "write_status": "measured",
+          "accepted_bytes": {
+            "values": [
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480,
+              4226480
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_bytes"
+          },
+          "write_calls": {
+            "values": [
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_calls"
+          },
+          "largest_write": {
+            "values": [
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536
+            ],
+            "status": "measured",
+            "scope": "logical_sink_largest_accepted_write"
+          },
+          "write_size_buckets": {
+            "status": "measured",
+            "bytes_0": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_1_to_512": {
+              "values": [
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_513_to_4096": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_4097_to_16384": {
+              "values": [
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_16385_to_65536": {
+              "values": [
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64,
+                64
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_over_65536": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            }
+          }
+        },
+        "publication": {
+          "status": "not_applicable",
+          "changed_spans": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          },
+          "published_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          }
+        },
+        "materialization": {
+          "status": "not_applicable",
+          "opc_parts": {
+            "status": "not_applicable",
+            "scope": "logical_materialization_counter"
+          }
+        },
+        "cfb_phases": {
+          "status": "not_applicable",
+          "open": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "atomic_publication": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          }
+        }
+      }
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "corpus": {
+        "name": "xlsx-cell-values-dense-sparse",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "dense-sparse",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 17792,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4265472,
+        "archive_bytes": 4251863,
+        "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 128,
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 178,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          26742124,
+          26792034,
+          26808344,
+          26896094,
+          26902974,
+          26938694,
+          26946174,
+          26985394,
+          27022034,
+          27052075,
+          27063695,
+          27072345,
+          27073614,
+          27109755,
+          27363526
+        ],
+        "sample_order": [
+          4,
+          3,
+          12,
+          5,
+          2,
+          0,
+          9,
+          11,
+          1,
+          10,
+          8,
+          13,
+          7,
+          6,
+          14
+        ],
+        "min": 26742124,
+        "p50": 26985394,
+        "p95": 27363526,
+        "p99": 27363526,
+        "max": 27363526,
+        "mean": 26984591.733333334,
+        "standard_deviation": 154018.70939943218,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 26899290.53213264,
+          "upper": 27069892.93453403
+        }
+      },
+      "sink": {
+        "accepted_bytes": 4251913,
+        "write_calls": 137,
+        "largest_write": 65536,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 69,
+          "bytes_513_to_4096": 3,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 65,
+          "bytes_over_65536": 0
+        }
+      },
+      "source": {
+        "read_calls": [
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180,
+          180
+        ],
+        "read_bytes": [
+          4258556,
+          4258556,
+          4258556,
+          4258556,
+          4258556,
+          4258556,
+          4258556,
+          4258556,
+          4258556,
+          4258556,
+          4258556,
+          4258556,
+          4258556,
+          4258556,
+          4258556
+        ],
+        "ordinary_payload_read_calls": [
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79,
+          79
+        ],
+        "ordinary_payload_read_bytes": [
+          4248985,
+          4248985,
+          4248985,
+          4248985,
+          4248985,
+          4248985,
+          4248985,
+          4248985,
+          4248985,
+          4248985,
+          4248985,
+          4248985,
+          4248985,
+          4248985,
+          4248985
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "xlsx_cell_values": {
+          "implementation": "source-backed",
+          "cache_mode": "unmanaged-control",
+          "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+          "update_count": 1,
+          "selected_worksheet_count": 1,
+          "open_ns": [
+            86010,
+            93290,
+            86000,
+            82331,
+            86281,
+            85011,
+            93820,
+            99930,
+            102401,
+            103941,
+            99510,
+            101120,
+            88261,
+            96710,
+            113761
+          ],
+          "plan_ns": [
+            10381418,
+            10332218,
+            10254508,
+            10232717,
+            10202927,
+            10242647,
+            10333628,
+            10351368,
+            10365137,
+            10216777,
+            10338338,
+            10285248,
+            10198137,
+            10299368,
+            10430968
+          ],
+          "plan_allocation_metrics": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "staging_allocation_metrics": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "commit_ns": [
+            5207014,
+            5210184,
+            5210294,
+            5206074,
+            5188794,
+            5243624,
+            5293164,
+            5233234,
+            5232904,
+            5230934,
+            5243814,
+            5214144,
+            5202134,
+            5233974,
+            5255734
+          ],
+          "commit_allocation_metrics": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "commit_core_allocation_metrics": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "publication_ns": [
+            11264252,
+            11386342,
+            11352172,
+            11270912,
+            11264122,
+            11324812,
+            11389143,
+            11389082,
+            11363253,
+            11394522,
+            11370413,
+            11384882,
+            11319812,
+            11442293,
+            11563063
+          ],
+          "publication_allocation_metrics": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "reopen_ns": [
+            24987145,
+            25126195,
+            25121386,
+            25172946,
+            25142916,
+            25777879,
+            26257061,
+            25934709,
+            25914039,
+            25921529,
+            25905579,
+            25416847,
+            26495072,
+            26116810,
+            26355801
+          ],
+          "source_read_calls": [
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180,
+            180
+          ],
+          "source_read_bytes": [
+            4258556,
+            4258556,
+            4258556,
+            4258556,
+            4258556,
+            4258556,
+            4258556,
+            4258556,
+            4258556,
+            4258556,
+            4258556,
+            4258556,
+            4258556,
+            4258556,
+            4258556
+          ],
+          "workbook_read_calls": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "workbook_read_bytes": [
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226,
+            226
+          ],
+          "selected_worksheet_read_calls": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "selected_worksheet_read_bytes": [
+            46610,
+            46610,
+            46610,
+            46610,
+            46610,
+            46610,
+            46610,
+            46610,
+            46610,
+            46610,
+            46610,
+            46610,
+            46610,
+            46610,
+            46610
+          ],
+          "unselected_worksheet_read_calls": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "unselected_worksheet_read_bytes": [
+            5970,
+            5970,
+            5970,
+            5970,
+            5970,
+            5970,
+            5970,
+            5970,
+            5970,
+            5970,
+            5970,
+            5970,
+            5970,
+            5970,
+            5970
+          ],
+          "payload_materializations": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "cache_hits": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_cold_loads": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "cache_waiter_joins": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_successful_loads": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "cache_failed_loads": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_evictions": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_bypasses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_oversized_bypasses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_allocation_bypasses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_in_flight_loads": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_retained_entries": [
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3
+          ],
+          "cache_retained_bytes": [
+            463595,
+            463595,
+            463595,
+            463595,
+            463595,
+            463595,
+            463595,
+            463595,
+            463595,
+            463595,
+            463595,
+            463595,
+            463595,
+            463595,
+            463595
+          ],
+          "cache_budget_managed": false,
+          "payload_memory_limit": null,
+          "publication_planning_memory_headroom": null,
+          "cache_budget_memory_limit": null,
+          "cache_budget_memory_used": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_budget_reserved_bytes": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "cache_budget_reservation_failures": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "pre_publication_budget": [
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": 0,
+              "cache_reserved_objects": 0
+            }
+          ],
+          "post_publication_budget": [
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 0,
+              "input_bytes_limit": null,
+              "output_bytes_used": 0,
+              "output_bytes_limit": null,
+              "work_used": 0,
+              "work_limit": null,
+              "objects_used": 0,
+              "objects_limit": null,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            }
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "budget_objects_used_after_handles_drop": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "output_sha256": [
+            "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+            "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+            "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+            "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+            "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+            "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+            "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+            "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+            "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+            "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+            "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+            "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+            "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+            "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+            "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c"
+          ],
+          "semantic_sha256": [
+            "cbafd0dd89c230fdbdecc0bf7d5c22bfdbea00db5dc9210892e3f36c942fc01d",
+            "cbafd0dd89c230fdbdecc0bf7d5c22bfdbea00db5dc9210892e3f36c942fc01d",
+            "cbafd0dd89c230fdbdecc0bf7d5c22bfdbea00db5dc9210892e3f36c942fc01d",
+            "cbafd0dd89c230fdbdecc0bf7d5c22bfdbea00db5dc9210892e3f36c942fc01d",
+            "cbafd0dd89c230fdbdecc0bf7d5c22bfdbea00db5dc9210892e3f36c942fc01d",
+            "cbafd0dd89c230fdbdecc0bf7d5c22bfdbea00db5dc9210892e3f36c942fc01d",
+            "cbafd0dd89c230fdbdecc0bf7d5c22bfdbea00db5dc9210892e3f36c942fc01d",
+            "cbafd0dd89c230fdbdecc0bf7d5c22bfdbea00db5dc9210892e3f36c942fc01d",
+            "cbafd0dd89c230fdbdecc0bf7d5c22bfdbea00db5dc9210892e3f36c942fc01d",
+            "cbafd0dd89c230fdbdecc0bf7d5c22bfdbea00db5dc9210892e3f36c942fc01d",
+            "cbafd0dd89c230fdbdecc0bf7d5c22bfdbea00db5dc9210892e3f36c942fc01d",
+            "cbafd0dd89c230fdbdecc0bf7d5c22bfdbea00db5dc9210892e3f36c942fc01d",
+            "cbafd0dd89c230fdbdecc0bf7d5c22bfdbea00db5dc9210892e3f36c942fc01d",
+            "cbafd0dd89c230fdbdecc0bf7d5c22bfdbea00db5dc9210892e3f36c942fc01d",
+            "cbafd0dd89c230fdbdecc0bf7d5c22bfdbea00db5dc9210892e3f36c942fc01d"
+          ],
+          "untouched_member_count": 15,
+          "untouched_member_sha256": [
+            "d09e41c91e307bec6bf0b10dacf82eb8dd64aec6a3ee244ea8fcadfa0dbf48a5",
+            "d09e41c91e307bec6bf0b10dacf82eb8dd64aec6a3ee244ea8fcadfa0dbf48a5",
+            "d09e41c91e307bec6bf0b10dacf82eb8dd64aec6a3ee244ea8fcadfa0dbf48a5",
+            "d09e41c91e307bec6bf0b10dacf82eb8dd64aec6a3ee244ea8fcadfa0dbf48a5",
+            "d09e41c91e307bec6bf0b10dacf82eb8dd64aec6a3ee244ea8fcadfa0dbf48a5",
+            "d09e41c91e307bec6bf0b10dacf82eb8dd64aec6a3ee244ea8fcadfa0dbf48a5",
+            "d09e41c91e307bec6bf0b10dacf82eb8dd64aec6a3ee244ea8fcadfa0dbf48a5",
+            "d09e41c91e307bec6bf0b10dacf82eb8dd64aec6a3ee244ea8fcadfa0dbf48a5",
+            "d09e41c91e307bec6bf0b10dacf82eb8dd64aec6a3ee244ea8fcadfa0dbf48a5",
+            "d09e41c91e307bec6bf0b10dacf82eb8dd64aec6a3ee244ea8fcadfa0dbf48a5",
+            "d09e41c91e307bec6bf0b10dacf82eb8dd64aec6a3ee244ea8fcadfa0dbf48a5",
+            "d09e41c91e307bec6bf0b10dacf82eb8dd64aec6a3ee244ea8fcadfa0dbf48a5",
+            "d09e41c91e307bec6bf0b10dacf82eb8dd64aec6a3ee244ea8fcadfa0dbf48a5",
+            "d09e41c91e307bec6bf0b10dacf82eb8dd64aec6a3ee244ea8fcadfa0dbf48a5",
+            "d09e41c91e307bec6bf0b10dacf82eb8dd64aec6a3ee244ea8fcadfa0dbf48a5"
+          ],
+          "output_budget_refusal": {
+            "successful_output_ceiling": 0,
+            "first_output_request_bytes": 0,
+            "one_under_output_limit": 0,
+            "accepted_output_bytes": 0,
+            "source_read_calls": 0,
+            "source_read_bytes": 0,
+            "output_bytes_used": 0,
+            "typed_output_resource_refusal": false,
+            "zero_output_verified": false,
+            "source_identity_preserved": false
+          }
+        }
+      },
+      "output_sha256": "6bcafbdb874727623f7d22ec518caa27b3859c754f3db8d351a5cf8fb2374f9c",
+      "operation_metrics": {
+        "sample_count": 15,
+        "sample_indices": [
+          4,
+          3,
+          12,
+          5,
+          2,
+          0,
+          9,
+          11,
+          1,
+          10,
+          8,
+          13,
+          7,
+          6,
+          14
+        ],
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "latency_claim": "comparable_timed_operation",
+        "source": {
+          "status": "not_applicable",
+          "counter_scope": "not_applicable_in_process_sink",
+          "logical_read_calls": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_pattern": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at_range_order_not_physical_io"
+          },
+          "compressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary"
+          },
+          "decompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary"
+          },
+          "recompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary"
+          },
+          "max_concurrent_reads": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          }
+        },
+        "process": {
+          "status": "not_applicable",
+          "user_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "system_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "clock_ticks_per_second": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "minor_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "major_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "voluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "nonvoluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "rss_delta_bytes": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta_not_peak"
+          },
+          "peak_rss_bytes": {
+            "status": "not_applicable",
+            "scope": "process_lifetime_high_water_after_not_operation_peak"
+          },
+          "rchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "wchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "read_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "cancelled_write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscr": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscw": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          }
+        },
+        "sink": {
+          "status": "not_applicable",
+          "output_bytes": {
+            "status": "not_applicable",
+            "scope": "post_operation_output_length_not_sink_write_volume"
+          },
+          "write_status": "measured",
+          "accepted_bytes": {
+            "values": [
+              4251913,
+              4251913,
+              4251913,
+              4251913,
+              4251913,
+              4251913,
+              4251913,
+              4251913,
+              4251913,
+              4251913,
+              4251913,
+              4251913,
+              4251913,
+              4251913,
+              4251913
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_bytes"
+          },
+          "write_calls": {
+            "values": [
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137,
+              137
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_calls"
+          },
+          "largest_write": {
+            "values": [
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536,
+              65536
+            ],
+            "status": "measured",
+            "scope": "logical_sink_largest_accepted_write"
+          },
+          "write_size_buckets": {
+            "status": "measured",
+            "bytes_0": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_1_to_512": {
+              "values": [
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69,
+                69
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_513_to_4096": {
+              "values": [
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_4097_to_16384": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_16385_to_65536": {
+              "values": [
+                65,
+                65,
+                65,
+                65,
+                65,
+                65,
+                65,
+                65,
+                65,
+                65,
+                65,
+                65,
+                65,
+                65,
+                65
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_over_65536": {
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            }
+          }
+        },
+        "publication": {
+          "status": "not_applicable",
+          "changed_spans": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          },
+          "published_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          }
+        },
+        "materialization": {
+          "status": "not_applicable",
+          "opc_parts": {
+            "status": "not_applicable",
+            "scope": "logical_materialization_counter"
+          }
+        },
+        "cfb_phases": {
+          "status": "not_applicable",
+          "open": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "atomic_publication": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

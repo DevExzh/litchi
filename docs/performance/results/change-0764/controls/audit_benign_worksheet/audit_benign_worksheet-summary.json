@@ -1,0 +1,368 @@
+{
+ "case": "audit_benign_worksheet",
+ "kind": "bounds",
+ "binaries": {
+  "before": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/a/xml_attribute_bounds",
+  "after": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/b/xml_attribute_bounds"
+ },
+ "core": 16,
+ "rounds": 4,
+ "samples_per_process": 31,
+ "warmup_per_process": 3,
+ "process_counters": [
+  {
+   "round": 1,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 3951902658,
+   "cycles": 743552039
+  },
+  {
+   "round": 1,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 3971429704,
+   "cycles": 739070492
+  },
+  {
+   "round": 1,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 3971434112,
+   "cycles": 746988727
+  },
+  {
+   "round": 1,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 3951905938,
+   "cycles": 730943337
+  },
+  {
+   "round": 2,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 3951906026,
+   "cycles": 747729186
+  },
+  {
+   "round": 2,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 3971430575,
+   "cycles": 744924169
+  },
+  {
+   "round": 2,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 3971435108,
+   "cycles": 739990332
+  },
+  {
+   "round": 2,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 3951904467,
+   "cycles": 732747985
+  },
+  {
+   "round": 3,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 3951901276,
+   "cycles": 734826256
+  },
+  {
+   "round": 3,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 3971429141,
+   "cycles": 738428924
+  },
+  {
+   "round": 3,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 3971431815,
+   "cycles": 741400318
+  },
+  {
+   "round": 3,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 3951904937,
+   "cycles": 729774723
+  },
+  {
+   "round": 4,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 3951904859,
+   "cycles": 730190620
+  },
+  {
+   "round": 4,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 3971432592,
+   "cycles": 745536769
+  },
+  {
+   "round": 4,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 3971432336,
+   "cycles": 743216306
+  },
+  {
+   "round": 4,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 3951910041,
+   "cycles": 732437050
+  }
+ ],
+ "median_process_instructions": {
+  "before": 3951904898.0,
+  "after": 3971432075.5
+ },
+ "median_process_cycles": {
+  "before": 732592517.5,
+  "after": 742308312.0
+ },
+ "series": [
+  {
+   "series": "default",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "audit_benign_worksheet-r1-A1.json",
+     "samples": 31,
+     "p50_ns": 4833374,
+     "p95_ns": 4908755,
+     "mean_ns": 4850102.838709678,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "audit_benign_worksheet-r1-B1.json",
+     "samples": 31,
+     "p50_ns": 4820214,
+     "p95_ns": 4855834,
+     "mean_ns": 4825445.580645162,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "audit_benign_worksheet-r1-B2.json",
+     "samples": 31,
+     "p50_ns": 4871024,
+     "p95_ns": 4889344,
+     "mean_ns": 4870910.0322580645,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "audit_benign_worksheet-r1-A2.json",
+     "samples": 31,
+     "p50_ns": 4765664,
+     "p95_ns": 4782524,
+     "mean_ns": 4769665.0,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "audit_benign_worksheet-r2-A1.json",
+     "samples": 31,
+     "p50_ns": 4860025,
+     "p95_ns": 4937395,
+     "mean_ns": 4877038.741935484,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "audit_benign_worksheet-r2-B1.json",
+     "samples": 31,
+     "p50_ns": 4863215,
+     "p95_ns": 4887865,
+     "mean_ns": 4864486.129032258,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "audit_benign_worksheet-r2-B2.json",
+     "samples": 31,
+     "p50_ns": 4839564,
+     "p95_ns": 4850944,
+     "mean_ns": 4835251.774193549,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "audit_benign_worksheet-r2-A2.json",
+     "samples": 31,
+     "p50_ns": 4780444,
+     "p95_ns": 4792913,
+     "mean_ns": 4782566.354838709,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "audit_benign_worksheet-r3-A1.json",
+     "samples": 31,
+     "p50_ns": 4793044,
+     "p95_ns": 4817053,
+     "mean_ns": 4797762.225806451,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "audit_benign_worksheet-r3-B1.json",
+     "samples": 31,
+     "p50_ns": 4819824,
+     "p95_ns": 4825774,
+     "mean_ns": 4820403.9677419355,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "audit_benign_worksheet-r3-B2.json",
+     "samples": 31,
+     "p50_ns": 4840924,
+     "p95_ns": 4849634,
+     "mean_ns": 4841256.645161291,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "audit_benign_worksheet-r3-A2.json",
+     "samples": 31,
+     "p50_ns": 4761364,
+     "p95_ns": 4787404,
+     "mean_ns": 4764204.645161291,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "audit_benign_worksheet-r4-A1.json",
+     "samples": 31,
+     "p50_ns": 4761384,
+     "p95_ns": 4787944,
+     "mean_ns": 4768384.677419355,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "audit_benign_worksheet-r4-B1.json",
+     "samples": 31,
+     "p50_ns": 4863195,
+     "p95_ns": 4880965,
+     "mean_ns": 4864590.9677419355,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "audit_benign_worksheet-r4-B2.json",
+     "samples": 31,
+     "p50_ns": 4850925,
+     "p95_ns": 4865744,
+     "mean_ns": 4855454.129032258,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "audit_benign_worksheet-r4-A2.json",
+     "samples": 31,
+     "p50_ns": 4769533,
+     "p95_ns": 4794514,
+     "mean_ns": 4787143.161290322,
+     "outcomes": [
+      "ok:Report { attributes: 53265, bytes: 1558391, events: 159588, max_depth: 5, text_bytes: 596909 }"
+     ]
+    }
+   ],
+   "median_p50_ns": {
+    "before": 4774988.5,
+    "after": 4845924.5
+   },
+   "paired_ratios_after_over_before": [
+    0.9972772642878454,
+    1.0221081469444762,
+    1.0006563752244073,
+    1.0123670520980896,
+    1.0055872635427507,
+    1.0167094975305395,
+    1.0213826484064297,
+    1.017064983091636
+   ],
+   "paired_ratio_median": 1.0145382748143146,
+   "paired_ratio_bootstrap_95": [
+    1.0006563752244073,
+    1.0213826484064297
+   ]
+  }
+ ]
+}

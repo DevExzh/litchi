@@ -1,0 +1,368 @@
+{
+ "case": "docx_styles_benign",
+ "kind": "bounds",
+ "binaries": {
+  "before": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/a/xml_attribute_bounds",
+  "after": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/b/xml_attribute_bounds"
+ },
+ "core": 16,
+ "rounds": 4,
+ "samples_per_process": 31,
+ "warmup_per_process": 3,
+ "process_counters": [
+  {
+   "round": 1,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 1259195253,
+   "cycles": 270246142
+  },
+  {
+   "round": 1,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 1247686493,
+   "cycles": 260287656
+  },
+  {
+   "round": 1,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 1248105707,
+   "cycles": 260445838
+  },
+  {
+   "round": 1,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 1259153557,
+   "cycles": 268549052
+  },
+  {
+   "round": 2,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 1259167141,
+   "cycles": 270332408
+  },
+  {
+   "round": 2,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 1247474006,
+   "cycles": 259742309
+  },
+  {
+   "round": 2,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 1247656089,
+   "cycles": 260378188
+  },
+  {
+   "round": 2,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 1259748681,
+   "cycles": 271352187
+  },
+  {
+   "round": 3,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 1259378952,
+   "cycles": 274952765
+  },
+  {
+   "round": 3,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 1247707075,
+   "cycles": 262090495
+  },
+  {
+   "round": 3,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 1247437323,
+   "cycles": 258838713
+  },
+  {
+   "round": 3,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 1259218085,
+   "cycles": 273490636
+  },
+  {
+   "round": 4,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 1259487978,
+   "cycles": 272956208
+  },
+  {
+   "round": 4,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 1247427331,
+   "cycles": 260132483
+  },
+  {
+   "round": 4,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 1247428147,
+   "cycles": 259624212
+  },
+  {
+   "round": 4,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 1259128901,
+   "cycles": 273922668
+  }
+ ],
+ "median_process_instructions": {
+  "before": 1259206669.0,
+  "after": 1247565047.5
+ },
+ "median_process_cycles": {
+  "before": 272154197.5,
+  "after": 260210069.5
+ },
+ "series": [
+  {
+   "series": "default",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_styles_benign-r1-A1.json",
+     "samples": 31,
+     "p50_ns": 1805469,
+     "p95_ns": 1815049,
+     "mean_ns": 1807081.2580645161,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_styles_benign-r1-B1.json",
+     "samples": 31,
+     "p50_ns": 1727149,
+     "p95_ns": 1747908,
+     "mean_ns": 1730991.4838709678,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_styles_benign-r1-B2.json",
+     "samples": 31,
+     "p50_ns": 1726218,
+     "p95_ns": 1754839,
+     "mean_ns": 1731212.4516129033,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_styles_benign-r1-A2.json",
+     "samples": 31,
+     "p50_ns": 1782719,
+     "p95_ns": 1788859,
+     "mean_ns": 1782932.0967741935,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_styles_benign-r2-A1.json",
+     "samples": 31,
+     "p50_ns": 1795629,
+     "p95_ns": 1804759,
+     "mean_ns": 1795976.677419355,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_styles_benign-r2-B1.json",
+     "samples": 31,
+     "p50_ns": 1724989,
+     "p95_ns": 1733139,
+     "mean_ns": 1725134.3870967743,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_styles_benign-r2-B2.json",
+     "samples": 31,
+     "p50_ns": 1727439,
+     "p95_ns": 1735859,
+     "mean_ns": 1729010.2258064516,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_styles_benign-r2-A2.json",
+     "samples": 31,
+     "p50_ns": 1797809,
+     "p95_ns": 1825278,
+     "mean_ns": 1803023.4838709678,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_styles_benign-r3-A1.json",
+     "samples": 31,
+     "p50_ns": 1824399,
+     "p95_ns": 1856079,
+     "mean_ns": 1833992.677419355,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_styles_benign-r3-B1.json",
+     "samples": 31,
+     "p50_ns": 1746119,
+     "p95_ns": 1762058,
+     "mean_ns": 1750073.5483870967,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_styles_benign-r3-B2.json",
+     "samples": 31,
+     "p50_ns": 1722619,
+     "p95_ns": 1746829,
+     "mean_ns": 1732520.5483870967,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_styles_benign-r3-A2.json",
+     "samples": 31,
+     "p50_ns": 1807699,
+     "p95_ns": 1818839,
+     "mean_ns": 1820720.6451612904,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_styles_benign-r4-A1.json",
+     "samples": 31,
+     "p50_ns": 1803899,
+     "p95_ns": 1814899,
+     "mean_ns": 1815054.4838709678,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_styles_benign-r4-B1.json",
+     "samples": 31,
+     "p50_ns": 1726178,
+     "p95_ns": 1745528,
+     "mean_ns": 1729545.0322580645,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_styles_benign-r4-B2.json",
+     "samples": 31,
+     "p50_ns": 1731428,
+     "p95_ns": 1741019,
+     "mean_ns": 1733080.8709677418,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_styles_benign-r4-A2.json",
+     "samples": 31,
+     "p50_ns": 1823769,
+     "p95_ns": 1837249,
+     "mean_ns": 1826744.8709677418,
+     "outcomes": [
+      "err:invalid DOCX format: style numPr is missing numId"
+     ]
+    }
+   ],
+   "median_p50_ns": {
+    "before": 1804684.0,
+    "after": 1726683.5
+   },
+   "paired_ratios_after_over_before": [
+    0.9566206896933706,
+    0.9683062782188332,
+    0.960660024982889,
+    0.9608579109349213,
+    0.9570927193009863,
+    0.9529346423270688,
+    0.9569149935778001,
+    0.9493680394830705
+   ],
+   "paired_ratio_median": 0.9570038564393932,
+   "paired_ratio_bootstrap_95": [
+    0.9529346423270688,
+    0.9608579109349213
+   ]
+  }
+ ]
+}

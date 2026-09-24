@@ -1,0 +1,28 @@
+{
+  "case": "mce_stream_declarations",
+  "elapsed_ns": [
+    426131556,
+    426244507,
+    423599692,
+    424116726,
+    425730273,
+    425791104,
+    426329067,
+    426830540,
+    426577458,
+    426651568,
+    427163302,
+    427239726,
+    428295147,
+    428528419,
+    425023009
+  ],
+  "input_bytes": 10392078,
+  "input_sha256": "214f23766080f0198a1fc61f8048748cd25405f0740c9c2e49ab69e36ca5be97",
+  "outcomes": [
+    "ok:8b5681401671c89273a36d11ab35bdc7bed2d8f9992c4c36ce0ca7895b553f83:6b63704cb674c6f93a2321a0ec625ba3c9498324003cf54fe23c8af0aa81c616:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0, ignored_elements: 0, ignored_attributes: 0, preserved_elements: 0, preserved_attributes: 0, unwrapped_elements: 0, events: 502 }"
+  ],
+  "p50_ns": 426329067,
+  "samples": 15,
+  "warmup": 3
+}

@@ -1,0 +1,19 @@
+{
+  "record": "0764",
+  "removed_during_the_task": [
+    {"path": "/home/zhuhe/code/litchi-worktrees/0764-w1 .. 0764-w4", "what": "the four sub-implementer worktrees, after their commits were cherry-picked", "method": "git worktree remove --force"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0764-w1 .. 0764-w4", "what": "their Cargo target dirs", "size": "15 + 15 + 24 + 7.2 GiB"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0764/{debug,release}/incremental", "what": "incremental caches, after the coordinator's disk note; later builds used CARGO_INCREMENTAL=0", "size": "about 17 GiB"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/scratch/0764/w1 .. w4", "what": "sub-implementer scratch; W1's timing files and W4's malformed-input probes copied to site-timings/ first"}
+  ],
+  "removed_after_committing_the_record": [
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0764", "what": "debug test builds of 15 crates, the facade and the harness; release harness", "size": "119 GiB"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0764-before", "what": "before-leg release harness build", "size": "1.1 GiB"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/0764-before-src", "what": "detached before-leg worktree at 1d1044e3ac with only the harness commits applied", "size": "12 GiB", "method": "git worktree remove --force"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/scratch/0764/*", "what": "measured binaries (hashes in binaries.sha256), the two 44 MB differential reports (hashes in differential/full-reports.sha256), raw ABBA output (copied here), census JSON (summary copied), perf and callgrind data, probe build", "size": "312 MiB"}
+  ],
+  "kept": [
+    "worktree /home/zhuhe/code/litchi-worktrees/0764-xml-attribute-dos-hardening and branch perf/0764-xml-attribute-dos-hardening",
+    "branches perf/0764-w1 .. perf/0764-w4 (the sub-implementers' original commits; their content is on the record branch under new hashes)"
+  ]
+}
