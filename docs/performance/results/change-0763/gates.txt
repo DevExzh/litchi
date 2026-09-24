@@ -1,0 +1,71 @@
+Gates for change 0763 at 1ab98ca669.
+Environment: CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0762 CARGO_BUILD_JOBS=6 CARGO_INCREMENTAL=0
+CARGO_PROFILE_DEV_DEBUG=0 (to keep the target directory small on the shared disk), rustc 1.95.0, --locked --offline,
+TMPDIR under scratch/0762.
+
+cargo fmt --all --check                                                                          exit 0
+cargo check <litchi-core and its in-scope dependents> --all-targets --locked                     exit 0 (no warnings)
+  set: -p litchi-core -p litchi -p litchi-cfb -p litchi-crypto -p litchi-doc -p litchi-docx -p litchi-drawingml
+       -p litchi-eval -p litchi-fonts -p litchi-imgconv -p litchi-markdown -p litchi-odb -p litchi-odc -p litchi-odf
+       -p litchi-odf-common -p litchi-odf-formula -p litchi-odg -p litchi-odi -p litchi-odm -p litchi-odp -p litchi-ods
+       -p litchi-odt -p litchi-ograph -p litchi-ole-common -p litchi-ooxml-common -p litchi-opc -p litchi-oth
+       -p litchi-ppt -p litchi-pptx -p litchi-py -p litchi-rtf -p litchi-sheet -p litchi-sign -p litchi-slide
+       -p litchi-spreadsheet-drawing -p litchi-vba -p litchi-word -p litchi-xls -p litchi-xlsb -p litchi-xlsx
+       (every workspace package that depends on litchi-core, iWork excluded)
+cargo clippy -p litchi-core -p litchi-docx -p litchi-xlsx --lib --no-deps --locked -- -D warnings           exit 0
+cargo clippy -p litchi-core -p litchi-docx -p litchi-xlsx --all-targets --no-deps --locked -- -D warnings   exit 0
+RUSTDOCFLAGS="-D warnings" cargo doc -p litchi-core -p litchi-docx -p litchi-xlsx --no-deps --locked        exit 0
+
+cargo test -p <crate> --locked --no-fail-fast (touched crates and the facade first, then in-scope dependents):
+  litchi-core                  exit 0  238 passed, 0 failed, 0 ignored
+  litchi-docx                  exit 0  1881 passed, 0 failed, 32 ignored
+  litchi-xlsx                  exit 0  2039 passed, 0 failed, 0 ignored
+  litchi                       exit 0  382 passed, 0 failed, 7 ignored (--features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt)
+  litchi-cfb                   exit 0  494 passed, 0 failed, 1 ignored
+  litchi-crypto                exit 0  43 passed, 0 failed, 0 ignored
+  litchi-doc                   exit 0  1293 passed, 0 failed, 13 ignored
+  litchi-drawingml             exit 0  355 passed, 0 failed, 0 ignored
+  litchi-eval                  exit 0  1147 passed, 0 failed, 0 ignored
+  litchi-fonts                 exit 0  19 passed, 0 failed, 0 ignored
+  litchi-imgconv               exit 0  209 passed, 0 failed, 1 ignored
+  litchi-markdown              exit 0  67 passed, 0 failed, 3 ignored
+  litchi-ograph                exit 0  70 passed, 0 failed, 0 ignored
+  litchi-ole-common            exit 0  255 passed, 0 failed, 1 ignored
+  litchi-ooxml-common          exit 0  371 passed, 0 failed, 0 ignored
+  litchi-opc                   exit 0  918 passed, 0 failed, 1 ignored
+  litchi-oth                   exit 0  98 passed, 0 failed, 0 ignored
+  litchi-ppt                   exit 0  1249 passed, 0 failed, 11 ignored
+  litchi-pptx                  exit 0  1167 passed, 0 failed, 3 ignored
+  litchi-rtf                   exit 0  1387 passed, 0 failed, 0 ignored
+  litchi-sheet                 exit 0  13 passed, 0 failed, 0 ignored
+  litchi-sign                  exit 0  25 passed, 0 failed, 0 ignored
+  litchi-slide                 exit 0  1 passed, 0 failed, 0 ignored
+  litchi-spreadsheet-drawing   exit 0  24 passed, 0 failed, 2 ignored
+  litchi-vba                   exit 0  47 passed, 0 failed, 0 ignored
+  litchi-word                  exit 0  1 passed, 0 failed, 0 ignored
+  litchi-xls                   exit 0  1611 passed, 0 failed, 1 ignored
+  litchi-xlsb                  exit 0  961 passed, 0 failed, 12 ignored
+
+Extra: the ODF dependents of litchi-core, same command:
+  litchi-odf-common            exit 0  530 passed, 0 failed, 1 ignored
+  litchi-odf                   exit 0  4 passed, 0 failed, 0 ignored
+  litchi-odt                   exit 0  1089 passed, 0 failed, 0 ignored
+  litchi-ods                   exit 0  1745 passed, 0 failed, 0 ignored
+  litchi-odp                   exit 0  404 passed, 0 failed, 0 ignored
+  litchi-odg                   exit 0  139 passed, 0 failed, 0 ignored
+  litchi-odb                   exit 0  88 passed, 0 failed, 0 ignored
+  litchi-odc                   exit 0  45 passed, 0 failed, 0 ignored
+  litchi-odi                   exit 0  45 passed, 0 failed, 0 ignored
+  litchi-odm                   exit 0  47 passed, 0 failed, 0 ignored
+  litchi-odf-formula           exit 0  37 passed, 0 failed, 0 ignored
+
+python3 tools/check_crate_boundaries.py                                                          exit 0
+python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+                                                                                                 exit 0 (OK: 10 performance claims validated)
+python3 tools/non_iwork_gate.py verify                                                           exit 1
+  "workspace package inventory mismatch (unexpected: litchi-xldm)": a known failure at base 1d1044e3ac,
+  being fixed on another branch (briefing, "Known gate failures").
+
+Not run: litchi-py's tests (Python bindings; compile-checked above), the harness tests and the CRUD
+coverage validator (the harness is unchanged), facade Clippy (untouched; its two known unit_arg lints are
+at base).

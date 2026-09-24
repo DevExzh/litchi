@@ -1,0 +1,562 @@
+[
+ {
+  "case": "ctl-docx-semantic-one-edit",
+  "corpus": "docx-semantic-large",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 5.9518,
+  "after_ms": 5.5478,
+  "change": -0.0679,
+  "direction": "favourable"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 19.2576,
+  "after_ms": 15.3027,
+  "change": -0.2054,
+  "direction": "favourable"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 15.4908,
+  "after_ms": 14.5593,
+  "change": -0.0601,
+  "direction": "favourable"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 36.3837,
+  "after_ms": 34.4212,
+  "change": -0.0539,
+  "direction": "favourable"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 29.097,
+  "after_ms": 30.8232,
+  "change": 0.0593,
+  "direction": "adverse"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 14.2556,
+  "after_ms": 17.0866,
+  "change": 0.1986,
+  "direction": "adverse"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 14.0125,
+  "after_ms": 15.0405,
+  "change": 0.0734,
+  "direction": "adverse"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 14.243,
+  "after_ms": 15.5396,
+  "change": 0.091,
+  "direction": "adverse"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 13.9396,
+  "after_ms": 14.7595,
+  "change": 0.0588,
+  "direction": "adverse"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 36.9373,
+  "after_ms": 34.2962,
+  "change": -0.0715,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 37.1723,
+  "after_ms": 34.516,
+  "change": -0.0715,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 36.9473,
+  "after_ms": 34.2793,
+  "change": -0.0722,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 36.6054,
+  "after_ms": 34.3682,
+  "change": -0.0611,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 36.7449,
+  "after_ms": 34.4621,
+  "change": -0.0621,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 36.5795,
+  "after_ms": 34.332,
+  "change": -0.0614,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 36.6022,
+  "after_ms": 34.1959,
+  "change": -0.0657,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 37.3837,
+  "after_ms": 34.3619,
+  "change": -0.0808,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 36.6423,
+  "after_ms": 34.247,
+  "change": -0.0654,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 36.4003,
+  "after_ms": 34.2377,
+  "change": -0.0594,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 36.9494,
+  "after_ms": 34.3706,
+  "change": -0.0698,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 36.5031,
+  "after_ms": 34.2483,
+  "change": -0.0618,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 36.7256,
+  "after_ms": 33.9541,
+  "change": -0.0755,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 37.0166,
+  "after_ms": 34.1149,
+  "change": -0.0784,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 36.5856,
+  "after_ms": 34.0022,
+  "change": -0.0706,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 36.0206,
+  "after_ms": 33.9347,
+  "change": -0.0579,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 36.313,
+  "after_ms": 34.047,
+  "change": -0.0624,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 36.0636,
+  "after_ms": 33.9447,
+  "change": -0.0588,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 36.2858,
+  "after_ms": 34.1279,
+  "change": -0.0595,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 37.2913,
+  "after_ms": 34.2167,
+  "change": -0.0824,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 36.4902,
+  "after_ms": 34.1255,
+  "change": -0.0648,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 2.3486,
+  "after_ms": 2.1621,
+  "change": -0.0794,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 2.4833,
+  "after_ms": 2.21,
+  "change": -0.11,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 2.364,
+  "after_ms": 2.1771,
+  "change": -0.0791,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 2.3374,
+  "after_ms": 2.1606,
+  "change": -0.0756,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 2.429,
+  "after_ms": 2.1929,
+  "change": -0.0972,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 2.3476,
+  "after_ms": 2.1644,
+  "change": -0.078,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 2.3538,
+  "after_ms": 2.1828,
+  "change": -0.0726,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 2.4437,
+  "after_ms": 2.2148,
+  "change": -0.0937,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 2.3725,
+  "after_ms": 2.1847,
+  "change": -0.0792,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 2.4782,
+  "after_ms": 2.2008,
+  "change": -0.112,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 2.5725,
+  "after_ms": 2.2263,
+  "change": -0.1346,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 2.4759,
+  "after_ms": 2.2026,
+  "change": -0.1104,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 2.3424,
+  "after_ms": 2.1825,
+  "change": -0.0682,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 2.4287,
+  "after_ms": 2.2454,
+  "change": -0.0755,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 2.3474,
+  "after_ms": 2.19,
+  "change": -0.0671,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 2.3432,
+  "after_ms": 2.1528,
+  "change": -0.0812,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 2.4408,
+  "after_ms": 2.1718,
+  "change": -0.1102,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 2.3581,
+  "after_ms": 2.1541,
+  "change": -0.0865,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 2.3405,
+  "after_ms": 2.1659,
+  "change": -0.0746,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 2.498,
+  "after_ms": 2.2117,
+  "change": -0.1146,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 2.3578,
+  "after_ms": 2.1717,
+  "change": -0.0789,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 2.3459,
+  "after_ms": 2.1876,
+  "change": -0.0675,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 2.4196,
+  "after_ms": 2.2225,
+  "change": -0.0815,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 2.3517,
+  "after_ms": 2.1909,
+  "change": -0.0684,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 255.329,
+  "after_ms": 176.9884,
+  "change": -0.3068,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 184.9564,
+  "after_ms": 174.2314,
+  "change": -0.058,
+  "direction": "favourable"
+ }
+]

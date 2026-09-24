@@ -1,0 +1,30 @@
+# lease_diff transcripts (full transcripts deleted; digests and outcome counts kept)
+before: 28862 lines, sha256 90f8efd8fa8db5f7e3c5a57490665b6da75c2cb0e94d36dac23234359ea3b1de, scenarios 28860
+before 0.87 s
+after: 28862 lines, sha256 90f8efd8fa8db5f7e3c5a57490665b6da75c2cb0e94d36dac23234359ea3b1de, scenarios 28860
+after 0.85 s
+first lines:
+docx calls 140 totals [0, 6606, 1202, 57, 3652]
+docx Memory parent=false limit=0: new: LimitExceeded { resource: "memory", observed: 64, limit: 0, written: 0 } | settled 0,0,0,0,0
+xlsx rows 40 totals [0, 0, 2556, 119, 121]
+outcome categories (same on both legs, since the transcripts are byte-identical):
+     140  docx cancellation
+   13212  docx input bytes refusal at a call
+       6  docx memory refusal at new
+     104  docx objects refusal at a call
+      10  docx objects refusal at new
+    1240  docx output bytes refusal at finish
+    1164  docx output bytes refusal at new
+      21  docx published
+    7300  docx work refusal at a call
+       4  docx work refusal at new
+       6  xlsx Memory refusal at new
+     224  xlsx Objects refusal at a call
+       2  xlsx Objects refusal at finish
+      12  xlsx Objects refusal at new
+    2158  xlsx OutputBytes refusal at finish
+    2954  xlsx OutputBytes refusal at new
+     240  xlsx Work refusal at a call
+       2  xlsx Work refusal at new
+      41  xlsx cancellation
+      20  xlsx published

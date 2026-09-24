@@ -1,0 +1,13 @@
+[package]
+name = "lease_diff"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+sha2 = "0.11"
+litchi-core = { path = "ROOT/crates/litchi-core" }
+litchi-docx = { path = "ROOT/crates/litchi-docx" }
+litchi-xlsx = { path = "ROOT/crates/litchi-xlsx" }
+
+[workspace]

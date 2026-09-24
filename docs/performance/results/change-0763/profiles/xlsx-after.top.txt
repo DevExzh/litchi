@@ -1,0 +1,28 @@
+# flat perf profile, whole process (includes untimed corpus build and reopen gates), xlsx_streaming_create large, 20 samples, CPU 12, binary bin/a (change 0763 after leg)
+    19.04%  [.] zlib_rs::deflate::algorithm::medium::deflate_medium                                                             -      -
+    16.99%  [.] zlib_rs::deflate::longest_match::longest_match                                                                  -      -
+     4.19%  [.] __memmove_avx512_unaligned_erms                                                                                 -      -
+     3.92%  [.] litchi_xlsx::streaming::push_escaped                                                                            -      -
+     2.73%  [.] litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row                                                   -      -
+     2.58%  [.] zlib_rs::deflate::flush_block_only                                                                              -      -
+     2.04%  [.] sha2::sha256::x86_sha::compress                                                                                 -      -
+     2.04%  [.] ryu::pretty::format64                                                                                           -      -
+     1.75%  [k] 0xffffffff9f124131                                                                                              -      -
+     1.68%  [.] __GI___readdir64                                                                                                -      -
+     1.61%  [k] 0xffffffff9f1119eb                                                                                              -      -
+     1.59%  [.] quick_xml::reader::ns_reader::NsReader<R>::process_event                                                        -      -
+     1.28%  [k] 0xffffffff9f4acb5c                                                                                              -      -
+     1.17%  [.] litchi_xlsx::streaming::append_cell                                                                             -      -
+     1.15%  [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell               -      -
+     1.15%  [.] crc32fast::specialized::pclmulqdq::calculate                                                                    -      -
+     1.13%  [.] quick_xml::name::NamespaceResolver::resolve_event                                                               -      -
+     1.09%  [.] <core::fmt::Formatter>::pad_integral                                                                            -      -
+     0.99%  [.] zlib_rs::deflate::compare256::avx2::compare256                                                                  -      -
+     0.96%  [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::drive                    -      -
+     0.93%  [k] 0xffffffff9f3abcc8                                                                                              -      -
+     0.87%  [.] 0x0000000000241c9b                                                                                              -      -
+     0.86%  [k] 0xffffffff9f1119a7                                                                                              -      -
+     0.86%  [.] litchi_xlsx::streaming::push_bytes                                                                              -      -
+     0.78%  [.] zlib_rs::deflate::slide_hash::avx2::slide_hash_chain                                                            -      -
+     0.77%  [.] litchi_core::budget::Lease::consume                                                                             -      -
+     0.73%  [k] 0xffffffff9f218f02                                                                                              -      -
