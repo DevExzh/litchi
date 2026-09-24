@@ -1,0 +1,53 @@
+{
+  "status": "pass",
+  "revision": "363464194e7e1f6f4e3f8e6ab96d2d7c969c7f42",
+  "changed_corpora": {
+    "doc-tiny": {
+      "archive_sha256": {
+        "old": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+        "new": "c9e22d55e3478ef25a7dd232f181ec0c30368c50bd988c151617d3884d4192f3"
+      },
+      "target_payload_sha256": {
+        "old": "9ccb6076c72911adde4fe8519e169d0ff039f341cf719d15270880ec10942d8a",
+        "new": "edb84aaae41a23ce8d779897bbf878cdc2ffef0d19a35a6bbaa84bf166c77d02"
+      }
+    },
+    "doc-large": {
+      "archive_sha256": {
+        "old": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
+        "new": "346cb6e85171cfc1e692155c54bf17c789e46961da15853ef169cbbe62ed9d1e"
+      },
+      "target_payload_sha256": {
+        "old": "33e6cd70a45181c28d4a3e7bfa4e7817bd82d7b2e89e39437a589243abdc38eb",
+        "new": "2e6a3316e9b9b891d6990f6d90177fe0df6f2a912e09220b17c68bb71cd29785"
+      }
+    },
+    "doc-payload-heavy": {
+      "archive_sha256": {
+        "old": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
+        "new": "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9"
+      },
+      "target_payload_sha256": {
+        "old": "55d1f2b0a28c85af42d88f132abd905b07b6f1fcb2b243a08083a53196c9bdb7",
+        "new": "1e6198bcebce876df278d1235ec909fd7c507c945a577380f1148f1b4460e49b"
+      }
+    }
+  },
+  "unchanged_corpora": 40,
+  "result_keys_sha256": {
+    "old": "63cdfaaf094b744baf9a6bb770c676c7752671a3d08a711fa0e2c98538efc8cd",
+    "new": "b57c5131fca1d96527a6f1b44e9185242d801f0de22bb99c714e1d381a963d22"
+  },
+  "catalog_sha256": {
+    "old": "f03c9f56846f3c7a22d012189e40126dd65be50efbfd24275c3f9ab40854e41a",
+    "new": "6cae8e94601da9f08c87052c207bfb406929bf01ea24e69a96da3e735f00ee11"
+  },
+  "content_set_sha256": {
+    "old": "8e629fef89f7eccf023ebc6a6e8b8aebdbcf91207f6d6dfedd2e2fe59c3452a5",
+    "new": "3f6e10552959c76cb230ec38222bb9363bceecc4a70cd1d62e22ba5d7535975f"
+  },
+  "policy_id": {
+    "old": "litchi-hosted-default-matrix-v4",
+    "new": "litchi-hosted-default-matrix-v5"
+  }
+}

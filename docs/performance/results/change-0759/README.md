@@ -59,6 +59,13 @@ This packet backs [record 0759](../../0759-spec-gap-branch-merge.md).
   - `check_sides.py`, which finds lines either side added that are absent
     from a merged file.
 
+- **[doc-fresh-writer-repin/](doc-fresh-writer-repin/receipt.json).** The
+  post-merge re-pin of the three DOC fresh-writer corpora:
+  - the one-sample preflight report and catalog (gzipped);
+  - its receipt (revision, binary hash, command);
+  - the promotion script, which verifies that only the DOC corpora changed,
+    and its summary of old and new identities.
+
 [cleanup.json](cleanup.json) lists what was removed after the gates ran: the
 two tip worktrees, every build directory and the scratch directory. The
 integration worktree is kept.

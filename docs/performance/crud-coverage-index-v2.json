@@ -2744,8 +2744,8 @@
   "checked_catalog": {
     "path": "docs/performance/results/perf-corpus-manifest-v2.json",
     "catalog_id": "litchi-perf-corpus-v2",
-    "catalog_sha256": "f03c9f56846f3c7a22d012189e40126dd65be50efbfd24275c3f9ab40854e41a",
-    "content_set_sha256": "8e629fef89f7eccf023ebc6a6e8b8aebdbcf91207f6d6dfedd2e2fe59c3452a5"
+    "catalog_sha256": "6cae8e94601da9f08c87052c207bfb406929bf01ea24e69a96da3e735f00ee11",
+    "content_set_sha256": "3f6e10552959c76cb230ec38222bb9363bceecc4a70cd1d62e22ba5d7535975f"
   },
   "status_values": [
     "measured",
@@ -2972,9 +2972,9 @@
             "kind": "checked-catalog",
             "case": "doc_fresh_write_to",
             "ids": [
-              "doc-cfb:sha256:3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
-              "doc-cfb:sha256:707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
-              "doc-cfb:sha256:ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+              "doc-cfb:sha256:346cb6e85171cfc1e692155c54bf17c789e46961da15853ef169cbbe62ed9d1e",
+              "doc-cfb:sha256:c9e22d55e3478ef25a7dd232f181ec0c30368c50bd988c151617d3884d4192f3",
+              "doc-cfb:sha256:fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9"
             ],
             "shapes": [
               "large",

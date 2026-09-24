@@ -1,0 +1,56 @@
+{
+  "lane": "preflight",
+  "revision": "363464194e7e1f6f4e3f8e6ab96d2d7c969c7f42",
+  "worktree_porcelain_lines_before_run": 0,
+  "build_command": [
+    "cargo",
+    "build",
+    "--release",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--locked",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "build_environment": {
+    "CARGO_BUILD_JOBS": "16",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/targets/postmerge/preflight-target",
+    "TMPDIR": "/home/zhuhe/code/litchi-worktrees/postmerge-scratch/tmp"
+  },
+  "binary_sha256": "ba576dec40e57ff211ad957a506a6675afb0c20297a37ec32ff88684f60d2f8a",
+  "command": [
+    "<CARGO_TARGET_DIR>/release/litchi-perf-baseline",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--json",
+    "preflight-report.json",
+    "--corpus-manifest",
+    "preflight-catalog.json"
+  ],
+  "working_directory": "/home/zhuhe/code/litchi-worktrees/merge-spec-gaps (outputs written outside it)",
+  "exit_code": 0,
+  "elapsed_seconds": 4.91,
+  "outputs": {
+    "preflight-report.json": {
+      "sha256": "1f3fa8ed0ad1648c91ca1790b35a35bdfdc3d36f7e57e929f9895232a7a25970",
+      "retained_as": "preflight-report.json.gz"
+    },
+    "preflight-catalog.json": {
+      "sha256": "ad15d21d5badb757af5797ad8a47bc83b03a64b398f38ea3ff96410253d98a02",
+      "retained_as": "preflight-catalog.json.gz"
+    }
+  },
+  "promotion": [
+    "python3",
+    "repin_doc_fresh_writer.py",
+    "<repo>",
+    "preflight-report.json",
+    "preflight-catalog.json",
+    "--write"
+  ],
+  "performance_claim": "none; the one sample per row only derives identity"
+}

@@ -10,12 +10,19 @@ The normative JSON Schema is
 [`schemas/corpus-manifest-v2.schema.json`](schemas/corpus-manifest-v2.schema.json).
 The checked default catalog is
 [`results/perf-corpus-manifest-v2.json`](results/perf-corpus-manifest-v2.json).
-The current [0508 catalog](changes/0508-default-semantic-text-export.md) has
-43 corpora and 213 bindings, with `catalog_sha256`
-`f03c9f56846f3c7a22d012189e40126dd65be50efbfd24275c3f9ab40854e41a`
+The current catalog has 43 corpora and 213 bindings, with `catalog_sha256`
+`6cae8e94601da9f08c87052c207bfb406929bf01ea24e69a96da3e735f00ee11`
 and `content_set_sha256`
-`8e629fef89f7eccf023ebc6a6e8b8aebdbcf91207f6d6dfedd2e2fe59c3452a5`.
+`3f6e10552959c76cb230ec38222bb9363bceecc4a70cd1d62e22ba5d7535975f`.
+It is the [0759](0759-spec-gap-branch-merge.md) re-pin of the three DOC
+fresh-writer corpora, whose bytes changed with the merged Dop2002 fix; every
+other corpus is unchanged.
 
+The historical [0508 catalog](changes/0508-default-semantic-text-export.md)
+has `catalog_sha256`
+`f03c9f56846f3c7a22d012189e40126dd65be50efbfd24275c3f9ab40854e41a` and
+`content_set_sha256`
+`8e629fef89f7eccf023ebc6a6e8b8aebdbcf91207f6d6dfedd2e2fe59c3452a5`.
 The historical 0465 checked catalog has `catalog_sha256`
 `d2c35126ee4e862ada539944ddb6cc2c654b82fe1e1465f505034fd1a9f7a84f` and
 `content_set_sha256`

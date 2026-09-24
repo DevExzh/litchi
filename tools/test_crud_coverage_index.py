@@ -30,10 +30,10 @@ EXPECTED_SELECTOR_NAMES_SHA256 = (
     "fcbd9d80c9c32e6e98c80b44d5a3253e0252efff4bad16304e9517c0e108c1ec"
 )
 EXPECTED_HISTORICAL_INDEX_SHA256 = (
-    "1a8a22039e9cd88431c2800913d1a86777373e44217881fc6ad5cce8e597a8b5"
+    "5002b254d1f2111dcbf86bf2401fe56891c4c257ab1b064c273bba0984ad82ce"
 )
 EXPECTED_CATALOG_SHA256 = (
-    "f03c9f56846f3c7a22d012189e40126dd65be50efbfd24275c3f9ab40854e41a"
+    "6cae8e94601da9f08c87052c207bfb406929bf01ea24e69a96da3e735f00ee11"
 )
 NEW_CONVERSION_SELECTORS = (
     "rtf_semantic_text_to_sink",
@@ -44,6 +44,42 @@ NEW_CONVERSION_SELECTORS = (
 PREVIOUS_RESULT_KEYS_SHA256 = (
     "f0fd76293959e72211e06e51b0a2b41f371423fda34c55144077193d262b1670"
 )
+# 0759 re-pinned the three DOC fresh-writer corpora: the merged Dop2002 fix
+# changed their archive and WordDocument digests and nothing else. Each field
+# maps to its (0508, current) digest, so the 0508 identity is recovered by
+# substituting the 0508 digest back.
+DOC_FRESH_WRITER_REPIN_0759 = {
+    "doc-tiny": {
+        "archive_sha256": (
+            "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+            "c9e22d55e3478ef25a7dd232f181ec0c30368c50bd988c151617d3884d4192f3",
+        ),
+        "target_payload_sha256": (
+            "9ccb6076c72911adde4fe8519e169d0ff039f341cf719d15270880ec10942d8a",
+            "edb84aaae41a23ce8d779897bbf878cdc2ffef0d19a35a6bbaa84bf166c77d02",
+        ),
+    },
+    "doc-large": {
+        "archive_sha256": (
+            "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
+            "346cb6e85171cfc1e692155c54bf17c789e46961da15853ef169cbbe62ed9d1e",
+        ),
+        "target_payload_sha256": (
+            "33e6cd70a45181c28d4a3e7bfa4e7817bd82d7b2e89e39437a589243abdc38eb",
+            "2e6a3316e9b9b891d6990f6d90177fe0df6f2a912e09220b17c68bb71cd29785",
+        ),
+    },
+    "doc-payload-heavy": {
+        "archive_sha256": (
+            "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
+            "fb899f2cc9033e5e9df0f1eaf67efc1ceeb58f7c57e27a1c8a7ccfb8e38865b9",
+        ),
+        "target_payload_sha256": (
+            "55d1f2b0a28c85af42d88f132abd905b07b6f1fcb2b243a08083a53196c9bdb7",
+            "1e6198bcebce876df278d1235ec909fd7c507c945a577380f1148f1b4460e49b",
+        ),
+    },
+}
 
 
 def _canonical(value: object) -> bytes:
@@ -327,8 +363,14 @@ class CrudCoverageIndexTests(unittest.TestCase):
         keys = []
         for case in old_cases:
             for name in self.identity["case_corpora"][case]:
+                corpus = copy.deepcopy(self.identity["corpora"][name])
+                for field, (before, current) in DOC_FRESH_WRITER_REPIN_0759.get(
+                    name, {}
+                ).items():
+                    self.assertEqual(corpus[field], current, (name, field))
+                    corpus[field] = before
                 corpus_identity = json.dumps(
-                    self.identity["corpora"][name],
+                    corpus,
                     sort_keys=True,
                     separators=(",", ":"),
                     allow_nan=False,
