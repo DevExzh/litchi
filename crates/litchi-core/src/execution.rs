@@ -15,7 +15,7 @@ use std::{
 
 use thiserror::Error;
 
-use crate::{Budget, Reservation, Resource, ResourceLimit, ScopedReservation};
+use crate::{Budget, Lease, Reservation, Resource, ResourceLimit, ScopedReservation};
 
 /// CPU-affinity policy for workers created by a runtime adapter.
 ///
@@ -366,6 +366,64 @@ impl ExecutionContext {
         self.check()?;
         self.budget.consume(resource, amount).map_err(Into::into)
     }
+
+    /// Opens a rough, chunked lease on this context's budget that checks
+    /// this context's cancellation token before every charge.
+    ///
+    /// See [`Budget::lease`] and [`Lease`]. Opening claims nothing and checks
+    /// nothing; [`ExecutionLease::consume`] checks cancellation first, exactly
+    /// as [`Self::consume`] does, so replacing `consume` calls with lease
+    /// charges keeps every cancellation check where it was.
+    #[must_use]
+    pub fn lease(&self, resource: Resource, chunk: u64) -> ExecutionLease {
+        ExecutionLease {
+            lease: self.budget.lease(resource, chunk),
+            cancellation: self.cancellation.clone(),
+        }
+    }
+}
+
+/// A [`Lease`] on an [`ExecutionContext`]'s budget that checks the context's
+/// cancellation token before every charge. Made by
+/// [`ExecutionContext::lease`].
+#[derive(Debug)]
+pub struct ExecutionLease {
+    lease: Lease,
+    cancellation: CancellationToken,
+}
+
+impl ExecutionLease {
+    /// Checks for cancellation, then hands out `amount` units
+    /// ([`Lease::consume`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExecutionError::Cancelled`] if cancellation was requested,
+    /// or [`ExecutionError::ResourceLimit`] if the budget or an ancestor has
+    /// less room than the charge needs. Nothing is handed out or claimed on
+    /// either error.
+    pub fn consume(&mut self, amount: u64) -> Result<(), ExecutionError> {
+        self.cancellation.check()?;
+        self.lease.consume(amount).map_err(Into::into)
+    }
+
+    /// Takes back units whose work did not happen ([`Lease::refund`]).
+    #[must_use = "check whether the refund was accepted"]
+    pub fn refund(&mut self, amount: u64) -> bool {
+        self.lease.refund(amount)
+    }
+
+    /// Returns every unit held but not handed out to the budget
+    /// ([`Lease::release`]).
+    pub fn release(&mut self) {
+        self.lease.release();
+    }
+
+    /// The underlying lease.
+    #[must_use]
+    pub const fn lease(&self) -> &Lease {
+        &self.lease
+    }
 }
 
 /// Typed execution-policy, cancellation, and budget errors.
@@ -579,6 +637,61 @@ mod tests {
     }
 
     #[test]
+    fn lease_charges_check_cancellation_first_and_charge_the_shared_hierarchy() {
+        let root = budget(5);
+        let child = root.child("operation", Limits::new(10, 100, 100, 100, 100, 100));
+        let (source, token) = CancellationSource::pair();
+        let context = context(child.clone(), token);
+
+        let mut lease = context.lease(Resource::Work, 16);
+        assert_eq!(root.used(Resource::Work), 0, "opening claims nothing");
+        lease.consume(3).expect("claim");
+        assert_eq!(root.used(Resource::Work), 16);
+        assert_eq!(child.used(Resource::Work), 16);
+        assert_eq!(lease.lease().held(), 13);
+
+        // A lease charge fails exactly where `consume` fails: cancellation
+        // is checked before the lease is touched.
+        source.cancel();
+        assert_eq!(lease.consume(1), Err(ExecutionError::Cancelled));
+        assert_eq!(
+            context.consume(Resource::Work, 1),
+            Err(ExecutionError::Cancelled)
+        );
+        assert_eq!(lease.lease().held(), 13);
+        assert_eq!(root.used(Resource::Work), 16);
+
+        assert!(lease.refund(3));
+        lease.release();
+        assert_eq!(root.used(Resource::Work), 0);
+        assert_eq!(child.used(Resource::Work), 0);
+    }
+
+    #[test]
+    fn lease_refusals_are_the_exact_typed_resource_limit() {
+        let root = budget(100);
+        let (_source, token) = CancellationSource::pair();
+        let context = context(root.clone(), token);
+        let mut lease = context.lease(Resource::Work, 64);
+        // A charge larger than a chunk claims what it needs.
+        lease.consume(99).expect("claims what the charge needs");
+        assert_eq!(root.used(Resource::Work), 99);
+        assert_eq!(lease.lease().held(), 0);
+        assert_eq!(
+            lease.consume(2),
+            Err(ExecutionError::ResourceLimit(ResourceLimit {
+                resource: Resource::Work,
+                observed: 101,
+                limit: 100,
+                scope: Arc::<str>::from("root"),
+            }))
+        );
+        lease.consume(1).expect("the last unit fits");
+        drop(lease);
+        assert_eq!(root.used(Resource::Work), 100);
+    }
+
+    #[test]
     fn public_handles_are_send_and_sync() {
         const fn assert_send_sync<T: Send + Sync>() {}
 
@@ -586,5 +699,7 @@ mod tests {
         assert_send_sync::<CancellationToken>();
         assert_send_sync::<ExecutionContext>();
         assert_send_sync::<ExecutionLimits>();
+        assert_send_sync::<ExecutionLease>();
+        assert_send_sync::<Lease>();
     }
 }

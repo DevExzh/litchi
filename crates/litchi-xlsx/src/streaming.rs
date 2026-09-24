@@ -13,7 +13,7 @@ use std::sync::{
 };
 
 use itoa::Buffer as IntegerBuffer;
-use litchi_core::{ExecutionContext, Reservation, Resource};
+use litchi_core::{ExecutionContext, ExecutionLease, Reservation, Resource};
 use litchi_opc::phys_pkg::{PartWriter, PhysPkgWriter};
 use litchi_opc::{OpcError, PackURI};
 use ryu::Buffer as FloatBuffer;
@@ -25,6 +25,16 @@ const MAX_ROWS: u32 = 1_048_576;
 const MAX_COLUMNS: u32 = 16_384;
 const MAX_CELL_CHARACTERS: u64 = 32_767;
 const MIN_OUTPUT_BYTES: u64 = 22;
+
+// Lease chunks (change 0763, owner decision 6 of change 0758). The writer
+// charges one Work unit per row and per cell, and one Object per row and per
+// cell. Leasing in these chunks turns the six budget updates of a four-cell
+// row into one claim per chunk, and caps what a sibling holder of the same
+// budget can see pre-claimed at 64 Ki Work units (well under 0.01% of the
+// finite profiles' Work ceilings) and 4 Ki objects (0.04% of the server
+// profile's).
+const WORK_LEASE_CHUNK: u64 = 64 * 1024;
+const OBJECT_LEASE_CHUNK: u64 = 4 * 1024;
 
 const CONTENT_TYPES_URI: &str = "/[Content_Types].xml";
 const PACKAGE_RELS_URI: &str = "/_rels/.rels";
@@ -185,13 +195,21 @@ impl<'a> StreamingCell<'a> {
 /// accepts only an owned `Write` sink.
 /// The execution context charges one writer object and six finalized package
 /// parts, plus one row and one object per emitted cell.  A nonempty row's
-/// object charge is reserved until its bytes are accepted.  Work is charged
+/// object charge is taken back if its bytes are not accepted.  Work is charged
 /// for package setup, every row attempt, and every cell encoding; rejected row
 /// attempts therefore still consume Work but do not consume row Objects.
+/// Row Work and Objects, and the final part's Object, are charged through
+/// rough budget leases: the writer claims them from the budget a chunk at a
+/// time, so another holder of the same budget sees up to one chunk per
+/// resource pre-claimed, while this writer is refused on exactly the call,
+/// and with exactly the values, exact accounting would refuse. The leases are
+/// returned to the budget when the writer is poisoned, when [`Self::finish`]
+/// returns and when the writer is dropped.
 /// Dropping the writer before [`Self::finish`] abandons the package and can
 /// leave the owned sink with an intentionally incomplete archive.
 pub struct StreamingWorkbookWriter<W: Write> {
     part: Option<PartWriter<BudgetedOutput<W>>>,
+    leases: WorkbookLeases,
     context: ExecutionContext,
     execution_state: Arc<ExecutionFailureState>,
     limits: StreamingWorkbookLimits,
@@ -205,9 +223,30 @@ pub struct StreamingWorkbookWriter<W: Write> {
     poison_message: Option<String>,
 }
 
+/// The writer's budget leases.
+struct WorkbookLeases {
+    work: ExecutionLease,
+    objects: ExecutionLease,
+}
+
+impl WorkbookLeases {
+    fn new(context: &ExecutionContext) -> Self {
+        Self {
+            work: context.lease(Resource::Work, WORK_LEASE_CHUNK),
+            objects: context.lease(Resource::Objects, OBJECT_LEASE_CHUNK),
+        }
+    }
+
+    /// Returns every unit claimed and not yet handed out to the budget.
+    fn release(&mut self) {
+        self.work.release();
+        self.objects.release();
+    }
+}
+
 /// Borrows the fields of a [`StreamingWorkbookWriter`] that a failure
 /// poisons, and nothing else. A closure or statement using it leaves the
-/// writer's execution context free to back an open scoped reservation.
+/// writer's execution context and budget leases free to be borrowed.
 macro_rules! poison_target {
     ($writer:expr) => {
         PoisonTarget {
@@ -311,6 +350,7 @@ impl<W: Write> StreamingWorkbookWriter<W> {
 
         Ok(Self {
             part: Some(part),
+            leases: WorkbookLeases::new(&context),
             context,
             execution_state,
             limits,
@@ -366,10 +406,23 @@ impl<W: Write> StreamingWorkbookWriter<W> {
     where
         I: IntoIterator<Item = StreamingCell<'a>>,
     {
+        let result = self.write_row_inner(row, cells);
+        if self.poisoned {
+            // A failed writer leaves the budget showing exactly what it used.
+            self.leases.release();
+        }
+        result
+    }
+
+    fn write_row_inner<'a, I>(&mut self, row: u32, cells: I) -> Result<()>
+    where
+        I: IntoIterator<Item = StreamingCell<'a>>,
+    {
         self.ensure_usable()?;
-        self.context
-            .consume(Resource::Work, 1)
-            .map_err(|error| self.poison_execution(error))?;
+        self.leases
+            .work
+            .consume(1)
+            .map_err(|error| poison_target!(self).execution(error))?;
         if row == 0 || row > self.limits.max_row || row > MAX_ROWS {
             return Err(invalid(format!(
                 "streaming XLSX row {row} is outside the configured domain"
@@ -411,9 +464,10 @@ impl<W: Write> StreamingWorkbookWriter<W> {
             if self.cells.saturating_add(row_cells).saturating_add(1) > self.limits.max_cells {
                 return Err(invalid("streaming XLSX cell limit exceeded"));
             }
-            self.context
-                .consume(Resource::Work, 1)
-                .map_err(|error| self.poison_execution(error))?;
+            self.leases
+                .work
+                .consume(1)
+                .map_err(|error| poison_target!(self).execution(error))?;
             append_cell(
                 &mut self.row_scratch,
                 self.limits.max_row_bytes,
@@ -430,39 +484,60 @@ impl<W: Write> StreamingWorkbookWriter<W> {
             self.last_row = Some(row);
             return Ok(());
         }
-        // The reservation borrows the context for the row's one write, so it
-        // costs one budget charge and no handle of its own.
-        let object_reservation = self
-            .context
-            .reserve_scoped(Resource::Objects, row_cells.saturating_add(1))
+        // The row's objects are charged before its one write, as the
+        // reservation this replaces was, and taken back on every path where
+        // that reservation was dropped.
+        let row_objects = row_cells.saturating_add(1);
+        self.leases
+            .objects
+            .consume(row_objects)
             .map_err(|error| poison_target!(self).execution(error))?;
-        {
-            let next_sheet_bytes = self
-                .sheet_xml_bytes
-                .saturating_add(row_bytes)
-                .saturating_add(u64::try_from(SHEET_SUFFIX.len()).unwrap_or(u64::MAX));
-            if next_sheet_bytes > self.limits.max_sheet_xml_bytes {
-                return Err(invalid("streaming XLSX worksheet XML limit exceeded"));
-            }
-            let part = self
-                .part
-                .as_mut()
-                .ok_or_else(|| invalid("streaming XLSX part is unavailable"))?;
-            if let Err(error) = part.write_all(&self.row_scratch) {
-                return Err(poison_target!(self).io(error));
-            }
-            if !object_reservation.commit(row_cells.saturating_add(1)) {
-                return Err(invalid("streaming XLSX row object reservation underflow"));
-            }
-            self.cells = self.cells.saturating_add(row_cells);
-            self.sheet_xml_bytes = self.sheet_xml_bytes.saturating_add(row_bytes);
+        let next_sheet_bytes = self
+            .sheet_xml_bytes
+            .saturating_add(row_bytes)
+            .saturating_add(u64::try_from(SHEET_SUFFIX.len()).unwrap_or(u64::MAX));
+        if next_sheet_bytes > self.limits.max_sheet_xml_bytes {
+            return Err(self.refund_row_objects(
+                row_objects,
+                invalid("streaming XLSX worksheet XML limit exceeded"),
+            ));
         }
+        let Some(part) = self.part.as_mut() else {
+            return Err(
+                self.refund_row_objects(row_objects, invalid("streaming XLSX part is unavailable"))
+            );
+        };
+        if let Err(error) = part.write_all(&self.row_scratch) {
+            let error = poison_target!(self).io(error);
+            return Err(self.refund_row_objects(row_objects, error));
+        }
+        self.cells = self.cells.saturating_add(row_cells);
+        self.sheet_xml_bytes = self.sheet_xml_bytes.saturating_add(row_bytes);
         self.last_row = Some(row);
         Ok(())
     }
 
+    /// Takes back a row's objects that were charged but not written, and
+    /// returns `error`.
+    fn refund_row_objects(&mut self, row_objects: u64, error: Error) -> Error {
+        if self.leases.objects.refund(row_objects) {
+            error
+        } else {
+            invalid("streaming XLSX row object lease refunded more than it handed out")
+        }
+    }
+
     /// Finalize the worksheet, central directory, and caller-owned sink.
+    ///
+    /// Whatever the outcome, the writer's leases are returned to the budget
+    /// before this returns.
     pub fn finish(mut self) -> Result<W> {
+        let result = self.finish_inner();
+        self.leases.release();
+        result
+    }
+
+    fn finish_inner(&mut self) -> Result<W> {
         if self.poisoned {
             return Err(self.poison_error());
         }
@@ -503,7 +578,9 @@ impl<W: Write> StreamingWorkbookWriter<W> {
                 return Err(mapped);
             },
         };
-        if let Err(error) = self.context.consume(Resource::Objects, 1) {
+        // Through the lease: a direct charge would count this writer's own
+        // unspent claim against it.
+        if let Err(error) = self.leases.objects.consume(1) {
             self.poisoned = true;
             let mapped = execution_failure(error, self.output_bytes());
             self.poison_message = Some(mapped.to_string());
@@ -548,7 +625,7 @@ impl<W: Write> StreamingWorkbookWriter<W> {
 }
 
 /// The writer fields a failure poisons, borrowed apart from the execution
-/// context so a row's scoped reservation can stay open meanwhile.
+/// context and the budget leases.
 struct PoisonTarget<'writer, W: Write> {
     part: &'writer mut Option<PartWriter<BudgetedOutput<W>>>,
     poisoned: &'writer mut bool,
@@ -1660,6 +1737,204 @@ mod tests {
                 .write_row(1, [StreamingCell::new(1, StreamingCellValue::Blank)])
                 .is_err()
         );
+    }
+
+    // -------------------------------------------------------------------
+    // Change 0763: row Work and Objects are charged through rough budget
+    // leases. A sole holder sees exactly the refusals of exact accounting,
+    // and the leases are returned when the writer is poisoned or finishes.
+    // -------------------------------------------------------------------
+
+    fn resource_limit(error: &Error) -> Option<litchi_core::ResourceLimit> {
+        let execution = match error {
+            Error::Package(OpcError::IncompleteOutput { source, .. }) => source.as_ref(),
+            Error::Package(error) => error,
+            _ => return None,
+        };
+        match execution {
+            OpcError::Execution(litchi_core::ExecutionError::ResourceLimit(limit)) => {
+                Some(limit.clone())
+            },
+            _ => None,
+        }
+    }
+
+    fn lease_row(row: u32) -> Vec<StreamingCell<'static>> {
+        let values = [
+            StreamingCellValue::Number(f64::from(row)),
+            StreamingCellValue::Text("lease & <row>"),
+            StreamingCellValue::Bool(row % 2 == 0),
+            StreamingCellValue::Blank,
+        ];
+        let count = 1 + usize::try_from(row % 4).unwrap();
+        values
+            .into_iter()
+            .take(count)
+            .enumerate()
+            .map(|(index, value)| StreamingCell::new(u32::try_from(index).unwrap() + 1, value))
+            .collect()
+    }
+
+    /// The exact charges of writing row `row` (Work for the row and each
+    /// cell, then the row's Objects), or of `finish` for `None`.
+    fn lease_charges(row: Option<u32>) -> Vec<(Resource, u64)> {
+        match row {
+            Some(row) => {
+                let cells = u64::try_from(lease_row(row).len()).unwrap();
+                let mut charges = vec![(Resource::Work, 1); 1 + usize::try_from(cells).unwrap()];
+                charges.push((Resource::Objects, cells + 1));
+                charges
+            },
+            None => vec![(Resource::Objects, 1)],
+        }
+    }
+
+    #[test]
+    fn a_sole_writer_is_refused_exactly_at_every_objects_and_work_limit() {
+        let script: Vec<Option<u32>> = (1..=20).map(Some).chain([None]).collect();
+        // `new` charges six Objects and one Work unit exactly, before the
+        // leases exist.
+        for (resource, fixed) in [(Resource::Objects, 6_u64), (Resource::Work, 1)] {
+            let total: u64 = fixed
+                + script
+                    .iter()
+                    .flat_map(|&row| lease_charges(row))
+                    .filter(|(charged, _)| *charged == resource)
+                    .map(|(_, amount)| amount)
+                    .sum::<u64>();
+            for limit in fixed..=total + 1 {
+                let mut used = fixed;
+                let mut expected = None;
+                'script: for (index, &row) in script.iter().enumerate() {
+                    for (charged, amount) in lease_charges(row) {
+                        if charged != resource {
+                            continue;
+                        }
+                        if used + amount > limit {
+                            expected = Some((index, used + amount));
+                            break 'script;
+                        }
+                        used += amount;
+                    }
+                }
+                let (objects, work) = if resource == Resource::Objects {
+                    (limit, 1 << 40)
+                } else {
+                    (1 << 40, limit)
+                };
+                let context = context_with_objects_and_work(objects, work);
+                let budget = context.budget().clone();
+                let mut writer = StreamingWorkbookWriter::new(
+                    Vec::new(),
+                    context,
+                    StreamingWorkbookLimits::default(),
+                )
+                .unwrap();
+                let mut refused = None;
+                for (index, &row) in script.iter().enumerate() {
+                    let Some(row) = row else { break };
+                    if let Err(error) = writer.write_row(row, lease_row(row)) {
+                        refused = Some((index, error));
+                        break;
+                    }
+                }
+                let finished = if refused.is_none() {
+                    let result = writer.finish();
+                    if let Err(error) = result {
+                        refused = Some((script.len() - 1, error));
+                        false
+                    } else {
+                        true
+                    }
+                } else {
+                    // The refusal poisoned the writer, which returned its
+                    // leases before `write_row` returned.
+                    assert!(writer.is_poisoned());
+                    false
+                };
+                match (expected, refused) {
+                    (None, None) => {
+                        assert!(finished);
+                        assert_eq!(budget.used(resource), total, "limit {limit}");
+                    },
+                    (Some((index, observed)), Some((actual, error))) => {
+                        assert_eq!(actual, index, "{resource:?} limit {limit}");
+                        let limit_error = resource_limit(&error).expect("typed resource limit");
+                        assert_eq!(
+                            (
+                                limit_error.resource,
+                                limit_error.observed,
+                                limit_error.limit
+                            ),
+                            (resource, observed, limit),
+                            "{resource:?} limit {limit}"
+                        );
+                        assert_eq!(budget.used(resource), used, "{resource:?} limit {limit}");
+                    },
+                    (expected, refused) => {
+                        panic!("{resource:?} limit {limit}: expected {expected:?}, got {refused:?}")
+                    },
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_sibling_sees_the_writers_pre_claimed_objects_until_it_finishes() {
+        let limits = Limits::new(
+            8 * 1024 * 1024,
+            u64::MAX,
+            16 * 1024 * 1024,
+            5_000,
+            64,
+            u64::MAX,
+        );
+        let root = Budget::root("xlsx-lease-root", limits);
+        let writer_budget = root.child("writer", limits);
+        let sibling = root.child("sibling", limits);
+        let (_source, token) = CancellationSource::pair();
+        let execution = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(8 * 1024 * 1024).unwrap(),
+            1,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(writer_budget.clone(), token, execution);
+        let mut writer =
+            StreamingWorkbookWriter::new(Vec::new(), context, StreamingWorkbookLimits::default())
+                .unwrap();
+        writer.write_row(1, lease_row(1)).unwrap();
+        // Six fixed Objects, the row's three, and the rest of one 4 Ki chunk.
+        assert_eq!(writer_budget.used(Resource::Objects), 6 + 4 * 1024);
+        assert!(sibling.consume(Resource::Objects, 5_000 - 9).is_err());
+        assert!(root.used(Resource::Objects) <= 5_000);
+        writer.finish().unwrap();
+        assert_eq!(writer_budget.used(Resource::Objects), 6 + 3 + 1);
+        sibling
+            .consume(Resource::Objects, 5_000 - 10)
+            .expect("exactly the rest of the root");
+    }
+
+    #[test]
+    fn leases_are_returned_when_the_writer_is_poisoned() {
+        let (source, context) = context_pair(16 * 1024 * 1024);
+        let budget = context.budget().clone();
+        let mut writer =
+            StreamingWorkbookWriter::new(Vec::new(), context, StreamingWorkbookLimits::default())
+                .unwrap();
+        writer.write_row(1, lease_row(1)).unwrap();
+        assert!(
+            budget.used(Resource::Work) > 3,
+            "the Work lease holds a chunk"
+        );
+        source.cancel();
+        assert!(writer.write_row(2, lease_row(2)).is_err());
+        assert!(writer.is_poisoned());
+        // Exactly setup and row 1: row 2's first charge observed the
+        // cancellation before it charged anything, as `consume` did.
+        assert_eq!(budget.used(Resource::Objects), 6 + 3);
+        assert_eq!(budget.used(Resource::Work), 1 + 3);
     }
 
     struct NonSeekSink(Vec<u8>);

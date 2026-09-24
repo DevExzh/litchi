@@ -47,13 +47,13 @@ pub use bom::{
 };
 pub use bounded::{BoundedU32, BoundsError};
 pub use budget::{
-    Budget, Limits, Profile, Reservation, Resource, ResourceLimit, ScopedReservation,
+    Budget, Lease, Limits, Profile, Reservation, Resource, ResourceLimit, ScopedReservation,
 };
 pub use detection::FileFormat;
 pub use error::{Error, Result};
 pub use execution::{
     AffinityPolicy, CancellationSource, CancellationToken, ExecutionContext, ExecutionError,
-    ExecutionLimits, ScopedWorkers,
+    ExecutionLease, ExecutionLimits, ScopedWorkers,
 };
 pub use metadata::Metadata;
 pub use patch::{

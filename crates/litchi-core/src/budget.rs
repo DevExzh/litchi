@@ -259,6 +259,23 @@ impl Budget {
         charge_chain(&self.node, resource, amount)
     }
 
+    /// Opens a rough, chunked lease on one resource of this budget.
+    ///
+    /// Opening claims nothing. The lease claims up to `chunk` units at a time,
+    /// the first time it is charged and whenever it runs out, and hands them
+    /// out locally; see [`Lease`] for what stays exact and what becomes rough.
+    /// A `chunk` of zero behaves as one.
+    #[must_use]
+    pub fn lease(&self, resource: Resource, chunk: u64) -> Lease {
+        Lease {
+            node: Arc::clone(&self.node),
+            resource,
+            chunk: chunk.max(1),
+            held: 0,
+            consumed: 0,
+        }
+    }
+
     /// Current local usage for one resource.
     #[must_use]
     pub fn used(&self, resource: Resource) -> u64 {
@@ -302,6 +319,62 @@ fn charge_chain(leaf: &Node, resource: Resource, amount: u64) -> Result<(), Reso
         current = node.parent.as_deref();
     }
     Ok(())
+}
+
+/// Claims between `need` and `want` units against `leaf` and then each
+/// ancestor in turn, and returns the amount every level now holds.
+///
+/// Each level is one atomic check-and-add of the current grant, shrunk to the
+/// room that level has left. A level with less room than `need` refuses: the
+/// levels already charged are released before the refusal is returned, and
+/// the refusal names that level, its limit and `used + need`. For a lease
+/// whose unspent claim is `amount - need`, that is exactly the value exact
+/// accounting of the whole `amount` would have reported there. When a level
+/// shrinks the grant, the levels already charged give back the difference, so
+/// on success every level holds exactly the returned amount. No level is ever
+/// observed above its limit, and the walk takes no reference counts.
+fn claim_chain(
+    leaf: &Node,
+    resource: Resource,
+    need: u64,
+    want: u64,
+) -> Result<u64, ResourceLimit> {
+    let mut grant = want.max(need);
+    let mut charged = 0usize;
+    let mut current = Some(leaf);
+    while let Some(node) = current {
+        let counter = &node.used[resource.index()];
+        let limit = node.limits.get(resource);
+        let mut taken = grant;
+        let result = counter.fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
+            let room = limit.checked_sub(used)?;
+            if room < need {
+                return None;
+            }
+            taken = grant.min(room);
+            used.checked_add(taken)
+        });
+        match result {
+            Ok(_) => {
+                if taken < grant {
+                    release_ancestor_prefix(leaf, charged, resource, grant - taken);
+                    grant = taken;
+                }
+                charged = charged.saturating_add(1);
+            },
+            Err(used) => {
+                release_ancestor_prefix(leaf, charged, resource, grant);
+                return Err(ResourceLimit {
+                    resource,
+                    observed: used.saturating_add(need),
+                    limit,
+                    scope: node.scope.clone(),
+                });
+            },
+        }
+        current = node.parent.as_deref();
+    }
+    Ok(grant)
 }
 
 /// RAII token for outstanding budget usage.
@@ -441,6 +514,129 @@ impl Drop for ScopedReservation<'_> {
         if self.amount != 0 {
             release_chain(self.node, self.resource, self.amount);
         }
+    }
+}
+
+/// A rough, chunked claim on one resource of a [`Budget`], made by
+/// [`Budget::lease`].
+///
+/// A lease claims budget a chunk at a time and hands it out locally, so an
+/// operation that charges many small amounts pays one atomic update per
+/// hierarchy level per chunk instead of one per charge. Every claim is the
+/// check-and-add [`Budget::consume`] makes: no level is ever observed above
+/// its limit, even transiently, and a refused claim leaves every level as it
+/// found it.
+///
+/// What stays exact: the lease's own holder is refused on the same charge, at
+/// the same level and with the same [`ResourceLimit`] values as exact
+/// accounting would give it, because a claim near a limit shrinks to the room
+/// left (never below what the charge needs) and a refusal reports the value
+/// the level would have reached had the charge been exact. Releasing or
+/// dropping the lease returns every unit it holds but has not handed out,
+/// so once it is released every counter shows exactly what was handed out.
+///
+/// What becomes rough: units the lease holds but has not handed out count as
+/// used for every other holder of the budget and its ancestors
+/// ("pre-claimed"), so another holder can be refused up to one chunk earlier
+/// than exact accounting would refuse it, and observes that much more usage.
+///
+/// [`Self::refund`] takes back units whose work did not happen, where exact
+/// accounting would have dropped a reservation. Dropping the lease releases
+/// on every path, including an error and an unwinding panic.
+#[derive(Debug)]
+pub struct Lease {
+    node: Arc<Node>,
+    resource: Resource,
+    chunk: u64,
+    /// Units claimed at every level of the chain and not handed out.
+    held: u64,
+    /// Units handed out and not refunded; bounds what [`Self::refund`] takes.
+    consumed: u64,
+}
+
+impl Lease {
+    /// Hands out `amount` units, claiming more from the budget first when
+    /// the lease holds fewer.
+    ///
+    /// A claim asks for `max(chunk, amount - held)` units and takes, at each
+    /// level, what that level has room for, but never less than the charge
+    /// needs. A charge the lease can cover touches no shared state.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ResourceLimit` when this budget or an ancestor has less room
+    /// than the charge needs. Nothing is handed out or claimed.
+    pub fn consume(&mut self, amount: u64) -> Result<(), ResourceLimit> {
+        if amount <= self.held {
+            self.held -= amount;
+        } else {
+            let need = amount - self.held;
+            let granted = claim_chain(&self.node, self.resource, need, need.max(self.chunk))?;
+            // The claim is at least what the charge needed; the rest stays
+            // with the lease.
+            self.held = granted.saturating_sub(need);
+        }
+        self.consumed = self.consumed.saturating_add(amount);
+        Ok(())
+    }
+
+    /// Takes back `amount` units handed out earlier whose work did not
+    /// happen. They return to the lease, not to the budget; releasing or
+    /// dropping the lease returns them.
+    ///
+    /// Returns `false`, and changes nothing, when `amount` exceeds what the
+    /// lease has handed out and not yet taken back.
+    #[must_use = "check whether the refund was accepted"]
+    pub fn refund(&mut self, amount: u64) -> bool {
+        if amount > self.consumed {
+            return false;
+        }
+        let Some(held) = self.held.checked_add(amount) else {
+            return false;
+        };
+        self.consumed -= amount;
+        self.held = held;
+        true
+    }
+
+    /// Returns every unit the lease holds but has not handed out to this
+    /// budget and each ancestor. The lease stays usable; its next charge
+    /// claims again.
+    pub fn release(&mut self) {
+        if self.held != 0 {
+            release_chain(&self.node, self.resource, self.held);
+            self.held = 0;
+        }
+    }
+
+    /// Units claimed from the budget and not handed out yet.
+    #[must_use]
+    pub const fn held(&self) -> u64 {
+        self.held
+    }
+
+    /// Units handed out and not refunded.
+    #[must_use]
+    pub const fn consumed(&self) -> u64 {
+        self.consumed
+    }
+
+    /// Units a claim asks for when the lease runs out.
+    #[must_use]
+    pub const fn chunk(&self) -> u64 {
+        self.chunk
+    }
+
+    /// Leased resource kind.
+    #[must_use]
+    pub const fn resource(&self) -> Resource {
+        self.resource
+    }
+}
+
+impl Drop for Lease {
+    fn drop(&mut self) {
+        self.release();
     }
 }
 
@@ -1172,5 +1368,384 @@ mod tests {
         assert_eq!(legacy.get(Resource::Workers), 7);
         assert_eq!(legacy.get(Resource::IoConcurrency), u64::MAX);
         assert_eq!(legacy.get(Resource::CpuTasks), 9);
+    }
+    // -----------------------------------------------------------------------
+    // Change 0763: rough budget leases (owner decision 6 of change 0758).
+    // -----------------------------------------------------------------------
+
+    /// Work limits of a leaf, its parent and the root.
+    fn work_levels(leaf: u64, middle: u64, root: u64) -> [Budget; 3] {
+        let work = |limit| Limits::new(100, 100, 100, 100, 100, limit);
+        let root = Budget::root("root", work(root));
+        let middle = root.child("middle", work(middle));
+        let leaf = middle.child("leaf", work(leaf));
+        [root, middle, leaf]
+    }
+
+    fn work_used(levels: &[Budget; 3]) -> [u64; 3] {
+        [
+            levels[0].used(Resource::Work),
+            levels[1].used(Resource::Work),
+            levels[2].used(Resource::Work),
+        ]
+    }
+
+    /// The first refused charge (its index and refusal) of `amounts` charged
+    /// exactly through `Budget::consume`, and every level's usage afterwards.
+    fn exact_outcome(
+        levels: &[Budget; 3],
+        amounts: &[u64],
+    ) -> (Option<(usize, ResourceLimit)>, [u64; 3]) {
+        for (index, &amount) in amounts.iter().enumerate() {
+            if let Err(error) = levels[2].consume(Resource::Work, amount) {
+                return (Some((index, error)), work_used(levels));
+            }
+        }
+        (None, work_used(levels))
+    }
+
+    /// The same charges through one lease, released at the refusal or the
+    /// end, as a writer releases its leases when it is poisoned or finishes.
+    fn lease_outcome(
+        levels: &[Budget; 3],
+        amounts: &[u64],
+        chunk: u64,
+    ) -> (Option<(usize, ResourceLimit)>, [u64; 3]) {
+        let mut lease = levels[2].lease(Resource::Work, chunk);
+        for (index, &amount) in amounts.iter().enumerate() {
+            let before = lease.held();
+            if let Err(error) = lease.consume(amount) {
+                // A refused charge claims and hands out nothing.
+                assert_eq!(lease.held(), before);
+                lease.release();
+                return (Some((index, error)), work_used(levels));
+            }
+            // What the lease holds is claimed at every level, and no level
+            // is ever over its limit.
+            let used = work_used(levels);
+            assert!(used[0] == used[1] && used[1] == used[2]);
+            for (level, &limit) in levels.iter().zip(&used) {
+                assert!(limit <= level.limit(Resource::Work));
+            }
+        }
+        lease.release();
+        (None, work_used(levels))
+    }
+
+    #[test]
+    fn a_lease_claims_chunks_and_hands_units_out_locally() {
+        let [root, middle, leaf] = work_levels(1_000, 1_000, 1_000);
+        let mut lease = leaf.lease(Resource::Work, 100);
+        assert_eq!(
+            (lease.held(), lease.chunk(), lease.resource()),
+            (0, 100, Resource::Work)
+        );
+        assert_eq!(root.used(Resource::Work), 0);
+
+        lease.consume(1).expect("first charge claims a chunk");
+        assert_eq!(lease.held(), 99);
+        for budget in [&root, &middle, &leaf] {
+            assert_eq!(budget.used(Resource::Work), 100);
+        }
+        lease.consume(99).expect("the rest of the chunk is local");
+        assert_eq!(lease.held(), 0);
+        assert_eq!(root.used(Resource::Work), 100);
+        // A charge larger than a chunk claims what it needs.
+        lease.consume(250).expect("a large charge");
+        assert_eq!(lease.held(), 0);
+        assert_eq!(root.used(Resource::Work), 350);
+        lease.consume(0).expect("a zero charge");
+        assert_eq!(root.used(Resource::Work), 350);
+        lease.consume(1).expect("claims again");
+        assert_eq!((lease.held(), lease.consumed()), (99, 351));
+        assert_eq!(leaf.used(Resource::Work), 450);
+
+        lease.release();
+        for budget in [&root, &middle, &leaf] {
+            assert_eq!(budget.used(Resource::Work), 351);
+        }
+        // A released lease stays usable, and a zero chunk claims one unit.
+        let mut exact = leaf.lease(Resource::Work, 0);
+        assert_eq!(exact.chunk(), 1);
+        exact.consume(3).expect("exact claim");
+        assert_eq!((exact.held(), leaf.used(Resource::Work)), (0, 354));
+    }
+
+    #[test]
+    fn a_sole_lease_holder_is_refused_exactly_as_exact_accounting_refuses() {
+        let amounts: Vec<u64> = (0..40_u64).map(|index| 1 + (index * 7) % 9).collect();
+        let total: u64 = amounts.iter().sum();
+        let loose = total + 100;
+        let mut refusals = 0;
+        for tight in 0..=total + 2 {
+            // The tight limit sits at each level in turn, and at two at once.
+            for (leaf, middle, root) in [
+                (tight, loose, loose),
+                (loose, tight, loose),
+                (loose, loose, tight),
+                (tight + 3, tight, loose),
+            ] {
+                let exact = exact_outcome(&work_levels(leaf, middle, root), &amounts);
+                for chunk in [1, 2, 5, 16, 64, 1_000, u64::MAX] {
+                    let leased = lease_outcome(&work_levels(leaf, middle, root), &amounts, chunk);
+                    assert_eq!(
+                        leased, exact,
+                        "limits {leaf}/{middle}/{root}, chunk {chunk}"
+                    );
+                }
+                refusals += usize::from(exact.0.is_some());
+            }
+        }
+        assert!(refusals > 0);
+    }
+
+    #[test]
+    fn siblings_see_pre_claimed_units_and_no_level_passes_its_limit() {
+        let root = Budget::root("root", Limits::new(100, 100, 100, 100, 100, 100));
+        let left = root.child("left", Limits::new(100, 100, 100, 100, 100, 100));
+        let right = root.child("right", Limits::new(100, 100, 100, 100, 100, 100));
+        let mut lease = left.lease(Resource::Work, 40);
+        lease.consume(1).expect("claim");
+        assert_eq!(root.used(Resource::Work), 40);
+        assert_eq!(left.used(Resource::Work), 40);
+
+        // Exact accounting would admit 1 + 61; the sibling sees the claim.
+        let refused = right
+            .consume(Resource::Work, 61)
+            .expect_err("pre-claimed units count as used");
+        assert_eq!(
+            (refused.observed, refused.limit, &*refused.scope),
+            (101, 100, "root")
+        );
+        assert_eq!(right.used(Resource::Work), 0);
+        right.consume(Resource::Work, 60).expect("up to the limit");
+        assert_eq!(root.used(Resource::Work), 100);
+
+        // The holder is still refused only when its own charge cannot fit:
+        // it has 39 units left locally and the root is full.
+        lease.consume(39).expect("local units");
+        let error = lease.consume(1).expect_err("nothing left anywhere");
+        assert_eq!(
+            (error.observed, error.limit, &*error.scope),
+            (101, 100, "root")
+        );
+        assert_eq!(root.used(Resource::Work), 100);
+
+        drop(lease);
+        assert_eq!(root.used(Resource::Work), 100);
+        assert_eq!(left.used(Resource::Work), 40);
+    }
+
+    #[test]
+    fn a_claim_near_a_limit_shrinks_to_the_room_at_every_level() {
+        // The root has the least room; the leaf and middle levels must give
+        // back what they were charged beyond it.
+        let [root, middle, leaf] = work_levels(1_000, 500, 30);
+        let mut lease = leaf.lease(Resource::Work, 200);
+        lease.consume(5).expect("shrunk claim");
+        assert_eq!(lease.held(), 25);
+        assert_eq!(
+            work_used(&[root.clone(), middle.clone(), leaf.clone()]),
+            [30, 30, 30]
+        );
+        lease.consume(25).expect("the rest of the room");
+        let error = lease.consume(1).expect_err("the root is full");
+        assert_eq!(
+            (error.observed, error.limit, &*error.scope),
+            (31, 30, "root")
+        );
+        assert_eq!(work_used(&[root, middle, leaf]), [30, 30, 30]);
+    }
+
+    #[test]
+    fn refunds_return_units_to_the_lease_and_release_settles_every_level() {
+        let [root, middle, leaf] = work_levels(1_000, 1_000, 1_000);
+        let mut lease = leaf.lease(Resource::Work, 64);
+        lease.consume(10).expect("charge");
+        assert!(lease.refund(4));
+        assert_eq!((lease.held(), lease.consumed()), (58, 6));
+        assert!(!lease.refund(7), "more than was handed out");
+        assert_eq!((lease.held(), lease.consumed()), (58, 6));
+        // Refunded units are reused before the budget is touched again.
+        lease.consume(58).expect("local");
+        assert_eq!(root.used(Resource::Work), 64);
+        lease.release();
+        for budget in [&root, &middle, &leaf] {
+            assert_eq!(budget.used(Resource::Work), 64);
+        }
+        assert!(lease.refund(64));
+        lease.release();
+        for budget in [&root, &middle, &leaf] {
+            assert_eq!(budget.used(Resource::Work), 0);
+        }
+    }
+
+    #[test]
+    fn a_lease_releases_when_dropped_even_while_unwinding() {
+        let [root, middle, leaf] = work_levels(1_000, 1_000, 1_000);
+        let unwound = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut lease = leaf.lease(Resource::Work, 100);
+            lease.consume(7).expect("charge");
+            assert_eq!(root.used(Resource::Work), 100);
+            panic!("abandon the operation");
+        }));
+        assert!(unwound.is_err());
+        for budget in [&root, &middle, &leaf] {
+            assert_eq!(budget.used(Resource::Work), 7);
+        }
+        // An error path drops the lease too.
+        let failed = (|| -> Result<(), ResourceLimit> {
+            let mut lease = leaf.lease(Resource::Work, 500);
+            lease.consume(3)?;
+            lease.consume(2_000)?;
+            Ok(())
+        })();
+        assert!(failed.is_err());
+        assert_eq!(root.used(Resource::Work), 10);
+    }
+
+    #[derive(Debug, Default)]
+    struct LeaseWorkerOutcome {
+        work_granted: u64,
+        work_refusals: u64,
+    }
+
+    /// One worker's fixed pseudo-random mix of lease charges, refunds,
+    /// releases and re-opened leases with exact consumption and owned and
+    /// scoped reservations. Memory is only reserved and released; Work stays
+    /// exactly where it was granted and not refunded.
+    fn lease_tree_worker(budget: &Budget, chain: &[usize], seed: u64) -> LeaseWorkerOutcome {
+        let refused = |error: &ResourceLimit, resource: Resource| {
+            let level = chain
+                .iter()
+                .copied()
+                .find(|&level| TREE_NAMES[level] == &*error.scope)
+                .expect("a refusal names a level of the charged chain");
+            let limit = if resource == Resource::Memory {
+                TREE_MEMORY[level]
+            } else {
+                TREE_WORK[level]
+            };
+            assert_eq!(error.resource, resource);
+            assert_eq!(error.limit, limit);
+            assert!(error.observed > limit);
+        };
+        let mut outcome = LeaseWorkerOutcome::default();
+        let mut owned: Vec<Reservation> = Vec::new();
+        let mut lease = budget.lease(Resource::Work, 1 + seed % 40);
+        let mut state = seed;
+        for _ in 0..TREE_STEPS {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let amount = 1 + state % 6;
+            match (state >> 8) % 8 {
+                0..=2 => match lease.consume(amount) {
+                    Ok(()) => outcome.work_granted += amount,
+                    Err(error) => {
+                        refused(&error, Resource::Work);
+                        outcome.work_refusals += 1;
+                    },
+                },
+                3 => {
+                    let back = amount.min(lease.consumed());
+                    assert!(lease.refund(back));
+                    outcome.work_granted -= back;
+                },
+                4 => lease.release(),
+                5 => {
+                    // Dropping the lease releases it; the next one claims anew.
+                    lease = budget.lease(Resource::Work, 1 + (state >> 20) % 40);
+                },
+                6 => match budget.consume(Resource::Work, amount) {
+                    Ok(()) => outcome.work_granted += amount,
+                    Err(error) => {
+                        refused(&error, Resource::Work);
+                        outcome.work_refusals += 1;
+                    },
+                },
+                _ => match budget.reserve(Resource::Memory, amount) {
+                    Ok(reservation) if owned.len() < 3 => owned.push(reservation),
+                    Ok(reservation) => drop(reservation),
+                    Err(error) => refused(&error, Resource::Memory),
+                },
+            }
+            if owned.len() == 3 && (state >> 24) % 2 == 0 {
+                owned.clear();
+            }
+        }
+        drop(owned);
+        drop(lease);
+        outcome
+    }
+
+    #[test]
+    fn concurrent_leases_and_reservations_keep_a_shared_hierarchy_exact() {
+        let mut budgets: Vec<Budget> = Vec::new();
+        for index in 0..TREE_NAMES.len() {
+            let limits = Limits::new(TREE_MEMORY[index], 100, 100, 100, 100, TREE_WORK[index]);
+            let budget = match TREE_PARENT[index] {
+                None => Budget::root(TREE_NAMES[index], limits),
+                Some(parent) => budgets[parent].child(TREE_NAMES[index], limits),
+            };
+            budgets.push(budget);
+        }
+        let stop = std::sync::atomic::AtomicBool::new(false);
+        let outcomes: Vec<LeaseWorkerOutcome> = std::thread::scope(|scope| {
+            // Pre-claimed or not, no level is ever read above its limit.
+            let monitor = scope.spawn(|| {
+                let mut passes = 0_u64;
+                loop {
+                    let last = stop.load(Ordering::Acquire);
+                    for (index, budget) in budgets.iter().enumerate() {
+                        assert!(budget.used(Resource::Memory) <= TREE_MEMORY[index]);
+                        assert!(budget.used(Resource::Work) <= TREE_WORK[index]);
+                    }
+                    passes += 1;
+                    if last {
+                        break passes;
+                    }
+                    std::thread::yield_now();
+                }
+            });
+            let stop_monitor = StopOnDrop(&stop);
+            let workers: Vec<_> = TREE_WORKER_NODE
+                .iter()
+                .enumerate()
+                .map(|(worker, &node)| {
+                    let budget = budgets[node].clone();
+                    let seed = 0x2545_F491_4F6C_DD1D_u64
+                        ^ (u64::try_from(worker).expect("worker index") + 1)
+                            .wrapping_mul(0x9E37_79B9_7F4A_7C15);
+                    scope.spawn(move || lease_tree_worker(&budget, &tree_chain(node), seed))
+                })
+                .collect();
+            let outcomes = workers
+                .into_iter()
+                .map(|worker| worker.join().expect("worker"))
+                .collect();
+            drop(stop_monitor);
+            assert!(monitor.join().expect("monitor") > 0);
+            outcomes
+        });
+
+        // Every lease is gone: each level holds exactly what its subtree was
+        // granted and did not refund, and no Memory.
+        for (index, budget) in budgets.iter().enumerate() {
+            assert_eq!(budget.used(Resource::Memory), 0, "{}", TREE_NAMES[index]);
+            let granted: u64 = TREE_WORKER_NODE
+                .iter()
+                .zip(&outcomes)
+                .filter(|(node, _)| tree_chain(**node).contains(&index))
+                .map(|(_, outcome)| outcome.work_granted)
+                .sum();
+            assert_eq!(
+                budget.used(Resource::Work),
+                granted,
+                "{}",
+                TREE_NAMES[index]
+            );
+        }
+        assert!(outcomes.iter().any(|outcome| outcome.work_refusals > 0));
     }
 }
