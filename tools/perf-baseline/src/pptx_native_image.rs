@@ -1290,13 +1290,19 @@ mod tests {
                 assert_eq!(images.len(), 1, "original picture inventory");
                 assert_eq!(images[0].relationship_id(), "rId2");
             } else {
+                // The resaved picture's blipFill holds an empty `<a:stretch/>`
+                // with no `a:fillRect`. The inventory parses the raw source
+                // range, so the empty-stretch check refuses it before the
+                // end-of-parse "requires exactly one direct fillRect" check
+                // can run. `Invalid` is the only typed kind, so the message
+                // fragment identifies which refusal fired.
                 let error = view
                     .slide(0)
                     .ok_or("missing shapes slide")?
                     .images()
                     .expect_err("resaved fixture must preserve its malformed picture refusal");
                 assert!(
-                    matches!(error, litchi_pptx::Error::Invalid(ref reason) if reason.contains("stretch requires exactly one direct fillRect")),
+                    matches!(error, litchi_pptx::Error::Invalid(ref reason) if reason.contains("blipFill stretch must contain one fillRect")),
                     "{error:?}"
                 );
             }
