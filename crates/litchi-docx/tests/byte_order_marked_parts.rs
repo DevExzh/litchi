@@ -184,13 +184,33 @@ fn observe(package: &Package) -> String {
     for paragraph in document.paragraphs().unwrap() {
         observed.push_str(&format!("{:?};", paragraph.text()));
     }
+    // Styles are read from a marked `word/styles.xml` like any other part.
+    if let Ok(mut styles) = document.styles() {
+        let listed = styles.iter().map(|styles| {
+            styles
+                .map(|style| {
+                    format!(
+                        "{}:{:?}:{:?}",
+                        style.style_id(),
+                        style.name(),
+                        style.based_on()
+                    )
+                })
+                .collect::<Vec<_>>()
+        });
+        observed.push_str(&format!("|styles {listed:?}"));
+    }
     observed
 }
 
 #[test]
 fn a_fully_marked_document_reads_and_saves_like_the_unmarked_document() {
-    let (kept, marked) = differential(&generated_document(), is_xml_member, |package| {
-        observe(package)
+    let document = generated_document();
+    assert!(members(&document).contains_key("word/styles.xml"));
+    let (kept, marked) = differential(&document, is_xml_member, |package| {
+        let observed = observe(package);
+        assert!(observed.contains("|styles"), "{observed}");
+        observed
     });
     assert_eq!(kept, marked, "an unedited save preserves every mark");
 }
