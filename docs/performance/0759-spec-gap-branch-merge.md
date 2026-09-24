@@ -574,8 +574,46 @@ failing before its fix. Item numbers are the review's.
 
 ### Gates after the fixes
 
-The 16-gate runner runs on the commit that adds this section. The next
-commit adds its logs and results.
+The 0675 runner ran once over all 16 gates with `CARGO_BUILD_JOBS=16`, on
+`9dda621226`, the commit that added this section. Its tree was `68d48794dd`,
+with 0 unstaged and 0 untracked paths. Every gate passed. The logs, the
+results file and the runner copy are in
+[postmerge-gates/](results/change-0759/postmerge-gates/results.json).
+
+| Gate | Result |
+|---|---|
+| fmt, check, clippy (`--lib`, `-D warnings`), rustdoc (`-D warnings`) | pass |
+| tests (14 crates) | 13,246 passed, 0 failed, 78 ignored (merge: 13,221) |
+| facade | 382 passed, 7 ignored |
+| facade-polyglot, allocator | 104 and 5 passed |
+| harness | 579 passed, 0 failed, 1 ignored: lib 554, other targets 25 (merge: 552 passed, 2 failed) |
+| claims (strict and structural), gate-tests (50), report, coverage | pass |
+| non-iwork | pass: 65 workspace packages, 46 bulk tree roots |
+| boundaries | pass: 65 packages, 244 declarations |
+
+These were also run on the fixed tree:
+- `cargo clippy --workspace --lib --no-deps -- -D warnings`: passes; the
+  facade `unit_arg` pair is gone.
+- `--all-features` after the allsorts fix, all with 0 failures:
+
+  | crate | passed |
+  |---|---:|
+  | litchi-pptx | 1,181 |
+  | litchi-docx | 1,905 |
+  | litchi-xlsx | 2,056 |
+  | litchi-opc | 954 |
+  | soapberry-zip | 648 |
+  | litchi-fonts | 25 |
+
+- All 27 `tools/test_*.py` modules: 1,942 tests, 0 failed, 20 skipped.
+
+Two lint findings exist before this work and were left unchanged:
+- `litchi-xlsb`'s all-targets clippy reports four `clippy::expect_used`
+  hits, in `comments/threaded/tests/mod.rs` and `shared_workbook/tests.rs`.
+  Those files were last changed by the merge commit, and the gate lints
+  `--lib` only.
+- The facade built with `docx` alone reports `missing_ooxml_catalog_part_error`
+  as dead code (from `93fe73b59c`).
 
 ## Cleanup
 
@@ -583,5 +621,10 @@ commit adds its logs and results.
 the gate logs were copied here: the two tip worktrees, every build directory
 (about 614 GiB, plus about 112 GB the subagents removed themselves) and the
 scratch directory. The integration worktree is kept.
+
+[postmerge-cleanup.json](results/change-0759/postmerge-cleanup.json) lists what
+the post-merge work removed: its worktrees and build directories, and, after
+the gate logs were committed, `targets/postmerge` (216 GiB) and the scratch
+directory.
 
 Evidence and scripts: [results/change-0759/](results/change-0759/README.md).

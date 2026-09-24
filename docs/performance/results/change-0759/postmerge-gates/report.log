@@ -1,0 +1,7 @@
+HEAD 9dda621226b1513140e6f18e0ed46f6003434448
+TREE 68d48794ddd6e7aeb39008032fa3860c190ad785
+UNSTAGED 0 UNTRACKED 0
+$ python3 tools/check_report_claim_classification.py --registry docs/performance/report-claim-classification-v1.json --repo-root .
+OK: 167 REPORT rows classified across 2 tables (strict_claim=0, historical=145, descriptive=14, withheld=8)
+
+exit 0

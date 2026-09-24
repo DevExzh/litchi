@@ -1,0 +1,35 @@
+HEAD 9dda621226b1513140e6f18e0ed46f6003434448
+TREE 68d48794ddd6e7aeb39008032fa3860c190ad785
+UNSTAGED 0 UNTRACKED 0
+$ cargo doc -p litchi-core -p soapberry-zip -p litchi-cfb -p litchi-ole-common -p litchi-opc -p litchi-ooxml-common -p litchi-doc -p litchi-docx -p litchi-ppt -p litchi-pptx -p litchi-xls -p litchi-xlsx -p litchi-xlsb -p xml-minifier --no-deps --locked
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-core)
+    Checking litchi-xldm v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-xldm)
+ Documenting xml-minifier v0.1.0 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/xml-minifier)
+ Documenting soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/soapberry-zip)
+ Documenting litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-core)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-cfb)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-opc)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-sheet)
+ Documenting litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-cfb)
+ Documenting litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-opc)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-vba)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-sign)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-ograph)
+ Documenting litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-ole-common)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-ooxml-common)
+ Documenting litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-ooxml-common)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-crypto)
+ Documenting litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-ppt)
+ Documenting litchi-doc v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-doc)
+ Documenting litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-xls)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-spreadsheet-drawing)
+ Documenting litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-docx)
+ Documenting litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-pptx)
+ Documenting litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-xlsx)
+ Documenting litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-xlsb)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 17.45s
+   Generated /home/zhuhe/code/litchi-worktrees/targets/postmerge/doc/litchi_cfb/index.html and 13 other files
+
+exit 0

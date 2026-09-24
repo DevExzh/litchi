@@ -66,6 +66,13 @@ This packet backs [record 0759](../../0759-spec-gap-branch-merge.md).
   - the promotion script, which verifies that only the DOC corpora changed,
     and its summary of old and new identities.
 
+- **[postmerge-gates/](postmerge-gates/results.json).** The final 16-gate
+  run after the post-merge fixes and the review follow-up, on `9dda621226`
+  (tree `68d48794dd`, 0 unstaged, 0 untracked): one `<gate>.log` per gate,
+  `results.json`, the runner's output and the runner copy (0675's, with
+  `CARGO_BUILD_JOBS=16` and the header lines above). Every gate passed.
+  [postmerge-cleanup.json](postmerge-cleanup.json) lists what was removed
+  afterwards.
 - **[remaining-absence-probes.txt](remaining-absence-probes.txt).** Part
   lookups that may still read a decode failure as absence. The review
   follow-up found them and left them unchanged. Each needs its own review.

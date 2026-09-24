@@ -1,0 +1,24 @@
+{
+  "change": "0759",
+  "date": "2026-09-24",
+  "scope": "post-merge fixes and review follow-up on integration/spec-gap-merge (b3cf1545f7..)",
+  "removed_during_the_work": [
+    {"path": "/home/zhuhe/code/litchi-worktrees/postmerge-scratch/wt-docx", "kind": "git worktree of the litchi-docx implementer (branch postmerge/review-docx, deleted after its eight commits were cherry-picked)"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/postmerge-scratch/wt-opc and wt-misc", "kind": "git worktrees prepared for two more implementers that could not be launched (branches postmerge/review-opc and postmerge/review-misc, deleted unused)"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/postmerge-scratch/tip-head", "kind": "detached git worktree at e6cca92db2, used to prove the --all-features PPTX goldens fail before the merge"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/postmerge/{docx,tip-head,preflight-target}", "kind": "build directories of the implementer (17 GiB), the pre-merge proof and the release preflight"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/postmerge/debug/incremental", "kind": "incremental compilation caches (68 GiB), removed when the shared disk ran short"}
+  ],
+  "removed_after_this_commit": [
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/postmerge", "kind": "build directory of the fixes and the 16-gate run", "size": "216 GiB"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/postmerge-scratch", "kind": "scratch: gate output and logs (copied into postmerge-gates/), the preflight outputs and re-pin script (copied into doc-fresh-writer-repin/), the runner copy (copied), temporary files", "size": "4.2 MiB"}
+  ],
+  "kept": [
+    "/home/zhuhe/code/litchi-worktrees/merge-spec-gaps (integration worktree on integration/spec-gap-merge), with its gitignored root Cargo.lock, which the allsorts change pruned of libz-sys and vcpkg, and its gitignored 3rdparty symlink",
+    "branch integration/spec-gap-merge (not pushed); feat/office-format-completeness unchanged at e6cca92db2"
+  ],
+  "untouched": [
+    "other agents' build directories under /home/zhuhe/code/litchi-worktrees/targets (0761 to 0769)",
+    "/home/zhuhe/code/litchi-worktrees/review-merge-notes.md and /home/zhuhe/code/litchi-worktrees/coord"
+  ]
+}
