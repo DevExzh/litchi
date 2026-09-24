@@ -10,6 +10,8 @@ use thiserror::Error;
 
 use crate::binding_tracker::{BindingTracker, BindingTrackerError};
 
+pub mod attributes;
+
 /// Return whether a value follows the XML 1.0 Fifth Edition `NCName` grammar.
 ///
 /// Relationship IDs and namespace prefixes use this Unicode-aware grammar;
