@@ -2383,3 +2383,34 @@ today; this reading applies only to retention that is a pure optimization.
 The scratch-storage clause is untouched and is the reason the fallback is
 recomputation rather than a spill: a retained document archive is document
 content, and litchi never writes it anywhere automatically.
+
+## 2026-09-24 clarification: chunked charging through a budget lease
+
+Authorized by owner decision 6 of
+[change 0758](../performance/0758-owner-decisions-2026-09-24.md) ("Accept a
+rough budget lease rather than a precise one"); implemented by
+[change 0763](../performance/0763-rough-budget-leases.md). This is a reading of
+"Every operation charges a hierarchical resource budget supplied by an
+execution context", not a new budget system.
+
+An operation may charge a budget through a `Lease` (`Budget::lease`,
+`ExecutionContext::lease`): it claims up to a stated chunk of one resource at
+a time, with the same atomic check-and-add per hierarchy level as any other
+charge, and hands the units out locally. That is charging the budget.
+
+What stays exact: no level is ever above its limit, even transiently; the
+lease's own holder is refused on the same charge, at the same level and with
+the same resource, observed value and limit as exact accounting; a refused
+claim changes nothing; and the units a lease holds but has not handed out
+return to the budget when it is released or dropped, including on an error, a
+cancellation or a poisoned operation, so every counter then settles at exactly
+what was handed out.
+
+What becomes rough, and only for other holders of the same budget: the
+pre-claimed units count as used, so another holder can be refused up to one
+chunk earlier than exact accounting would refuse it, and a refusal it receives
+reports usage that includes the pre-claim. Each lease's chunk size is stated
+with its reason by the code that opens it. Reservations, `consume` and every
+charge made outside a lease are unchanged. ADR 0031's reservation dimensions
+(`Workers`, `IoConcurrency`) are admission-time reservations, not charges, and
+are not leased.

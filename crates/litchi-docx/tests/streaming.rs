@@ -314,3 +314,261 @@ fn package_bytes_do_not_depend_on_how_run_text_is_split() {
         assert_eq!(&paragraph.text().expect("paragraph text"), expected);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Change 0763: the writer charges Objects, Work and input bytes through rough
+// budget leases. A sole holder of the budget must see exactly the refusals of
+// exact accounting; the leases must be returned when the writer is poisoned
+// and when it finishes.
+// ---------------------------------------------------------------------------
+
+/// One API call of the lease script.
+#[derive(Debug, Clone, Copy)]
+enum Call<'a> {
+    StartParagraph,
+    StartRun,
+    Text(&'a str),
+    FinishRun,
+    FinishParagraph,
+}
+
+fn lease_script(texts: &[String]) -> Vec<Call<'_>> {
+    let mut calls = Vec::new();
+    for (index, text) in texts.iter().enumerate() {
+        calls.push(Call::StartParagraph);
+        calls.push(Call::StartRun);
+        if index % 3 == 2 {
+            // Two text calls in one run.
+            let split = text
+                .char_indices()
+                .nth(text.chars().count() / 2)
+                .map_or(0, |(at, _)| at);
+            calls.push(Call::Text(&text[..split]));
+            calls.push(Call::Text(&text[split..]));
+        } else {
+            calls.push(Call::Text(text));
+        }
+        calls.push(Call::FinishRun);
+        calls.push(Call::FinishParagraph);
+    }
+    calls
+}
+
+/// The exact charges each call makes, in order: the writer's documented
+/// accounting (Work in 64-character checkpoints, then the text's bytes).
+fn call_charges(call: Call<'_>) -> Vec<(Resource, u64)> {
+    match call {
+        Call::StartParagraph | Call::StartRun => {
+            vec![(Resource::Objects, 1), (Resource::Work, 1)]
+        },
+        Call::Text(text) => {
+            let characters = u64::try_from(text.chars().count()).expect("characters");
+            let mut charges =
+                vec![(Resource::Work, 64); usize::try_from(characters / 64).expect("pieces")];
+            if characters % 64 != 0 {
+                charges.push((Resource::Work, characters % 64));
+            }
+            charges.push((
+                Resource::InputBytes,
+                u64::try_from(text.len()).expect("bytes"),
+            ));
+            charges
+        },
+        Call::FinishRun | Call::FinishParagraph => vec![(Resource::Work, 1)],
+    }
+}
+
+fn apply_call<W: Write>(
+    writer: &mut StreamingDocumentWriter<W>,
+    call: Call<'_>,
+) -> Result<(), StreamingDocumentError> {
+    match call {
+        Call::StartParagraph => writer.start_paragraph(),
+        Call::StartRun => writer.start_run(),
+        Call::Text(text) => writer.write_text(text),
+        Call::FinishRun => writer.finish_run(),
+        Call::FinishParagraph => writer.finish_paragraph(),
+    }
+}
+
+fn budget_with(resource: Resource, limit: u64) -> Budget {
+    let value = |candidate: Resource| {
+        if candidate == resource {
+            limit
+        } else {
+            1 << 40
+        }
+    };
+    Budget::root(
+        "docx-lease-limit",
+        CoreLimits::new(
+            1024 * 1024,
+            value(Resource::InputBytes),
+            1 << 40,
+            value(Resource::Objects),
+            64,
+            value(Resource::Work),
+        ),
+    )
+}
+
+#[test]
+fn a_sole_writer_is_refused_exactly_at_every_objects_work_and_input_limit() {
+    let texts: Vec<String> = (0..9)
+        .map(|index| format!("lease {index}: café & <b> {}", "é".repeat(index * 17)))
+        .collect();
+    let calls = lease_script(&texts);
+    // `new` charges five Objects and two Work units exactly, before any
+    // lease exists.
+    for (resource, fixed, name) in [
+        (Resource::Objects, 5_u64, "objects"),
+        (Resource::Work, 2, "work"),
+        (Resource::InputBytes, 0, "input bytes"),
+    ] {
+        let total: u64 = fixed
+            + calls
+                .iter()
+                .flat_map(|&call| call_charges(call))
+                .filter(|(charged, _)| *charged == resource)
+                .map(|(_, amount)| amount)
+                .sum::<u64>();
+        for limit in fixed..=total + 1 {
+            // The exact model: the first charge that would pass the limit.
+            let mut used = fixed;
+            let mut expected = None;
+            'calls: for (index, &call) in calls.iter().enumerate() {
+                for (charged, amount) in call_charges(call) {
+                    if charged != resource {
+                        continue;
+                    }
+                    if used + amount > limit {
+                        expected = Some((index, used + amount));
+                        break 'calls;
+                    }
+                    used += amount;
+                }
+            }
+            let budget = budget_with(resource, limit);
+            let (_source, execution) = context_for(budget.clone());
+            let mut writer = StreamingDocumentWriter::new(Vec::new(), execution, limits())
+                .expect("streaming writer");
+            let mut refused = None;
+            for (index, &call) in calls.iter().enumerate() {
+                if let Err(error) = apply_call(&mut writer, call) {
+                    refused = Some((index, error));
+                    break;
+                }
+            }
+            match (expected, refused) {
+                (None, None) => {
+                    writer.finish().expect("package finish");
+                    assert_eq!(budget.used(resource), total, "{name} limit {limit}");
+                },
+                (Some((index, observed)), Some((actual, error))) => {
+                    assert_eq!(actual, index, "{name} limit {limit}");
+                    assert!(
+                        matches!(
+                            error,
+                            StreamingDocumentError::LimitExceeded {
+                                resource: refused_resource,
+                                observed: refused_observed,
+                                limit: refused_limit,
+                                ..
+                            } if refused_resource == name
+                                && refused_observed == observed
+                                && refused_limit == limit
+                        ),
+                        "{name} limit {limit}: {error:?}"
+                    );
+                    // The poisoned writer returned its leases: the budget
+                    // shows exactly the charges made before the refusal.
+                    assert!(writer.is_poisoned());
+                    assert_eq!(budget.used(resource), used, "{name} limit {limit}");
+                },
+                (expected, refused) => {
+                    panic!("{name} limit {limit}: expected {expected:?}, writer gave {refused:?}")
+                },
+            }
+        }
+    }
+}
+
+#[test]
+fn a_sibling_sees_the_writers_pre_claim_until_the_writer_finishes() {
+    let root = Budget::root(
+        "docx-lease-root",
+        CoreLimits::new(1024 * 1024, 1 << 30, 1 << 30, 1 << 20, 64, 100_000),
+    );
+    let child = |name: &str| {
+        root.child(
+            name.to_owned(),
+            CoreLimits::new(1024 * 1024, 1 << 30, 1 << 30, 1 << 20, 64, 100_000),
+        )
+    };
+    let (writer_budget, sibling) = (child("writer"), child("sibling"));
+    let (_source, execution) = context_for(writer_budget.clone());
+    let mut writer =
+        StreamingDocumentWriter::new(Vec::new(), execution, limits()).expect("streaming writer");
+    writer.start_paragraph().expect("paragraph");
+    // The writer used 3 Work units and holds the rest of one 64 Ki chunk,
+    // which the sibling observes as used.
+    assert_eq!(writer_budget.used(Resource::Work), 64 * 1024 + 2);
+    let refused = sibling
+        .consume(Resource::Work, 100_000 - 3)
+        .expect_err("exact accounting would admit this; the pre-claim does not");
+    assert_eq!(refused.limit, 100_000);
+    assert!(root.used(Resource::Work) <= 100_000);
+    writer.start_run().expect("run");
+    writer.write_text("sibling").expect("text");
+    writer.finish_run().expect("run finish");
+    writer.finish_paragraph().expect("paragraph finish");
+    writer.finish().expect("package finish");
+    // Finishing returned the lease: exactly the writer's charges remain.
+    let used = 2 + 1 + 1 + 7 + 1 + 1;
+    assert_eq!(writer_budget.used(Resource::Work), used);
+    sibling
+        .consume(Resource::Work, 100_000 - used)
+        .expect("the rest of the root");
+    assert_eq!(root.used(Resource::Work), 100_000);
+}
+
+#[test]
+fn leases_are_returned_when_the_writer_is_poisoned_or_dropped() {
+    let budget = Budget::root(
+        "docx-lease-poison",
+        CoreLimits::new(1024 * 1024, 1 << 30, 1 << 30, 1 << 20, 64, 1 << 30),
+    );
+    let (source, execution) = context_for(budget.clone());
+    let mut writer =
+        StreamingDocumentWriter::new(Vec::new(), execution, limits()).expect("streaming writer");
+    writer.start_paragraph().expect("paragraph");
+    writer.start_run().expect("run");
+    writer.write_text("café").expect("text");
+    assert!(
+        budget.used(Resource::Work) > 8,
+        "the Work lease holds a chunk"
+    );
+    source.cancel();
+    let error = writer.finish_run().expect_err("cancelled");
+    assert!(matches!(error, StreamingDocumentError::Cancelled { .. }));
+    // Cancellation poisoned the writer, which returned every lease.
+    assert_eq!(budget.used(Resource::Objects), 5 + 2);
+    assert_eq!(budget.used(Resource::Work), 2 + 1 + 1 + 4);
+    assert_eq!(budget.used(Resource::InputBytes), 5);
+    drop(writer);
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    // Dropping a healthy writer returns its leases too.
+    let budget = Budget::root(
+        "docx-lease-drop",
+        CoreLimits::new(1024 * 1024, 1 << 30, 1 << 30, 1 << 20, 64, 1 << 30),
+    );
+    let (_source, execution) = context_for(budget.clone());
+    let mut writer =
+        StreamingDocumentWriter::new(Vec::new(), execution, limits()).expect("streaming writer");
+    writer.start_paragraph().expect("paragraph");
+    assert!(budget.used(Resource::Objects) > 6);
+    drop(writer);
+    assert_eq!(budget.used(Resource::Objects), 6);
+    assert_eq!(budget.used(Resource::Work), 3);
+}

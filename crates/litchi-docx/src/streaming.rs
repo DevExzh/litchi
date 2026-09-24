@@ -13,7 +13,7 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
-use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource};
+use litchi_core::{ExecutionContext, ExecutionError, ExecutionLease, Reservation, Resource};
 use litchi_opc::phys_pkg::{PartWriter, PhysPkgWriter};
 use litchi_opc::{OpcError, PackURI};
 
@@ -28,6 +28,18 @@ const OPC_MAX_OUTPUT_BYTES: u64 = 512 * 1024 * 1024;
 const FIXED_OBJECT_CHARGE: u64 = 5;
 const FIXED_WORK_CHARGE: u64 = 2;
 const TEXT_SCAN_CHECK_INTERVAL: u64 = 64;
+
+// Lease chunks (change 0763, owner decision 6 of change 0758). The writer
+// charges one Object and about four Work units per paragraph, one of each per
+// run, one Work unit per text character and each run's input bytes. Leasing
+// in these chunks turns the seven budget updates per paragraph into one claim
+// per chunk, and caps what a sibling holder of the same budget can see
+// pre-claimed at one chunk per resource: 64 Ki Work units and 64 KiB of input
+// (well under 0.01% of the finite profiles' Work and input ceilings), and
+// 4 Ki objects (0.04% of the server profile's).
+const WORK_LEASE_CHUNK: u64 = 64 * 1024;
+const OBJECT_LEASE_CHUNK: u64 = 4 * 1024;
+const INPUT_LEASE_CHUNK: u64 = 64 * 1024;
 
 const CONTENT_TYPES_URI: &str = "/[Content_Types].xml";
 const PACKAGE_RELS_URI: &str = "/_rels/.rels";
@@ -415,7 +427,14 @@ enum Phase {
 ///
 /// The execution context charges one writer object, one object per paragraph,
 /// one object per run, package setup/finalization work, input bytes, output
-/// bytes, and a fixed XML-escaping scratch capability.  Dropping the writer
+/// bytes, and a fixed XML-escaping scratch capability.  Objects, Work and
+/// input bytes are charged through rough budget leases: the writer claims
+/// them from the budget a chunk at a time, so another holder of the same
+/// budget sees up to one chunk per resource pre-claimed, while this writer is
+/// refused on exactly the call, and with exactly the values, exact accounting
+/// would refuse. The leases are returned to the budget when the writer is
+/// poisoned, when [`Self::finish`] returns and when the writer is dropped, so
+/// the budget then shows exactly what the writer used. Dropping the writer
 /// before [`Self::finish`] abandons the package and can leave the owned sink
 /// with an intentionally incomplete archive.
 ///
@@ -425,16 +444,42 @@ enum Phase {
 /// writer's accounting surface.
 pub struct StreamingDocumentWriter<W: Write> {
     state: DocumentState<W>,
+    leases: DocumentLeases,
     context: ExecutionContext,
     _scratch: Reservation,
 }
 
+/// The writer's budget leases, kept apart from [`DocumentState`] so a charge
+/// can borrow a lease while the state reports a failure.
+struct DocumentLeases {
+    objects: ExecutionLease,
+    work: ExecutionLease,
+    input: ExecutionLease,
+}
+
+impl DocumentLeases {
+    fn new(context: &ExecutionContext) -> Self {
+        Self {
+            objects: context.lease(Resource::Objects, OBJECT_LEASE_CHUNK),
+            work: context.lease(Resource::Work, WORK_LEASE_CHUNK),
+            input: context.lease(Resource::InputBytes, INPUT_LEASE_CHUNK),
+        }
+    }
+
+    /// Returns every unit claimed and not yet handed out to the budget.
+    fn release(&mut self) {
+        self.objects.release();
+        self.work.release();
+        self.input.release();
+    }
+}
+
 /// Everything a [`StreamingDocumentWriter`] mutates while it emits XML.
 ///
-/// It is kept apart from the writer's [`ExecutionContext`] so that a budget
-/// reservation borrowed from the context can stay open while this state
-/// emits. The owned sink is declared first, so it is still the first thing
-/// the writer drops.
+/// It is kept apart from the writer's [`ExecutionContext`] and budget leases
+/// so that a lease can be charged, and the context checked, while this state
+/// emits or reports a failure. The owned sink is declared first, so it is
+/// still the first thing the writer drops.
 struct DocumentState<W: Write> {
     part: Option<PartWriter<BudgetedOutput<W>>>,
     limits: StreamingDocumentLimits,
@@ -548,6 +593,7 @@ impl<W: Write> StreamingDocumentWriter<W> {
                 execution_state,
                 poison: None,
             },
+            leases: DocumentLeases::new(&context),
             context,
             _scratch: scratch,
         })
@@ -590,8 +636,25 @@ impl<W: Write> StreamingDocumentWriter<W> {
         self.state.poison.is_some()
     }
 
+    /// Returns the leases to the budget once the writer is poisoned, so a
+    /// failed writer leaves the budget showing exactly what it used.
+    fn settle<T>(
+        &mut self,
+        result: Result<T, StreamingDocumentError>,
+    ) -> Result<T, StreamingDocumentError> {
+        if self.state.poison.is_some() {
+            self.leases.release();
+        }
+        result
+    }
+
     /// Start the next logical paragraph.
     pub fn start_paragraph(&mut self) -> Result<(), StreamingDocumentError> {
+        let result = self.start_paragraph_inner();
+        self.settle(result)
+    }
+
+    fn start_paragraph_inner(&mut self) -> Result<(), StreamingDocumentError> {
         self.state.ensure_usable()?;
         if !matches!(self.state.phase, Phase::Ready) {
             return Err(self.state.state_error("a paragraph is already open"));
@@ -612,9 +675,10 @@ impl<W: Write> StreamingDocumentWriter<W> {
             .map_err(|resource| self.state.fail_overflow(resource))?;
         self.state
             .preflight_document_and_paragraph(paragraph_bytes, paragraph_bytes)?;
-        self.context
-            .consume(Resource::Objects, 1)
-            .and_then(|_| self.context.consume(Resource::Work, 1))
+        self.leases
+            .objects
+            .consume(1)
+            .and_then(|()| self.leases.work.consume(1))
             .map_err(|error| self.state.fail_execution(error))?;
         self.state
             .emit_document(PARAGRAPH_PREFIX, paragraph_bytes, Some(paragraph_bytes))?;
@@ -630,6 +694,11 @@ impl<W: Write> StreamingDocumentWriter<W> {
 
     /// Start a plain text run in the current paragraph.
     pub fn start_run(&mut self) -> Result<(), StreamingDocumentError> {
+        let result = self.start_run_inner();
+        self.settle(result)
+    }
+
+    fn start_run_inner(&mut self) -> Result<(), StreamingDocumentError> {
         self.state.ensure_usable()?;
         let Phase::Paragraph {
             run_open,
@@ -671,9 +740,10 @@ impl<W: Write> StreamingDocumentWriter<W> {
                 .map_err(|resource| self.state.fail_overflow(resource))?;
         self.state
             .preflight_document_and_paragraph(run_bytes, next_paragraph_bytes)?;
-        self.context
-            .consume(Resource::Objects, 1)
-            .and_then(|_| self.context.consume(Resource::Work, 1))
+        self.leases
+            .objects
+            .consume(1)
+            .and_then(|()| self.leases.work.consume(1))
             .map_err(|error| self.state.fail_execution(error))?;
         self.state
             .emit_document(RUN_PREFIX, run_bytes, Some(run_bytes))?;
@@ -693,6 +763,11 @@ impl<W: Write> StreamingDocumentWriter<W> {
     /// emitted.  Tabs, line feeds, and carriage returns are rejected because
     /// they require structural `w:tab`, `w:br`, or `w:cr` elements.
     pub fn write_text(&mut self, text: &str) -> Result<(), StreamingDocumentError> {
+        let result = self.write_text_inner(text);
+        self.settle(result)
+    }
+
+    fn write_text_inner(&mut self, text: &str) -> Result<(), StreamingDocumentError> {
         self.state.ensure_usable()?;
         let Phase::Paragraph {
             run_open: true,
@@ -728,23 +803,27 @@ impl<W: Write> StreamingDocumentWriter<W> {
                 self.state.limits.max_input_bytes,
             ));
         }
-        let (encoded_bytes, _text_chars) = self.state.encoded_text_size(&self.context, text)?;
+        let (encoded_bytes, _text_chars) =
+            self.state.encoded_text_size(&mut self.leases.work, text)?;
         let next_paragraph_bytes =
             checked_add(paragraph_xml_bytes, encoded_bytes, "paragraph XML bytes")
                 .map_err(|resource| self.state.fail_overflow(resource))?;
         self.state
             .preflight_document_and_paragraph(encoded_bytes, next_paragraph_bytes)?;
-        // The reservation borrows the context while the state emits, so it
-        // costs one budget charge and no handle of its own.
-        let input_reservation = self
-            .context
-            .reserve_scoped(Resource::InputBytes, input_bytes)
+        // The input is charged before any of its XML is emitted, as the
+        // reservation this replaces was, and taken back if the emission
+        // fails, where that reservation was dropped.
+        self.leases
+            .input
+            .consume(input_bytes)
             .map_err(|error| self.state.fail_execution(error))?;
-        self.state.emit_escaped_text(&self.context, text)?;
-        if !input_reservation.commit(input_bytes) {
-            return Err(self
-                .state
-                .fail_invalid("input reservation committed more bytes than reserved"));
+        if let Err(error) = self.state.emit_escaped_text(&self.context, text) {
+            if !self.leases.input.refund(input_bytes) {
+                return Err(self
+                    .state
+                    .fail_invalid("input lease refunded more bytes than it handed out"));
+            }
+            return Err(error);
         }
         self.state.input_bytes = next_input;
         self.state.phase = match self.state.phase {
@@ -769,6 +848,11 @@ impl<W: Write> StreamingDocumentWriter<W> {
 
     /// Finish the current run.
     pub fn finish_run(&mut self) -> Result<(), StreamingDocumentError> {
+        let result = self.finish_run_inner();
+        self.settle(result)
+    }
+
+    fn finish_run_inner(&mut self) -> Result<(), StreamingDocumentError> {
         self.state.ensure_usable()?;
         let Phase::Paragraph {
             run_open: true,
@@ -789,8 +873,9 @@ impl<W: Write> StreamingDocumentWriter<W> {
             .map_err(|error| self.state.fail_execution(error))?;
         self.state
             .preflight_document_and_paragraph(suffix_bytes, next_paragraph_bytes)?;
-        self.context
-            .consume(Resource::Work, 1)
+        self.leases
+            .work
+            .consume(1)
             .map_err(|error| self.state.fail_execution(error))?;
         self.state
             .emit_document(RUN_SUFFIX, suffix_bytes, Some(suffix_bytes))?;
@@ -805,6 +890,11 @@ impl<W: Write> StreamingDocumentWriter<W> {
 
     /// Finish the current paragraph.
     pub fn finish_paragraph(&mut self) -> Result<(), StreamingDocumentError> {
+        let result = self.finish_paragraph_inner();
+        self.settle(result)
+    }
+
+    fn finish_paragraph_inner(&mut self) -> Result<(), StreamingDocumentError> {
         self.state.ensure_usable()?;
         let Phase::Paragraph {
             run_open: false,
@@ -826,8 +916,9 @@ impl<W: Write> StreamingDocumentWriter<W> {
             .map_err(|error| self.state.fail_execution(error))?;
         self.state
             .preflight_document_and_paragraph(suffix_bytes, next_paragraph_bytes)?;
-        self.context
-            .consume(Resource::Work, 1)
+        self.leases
+            .work
+            .consume(1)
             .map_err(|error| self.state.fail_execution(error))?;
         self.state
             .emit_document(PARAGRAPH_SUFFIX, suffix_bytes, Some(suffix_bytes))?;
@@ -836,7 +927,16 @@ impl<W: Write> StreamingDocumentWriter<W> {
     }
 
     /// Finalize the document XML, ZIP central directory, and caller-owned sink.
+    ///
+    /// Whatever the outcome, the writer's leases are returned to the budget
+    /// before this returns.
     pub fn finish(mut self) -> Result<W, StreamingDocumentError> {
+        let result = self.finish_inner();
+        self.leases.release();
+        result
+    }
+
+    fn finish_inner(&mut self) -> Result<W, StreamingDocumentError> {
         self.state.ensure_usable()?;
         if !matches!(self.state.phase, Phase::Ready) {
             return Err(self.state.state_error("finish the current paragraph first"));
@@ -1092,12 +1192,12 @@ impl<W: Write> DocumentState<W> {
 
     fn encoded_text_size(
         &mut self,
-        context: &ExecutionContext,
+        work_lease: &mut ExecutionLease,
         text: &str,
     ) -> Result<(u64, u64), StreamingDocumentError> {
         let result = scan_plain_text(text, |work| {
-            context
-                .consume(Resource::Work, work)
+            work_lease
+                .consume(work)
                 .map_err(|error| self.fail_execution(error))
         });
         match result {
