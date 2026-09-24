@@ -1,10 +1,10 @@
 # ADR 0032: Snapshot memos of small derived values of payload bytes
 
-- Status: **Proposed — awaiting human review. Not accepted, not normative, and
-  deliberately absent from the accepted table in [README](README.md).** No code
-  may cite this record as authority until a human accepts it.
+- Status: Accepted (2026-09-24, by the owner's decision recorded in
+  [change 0758](../performance/0758-owner-decisions-2026-09-24.md); proposed
+  2026-09-23)
 - Date: 2026-09-23
-- Supersedes: nothing. Amends, if accepted: the 2026-09-16 amendment of
+- Supersedes: nothing. Amends: the 2026-09-16 amendment of
   [ADR 0005](0005-io-memory-and-performance.md) titled "retained per-part digest
   memos on an opened-presentation snapshot and its facade", by widening the one
   noun it admits. Every other sentence of ADR 0005, and every other accepted
@@ -110,7 +110,7 @@ propose that.
 
 ### 4. What re-applies
 
-If this record is accepted, change 0743's commit `99ce9c5e34` re-applies
+With this record accepted, change 0743's commit `99ce9c5e34` re-applies
 unchanged except for the rule in section 3: `SlideRootMemo::from_records`
 returns `Result<Self>` and its reservation failure becomes
 `Error::Allocation { resource: "opened-presentation slide-root memo", .. }`,

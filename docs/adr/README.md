@@ -44,6 +44,7 @@ Office round trips.
 | [0029](0029-iwa-index-foundation.md) | Archive-free IWA object-index foundation |
 | [0030](0030-lazy-opc-part-decode.md) | Lazy OPC part decode behind the fallible package accessors |
 | [0031](0031-execution-context-budgets.md) | I/O concurrency, CPU task and executor budgets in the execution context |
+| [0032](0032-snapshot-derived-value-memos.md) | Snapshot memos of small derived values of payload bytes (widens ADR 0005's 2026-09-16 digest-memo amendment) |
 
 The OGraph record retains its original 0025 identity. The later XLS record,
 which duplicated that number, is indexed as 0027; its decision text remains
@@ -60,14 +61,14 @@ table above. Nothing in the workspace may cite them as authority, and no code
 change is permitted on their basis, until a human accepts one and moves it into
 the table.
 
-| ADR | Proposal | Raised by |
-|---|---|---|
-| [0032](0032-snapshot-derived-value-memos.md) | Snapshot memos of small derived values of payload bytes (widens ADR 0005's 2026-09-16 digest-memo amendment) | [change 0743](../performance/0743-pptx-semantic-text-and-edit-path.md), whose reverted commit `99ce9c5e34` implemented and measured such a memo |
-
-ADR 0030 and ADR 0031, proposed on 2026-09-15, were accepted on 2026-09-16 by
-the owner's decision recorded in
-[change 0652](../performance/0652-owner-decisions-for-the-third-wave.md) and
-now appear in the table above.
+No proposed record is outstanding. ADR 0030 and ADR 0031, proposed on
+2026-09-15, were accepted on 2026-09-16 by the owner's decision recorded in
+[change 0652](../performance/0652-owner-decisions-for-the-third-wave.md). ADR
+0032, proposed on 2026-09-23 by
+[change 0743](../performance/0743-pptx-semantic-text-and-edit-path.md), was
+accepted on 2026-09-24 by the owner's decision recorded in
+[change 0758](../performance/0758-owner-decisions-2026-09-24.md). All three now
+appear in the table above.
 
 ## Decision hierarchy
 
