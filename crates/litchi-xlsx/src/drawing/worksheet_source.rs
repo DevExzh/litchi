@@ -23,6 +23,7 @@ use quick_xml::name::{PrefixDeclaration, QName};
 use quick_xml::reader::Reader;
 
 use crate::error::{Result, allocation, invalid};
+use litchi_ooxml_common::xml::attributes::count_up_to;
 use litchi_ooxml_common::xml::{decode_xml_reference, is_ncname};
 
 const SPREADSHEETML: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -766,14 +767,17 @@ impl NamespaceState {
                 previous,
             });
         }
-        self.validate_attributes(element)?;
+        self.validate_attributes(element, limits.max_attributes)?;
         Ok(scope)
     }
 
-    fn validate_attributes(&self, element: &BytesStart<'_>) -> Result<()> {
+    fn validate_attributes(&self, element: &BytesStart<'_>, max_attributes: usize) -> Result<()> {
         let mut expanded: Vec<(Option<Vec<u8>>, Vec<u8>)> = Vec::new();
+        // `push` has refused a tag with more than `max_attributes`; counting
+        // no further, and without quick-xml's duplicate check, keeps this
+        // reservation bounded on its own.
         expanded
-            .try_reserve_exact(element.attributes().with_checks(true).count())
+            .try_reserve_exact(count_up_to(element, max_attributes))
             .map_err(|source| allocation("worksheet expanded attribute names", source))?;
         for attribute in element.attributes().with_checks(true) {
             let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
@@ -1001,4 +1005,94 @@ fn validate_binding(prefix: &[u8], uri: &[u8]) -> Result<()> {
         return Err(invalid("worksheet XML prefixed namespace binding is empty"));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::Error;
+
+    /// ` a00000="0" a00001="1" ...`: `count` distinct attribute names.
+    fn distinct_attributes(count: usize) -> String {
+        (0..count)
+            .map(|index| format!(" a{index:05}=\"{index}\""))
+            .collect()
+    }
+
+    fn worksheet(attributes: &str) -> String {
+        format!(
+            "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData{attributes}/></worksheet>"
+        )
+    }
+
+    fn scan(xml: &str, max_attributes: usize) -> Result<WorksheetSourceScan> {
+        WorksheetSourceScan::scan_with_limits(
+            xml.as_bytes(),
+            WorksheetSourceLimits {
+                max_attributes,
+                ..WorksheetSourceLimits::default()
+            },
+        )
+    }
+
+    fn refused<T>(result: Result<T>, expected: &str) -> bool {
+        matches!(result, Err(Error::Invalid(message)) if message.contains(expected))
+    }
+
+    #[test]
+    fn attribute_limits_and_duplicates_are_refused_as_before() {
+        assert!(
+            scan(
+                &worksheet(&distinct_attributes(MAX_ATTRIBUTES)),
+                MAX_ATTRIBUTES
+            )
+            .is_ok()
+        );
+        assert!(refused(
+            scan(
+                &worksheet(&distinct_attributes(MAX_ATTRIBUTES + 1)),
+                MAX_ATTRIBUTES
+            ),
+            "exceeds caller attribute limit"
+        ));
+        assert!(scan(&worksheet(&distinct_attributes(4)), 4).is_ok());
+        assert!(refused(
+            scan(&worksheet(&distinct_attributes(5)), 4),
+            "exceeds caller attribute limit"
+        ));
+        assert!(refused(
+            scan(&worksheet(" a='1' a='2'"), MAX_ATTRIBUTES),
+            "duplicated attribute"
+        ));
+        assert!(refused(
+            scan(
+                &worksheet(" xmlns:p='urn:p' xmlns:q='urn:p' p:a='1' q:a='2'"),
+                MAX_ATTRIBUTES
+            ),
+            "duplicate expanded attributes"
+        ));
+        // 20,000 distinct names followed by 20,000 repeats of the last one.
+        let mut attributes = distinct_attributes(20_000);
+        for _ in 0..20_000 {
+            attributes.push_str(" a19999=\"r\"");
+        }
+        assert!(refused(
+            scan(&worksheet(&attributes), MAX_ATTRIBUTES),
+            "exceeds caller attribute limit"
+        ));
+    }
+
+    #[test]
+    fn expanded_names_are_validated_past_the_bounded_reservation() {
+        // The reservation counts at most `max_attributes + 1` attributes;
+        // validation still reads every one of them.
+        let namespaces = NamespaceState::default();
+        let tag = BytesStart::from_content("e a='1' b='2' c='3' d='4' e='5'", 1);
+        assert!(namespaces.validate_attributes(&tag, 2).is_ok());
+        let tag = BytesStart::from_content("e a='1' b='2' c='3' d='4' a='5'", 1);
+        assert!(refused(
+            namespaces.validate_attributes(&tag, 2),
+            "duplicated attribute"
+        ));
+    }
 }

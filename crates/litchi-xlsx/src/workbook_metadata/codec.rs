@@ -3,6 +3,7 @@
 use crate::error::{Error, Result, invalid};
 use litchi_ooxml_common::XmlError;
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::SeenNames;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::{NsReader, XmlVersion};
@@ -606,6 +607,9 @@ fn node(
         .map_err(xml_error)?
         .into();
     let mut values = Vec::new();
+    // Expanded names borrowed from the resolver and the tag: checking each
+    // one costs O(log n), where scanning `values` would cost O(n).
+    let mut expanded = SeenNames::new();
     for item in element.attributes().with_checks(true) {
         let item = item.map_err(xml_error)?;
         if item.key.as_ref() == b"xmlns" || item.key.as_ref().starts_with(b"xmlns:") {
@@ -623,10 +627,10 @@ fn node(
         if value.len() > MAX_STRING {
             return Err(limit("attribute string"));
         }
-        if values
-            .iter()
-            .any(|a: &Attribute| a.ns == ans && a.local == alocal)
-        {
+        if !expanded.insert((
+            namespace_bytes(&resolved),
+            item.key.local_name().into_inner(),
+        )) {
             return Err(invalid("duplicate expanded attribute"));
         }
         values.push(Attribute {
@@ -653,6 +657,14 @@ fn namespace(value: &ResolveResult<'_>) -> Result<String> {
             "unbound namespace prefix {}",
             String::from_utf8_lossy(p)
         ))),
+    }
+}
+/// The bytes of the namespace [`namespace`] returns: the URI when bound and
+/// empty when unbound. An unknown prefix, which `namespace` refuses, is empty.
+fn namespace_bytes<'a>(value: &ResolveResult<'a>) -> &'a [u8] {
+    match value {
+        ResolveResult::Bound(Namespace(value)) => value,
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => &[],
     }
 }
 fn append(stack: &mut [Node], root: &mut Option<Node>, value: Node) -> Result<()> {
@@ -889,4 +901,67 @@ fn limit(value: impl Into<String>) -> Error {
         "workbook metadata resource limit exceeded: {}",
         value.into()
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// ` a00000="0" a00001="1" ...`: `count` distinct attribute names.
+    fn distinct_attributes(count: usize) -> String {
+        (0..count)
+            .map(|index| format!(" a{index:05}=\"{index}\""))
+            .collect()
+    }
+
+    fn parse(xml: &str) -> Result<Node> {
+        parse_dom(xml.as_bytes())
+    }
+
+    fn attributes(node: &Node) -> Vec<(&str, &str, &str)> {
+        node.attrs
+            .iter()
+            .map(|attribute| {
+                (
+                    attribute.ns.as_str(),
+                    attribute.local.as_str(),
+                    attribute.value.as_str(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn duplicate_attribute_names_are_refused_as_before() {
+        let node = parse("<e xmlns:p='urn:p' xmlns:q='urn:q' p:a='1' q:a='2' a='3'/>").unwrap();
+        assert_eq!(
+            attributes(&node),
+            [("urn:p", "a", "1"), ("urn:q", "a", "2"), ("", "a", "3")]
+        );
+        assert!(matches!(
+            parse("<e xmlns:p='urn:p' xmlns:q='urn:p' p:a='1' q:a='2'/>"),
+            Err(Error::Invalid(message)) if message == "duplicate expanded attribute"
+        ));
+        assert!(matches!(
+            parse("<e a='1' a='2'/>"),
+            Err(Error::Xml(XmlError::Malformed(message)))
+                if message.contains("duplicated attribute")
+        ));
+        // A value is checked before its name, as before.
+        assert!(matches!(
+            parse("<e xmlns:p='urn:p' xmlns:q='urn:p' p:a='1' q:a='&bogus;'/>"),
+            Err(Error::Xml(_))
+        ));
+    }
+
+    #[test]
+    fn many_distinct_attribute_names_are_read_in_order() {
+        // Scanning the attributes read so far compared ~1.25e9 pairs here.
+        let node = parse(&format!("<e{}/>", distinct_attributes(50_000))).unwrap();
+        assert_eq!(node.attrs.len(), 50_000);
+        for (index, attribute) in node.attrs.iter().enumerate() {
+            assert_eq!(attribute.local, format!("a{index:05}"));
+            assert_eq!(attribute.value, index.to_string());
+        }
+    }
 }

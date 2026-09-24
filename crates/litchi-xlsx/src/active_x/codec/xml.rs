@@ -14,6 +14,7 @@ use super::super::{
 };
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::SeenNames;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::{NsReader, XmlVersion};
@@ -570,6 +571,9 @@ fn make_node(
         .map_err(xml_error)?
         .to_string();
     let mut attrs = Vec::new();
+    // Expanded names borrowed from the resolver and the tag: checking each
+    // one costs O(log n), where scanning `attrs` would cost O(n).
+    let mut expanded = SeenNames::new();
     for item in e.attributes().with_checks(true) {
         let item = item.map_err(xml_error)?;
         let raw = item.key.as_ref();
@@ -586,10 +590,10 @@ fn make_node(
             .map_err(xml_error)?
             .into_owned();
         bounded(&value, "XML attribute")?;
-        if attrs
-            .iter()
-            .any(|a: &Attribute| a.ns == ans && a.local == alocal)
-        {
+        if !expanded.insert((
+            resolved_bytes(&resolved),
+            item.key.local_name().into_inner(),
+        )) {
             return Err(invalid("duplicate expanded XML attribute"));
         }
         attrs.push(Attribute {
@@ -617,6 +621,15 @@ fn resolved_ns(value: &ResolveResult<'_>) -> Result<String> {
             "unbound XML namespace prefix '{}'",
             String::from_utf8_lossy(prefix)
         ))),
+    }
+}
+/// The bytes of the namespace [`resolved_ns`] returns: the URI when bound
+/// and empty when unbound. An unknown prefix, which `resolved_ns` refuses,
+/// is empty.
+fn resolved_bytes<'a>(value: &ResolveResult<'a>) -> &'a [u8] {
+    match value {
+        ResolveResult::Bound(Namespace(value)) => value,
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => &[],
     }
 }
 fn append_node(stack: &mut [Node], root: &mut Option<Node>, node: Node) -> Result<()> {
@@ -1009,4 +1022,65 @@ fn is_sml(ns: &str) -> bool {
 }
 fn is_xdr(ns: &str) -> bool {
     matches!(ns, XDR | XDR_STRICT)
+}
+
+#[cfg(test)]
+mod tests {
+    use litchi_ooxml_common::Error as CommonError;
+
+    use super::*;
+    use crate::error::Error;
+
+    /// ` a00000="0" a00001="1" ...`: `count` distinct attribute names.
+    fn distinct_attributes(count: usize) -> String {
+        (0..count)
+            .map(|index| format!(" a{index:05}=\"{index}\""))
+            .collect()
+    }
+
+    fn attributes(node: &Node) -> Vec<(&str, &str, &str)> {
+        node.attrs
+            .iter()
+            .map(|attribute| {
+                (
+                    attribute.ns.as_str(),
+                    attribute.local.as_str(),
+                    attribute.value.as_str(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn duplicate_attribute_names_are_refused_as_before() {
+        let node = parse_dom(
+            b"<e xmlns:p='urn:p' xmlns:q='urn:q' p:a='1' q:a='2' a='3'/>",
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            attributes(&node),
+            [("urn:p", "a", "1"), ("urn:q", "a", "2"), ("", "a", "3")]
+        );
+        assert!(matches!(
+            parse_dom(b"<e xmlns:p='urn:p' xmlns:q='urn:p' p:a='1' q:a='2'/>", false),
+            Err(Error::Invalid(message)) if message == "duplicate expanded XML attribute"
+        ));
+        assert!(matches!(
+            parse_dom(b"<e a='1' a='2'/>", false),
+            Err(Error::Common(CommonError::Xml(message))) if message.contains("duplicated attribute")
+        ));
+    }
+
+    #[test]
+    fn many_distinct_attribute_names_are_read_in_order() {
+        // Scanning the attributes read so far compared ~1.25e9 pairs here.
+        let xml = format!("<e{}/>", distinct_attributes(50_000));
+        let node = parse_dom(xml.as_bytes(), false).unwrap();
+        assert_eq!(node.attrs.len(), 50_000);
+        for (index, attribute) in node.attrs.iter().enumerate() {
+            assert_eq!(attribute.local, format!("a{index:05}"));
+            assert_eq!(attribute.value, index.to_string());
+        }
+    }
 }
