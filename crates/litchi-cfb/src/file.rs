@@ -88,6 +88,98 @@ impl CheckedBitSet {
             *value &= !(1u64 << (bit % BITSET_WORD_BITS));
         }
     }
+
+    /// Covers the first `bit_len` bits for a chain walk over a table of that
+    /// length, as a reusable map whose every bit is clear between walks.
+    ///
+    /// Only growth writes words: the new words arrive clear, and the existing
+    /// ones are clear by the invariant. `bit_len` then bounds `contains` and
+    /// `insert` exactly as a fresh map of that length would.
+    #[inline]
+    fn cover(&mut self, bit_len: usize, resource: &'static str) -> Result<(), OleError> {
+        let word_count = bit_len.div_ceil(BITSET_WORD_BITS);
+        if self.words.len() < word_count {
+            let growth = word_count - self.words.len();
+            self.words
+                .try_reserve_exact(growth)
+                .map_err(|source| OleError::allocation(resource, source))?;
+            // The fallible reserve above makes this resize infallible.
+            self.words.resize(word_count, 0);
+            visited_map_work::record(growth);
+        }
+        self.bit_len = bit_len;
+        Ok(())
+    }
+
+    /// Restores the all-clear invariant after a walk over a table of
+    /// `bit_len` entries that set exactly the bits of `recorded`: clears those
+    /// bits, or the words covering the table, whichever writes fewer words.
+    /// A walk therefore costs time proportional to its chain, never more than
+    /// the table's words.
+    #[inline]
+    fn clear_walk(&mut self, recorded: &[u32], bit_len: usize) {
+        let word_count = bit_len.div_ceil(BITSET_WORD_BITS);
+        if recorded.len() < word_count {
+            for &sector in recorded {
+                if let Ok(index) = usize::try_from(sector) {
+                    self.remove(index);
+                }
+            }
+            visited_map_work::record(recorded.len());
+        } else {
+            self.clear_table(bit_len);
+        }
+    }
+
+    /// Clears every word covering the first `bit_len` bits: the restoration
+    /// of a walk whose set bits are not all recorded, such as a failed one.
+    #[inline]
+    fn clear_table(&mut self, bit_len: usize) {
+        let word_count = bit_len.div_ceil(BITSET_WORD_BITS);
+        if let Some(words) = self.words.get_mut(..word_count) {
+            words.fill(0);
+            visited_map_work::record(word_count);
+        } else {
+            // A walk never sets a bit its table does not cover; clearing the
+            // whole map keeps the invariant without relying on that.
+            visited_map_work::record(self.words.len());
+            self.words.fill(0);
+        }
+    }
+}
+
+/// Accounting of the words a reusable chain map writes, which the tests read
+/// to bound the work per stream without timing it. Outside tests it compiles
+/// to nothing.
+#[cfg(test)]
+pub(crate) mod visited_map_work {
+    use std::cell::Cell;
+
+    thread_local! {
+        static WORDS: Cell<u64> = const { Cell::new(0) };
+    }
+
+    /// Adds `words` written words to this thread's count.
+    pub(crate) fn record(words: usize) {
+        WORDS.with(|count| {
+            count.set(
+                count
+                    .get()
+                    .saturating_add(u64::try_from(words).unwrap_or(u64::MAX)),
+            );
+        });
+    }
+
+    /// Returns this thread's count and resets it to zero.
+    pub(crate) fn take() -> u64 {
+        WORDS.with(|count| count.replace(0))
+    }
+}
+
+#[cfg(not(test))]
+mod visited_map_work {
+    #[inline(always)]
+    pub(super) fn record(_words: usize) {}
 }
 
 /// Raw OLE directory entry structure (128 bytes)
@@ -260,6 +352,14 @@ pub struct OleFile<R: Read + Seek> {
     ministream: Option<Vec<u8>>,
     /// Exclusive ownership of every physical sector in the file.
     sector_roles: Vec<PhysicalSectorRole>,
+    /// Chain buffers [`Self::open_stream`] reuses, so a read collects its
+    /// chain in time proportional to the chain rather than allocating and
+    /// clearing a map the size of the FAT or MiniFAT for every stream. They
+    /// are empty until the first read and then retain one bit per entry of
+    /// the larger table read so far and one `u32` per sector of the longest
+    /// chain read so far, 1/128 (512-byte sectors) or 1/1024 (4096-byte
+    /// sectors) of that stream's bytes.
+    stream_chain: EndChainScratch,
 }
 
 /// The validated, cursor-independent portion of an OLE file.
@@ -893,6 +993,7 @@ impl<R: Read + Seek> OleFile<R> {
             dir_name_data: Vec::new(),
             ministream: None,
             sector_roles,
+            stream_chain: EndChainScratch::default(),
         };
 
         // Load FAT (File Allocation Table)
@@ -2344,7 +2445,25 @@ impl<R: Read + Seek> OleFile<R> {
         start_sector: u32,
         declared_size: u64,
     ) -> Result<Vec<u8>, OleError> {
-        let sectors = collect_sector_chain(&self.fat, start_sector, "FAT")?;
+        // The chain buffers are moved out while the batched read borrows the
+        // reader, and put back whatever the outcome: `collect` leaves every
+        // visited bit clear on success and on error alike.
+        let mut chain = std::mem::take(&mut self.stream_chain);
+        let result = self.read_fat_chain(&mut chain, start_sector, declared_size);
+        self.stream_chain = chain;
+        result
+    }
+
+    /// [`Self::read_stream_from_fat`] with the chain collected into `chain`,
+    /// with the checks and errors of `collect_sector_chain`.
+    fn read_fat_chain(
+        &mut self,
+        chain: &mut EndChainScratch,
+        start_sector: u32,
+        declared_size: u64,
+    ) -> Result<Vec<u8>, OleError> {
+        chain.collect(&self.fat, start_sector, "FAT")?;
+        let sectors = chain.sectors();
         let size = usize::try_from(declared_size)
             .map_err(|_err| OleError::CorruptedFile("FAT stream is too large".to_string()))?;
         let required_sectors = size.div_ceil(self.sector_size);
@@ -2426,7 +2545,11 @@ impl<R: Read + Seek> OleFile<R> {
             .ministream
             .as_ref()
             .ok_or_else(|| OleError::CorruptedFile("No mini stream".to_string()))?;
-        let sectors = collect_sector_chain(&self.minifat, start_sector, "MiniFAT")?;
+        // The same checks and errors as `collect_sector_chain`, into the
+        // retained buffers.
+        self.stream_chain
+            .collect(&self.minifat, start_sector, "MiniFAT")?;
+        let sectors = self.stream_chain.sectors();
         let stream_len = usize::try_from(size)
             .map_err(|_err| OleError::CorruptedFile("MiniFAT stream is too large".to_string()))?;
         let chain_capacity = sectors
@@ -2443,7 +2566,7 @@ impl<R: Read + Seek> OleFile<R> {
         let mut data = try_vec_with_capacity(stream_len, "MiniFAT stream data")?;
 
         // Copy all mini sectors
-        for &sector in &sectors {
+        for &sector in sectors {
             let position = usize::try_from(sector)
                 .ok()
                 .and_then(|sector_id| sector_id.checked_mul(self.mini_sector_size))
@@ -3614,6 +3737,14 @@ fn collect_directory_sector_chain(
     Ok(sectors)
 }
 
+/// Collects the chain starting at `start_sector` up to its `ENDOFCHAIN`
+/// terminator into a fresh vector, with a fresh visited map the size of the
+/// table.
+///
+/// This allocating form was `open_stream`'s chain collection. The reader now
+/// collects into its retained [`EndChainScratch`], which runs the same walker;
+/// this form stays as the oracle the tests hold that scratch to.
+#[cfg(test)]
 fn collect_sector_chain(
     allocation_table: &[u32],
     start_sector: u32,
@@ -3639,7 +3770,7 @@ fn collect_sector_chain(
 /// terminator, recording each sector in `sectors` and marking it in
 /// `visited`, which must cover `allocation_table` with every bit clear.
 ///
-/// This is the one implementation of the checks [`collect_sector_chain`] and
+/// This is the one implementation of the checks `collect_sector_chain` and
 /// [`EndChainScratch::collect`] perform: every index must lie inside
 /// `allocation_table`, be visited once, and lead to `ENDOFCHAIN` or a regular
 /// sector. On success, the bits it set are exactly those of the sectors it
@@ -3762,9 +3893,17 @@ fn collect_sector_chain_exact(
 /// chains against the same FAT or MiniFAT, so retaining these buffers removes
 /// the two transient allocations that would otherwise occur for every
 /// stream. The buffers are deliberately private to that validation path.
+///
+/// The visited map keeps every bit clear between collections. A collection
+/// marks exactly the sectors it records, so it is restored by clearing those
+/// bits or the table's words, whichever is fewer; a failed collection clears
+/// the table's words. Validating every stream against one table therefore
+/// costs time proportional to the chains, where clearing a table-sized map
+/// for each stream cost the stream count times the table.
 #[derive(Debug, Default)]
 struct SectorChainScratch {
     sectors: Vec<u32>,
+    /// Every bit is clear between calls to [`Self::collect_exact`].
     visited: CheckedBitSet,
 }
 
@@ -3782,20 +3921,10 @@ impl SectorChainScratch {
         self.reset_visited();
     }
 
+    /// Covers a table of `bit_len` entries. Nothing is cleared: every bit is
+    /// already clear, so the map reads as a fresh one of that length.
     fn prepare_visited(&mut self, bit_len: usize) -> Result<(), OleError> {
-        let word_count = bit_len.div_ceil(BITSET_WORD_BITS);
-        let visited = &mut self.visited;
-        if visited.words.len() < word_count {
-            visited
-                .words
-                .try_reserve_exact(word_count - visited.words.len())
-                .map_err(|source| OleError::allocation("sector-chain map", source))?;
-            // The fallible reserve above makes this resize infallible.
-            visited.words.resize(word_count, 0);
-        }
-        visited.bit_len = bit_len;
-        visited.words.fill(0);
-        Ok(())
+        self.visited.cover(bit_len, "sector-chain map")
     }
 
     fn collect_exact(
@@ -3884,7 +4013,14 @@ impl SectorChainScratch {
             }
             Ok(())
         })();
-        if result.is_err() {
+        // Restore the all-clear map. Each `insert` above is immediately
+        // followed by the infallible `push` of its sector, so a successful
+        // walk set exactly the bits of the chain it recorded.
+        if result.is_ok() {
+            self.visited
+                .clear_walk(&self.sectors, allocation_table.len());
+        } else {
+            self.visited.clear_table(allocation_table.len());
             self.reset();
         }
         result
@@ -3892,14 +4028,14 @@ impl SectorChainScratch {
 }
 
 /// Reusable buffers for collecting chains up to their `ENDOFCHAIN`
-/// terminator, with exactly the checks and errors of [`collect_sector_chain`]
+/// terminator, with exactly the checks and errors of `collect_sector_chain`
 /// (both run [`walk_chain_to_end`]).
 ///
 /// The visited map keeps every bit clear between collections. A successful
 /// walk marks exactly the sectors it records, so the map is restored by
 /// clearing those bits or the table's words, whichever is fewer; a failed walk
 /// clears the table's words. Collecting chains against one table therefore
-/// costs time proportional to the chains, where [`collect_sector_chain`]
+/// costs time proportional to the chains, where `collect_sector_chain`
 /// allocates and clears a table-sized map for each.
 #[derive(Debug, Default)]
 struct EndChainScratch {
@@ -3914,7 +4050,7 @@ impl EndChainScratch {
     }
 
     /// Collects the chain starting at `start_sector`. On error the recorded
-    /// chain is empty, as [`collect_sector_chain`] returns none.
+    /// chain is empty, as `collect_sector_chain` returns none.
     fn collect(
         &mut self,
         allocation_table: &[u32],
@@ -3927,16 +4063,8 @@ impl EndChainScratch {
         }
         // Cover this table: new words are clear, and every existing word is
         // clear by the invariant.
-        let word_count = allocation_table.len().div_ceil(BITSET_WORD_BITS);
-        if self.visited.words.len() < word_count {
-            self.visited
-                .words
-                .try_reserve_exact(word_count - self.visited.words.len())
-                .map_err(|source| OleError::allocation("sector-chain map", source))?;
-            // The fallible reserve above makes this resize infallible.
-            self.visited.words.resize(word_count, 0);
-        }
-        self.visited.bit_len = allocation_table.len();
+        self.visited
+            .cover(allocation_table.len(), "sector-chain map")?;
         let result = walk_chain_to_end(
             allocation_table,
             start_sector,
@@ -3944,17 +4072,14 @@ impl EndChainScratch {
             &mut self.visited,
             &mut self.sectors,
         );
-        // Only the table's words can hold bits this walk set.
-        if result.is_ok() && self.sectors.len() < word_count {
-            for &sector in &self.sectors {
-                if let Ok(index) = usize::try_from(sector) {
-                    self.visited.remove(index);
-                }
-            }
-        } else if let Some(words) = self.visited.words.get_mut(..word_count) {
-            words.fill(0);
-        }
-        if result.is_err() {
+        // Only the table's words can hold bits this walk set. A successful
+        // walk set exactly the bits of the chain it recorded; a failed one
+        // may have marked a sector it could not record.
+        if result.is_ok() {
+            self.visited
+                .clear_walk(&self.sectors, allocation_table.len());
+        } else {
+            self.visited.clear_table(allocation_table.len());
             self.sectors.clear();
         }
         result
@@ -4144,6 +4269,10 @@ fn format_clsid(bytes: &[u8]) -> String {
 pub fn is_ole_file(data: &[u8]) -> bool {
     data.len() >= MINIMAL_OLEFILE_SIZE && &data[0..8] == MAGIC
 }
+
+#[cfg(test)]
+#[path = "chain_work_tests.rs"]
+mod chain_work_tests;
 
 #[cfg(test)]
 mod tests {
@@ -4656,6 +4785,7 @@ mod tests {
             dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; physical_count],
+            stream_chain: EndChainScratch::default(),
         }
     }
 
@@ -4709,6 +4839,7 @@ mod tests {
             dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; 2],
+            stream_chain: EndChainScratch::default(),
         };
 
         assert_eq!(file.read_stream_from_fat(0, 3).unwrap(), b"abc");
@@ -4730,6 +4861,7 @@ mod tests {
             dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: Vec::new(),
+            stream_chain: EndChainScratch::default(),
         }
     }
 
@@ -4941,6 +5073,7 @@ mod tests {
             dir_name_data: Vec::new(),
             ministream: Some(ministream),
             sector_roles: Vec::new(),
+            stream_chain: EndChainScratch::default(),
         }
     }
 
@@ -5005,6 +5138,7 @@ mod tests {
             ],
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; bytes.len() / SECTOR_SIZE_V3],
+            stream_chain: EndChainScratch::default(),
         }
     }
 
@@ -5483,6 +5617,7 @@ mod tests {
             dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; physical_sectors],
+            stream_chain: EndChainScratch::default(),
         }
     }
 
@@ -5826,6 +5961,7 @@ mod tests {
             dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; 3],
+            stream_chain: EndChainScratch::default(),
         };
         let mut data = vec![0xFF; 2 * SECTOR_SIZE_V3];
 
@@ -5884,6 +6020,7 @@ mod tests {
             dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; 113],
+            stream_chain: EndChainScratch::default(),
         };
         assert!(matches!(
             file.load_fat(&header, 111, 109, 2),
@@ -5921,6 +6058,7 @@ mod tests {
             dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed; 2],
+            stream_chain: EndChainScratch::default(),
         };
 
         assert!(matches!(
@@ -5947,6 +6085,7 @@ mod tests {
             dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: vec![PhysicalSectorRole::Unclaimed],
+            stream_chain: EndChainScratch::default(),
         };
 
         assert!(matches!(
@@ -5988,6 +6127,7 @@ mod tests {
             dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: Vec::new(),
+            stream_chain: EndChainScratch::default(),
         };
         assert!(matches!(
             file.read_sector(0),
@@ -6014,6 +6154,7 @@ mod tests {
             dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: Vec::new(),
+            stream_chain: EndChainScratch::default(),
         };
         let mut destination = [0xFF; SECTOR_SIZE_V3];
 
@@ -6105,6 +6246,7 @@ mod tests {
             dir_name_data,
             ministream: None,
             sector_roles: Vec::new(),
+            stream_chain: EndChainScratch::default(),
         };
 
         let streams = file.list_streams();
