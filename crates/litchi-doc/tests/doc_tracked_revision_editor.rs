@@ -425,3 +425,40 @@ fn tracked_insertion_at_the_saved_caret_keeps_the_caret_before_the_new_text() {
         assert_eq!(saved_selection_cps(&rejected), recorded, "{name}");
     }
 }
+
+/// Tracked insertions into these real documents rebuild CHPX FKP pages whose
+/// even-rounded size estimate fills a page exactly while the first CHPX placed
+/// below the count byte needs one more byte. The pages must still reopen.
+#[test]
+fn tracked_insertions_keep_rebuilt_chpx_pages_readable() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for path in [
+        "test-data/poi/test-data/document/saved-by-table.doc",
+        "test-data/libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc",
+        "test-data/poi/test-data/document/au.edu.utas.www___data_assets_word_doc_0003_154335_International-Travel-Approval-Request-Form.doc",
+    ] {
+        let source = std::fs::read(root.join(path)).expect("DOC fixture should exist");
+        let mut editor = RevisionEditor::open(source, Limits::default())
+            .unwrap_or_else(|error| panic!("{path} should open: {error}"));
+        editor
+            .add_text(
+                0,
+                "x",
+                RevisionKind::Insertion,
+                RevisionMetadata::new("0768"),
+            )
+            .unwrap_or_else(|error| panic!("{path} should accept the insertion: {error}"));
+        let output = editor.finish().unwrap();
+        let reopened = RevisionEditor::open(output.clone(), Limits::default())
+            .unwrap_or_else(|error| panic!("{path} output should reopen: {error}"));
+        assert!(
+            reopened.revisions().unwrap().iter().any(|revision| (
+                revision.start_cp,
+                revision.end_cp
+            ) == (0, 1)
+                && revision.author == "0768"),
+            "{path}"
+        );
+        assert_eq!(reopened.finish().unwrap(), output, "{path}");
+    }
+}
