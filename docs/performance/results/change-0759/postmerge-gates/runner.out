@@ -1,0 +1,16 @@
+fmt 0 28.02
+check 0 32.53
+clippy 0 32.79
+tests 0 319.56
+facade 0 75.83
+rustdoc 0 18.79
+harness 0 791.57
+allocator 0 27.79
+facade-polyglot 0 33.46
+claims 0 71.38
+claims-structural 0 0.65
+gate-tests 0 76.77
+report 0 0.64
+coverage 0 0.92
+non-iwork 0 5.31
+boundaries 0 273.47

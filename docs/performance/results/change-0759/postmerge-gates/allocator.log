@@ -1,0 +1,19 @@
+HEAD 9dda621226b1513140e6f18e0ed46f6003434448
+TREE 68d48794ddd6e7aeb39008032fa3860c190ad785
+UNSTAGED 0 UNTRACKED 0
+$ cargo test --manifest-path tools/perf-baseline/Cargo.toml --locked --features allocator-metrics --bin docx_bounded_tail_append_compare -- --test-threads=1
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/tools/perf-baseline)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 27.08s
+     Running unittests src/bin/docx_bounded_tail_append_compare.rs (/home/zhuhe/code/litchi-worktrees/targets/postmerge/debug/deps/docx_bounded_tail_append_compare-bbb1df254f513d8c)
+
+running 5 tests
+test allocator::tests::global_allocator_records_a_failed_allocation ... ok
+test allocator::tests::global_allocator_records_a_failed_realloc_without_losing_old_allocation ... ok
+test allocator::tests::global_allocator_records_realloc_grow_and_shrink ... ok
+test allocator::tests::global_allocator_records_successful_alloc_and_dealloc_with_live_peak ... ok
+test allocator::tests::global_allocator_records_zeroed_alloc_and_zeroes_memory ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+exit 0
