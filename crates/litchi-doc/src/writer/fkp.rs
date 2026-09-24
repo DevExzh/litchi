@@ -11,7 +11,17 @@
 //! `CHPFormattedDiskPage` / `PAPFormattedDiskPage`.
 
 /// I/O error returned while generating FKP pages.
+///
+/// A property that no page can hold is refused with
+/// [`std::io::ErrorKind::InvalidInput`].
 pub type IoError = std::io::Error;
+
+/// The largest CHPX `grpprl`: `Chpx.cb` is one byte (MS-DOC 2.9.32).
+const MAX_CHPX_GRPPRL: usize = 255;
+
+fn refuse(message: String) -> IoError {
+    IoError::new(std::io::ErrorKind::InvalidInput, message)
+}
 
 /// Character property (CHPX) entry
 /// Represents a formatting run from `fc_start` to `fc_end`
@@ -80,7 +90,23 @@ impl ChpxFkpBuilder {
     ///
     /// If all entries fit in a single page, a single page is returned.
     /// Otherwise entries are split across multiple pages.
+    ///
+    /// # Errors
+    ///
+    /// A `grpprl` longer than 255 bytes, which `Chpx.cb` cannot count, is
+    /// refused with [`std::io::ErrorKind::InvalidInput`] instead of being
+    /// cut.
     pub fn generate_pages(&self) -> Result<FkpPages, IoError> {
+        if let Some(entry) = self
+            .entries
+            .iter()
+            .find(|entry| entry.grpprl.len() > MAX_CHPX_GRPPRL)
+        {
+            return Err(refuse(format!(
+                "CHPX grpprl of {} bytes exceeds the {MAX_CHPX_GRPPRL} bytes Chpx.cb can count",
+                entry.grpprl.len()
+            )));
+        }
         if self.entries.is_empty() {
             // Return one empty page
             return Ok(FkpPages {
@@ -124,6 +150,14 @@ impl ChpxFkpBuilder {
             while n > 1 && !Self::page_fits(&self.entries[start..start + n]) {
                 n -= 1;
             }
+            // One CHPX of at most 255 bytes always fits an empty page; the
+            // check keeps an estimate error from ever writing an overlap.
+            if !Self::page_fits(&self.entries[start..start + n]) {
+                return Err(refuse(format!(
+                    "CHPX of {} bytes cannot fit in one FKP page",
+                    self.entries[start].grpprl.len()
+                )));
+            }
 
             let end = (start + n).min(self.entries.len());
             let page = Self::build_page(&self.entries[start..end])?;
@@ -151,7 +185,7 @@ impl ChpxFkpBuilder {
             .rev()
             .filter(|entry| !entry.grpprl.is_empty())
         {
-            let Some(chpx_start) = data_offset.checked_sub(1 + entry.grpprl.len().min(255)) else {
+            let Some(chpx_start) = data_offset.checked_sub(1 + entry.grpprl.len()) else {
                 return false;
             };
             data_offset = chpx_start - chpx_start % 2;
@@ -177,7 +211,7 @@ impl ChpxFkpBuilder {
         fkp[last_fc_off..last_fc_off + 4].copy_from_slice(&entries[n - 1].fc_end.to_le_bytes());
 
         // Count byte
-        fkp[511] = n as u8;
+        fkp[511] = u8::try_from(n).map_err(|_| refuse(format!("{n} CHPXs exceed one FKP")))?;
 
         // RGB array offset
         let rgb_off = (n + 1) * 4;
@@ -188,13 +222,19 @@ impl ChpxFkpBuilder {
             if entry.grpprl.is_empty() {
                 fkp[rgb_off + i] = 0;
             } else {
-                let sz = entry.grpprl.len().min(255);
-                let chpx_size = 1 + sz;
-                data_offset -= chpx_size;
+                let sz = entry.grpprl.len();
+                let cb = u8::try_from(sz)
+                    .map_err(|_| refuse(format!("CHPX grpprl of {sz} bytes exceeds Chpx.cb")))?;
+                data_offset = data_offset
+                    .checked_sub(1 + sz)
+                    .ok_or_else(|| refuse("CHPX FKP page overflow".to_string()))?;
                 data_offset -= data_offset % 2; // word-align
+                if data_offset < rgb_off + n {
+                    return Err(refuse("CHPX FKP page overflow".to_string()));
+                }
 
-                fkp[data_offset] = sz as u8;
-                fkp[data_offset + 1..data_offset + 1 + sz].copy_from_slice(&entry.grpprl[..sz]);
+                fkp[data_offset] = cb;
+                fkp[data_offset + 1..data_offset + 1 + sz].copy_from_slice(&entry.grpprl);
                 fkp[rgb_off + i] = (data_offset / 2) as u8;
             }
         }
@@ -251,6 +291,14 @@ impl PapxFkpBuilder {
     }
 
     /// Generate one or more 512-byte PAPX FKP pages.
+    ///
+    /// # Errors
+    ///
+    /// Paragraph properties that cannot fit in one page even alone (a
+    /// `grpprl` of 486 bytes or more, beside the 2-byte `istd`) are refused
+    /// with [`std::io::ErrorKind::InvalidInput`]. MS-DOC stores such
+    /// properties in the Data stream through `sprmPHugePapx`, which this
+    /// builder does not write.
     pub fn generate_pages(&self) -> Result<FkpPages, IoError> {
         if self.entries.is_empty() {
             return Ok(FkpPages {
@@ -288,6 +336,12 @@ impl PapxFkpBuilder {
             // filled to the estimate could overwrite its last BX entry.
             while n > 1 && !Self::page_fits(&self.entries[start..start + n]) {
                 n -= 1;
+            }
+            if !Self::page_fits(&self.entries[start..start + n]) {
+                return Err(refuse(format!(
+                    "paragraph properties of {} bytes cannot fit in one PAPX FKP page",
+                    self.entries[start].grpprl.len()
+                )));
             }
 
             let end = (start + n).min(self.entries.len());
@@ -335,10 +389,11 @@ impl PapxFkpBuilder {
         fkp[last_fc_off..last_fc_off + 4].copy_from_slice(&entries[n - 1].fc_end.to_le_bytes());
 
         // Count byte
-        fkp[511] = n as u8;
+        fkp[511] = u8::try_from(n).map_err(|_| refuse(format!("{n} PAPXs exceed one FKP")))?;
 
         // BX array offset
         let bx_off = (n + 1) * 4;
+        let property_start = bx_off + n * BX_SIZE;
         let mut grpprl_offset = 511usize;
 
         // Fill grpprl data forward (matching the forward BX index order)
@@ -350,8 +405,13 @@ impl PapxFkpBuilder {
             let len = grpprl_full.len();
 
             let extra = if (len % 2) > 0 { 1 } else { 2 };
-            grpprl_offset -= len + extra;
+            grpprl_offset = grpprl_offset
+                .checked_sub(len + extra)
+                .ok_or_else(|| refuse("PAPX FKP page overflow".to_string()))?;
             grpprl_offset -= grpprl_offset % 2;
+            if grpprl_offset < property_start {
+                return Err(refuse("PAPX FKP page overflow".to_string()));
+            }
 
             // BX entry: word-offset pointer + 12 bytes PHE (zeros)
             let bx_pos = bx_off + i * BX_SIZE;
@@ -576,6 +636,86 @@ mod tests {
         }
         assert_eq!(count, 3);
         assert_eq!(pages.ranges, [(0, 20), (20, 30)]);
+    }
+
+    /// One PAPX whose `grpprl` (beside the 2-byte `istd`) is `size` bytes.
+    fn single_papx(size: usize) -> Result<FkpPages, IoError> {
+        let mut builder = PapxFkpBuilder::new();
+        builder.add_entry(0, 4, vec![0x5A; size]);
+        builder.generate_pages()
+    }
+
+    #[test]
+    fn papx_that_cannot_fit_a_page_alone_is_refused_instead_of_overlapping_or_panicking() {
+        // 485 bytes is the largest grpprl one PAPX FKP can hold: the PAPX
+        // (1-byte cb, istd and grpprl) starts at offset 22, after the two FCs
+        // and the 13-byte BX.
+        let pages = single_papx(485).unwrap();
+        let parsed = crate::parts::fkp::PapxFkp::parse(&pages.pages[0], &[]).unwrap();
+        assert_eq!(parsed.count(), 1);
+        assert_eq!(&parsed.entry(0).unwrap().grpprl[2..], &[0x5A; 485]);
+        assert_eq!(
+            pages.pages[0][8], 11,
+            "BX word offset of the PAPX at byte 22"
+        );
+
+        // 486 bytes would overlap the BX (the base wrote that page), and from
+        // 508 bytes the base's offset arithmetic underflowed and panicked.
+        for size in [486, 487, 507, 508, 509, 510, 511, 4_096] {
+            let error = single_papx(size).unwrap_err();
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput, "{size}");
+        }
+
+        // Entries before an oversized one do not rescue it.
+        let mut builder = PapxFkpBuilder::new();
+        builder.add_entry(0, 4, vec![0x5A; 8]);
+        builder.add_entry(4, 8, vec![0x5A; 500]);
+        assert_eq!(
+            builder.generate_pages().unwrap_err().kind(),
+            std::io::ErrorKind::InvalidInput
+        );
+    }
+
+    #[test]
+    fn chpx_longer_than_its_count_byte_is_refused_instead_of_cut() {
+        let mut builder = ChpxFkpBuilder::new();
+        builder.add_entry(0, 4, vec![0xA5; 255]);
+        let pages = builder.generate_pages().unwrap();
+        let parsed = crate::parts::fkp::ChpxFkp::parse(&pages.pages[0], &[]).unwrap();
+        assert_eq!(parsed.entries()[0].grpprl.len(), 255);
+
+        // The base cut a 256-byte grpprl to 255 bytes, which can split a SPRM.
+        builder.add_entry(4, 8, vec![0xA5; 256]);
+        assert_eq!(
+            builder.generate_pages().unwrap_err().kind(),
+            std::io::ErrorKind::InvalidInput
+        );
+    }
+
+    /// A fresh table row stores its table properties in its row-end PAPX, which
+    /// grows by 22 bytes a column (`sprmTDefTable`); from 22 columns it cannot
+    /// fit one FKP page. The writer now refuses such a row with a typed error;
+    /// at the base it wrote an unreadable page (22 columns) or panicked in the
+    /// PAPX builder (23 to 63 columns).
+    #[test]
+    fn fresh_writer_refuses_a_table_row_whose_properties_cannot_fit_a_page() {
+        let write = |columns: usize| {
+            let mut writer = crate::writer::Writer::new();
+            writer.add_table(1, columns).unwrap();
+            let mut output = std::io::Cursor::new(Vec::new());
+            writer.write_to(&mut output).map(|()| output.into_inner())
+        };
+        let bytes = write(21).unwrap();
+        let mut package = crate::Package::from_reader(std::io::Cursor::new(bytes)).unwrap();
+        package.document().unwrap().text().unwrap();
+        for columns in [22, 23, 40, 63] {
+            match write(columns) {
+                Err(crate::writer::WriteError::Io(error)) => {
+                    assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput, "{columns}");
+                },
+                other => panic!("{columns} columns: {:?}", other.map(|bytes| bytes.len())),
+            }
+        }
     }
 
     #[test]
