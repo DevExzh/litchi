@@ -1331,13 +1331,28 @@ fn optional_xml_member_size(bytes: &[u8]) -> usize {
     1usize.saturating_add(framed_size(bytes.len()))
 }
 
+/// Borrow a present part whose payload the closure needs.
+///
+/// Presence is decided first with [`OpcPackage::part_metadata`], which never
+/// decodes. Under ADR 0030 `get_part` decodes the payload on first access, so
+/// an error here is a present part that failed to decode, never an absence.
+fn decoded_part<'package>(
+    package: &'package OpcPackage,
+    name: &PackURI,
+) -> std::result::Result<&'package dyn Part, PatchError> {
+    package.get_part(name).map_err(|_| PatchError::InvalidText {
+        field: "Ink durable part payload",
+    })
+}
+
 fn part_member_size(
     package: &OpcPackage,
     name: &PackURI,
 ) -> std::result::Result<usize, PatchError> {
-    let Ok(part) = package.get_part(name) else {
+    if package.part_metadata(name).is_none() {
         return Ok(1);
-    };
+    }
+    let part = decoded_part(package, name)?;
     let relationships =
         package
             .source_relationships(name)
@@ -1357,11 +1372,14 @@ fn parts_equal(
     after: &OpcPackage,
     name: &PackURI,
 ) -> std::result::Result<bool, PatchError> {
-    let left = before.get_part(name).ok();
-    let right = after.get_part(name).ok();
-    match (left, right) {
-        (None, None) => Ok(true),
-        (Some(left), Some(right)) => {
+    match (
+        before.part_metadata(name).is_some(),
+        after.part_metadata(name).is_some(),
+    ) {
+        (false, false) => Ok(true),
+        (true, true) => {
+            let left = decoded_part(before, name)?;
+            let right = decoded_part(after, name)?;
             let left_relationships =
                 before
                     .source_relationships(name)
@@ -1599,9 +1617,10 @@ fn capture_part(
     package: &OpcPackage,
     name: &PackURI,
 ) -> std::result::Result<Option<Member>, PatchError> {
-    let Ok(part) = package.get_part(name) else {
+    if package.part_metadata(name).is_none() {
         return Ok(None);
-    };
+    }
+    let part = decoded_part(package, name)?;
     let relationships =
         package
             .source_relationships(name)
@@ -3059,6 +3078,83 @@ mod tests {
                 .to_string()
                 .contains("truncated Ink durable closure records")
         );
+    }
+
+    /// A lazily opened package with one changed XML part and, optionally, a
+    /// stored member whose payload fails its CRC on first decode. Deferred
+    /// open accepts it; only a read of that member's payload fails (ADR 0030).
+    fn lazy_package(good: &[u8], corrupt_member: bool) -> OpcPackage {
+        const MANIFEST: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="bin" ContentType="application/octet-stream"/></Types>"#;
+        const ROOT_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#;
+        const CORRUPT_PAYLOAD: &[u8] = b"ink-durable-corrupt-payload";
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored("[Content_Types].xml", MANIFEST)
+            .expect("manifest");
+        writer
+            .write_stored("_rels/.rels", ROOT_RELATIONSHIPS)
+            .expect("root relationships");
+        writer.write_stored("custom/good.xml", good).expect("good");
+        if corrupt_member {
+            writer
+                .write_stored("custom/bad.bin", CORRUPT_PAYLOAD)
+                .expect("corrupt member");
+        }
+        let mut bytes = writer.finish_to_bytes().expect("archive");
+        if corrupt_member {
+            let offset = bytes
+                .windows(CORRUPT_PAYLOAD.len())
+                .position(|window| window == CORRUPT_PAYLOAD)
+                .expect("stored payload");
+            bytes[offset] ^= 1;
+        }
+        OpcPackage::from_vec(bytes).expect("corruption is deferred to first decode")
+    }
+
+    fn is_undecodable_part(result: std::result::Result<impl Sized, PatchError>) -> bool {
+        matches!(
+            result,
+            Err(PatchError::InvalidText {
+                field: "Ink durable part payload"
+            })
+        )
+    }
+
+    // Review of the 0759 merge: the closure probes read any `get_part` error
+    // as absence, so a present part whose payload failed to decode was
+    // silently left out of the reverse closure.
+    #[test]
+    fn closure_probes_refuse_a_present_part_that_fails_to_decode() {
+        let before = lazy_package(b"<a/>", true);
+        let after = lazy_package(b"<b/>", false);
+        let bad = PackURI::new("/custom/bad.bin").expect("part name");
+
+        // Absence is decided from metadata alone and decodes nothing.
+        assert_eq!(part_member_size(&after, &bad).expect("absent"), 1);
+        assert!(capture_part(&after, &bad).expect("absent").is_none());
+        assert!(!parts_equal(&before, &after, &bad).expect("presence differs"));
+        assert!(!parts_equal(&after, &before, &bad).expect("presence differs"));
+        assert_eq!(before.deferred_decode_counters(), Some((0, 0)));
+        assert_eq!(after.deferred_decode_counters(), Some((0, 0)));
+
+        // A present part whose payload is needed reports its decode failure.
+        assert!(is_undecodable_part(part_member_size(&before, &bad)));
+        assert!(is_undecodable_part(capture_part(&before, &bad)));
+        assert!(is_undecodable_part(parts_equal(&before, &before, &bad)));
+        assert!(is_undecodable_part(encode_delta(
+            &before,
+            &after,
+            MAX_DELTA_BYTES
+        )));
+        assert!(is_undecodable_part(encode_delta(
+            &after,
+            &before,
+            MAX_DELTA_BYTES
+        )));
+
+        // Without the corrupt member the same transition still encodes.
+        let clean = lazy_package(b"<a/>", false);
+        assert!(encode_delta(&clean, &after, MAX_DELTA_BYTES).is_ok());
     }
 
     #[test]
