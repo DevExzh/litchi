@@ -1,0 +1,58 @@
+Gates for change 0762 at bc18e8abdd (source identical to the measured after binaries).
+Environment: CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0762 CARGO_BUILD_JOBS=6, rustc 1.95.0, --locked --offline,
+TMPDIR under scratch/0762. The root Cargo.lock was regenerated offline once (it predates the base's
+litchi-xldm package; no dependency version changed), after which every command runs with --locked.
+
+cargo fmt --all --check                                                                          exit 0
+cargo check <soapberry-zip and its in-scope dependents> --all-targets --locked                   exit 0 (no warnings)
+  set: -p soapberry-zip -p litchi -p litchi-doc -p litchi-docx -p litchi-drawingml -p litchi-odb -p litchi-odc
+       -p litchi-odf -p litchi-odf-common -p litchi-odf-formula -p litchi-odg -p litchi-odi -p litchi-odm -p litchi-odp
+       -p litchi-ods -p litchi-odt -p litchi-ooxml-common -p litchi-opc -p litchi-oth -p litchi-ppt -p litchi-pptx
+       -p litchi-py -p litchi-sign -p litchi-spreadsheet-drawing -p litchi-xls -p litchi-xlsb -p litchi-xlsx
+       (every workspace package that depends on soapberry-zip, iWork excluded)
+cargo clippy -p soapberry-zip -p litchi-docx --lib --no-deps --locked -- -D warnings             exit 0
+cargo clippy -p soapberry-zip -p litchi-docx --all-targets --no-deps --locked -- -D warnings     exit 0
+RUSTDOCFLAGS="-D warnings" cargo doc -p soapberry-zip -p litchi-docx --no-deps --locked          exit 0
+
+cargo test -p <crate> --locked --no-fail-fast (touched crates first, then in-scope dependents):
+  soapberry-zip                exit 0  652 passed, 0 failed, 2 ignored
+  litchi-docx                  exit 0  1878 passed, 0 failed, 32 ignored
+  litchi-opc                   exit 0  918 passed, 0 failed, 1 ignored
+  litchi-xlsx                  exit 0  2036 passed, 0 failed, 0 ignored
+  litchi-pptx                  exit 0  1167 passed, 0 failed, 3 ignored
+  litchi-ooxml-common          exit 0  371 passed, 0 failed, 0 ignored
+  litchi-drawingml             exit 0  355 passed, 0 failed, 0 ignored
+  litchi-spreadsheet-drawing   exit 0  24 passed, 0 failed, 2 ignored
+  litchi-xlsb                  exit 0  961 passed, 0 failed, 12 ignored
+  litchi-doc                   exit 0  1293 passed, 0 failed, 13 ignored
+  litchi-ppt                   exit 0  1249 passed, 0 failed, 11 ignored
+  litchi-xls                   exit 0  1611 passed, 0 failed, 1 ignored
+  litchi-sign                  exit 0  25 passed, 0 failed, 0 ignored
+  litchi-oth                   exit 0  98 passed, 0 failed, 0 ignored
+  litchi                       exit 0  382 passed, 0 failed, 7 ignored (--features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt)
+
+Extra: the ODF dependents of soapberry-zip (out of scope, unaffected by construction), same command:
+  litchi-odf-common            exit 0  530 passed, 0 failed, 1 ignored
+  litchi-odf                   exit 0  4 passed, 0 failed, 0 ignored
+  litchi-odt                   exit 0  1089 passed, 0 failed, 0 ignored
+  litchi-ods                   exit 0  1745 passed, 0 failed, 0 ignored
+  litchi-odp                   exit 0  404 passed, 0 failed, 0 ignored
+  litchi-odg                   exit 0  139 passed, 0 failed, 0 ignored (rerun after the disk filled; CARGO_PROFILE_DEV_DEBUG=0)
+  litchi-odb                   exit 0  88 passed, 0 failed, 0 ignored (rerun after the disk filled; CARGO_PROFILE_DEV_DEBUG=0)
+  litchi-odc                   exit 0  45 passed, 0 failed, 0 ignored (rerun after the disk filled; CARGO_PROFILE_DEV_DEBUG=0)
+  litchi-odi                   exit 0  45 passed, 0 failed, 0 ignored (rerun after the disk filled; CARGO_PROFILE_DEV_DEBUG=0)
+  litchi-odm                   exit 0  47 passed, 0 failed, 0 ignored (rerun after the disk filled; CARGO_PROFILE_DEV_DEBUG=0)
+  litchi-odf-formula           exit 0  37 passed, 0 failed, 0 ignored (rerun after the disk filled; CARGO_PROFILE_DEV_DEBUG=0)
+  The six ODF crates listed with the rerun note first failed to link ("ld terminated with signal 7
+  [Bus error]") because the shared disk had filled to 0 bytes; they passed after space was freed, rebuilt
+  with CARGO_PROFILE_DEV_DEBUG=0 to keep the target small.
+
+python3 tools/check_crate_boundaries.py                                                          exit 0
+python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+                                                                                                 exit 0 (OK: 10 performance claims validated)
+python3 tools/non_iwork_gate.py verify                                                           exit 1
+  "workspace package inventory mismatch (unexpected: litchi-xldm)": a known failure at base 1d1044e3ac,
+  being fixed on another branch (briefing, "Known gate failures").
+
+Not run: the harness tests and the CRUD coverage validator (the harness is unchanged); facade Clippy
+(the facade is untouched; its two known unit_arg lints are at base).

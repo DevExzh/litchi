@@ -1,0 +1,25 @@
+# flat perf profile, whole process (includes untimed corpus build and reopen gates), xlsx_streaming_create large, 20 samples, CPU 12, binary bin/a
+    17.31%  [.] zlib_rs::deflate::algorithm::medium::deflate_medium                                                             -      -
+    17.20%  [.] zlib_rs::deflate::longest_match::longest_match                                                                  -      -
+     9.09%  [.] litchi_core::execution::ExecutionContext::consume                                                               -      -
+     2.92%  [.] litchi_xlsx::streaming::push_escaped                                                                            -      -
+     2.77%  [.] zlib_rs::deflate::flush_block_only                                                                              -      -
+     2.18%  [.] sha2::sha256::x86_sha::compress                                                                                 -      -
+     1.73%  [.] quick_xml::reader::ns_reader::NsReader<R>::process_event                                                        -      -
+     1.66%  [.] __memmove_avx512_unaligned_erms                                                                                 -      -
+     1.62%  [.] __GI___readdir64                                                                                                -      -
+     1.61%  [.] litchi_core::execution::ExecutionContext::reserve_scoped                                                        -      -
+     1.59%  [k] 0xffffffff9f124131                                                                                              -      -
+     1.53%  [k] 0xffffffff9f4acb5c                                                                                              -      -
+     1.29%  [.] ryu::pretty::format64                                                                                           -      -
+     1.28%  [k] 0xffffffff9f1119eb                                                                                              -      -
+     1.27%  [.] crc32fast::specialized::pclmulqdq::calculate                                                                    -      -
+     1.21%  [.] quick_xml::name::NamespaceResolver::resolve_event                                                               -      -
+     1.18%  [.] <core::fmt::Formatter>::pad_integral                                                                            -      -
+     1.15%  [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::drive                    -      -
+     1.10%  [k] 0xffffffff9f218f02                                                                                              -      -
+     1.07%  [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell               -      -
+     1.05%  [.] zlib_rs::deflate::compare256::avx2::compare256                                                                  -      -
+     0.95%  [.] 0x0000000000241c9b                                                                                              -      -
+     0.89%  [k] 0xffffffff9f1119a7                                                                                              -      -
+     0.75%  [k] 0xffffffff9f3abcc8                                                                                              -      -

@@ -1,0 +1,108 @@
+# member_probe digest, both legs (full outputs deleted; digests of their member sections kept)
+## before
+archive docx-tiny bytes=1233 sha256=a832c8f22d3d6ab332bf8672e1d92afb0859127594ca2b52393ee51b783f9cba members=3
+packed-total docx-tiny compressed=841
+archive docx-medium bytes=24571 sha256=62ad295cfd55c7eaaa9d102bafb7bb45c7cdb860c7dfc81d89f81a4a18494f31 members=3
+packed-total docx-medium compressed=24179
+archive docx-large bytes=376848 sha256=adf297d18b6dfcee2da6a1fd07b129879c184a1aeec5b76dadcaf9e86e86891b members=3
+packed-total docx-large compressed=376456
+archive xlsx-tiny bytes=3451 sha256=21e1f8267717fed447ef787285f154ccbf7a6d2ba460d385956e3d8546e7336c members=6
+packed-total xlsx-tiny compressed=2661
+archive xlsx-medium bytes=167418 sha256=c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d members=6
+packed-total xlsx-medium compressed=166628
+archive xlsx-large bytes=2563433 sha256=cf6965fc6ec2586d52f127fc58301aae68d2e10b51488312c88d20165153a3b1 members=6
+packed-total xlsx-large compressed=2562643
+archive pptx-tiny bytes=36259 sha256=951505889af106f032241c30f07b5d237e54822dade768c911aca2d0f68c22c5 members=53
+packed-total pptx-tiny compressed=28089
+archive pptx-medium bytes=274398 sha256=1f33f8b2c36a2a51abc62d827e4c915dd3b4e52859b300323f250ab561942cf2 members=549
+packed-total pptx-medium compressed=192692
+archive pptx-large bytes=7940406 sha256=c7b08da644e651046d368b1baaff9a12c6d7218c4f96914dacb1033722e4b527 members=16421
+packed-total pptx-large compressed=5465000
+member lines: 17050, sha256 of all member lines: bd7f09163c842d914516a723ac65159b2c6d12ea8b1a9d01986f0bf7ca2d351e
+packed lines: 17050, sha256: 4489d7664ebe89ac4849e63353905b4975de5f4d7d3f2ea77fca923bff4f539e
+full output sha256: 9b7d3d0c36b4f8f8a0c6e7a368ca2c0f774ab96fe634a024d0a8d0a5b8b6b24a
+## after
+archive docx-tiny bytes=1215 sha256=0f24ba74371cbc75ed00a10260f52e096c004a7aeba732029c70ceaa4134b9aa members=3
+packed-total docx-tiny compressed=823
+archive docx-medium bytes=24553 sha256=04e3ea69587f48af6298e580a13596d0db6761f7226edae3163dcb98e17540d0 members=3
+packed-total docx-medium compressed=24161
+archive docx-large bytes=376054 sha256=e263d219dc7e4ba07c86a902f8d54346bafa19efd5e0c3c66a181416f93cd19b members=3
+packed-total docx-large compressed=375662
+archive xlsx-tiny bytes=3455 sha256=f9628702952187dc0d3d29a705ed7a2a4861ad4635316d5ff079c34ffe2106a8 members=6
+packed-total xlsx-tiny compressed=2665
+archive xlsx-medium bytes=163790 sha256=7a708509643ff23983c3533037b85ecc32359a4a7094bd15e2abe36913b49da4 members=6
+packed-total xlsx-medium compressed=163000
+archive xlsx-large bytes=2559706 sha256=edbf573c8563fa1a32e28139170d890badcdd120642e36d774fcc45b6a00478e members=6
+packed-total xlsx-large compressed=2558916
+archive pptx-tiny bytes=35924 sha256=bd47ff39c0d3a8445df13dd706c055f0b17d0f0b9e642893c77f8638338bd26d members=53
+packed-total pptx-tiny compressed=27754
+archive pptx-medium bytes=270370 sha256=6cfa2234997b636231a356b3dd47e4fc1730af958601501d9ce655735c0966cd members=549
+packed-total pptx-medium compressed=188664
+archive pptx-large bytes=7821547 sha256=8658e17dd6756b35e338f89d70b7bdc32286ace0ca805cbe60c64284fa083ab8 members=16421
+packed-total pptx-large compressed=5346141
+member lines: 17050, sha256 of all member lines: bd7f09163c842d914516a723ac65159b2c6d12ea8b1a9d01986f0bf7ca2d351e
+packed lines: 17050, sha256: 2588651907c83391accbf81430b13487143cc2693edf0d8b7a34c4752eae7dc1
+full output sha256: 1499d335db8789e7bf8576553a968b793ccf372ebcad29480036c80457d92001
+## per-member compressed sizes of the tiny corpora, before -> after
+packed docx-tiny [Content_Types].xml compressed=242	compressed=236
+packed docx-tiny _rels/.rels compressed=183	compressed=177
+packed docx-tiny word/document.xml compressed=416	compressed=410
+packed xlsx-tiny [Content_Types].xml compressed=274	compressed=268
+packed xlsx-tiny _rels/.rels compressed=183	compressed=177
+packed xlsx-tiny xl/workbook.xml compressed=194	compressed=188
+packed xlsx-tiny xl/_rels/workbook.xml.rels compressed=204	compressed=198
+packed xlsx-tiny xl/styles.xml compressed=285	compressed=278
+packed xlsx-tiny xl/worksheets/sheet1.xml compressed=1521	compressed=1556
+packed pptx-tiny [Content_Types].xml compressed=459	compressed=447
+packed pptx-tiny _rels/.rels compressed=234	compressed=230
+packed pptx-tiny docProps/core.xml compressed=212	compressed=205
+packed pptx-tiny docProps/app.xml compressed=492	compressed=486
+packed pptx-tiny ppt/presProps.xml compressed=326	compressed=320
+packed pptx-tiny ppt/viewProps.xml compressed=419	compressed=413
+packed pptx-tiny ppt/tableStyles.xml compressed=166	compressed=160
+packed pptx-tiny ppt/slideMasters/slideMaster1.xml compressed=1768	compressed=1760
+packed pptx-tiny ppt/slideMasters/_rels/slideMaster1.xml.rels compressed=269	compressed=263
+packed pptx-tiny ppt/slideLayouts/slideLayout1.xml compressed=1061	compressed=1054
+packed pptx-tiny ppt/slideLayouts/_rels/slideLayout1.xml.rels compressed=187	compressed=181
+packed pptx-tiny ppt/slideLayouts/slideLayout2.xml compressed=878	compressed=871
+packed pptx-tiny ppt/slideLayouts/_rels/slideLayout2.xml.rels compressed=187	compressed=181
+packed pptx-tiny ppt/slideLayouts/slideLayout3.xml compressed=1118	compressed=1113
+packed pptx-tiny ppt/slideLayouts/_rels/slideLayout3.xml.rels compressed=187	compressed=181
+packed pptx-tiny ppt/slideLayouts/slideLayout4.xml compressed=1040	compressed=1034
+packed pptx-tiny ppt/slideLayouts/_rels/slideLayout4.xml.rels compressed=187	compressed=181
+packed pptx-tiny ppt/slideLayouts/slideLayout5.xml compressed=1247	compressed=1242
+packed pptx-tiny ppt/slideLayouts/_rels/slideLayout5.xml.rels compressed=187	compressed=181
+packed pptx-tiny ppt/slideLayouts/slideLayout6.xml compressed=790	compressed=783
+packed pptx-tiny ppt/slideLayouts/_rels/slideLayout6.xml.rels compressed=187	compressed=181
+packed pptx-tiny ppt/slideLayouts/slideLayout7.xml compressed=747	compressed=740
+packed pptx-tiny ppt/slideLayouts/_rels/slideLayout7.xml.rels compressed=187	compressed=181
+packed pptx-tiny ppt/slideLayouts/slideLayout8.xml compressed=1205	compressed=1199
+packed pptx-tiny ppt/slideLayouts/_rels/slideLayout8.xml.rels compressed=187	compressed=181
+packed pptx-tiny ppt/slideLayouts/slideLayout9.xml compressed=1139	compressed=1132
+packed pptx-tiny ppt/slideLayouts/_rels/slideLayout9.xml.rels compressed=187	compressed=181
+packed pptx-tiny ppt/slideLayouts/slideLayout10.xml compressed=906	compressed=903
+packed pptx-tiny ppt/slideLayouts/_rels/slideLayout10.xml.rels compressed=187	compressed=181
+packed pptx-tiny ppt/slideLayouts/slideLayout11.xml compressed=957	compressed=951
+packed pptx-tiny ppt/slideLayouts/_rels/slideLayout11.xml.rels compressed=187	compressed=181
+packed pptx-tiny ppt/theme/theme1.xml compressed=1569	compressed=1566
+packed pptx-tiny ppt/theme/theme2.xml compressed=1569	compressed=1566
+packed pptx-tiny ppt/notesMasters/notesMaster1.xml compressed=1435	compressed=1439
+packed pptx-tiny ppt/notesMasters/_rels/notesMaster1.xml.rels compressed=182	compressed=176
+packed pptx-tiny ppt/presentation.xml compressed=340	compressed=330
+packed pptx-tiny ppt/_rels/presentation.xml.rels compressed=313	compressed=309
+packed pptx-tiny ppt/slides/slide1.xml compressed=460	compressed=452
+packed pptx-tiny ppt/slides/_rels/slide1.xml.rels compressed=188	compressed=181
+packed pptx-tiny ppt/slides/slide2.xml compressed=461	compressed=453
+packed pptx-tiny ppt/slides/_rels/slide2.xml.rels compressed=188	compressed=181
+packed pptx-tiny ppt/slides/slide3.xml compressed=461	compressed=453
+packed pptx-tiny ppt/slides/_rels/slide3.xml.rels compressed=188	compressed=181
+packed pptx-tiny ppt/slides/slide4.xml compressed=461	compressed=453
+packed pptx-tiny ppt/slides/_rels/slide4.xml.rels compressed=188	compressed=181
+packed pptx-tiny ppt/slides/slide5.xml compressed=461	compressed=453
+packed pptx-tiny ppt/slides/_rels/slide5.xml.rels compressed=188	compressed=181
+packed pptx-tiny ppt/slides/slide6.xml compressed=461	compressed=453
+packed pptx-tiny ppt/slides/_rels/slide6.xml.rels compressed=188	compressed=181
+packed pptx-tiny ppt/slides/slide7.xml compressed=461	compressed=453
+packed pptx-tiny ppt/slides/_rels/slide7.xml.rels compressed=188	compressed=181
+packed pptx-tiny ppt/slides/slide8.xml compressed=461	compressed=453
+packed pptx-tiny ppt/slides/_rels/slide8.xml.rels compressed=188	compressed=181

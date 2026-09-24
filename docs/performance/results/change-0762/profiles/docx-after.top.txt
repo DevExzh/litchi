@@ -1,0 +1,27 @@
+# flat perf profile, whole process (includes untimed corpus build and reopen gates), docx_streaming_create large, 30 samples, CPU 12, binary bin/a
+    15.30%  [.] litchi_core::execution::ExecutionContext::consume                                                           -      -
+     9.03%  [.] zlib_rs::deflate::algorithm::medium::deflate_medium                                                         -      -
+     3.39%  [k] 0xffffffff9ff30b07                                                                                          -      -
+     2.46%  [k] 0xffffffff9f04eeec                                                                                          -      -
+     2.41%  [.] __memmove_avx512_unaligned_erms                                                                             -      -
+     2.00%  [.] <core::fmt::Formatter>::pad_integral                                                                        -      -
+     1.70%  [k] 0xffffffff9f124131                                                                                          -      -
+     1.70%  [.] sha2::sha256::x86_sha::compress                                                                             -      -
+     1.67%  [.] litchi_docx::streaming::StreamingDocumentWriter<W>::finish_run                                              -      -
+     1.66%  [.] __GI___readdir64                                                                                            -      -
+     1.63%  [.] quick_xml::reader::ns_reader::NsReader<R>::process_event                                                    -      -
+     1.34%  [k] 0xffffffff9ff30da0                                                                                          -      -
+     1.25%  [k] 0xffffffff9f1154c9                                                                                          -      -
+     1.24%  [.] litchi_docx::paragraph::codec::text::extract_word_text                                                      -      -
+     1.14%  [k] 0xffffffff9f273cd9                                                                                          -      -
+     1.10%  [k] 0xffffffff9f1119a7                                                                                          -      -
+     1.03%  [.] litchi_docx::streaming::StreamingDocumentWriter<W>::write_text                                              -      -
+     0.97%  [.] 0x0000000000241c9b                                                                                          -      -
+     0.86%  [.] crc32fast::specialized::pclmulqdq::calculate                                                                -      -
+     0.85%  [k] 0xffffffff9ff309f5                                                                                          -      -
+     0.85%  [.] quick_xml::encoding::Decoder::decode_cow                                                                    -      -
+     0.81%  [k] 0xffffffff9ef88828                                                                                          -      -
+     0.77%  [.] litchi_core::execution::ExecutionContext::reserve_scoped                                                    -      -
+     0.76%  [k] 0xffffffff9f156aa0                                                                                          -      -
+     0.73%  [k] 0xffffffff9f15602b                                                                                          -      -
+     0.73%  [.] zlib_rs::deflate::flush_block_only                                                                          -      -

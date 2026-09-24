@@ -1,0 +1,29 @@
+# flat perf profile, whole process (includes untimed corpus build and reopen gates), pptx_streaming_create large, 15 samples, CPU 12, binary bin/b
+     9.31%  [.] soapberry_zip::office::normalize_str_fallibly                                                                  -      -
+     7.91%  [.] __memmove_avx512_unaligned_erms                                                                                -      -
+     7.10%  [.] _int_malloc                                                                                                    -      -
+     6.97%  [.] hashbrown::map::HashMap<K,V,S,A>::insert                                                                       -      -
+     6.92%  [.] soapberry_zip::office::clone_str_fallibly                                                                      -      -
+     6.71%  [.] _int_free_merge_chunk                                                                                          -      -
+     5.95%  [.] cfree@GLIBC_2.2.5                                                                                              -      -
+     5.51%  [.] unlink_chunk.isra.0                                                                                            -      -
+     4.68%  [.] soapberry_zip::office::ArchiveReader::new_with_limits                                                          -      -
+     4.13%  [.] <core::hash::sip::Hasher<S> as core::hash::Hasher>::write                                                      -      -
+     2.31%  [.] <alloc::string::String>::try_reserve                                                                           -      -
+     1.98%  [.] zlib_rs::deflate::Heap::pqdownheap                                                                             -      -
+     1.81%  [.] malloc                                                                                                         -      -
+     1.73%  [.] core::hash::BuildHasher::hash_one                                                                              -      -
+     1.59%  [.] _int_free_maybe_trim                                                                                           -      -
+     1.55%  [.] core::slice::memchr::memrchr                                                                                   -      -
+     1.53%  [.] alloc::raw_vec::RawVecInner<A>::finish_grow                                                                    -      -
+     1.49%  [.] zlib_rs::deflate::algorithm::medium::deflate_medium                                                            -      -
+     1.43%  [.] soapberry_zip::office::clone_name_fallibly                                                                     -      -
+     1.39%  [.] <alloc::string::String>::try_reserve_exact                                                                     -      -
+     1.28%  [.] __libc_malloc2                                                                                                 -      -
+     1.23%  [.] __memset_avx512_unaligned_erms                                                                                 -      -
+     1.22%  [.] zlib_rs::deflate::flush_block_only                                                                             -      -
+     1.01%  [.] <alloc::raw_vec::RawVecInner>::finish_grow                                                                     -      -
+     0.89%  [.] soapberry_zip::office::normalized_member_name                                                                  -      -
+     0.86%  [.] _int_free_chunk                                                                                                -      -
+     0.82%  [.] <hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop                                                 -      -
+     0.77%  [.] core::str::converts::from_utf8                                                                                 -      -

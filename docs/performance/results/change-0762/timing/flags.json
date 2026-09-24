@@ -1,0 +1,1592 @@
+[
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 19.6162,
+  "after_ms": 16.2234,
+  "change": -0.173,
+  "direction": "favourable"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 15.6366,
+  "after_ms": 14.2291,
+  "change": -0.09,
+  "direction": "favourable"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 19.513,
+  "after_ms": 14.9305,
+  "change": -0.2348,
+  "direction": "favourable"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 16.2779,
+  "after_ms": 14.2773,
+  "change": -0.1229,
+  "direction": "favourable"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 29.6685,
+  "after_ms": 31.9192,
+  "change": 0.0759,
+  "direction": "adverse"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 24.0374,
+  "after_ms": 25.3422,
+  "change": 0.0543,
+  "direction": "adverse"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 23.5539,
+  "after_ms": 20.7491,
+  "change": -0.1191,
+  "direction": "favourable"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 28.4747,
+  "after_ms": 31.3409,
+  "change": 0.1007,
+  "direction": "adverse"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 36.3491,
+  "after_ms": 39.361,
+  "change": 0.0829,
+  "direction": "adverse"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 27.0728,
+  "after_ms": 34.382,
+  "change": 0.27,
+  "direction": "adverse"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 35.094,
+  "after_ms": 40.9107,
+  "change": 0.1657,
+  "direction": "adverse"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 27.7451,
+  "after_ms": 32.639,
+  "change": 0.1764,
+  "direction": "adverse"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 19.2226,
+  "after_ms": 18.048,
+  "change": -0.0611,
+  "direction": "favourable"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 31.5276,
+  "after_ms": 19.4667,
+  "change": -0.3826,
+  "direction": "favourable"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 18.8269,
+  "after_ms": 17.5068,
+  "change": -0.0701,
+  "direction": "favourable"
+ },
+ {
+  "case": "ctl-xlsx-ordinary-save",
+  "corpus": "xlsx-cell-values-medium",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 35.3957,
+  "after_ms": 32.2954,
+  "change": -0.0876,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 50.9964,
+  "after_ms": 35.9316,
+  "change": -0.2954,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 51.4656,
+  "after_ms": 36.0215,
+  "change": -0.3001,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 51.0595,
+  "after_ms": 35.9267,
+  "change": -0.2964,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 50.1582,
+  "after_ms": 36.0502,
+  "change": -0.2813,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 55.8376,
+  "after_ms": 36.4644,
+  "change": -0.347,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 50.8729,
+  "after_ms": 36.0949,
+  "change": -0.2905,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 48.9293,
+  "after_ms": 35.6525,
+  "change": -0.2713,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 49.8048,
+  "after_ms": 35.8435,
+  "change": -0.2803,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 49.0768,
+  "after_ms": 35.7174,
+  "change": -0.2722,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 49.4388,
+  "after_ms": 35.5493,
+  "change": -0.2809,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 49.8541,
+  "after_ms": 35.7762,
+  "change": -0.2824,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 49.4753,
+  "after_ms": 35.5836,
+  "change": -0.2808,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 49.0827,
+  "after_ms": 35.6697,
+  "change": -0.2733,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 50.4717,
+  "after_ms": 36.0239,
+  "change": -0.2863,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 49.2576,
+  "after_ms": 35.6856,
+  "change": -0.2755,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 49.2674,
+  "after_ms": 35.7442,
+  "change": -0.2745,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 49.6631,
+  "after_ms": 35.9213,
+  "change": -0.2767,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 49.2876,
+  "after_ms": 35.7613,
+  "change": -0.2744,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 49.4959,
+  "after_ms": 35.402,
+  "change": -0.2847,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 49.863,
+  "after_ms": 35.9069,
+  "change": -0.2799,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 49.9425,
+  "after_ms": 35.4913,
+  "change": -0.2894,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 48.9063,
+  "after_ms": 35.592,
+  "change": -0.2722,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 50.3822,
+  "after_ms": 35.7509,
+  "change": -0.2904,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-large",
+  "corpus": "docx-streaming-paragraphs-large",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 49.2976,
+  "after_ms": 35.5957,
+  "change": -0.2779,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 3.1772,
+  "after_ms": 2.2821,
+  "change": -0.2817,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 3.2486,
+  "after_ms": 2.2904,
+  "change": -0.295,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 3.198,
+  "after_ms": 2.2831,
+  "change": -0.2861,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 3.1202,
+  "after_ms": 2.2862,
+  "change": -0.2673,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 3.1356,
+  "after_ms": 2.3,
+  "change": -0.2665,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 3.1214,
+  "after_ms": 2.2965,
+  "change": -0.2643,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 3.1696,
+  "after_ms": 2.2431,
+  "change": -0.2923,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 3.2126,
+  "after_ms": 2.2527,
+  "change": -0.2988,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 3.1881,
+  "after_ms": 2.2447,
+  "change": -0.2959,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 3.1162,
+  "after_ms": 2.2665,
+  "change": -0.2727,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 3.1708,
+  "after_ms": 2.278,
+  "change": -0.2816,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 3.1221,
+  "after_ms": 2.2675,
+  "change": -0.2737,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 3.3146,
+  "after_ms": 2.3224,
+  "change": -0.2993,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 6.2854,
+  "after_ms": 2.3433,
+  "change": -0.6272,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 4.592,
+  "after_ms": 2.3233,
+  "change": -0.4941,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 3.1402,
+  "after_ms": 2.2779,
+  "change": -0.2746,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 3.224,
+  "after_ms": 2.3794,
+  "change": -0.262,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 3.1613,
+  "after_ms": 2.3053,
+  "change": -0.2708,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 3.1876,
+  "after_ms": 2.2649,
+  "change": -0.2895,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 3.2345,
+  "after_ms": 2.2704,
+  "change": -0.2981,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 3.1933,
+  "after_ms": 2.2635,
+  "change": -0.2912,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 3.1427,
+  "after_ms": 2.2783,
+  "change": -0.275,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 3.19,
+  "after_ms": 2.3073,
+  "change": -0.2767,
+  "direction": "favourable"
+ },
+ {
+  "case": "docx-medium",
+  "corpus": "docx-streaming-paragraphs-medium",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 3.1454,
+  "after_ms": 2.2816,
+  "change": -0.2746,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 190.8676,
+  "after_ms": 172.9152,
+  "change": -0.0941,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 193.0543,
+  "after_ms": 174.2131,
+  "change": -0.0976,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 190.4835,
+  "after_ms": 172.3482,
+  "change": -0.0952,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 190.6839,
+  "after_ms": 167.058,
+  "change": -0.1239,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 193.2119,
+  "after_ms": 175.0961,
+  "change": -0.0938,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 190.09,
+  "after_ms": 168.1898,
+  "change": -0.1152,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 185.7221,
+  "after_ms": 171.815,
+  "change": -0.0749,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 191.509,
+  "after_ms": 173.245,
+  "change": -0.0954,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 186.3772,
+  "after_ms": 171.3101,
+  "change": -0.0808,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 191.8153,
+  "after_ms": 169.3304,
+  "change": -0.1172,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 192.8513,
+  "after_ms": 171.8338,
+  "change": -0.109,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 191.4491,
+  "after_ms": 168.6355,
+  "change": -0.1192,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 188.897,
+  "after_ms": 174.2586,
+  "change": -0.0775,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 188.8461,
+  "after_ms": 174.7889,
+  "change": -0.0744,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 191.8408,
+  "after_ms": 171.9337,
+  "change": -0.1038,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 198.5329,
+  "after_ms": 173.2649,
+  "change": -0.1273,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 193.0604,
+  "after_ms": 171.8584,
+  "change": -0.1098,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 190.1503,
+  "after_ms": 166.5121,
+  "change": -0.1243,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 193.6789,
+  "after_ms": 170.9588,
+  "change": -0.1173,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 190.0958,
+  "after_ms": 167.3604,
+  "change": -0.1196,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 188.8011,
+  "after_ms": 171.1531,
+  "change": -0.0935,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 191.5622,
+  "after_ms": 173.7966,
+  "change": -0.0927,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-large",
+  "corpus": "pptx-streaming-slides-large",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 188.9679,
+  "after_ms": 171.4325,
+  "change": -0.0928,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 6.3722,
+  "after_ms": 5.8364,
+  "change": -0.0841,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 6.4,
+  "after_ms": 5.9661,
+  "change": -0.0678,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 6.3556,
+  "after_ms": 5.8649,
+  "change": -0.0772,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 6.3391,
+  "after_ms": 5.8057,
+  "change": -0.0841,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 6.379,
+  "after_ms": 5.9312,
+  "change": -0.0702,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 6.3048,
+  "after_ms": 5.8167,
+  "change": -0.0774,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 6.3635,
+  "after_ms": 5.8476,
+  "change": -0.0811,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 6.3867,
+  "after_ms": 5.9938,
+  "change": -0.0615,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 6.344,
+  "after_ms": 5.8745,
+  "change": -0.074,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 6.4026,
+  "after_ms": 5.8445,
+  "change": -0.0872,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 6.4898,
+  "after_ms": 5.9845,
+  "change": -0.0779,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 6.3911,
+  "after_ms": 5.881,
+  "change": -0.0798,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 6.4194,
+  "after_ms": 5.8552,
+  "change": -0.0879,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 6.4593,
+  "after_ms": 5.9842,
+  "change": -0.0735,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 6.4171,
+  "after_ms": 5.8853,
+  "change": -0.0829,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 6.4595,
+  "after_ms": 5.8331,
+  "change": -0.097,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 6.4981,
+  "after_ms": 6.0011,
+  "change": -0.0765,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 6.4451,
+  "after_ms": 5.8682,
+  "change": -0.0895,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 6.3845,
+  "after_ms": 5.8196,
+  "change": -0.0885,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 6.4324,
+  "after_ms": 5.9712,
+  "change": -0.0717,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 6.3568,
+  "after_ms": 5.8672,
+  "change": -0.077,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 6.3527,
+  "after_ms": 5.8275,
+  "change": -0.0827,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 6.3852,
+  "after_ms": 5.9605,
+  "change": -0.0665,
+  "direction": "favourable"
+ },
+ {
+  "case": "pptx-medium",
+  "corpus": "pptx-streaming-slides-medium",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 6.321,
+  "after_ms": 5.8563,
+  "change": -0.0735,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 163.9009,
+  "after_ms": 90.6273,
+  "change": -0.4471,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 164.6052,
+  "after_ms": 90.8096,
+  "change": -0.4483,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 163.9495,
+  "after_ms": 90.594,
+  "change": -0.4474,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 163.5478,
+  "after_ms": 90.6899,
+  "change": -0.4455,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 164.5065,
+  "after_ms": 91.2611,
+  "change": -0.4452,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 163.5889,
+  "after_ms": 90.7628,
+  "change": -0.4452,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 164.2646,
+  "after_ms": 90.4729,
+  "change": -0.4492,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 165.3027,
+  "after_ms": 90.8495,
+  "change": -0.4504,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 164.0694,
+  "after_ms": 90.4828,
+  "change": -0.4485,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 163.9395,
+  "after_ms": 90.7499,
+  "change": -0.4464,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 166.2188,
+  "after_ms": 91.0458,
+  "change": -0.4523,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 163.7459,
+  "after_ms": 90.749,
+  "change": -0.4458,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 163.9451,
+  "after_ms": 90.2014,
+  "change": -0.4498,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 165.2089,
+  "after_ms": 90.3359,
+  "change": -0.4532,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 163.9855,
+  "after_ms": 90.0937,
+  "change": -0.4506,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 164.4691,
+  "after_ms": 90.0269,
+  "change": -0.4526,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 165.8071,
+  "after_ms": 90.2166,
+  "change": -0.4559,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 164.5181,
+  "after_ms": 90.0522,
+  "change": -0.4526,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 165.0309,
+  "after_ms": 90.4426,
+  "change": -0.452,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 171.2455,
+  "after_ms": 95.3831,
+  "change": -0.443,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 165.4059,
+  "after_ms": 90.8013,
+  "change": -0.451,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 162.6354,
+  "after_ms": 92.2213,
+  "change": -0.433,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 163.6469,
+  "after_ms": 95.8112,
+  "change": -0.4145,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-large",
+  "corpus": "xlsx-streaming-create-large",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 162.853,
+  "after_ms": 92.5103,
+  "change": -0.4319,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 10.6,
+  "after_ms": 5.7075,
+  "change": -0.4616,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 10.65,
+  "after_ms": 5.7321,
+  "change": -0.4618,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 10.6033,
+  "after_ms": 5.7032,
+  "change": -0.4621,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 1,
+  "metric": "p50",
+  "before_ms": 10.656,
+  "after_ms": 5.6308,
+  "change": -0.4716,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 1,
+  "metric": "p95",
+  "before_ms": 10.7607,
+  "after_ms": 5.701,
+  "change": -0.4702,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 1,
+  "metric": "mean",
+  "before_ms": 10.6595,
+  "after_ms": 5.6361,
+  "change": -0.4713,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 10.6385,
+  "after_ms": 5.6227,
+  "change": -0.4715,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 10.6622,
+  "after_ms": 5.6605,
+  "change": -0.4691,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 10.6221,
+  "after_ms": 5.6249,
+  "change": -0.4705,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 2,
+  "metric": "p50",
+  "before_ms": 10.7119,
+  "after_ms": 5.637,
+  "change": -0.4738,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 2,
+  "metric": "p95",
+  "before_ms": 10.8844,
+  "after_ms": 5.6628,
+  "change": -0.4797,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 2,
+  "metric": "mean",
+  "before_ms": 10.7202,
+  "after_ms": 5.6374,
+  "change": -0.4741,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 10.6237,
+  "after_ms": 5.6452,
+  "change": -0.4686,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 10.7177,
+  "after_ms": 5.6605,
+  "change": -0.4718,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 10.6325,
+  "after_ms": 5.6452,
+  "change": -0.4691,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 3,
+  "metric": "p50",
+  "before_ms": 10.5743,
+  "after_ms": 5.6339,
+  "change": -0.4672,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 3,
+  "metric": "p95",
+  "before_ms": 10.6124,
+  "after_ms": 5.659,
+  "change": -0.4668,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 3,
+  "metric": "mean",
+  "before_ms": 10.5723,
+  "after_ms": 5.6338,
+  "change": -0.4671,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 10.6834,
+  "after_ms": 5.6408,
+  "change": -0.472,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 10.7585,
+  "after_ms": 5.6997,
+  "change": -0.4702,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 10.6837,
+  "after_ms": 5.6467,
+  "change": -0.4715,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 4,
+  "metric": "p50",
+  "before_ms": 10.5655,
+  "after_ms": 5.6965,
+  "change": -0.4608,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 4,
+  "metric": "p95",
+  "before_ms": 10.6452,
+  "after_ms": 5.7417,
+  "change": -0.4606,
+  "direction": "favourable"
+ },
+ {
+  "case": "xlsx-medium",
+  "corpus": "xlsx-streaming-create-medium",
+  "round": 4,
+  "metric": "mean",
+  "before_ms": 10.5787,
+  "after_ms": 5.6968,
+  "change": -0.4615,
+  "direction": "favourable"
+ }
+]

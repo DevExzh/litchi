@@ -1,0 +1,17 @@
+# flat perf profile, whole process (includes untimed corpus build and reopen gates), xlsx_streaming_create large, 20 samples, CPU 12, binary bin/b
+    42.73%  [.] zlib_rs::deflate::longest_match::longest_match                                                                  -      -
+    14.36%  [.] zlib_rs::deflate::algorithm::medium::deflate_medium                                                             -      -
+     7.73%  [.] litchi_core::execution::ExecutionContext::consume                                                               -      -
+     2.04%  [.] litchi_xlsx::streaming::push_escaped                                                                            -      -
+     1.81%  [.] __memmove_avx512_unaligned_erms                                                                                 -      -
+     1.79%  [.] zlib_rs::deflate::flush_block_only                                                                              -      -
+     1.59%  [.] sha2::sha256::x86_sha::compress                                                                                 -      -
+     1.07%  [.] quick_xml::reader::ns_reader::NsReader<R>::process_event                                                        -      -
+     1.05%  [.] litchi_core::execution::ExecutionContext::reserve_scoped                                                        -      -
+     1.04%  [.] <core::fmt::Formatter>::pad_integral                                                                            -      -
+     0.89%  [.] ryu::pretty::format64                                                                                           -      -
+     0.83%  [.] zlib_rs::deflate::compare256::avx2::compare256                                                                  -      -
+     0.83%  [.] crc32fast::specialized::pclmulqdq::calculate                                                                    -      -
+     0.82%  [.] 0x0000000000241c9b                                                                                              -      -
+     0.77%  [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell               -      -
+     0.70%  [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::drive                    -      -

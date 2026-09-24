@@ -1,0 +1,8 @@
+[package]
+name = "chunk_dependence"
+version = "0.1.0"
+edition = "2024"
+publish = false
+[dependencies]
+flate2 = { version = "1", features = ["zlib-rs"], default-features = false }
+[workspace]

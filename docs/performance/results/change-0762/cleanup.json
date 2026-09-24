@@ -1,0 +1,39 @@
+{
+  "record": "0762",
+  "performed": "2026-09-24, during and after the measurements, before the record and packet were committed; the remaining directories are removed by record 0763, which shares this branch",
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0762",
+      "bytes_approx": "221 GB",
+      "what": "candidate Cargo target directory with full-debug test builds of soapberry-zip, litchi-docx and every dependent, the facade and the ODF crates, and the release native and allocation harness binaries (digests in binaries.txt); removed early, when the shared disk filled to 0 bytes during the gate runs. It was then recreated at 1.4 GB, without debug information, only for the six ODF test reruns, and is reused by record 0763"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0762-before",
+      "bytes_approx": "1.3 GB",
+      "what": "release native and allocation harness builds of base 1d1044e3ac for the before leg (digests in binaries.txt)"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0762-probe",
+      "bytes_approx": "1.3 GB",
+      "what": "release builds of level_probe and chunk_dependence"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0762-probe-before",
+      "bytes_approx": "504 MB",
+      "what": "release build of member_probe against the base tree"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0762-probe-after",
+      "bytes_approx": "505 MB",
+      "what": "release build of member_probe against the candidate tree"
+    }
+  ],
+  "kept_for_record_0763": [
+    "/home/zhuhe/code/litchi-worktrees/0762-before-src: the detached before worktree, checked out at bc18e8abdd as 0763's before leg",
+    "/home/zhuhe/code/litchi-worktrees/scratch/0762: raw reports (copied into this packet, gzip-compressed), the full member_probe outputs (summarized in probe/member-digest-summary.txt), the measured binary copies and draft files"
+  ],
+  "kept": [
+    "/home/zhuhe/code/litchi-worktrees/0762-streaming-compression-and-leases (worktree) and branch perf/0762-streaming-compression-and-leases"
+  ],
+  "not_created": "TMPDIR pointed into scratch/0762; no build, measurement or evidence artifact was written to /tmp or to the main checkout"
+}
