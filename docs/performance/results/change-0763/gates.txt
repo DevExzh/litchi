@@ -69,3 +69,25 @@ python3 tools/non_iwork_gate.py verify                                          
 Not run: litchi-py's tests (Python bindings; compile-checked above), the harness tests and the CRUD
 coverage validator (the harness is unchanged), facade Clippy (untouched; its two known unit_arg lints are
 at base).
+
+After the review corrections (3f4e7f5d71 lease refund cap, 7b0bd40c02 owned-entry poison check and
+finish retry), 2026-09-24, fresh CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0762-review-fix,
+CARGO_BUILD_JOBS=6 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0, TMPDIR under scratch/0762, --locked --offline:
+
+cargo fmt --all --check                                                                          exit 0
+cargo clippy -p litchi-core -p soapberry-zip -p litchi-docx -p litchi-xlsx --lib --no-deps -- -D warnings          exit 0
+cargo clippy -p litchi-core -p soapberry-zip -p litchi-docx -p litchi-xlsx --all-targets --no-deps -- -D warnings  exit 0
+RUSTDOCFLAGS="-D warnings" cargo doc -p litchi-core -p soapberry-zip -p litchi-docx -p litchi-xlsx --no-deps       exit 0
+cargo test -p <crate> --locked --no-fail-fast:
+  litchi-core      exit 0  240 passed, 0 failed, 0 ignored
+  soapberry-zip    exit 0  654 passed, 0 failed, 2 ignored
+  litchi-docx      exit 0  1881 passed, 0 failed, 32 ignored
+  litchi-xlsx      exit 0  2040 passed, 0 failed, 0 ignored
+  litchi-opc       exit 0  918 passed, 0 failed, 1 ignored
+  litchi-pptx      exit 0  1167 passed, 0 failed, 3 ignored
+  (litchi-opc and litchi-pptx are extras: both write through StreamingArchiveWriter, which sits on the
+  owned-entry writer.)
+Mutation checks, each reverted afterwards: removing the refund cap fails 3 litchi-core tests and the
+XLSX wide-row test; removing the poison check from write, or from finish, fails the poison test;
+removing the retry from the Deflate finish, or from the Store finish flush, fails the finish test and
+the split test.

@@ -368,8 +368,11 @@ What moves, precisely:
   (`max_output_bytes`, the DOCX and XLSX writers' `OutputBytes` budget and
   `max_output_bytes`, the PPTX writer's `BudgetedSink`), surfaces up to one
   chunk (16 KiB of uncompressed input) later than before, on a later write or
-  at the finish. The writers already mapped a failure at any of those calls to
-  the same typed error.
+  at the finish. "Before" already includes the codec's own buffering, which
+  on highly compressible input is far longer: the review below measured a
+  compressed limit of 7 bytes on 4 MiB of repeated XML refused only after
+  4,079,616 input bytes. The writers already mapped a failure at any of those
+  calls to the same typed error.
 * **What does not move.** The uncompressed entry and total limits
   (`max_entry_size`, `max_total_size`) and every semantic limit of the three
   writers are checked before a write is forwarded, exactly as before. Every
@@ -479,6 +482,54 @@ sync flush), and
 `package_bytes_do_not_depend_on_how_run_text_is_split` (600 paragraphs, each
 run's text written whole and in four piece patterns; identical packages that
 reopen to the same paragraphs).
+
+## Review corrections
+
+An independent review (its probes are not part of this packet) confirmed the
+change: 60 random write splittings (zero-length, boundary-ending and
+multi-chunk writes, raw `write` loops, short and interrupting sinks) and 30
+with flushes at fixed offsets gave identical archives; 1,920 preservation and
+borrowed-path digests over 320 OOXML fixtures were identical on both builds;
+compressed and output limits were exact at N−1, N, N+1 and T−1, T, T+1. It
+found two defects in the owned-entry writer, both present at the base but more
+likely to matter with batching, and one inaccurate sentence; all three are
+fixed in `7b0bd40c02`:
+
+* **A poisoned entry still wrote.** After a sink failure other than
+  `Interrupted` poisoned the archive, a later `ZipOwnedEntryWriter::write` or
+  `flush` still ran: a Deflate entry pushed the chunk the failed write had
+  left staged into a sink that had since recovered, and answered `Ok` (at the
+  base it sent the failed write's pending output instead). Only `finish`
+  refused, and only after sending that chunk and the final block. `write`,
+  `flush` and `finish` now check the poison before any sink I/O.
+  `StreamingArchiveEntry`, which the Office writers use, already refused a
+  poisoned entry itself. Test:
+  `a_poisoned_owned_entry_refuses_later_calls_before_its_sink` (Deflate and
+  Store; the sink fails at 100 bytes to 40 KB and is then healed; a later
+  write, an empty write, a flush and the finish are all refused, and the sink
+  receives nothing more).
+* **An interruption in `finish` lost the archive.** `finish` consumes the
+  entry, so a sink call interrupted with `Interrupted` inside it ended the
+  entry and its archive, and batching moves up to one chunk's output into
+  `finish`. `finish` now retries an interrupted sink call where it stopped, as
+  `write_all` does; every codec call still follows a complete drain, so none
+  is repeated and the member's bytes do not change. Tests:
+  `owned_entry_finish_retries_interrupted_sink_calls_without_changing_bytes`
+  (the test corpus finished into sinks interrupting every 2nd, 3rd or 5th
+  write or flush equals the reference archive), and the split test's
+  interrupting sinks now stay armed through each entry's `finish`. The
+  archive's own `finish` ends with a sink flush that does not retry an
+  interruption; that is unchanged.
+* **Rustdoc.** `ZipOwnedEntryWriter` and `StreamingArchiveEntry` said a
+  refusal surfaces "up to one 16 KiB chunk of input later than the write that
+  caused it". It surfaces after the codec's own buffering plus up to one
+  staged chunk, as the section on error timing says; both now say so.
+
+Removing either poison check or either retry fails a test. On success paths
+the fix adds one poisoned-flag test per owned-entry `write` and `flush`; the
+timings above were not re-measured. The gates after the fix are listed in
+`results/change-0762/gates.txt` and in
+[0763](0763-rough-budget-leases.md#review-corrections).
 
 ## Cleanup
 

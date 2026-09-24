@@ -51,6 +51,9 @@ complete 16 KiB chunk and an empty output buffer. Evidence: a staged model
 checked against flate2's own encoder, 24 random write splittings, short and
 interrupting sinks, five DOCX text splittings in five processes, and
 mutation checks. No limit is ever exceeded on output; compressed-size, output
-and sink refusals can surface up to one 16 KiB chunk later, and the
-uncompressed limits stay exact per write. No durable format binds these
-bytes.
+and sink refusals can surface up to one 16 KiB chunk later than before (on
+top of the codec's own buffering), and the uncompressed limits stay exact per
+write. After review, a poisoned owned entry refuses `write`, `flush` and
+`finish` before its sink sees another byte, and `finish` retries an
+interrupted sink call instead of losing the archive; both were pre-existing.
+No durable format binds these bytes.
