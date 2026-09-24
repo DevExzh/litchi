@@ -14,6 +14,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::Reader;
 
 use super::metadata::{MetadataFileKind, MetadataModel};
+use super::seen_names::SeenNames;
 use super::{GeneratedNameKind, Storage, classify_generated_path};
 
 const MAX_OLAP_XML_BYTES: usize = 32 * 1024 * 1024;
@@ -1105,6 +1106,9 @@ fn make_node(
     let raw = std::str::from_utf8(qualified_name.as_ref()).map_err(xml_error)?;
     let name = raw.rsplit(':').next().unwrap_or(raw).to_owned();
     let mut attributes = Vec::new();
+    // Names borrowed from the tag: checking each one costs O(log n), where
+    // scanning `attributes` would cost O(n).
+    let mut seen = SeenNames::default();
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(xml_error)?;
         let key = std::str::from_utf8(attribute.key.as_ref())
@@ -1114,7 +1118,7 @@ fn make_node(
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
             .map_err(xml_error)?
             .into_owned();
-        if attributes.iter().any(|(existing, _)| existing == &key) {
+        if !seen.insert(attribute.key.into_inner()) {
             return Err(OlapError::new("duplicate OLAP XML attribute"));
         }
         attributes.push((key, value));
@@ -1429,5 +1433,43 @@ mod tests {
         let mut bad = metadata.clone();
         bad.hierarchies[0].level_ids[1] = "State".into();
         assert!(validate(&model, &bad).is_err());
+    }
+
+    /// ` a00000="0" a00001="1" ...`: `count` distinct attribute names.
+    fn distinct_attributes(count: usize) -> String {
+        (0..count)
+            .map(|index| format!(" a{index:05}=\"{index}\""))
+            .collect()
+    }
+
+    #[test]
+    fn duplicate_attribute_names_are_refused_as_before() {
+        let root = parse_xml(b"<e a='1' b='2'/>").unwrap();
+        assert_eq!(
+            root.attributes,
+            [
+                ("a".to_owned(), "1".to_owned()),
+                ("b".to_owned(), "2".to_owned())
+            ]
+        );
+        let error = parse_xml(b"<e a='1' b='2' a='3'/>")
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.starts_with("invalid OLAP XML: ") && error.contains("duplicated attribute"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn many_distinct_attribute_names_are_read_in_order() {
+        // Scanning the attributes read so far compared ~1.25e9 pairs here.
+        let xml = format!("<e{}/>", distinct_attributes(50_000));
+        let root = parse_xml(xml.as_bytes()).unwrap();
+        assert_eq!(root.attributes.len(), 50_000);
+        for (index, (name, value)) in root.attributes.iter().enumerate() {
+            assert_eq!(*name, format!("a{index:05}"));
+            assert_eq!(*value, index.to_string());
+        }
     }
 }

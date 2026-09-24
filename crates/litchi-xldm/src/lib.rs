@@ -20,6 +20,7 @@ pub mod olapproof;
 
 mod codec;
 mod model;
+mod seen_names;
 mod semantic;
 mod tabular_paths;
 mod validation;
