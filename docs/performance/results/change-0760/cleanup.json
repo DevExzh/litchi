@@ -4,17 +4,46 @@
   "binary_digests": "binaries.sha256 (harness legs, probes, counting-allocator probes and the frame-pointer profile probe, recorded before removal)",
   "removed_by": "the implementer, after the record and this packet were committed, each deletion run in the foreground",
   "removed": [
-    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0760", "size": "72G", "what": "debug/: check, clippy, test (default, all-features, facade) and rustdoc builds of the worktree; probe-a, probe-b: first differential probe legs; probe-pa, probe-pb: counter, dump, allocation and differential probes; probe-pb-fp: frame-pointer profile probe; doc/"},
-    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0760-before", "size": "3.9G", "what": "before-leg release harness build, and the base clippy and all-features comparison builds"},
-    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0760-branch", "size": "1.1G", "what": "after-leg release harness build"},
-    {"path": "/home/zhuhe/code/litchi-worktrees/scratch/0760 (contents)", "size": "1.3G", "what": "staged binaries (digests kept), probe crates (source kept in probe/), raw runs (copied into timing/, aa/, counters/, alloc/), the 52 MB differential outputs and 18 MB of output dumps (digests kept in differential/ and outputs/), logs, TMPDIR"},
-    {"path": "/home/zhuhe/code/litchi-worktrees/0760-before-src", "size": "10G", "what": "detached sparse worktree at 1d1044e3ac for the before legs, git worktree remove --force"},
-    {"path": "/home/zhuhe/code/litchi-worktrees/0760-branch-src", "size": "10G", "what": "detached sparse worktree at dfde1e43bb for the after legs, git worktree remove --force"},
-    {"path": "/home/zhuhe/.debug/home/zhuhe/code/litchi-worktrees/{scratch,targets}/0760", "size": "652M", "what": "perf build-id cache copies of the profiled probe binaries, and their 3 .build-id links"}
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0760",
+      "size": "72G",
+      "what": "debug/: check, clippy, test (default, all-features, facade) and rustdoc builds of the worktree; probe-a, probe-b: first differential probe legs; probe-pa, probe-pb: counter, dump, allocation and differential probes; probe-pb-fp: frame-pointer profile probe; doc/"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0760-before",
+      "size": "3.9G",
+      "what": "before-leg release harness build, and the base clippy and all-features comparison builds"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0760-branch",
+      "size": "1.1G",
+      "what": "after-leg release harness build"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/scratch/0760 (contents)",
+      "size": "1.3G",
+      "what": "staged binaries (digests kept), probe crates (source kept in probe/), raw runs (copied into timing/, aa/, counters/, alloc/), the 52 MB differential outputs and 18 MB of output dumps (digests kept in differential/ and outputs/), logs, TMPDIR"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0760-before-src",
+      "size": "10G",
+      "what": "detached sparse worktree at 1d1044e3ac for the before legs, git worktree remove --force"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0760-branch-src",
+      "size": "10G",
+      "what": "detached sparse worktree at dfde1e43bb for the after legs, git worktree remove --force"
+    },
+    {
+      "path": "/home/zhuhe/.debug/home/zhuhe/code/litchi-worktrees/{scratch,targets}/0760",
+      "size": "652M",
+      "what": "perf build-id cache copies of the profiled probe binaries, and their 3 .build-id links"
+    }
   ],
   "tmpdir": "TMPDIR pointed at scratch/0760/tmp for every build, test and measurement; nothing was written to /tmp",
   "kept": [
     "/home/zhuhe/code/litchi-worktrees/0760-pptx-slide-root-memo-reapply (worktree, including its untracked, ignored root Cargo.lock)",
     "branch perf/0760-pptx-slide-root-memo-reapply"
-  ]
+  ],
+  "verified": "2026-09-24, after commit 4bc847adbc: listing targets/0760* reports no such file; git worktree list shows only the implementation worktree for this change (0760-before-src and 0760-branch-src removed with git worktree remove --force); scratch/0760 is empty; no .build-id link under ~/.debug points into a 0760 path and ~/.debug/home/zhuhe/code/litchi-worktrees/{scratch,targets}/0760 no longer exist (the other changes' entries there were left untouched)"
 }
