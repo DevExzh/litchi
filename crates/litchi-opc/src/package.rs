@@ -587,6 +587,17 @@ impl OpcPackage {
             .map(|matches| matches.then_some((bytes, map)))
     }
 
+    /// Whether the retained source manifest is still `allocation`, the one
+    /// the open captured. A token installed since then
+    /// ([`Self::try_replace_content_types`] or a batch add) replaces the
+    /// allocation, so this is `false` even when that token still describes
+    /// every part exactly as the source manifest did.
+    pub(crate) fn retains_source_content_types(&self, allocation: &Arc<Vec<u8>>) -> bool {
+        self.source_content_types_xml
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(current, allocation))
+    }
+
     fn source_content_types_matches_current_parts(&self, source: &ContentTypeMap) -> Result<bool> {
         if self.parts.values().any(|part| {
             source

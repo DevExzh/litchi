@@ -282,8 +282,15 @@ impl<'package> PublicationPlan<'package> {
         }
         parts.sort_unstable_by(|left, right| left.partname.as_str().cmp(right.partname.as_str()));
 
+        // Matching part names and types is not enough to copy the source
+        // member: a manifest token installed since open can describe the same
+        // parts with different bytes, and the full writer publishes it. The
+        // package must still hold the very allocation the open captured.
         let content_types_pristine = content_types_match_source
-            && provenance.is_some_and(|provenance| provenance.parts.len() == parts.len());
+            && provenance.is_some_and(|provenance| {
+                provenance.parts.len() == parts.len()
+                    && package.retains_source_content_types(&provenance.content_types_xml)
+            });
         let package_rels_pristine = provenance.is_some_and(|provenance| {
             package
                 .rels()
@@ -3686,6 +3693,59 @@ mod tests {
             relationships.get("rId1").unwrap().target_ref(),
             "https://example.com"
         );
+    }
+
+    #[test]
+    fn replaced_content_types_token_is_published_on_every_route() {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_deflated(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_deflated(
+                "_rels/.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test:item" Target="custom/item1.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer
+            .write_deflated("custom/item1.xml", b"<item/>")
+            .unwrap();
+        let source = writer.finish_to_bytes().unwrap();
+        let item = PackURI::new("/custom/item1.xml").unwrap();
+        for preserve in [true, false] {
+            let mut package = if preserve {
+                OpcPackage::from_vec(source.clone()).unwrap()
+            } else {
+                OpcPackage::from_bytes(&source).unwrap().clone()
+            };
+            assert_eq!(package.preservation_source().is_some(), preserve);
+            // The override repeats the type the Default already gives, so the
+            // token describes every part exactly as the source manifest did;
+            // only its bytes differ.
+            let current = package.source_content_types().unwrap();
+            let replacement = current
+                .with_part_overrides(&[(&item, "application/xml")], 1 << 20)
+                .unwrap();
+            assert_ne!(replacement.bytes(), current.bytes());
+            assert!(
+                package
+                    .try_replace_content_types(current.bytes(), &replacement)
+                    .unwrap()
+            );
+
+            let output = PackageWriter::to_bytes(&package).unwrap();
+            let published = soapberry_zip::office::ArchiveReader::new(&output)
+                .unwrap()
+                .read("[Content_Types].xml")
+                .unwrap();
+            assert_eq!(published, replacement.bytes(), "preserve={preserve}");
+            let mut streamed = Vec::new();
+            PackageWriter::write_to_stream(&mut streamed, &package).unwrap();
+            assert_eq!(streamed, output, "preserve={preserve}");
+        }
     }
 
     #[test]
