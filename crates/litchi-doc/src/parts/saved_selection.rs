@@ -23,8 +23,8 @@ const MAX_CP: i32 = i32::MAX;
 pub(crate) enum SavedSelectionSpliceError {
     /// The selected record or its context is malformed.
     Invalid(PackageError),
-    /// A CP lies strictly inside replaced text, or an insertion occurs at an
-    /// existing CP, so a lossless position mapping is not provable.
+    /// A CP lies strictly inside replaced or removed text, so the characters
+    /// it was recorded between no longer exist and no mapping is provable.
     Ambiguous,
 }
 const MIN_TABLE_EDGE: i16 = -31_680;
@@ -377,9 +377,11 @@ impl SavedSelection {
     ///
     /// CPs before the replaced range remain fixed, CPs after it move by the
     /// signed size delta, and the two exact range boundaries map to the
-    /// corresponding new boundaries. An interior CP cannot be mapped without
-    /// selecting a semantic point inside replaced text, so the operation is
-    /// refused instead of retaining a stale coordinate.
+    /// corresponding new boundaries. A CP at the point of a pure insertion is
+    /// the start boundary of an empty range and keeps its value, so the
+    /// inserted text follows the recorded position. An interior CP cannot be
+    /// mapped without selecting a semantic point inside replaced text, so the
+    /// operation is refused instead of retaining a stale coordinate.
     pub(crate) fn remap_for_splice(
         &self,
         start: u32,
@@ -973,29 +975,26 @@ pub(crate) fn table_range(
     Ok((start, end))
 }
 
+/// Maps one `Selsf` CP across the replacement of `start..end` by `added`
+/// characters.
+///
+/// A CP at or before `start` keeps its value and a CP at or after `end` keeps
+/// its distance from the end, so every recorded position stays next to the
+/// character that bounded it. A pure insertion (`start == end`) at a recorded
+/// CP therefore lands after that position, which is the only choice MS-DOC
+/// 2.9.244 admits for every selection kind: a whole-row selection's `cpFirst`
+/// MUST be the beginning of its row, a text block's `cpFirst` and `cpLim`
+/// MUST be line beginnings, and inserted text leaves each of those positions
+/// where it was. Only a CP strictly inside replaced or removed text is
+/// ambiguous, because the characters it pointed between no longer exist.
 fn remap_splice_cp(
     cp: u32,
     start: u32,
     end: u32,
     added: u32,
 ) -> std::result::Result<u32, SavedSelectionSpliceError> {
-    if start == end {
-        if cp == start {
-            return Err(SavedSelectionSpliceError::Ambiguous);
-        }
-        return if cp < start {
-            Ok(cp)
-        } else {
-            cp.checked_add(added).ok_or_else(|| {
-                SavedSelectionSpliceError::Invalid(corrupted("remapped Selsf CP overflows"))
-            })
-        };
-    }
-    if cp < start {
+    if cp <= start {
         return Ok(cp);
-    }
-    if cp == start {
-        return Ok(start);
     }
     if cp == end {
         return start.checked_add(added).ok_or_else(|| {
@@ -1264,6 +1263,90 @@ mod tests {
         let remapped = selection.remap_for_splice(4, 8, 2, 10).unwrap();
         assert_eq!(i32::from_le_bytes(remapped[8..12].try_into().unwrap()), 6);
         assert_eq!(i32::from_le_bytes(remapped[28..32].try_into().unwrap()), 4);
+    }
+
+    fn remapped_cps(remapped: &[u8; SELSF_SIZE]) -> (i32, i32, i32) {
+        let at =
+            |offset: usize| i32::from_le_bytes(remapped[offset..offset + 4].try_into().unwrap());
+        (at(4), at(8), at(20))
+    }
+
+    #[test]
+    fn pure_insertion_at_a_recorded_cp_keeps_the_position_before_the_new_text() {
+        // An insertion point stays on its CP when text is inserted there and
+        // moves with the text for an insertion before it.
+        let mut caret = record(1 << 15);
+        caret[8..12].copy_from_slice(&4i32.to_le_bytes());
+        let caret = SavedSelection::parse_bytes(&caret).unwrap();
+        assert_eq!(
+            remapped_cps(&caret.remap_for_splice(4, 4, 3, 11).unwrap()),
+            (4, 4, 4)
+        );
+        assert_eq!(
+            remapped_cps(&caret.remap_for_splice(2, 2, 3, 11).unwrap()),
+            (7, 7, 7)
+        );
+        assert_eq!(
+            caret.remap_for_splice(5, 5, 3, 11).unwrap().as_slice(),
+            caret.bytes()
+        );
+
+        // Text inserted at a selection's first CP joins the selection, as the
+        // replacement text does when a replaced range starts there; text
+        // inserted at its limit stays outside.
+        let selection = SavedSelection::parse_bytes(&record(0)).unwrap();
+        let inserted = selection.remap_for_splice(4, 4, 3, 11).unwrap();
+        assert_eq!(remapped_cps(&inserted), (4, 11, 4));
+        assert_eq!(
+            remapped_cps(&selection.remap_for_splice(8, 8, 3, 11).unwrap()),
+            (4, 8, 4)
+        );
+        assert_eq!(
+            remapped_cps(&selection.remap_for_splice(6, 6, 3, 11).unwrap()),
+            (4, 11, 4)
+        );
+        assert_eq!(
+            remapped_cps(&selection.remap_for_splice(4, 8, 2, 6).unwrap()),
+            (4, 6, 4)
+        );
+
+        // Removing the inserted text again restores the recorded bytes.
+        let inserted = SavedSelection::parse_bytes(&inserted).unwrap();
+        assert_eq!(
+            inserted.remap_for_splice(4, 7, 0, 8).unwrap().as_slice(),
+            selection.bytes()
+        );
+
+        // A whole-row selection's cpFirst MUST stay the start of its row and
+        // its cpLim the end of its last row (MS-DOC 2.9.244); text inserted at
+        // either position does not move them.
+        let mut rows = record(1 << 11);
+        rows[16..20].copy_from_slice(&0x0040_0000u32.to_le_bytes());
+        rows[32..34].copy_from_slice(&MIN_TABLE_EDGE.to_le_bytes());
+        rows[34..36].copy_from_slice(&MAX_TABLE_EDGE.to_le_bytes());
+        let rows = SavedSelection::parse_bytes(&rows).unwrap();
+        assert_eq!(
+            remapped_cps(&rows.remap_for_splice(4, 4, 3, 11).unwrap()),
+            (4, 11, 4)
+        );
+        assert_eq!(
+            remapped_cps(&rows.remap_for_splice(8, 8, 3, 11).unwrap()),
+            (4, 8, 4)
+        );
+
+        // A CP strictly inside replaced or removed text stays ambiguous.
+        assert!(matches!(
+            selection.remap_for_splice(3, 5, 1, 7),
+            Err(SavedSelectionSpliceError::Ambiguous)
+        ));
+        assert!(matches!(
+            selection.remap_for_splice(2, 6, 0, 4),
+            Err(SavedSelectionSpliceError::Ambiguous)
+        ));
+        assert!(matches!(
+            caret.remap_for_splice(3, 5, 4, 10),
+            Err(SavedSelectionSpliceError::Ambiguous)
+        ));
     }
 
     #[test]
