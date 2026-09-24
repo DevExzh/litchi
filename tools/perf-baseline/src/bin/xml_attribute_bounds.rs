@@ -111,10 +111,16 @@ fn build_case(name: &str) -> Result<Case, Box<dyn Error>> {
             input: declaration_flood(20_000).into_bytes(),
             run: run_mce_codec,
         },
-        // 32 nested elements re-declaring 1,000 prefixes each, around an
-        // element of 1,000 attributes in a namespace bound at the root.
+        // 32 nested elements re-declaring 1,000 prefixes each, around 50
+        // elements of 1,000 attributes each in a namespace bound at the root.
         "mce_shadowed_chain" => Case {
-            input: shadowed_chain(32, 1_000, 1_000).into_bytes(),
+            input: shadowed_chain(32, 1_000, 1_000, 50).into_bytes(),
+            run: run_mce_codec,
+        },
+        // 2,000 sibling elements that each declare the same 1,000 prefixes,
+        // which both builds admit.
+        "mce_declarations_admitted" => Case {
+            input: stream_declarations(2_000, 1_000).into_bytes(),
             run: run_mce_codec,
         },
         // Ten dropped wrappers re-declaring 100 prefixes each, around 2,000
@@ -153,7 +159,7 @@ fn declaration_flood(count: usize) -> String {
     xml
 }
 
-fn shadowed_chain(depth: usize, width: usize, attributes: usize) -> String {
+fn shadowed_chain(depth: usize, width: usize, attributes: usize, elements: usize) -> String {
     let mut xml = format!(r#"<r xmlns:mc="{MC}" xmlns:z="urn:z">"#);
     for level in 0..depth {
         xml.push_str("<s");
@@ -162,11 +168,12 @@ fn shadowed_chain(depth: usize, width: usize, attributes: usize) -> String {
         }
         xml.push('>');
     }
-    xml.push_str("<z:e");
+    let mut element = String::from("<z:e");
     for index in 0..attributes {
-        let _ = write!(xml, r#" z:a{index}="""#);
+        let _ = write!(element, r#" z:a{index}="""#);
     }
-    xml.push_str("/>");
+    element.push_str("/>");
+    xml.push_str(&element.repeat(elements));
     for _ in 0..depth {
         xml.push_str("</s>");
     }
