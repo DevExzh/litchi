@@ -6,6 +6,7 @@ use crate::presentation::embedded::{
     limit, relationship_value, validate_root,
 };
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::count_up_to;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -172,7 +173,7 @@ fn parse_control(
     decoder: Decoder,
     resolver: &NamespaceResolver,
 ) -> Result<Parsed> {
-    if element.attributes().with_checks(true).count() > MAX_XML_ATTRIBUTES {
+    if count_up_to(element, MAX_XML_ATTRIBUTES) > MAX_XML_ATTRIBUTES {
         return Err(limit("control XML attributes", MAX_XML_ATTRIBUTES));
     }
     let optional = |name: &[u8], label: &'static str| -> Result<Option<String>> {
@@ -367,4 +368,66 @@ fn attribute(
         );
     }
     Ok(value)
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+mod tests {
+    use super::*;
+
+    fn slide(control_attributes: &str) -> Vec<u8> {
+        format!(
+            r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:controls><p:control{control_attributes}/></p:controls></p:cSld></p:sld>"#
+        )
+        .into_bytes()
+    }
+
+    /// `count` distinct attributes.
+    fn distinct(count: usize) -> String {
+        (0..count)
+            .map(|index| format!(" x{index}=\"{index}\""))
+            .collect()
+    }
+
+    fn is_attribute_limit(result: &Result<Vec<Parsed>>) -> bool {
+        matches!(
+            result,
+            Err(crate::Error::Limit {
+                resource: "control XML attributes",
+                limit: MAX_XML_ATTRIBUTES,
+            })
+        )
+    }
+
+    #[test]
+    fn control_attribute_limit_counts_every_attribute() {
+        let at_limit = format!(" name=\"CheckBox\"{}", distinct(MAX_XML_ATTRIBUTES - 1));
+        let parsed = scan(&slide(&at_limit), &mut 0).unwrap();
+        assert_eq!(parsed[0].name.as_deref(), Some("CheckBox"));
+
+        let over_limit = format!(" name=\"CheckBox\"{}", distinct(MAX_XML_ATTRIBUTES));
+        assert!(is_attribute_limit(&scan(&slide(&over_limit), &mut 0)));
+    }
+
+    #[test]
+    fn crowded_and_duplicate_control_attributes_are_refused_as_before() {
+        // 20,000 distinct names followed by 20,000 repeats of the last one.
+        let mut crowded = distinct(20_000);
+        for _ in 0..20_000 {
+            crowded.push_str(" x19999=\"repeat\"");
+        }
+        assert!(is_attribute_limit(&scan(&slide(&crowded), &mut 0)));
+
+        // Under the limit, a duplicate is refused where the attributes are read.
+        assert!(matches!(
+            scan(&slide(r#" name="A" name="B""#), &mut 0),
+            Err(crate::Error::Decode(
+                litchi_ooxml_common::XmlError::Malformed(_)
+            ))
+        ));
+    }
 }

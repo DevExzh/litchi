@@ -5,6 +5,7 @@ use crate::presentation::embedded::{
     increment_nodes, invalid, limit,
 };
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::count_up_to;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
@@ -103,7 +104,7 @@ fn make_node(
     resolver: &NamespaceResolver,
     namespace: &ResolveResult<'_>,
 ) -> Result<Node> {
-    if element.attributes().with_checks(true).count() > MAX_XML_ATTRIBUTES {
+    if count_up_to(element, MAX_XML_ATTRIBUTES) > MAX_XML_ATTRIBUTES {
         return Err(limit("OLE XML attributes", MAX_XML_ATTRIBUTES));
     }
     let namespace = match namespace {
@@ -310,5 +311,64 @@ fn parse_bool(value: &str) -> Result<bool> {
         "true" | "1" => Ok(true),
         "false" | "0" => Ok(false),
         _ => Err(invalid("invalid OLE boolean")),
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+mod tests {
+    use super::*;
+
+    fn slide(attributes: &str) -> Vec<u8> {
+        format!(
+            r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld{attributes}/></p:sld>"#
+        )
+        .into_bytes()
+    }
+
+    /// `count` distinct attributes.
+    fn distinct(count: usize) -> String {
+        (0..count)
+            .map(|index| format!(" x{index}=\"{index}\""))
+            .collect()
+    }
+
+    fn is_attribute_limit(result: &Result<Node>) -> bool {
+        matches!(
+            result,
+            Err(crate::Error::Limit {
+                resource: "OLE XML attributes",
+                limit: MAX_XML_ATTRIBUTES,
+            })
+        )
+    }
+
+    #[test]
+    fn ole_attribute_limit_counts_every_attribute() {
+        let root = parse_tree(&slide(&distinct(MAX_XML_ATTRIBUTES))).unwrap();
+        assert_eq!(root.children[0].attributes.len(), MAX_XML_ATTRIBUTES);
+        assert!(is_attribute_limit(&parse_tree(&slide(&distinct(
+            MAX_XML_ATTRIBUTES + 1
+        )))));
+    }
+
+    #[test]
+    fn crowded_and_duplicate_ole_attributes_are_refused_as_before() {
+        // 20,000 distinct names followed by 20,000 repeats of the last one.
+        let mut crowded = distinct(20_000);
+        for _ in 0..20_000 {
+            crowded.push_str(" x19999=\"repeat\"");
+        }
+        assert!(is_attribute_limit(&parse_tree(&slide(&crowded))));
+
+        // Under the limit, a duplicate is refused where the attributes are read.
+        assert!(matches!(
+            parse_tree(&slide(r#" a="1" a="2""#)),
+            Err(crate::Error::Xml(_))
+        ));
     }
 }
