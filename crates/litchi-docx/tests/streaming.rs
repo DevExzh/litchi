@@ -241,3 +241,76 @@ fn cancellation_and_hierarchical_scratch_release_are_observable() {
     assert_eq!(child.used(Resource::Memory), 0);
     assert_eq!(parent.used(Resource::Memory), 0);
 }
+
+/// Writes `paragraphs`, one run each, handing every run's text to
+/// `write_text` in pieces of `piece(n)` bytes (rounded up to a character
+/// boundary) for the n-th piece.
+fn render_split(paragraphs: &[String], piece: &dyn Fn(usize) -> usize) -> Vec<u8> {
+    let (_budget, _source, execution) = context();
+    let mut writer =
+        StreamingDocumentWriter::new(Vec::new(), execution, limits()).expect("streaming writer");
+    for text in paragraphs {
+        writer.start_paragraph().expect("paragraph");
+        writer.start_run().expect("run");
+        let mut rest = text.as_str();
+        let mut number = 0;
+        while !rest.is_empty() {
+            let mut take = piece(number).clamp(1, rest.len());
+            while !rest.is_char_boundary(take) {
+                take += 1;
+            }
+            writer.write_text(&rest[..take]).expect("text piece");
+            rest = &rest[take..];
+            number += 1;
+        }
+        writer.finish_run().expect("run finish");
+        writer.finish_paragraph().expect("paragraph finish");
+    }
+    writer.finish().expect("package finish")
+}
+
+/// Change 0762: the document member is compressed in fixed chunks cut at
+/// absolute member offsets, so the package bytes are a function of the
+/// document alone, not of how the caller split each run's text.
+#[test]
+fn package_bytes_do_not_depend_on_how_run_text_is_split() {
+    let paragraphs: Vec<String> = (0..600)
+        .map(|index| {
+            format!(
+                "paragraph {index:04}: café & <tags> {}",
+                "lorem ipsum dolor ".repeat(index % 7)
+            )
+        })
+        .collect();
+    let whole = render_split(&paragraphs, &|_| usize::MAX);
+    let physical = litchi_opc::phys_pkg::OwnedPhysPkgReader::from_bytes(whole.clone())
+        .expect("physical package");
+    let document_xml = physical
+        .blob_for(&PackURI::new("/word/document.xml").expect("document URI"))
+        .expect("document XML");
+    // The member spans several 16 KiB chunks.
+    assert!(document_xml.len() > 3 * 16 * 1024);
+    let pieces: [&dyn Fn(usize) -> usize; 4] = [
+        &|_| 1,
+        &|number| 1 + number % 5,
+        &|number| 3 + (number * 7) % 11,
+        &|number| if number % 2 == 0 { 2 } else { 40 },
+    ];
+    for piece in pieces {
+        assert_eq!(render_split(&paragraphs, piece), whole);
+    }
+    let package = Package::from_reader(Cursor::new(whole)).expect("reopen DOCX");
+    let document = package.document().expect("main document");
+    assert_eq!(
+        document.paragraph_count().expect("paragraph count"),
+        paragraphs.len()
+    );
+    for (paragraph, expected) in document
+        .paragraphs()
+        .expect("paragraphs")
+        .iter()
+        .zip(&paragraphs)
+    {
+        assert_eq!(&paragraph.text().expect("paragraph text"), expected);
+    }
+}
