@@ -2196,15 +2196,19 @@ fn validate_delta_source(package: &OpcPackage, records: &[Record]) -> Result<()>
                     ));
                 }
                 let name = PackURI::new(record.name.clone()).map_err(Error::Uri)?;
-                match (&record.before, package.get_part(&name)) {
-                    (None, Ok(_)) => {
+                // Presence comes from metadata alone. A present part is
+                // decoded only to compare its payload, and a decode failure
+                // is reported as such, never as an absent part (ADR 0030).
+                match (&record.before, package.part_metadata(&name).is_some()) {
+                    (None, true) => {
                         return Err(invalid_durable("unexpected Ink durable source part"));
                     },
-                    (Some(_), Err(_)) => {
+                    (Some(_), false) => {
                         return Err(invalid_durable("missing Ink durable source part"));
                     },
-                    (None, Err(_)) => {},
-                    (Some(expected), Ok(part)) => {
+                    (None, false) => {},
+                    (Some(expected), true) => {
+                        let part = package.get_part(&name)?;
                         let Some((present, relationships)) = expected.relationships.as_ref() else {
                             return Err(invalid_durable("missing source part relationship token"));
                         };
@@ -3155,6 +3159,45 @@ mod tests {
         // Without the corrupt member the same transition still encodes.
         let clean = lazy_package(b"<a/>", false);
         assert!(encode_delta(&clean, &after, MAX_DELTA_BYTES).is_ok());
+    }
+
+    #[test]
+    fn delta_source_guard_refuses_a_present_part_that_fails_to_decode() {
+        let record = |before: Option<&[u8]>| Record {
+            kind: 2,
+            name: "/custom/bad.bin".into(),
+            before: before.map(|payload| Member {
+                content_type: Some("application/octet-stream".into()),
+                payload: payload.to_vec(),
+                relationships: Some((false, Vec::new())),
+            }),
+            after: None,
+        };
+        fn is_refusal(result: Result<()>, reason: &str) -> bool {
+            matches!(result, Err(Error::InvalidFormat(message)) if message.ends_with(reason))
+        }
+
+        // A truly absent part matches a closure that records it as absent,
+        // and presence is decided without decoding anything.
+        let clean = lazy_package(b"<a/>", false);
+        assert!(validate_delta_source(&clean, &[record(None)]).is_ok());
+        assert!(is_refusal(
+            validate_delta_source(&clean, &[record(Some(b"payload"))]),
+            "missing Ink durable source part"
+        ));
+        assert_eq!(clean.deferred_decode_counters(), Some((0, 0)));
+
+        // A present part is never taken for an absent one, and its decode
+        // failure is reported as one rather than as a missing part.
+        let corrupt = lazy_package(b"<a/>", true);
+        assert!(is_refusal(
+            validate_delta_source(&corrupt, &[record(None)]),
+            "unexpected Ink durable source part"
+        ));
+        assert!(matches!(
+            validate_delta_source(&corrupt, &[record(Some(b"payload"))]),
+            Err(Error::Opc(litchi_opc::OpcError::ZipError(_)))
+        ));
     }
 
     #[test]
