@@ -127,11 +127,14 @@ impl Package {
     fn alt_chunk_namespace(&self) -> Result<Conformance> {
         let document_uri = PackURI::new("/word/document.xml")
             .map_err(|error| Error::InvalidUri(format!("document URI: {error}")))?;
-        let strict = self.opc.get_part(&document_uri).is_ok_and(|part| {
-            part.blob()
-                .windows(b"http://purl.oclc.org/ooxml/wordprocessingml/main".len())
-                .any(|window| window == b"http://purl.oclc.org/ooxml/wordprocessingml/main")
-        });
+        // The namespace scan needs the payload, so a failure to read it is
+        // reported rather than taken for a Transitional document (ADR 0030).
+        let strict = self
+            .opc
+            .get_part(&document_uri)?
+            .blob()
+            .windows(b"http://purl.oclc.org/ooxml/wordprocessingml/main".len())
+            .any(|window| window == b"http://purl.oclc.org/ooxml/wordprocessingml/main");
         Ok(if strict {
             Conformance::Strict
         } else {
