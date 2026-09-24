@@ -744,13 +744,41 @@ impl Package {
 
     /// Atomically save the package to a filesystem path.
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically save the package to a filesystem path at a caller-chosen
+    /// [`Durability`](litchi_core::Durability).
+    ///
+    /// [`Self::save`] is this method at `Durability::Full`. Every level
+    /// publishes the same bytes through the same sibling temporary file and
+    /// rename; a weaker level only skips the parent-directory sync
+    /// (`FileOnly`) or both synchronizations (`NoSync`), with the crash
+    /// guarantees `Durability` states. The level is never stored on the
+    /// package.
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> Result<()> {
         self.ensure_ordinary_output("save")?;
-        self.save_plain(path)
+        self.save_plain_with_durability(path, durability)
     }
 
     /// Explicitly save a plaintext OPC package atomically.
     pub fn save_plain(&self, path: impl AsRef<Path>) -> Result<()> {
-        writer::save(&self.0, path)
+        self.save_plain_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Explicitly save a plaintext OPC package atomically at a caller-chosen
+    /// [`Durability`](litchi_core::Durability); see
+    /// [`Self::save_with_durability`].
+    pub fn save_plain_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> Result<()> {
+        writer::save(&self.0, path, durability)
     }
 
     /// Atomically save with an explicitly selected encryption profile.

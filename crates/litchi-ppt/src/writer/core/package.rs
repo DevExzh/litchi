@@ -303,6 +303,28 @@ impl Writer {
     ///
     /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), WriteError> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Save the presentation atomically at a caller-chosen
+    /// [`Durability`](litchi_core::Durability).
+    ///
+    /// [`Self::save`] is this method at `Durability::Full`. Every level
+    /// writes the same bytes through the same sibling temporary file and
+    /// atomic replacement; a weaker level only skips the parent-directory
+    /// sync (`FileOnly`) or both synchronizations (`NoSync`), with the crash
+    /// guarantees `Durability` states.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the file cannot be written
+    /// or replaced. Only `Durability::Full` can report that the destination
+    /// was replaced but its directory could not be synchronized.
+    pub fn save_with_durability<P: AsRef<std::path::Path>>(
+        &mut self,
+        path: P,
+        durability: litchi_core::Durability,
+    ) -> Result<(), WriteError> {
         self.validate_encryption()?;
         self.validate_references()?;
         let font_plan = self.font_publication_plan()?;
@@ -716,7 +738,7 @@ impl Writer {
             ole_writer.create_stream_owned(&["Pictures"], pictures)?;
         }
 
-        ole_writer.save(path)?;
+        ole_writer.save_with_durability(path, durability)?;
 
         Ok(())
     }

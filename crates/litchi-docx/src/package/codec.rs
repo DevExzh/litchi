@@ -27,6 +27,7 @@ use super::model::{
 };
 #[cfg(feature = "encryption")]
 pub(super) use super::model::{Limits, Mode};
+use litchi_core::Durability;
 use litchi_opc::OpcError;
 use std::sync::Arc;
 
@@ -514,8 +515,32 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        self.save_with_durability(path, Durability::Full)
+    }
+
+    /// Save the package to a file at a caller-chosen [`Durability`].
+    ///
+    /// [`Self::save`] is this method at [`Durability::Full`]. Every level
+    /// writes the same bytes through the same sibling temporary file and
+    /// atomic rename, and a failure before the rename leaves the destination
+    /// untouched. A weaker level only skips synchronizations:
+    /// [`Durability::FileOnly`] skips the parent-directory sync and
+    /// [`Durability::NoSync`] also skips the temporary file's sync, with the
+    /// crash guarantees [`Durability`] states. The level applies to this call
+    /// only and is never stored on the package.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`], except that only [`Durability::Full`] can report
+    /// that the destination was replaced but its directory could not be
+    /// synchronized ([`litchi_opc::OpcError::Committed`]).
+    pub fn save_with_durability<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        durability: Durability,
+    ) -> Result<()> {
         self.ensure_plain_output("save")?;
-        self.save_plain_impl(path)
+        self.save_plain_impl(path, durability)
     }
 
     /// Explicitly save a plaintext package, even when the source was encrypted.
@@ -524,13 +549,29 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn save_plain<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
-        self.save_plain_impl(path)
+        self.save_plain_with_durability(path, Durability::Full)
     }
 
-    fn save_plain_impl<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
-        litchi_opc::atomic::replace_with::<Error>(path.as_ref(), |temporary| {
-            self.write_plain(temporary)
-        })
+    /// Explicitly save a plaintext package at a caller-chosen [`Durability`];
+    /// see [`Self::save_with_durability`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn save_plain_with_durability<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        durability: Durability,
+    ) -> Result<()> {
+        self.save_plain_impl(path, durability)
+    }
+
+    fn save_plain_impl<P: AsRef<Path>>(&mut self, path: P, durability: Durability) -> Result<()> {
+        litchi_opc::atomic::replace_with_durability::<Error>(
+            path.as_ref(),
+            durability,
+            |temporary| self.write_plain(temporary),
+        )
     }
 
     /// Save the package to a stream.

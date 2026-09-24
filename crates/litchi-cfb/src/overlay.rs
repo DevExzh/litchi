@@ -8,12 +8,11 @@
 use crate::consts::{ENDOFCHAIN, MAXREGSECT, STGTY_STREAM};
 use crate::file::{OleError, OleFile, ParsedOleIndex};
 use crate::shared::SharedOleFile;
-use crate::writer::{atomic_replace, create_sibling_temp_file, parent_directory, sync_parent};
-use litchi_core::{ReadAt, SourceVersion};
+use crate::writer::{PublishFailure, PublishSteps, SystemSteps, TemporaryIdentity, publish_staged};
+use litchi_core::{Durability, ReadAt, SourceVersion};
 use sha2::{Digest as _, Sha256};
 use std::collections::TryReserveError;
-use std::fs;
-use std::io::{self, BufWriter, Read, Seek, SeekFrom, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
 use std::path::Path;
 use std::sync::Arc;
@@ -594,7 +593,8 @@ enum PublicationRoute {
     /// rechecked by a complete preflight after the last sink byte.
     DirectSink,
     /// Atomic save (`save`): the caller's own pre-rename preflight follows
-    /// flush and fsync, so the emission does not repeat it.
+    /// the flush (and the file sync, at a level that synchronizes the file),
+    /// so the emission does not repeat it.
     AtomicStaging,
 }
 
@@ -978,49 +978,81 @@ impl ValidatedOverlayPlan {
     /// Before rename, every failure leaves the destination unchanged. After a
     /// successful rename, parent-directory sync failure is returned as
     /// [`OverlayError::Committed`] so callers do not retry as if the old file
-    /// were still present.
+    /// were still present. This is [`Self::save_with_durability`] at
+    /// [`Durability::Full`].
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<PublishReport, OverlayError> {
-        let path = path.as_ref();
-        let parent = parent_directory(path);
+        self.save_with_durability(path, Durability::Full)
+    }
+
+    /// Publishes through a sibling temporary file and atomic rename at a
+    /// caller-chosen [`Durability`].
+    ///
+    /// Every level emits the same bytes and keeps every source and target
+    /// identity check of [`Self::save`], including the complete pre-rename
+    /// fingerprint recheck of a generic positional source, so a late source
+    /// change is still refused before the destination is replaced. A weaker
+    /// level only skips the staged file's synchronization
+    /// ([`Durability::NoSync`]) or the parent directory's
+    /// ([`Durability::FileOnly`] and [`Durability::NoSync`]), with the crash
+    /// guarantees [`Durability`] states. Only [`Durability::Full`] can return
+    /// [`OverlayError::Committed`].
+    pub fn save_with_durability<P: AsRef<Path>>(
+        &self,
+        path: P,
+        durability: Durability,
+    ) -> Result<PublishReport, OverlayError> {
+        self.save_with_steps(path.as_ref(), durability, &mut SystemSteps)
+    }
+
+    pub(crate) fn save_with_steps<S: PublishSteps>(
+        &self,
+        path: &Path,
+        durability: Durability,
+        steps: &mut S,
+    ) -> Result<PublishReport, OverlayError> {
         // Sealed owned bytes cannot change while this plan is alive, and
         // planning computed both digests over them. Such a plan takes none of
         // the three complete-artifact checks below (pre-temporary-file,
         // emission hash, pre-rename); publication keeps every read, write,
-        // flush, fsync, rename and parent-sync step.
+        // flush and rename step, and each synchronization its level asks for.
         if !self.source.source_is_owned_immutable {
             // Complete the potentially expensive source/fingerprint
             // validation before creating even a temporary file.
             self.preflight_fingerprints()?;
         }
-        let (temporary_path, file) = create_sibling_temp_file(path)?;
-        let result = (|| {
-            let mut buffered = BufWriter::new(file);
-            let report = self
+        publish_staged(
+            path,
+            durability,
+            TemporaryIdentity::Unchecked,
+            steps,
+            |staging| {
                 // `save` has its own mandatory pre-rename preflight below. The
                 // direct sink path keeps the post-emission preflight inside
                 // `write_validated`; the staging route skips only that
                 // duplicate scan, and a generic source's emission still
                 // hashes every source and target byte.
-                .write_validated(&mut buffered, PublicationRoute::AtomicStaging)
-                .map_err(strip_staging_progress)?;
-            buffered.flush()?;
-            buffered.get_ref().sync_all()?;
-
-            if !self.source.source_is_owned_immutable {
+                self.write_validated(staging, PublicationRoute::AtomicStaging)
+                    .map_err(strip_staging_progress)
+            },
+            |_staged_file, _report| {
+                if self.source.source_is_owned_immutable {
+                    return Ok(());
+                }
                 // Close the staging window with the same full identity check.
                 // A stable but dishonest version token must not hide a late
                 // source byte change immediately before the atomic rename.
-                self.preflight_fingerprints()?;
-            }
-            drop(buffered);
-            atomic_replace(&temporary_path, path)?;
-            sync_parent(parent).map_err(|source| OverlayError::Committed { source })?;
-            Ok(report)
-        })();
-        if result.is_err() {
-            drop(fs::remove_file(&temporary_path));
-        }
-        result
+                self.preflight_fingerprints()
+            },
+        )
+        .map_err(|failure| match failure {
+            PublishFailure::Create(error) => OverlayError::from(error),
+            PublishFailure::Caller(error) => error,
+            PublishFailure::Flush { source, .. }
+            | PublishFailure::SyncFile { source, .. }
+            | PublishFailure::Identity { source, .. }
+            | PublishFailure::Replace { source, .. } => OverlayError::Io(source),
+            PublishFailure::Committed { source, .. } => OverlayError::Committed { source },
+        })
     }
 
     fn preflight_fingerprints(&self) -> Result<(), OverlayError> {

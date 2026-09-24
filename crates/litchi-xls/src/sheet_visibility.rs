@@ -760,6 +760,17 @@ impl SourceBackedCommit {
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<PublishReport, OverlayError> {
         self.plan.save(path)
     }
+
+    /// Publishes through the common sibling-file and atomic-rename path at a
+    /// caller-chosen [`Durability`](litchi_core::Durability); see
+    /// [`litchi_cfb::ValidatedOverlayPlan::save_with_durability`].
+    pub fn save_with_durability<P: AsRef<Path>>(
+        &self,
+        path: P,
+        durability: litchi_core::Durability,
+    ) -> Result<PublishReport, OverlayError> {
+        self.plan.save_with_durability(path, durability)
+    }
 }
 
 impl fmt::Debug for SourceBackedCommit {

@@ -29,6 +29,28 @@ impl Writer {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<()> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Save the XLS file atomically at a caller-chosen
+    /// [`Durability`](litchi_core::Durability).
+    ///
+    /// [`Self::save`] is this method at `Durability::Full`. Every level
+    /// writes the same bytes through the same sibling temporary file and
+    /// atomic replacement; a weaker level only skips the parent-directory
+    /// sync (`FileOnly`) or both synchronizations (`NoSync`), with the crash
+    /// guarantees `Durability` states.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if validation, encoding, or the atomic replacement
+    /// fails. Only `Durability::Full` can report that the destination was
+    /// replaced but its directory could not be synchronized.
+    pub fn save_with_durability<P: AsRef<std::path::Path>>(
+        &mut self,
+        path: P,
+        durability: litchi_core::Durability,
+    ) -> Result<()> {
         // Generate the Workbook stream + pivot cache streams
         let streams = self.generate_workbook_streams()?;
 
@@ -37,7 +59,7 @@ impl Writer {
         self.populate_compound_document(&mut ole_writer, streams)?;
 
         // Save to file
-        ole_writer.save(path)?;
+        ole_writer.save_with_durability(path, durability)?;
 
         Ok(())
     }
