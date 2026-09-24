@@ -18,6 +18,7 @@ use litchi_ooxml_common::properties::time::DateTime;
 use litchi_ooxml_common::xml::attributes::first_wins;
 use litchi_opc::{PackURI, PartData, SourceLineage, SourceXmlPart};
 use quick_xml::events::Event;
+use quick_xml::events::attributes::AttrError;
 use quick_xml::name::{Namespace, PrefixDeclaration, ResolveResult};
 use quick_xml::reader::NsReader;
 use quick_xml::{Reader, XmlVersion};
@@ -8798,9 +8799,26 @@ fn complex_field_marker(xml: &[u8]) -> Result<Option<ComplexFieldMarker>, Refusa
                     b"fldChar",
                     &fragment_prefix,
                 ) {
-                    let value = first_wins(&element)
-                        .filter_map(Result::ok)
-                        .find(|attribute| attribute.key.local_name().as_ref() == b"fldCharType")
+                    // Repeated names are skipped as before, but a lexical
+                    // attribute error before `fldCharType` refuses the marker.
+                    // quick-xml's checked iterator skipped such errors too,
+                    // yet refused `fldCharType=begin fldCharType="end"`: it
+                    // recorded the malformed first occurrence and reported the
+                    // second as a duplicate, where `first_wins` would read the
+                    // second.
+                    let mut marker = None;
+                    for attribute in first_wins(&element) {
+                        let attribute = match attribute {
+                            Ok(attribute) => attribute,
+                            Err(AttrError::Duplicated(..)) => continue,
+                            Err(_error) => return Err(Refusal::ComplexContent),
+                        };
+                        if attribute.key.local_name().as_ref() == b"fldCharType" {
+                            marker = Some(attribute);
+                            break;
+                        }
+                    }
+                    let value = marker
                         .ok_or(Refusal::ComplexContent)?
                         .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
                         .map_err(|_error| Refusal::ComplexContent)?;

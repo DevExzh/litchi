@@ -305,3 +305,55 @@ fn an_empty_elements_declarations_leave_the_scope_when_the_raw_flow_recovers() {
         "{error:?}"
     );
 }
+
+#[test]
+fn no_configuration_admits_more_than_the_ceiling() {
+    use super::model::ATTRIBUTES_PER_ELEMENT_CEILING;
+
+    let unbounded = Limits {
+        max_attributes_per_element: usize::MAX,
+        ..Limits::default()
+    };
+    // The in-memory processor applies the ceiling whatever the field holds.
+    codec(
+        &with_tag(&attributes(ATTRIBUTES_PER_ELEMENT_CEILING)),
+        &unbounded,
+    )
+    .expect("the ceiling is admitted");
+    let error = codec(
+        &with_tag(&attributes(ATTRIBUTES_PER_ELEMENT_CEILING + 1)),
+        &unbounded,
+    )
+    .expect_err("one attribute more is refused");
+    assert!(is_limit(&error, "attributes per element"), "{error:?}");
+
+    // The stream refuses such a configuration before reading.
+    let stream_limits = StreamLimits::new(unbounded);
+    let error = stream(&with_tag(&attributes(1)), &stream_limits).expect_err("refused");
+    assert!(
+        matches!(&error, StreamError::Mce { error, .. } if is_limit(error, "MCE attributes per element")),
+        "{error:?}"
+    );
+    let per_event = StreamLimits {
+        max_attributes_per_event: ATTRIBUTES_PER_ELEMENT_CEILING + 1,
+        ..StreamLimits::default()
+    };
+    let error = stream(&with_tag(&attributes(1)), &per_event).expect_err("refused");
+    assert!(
+        matches!(&error, StreamError::Mce { error, .. } if is_limit(error, "stream attributes per event")),
+        "{error:?}"
+    );
+    // At the ceiling both limits are valid.
+    let widest = StreamLimits {
+        max_attributes_per_event: ATTRIBUTES_PER_ELEMENT_CEILING,
+        ..StreamLimits::new(Limits {
+            max_attributes_per_element: ATTRIBUTES_PER_ELEMENT_CEILING,
+            ..Limits::default()
+        })
+    };
+    stream(
+        &with_tag(&attributes(ATTRIBUTES_PER_ELEMENT_CEILING)),
+        &widest,
+    )
+    .expect("the ceiling is admitted by the stream");
+}

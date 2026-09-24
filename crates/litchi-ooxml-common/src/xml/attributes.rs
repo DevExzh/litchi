@@ -38,11 +38,16 @@ const LINEAR_NAMES: usize = 32;
 ///
 /// On a tag without duplicate names this yields exactly what
 /// `tag.attributes()` yields. On a tag with duplicates it yields the same
-/// `Ok` items in the same order unless quick-xml's recovery would resume
-/// inside a duplicate's value (see the module documentation), or unless a
-/// name's first occurrence is itself malformed, in which case quick-xml
-/// reports its later occurrences as duplicates while this yields the first
-/// well-formed one.
+/// `Ok` items in the same order except in three cases, all malformed:
+///
+/// * quick-xml's recovery resumes inside a duplicate's quoted value and reports
+///   names from within it (see the module documentation); this does not;
+/// * an attribute written directly after a duplicate, with no separating
+///   whitespace (`a="1" a="2"b="3"`), is lost by quick-xml, whose recovery
+///   skips to the next whitespace; this yields it;
+/// * a name whose first occurrence is itself malformed (`a=x a="2"`) is
+///   recorded by quick-xml, which then reports its later occurrences as
+///   duplicates; this yields the first well-formed occurrence.
 ///
 /// It costs `O(log n)` name comparisons per attribute once a tag has more
 /// than 32, and a linear scan of the names seen so far below that.
@@ -349,6 +354,23 @@ mod tests {
                 Ok((b"a".to_vec(), b"1".to_vec())),
                 Err(AttrError::Duplicated(8, 2)),
                 Ok((b"c".to_vec(), b"3".to_vec())),
+            ]
+        );
+    }
+
+    #[test]
+    fn an_attribute_glued_to_a_duplicate_is_not_lost() {
+        let tag = tag(r#"e a="1" a="2"b="3""#);
+        // quick-xml skips from the duplicate's `=` to the next whitespace, so
+        // it never reports `b`.
+        let lenient: Vec<_> = checked(&tag).into_iter().filter_map(Result::ok).collect();
+        assert!(!lenient.iter().any(|(key, _)| key == b"b"), "{lenient:?}");
+        assert_eq!(
+            first(&tag),
+            vec![
+                Ok((b"a".to_vec(), b"1".to_vec())),
+                Err(AttrError::Duplicated(8, 2)),
+                Ok((b"b".to_vec(), b"3".to_vec())),
             ]
         );
     }
