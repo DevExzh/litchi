@@ -909,9 +909,24 @@ pub(crate) fn generate_workbook_stream(
                     biff::write_boolerr(&mut stream, *row, *col, xf_index, *value)?;
                 },
                 CellValue::Formula(formula) => {
-                    let expression = formula.strip_prefix('=').unwrap_or(formula);
-                    let tokens = FormulaTokenizer::new().tokenize(expression)?;
-                    let encoded = encode_ptg_tokens(&tokens)?;
+                    // `write_formula*` encoded the formula when it staged the
+                    // cell; other formula cells are encoded here.
+                    let staged = worksheet.formula_tokens((*row, *col));
+                    let encoded = match staged {
+                        Some(tokens) => std::borrow::Cow::Borrowed(tokens),
+                        None => {
+                            let expression = formula.strip_prefix('=').unwrap_or(formula);
+                            let tokens = FormulaTokenizer::new().tokenize(expression)?;
+                            std::borrow::Cow::Owned(encode_ptg_tokens(&tokens)?)
+                        },
+                    };
+                    debug_assert!(staged.is_none_or(|tokens| {
+                        let expression = formula.strip_prefix('=').unwrap_or(formula);
+                        FormulaTokenizer::new()
+                            .tokenize(expression)
+                            .and_then(|tokens| encode_ptg_tokens(&tokens))
+                            .is_ok_and(|fresh| fresh == tokens)
+                    }));
                     let metadata = cell.formula_metadata.clone().unwrap_or_else(|| {
                         crate::FormulaMetadata::new().with_always_calculate(true)
                     });

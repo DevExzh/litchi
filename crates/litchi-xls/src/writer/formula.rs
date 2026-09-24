@@ -22,7 +22,6 @@
 
 use super::super::Error;
 use super::string_limits::{FORMULA_STRING_UNITS, checked_utf16_len, u8_len};
-use std::collections::HashMap;
 
 /// The field [`Error::StringTooLong`] names for an over-long string constant.
 const FORMULA_STRING_FIELD: &str = "formula string literal";
@@ -318,35 +317,49 @@ fn parse_ref(value: &str) -> Result<Ref, Error> {
         .rel_col(column_relative))
 }
 
+/// The built-in functions the tokenizer recognizes, by upper-case name, with
+/// their indices in the Excel function table.
+const FUNCTIONS: [(&str, u16); 14] = [
+    ("SUM", 4),
+    ("IF", 1),
+    ("COUNT", 0),
+    ("AVERAGE", 5),
+    ("MAX", 7),
+    ("MIN", 6),
+    ("VLOOKUP", 102),
+    ("CONCATENATE", 336),
+    ("LEFT", 115),
+    ("RIGHT", 116),
+    ("MID", 31),
+    ("LEN", 32),
+    ("ROUND", 27),
+    ("ABS", 24),
+];
+
 /// Formula tokenizer - converts infix formula to RPN tokens
 pub struct FormulaTokenizer {
     /// Built-in function names to indices
-    functions: HashMap<String, u16>,
+    functions: &'static [(&'static str, u16)],
 }
 
 impl FormulaTokenizer {
     /// Create a new formula tokenizer
+    ///
+    /// Its function table is static, so creating one allocates nothing: the
+    /// writer creates one per formula.
     #[must_use]
-    pub fn new() -> Self {
-        let mut functions = HashMap::new();
+    pub const fn new() -> Self {
+        Self {
+            functions: &FUNCTIONS,
+        }
+    }
 
-        // Common Excel functions (index from Excel function table)
-        functions.insert("SUM".to_string(), 4);
-        functions.insert("IF".to_string(), 1);
-        functions.insert("COUNT".to_string(), 0);
-        functions.insert("AVERAGE".to_string(), 5);
-        functions.insert("MAX".to_string(), 7);
-        functions.insert("MIN".to_string(), 6);
-        functions.insert("VLOOKUP".to_string(), 102);
-        functions.insert("CONCATENATE".to_string(), 336);
-        functions.insert("LEFT".to_string(), 115);
-        functions.insert("RIGHT".to_string(), 116);
-        functions.insert("MID".to_string(), 31);
-        functions.insert("LEN".to_string(), 32);
-        functions.insert("ROUND".to_string(), 27);
-        functions.insert("ABS".to_string(), 24);
-
-        Self { functions }
+    /// The Excel function-table index of the upper-case function `name`.
+    fn function_index(&self, name: &str) -> Option<u16> {
+        self.functions
+            .iter()
+            .find(|(function, _)| *function == name)
+            .map(|(_, index)| *index)
     }
 
     /// Tokenize a formula string to RPN tokens
@@ -446,7 +459,7 @@ impl FormulaTokenizer {
                 // Check if it's a function call
                 if i < chars.len() && chars[i] == '(' {
                     let func_name = token.to_uppercase();
-                    let func_idx = self.functions.get(&func_name).copied().ok_or_else(|| {
+                    let func_idx = self.function_index(&func_name).ok_or_else(|| {
                         Error::InvalidData(format!("Unknown function: {func_name}"))
                     })?;
                     let mut next = i + 1;
@@ -1808,5 +1821,43 @@ mod tests {
         let subnormal = format!("{:.324}", f64::from_bits(1));
         assert!(compile_array_formula(&subnormal, limits).is_err());
         assert!(try_encode_array_tokens(&[Ptg::Num(-0.0)], &[None], 1_800).is_err());
+    }
+
+    /// The static function table (change 0766) resolves every name the
+    /// per-tokenizer map did, in any case, to the same Excel index, and
+    /// nothing else.
+    #[test]
+    fn every_function_resolves_to_its_excel_index_in_any_case() {
+        let expected = [
+            ("SUM", 4),
+            ("IF", 1),
+            ("COUNT", 0),
+            ("AVERAGE", 5),
+            ("MAX", 7),
+            ("MIN", 6),
+            ("VLOOKUP", 102),
+            ("CONCATENATE", 336),
+            ("LEFT", 115),
+            ("RIGHT", 116),
+            ("MID", 31),
+            ("LEN", 32),
+            ("ROUND", 27),
+            ("ABS", 24),
+        ];
+        let tokenizer = FormulaTokenizer::new();
+        for (name, index) in expected {
+            for spelling in [name.to_string(), name.to_lowercase()] {
+                let tokens = tokenizer.tokenize(&format!("{spelling}(1)")).unwrap();
+                assert!(
+                    tokens
+                        .iter()
+                        .any(|token| matches!(token, Ptg::Func(found, _) if *found == index)),
+                    "{spelling}: {tokens:?}"
+                );
+            }
+        }
+        for unknown in ["SUMX(1)", "SU(1)", "NOW()", "Sum2(1)"] {
+            assert!(tokenizer.tokenize(unknown).is_err(), "{unknown}");
+        }
     }
 }

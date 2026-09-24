@@ -250,6 +250,11 @@ pub(super) struct WritableWorksheet {
     pub name: String,
     /// Cells to write (indexed by (row, col))
     pub cells: HashMap<(u32, u16), WritableCell>,
+    /// The encoded tokens of the formula cells `write_formula*` staged, by
+    /// cell, so the write does not tokenize them a second time. `add_cell`,
+    /// the only way a cell is staged, drops a cell's entry, so an entry
+    /// always belongs to the formula its cell holds.
+    formula_tokens: HashMap<(u32, u16), Vec<u8>>,
     /// First used row
     pub first_row: u32,
     /// Last used row (exclusive)
@@ -334,6 +339,7 @@ impl WritableWorksheet {
         Self {
             name,
             cells: HashMap::new(),
+            formula_tokens: HashMap::new(),
             first_row: 0,
             last_row: 0,
             first_col: 0,
@@ -391,7 +397,22 @@ impl WritableWorksheet {
             self.last_col = self.last_col.max(col + 1);
         }
 
-        self.cells.insert((row, col), cell);
+        // Replacing a cell drops the tokens staged for its old formula.
+        if self.cells.insert((row, col), cell).is_some() && !self.formula_tokens.is_empty() {
+            self.formula_tokens.remove(&(row, col));
+        }
+    }
+
+    /// Stages a formula cell with the tokens its formula encodes to.
+    pub(super) fn add_formula_cell(&mut self, cell: WritableCell, tokens: Vec<u8>) {
+        let key = (u32::from(cell.row()), u16::from(cell.col()));
+        self.add_cell(cell);
+        self.formula_tokens.insert(key, tokens);
+    }
+
+    /// The tokens `add_formula_cell` staged for the formula cell at `key`.
+    pub(super) fn formula_tokens(&self, key: (u32, u16)) -> Option<&[u8]> {
+        self.formula_tokens.get(&key).map(Vec::as_slice)
     }
 
     pub(super) fn include_list_object_range(&mut self, range: crate::ListObjectRange) {

@@ -6,9 +6,14 @@ use crate::writer::string_limits::{SHARED_STRING_UNITS, ensure_utf16_len_within}
 
 /// Refuses a formula cell the workbook write would refuse, by running the
 /// write's own steps for it — tokenizing, encoding and building its
-/// `Formula` record, into a sink — when the cell is set. The write repeats
-/// them unchanged: they depend only on the cell, its formula and metadata.
-fn check_formula_cell(pos: CellPos, formula: &str, metadata: crate::FormulaMetadata) -> Result<()> {
+/// `Formula` record, into a sink — when the cell is set, and returns the
+/// encoded tokens, which the write then uses instead of tokenizing again.
+/// The steps depend only on the cell, its formula and its metadata.
+fn check_formula_cell(
+    pos: CellPos,
+    formula: &str,
+    metadata: crate::FormulaMetadata,
+) -> Result<Vec<u8>> {
     let expression = formula.strip_prefix('=').unwrap_or(formula);
     let tokens = FormulaTokenizer::new().tokenize(expression)?;
     let encoded = encode_ptg_tokens(&tokens)?;
@@ -19,7 +24,8 @@ fn check_formula_cell(pos: CellPos, formula: &str, metadata: crate::FormulaMetad
         0,
         &encoded,
         metadata,
-    )
+    )?;
+    Ok(encoded)
 }
 
 impl Writer {
@@ -162,16 +168,18 @@ impl Writer {
         format_id: u16,
     ) -> Result<()> {
         let pos = CellPos::try_new(row, col)?;
-        check_formula_cell(
+        let tokens = check_formula_cell(
             pos,
             formula,
             crate::FormulaMetadata::new().with_always_calculate(true),
         )?;
-        self.write_cell(
+        self.stage_cell(
             sheet,
             pos,
             CellValue::Formula(formula.to_string()),
             format_id,
+            None,
+            Some(tokens),
         )
     }
 
@@ -210,13 +218,14 @@ impl Writer {
     ) -> Result<()> {
         crate::formula_metadata::validate_for_write(&metadata)?;
         let pos = CellPos::try_new(row, col)?;
-        check_formula_cell(pos, formula, metadata.clone())?;
-        self.write_cell_with_formula_metadata(
+        let tokens = check_formula_cell(pos, formula, metadata.clone())?;
+        self.stage_cell(
             sheet,
             pos,
             CellValue::Formula(formula.to_string()),
             format_id,
             Some(metadata),
+            Some(tokens),
         )
     }
 
@@ -331,16 +340,19 @@ impl Writer {
         value: CellValue,
         format_id: u16,
     ) -> Result<()> {
-        self.write_cell_with_formula_metadata(sheet, pos, value, format_id, None)
+        self.stage_cell(sheet, pos, value, format_id, None, None)
     }
 
-    fn write_cell_with_formula_metadata(
+    /// Stages one cell; `formula_tokens` are the encoded tokens of a formula
+    /// cell's formula, which `check_formula_cell` produced.
+    fn stage_cell(
         &mut self,
         sheet: usize,
         pos: CellPos,
         value: CellValue,
         format_id: u16,
         formula_metadata: Option<crate::FormulaMetadata>,
+        formula_tokens: Option<Vec<u8>>,
     ) -> Result<()> {
         if self.fmt.get_format(format_id).is_none() {
             return Err(Error::InvalidFormat(format_id));
@@ -366,9 +378,12 @@ impl Writer {
             )));
         }
 
-        worksheet.add_cell(
-            WritableCell::new(pos, value, format_id, None).with_formula_metadata(formula_metadata),
-        );
+        let cell =
+            WritableCell::new(pos, value, format_id, None).with_formula_metadata(formula_metadata);
+        match formula_tokens {
+            Some(tokens) => worksheet.add_formula_cell(cell, tokens),
+            None => worksheet.add_cell(cell),
+        }
 
         Ok(())
     }
