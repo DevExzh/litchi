@@ -10,11 +10,13 @@ pub use codec::{master_xml, write_text, write_text_with};
 pub(crate) use codec::{rewrite_text, root_conformance_from_processed};
 pub use model::{Conformance, Graph, Link, Master, Slide, Theme};
 pub(crate) use package::{
-    SlideRootProof, apply_commit, apply_patch, clear_checked, load, load_snapshot,
+    SlideRootMemo, SlideRootProof, apply_commit, apply_patch, clear_checked, load, load_snapshot,
     load_snapshot_with_slide_root_proofs, remove_checked,
 };
 #[cfg(test)]
-pub(crate) use package::{clear, put, remove};
+pub(crate) use package::{
+    SlideRootRecord, clear, put, remove, with_refused_slide_root_reservation,
+};
 pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
 
 pub(crate) const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";

@@ -48,19 +48,24 @@ pub(super) fn validate_slide_catalog(
 
 #[cfg(test)]
 pub(crate) fn capture_slides<'a>(presentation: &Presentation<'a>) -> Result<CaptureSlides<'a>> {
-    capture_slides_inner(presentation, None)
+    capture_slides_inner(presentation, None, None)
 }
 
+/// Capture every slide, reusing MCE projections the parent snapshot retained
+/// and notes-root classifications `proved_roots` holds for the exact payload
+/// allocations this capture reads.
 pub(crate) fn capture_slides_with_mce<'a, 'parent>(
     presentation: &Presentation<'a>,
     capture: &mut MceCapture<'a, 'parent>,
+    proved_roots: Option<&crate::notes::SlideRootMemo>,
 ) -> Result<CaptureSlides<'a>> {
-    capture_slides_inner(presentation, Some(capture))
+    capture_slides_inner(presentation, Some(capture), proved_roots)
 }
 
 fn capture_slides_inner<'a, 'parent>(
     presentation: &Presentation<'a>,
     mut capture: Option<&mut MceCapture<'a, 'parent>>,
+    proved_roots: Option<&crate::notes::SlideRootMemo>,
 ) -> Result<CaptureSlides<'a>> {
     let package = presentation.package();
     let references = presentation.catalog()?;
@@ -93,6 +98,7 @@ fn capture_slides_inner<'a, 'parent>(
                     part,
                     collect_notes_proofs,
                     capture,
+                    proved_roots,
                 )?,
                 None => SlidePart::from_part_with_name(part, collect_notes_proofs)?,
             };

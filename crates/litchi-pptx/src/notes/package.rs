@@ -77,7 +77,239 @@ impl<'a> SlideRootProof<'a> {
     pub(crate) fn is_valid(self) -> bool {
         self.conformance.is_some()
     }
+
+    /// Lifetime-free record of this proof: the allocation key of the exact raw
+    /// observation it classified, and the classification.
+    pub(crate) fn record(self) -> SlideRootRecord {
+        SlideRootRecord {
+            key: raw_key(self.raw),
+            conformance: self.conformance,
+        }
+    }
 }
+
+/// Allocation key of one raw slide observation: its address and length.
+pub(crate) type RawKey = (usize, usize);
+
+fn raw_key(raw: &[u8]) -> RawKey {
+    (raw.as_ptr() as usize, raw.len())
+}
+
+/// Resource named by the typed error a refused memo reservation raises.
+const SLIDE_ROOT_MEMO: &str = "opened-presentation slide-root memo";
+
+/// A [`SlideRootProof`] detached from the borrow of the package it read.
+///
+/// The key alone proves nothing, because nothing keeps its allocation alive;
+/// [`SlideRootMemo::from_records`] admits a record only together with a strong
+/// owner of that exact allocation.
+#[derive(Clone, Copy)]
+pub(crate) struct SlideRootRecord {
+    key: RawKey,
+    conformance: Option<Conformance>,
+}
+
+impl SlideRootRecord {
+    /// A record for `raw` with an arbitrary classification, for the tests that
+    /// plant records the scan never produced.
+    #[cfg(test)]
+    pub(crate) fn for_test(raw: &[u8], conformance: Option<Conformance>) -> Self {
+        Self {
+            key: raw_key(raw),
+            conformance,
+        }
+    }
+}
+
+/// One retained classification: the allocation it classified, held strongly
+/// so its address cannot be reused while the entry lives, and the result.
+#[derive(Clone)]
+struct SlideRootEntry {
+    key: RawKey,
+    raw: Arc<Vec<u8>>,
+    conformance: Conformance,
+}
+
+/// Notes-root classifications proved by one opened-presentation capture,
+/// keyed by the payload allocation each one read (ADR 0032).
+///
+/// An entry asserts *the slide payload at address `a` of length `l`,
+/// processed under the default markup-compatibility profile, classifies as
+/// `c` under the complete notes-graph root scan*. That classification is a
+/// deterministic, total function of the payload bytes alone: the scan's
+/// profile, root name and ceilings are compile-time constants, and it reads no
+/// part name, content type, relationship, other part or caller limit. Only a
+/// classification the scan returned is kept; a slide the scan refuses is
+/// never memoized, so its refusal is always recomputed from the bytes.
+///
+/// The entry retains the payload `Arc`, so the address cannot be recycled by
+/// a different payload while the entry lives, and a hit on the exact raw
+/// observation a later capture makes therefore proves byte identity. A miss is
+/// an ordinary scan, so no value, refusal or published byte depends on which
+/// entries the memo holds; a hit is re-derived by a `debug_assert!` in test and
+/// debug builds.
+///
+/// Entries are admitted only for allocations the owning snapshot's package
+/// holds, so the memo pins no payload that package does not already own. It is
+/// built by one capture or projected by one rebind and never mutated after.
+/// Its resident cost is one 32-byte entry (key, `Arc`, classification) per
+/// captured slide, bounded by the capture's slide limit, reserved fallibly.
+#[derive(Clone, Default)]
+pub(crate) struct SlideRootMemo {
+    entries: Vec<SlideRootEntry>,
+}
+
+impl SlideRootMemo {
+    /// Admit every successful classification in `records` whose allocation
+    /// `owner` proves the owning snapshot holds.
+    ///
+    /// The table is reserved fallibly before any entry is admitted, and a
+    /// refused reservation is the typed [`Error::Allocation`] the capture
+    /// reports for its other reservations, never an abort and never a silently
+    /// empty memo (ADR 0032 section 3).
+    pub(crate) fn from_records(
+        records: impl ExactSizeIterator<Item = SlideRootRecord>,
+        owner: impl Fn(RawKey) -> Option<Arc<Vec<u8>>>,
+    ) -> Result<Self> {
+        let mut entries = Vec::new();
+        reserve_entries(&mut entries, records.len())
+            .map_err(|source| allocation(SLIDE_ROOT_MEMO, source))?;
+        for record in records {
+            // A slide the scan refused is recomputed from its bytes every time.
+            let Some(conformance) = record.conformance else {
+                continue;
+            };
+            let Some(raw) = owner(record.key).filter(|raw| raw_key(raw) == record.key) else {
+                continue;
+            };
+            if entries.len() == entries.capacity() {
+                reserve_entries(&mut entries, 1)
+                    .map_err(|source| allocation(SLIDE_ROOT_MEMO, source))?;
+            }
+            entries.push(SlideRootEntry {
+                key: record.key,
+                raw,
+                conformance,
+            });
+        }
+        Ok(Self::sorted(entries))
+    }
+
+    /// Keep only the entries whose allocation `owner` proves a rebound
+    /// snapshot's own package holds, each retaining the `Arc` `owner` returns.
+    ///
+    /// A rebind is infallible, so a table that cannot be reserved is an empty
+    /// memo, exactly as the part-digest projection beside it degrades (ADR 0032
+    /// section 3); an empty memo is only a miss.
+    pub(crate) fn project(&self, owner: impl Fn(RawKey) -> Option<Arc<Vec<u8>>>) -> Self {
+        let mut entries = Vec::new();
+        if reserve_entries(&mut entries, self.entries.len()).is_err() {
+            return Self::default();
+        }
+        for entry in &self.entries {
+            if let Some(raw) = owner(entry.key).filter(|raw| raw_key(raw) == entry.key) {
+                entries.push(SlideRootEntry {
+                    key: entry.key,
+                    raw,
+                    conformance: entry.conformance,
+                });
+            }
+        }
+        // `self.entries` is sorted and unique by key, and so is its subsequence.
+        Self { entries }
+    }
+
+    fn sorted(mut entries: Vec<SlideRootEntry>) -> Self {
+        // Neither the unstable sort nor the deduplication allocates.
+        entries.sort_unstable_by_key(|entry| entry.key);
+        // Two slides may share one payload allocation; its bytes, and so its
+        // classification, are the same for both.
+        debug_assert!(
+            entries.windows(2).all(
+                |pair| pair[0].key != pair[1].key || pair[0].conformance == pair[1].conformance
+            ),
+            "one slide payload allocation was classified two different ways"
+        );
+        entries.dedup_by_key(|entry| entry.key);
+        Self { entries }
+    }
+
+    /// Classification proved for exactly this raw observation, if any.
+    pub(crate) fn lookup(&self, raw: &[u8]) -> Option<Conformance> {
+        let index = self
+            .entries
+            .binary_search_by_key(&raw_key(raw), |entry| entry.key)
+            .ok()?;
+        let entry = self.entries.get(index)?;
+        std::ptr::eq(entry.raw.as_slice(), raw).then_some(entry.conformance)
+    }
+
+    /// Number of retained classifications.
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Each entry's key, the payload allocation it retains and its
+    /// classification, for the tests that prove what an entry names.
+    #[cfg(test)]
+    pub(crate) fn retained(
+        &self,
+    ) -> impl Iterator<Item = (RawKey, &Arc<Vec<u8>>, Conformance)> + '_ {
+        self.entries
+            .iter()
+            .map(|entry| (entry.key, &entry.raw, entry.conformance))
+    }
+
+    /// Bytes the table occupies itself, excluding the payloads it names and
+    /// the `Arc` header a snapshot keeps it behind.
+    #[cfg(test)]
+    pub(crate) fn resident_bytes(&self) -> usize {
+        self.entries.capacity() * size_of::<SlideRootEntry>()
+    }
+
+    /// Size of one entry, stated by the implementing record.
+    #[cfg(test)]
+    pub(crate) const ENTRY_BYTES: usize = size_of::<SlideRootEntry>();
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Whether this thread's memo reservations are refused, for the tests that
+    /// prove a refused reservation is a typed error rather than an abort or a
+    /// silently empty memo.
+    static REFUSE_SLIDE_ROOT_RESERVATION: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+}
+
+/// Reserve room for `additional` more entries, fallibly.
+fn reserve_entries(
+    entries: &mut Vec<SlideRootEntry>,
+    additional: usize,
+) -> std::result::Result<(), std::collections::TryReserveError> {
+    #[cfg(test)]
+    if REFUSE_SLIDE_ROOT_RESERVATION.with(std::cell::Cell::get) {
+        // No allocator can satisfy this request, so the error is the genuine
+        // one a refused reservation returns.
+        return entries.try_reserve_exact(usize::MAX);
+    }
+    entries.try_reserve_exact(additional)
+}
+
+/// Run `operation` with every slide-root memo reservation on this thread
+/// refused, restoring the previous setting afterwards, even on a panic.
+#[cfg(test)]
+pub(crate) fn with_refused_slide_root_reservation<T>(operation: impl FnOnce() -> T) -> T {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            REFUSE_SLIDE_ROOT_RESERVATION.with(|refuse| refuse.set(self.0));
+        }
+    }
+    let _restore = Restore(REFUSE_SLIDE_ROOT_RESERVATION.with(|refuse| refuse.replace(true)));
+    operation()
+}
+
 /// Load and validate the complete bounded notes graph for a presentation part.
 ///
 /// The returned graph is lifetime-free and independently editable, so each

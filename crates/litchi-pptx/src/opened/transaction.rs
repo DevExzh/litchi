@@ -1280,6 +1280,10 @@ impl Transaction {
                 patch,
             });
         }
+        // The staged package shares every slide payload allocation the
+        // transaction did not rewrite, so the source snapshot's proved
+        // notes-root classifications answer for those slides and only the
+        // rewritten ones are rescanned; every other validation still runs.
         let snapshot = super::model::capture_with_revision_and_digests_and_mce(
             &working,
             self.source.limits,
@@ -1287,6 +1291,7 @@ impl Transaction {
             revision,
             digests,
             self.source.retained_mce.as_deref(),
+            Some(self.source.slide_roots.as_ref()),
         )?;
         Ok(Commit { snapshot, patch })
     }

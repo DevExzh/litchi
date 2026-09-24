@@ -234,8 +234,9 @@ impl<'a> Presentation<'a> {
     pub(crate) fn capture_slides_with_mce<'parent>(
         &self,
         capture: &mut crate::parts::MceCapture<'a, 'parent>,
+        proved_roots: Option<&crate::notes::SlideRootMemo>,
     ) -> Result<package::CaptureSlides<'a>> {
-        package::capture_slides_with_mce(self, capture)
+        package::capture_slides_with_mce(self, capture, proved_roots)
     }
 
     /// Resolve the slide masters declared by `p:sldMasterIdLst` in XML order.

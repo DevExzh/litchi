@@ -18,6 +18,8 @@ mod xml;
 #[cfg(test)]
 mod mce_retention_tests;
 #[cfg(test)]
+mod slide_root_memo_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod text_run_tests;
