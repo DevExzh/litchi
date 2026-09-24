@@ -8,6 +8,7 @@ use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{OpcPackage, PackURI};
 use sha2::{Digest, Sha256};
 
+use crate::notes::SlideRootMemo;
 use crate::parts::{MceCapture, PresentationPart, RetainedMce};
 use crate::{Error, Result};
 
@@ -325,6 +326,17 @@ pub struct Snapshot {
     /// This table is optional, bounded by `Limits`, and shares cheaply across
     /// snapshot clones without changing the snapshot's semantic meaning.
     pub(crate) retained_mce: Option<Arc<RetainedMce>>,
+    /// Notes-root classifications this snapshot's capture proved, keyed by
+    /// the payload allocation each one read (ADR 0032).
+    ///
+    /// Every entry names an allocation `package` holds, so the memo pins no
+    /// bytes the snapshot does not already own. A capture of a package that
+    /// still shares a slide payload allocation — a commit's staged package
+    /// shares every slide it did not rewrite — reuses the classification
+    /// instead of rescanning that slide. A miss is the ordinary scan. The memo
+    /// is built by the capture or projected by a rebind, never mutated, and
+    /// clones share it.
+    pub(crate) slide_roots: Arc<SlideRootMemo>,
 }
 
 /// Memoized per-part payload digests, keyed by payload allocation address and
@@ -561,6 +573,11 @@ impl Snapshot {
             .retained_mce
             .as_ref()
             .and_then(|retained| retained.project_with_owner(|key| part_digests.owner_for(key)));
+        // Like the MCE table, the slide-root memo keeps only the entries whose
+        // allocation the rebound package itself holds, each retaining that
+        // package's own `Arc`; like the digest projection, a table that cannot
+        // be reserved is empty, which only costs a later scan (ADR 0032).
+        let slide_roots = Arc::new(self.slide_roots.project(|key| part_digests.owner_for(key)));
         Self {
             // `packages_equal` proves the fingerprint inputs are identical; it
             // says nothing about ZIP ordering, compression, or retained source
@@ -578,6 +595,7 @@ impl Snapshot {
             // names an allocation owned by the rebound package. Entries whose
             // source allocation was replaced are simply dropped.
             retained_mce,
+            slide_roots,
             package: owned,
             ..self.clone()
         }
@@ -647,6 +665,7 @@ pub(crate) fn capture_with_provenance(
         physical_source_provenance,
         Revision::Cold,
         None,
+        None,
     )
 }
 
@@ -668,9 +687,16 @@ pub(crate) fn capture_with_parent_digests(
         physical_source_provenance,
         Revision::Parent(parent),
         None,
+        None,
     )
 }
 
+/// Capture a package with its already computed revision, reusing a parent
+/// snapshot's retained MCE projections and its proved notes-root
+/// classifications for every payload allocation the two packages share. A
+/// commit passes its source snapshot's; the cross-slide copy passes neither.
+/// Every validation still runs; only work whose result is proved for the
+/// identical bytes is not repeated.
 pub(crate) fn capture_with_revision_and_digests_and_mce(
     package: &OpcPackage,
     limits: Limits,
@@ -678,6 +704,7 @@ pub(crate) fn capture_with_revision_and_digests_and_mce(
     revision: [u8; 32],
     digests: PartDigests,
     parent_mce: Option<&RetainedMce>,
+    parent_roots: Option<&SlideRootMemo>,
 ) -> Result<Snapshot> {
     capture_internal(
         package,
@@ -685,6 +712,7 @@ pub(crate) fn capture_with_revision_and_digests_and_mce(
         physical_source_provenance,
         Revision::Known(revision, digests),
         parent_mce,
+        parent_roots,
     )
 }
 
@@ -705,6 +733,7 @@ fn capture_internal(
     physical_source_provenance: bool,
     revision: Revision<'_>,
     parent_mce: Option<&RetainedMce>,
+    parent_roots: Option<&SlideRootMemo>,
 ) -> Result<Snapshot> {
     let presentation = PresentationPart::from_package(package)?;
     let presentation_name = presentation.part().partname().clone();
@@ -717,7 +746,7 @@ fn capture_internal(
     }
     let view = crate::presentation::Presentation::new(presentation, package);
     let mut mce_capture = MceCapture::new(parent_mce, limits.max_retained_mce_bytes());
-    let captured = view.capture_slides_with_mce(&mut mce_capture)?;
+    let captured = view.capture_slides_with_mce(&mut mce_capture, parent_roots)?;
     if references.len() != captured.slides.len() {
         return Err(invalid(
             "opened-presentation slide references do not resolve one-to-one",
@@ -795,7 +824,6 @@ fn capture_internal(
         )?,
         None => crate::notes::load_snapshot(package, &presentation_name)?,
     };
-    drop(slide_root_proofs);
     let slide_name_index = SlideNameIndex::build(&slides)?;
     // The snapshot owns its package from here on, and the memo it keeps must
     // name that package's own payload allocations, so the revision is taken
@@ -823,6 +851,19 @@ fn capture_internal(
         Revision::Parent(parent) => package_fingerprint_with_memo(owned.as_ref(), Some(parent))?,
     };
     let retained_mce = mce_capture.finish(|key| part_digests.owner_for(key));
+    // The proofs borrow the input package. Each successful classification is
+    // kept only when the owned package's digest memo holds, and hands over,
+    // the very allocation it read; a refused reservation fails the capture
+    // with a typed error after every validation has passed (ADR 0032).
+    let slide_roots = Arc::new(SlideRootMemo::from_records(
+        slide_root_proofs
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .map(|proof| proof.record()),
+        |key| part_digests.owner_for(key),
+    )?);
+    drop(slide_root_proofs);
     Ok(Snapshot {
         package: owned,
         presentation_name,
@@ -834,6 +875,7 @@ fn capture_internal(
         physical_revision: Arc::new(OnceLock::new()),
         part_digests: Arc::new(part_digests),
         retained_mce,
+        slide_roots,
     })
 }
 

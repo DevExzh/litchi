@@ -9,6 +9,8 @@ mod slide;
 
 pub use presentation::{PresentationPart, SlideReference};
 pub use slide::{SlideLayoutPart, SlideMasterPart, SlidePart};
+#[cfg(test)]
+pub(crate) use slide::{take_proved_root_hits, take_root_scans};
 
 use std::borrow::Cow;
 use std::mem::size_of;

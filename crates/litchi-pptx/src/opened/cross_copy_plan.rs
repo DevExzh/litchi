@@ -851,6 +851,7 @@ pub(crate) fn apply_plan(
         source_revision,
         source_digests,
         None,
+        None,
     )?;
     remember_physical_revision(&source_snapshot, limits, source_physical_revision);
     let destination_snapshot = super::model::capture_with_revision_and_digests_and_mce(
@@ -859,6 +860,7 @@ pub(crate) fn apply_plan(
         destination_physical_source_provenance,
         destination_revision,
         destination_digests,
+        None,
         None,
     )?;
     remember_physical_revision(&destination_snapshot, limits, destination_physical_revision);
@@ -967,6 +969,7 @@ pub(crate) fn apply_patch(
         source_revision,
         source_digests,
         None,
+        None,
     )?;
     remember_physical_revision(&source_snapshot, limits, source_physical_revision);
     let destination_snapshot = super::model::capture_with_revision_and_digests_and_mce(
@@ -975,6 +978,7 @@ pub(crate) fn apply_patch(
         destination_physical_source_provenance,
         destination_revision,
         destination_digests,
+        None,
         None,
     )?;
     remember_physical_revision(&destination_snapshot, limits, destination_physical_revision);

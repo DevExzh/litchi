@@ -1031,6 +1031,29 @@ fn semantic_text_single_pass(xml: &[u8], paragraph_separator: &str) -> Result<St
     }
 }
 
+#[cfg(test)]
+thread_local! {
+    /// Proved slide-root classifications reused on this thread, for tests
+    /// that must show a capture skipped the scan rather than only that its
+    /// result is right.
+    static PROVED_ROOT_HITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Complete notes-root scans run on this thread, including the debug
+    /// re-derivation of every reused classification.
+    static ROOT_SCANS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Return and reset this thread's count of reused slide-root classifications.
+#[cfg(test)]
+pub(crate) fn take_proved_root_hits() -> usize {
+    PROVED_ROOT_HITS.with(|hits| hits.replace(0))
+}
+
+/// Return and reset this thread's count of complete notes-root scans.
+#[cfg(test)]
+pub(crate) fn take_root_scans() -> usize {
+    ROOT_SCANS.with(|scans| scans.replace(0))
+}
+
 fn text_and_name_from_part(part: &dyn Part) -> Result<(String, String)> {
     // Keep the established individual projections as the semantic source of
     // truth. Text uses the same bounded namespace-aware parser as the sink,
@@ -1083,41 +1106,63 @@ impl<'a> SlidePart<'a> {
     ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
         validate_content_type(part, ct::PML_SLIDE)?;
         let xml = processed_xml_with_source(part)?;
-        Self::finish_from_processed(part, collect_notes_proof, xml)
+        Self::finish_from_processed(part, collect_notes_proof, xml, None)
     }
 
     /// Capture variant that may reuse a default-profile transformed slide
-    /// projection already retained by the opened snapshot. Every source,
-    /// root, name, notes-proof, and MCE limit check still runs for this call.
+    /// projection already retained by the opened snapshot, and a notes-root
+    /// classification an earlier capture proved for the same payload
+    /// allocation. Every source, root, name, and MCE limit check still runs
+    /// for this call; only the complete notes-root scan of a payload whose
+    /// classification is already proved is not repeated.
     pub(crate) fn from_part_with_name_with_capture<'parent>(
         part: &'a dyn Part,
         collect_notes_proof: bool,
         capture: &mut MceCapture<'a, 'parent>,
+        proved_roots: Option<&crate::notes::SlideRootMemo>,
     ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
         validate_content_type(part, ct::PML_SLIDE)?;
         let xml = processed_xml_with_capture(part, capture)?;
-        Self::finish_from_processed(part, collect_notes_proof, xml)
+        Self::finish_from_processed(part, collect_notes_proof, xml, proved_roots)
     }
 
     fn finish_from_processed(
         part: &'a dyn Part,
         collect_notes_proof: bool,
         xml: super::ProcessedXml<'a>,
+        proved_roots: Option<&crate::notes::SlideRootMemo>,
     ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
         if root_name_from_xml(xml.processed.as_ref())? != "sld" {
             return Err(invalid("slide part does not have a p:sld root"));
         }
         let name = c_sld_name_from_xml(xml.processed.as_ref());
         let notes_proof = (collect_notes_proof && name.is_ok()).then(|| {
-            SlideRootProof::new(
-                xml.source,
+            let scan = || {
+                #[cfg(test)]
+                ROOT_SCANS.with(|scans| scans.set(scans.get() + 1));
                 crate::notes::root_conformance_from_processed(
                     xml.processed.as_ref(),
                     xml.source.len(),
                     crate::notes::MAX_SLIDE_XML,
                     "sld",
-                ),
-            )
+                )
+            };
+            // The memo is keyed on the exact raw observation MCE just read, so
+            // a hit names these very bytes; a miss is the ordinary scan.
+            let conformance = match proved_roots.and_then(|memo| memo.lookup(xml.source)) {
+                Some(proved) => {
+                    debug_assert_eq!(
+                        scan(),
+                        Some(proved),
+                        "a proved slide-root classification answered for different bytes"
+                    );
+                    #[cfg(test)]
+                    PROVED_ROOT_HITS.with(|hits| hits.set(hits.get() + 1));
+                    Some(proved)
+                },
+                None => scan(),
+            };
+            SlideRootProof::new(xml.source, conformance)
         });
         drop(xml);
         let name = name.map(|name| name.unwrap_or_else(|| part.partname().to_string()));

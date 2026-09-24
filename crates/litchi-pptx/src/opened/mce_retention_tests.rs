@@ -463,6 +463,7 @@ fn capture_committed_candidate(source: &Snapshot, candidate: &OpcPackage) -> Res
         revision,
         digests,
         source.retained_mce.as_deref(),
+        Some(source.slide_roots.as_ref()),
     )
 }
 
