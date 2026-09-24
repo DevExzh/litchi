@@ -33,7 +33,7 @@ use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationships, TargetMode}
 
 use super::{Limits, Snapshot};
 use crate::notes::{
-    Conformance, SlideRootMemo, SlideRootRecord, with_refused_slide_root_reservation,
+    Conformance, SlideRootMemo, SlideRootProof, with_refused_slide_root_reservation,
 };
 use crate::parts::{take_proved_root_hits, take_root_scans};
 use crate::{Error, Package, Result};
@@ -680,17 +680,72 @@ fn the_notes_owning_deck_reuses_proofs_and_keeps_its_notes_graph() -> Result<()>
 // ADR 0032 conditions, each proven by behaviour rather than asserted.
 // ---------------------------------------------------------------------------
 
+/// ADR 0032 section 1: the classification is a function of the payload bytes
+/// alone, never of the part that holds them. A slide made to share another
+/// slide's allocation hits that slide's entry under its own part name, and the
+/// capture equals the plain and the cold one.
+#[test]
+fn a_shared_allocation_hits_under_another_part_name_and_equals_plain_and_cold() -> Result<()> {
+    let package = text_box_package(4, 2)?;
+    let source = package.opened_presentation()?;
+    let mut candidate = source.package.as_ref().clone();
+    let shared = candidate.get_part(&source.slides[1].part_name)?.blob_arc();
+    candidate
+        .get_part_mut(&source.slides[3].part_name)?
+        .set_blob_shared(Arc::clone(&shared));
+    let moved = candidate.get_part(&source.slides[3].part_name)?.blob();
+    assert!(
+        std::ptr::eq(moved, shared.as_slice()),
+        "slide 3 now holds slide 1's allocation"
+    );
+    assert_eq!(
+        source.slide_roots.lookup(moved),
+        Some(Conformance::Transitional),
+        "slide 1's entry answers for slide 3's part"
+    );
+    take_proved_root_hits();
+    let assisted = recapture(&source, &candidate, true);
+    assert_eq!(
+        take_proved_root_hits(),
+        4,
+        "every slide hits, slide 3 through slide 1's entry"
+    );
+    let plain = recapture(&source, &candidate, false);
+    assert_eq!(take_proved_root_hits(), 0);
+    let cold = super::model::capture_with_provenance(
+        &candidate,
+        source.limits,
+        source.physical_source_provenance,
+    );
+    assert!(assisted.is_ok(), "the shared-payload deck captures");
+    assert_same_result("shared allocation, plain", &assisted, &plain);
+    assert_same_result("shared allocation, cold", &assisted, &cold);
+    // One entry answers for both parts holding the shared allocation.
+    let assisted = assisted?;
+    assert_eq!(assisted.slide_roots.len(), 3);
+    assert_eq!(
+        assisted.slide_roots.lookup(slide_blob(&assisted, 1)),
+        assisted.slide_roots.lookup(slide_blob(&assisted, 3))
+    );
+    Ok(())
+}
+
 /// Condition: keyed on allocation identity, with a strong reference that keeps
 /// the key from being recycled by a different payload while the entry lives.
 #[test]
 fn an_entry_holds_its_allocation_strongly_so_its_key_cannot_be_recycled() -> Result<()> {
     let payload = Arc::new(b"<p:sld/>".to_vec());
-    let record = SlideRootRecord::for_test(payload.as_slice(), Some(Conformance::Transitional));
     let owner_key = (payload.as_ptr() as usize, payload.len());
     let owned = Arc::clone(&payload);
-    let memo = SlideRootMemo::from_records([record].into_iter(), move |key| {
-        (key == owner_key).then(|| Arc::clone(&owned))
-    })?;
+    // The proof borrows `payload`, so the classified allocation is alive while
+    // the memo is built; a proof cannot outlive the bytes it classified.
+    let memo = SlideRootMemo::from_records(
+        &[SlideRootProof::new(
+            payload.as_slice(),
+            Some(Conformance::Transitional),
+        )],
+        move |key| (key == owner_key).then(|| Arc::clone(&owned)),
+    )?;
     assert_eq!(memo.len(), 1);
     assert_eq!(
         Arc::strong_count(&payload),
@@ -760,12 +815,12 @@ fn from_records_admits_only_owned_aliasing_successful_classifications() -> Resul
     let aliased = Arc::new(b"<p:sld aliased/>".to_vec());
     let impostor = Arc::new(b"<p:sld impostor/>".to_vec());
     let key = |payload: &Arc<Vec<u8>>| (payload.as_ptr() as usize, payload.len());
-    let records = [
-        SlideRootRecord::for_test(&owned, Some(Conformance::Strict)),
-        SlideRootRecord::for_test(&unowned, Some(Conformance::Transitional)),
+    let proofs = [
+        SlideRootProof::new(owned.as_slice(), Some(Conformance::Strict)),
+        SlideRootProof::new(unowned.as_slice(), Some(Conformance::Transitional)),
         // A slide the scan refused is recomputed from its bytes every time.
-        SlideRootRecord::for_test(&refused, None),
-        SlideRootRecord::for_test(&aliased, Some(Conformance::Transitional)),
+        SlideRootProof::new(refused.as_slice(), None),
+        SlideRootProof::new(aliased.as_slice(), Some(Conformance::Transitional)),
     ];
     let (owned_key, refused_key, aliased_key) = (key(&owned), key(&refused), key(&aliased));
     let (owner_owned, owner_refused, owner_impostor) = (
@@ -773,7 +828,7 @@ fn from_records_admits_only_owned_aliasing_successful_classifications() -> Resul
         Arc::clone(&refused),
         Arc::clone(&impostor),
     );
-    let memo = SlideRootMemo::from_records(records.into_iter(), move |candidate| {
+    let memo = SlideRootMemo::from_records(&proofs, move |candidate| {
         if candidate == owned_key {
             Some(Arc::clone(&owner_owned))
         } else if candidate == refused_key {
@@ -1140,24 +1195,25 @@ fn every_hit_is_re_derived_in_debug_builds() -> Result<()> {
 fn a_planted_wrong_classification_is_caught_by_the_re_derivation() {
     let package = text_box_package(3, 1).expect("package");
     let mut source = package.opened_presentation().expect("snapshot");
-    let records: Vec<SlideRootRecord> = (0..3)
-        .map(|index| {
-            SlideRootRecord::for_test(slide_blob(&source, index), Some(Conformance::Strict))
+    let planted = {
+        // Proofs of the wrong classification, borrowing the snapshot's own
+        // slide payloads.
+        let proofs: Vec<SlideRootProof<'_>> = (0..3)
+            .map(|index| SlideRootProof::new(slide_blob(&source, index), Some(Conformance::Strict)))
+            .collect();
+        let names: Vec<PackURI> = source
+            .slides
+            .iter()
+            .map(|slide| slide.part_name.clone())
+            .collect();
+        SlideRootMemo::from_records(&proofs, |key| {
+            names.iter().find_map(|name| {
+                let blob = source.package.get_part(name).ok()?.blob_arc();
+                ((blob.as_ptr() as usize, blob.len()) == key).then_some(blob)
+            })
         })
-        .collect();
-    let package_ref = Arc::clone(&source.package);
-    let names: Vec<PackURI> = source
-        .slides
-        .iter()
-        .map(|slide| slide.part_name.clone())
-        .collect();
-    let planted = SlideRootMemo::from_records(records.into_iter(), |key| {
-        names.iter().find_map(|name| {
-            let blob = package_ref.get_part(name).ok()?.blob_arc();
-            ((blob.as_ptr() as usize, blob.len()) == key).then_some(blob)
-        })
-    })
-    .expect("planted memo");
+        .expect("planted memo")
+    };
     assert_eq!(planted.len(), 3);
     source.slide_roots = Arc::new(planted);
     let mut edit = source.edit();

@@ -851,16 +851,13 @@ fn capture_internal(
         Revision::Parent(parent) => package_fingerprint_with_memo(owned.as_ref(), Some(parent))?,
     };
     let retained_mce = mce_capture.finish(|key| part_digests.owner_for(key));
-    // The proofs borrow the input package. Each successful classification is
-    // kept only when the owned package's digest memo holds, and hands over,
-    // the very allocation it read; a refused reservation fails the capture
-    // with a typed error after every validation has passed (ADR 0032).
+    // The proofs borrow the input package, so every classified allocation is
+    // alive while the memo is built. Each successful classification is kept
+    // only when the owned package's digest memo holds, and hands over, the
+    // very allocation it read; a refused reservation fails the capture with a
+    // typed error after every capture validation has passed (ADR 0032).
     let slide_roots = Arc::new(SlideRootMemo::from_records(
-        slide_root_proofs
-            .as_deref()
-            .unwrap_or_default()
-            .iter()
-            .map(|proof| proof.record()),
+        slide_root_proofs.as_deref().unwrap_or_default(),
         |key| part_digests.owner_for(key),
     )?);
     drop(slide_root_proofs);

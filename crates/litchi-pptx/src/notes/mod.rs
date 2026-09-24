@@ -14,9 +14,7 @@ pub(crate) use package::{
     load_snapshot_with_slide_root_proofs, remove_checked,
 };
 #[cfg(test)]
-pub(crate) use package::{
-    SlideRootRecord, clear, put, remove, with_refused_slide_root_reservation,
-};
+pub(crate) use package::{clear, put, remove, with_refused_slide_root_reservation};
 pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
 
 pub(crate) const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
