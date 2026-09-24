@@ -10,6 +10,7 @@
 use std::collections::HashSet;
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, OffsetLimits, active_offsets};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -342,6 +343,7 @@ fn capture_selected(
     selected: &[u32],
 ) -> Result<Vec<Host>> {
     let mut reader = reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut stack = Vec::new();
     stack
         .try_reserve(limits.max_xml_depth)
@@ -370,7 +372,7 @@ fn capture_selected(
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let event_position = position(reader.buffer_position())?;
+        let event_position = position(origin, reader.buffer_position())?;
         let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -736,6 +738,7 @@ fn candidate_form(
 
 fn candidate_offsets(xml: &[u8], dialect: StoryDialect, limits: Limits) -> Result<Vec<u32>> {
     let mut reader = reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut offsets = Vec::new();
@@ -743,7 +746,7 @@ fn candidate_offsets(xml: &[u8], dialect: StoryDialect, limits: Limits) -> Resul
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let event_position = position(reader.buffer_position())?;
+        let event_position = position(origin, reader.buffer_position())?;
         let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -1693,9 +1696,12 @@ fn end_position(
     Ok(event_position)
 }
 
-fn position(position: u64) -> Result<usize> {
-    usize::try_from(position)
-        .map_err(|error| Error::Invalid(format!("DOCX story position does not fit usize: {error}")))
+/// The byte offset in the reader's input of reader position `position`;
+/// `origin` is that input's [`ReaderOrigin`].
+fn position(origin: ReaderOrigin, position: u64) -> Result<usize> {
+    origin
+        .offset(position)
+        .ok_or_else(|| Error::Invalid("DOCX story position does not fit usize".into()))
 }
 
 fn invalid(message: &'static str) -> Error {

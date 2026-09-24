@@ -11,6 +11,7 @@ use std::ops::Range;
 
 use super::model::{MAX_DOCUMENT_VARIABLE_DEPTH, MAX_DOCUMENT_VARIABLE_XML_BYTES, Variables};
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -446,20 +447,23 @@ fn scan_settings_layout(xml: &[u8]) -> Result<SettingsLayout> {
     }
 
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().check_end_names = true;
     let mut layout = SettingsLayout::default();
     let mut depth = 0usize;
     let mut doc_vars_start = None;
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_source_error| invalid("document-variable XML offset is too large"))?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("document-variable XML offset is too large"))?;
         let event = reader
             .read_event()
             .map_err(|error| xml_error(error.to_string()))?
             .into_owned();
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_source_error| invalid("document-variable XML offset is too large"))?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("document-variable XML offset is too large"))?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
 

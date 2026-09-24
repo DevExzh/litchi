@@ -10,6 +10,10 @@ use super::{
 };
 
 /// A source byte span into an Ink document source buffer.
+///
+/// Offsets count every byte of the source, including a leading UTF-8
+/// byte-order mark (change 0765; before it, spans of a marked source were
+/// three bytes early).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[must_use]
 pub struct SourceSpan {

@@ -10,6 +10,7 @@ use std::borrow::Cow;
 use std::ops::Range;
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, PackURI, Part};
@@ -1387,12 +1388,15 @@ fn find_first_start_tag(
     local: &[u8],
 ) -> Result<Option<StartTag>> {
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("shape source position exceeds usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("shape source position exceeds usize"))?;
         let event = reader.read_event()?.into_owned();
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("shape source position exceeds usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("shape source position exceeds usize"))?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -1506,6 +1510,7 @@ struct TextRunLocation {
 
 fn locate_text_content(source: &[u8], shape: Range<usize>) -> Result<TextLocation> {
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     let mut runs = Vec::new();
     let mut open_text = None;
     let mut end_para = None;
@@ -1515,11 +1520,13 @@ fn locate_text_content(source: &[u8], shape: Range<usize>) -> Result<TextLocatio
     let mut tx_body_prefix = Vec::new();
 
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("shape source position exceeds usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("shape source position exceeds usize"))?;
         let event = reader.read_event()?.into_owned();
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("shape source position exceeds usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("shape source position exceeds usize"))?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -1719,6 +1726,7 @@ fn locate_slot(
     shape: Range<usize>,
 ) -> Result<(SlotLocation, Option<PlaceholderTypeExtension>)> {
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     let mut stack = Vec::<ScanFrame>::new();
     let mut placeholder = None;
     let mut extension_list = None;
@@ -1727,11 +1735,13 @@ fn locate_slot(
     let mut variant_value = None;
 
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("p232 source position exceeds usize".into()))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Invalid("p232 source position exceeds usize".into()))?;
         let event = reader.read_event()?.into_owned();
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("p232 source position exceeds usize".into()))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Invalid("p232 source position exceeds usize".into()))?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {

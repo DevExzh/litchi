@@ -17,6 +17,7 @@
 //! Bounded, loss-preserving XML codec for `w12:collapsed` in a paragraph.
 
 use crate::error::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -122,6 +123,7 @@ fn locate(
     }
 
     let mut reader = NsReader::from_reader(xml_bytes);
+    let origin = ReaderOrigin::of(xml_bytes);
     if let Some(initial_resolver) = initial_resolver {
         *reader.resolver_mut() = initial_resolver.clone();
     }
@@ -137,12 +139,12 @@ fn locate(
     let mut nodes = 0usize;
 
     loop {
-        let event_start = offset(&reader)?;
+        let event_start = offset(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
         let event = event.into_owned();
-        let event_end = offset(&reader)?;
+        let event_end = offset(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         if matches!(event, Event::Start(_) | Event::Empty(_)) {
@@ -421,10 +423,10 @@ fn text(bytes: &[u8]) -> &str {
     std::str::from_utf8(bytes).expect("canonical collapsed XML is UTF-8")
 }
 
-fn offset(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position()).map_err(|_source_error| {
-        Error::InvalidFormat("paragraph XML offset does not fit usize".to_owned())
-    })
+fn offset(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::InvalidFormat("paragraph XML offset does not fit usize".to_owned()))
 }
 
 fn splice(source: &[u8], range: ByteRange, replacement: &[u8]) -> Vec<u8> {

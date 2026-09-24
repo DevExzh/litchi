@@ -1,5 +1,6 @@
 //! Bounded extension inspection and source-local replacement.
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -580,6 +581,7 @@ fn opening_name(opening: &[u8]) -> crate::Result<&[u8]> {
 
 fn find_target(xml: &[u8], owner: Span, target: Target) -> crate::Result<Option<Span>> {
     let mut reader = NsReader::from_reader(&xml[owner.start..owner.end]);
+    let origin = ReaderOrigin::of(&xml[owner.start..owner.end]);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
@@ -588,11 +590,17 @@ fn find_target(xml: &[u8], owner: Span, target: Target) -> crate::Result<Option<
     let mut candidate_start = None;
     let mut found = None;
     loop {
-        let start = reader.buffer_position() as usize + owner.start;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("data-type-icon XML offset exceeds usize"))?
+            + owner.start;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(|error| invalid(error.to_string()))?;
-        let end = reader.buffer_position() as usize + owner.start;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("data-type-icon XML offset exceeds usize"))?
+            + owner.start;
         if !matches!(event, Event::Eof) {
             nodes = nodes
                 .checked_add(1)
@@ -684,6 +692,7 @@ fn find_target(xml: &[u8], owner: Span, target: Target) -> crate::Result<Option<
 
 fn scan_owners(xml: &[u8], owner_kind: OwnerKind) -> crate::Result<Vec<OwnerSpan>> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
@@ -693,11 +702,15 @@ fn scan_owners(xml: &[u8], owner_kind: OwnerKind) -> crate::Result<Vec<OwnerSpan
     let mut nodes = 0usize;
 
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("data-type-icon XML offset exceeds usize"))?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(|error| invalid(error.to_string()))?;
-        let end = reader.buffer_position() as usize;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("data-type-icon XML offset exceeds usize"))?;
         if !matches!(event, Event::Eof) {
             nodes = nodes
                 .checked_add(1)

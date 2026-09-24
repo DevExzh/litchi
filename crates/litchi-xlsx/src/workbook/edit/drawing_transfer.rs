@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeSet, HashSet};
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, PackURI, Part, Relationship, TargetMode};
 use litchi_sheet::{Cell as Address, Rect};
@@ -570,6 +571,7 @@ struct DrawingLayout {
 
 fn drawing_layout(xml: &[u8]) -> Result<DrawingLayout> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -578,9 +580,9 @@ fn drawing_layout(xml: &[u8]) -> Result<DrawingLayout> {
     let mut open_anchor = None;
     let mut anchors = Vec::new();
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -678,6 +680,7 @@ enum Coordinate {
 
 fn parse_anchor(xml: &[u8], span: &AnchorSpan) -> Result<Anchor> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut marker = Marker::None;
     let mut coordinate = None;
@@ -685,10 +688,10 @@ fn parse_anchor(xml: &[u8], span: &AnchorSpan) -> Result<Anchor> {
     let mut from_column = None;
     let mut relationship_ids = HashSet::new();
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         if end <= span.start {
@@ -772,14 +775,15 @@ fn translate_anchor(
     column_delta: i64,
 ) -> Result<Vec<u8>> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut writer = Writer::new(Vec::new());
     let mut marker = Marker::None;
     let mut coordinate = None;
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, _) = resolver.resolve_event(event.clone());
         if end <= span.start {
@@ -869,6 +873,7 @@ fn worksheet_drawing_reference(xml: &[u8]) -> Result<Option<String>> {
 
 fn worksheet_layout(xml: &[u8]) -> Result<WorksheetLayout> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -877,7 +882,7 @@ fn worksheet_layout(xml: &[u8]) -> Result<WorksheetLayout> {
     let mut root_close = None;
     let mut child_state = WorksheetChildState::default();
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         let resolver = reader.resolver().clone();
@@ -1051,9 +1056,10 @@ fn allocate_uri(original: &PackURI, reserved: &mut BTreeSet<String>) -> Result<P
     )))
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source| invalid("XML position does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("XML position does not fit usize"))
 }
 
 fn xdr(namespace: &ResolveResult<'_>) -> bool {

@@ -1,6 +1,7 @@
 //! Typed support for the MS-XLSX Slicers part.
 
 use crate::error::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::XmlVersion;
@@ -117,6 +118,7 @@ pub fn parse_slicers(xml: &[u8]) -> Result<Slicers> {
         return Err(limit("part bytes"));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let decoder = reader.decoder();
     let mut depth = 0usize;
     let mut root_seen = false;
@@ -128,13 +130,15 @@ pub fn parse_slicers(xml: &[u8]) -> Result<Slicers> {
     let mut total_extension_bytes = 0usize;
 
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("Slicers XML offset overflow"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Slicers XML offset overflow"))?;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("Slicers XML offset overflow"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Slicers XML offset overflow"))?;
 
         match event {
             Event::Start(element) => {

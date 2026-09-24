@@ -8,6 +8,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::custom_xml::valid_guid;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::part::BlobPart;
@@ -1578,6 +1579,7 @@ pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Survey> {
     }
     crate::source_attributes::validate_xml_characters(xml)?;
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut parser = Parser {
@@ -1586,7 +1588,9 @@ pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Survey> {
     };
     let mut extension_total = 0usize;
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("survey XML position exceeds usize"))?;
         let event = reader.read_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
@@ -1621,7 +1625,9 @@ pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Survey> {
                 validate_element_names(&reader, &element)?;
                 let namespace = reader.resolver().resolve_element(element.name()).0;
                 if let Some(target) = parser.extension_target(&namespace, &element)? {
-                    let end = reader.buffer_position() as usize;
+                    let end = origin
+                        .offset(reader.buffer_position())
+                        .ok_or_else(|| invalid("survey XML position exceeds usize"))?;
                     let length = end - start;
                     if length
                         > limits
@@ -1715,9 +1721,17 @@ fn read_extension_list(
     maximum: usize,
     max_depth: usize,
 ) -> Result<Vec<u8>> {
+    // `xml` is the reader's input; `start` and the slice below are byte
+    // offsets into it.
+    let origin = ReaderOrigin::of(xml);
+    let position = |reader: &NsReader<&[u8]>| {
+        origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("survey XML position exceeds usize"))
+    };
     let mut depth = 1usize;
     loop {
-        if reader.buffer_position() as usize - start > maximum {
+        if position(reader)? - start > maximum {
             return Err(invalid("survey extension list exceeds the size limit"));
         }
         let event = reader.read_event().map_err(xml_error)?;
@@ -1754,7 +1768,7 @@ fn read_extension_list(
             },
             Event::Eof => return Err(invalid("unterminated Survey extension list")),
         }
-        let end = reader.buffer_position() as usize;
+        let end = position(reader)?;
         if end - start > maximum {
             return Err(invalid("survey extension list exceeds the size limit"));
         }

@@ -32,6 +32,7 @@ use std::mem::size_of;
 use std::ops::Range;
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::{Resource, ResourceLimit};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, OwnedRelationships, PackURI, Part, ReadLimits};
@@ -5277,6 +5278,7 @@ fn scan_xml_config(
     // declarations after decoding their namespace URI and retains the same
     // source offsets from the reader.
     let mut reader = Reader::from_reader(bytes);
+    let origin = ReaderOrigin::of(bytes);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut elements = Vec::<XmlElement>::new();
@@ -5305,11 +5307,15 @@ fn scan_xml_config(
         if events > limits.events {
             return Err(invalid("PivotTable XML event count exceeds caller limit"));
         }
-        let before = reader.buffer_position() as usize;
+        let before = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("PivotTable XML offset exceeds usize"))?;
         let event = reader
             .read_event()
             .map_err(|error| invalid(error.to_string()))?;
-        let after = reader.buffer_position() as usize;
+        let after = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("PivotTable XML offset exceeds usize"))?;
         if !matches!(event, Event::Eof) {
             nodes = nodes
                 .checked_add(1)

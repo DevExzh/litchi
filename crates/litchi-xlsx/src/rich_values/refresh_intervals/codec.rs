@@ -3,6 +3,7 @@
 use std::collections::TryReserveError;
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -94,6 +95,7 @@ pub(crate) fn inspect(xml: &[u8]) -> Result<Inspection> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
+    let origin = ReaderOrigin::of(xml);
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut types = Vec::<TypeInspection>::new();
@@ -102,11 +104,11 @@ pub(crate) fn inspect(xml: &[u8]) -> Result<Inspection> {
     let mut types_seen = false;
 
     loop {
-        let start = checked_position(reader.buffer_position(), xml.len())?;
+        let start = checked_position(origin, reader.buffer_position(), xml.len())?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(super::super::xml_error)?;
-        let end = checked_position(reader.buffer_position(), xml.len())?;
+        let end = checked_position(origin, reader.buffer_position(), xml.len())?;
         match event {
             Event::Start(element) => {
                 let info = ElementInfo::new(&reader, &element)?;
@@ -983,9 +985,12 @@ fn bounded_qname(element: &BytesStart<'_>) -> Result<Vec<u8>> {
     Ok(name.as_ref().to_vec())
 }
 
-fn checked_position(position: u64, source_len: usize) -> Result<usize> {
-    let position = usize::try_from(position)
-        .map_err(|_| invalid("rich-value XML source position overflows usize"))?;
+/// The byte offset in the source of reader position `position`; `origin` is
+/// the source's [`ReaderOrigin`].
+fn checked_position(origin: ReaderOrigin, position: u64, source_len: usize) -> Result<usize> {
+    let position = origin
+        .offset(position)
+        .ok_or_else(|| invalid("rich-value XML source position overflows usize"))?;
     if position > source_len {
         return Err(invalid(
             "rich-value XML source position exceeds source bytes",

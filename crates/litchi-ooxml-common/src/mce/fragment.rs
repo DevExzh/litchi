@@ -18,6 +18,7 @@
 
 use std::borrow::Cow;
 
+use litchi_core::xml::ReaderOrigin;
 use memchr::memmem;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::Reader;
@@ -261,13 +262,15 @@ pub fn self_contained_fragment<'a>(
 fn root_start_tag_end(document: &[u8]) -> R<Option<usize>> {
     let mut reader = Reader::from_reader(document);
     reader.config_mut().trim_text(false);
+    let origin = ReaderOrigin::of(document);
     let mut buffer = Vec::new();
     loop {
         match reader.read_event_into(&mut buffer).map_err(xerr)? {
             Event::Start(_) | Event::Empty(_) => {
-                return usize::try_from(reader.buffer_position())
+                return origin
+                    .offset(reader.buffer_position())
                     .map(Some)
-                    .map_err(|_error| bad("document offset does not fit usize"));
+                    .ok_or_else(|| bad("document offset does not fit usize"));
             },
             Event::Eof => return Ok(None),
             _ => {},
@@ -298,13 +301,15 @@ fn root_tracker(document: &[u8], limits: &Limits) -> R<BindingTracker> {
 /// A tracker holding the declarations in scope at `offset`.
 fn walked_tracker(document: &[u8], offset: usize, limits: &Limits) -> R<BindingTracker> {
     let mut reader = Reader::from_reader(document);
+    let origin = ReaderOrigin::of(document);
     reader.config_mut().trim_text(false);
     let mut tracker = BindingTracker::new();
     let mut buffer = Vec::new();
     let mut depth = 0usize;
     loop {
-        let position = usize::try_from(reader.buffer_position())
-            .map_err(|_error| bad("document offset does not fit usize"))?;
+        let position = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| bad("document offset does not fit usize"))?;
         if position >= offset {
             return Ok(tracker);
         }
@@ -341,6 +346,7 @@ fn push(tracker: &mut BindingTracker, element: &BytesStart<'_>, limits: &Limits)
 /// the prefixes that tag already declares.
 fn root_insertion_point(fragment: &[u8]) -> R<(usize, Vec<Box<[u8]>>)> {
     let mut reader = Reader::from_reader(fragment);
+    let origin = ReaderOrigin::of(fragment);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     loop {
@@ -348,8 +354,9 @@ fn root_insertion_point(fragment: &[u8]) -> R<(usize, Vec<Box<[u8]>>)> {
         let empty = matches!(event, Event::Empty(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                let end = usize::try_from(reader.buffer_position())
-                    .map_err(|_error| bad("fragment offset does not fit usize"))?;
+                let end = origin
+                    .offset(reader.buffer_position())
+                    .ok_or_else(|| bad("fragment offset does not fit usize"))?;
                 // The tag ends with `>`, and `/>` when it is an empty element.
                 let closing = if empty { 2 } else { 1 };
                 let insertion = end

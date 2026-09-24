@@ -3,6 +3,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::{DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE};
 use quick_xml::Reader;
 use quick_xml::encoding::Decoder;
@@ -16,6 +17,11 @@ use crate::{Error, Result};
 const MAX_XML_DEPTH: usize = 256;
 const MAX_XML_NODES: usize = 1_000_000;
 
+/// Re-emit a changed slide without inter-element formatting.
+///
+/// A leading UTF-8 byte-order mark, which the reader consumes before its
+/// first event, is carried to the output unchanged: it is a byte the producer
+/// wrote, not formatting.
 pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<Vec<u8>> {
     let mut reader = Reader::from_reader(source);
     reader.config_mut().trim_text(false);
@@ -26,6 +32,7 @@ pub(crate) fn compact_changed_slide_xml(source: &[u8]) -> Result<Vec<u8>> {
             resource: "opened-presentation compact slide XML",
             source,
         })?;
+    output.extend_from_slice(&source[..ReaderOrigin::of(source).skipped()]);
     let mut preserve_space = Vec::new();
     let mut pending_whitespace = Vec::new();
     let mut text_run_has_content = false;
@@ -953,6 +960,7 @@ pub(crate) fn append_shape(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
         ));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     let mut nodes = 0usize;
@@ -960,7 +968,7 @@ pub(crate) fn append_shape(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
     let mut trees = 0usize;
     let mut insertion = None;
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -1329,6 +1337,7 @@ fn slide_id_elements(
     context: Option<&litchi_core::ExecutionContext>,
 ) -> Result<Vec<SlideIdElement>> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     let mut nodes = 0usize;
@@ -1337,7 +1346,7 @@ fn slide_id_elements(
     let mut open = None;
     let mut elements = Vec::new();
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -1359,7 +1368,7 @@ fn slide_id_elements(
         };
         let event = event.into_owned();
         drop(namespace);
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         match event {
             Event::Start(element) => {
                 bump(&mut nodes)?;
@@ -1626,6 +1635,7 @@ fn drawing_text_elements_for_owners(
     owners: &[Range<usize>],
 ) -> Result<Vec<Vec<TextElement>>> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut spans = Vec::new();
     spans
@@ -1640,7 +1650,7 @@ fn drawing_text_elements_for_owners(
     let mut depth = 0usize;
     let mut nodes = 0usize;
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -1649,7 +1659,7 @@ fn drawing_text_elements_for_owners(
         // namespace holds the reader, so ending that borrow needs no copy of
         // the event.
         drop(namespace);
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         match event {
             Event::Start(element) => {
                 bump(&mut nodes)?;
@@ -1779,9 +1789,10 @@ fn is_presentation_namespace(namespace: &ResolveResult<'_>) -> bool {
     )
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| invalid("opened-presentation XML position exceeds usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("opened-presentation XML position exceeds usize"))
 }
 
 fn check_execution_context(context: Option<&litchi_core::ExecutionContext>) -> Result<()> {

@@ -2,6 +2,7 @@
 
 use std::io::Write;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::{relationships, xml::unqualified_attribute_value};
 use quick_xml::{
     XmlVersion,
@@ -29,6 +30,7 @@ pub fn read(xml: &[u8]) -> Result<Metadata> {
     }
 
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_comments = true;
     let mut buffer = Vec::new();
@@ -37,15 +39,17 @@ pub fn read(xml: &[u8]) -> Result<Metadata> {
     let mut root_closed = false;
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("model3d XML offset exceeds usize"))?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("model3d XML offset exceeds usize"))?;
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(xml_error)?;
         let namespace = resolved_namespace(&namespace)?;
         let event = event.into_owned();
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("model3d XML offset exceeds usize"))?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("model3d XML offset exceeds usize"))?;
 
         match event {
             Event::Start(element) if metadata.is_none() && root_depth == 0 => {
@@ -75,7 +79,7 @@ pub fn read(xml: &[u8]) -> Result<Metadata> {
             Event::Start(element) if metadata.is_some() && root_depth == 1 => {
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 let child_start = event_start;
-                let child_end = capture_namespace_element(&mut reader, &mut buffer)?;
+                let child_end = capture_namespace_element(&mut reader, origin, &mut buffer)?;
                 let raw = xml
                     .get(child_start..child_end)
                     .ok_or_else(|| invalid("model3d child range is outside the input"))?;
@@ -139,27 +143,30 @@ pub fn opaque(xml: &[u8]) -> Result<Inert> {
         return Err(limit("model3d inert fragment bytes", MAX_FRAGMENT_BYTES));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut root = None;
     let mut root_start = 0usize;
     let mut root_end = 0usize;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("model3d fragment offset exceeds usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("model3d fragment offset exceeds usize"))?;
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(xml_error)?;
         let namespace = resolved_namespace(&namespace)?;
         let event = event.into_owned();
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("model3d fragment offset exceeds usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("model3d fragment offset exceeds usize"))?;
         match event {
             Event::Start(element) if root.is_none() => {
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 root = Some((local, namespace));
                 root_start = start;
-                root_end = capture_namespace_element(&mut reader, &mut buffer)?;
+                root_end = capture_namespace_element(&mut reader, origin, &mut buffer)?;
             },
             Event::Empty(element) if root.is_none() => {
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
@@ -257,9 +264,10 @@ fn push_child(
 
 fn parse_raster(xml: &[u8], inherited: &[Namespace]) -> Result<Raster> {
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
-    let (root, empty, root_start, root_end) = next_element(&mut reader, &mut buffer)?;
+    let (root, empty, root_start, root_end) = next_element(&mut reader, origin, &mut buffer)?;
     if root.local_name().as_ref() != b"raster" {
         return Err(invalid("model3d raster fragment has the wrong root"));
     }
@@ -280,19 +288,21 @@ fn parse_raster(xml: &[u8], inherited: &[Namespace]) -> Result<Raster> {
     let mut children = Vec::new();
     let mut depth = 1usize;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("model3d raster offset exceeds usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("model3d raster offset exceeds usize"))?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(xml_error)?
             .into_owned();
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("model3d raster offset exceeds usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("model3d raster offset exceeds usize"))?;
         match event {
             Event::Start(element) if depth == 1 => {
                 let local = local_name(&element.name())?;
                 let namespace = prefix_namespace(element.name().prefix(), &namespaces);
-                let child_end = capture_plain_element(&mut reader, &mut buffer)?;
+                let child_end = capture_plain_element(&mut reader, origin, &mut buffer)?;
                 let raw = xml
                     .get(start..child_end)
                     .ok_or_else(|| invalid("model3d raster child range is outside the input"))?;
@@ -368,9 +378,10 @@ fn push_raster_child(
 
 fn parse_blip(xml: &[u8], inherited: &[Namespace]) -> Result<Blip> {
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
-    let (root, empty, _, _) = next_element(&mut reader, &mut buffer)?;
+    let (root, empty, _, _) = next_element(&mut reader, origin, &mut buffer)?;
     if root.local_name().as_ref() != b"blip" {
         return Err(invalid("model3d blip fragment has the wrong root"));
     }
@@ -383,19 +394,21 @@ fn parse_blip(xml: &[u8], inherited: &[Namespace]) -> Result<Blip> {
 
     let mut children = Vec::new();
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("model3d blip offset exceeds usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("model3d blip offset exceeds usize"))?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(xml_error)?
             .into_owned();
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("model3d blip offset exceeds usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("model3d blip offset exceeds usize"))?;
         match event {
             Event::Start(element) => {
                 let local = local_name(&element.name())?;
                 let namespace = prefix_namespace(element.name().prefix(), &namespaces);
-                let child_end = capture_plain_element(&mut reader, &mut buffer)?;
+                let child_end = capture_plain_element(&mut reader, origin, &mut buffer)?;
                 let raw = xml
                     .get(start..child_end)
                     .ok_or_else(|| invalid("model3d blip child range is outside the input"))?;
@@ -664,17 +677,20 @@ fn is_relationship_prefix(prefix: &str, namespaces: &[Namespace]) -> bool {
 
 fn next_element(
     reader: &mut Reader<&[u8]>,
+    origin: ReaderOrigin,
     buffer: &mut Vec<u8>,
 ) -> Result<(BytesStart<'static>, bool, usize, usize)> {
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("model3d fragment offset exceeds usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("model3d fragment offset exceeds usize"))?;
         let event = reader
             .read_event_into(buffer)
             .map_err(xml_error)?
             .into_owned();
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("model3d fragment offset exceeds usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("model3d fragment offset exceeds usize"))?;
         match event {
             Event::Start(element) => {
                 buffer.clear();
@@ -704,6 +720,7 @@ fn next_element(
 
 fn capture_namespace_element<R: std::io::BufRead>(
     reader: &mut NsReader<R>,
+    origin: ReaderOrigin,
     buffer: &mut Vec<u8>,
 ) -> Result<usize> {
     let mut depth = 1usize;
@@ -712,8 +729,9 @@ fn capture_namespace_element<R: std::io::BufRead>(
         buffer.clear();
         let (_, event) = reader.read_resolved_event_into(buffer).map_err(xml_error)?;
         let event = event.into_owned();
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("model3d XML offset exceeds usize"))?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("model3d XML offset exceeds usize"))?;
         match event {
             Event::Start(_) => {
                 depth = depth
@@ -756,6 +774,7 @@ fn capture_namespace_element<R: std::io::BufRead>(
 
 fn capture_plain_element<R: std::io::BufRead>(
     reader: &mut Reader<R>,
+    origin: ReaderOrigin,
     buffer: &mut Vec<u8>,
 ) -> Result<usize> {
     let mut depth = 1usize;
@@ -765,8 +784,9 @@ fn capture_plain_element<R: std::io::BufRead>(
             .read_event_into(buffer)
             .map_err(xml_error)?
             .into_owned();
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("model3d XML offset exceeds usize"))?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("model3d XML offset exceeds usize"))?;
         match event {
             Event::Start(_) => {
                 depth = depth

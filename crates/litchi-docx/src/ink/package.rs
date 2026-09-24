@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use litchi_core::Position;
+use litchi_core::xml::ReaderOrigin;
 use litchi_drawingml::ink as shared;
 use litchi_ooxml_common::xml_name::is_ncname;
 use litchi_opc::constants::relationship_type as rt;
@@ -127,6 +128,7 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
         shared::MAX_SOURCE_BYTES,
     )?;
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
@@ -142,12 +144,12 @@ pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
     let mut nodes = 0usize;
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
         let (namespace, event) = reader.resolver().resolve_event(event);
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         match event {
             Event::Start(element) => {
                 if root_closed {
@@ -351,6 +353,7 @@ fn validate_trace_streams(
 ) -> Result<()> {
     let default_format = TraceFormat::default_xy();
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
@@ -359,11 +362,11 @@ fn validate_trace_streams(
     let mut active: Option<(usize, trace::Validator<'_>)> = None;
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         match event {
             Event::Start(_) => {
                 if active.is_some() {
@@ -1647,9 +1650,10 @@ pub(crate) fn has_ink_root(xml: &[u8]) -> Result<bool> {
     Err(exceeded("payload prolog events", 257, 256))
 }
 
-fn position<R: std::io::BufRead>(reader: &NsReader<R>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| Error::Invalid("DOCX Ink XML offset exceeds usize".into()))
+fn position<R: std::io::BufRead>(reader: &NsReader<R>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::Invalid("DOCX Ink XML offset exceeds usize".into()))
 }
 
 const fn role_index(kind: StoryKind) -> usize {

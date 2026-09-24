@@ -13,6 +13,7 @@
 use std::ops::Range;
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::{SourceVersion, xml::escape_xml};
 use litchi_drawingml::theme::codec;
 use litchi_drawingml::theme::family;
@@ -1215,20 +1216,21 @@ fn root_name_replacement(xml: &[u8], name: &str) -> Result<Replacement> {
         .replace('\n', "&#10;")
         .replace('\t', "&#9;");
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     loop {
-        let start = usize::try_from(reader.buffer_position()).map_err(|_error| {
-            Error::CapacityOverflow {
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or(Error::CapacityOverflow {
                 resource: "Theme XML offset",
-            }
-        })?;
+            })?;
         let event = reader
             .read_event()
             .map_err(|error| Error::InvalidFormat(format!("invalid Theme XML: {error}")))?;
-        let end = usize::try_from(reader.buffer_position()).map_err(|_error| {
-            Error::CapacityOverflow {
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or(Error::CapacityOverflow {
                 resource: "Theme XML offset",
-            }
-        })?;
+            })?;
         if let Event::Start(element) = event {
             if element.local_name().as_ref() != b"theme" {
                 return Err(invalid("Theme XML has an unexpected root"));
@@ -1356,22 +1358,23 @@ pub(crate) fn replace_source_xml_part(
 
 fn root_element_ranges(xml: &[u8]) -> Result<(Range<usize>, Range<usize>)> {
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut open = None;
     loop {
-        let start = usize::try_from(reader.buffer_position()).map_err(|_error| {
-            Error::CapacityOverflow {
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or(Error::CapacityOverflow {
                 resource: "Theme XML root offset",
-            }
-        })?;
+            })?;
         let event = reader
             .read_event()
             .map_err(|error| Error::InvalidFormat(format!("invalid Theme XML: {error}")))?;
-        let end = usize::try_from(reader.buffer_position()).map_err(|_error| {
-            Error::CapacityOverflow {
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or(Error::CapacityOverflow {
                 resource: "Theme XML root offset",
-            }
-        })?;
+            })?;
         match event {
             Event::Start(element) => {
                 if depth == 0 {

@@ -10,6 +10,7 @@
 
 use crate::error::{Error, Result};
 use crate::paragraph::is_fragment_word_name;
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::xml::escape_xml;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -122,6 +123,7 @@ fn locate(xml: &[u8], initial_resolver: Option<&NamespaceResolver>) -> Result<(L
     }
 
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     if let Some(initial_resolver) = initial_resolver {
         *reader.resolver_mut() = initial_resolver.clone();
     }
@@ -139,12 +141,12 @@ fn locate(xml: &[u8], initial_resolver: Option<&NamespaceResolver>) -> Result<(L
     let mut symbol_start = None;
 
     loop {
-        let event_start = offset(&reader)?;
+        let event_start = offset(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let event_end = offset(&reader)?;
+        let event_end = offset(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let decoder = reader.decoder();
         let (namespace, event) = resolver.resolve_event(event);
@@ -399,10 +401,10 @@ fn is_symex_attribute(namespace: &ResolveResult<'_>, element: &BytesStart<'_>) -
         )
 }
 
-fn offset(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position()).map_err(|_source_error| {
-        Error::InvalidFormat("Word run XML offset does not fit usize".into())
-    })
+fn offset(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::InvalidFormat("Word run XML offset does not fit usize".into()))
 }
 
 fn splice(source: &[u8], range: ByteRange, replacement: &[u8]) -> Vec<u8> {

@@ -13,6 +13,7 @@ use std::collections::TryReserveError;
 use std::io::{self, Write};
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::{
     ExecutionContext, ExecutionError, Position, SourceVersion, TextObjectKind, TextOutputError,
     TextOutputOptions, TextOutputReport,
@@ -2638,9 +2639,11 @@ fn append_namespace_attribute(
     Ok(())
 }
 
-fn reader_position(reader: &Reader<&[u8]>) -> Result<usize> {
+/// The byte offset in the reader's input of its current position; `origin`
+/// is that input's [`ReaderOrigin`].
+fn reader_position(reader: &Reader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
     let position = reader.buffer_position();
-    usize::try_from(position).map_err(|_| {
+    origin.offset(position).ok_or_else(|| {
         Error::Document(crate::Error::Xml(format!(
             "XML buffer position {position} exceeds addressable input",
         )))
@@ -2962,6 +2965,7 @@ fn scan_glossary_many(
         })?;
     matched.resize_with(selectors.len(), || false);
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut event_count = 0usize;
@@ -3001,7 +3005,7 @@ fn scan_glossary_many(
         })?;
 
     loop {
-        let before = reader_position(&reader)?;
+        let before = reader_position(&reader, origin)?;
         let event = reader.read_event().map_err(|error| {
             Error::Document(crate::Error::InvalidFormat(format!(
                 "invalid glossary XML: {error}",
@@ -3022,7 +3026,7 @@ fn scan_glossary_many(
         if event_count & 63 == 0 {
             check_execution_context(execution)?;
         }
-        let after = reader_position(&reader)?;
+        let after = reader_position(&reader, origin)?;
         match event {
             Event::Start(start) => {
                 let event_start = before;
@@ -3695,6 +3699,7 @@ fn scan_story(
         },
     };
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut event_count = 0usize;
@@ -3723,7 +3728,7 @@ fn scan_story(
     let empty_namespace_context = NamespaceContext::default();
 
     loop {
-        let before = reader_position(&reader)?;
+        let before = reader_position(&reader, origin)?;
         let event = reader.read_event().map_err(|error| {
             Error::Document(crate::Error::InvalidFormat(format!(
                 "invalid story XML: {error}",
@@ -3744,7 +3749,7 @@ fn scan_story(
         if event_count & 63 == 0 {
             check_execution_context(execution)?;
         }
-        let after = reader_position(&reader)?;
+        let after = reader_position(&reader, origin)?;
         match event {
             Event::Start(start) => {
                 let event_start = before;

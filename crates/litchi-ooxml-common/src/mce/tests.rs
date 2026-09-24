@@ -2532,14 +2532,15 @@ mod namespace_emission_contract_tests {
     /// shape consumers use when they slice a view out of the processed buffer.
     fn element_spans(xml: &[u8]) -> Vec<(usize, usize)> {
         let mut reader = quick_xml::Reader::from_reader(xml);
+        let origin = litchi_core::xml::ReaderOrigin::of(xml);
         reader.config_mut().trim_text(false);
         reader.config_mut().check_end_names = true;
         let mut open: Vec<usize> = Vec::new();
         let mut spans = Vec::new();
         loop {
-            let start = usize::try_from(reader.buffer_position()).expect("position");
+            let start = origin.offset(reader.buffer_position()).expect("position");
             let event = reader.read_event().expect("processed XML must parse");
-            let end = usize::try_from(reader.buffer_position()).expect("position");
+            let end = origin.offset(reader.buffer_position()).expect("position");
             match event {
                 Event::Start(_) => open.push(start),
                 Event::Empty(_) => spans.push((start, end)),

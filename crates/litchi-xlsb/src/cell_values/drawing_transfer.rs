@@ -19,6 +19,7 @@
 use crate::Workbook;
 use crate::package::error::{Error, Result};
 use crate::raw::{Header, Limits as RawLimits, Records, Writer as BinaryWriter, kind};
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, PackURI, Part, TargetMode};
 use quick_xml::XmlVersion;
@@ -846,14 +847,15 @@ fn effective_drawing_xml(source: &[u8]) -> Result<Vec<u8>> {
 
 fn drawing_layout(xml: &[u8]) -> Result<DrawingLayout> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut layout = LayoutBuilder::default();
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, resolved_event) = resolver.resolve_event(event);
         match &resolved_event {
@@ -1804,10 +1806,12 @@ fn parse_object_id(value: &str) -> Result<u32> {
         .map_err(|error| refused(DrawingTransferRefusal::InvalidObjectId(error.to_string())))
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position()).map_err(|error| {
-        Error::InvalidFormat(format!("drawing XML position exceeds usize: {error}"))
-    })
+/// The byte offset in the reader's input of its current position; `origin`
+/// is that input's [`ReaderOrigin`].
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::InvalidFormat("drawing XML position exceeds usize".to_string()))
 }
 
 fn xml_error(error: impl fmt::Display) -> Error {

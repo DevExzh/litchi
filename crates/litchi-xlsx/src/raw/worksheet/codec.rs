@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::collections::HashSet;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 use litchi_sheet::{COLUMNS, Cell as Address, Column as ColumnIndex, ROWS, Rect, Row as RowIndex};
 use quick_xml::XmlVersion;
@@ -340,7 +341,7 @@ impl<'c> Parser<'c> {
                     let spliced = lane::splice_without_body(bytes, entry.position, resume)?;
                     let mut tail = NsReader::from_reader(spliced.as_slice());
                     tail.config_mut().check_end_names = true;
-                    lane::skip_to(&mut tail, entry.position)?;
+                    lane::skip_to(&mut tail, &spliced, entry.position)?;
                     if parser
                         .drive(&mut tail, &mut stack, &mut closed_root, None)?
                         .is_some()
@@ -1464,6 +1465,9 @@ where
 {
     let mut reader = NsReader::from_reader(content);
     reader.config_mut().check_end_names = true;
+    // Event spans become source facts: byte offsets into `content`, whose
+    // leading byte-order mark precedes reader position zero.
+    let origin = ReaderOrigin::of(content);
     let mut parser = Parser::new(x14ac::Values::default());
     let mut stack = Vec::new();
     let mut closed_root = false;
@@ -1477,14 +1481,14 @@ where
     };
 
     loop {
-        let Ok(event_start) = usize::try_from(reader.buffer_position()) else {
+        let Some(event_start) = origin.offset(reader.buffer_position()) else {
             return super::SourceParseAttempt::ProvisionalFailed;
         };
         let event = match reader.read_event() {
             Ok(event) => event,
             Err(_) => return super::SourceParseAttempt::ReaderFailed,
         };
-        let Ok(event_end) = usize::try_from(reader.buffer_position()) else {
+        let Some(event_end) = origin.offset(reader.buffer_position()) else {
             return super::SourceParseAttempt::ProvisionalFailed;
         };
         let event_limit_exceeded = match event_count.checked_add(1) {

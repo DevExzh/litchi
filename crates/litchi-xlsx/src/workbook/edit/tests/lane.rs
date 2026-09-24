@@ -331,17 +331,88 @@ fn a_changed_cell_reemitted_into_an_omitted_run_keeps_the_complete_readback() {
     assert!(error.contains("duplicate worksheet cell"), "{error}");
 }
 
+/// Commit `operations` and return the published worksheet part and the
+/// cells the published snapshot reads back.
+fn committed_worksheet(
+    source: &Workbook,
+    operations: &[Operation],
+) -> Result<(Vec<u8>, String), String> {
+    let describe = |error: crate::Error| format!("{error:?} / {error}");
+    let style = source.styles().map_err(describe)?.get(1).ok_or("style 1")?;
+    let mut edit = source.edit().map_err(describe)?;
+    {
+        let mut sheet = edit.sheet("Sheet1").map_err(describe)?.ok_or("sheet")?;
+        for operation in operations {
+            match operation {
+                Operation::Number(address, value) => sheet.set(*address, *value),
+                Operation::Text(address, value) => sheet.set(*address, value.as_str()),
+                Operation::Bool(address, value) => sheet.set(*address, *value),
+                Operation::Formula(address) => {
+                    sheet.set(*address, Formula::new("1+1").expect("formula"))
+                },
+                Operation::Clear(address) => sheet.clear(*address),
+                Operation::Remove(address) => sheet.remove(*address),
+                Operation::Style(address) => sheet.style(*address, &style),
+                Operation::ResetStyle(address) => sheet.reset_style(*address),
+            }
+            .map_err(describe)?;
+        }
+    }
+    let commit = edit.commit().map_err(describe)?;
+    let part = commit
+        .workbook()
+        .inner
+        .package
+        .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").expect("sheet URI"))
+        .map_err(|error| error.to_string())?
+        .blob()
+        .to_vec();
+    let cells = commit
+        .workbook()
+        .sheet("Sheet1")
+        .map_err(describe)?
+        .ok_or("published sheet")?
+        .cells("A1:XFD1048576")
+        .map_err(describe)?
+        .map(|(address, cell)| format!("{address:?}={cell:?}"))
+        .collect::<Vec<_>>()
+        .join(";");
+    Ok((part, cells))
+}
+
 #[test]
-fn byte_order_marked_worksheets_publish_identical_outcomes() {
+fn byte_order_marked_worksheets_edit_exactly_like_unmarked_ones() {
+    // Change 0765: the edit scanner and the three lanes address document
+    // offsets, so a marked worksheet takes the same routes and publishes the
+    // unmarked worksheet's bytes behind the carried mark.
     let mut random = Lcg(47);
-    let xml = format!("\u{feff}{}", dense_sheet(&mut random, 80, 60, ""));
+    let plain = dense_sheet(&mut random, 80, 60, "");
+    let marked = format!("\u{feff}{plain}");
     for operations in [
         vec![Operation::Number(Address::at(0, 0).expect("A1"), 42)],
         vec![Operation::Text(
             Address::at(3, 3).expect("D4"),
             "bom".to_owned(),
         )],
+        vec![
+            Operation::Clear(Address::at(10, 10).expect("K11")),
+            Operation::Bool(Address::at(79, 59).expect("BH80"), true),
+            Operation::Formula(Address::at(81, 61).expect("BJ82")),
+        ],
     ] {
-        assert!(!assert_parity(&xml, &operations));
+        let reduced = assert_parity(&plain, &operations);
+        assert_eq!(
+            assert_parity(&marked, &operations),
+            reduced,
+            "{operations:?}"
+        );
+        let (plain_part, plain_cells) =
+            committed_worksheet(&workbook_with_sheet(&plain), &operations).expect("plain edit");
+        let (marked_part, marked_cells) =
+            committed_worksheet(&workbook_with_sheet(&marked), &operations).expect("marked edit");
+        assert!(!plain_part.starts_with(b"\xEF\xBB\xBF"));
+        assert_eq!(marked_part.get(..3), Some(&b"\xEF\xBB\xBF"[..]));
+        assert_eq!(&marked_part[3..], plain_part.as_slice(), "{operations:?}");
+        assert_eq!(marked_cells, plain_cells, "{operations:?}");
     }
 }

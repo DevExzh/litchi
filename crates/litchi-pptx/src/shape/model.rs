@@ -9,7 +9,11 @@ use crate::{Error, Result};
 ///
 /// Spans are compact so a large scene can retain its index without copying
 /// individual shape subtrees. Use [`Scene::xml`](super::Scene::xml) to obtain
-/// the owner against which this span is defined.
+/// the owner against which this span is defined: `&scene.xml()[start..end]`
+/// is the element. Offsets count every byte of that owner, including a
+/// leading UTF-8 byte-order mark, which the owner keeps whenever markup
+/// compatibility processing did not rewrite it (change 0765; before it,
+/// spans of a marked owner were three bytes early).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Span {
     pub(super) start: u32,
@@ -17,7 +21,8 @@ pub struct Span {
 }
 
 impl Span {
-    /// Byte offset from the beginning of the processed owner XML.
+    /// Byte offset from the beginning of the processed owner XML, counting a
+    /// leading byte-order mark.
     #[inline]
     #[must_use]
     pub const fn start(self) -> u32 {

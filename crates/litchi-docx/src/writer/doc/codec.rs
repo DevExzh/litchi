@@ -7,6 +7,7 @@
     reason = "parser bindings are intentionally refined after validation"
 )]
 use crate::error::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::Reader;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -403,11 +404,12 @@ fn locate_settings_root(xml: &[u8]) -> Result<SettingsRoot> {
     }
 
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut saw_root = false;
     let mut root_info = None;
     loop {
-        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+        let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
             Error::InvalidFormat("settings root offset does not fit usize".into())
         })?;
         let event = {
@@ -439,7 +441,7 @@ fn locate_settings_root(xml: &[u8]) -> Result<SettingsRoot> {
                 | Event::GeneralRef(_) => RootEvent::Other,
             }
         };
-        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+        let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
             Error::InvalidFormat("settings root offset does not fit usize".into())
         })?;
 

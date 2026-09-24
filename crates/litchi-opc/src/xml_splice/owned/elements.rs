@@ -1,7 +1,10 @@
 //! Bounded batches of structural edits on retained XML.
 
-use super::{MAX_EDITS, MAX_OWNED_XML_BYTES, OwnedXmlPart, invalid_source, validate_source_xml};
+use super::{
+    MAX_EDITS, MAX_OWNED_XML_BYTES, OwnedXmlPart, invalid_source, owned_offset, validate_source_xml,
+};
 use crate::{OpcError, ReadLimits, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::{events::Event, reader::NsReader};
 use std::{fmt, ops::Range, sync::Arc};
 
@@ -107,14 +110,15 @@ impl OwnedXmlPart {
             });
         }
         let mut reader = NsReader::from_reader(self.bytes.as_slice());
+        let origin = ReaderOrigin::of(self.bytes.as_slice());
         let mut stack = Vec::new();
         let mut next = 0usize;
         loop {
-            let start = reader.buffer_position() as usize;
+            let start = owned_offset(&reader, origin)?;
             let event = reader
                 .read_event()
                 .map_err(|error| invalid_source(error.to_string()))?;
-            let end = reader.buffer_position() as usize;
+            let end = owned_offset(&reader, origin)?;
             if next < targets.len() && start > targets[next].tag.start {
                 return Err(invalid_source(
                     "element update does not identify an opening tag",

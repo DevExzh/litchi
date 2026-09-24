@@ -15,6 +15,7 @@ use super::validation::{
     presentation_later, resolve_anchor, validate_relative_target, validate_selected_relationship,
     xml_position,
 };
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{
     Capabilities, Limits, OffsetLimits, active_offsets, process_markup_compatibility,
 };
@@ -349,6 +350,7 @@ fn scan_owner_xml(xml: &[u8], content_type: &str) -> Result<OwnerXml> {
         });
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     let mut nodes = 0usize;
@@ -368,11 +370,11 @@ fn scan_owner_xml(xml: &[u8], content_type: &str) -> Result<OwnerXml> {
     let mut open_anchor: Option<OpenAnchor> = None;
 
     loop {
-        let start = xml_position(&reader)?;
+        let start = xml_position(&reader, origin)?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let event_conformance = pml(&namespace);
         drop(namespace);
-        let end = xml_position(&reader)?;
+        let end = xml_position(&reader, origin)?;
         match event {
             Event::Start(element) => {
                 bump_owner_node(&mut nodes)?;
@@ -756,11 +758,12 @@ fn owner_map_offsets(xml: &[u8]) -> Result<Vec<u32>> {
         });
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut offsets = Vec::new();
     let mut nodes = 0usize;
     let mut depth = 0usize;
     loop {
-        let start = xml_position(&reader)?;
+        let start = xml_position(&reader, origin)?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let conformance = pml(&namespace);
         drop(namespace);
@@ -813,15 +816,16 @@ fn collect_owner_map_elements(xml: &[u8], active: Option<&[u32]>) -> Result<Vec<
     }
     let mut active = active.map(|offsets| offsets.iter().copied().peekable());
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut frames = Vec::new();
     let mut elements = Vec::new();
     let mut nodes = 0usize;
     loop {
-        let start = xml_position(&reader)?;
+        let start = xml_position(&reader, origin)?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let conformance = pml(&namespace);
         drop(namespace);
-        let end = xml_position(&reader)?;
+        let end = xml_position(&reader, origin)?;
         match event {
             Event::Start(element) => {
                 bump_owner_node(&mut nodes)?;
@@ -1093,14 +1097,15 @@ fn source_anchor_identity(
     conformance: Conformance,
 ) -> Result<AnchorIdentity> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     loop {
-        let start = xml_position(&reader)?;
+        let start = xml_position(&reader, origin)?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let is_selected = start == selected.span.start
             && pml(&namespace) == Some(conformance)
             && matches!(&event, Event::Start(element) | Event::Empty(element) if element.local_name().as_ref() == b"tags");
         drop(namespace);
-        let end = xml_position(&reader)?;
+        let end = xml_position(&reader, origin)?;
         if is_selected {
             let (Event::Start(element) | Event::Empty(element)) = event else {
                 return Err(invalid("raw direct p:tags mapping is not an element"));

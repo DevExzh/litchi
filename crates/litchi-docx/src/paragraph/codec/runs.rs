@@ -7,6 +7,7 @@
 use crate::error::{Error, Result};
 use crate::smart_tag::SmartTag;
 use litchi_core::XmlSlice;
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
@@ -42,16 +43,16 @@ impl Paragraph {
         let source = self.xml_data.xml_ref()?;
         let _parser_admission = source.parser_admission()?;
         let mut reader = NsReader::from_reader(xml_bytes);
+        let origin = ReaderOrigin::of(xml_bytes);
         let mut runs = SmallVec::new();
         let mut run_start = None;
         let mut run_depth = 0usize;
         let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
 
         loop {
-            let event_start =
-                usize::try_from(reader.buffer_position()).map_err(|_source_error| {
-                    Error::InvalidFormat("Word paragraph offset does not fit usize".to_string())
-                })?;
+            let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+                Error::InvalidFormat("Word paragraph offset does not fit usize".to_string())
+            })?;
             let event = {
                 let (namespace, event) = reader
                     .read_resolved_event()
@@ -106,7 +107,7 @@ impl Paragraph {
                     | Event::GeneralRef(_) => RunEvent::Other,
                 }
             };
-            let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+            let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
                 Error::InvalidFormat("Word paragraph offset does not fit usize".to_string())
             })?;
 
@@ -174,16 +175,16 @@ impl Paragraph {
         let source_arc = source_slice.arc();
         let base_offset = source_slice.start();
         let mut reader = NsReader::from_reader(xml_bytes);
+        let origin = ReaderOrigin::of(xml_bytes);
         let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
         let mut depth = 0usize;
         let mut open_tags = Vec::new();
         let mut ranges = Vec::new();
 
         loop {
-            let event_start =
-                usize::try_from(reader.buffer_position()).map_err(|_source_error| {
-                    Error::InvalidFormat("Word smart-tag offset does not fit usize".into())
-                })?;
+            let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+                Error::InvalidFormat("Word smart-tag offset does not fit usize".into())
+            })?;
             let event = {
                 let (namespace, event) = reader
                     .read_resolved_event()
@@ -231,7 +232,7 @@ impl Paragraph {
                     | Event::GeneralRef(_) => SmartTagEvent::Other,
                 }
             };
-            let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+            let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
                 Error::InvalidFormat("Word smart-tag offset does not fit usize".into())
             })?;
 

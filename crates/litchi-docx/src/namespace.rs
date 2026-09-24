@@ -23,6 +23,7 @@
     reason = "local parser names mirror the OOXML role currently being decoded"
 )]
 use crate::error::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -444,6 +445,7 @@ fn scan_word_element_ranges_impl(
     }
 
     let mut reader = NsReader::from_reader(xml_bytes);
+    let origin = ReaderOrigin::of(xml_bytes);
     for (prefix, namespace) in inherited_namespaces {
         let prefix = prefix
             .as_deref()
@@ -463,7 +465,7 @@ fn scan_word_element_ranges_impl(
     let mut total_depth = 0usize;
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+        let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
             Error::InvalidFormat("Word XML offset does not fit usize".to_string())
         })?;
         let event = {
@@ -570,7 +572,7 @@ fn scan_word_element_ranges_impl(
                 | Event::GeneralRef(_) => ScanEvent::Other,
             }
         };
-        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+        let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
             Error::InvalidFormat("Word XML offset does not fit usize".to_string())
         })?;
 

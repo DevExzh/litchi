@@ -13,6 +13,7 @@
 use crate::error::{Error, Result};
 use crate::header_footer::Kind;
 use crate::section::Start;
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml_name::is_ncname;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
@@ -885,13 +886,14 @@ fn append_preserved_attributes(xml: &mut String, attributes: &[String]) -> Resul
 
 fn first_start_tag_end(xml: &str) -> Result<usize> {
     let mut reader = NsReader::from_reader(xml.as_bytes());
+    let origin = ReaderOrigin::of(xml.as_bytes());
     loop {
         let (_, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("generated section child is not valid XML: {error}"))
         })?;
         match event {
             Event::Start(_) | Event::Empty(_) => {
-                return usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+                return origin.offset(reader.buffer_position()).ok_or_else(|| {
                     Error::InvalidFormat("generated section child offset overflow".into())
                 });
             },
@@ -1143,14 +1145,16 @@ fn direct_children(xml: &str) -> Result<Vec<(String, String)>> {
         .map(str::as_bytes)
         .map(ToOwned::to_owned);
     let mut reader = NsReader::from_reader(xml.as_bytes());
+    let origin = ReaderOrigin::of(xml.as_bytes());
     let mut depth = 0usize;
     let mut root_seen = false;
     let mut child: Option<(String, usize, usize)> = None;
     let mut stack = Vec::new();
     let mut children = Vec::new();
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_source_error| Error::InvalidFormat("section XML offset overflow".into()))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::InvalidFormat("section XML offset overflow".into()))?;
         let (word_element, event) = {
             let (namespace, event) = reader.read_resolved_event().map_err(|error| {
                 Error::InvalidFormat(format!("section namespace resolution failed: {error}"))
@@ -1167,8 +1171,9 @@ fn direct_children(xml: &str) -> Result<Vec<(String, String)>> {
             };
             (word_element, event)
         };
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_source_error| Error::InvalidFormat("section XML offset overflow".into()))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::InvalidFormat("section XML offset overflow".into()))?;
         if depth > 0 && matches!(&event, Event::Start(_) | Event::Empty(_)) {
             validate_direct_child_attributes(&metadata, &xml[start..end])?;
         }
@@ -2479,13 +2484,14 @@ fn validate_leaf_content(xml: &str) -> Result<()> {
 
 fn element_inner(xml: &str) -> Result<Option<&str>> {
     let mut reader = NsReader::from_reader(xml.as_bytes());
+    let origin = ReaderOrigin::of(xml.as_bytes());
     let open_end = loop {
         let (_, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("section namespace resolution failed: {error}"))
         })?;
         match event {
             Event::Start(_) => {
-                break usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+                break origin.offset(reader.buffer_position()).ok_or_else(|| {
                     Error::InvalidFormat("section property offset overflow".into())
                 })?;
             },
@@ -2504,9 +2510,9 @@ fn element_inner(xml: &str) -> Result<Option<&str>> {
     };
     let mut depth = 1usize;
     let close_start = loop {
-        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
-            Error::InvalidFormat("section property offset overflow".into())
-        })?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::InvalidFormat("section property offset overflow".into()))?;
         let (_, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("section namespace resolution failed: {error}"))
         })?;
@@ -2527,8 +2533,9 @@ fn element_inner(xml: &str) -> Result<Option<&str>> {
             _ => {},
         }
     };
-    let final_position = usize::try_from(reader.buffer_position())
-        .map_err(|_source_error| Error::InvalidFormat("section property offset overflow".into()))?;
+    let final_position = origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::InvalidFormat("section property offset overflow".into()))?;
     if !xml[final_position..].trim().is_empty() {
         return Err(Error::InvalidFormat(
             "section property has trailing content".into(),

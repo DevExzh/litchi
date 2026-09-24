@@ -27,6 +27,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::OffsetLimits;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -402,6 +403,7 @@ struct MceFrame {
 fn scan(source: &[u8], limits: &Limits) -> Result<Vec<SourceOccurrence>> {
     let active = active_offsets(source, limits)?;
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     let mut depth = 0usize;
     let mut events = 0usize;
     let mut open = None::<Open>;
@@ -413,7 +415,7 @@ fn scan(source: &[u8], limits: &Limits) -> Result<Vec<SourceOccurrence>> {
         .map_err(alloc("content-control source inventory"))?;
 
     loop {
-        let begin = pos(&reader)?;
+        let begin = pos(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
@@ -421,7 +423,7 @@ fn scan(source: &[u8], limits: &Limits) -> Result<Vec<SourceOccurrence>> {
             .into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
-        let end = pos(&reader)?;
+        let end = pos(&reader, origin)?;
         events = checked_add(events, 1, "content-control source event count")?;
         if events > limits.max_events {
             return Err(invalid("content-control source event limit exceeded"));
@@ -936,6 +938,7 @@ fn exact_attribute(
 
 fn active_offsets(source: &[u8], limits: &Limits) -> Result<HashSet<usize>> {
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     let mut offsets = Vec::new();
     offsets
         .try_reserve(limits.max_content_controls.min(1_024))
@@ -943,7 +946,7 @@ fn active_offsets(source: &[u8], limits: &Limits) -> Result<HashSet<usize>> {
     let mut events = 0usize;
     let mut depth = 0usize;
     loop {
-        let begin = pos(&reader)?;
+        let begin = pos(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
@@ -1103,9 +1106,10 @@ fn find_attr(source: &[u8], start: usize, end: usize, wanted: &[u8]) -> Result<A
     ))
 }
 
-fn pos(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source_error| invalid("content-control XML offset does not fit usize"))
+fn pos(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("content-control XML offset does not fit usize"))
 }
 
 fn checked_add(left: usize, right: usize, resource: &str) -> Result<usize> {

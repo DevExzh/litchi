@@ -174,10 +174,33 @@ fn ordering_and_coordinate_refusals_are_unchanged() {
 }
 
 #[test]
-fn byte_order_marked_worksheets_keep_the_reader_with_identical_layouts() {
+fn byte_order_marked_worksheets_take_the_lane_with_document_offsets() {
+    // The reader drops a leading byte-order mark without counting it; the
+    // scanner's spans are document offsets, so a marked document lays out
+    // exactly like the same document behind three bytes of whitespace, and
+    // both routes agree.
     let mut random = Lcg(0xB0C);
     for _ in 0..50 {
-        let document = format!("\u{feff}{}", worksheet(&generated_body(&mut random, false)));
-        assert!(!assert_parity(document.as_bytes(), None), "{document}");
+        let body = generated_body(&mut random, false);
+        let document = worksheet(&body);
+        let root = document
+            .find("<worksheet")
+            .expect("generated worksheet root");
+        let undeclared = &document[root..];
+        let marked = format!("\u{feff}{undeclared}");
+        let spaced = format!("   {undeclared}");
+        assert!(assert_parity(marked.as_bytes(), None), "{marked}");
+        assert!(assert_parity(spaced.as_bytes(), None), "{spaced}");
+        assert_eq!(
+            format!("{:?}", scan(marked.as_bytes())),
+            format!("{:?}", scan(spaced.as_bytes())),
+            "{marked}"
+        );
+        let declared = format!("\u{feff}{document}");
+        assert!(assert_parity(declared.as_bytes(), None), "{declared}");
     }
+    // A second mark is character data before the root, which the scanner
+    // ignores like any other text there; its spans stay document offsets.
+    let doubled = format!("\u{feff}\u{feff}{}", worksheet("<row r=\"1\"/>"));
+    assert!(assert_parity(doubled.as_bytes(), None), "{doubled}");
 }

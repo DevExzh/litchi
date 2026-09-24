@@ -11,6 +11,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_drawingml::svg_blip::{self, Namespace, NamespaceContext, SvgBlip};
 use litchi_spreadsheet_drawing::shape::{
     Anchor as DrawingAnchor, CellMarker, EditAs, Emu, EmuExtent, EmuOffset,
@@ -1314,17 +1315,13 @@ impl<'a> Scanner<'a> {
         reader.config_mut().trim_text(false);
         reader.config_mut().check_end_names = true;
         reader.config_mut().check_comments = true;
-        let source_prefix = if self.source.starts_with(b"\xEF\xBB\xBF") {
-            3
-        } else {
-            0
-        };
+        let origin = ReaderOrigin::of(self.source);
         let mut buffer = Vec::new();
 
         loop {
-            let event_start = position(&reader, source_prefix)?;
+            let event_start = position(&reader, origin)?;
             let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
-            let event_end = position(&reader, source_prefix)?;
+            let event_end = position(&reader, origin)?;
             if event_end < event_start || event_end > self.source.len() {
                 return Err(invalid("XML event range is outside the drawing source"));
             }
@@ -3015,14 +3012,14 @@ fn namespace_complete_element_fragment(
     let mut reader = Reader::from_reader(fragment);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
+    let origin = ReaderOrigin::of(fragment);
     let mut buffer = Vec::new();
     loop {
         let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
         let empty_root = matches!(&event, Event::Empty(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                let end = usize::try_from(reader.buffer_position())
-                    .map_err(|_| invalid("fragment root end exceeds usize"))?;
+                let end = position(&reader, origin)?;
                 let mut declared = Vec::<Vec<u8>>::new();
                 for attribute in element.attributes().with_checks(true) {
                     let attribute = attribute.map_err(xml_error)?;
@@ -3614,11 +3611,10 @@ fn push_namespace_uri(output: &mut Vec<u8>, value: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn position(reader: &Reader<&[u8]>, source_prefix: usize) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("XML source position exceeds usize"))?
-        .checked_add(source_prefix)
-        .ok_or_else(|| invalid("XML source position overflows usize"))
+fn position(reader: &Reader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("XML source position exceeds usize"))
 }
 
 fn xml_error(error: impl std::fmt::Display) -> Error {

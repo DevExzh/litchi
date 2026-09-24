@@ -35,6 +35,7 @@ use crate::package::printer_settings::{
     MAX_SETTINGS_BYTES, PRINTER_CT, PrinterSettingsResource, is_printer_relationship,
     validate_printer_settings_uri, validate_settings_bytes,
 };
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -2246,12 +2247,14 @@ pub(super) fn insert_workbook_entry(
     attr(&mut fragment, "r:id", &entry.workbook_relationship_id);
     fragment.extend_from_slice(b"/>");
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut sheets_depth = None;
     let mut position = None;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("workbook XML offset overflow"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("workbook XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {

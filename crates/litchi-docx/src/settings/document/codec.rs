@@ -35,6 +35,7 @@ use crate::namespace::{
     STRICT_WORDPROCESSINGML_NAMESPACE, is_wordprocessing_namespace, word_attribute_value,
 };
 use crate::numbering::Format;
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::Limits as MceLimits;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -991,6 +992,7 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
         Error::InvalidFormat("lossless settings mutation currently requires UTF-8 XML".into())
     })?;
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut root_qname = None;
@@ -1025,16 +1027,16 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
     let mut mail_merge_insert_at = None;
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
-            Error::InvalidFormat("settings XML offset is too large".into())
-        })?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::InvalidFormat("settings XML offset is too large".into()))?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
-            Error::InvalidFormat("settings XML offset is too large".into())
-        })?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::InvalidFormat("settings XML offset is too large".into()))?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
 

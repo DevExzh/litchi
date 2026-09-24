@@ -11,6 +11,7 @@
 /// bounded sizes. Serialization is deterministic and never interprets
 /// relationship-looking content inside retained subtrees.
 use crate::error::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::custom_xml::valid_guid;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -234,6 +235,7 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
         return Err(limit("part bytes"));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let decoder = reader.decoder();
@@ -256,11 +258,13 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
         if events > MAX_EVENTS {
             return Err(limit("XML event count"));
         }
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("Slicer Cache XML offset overflow"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Slicer Cache XML offset overflow"))?;
         let borrowed = reader.read_event().map_err(xml_error)?;
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("Slicer Cache XML offset overflow"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Slicer Cache XML offset overflow"))?;
         let event_bytes = end
             .checked_sub(start)
             .ok_or_else(|| invalid("Slicer Cache XML offsets moved backwards"))?;

@@ -27,6 +27,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
@@ -88,6 +89,7 @@ pub(crate) fn parse(source: &[u8], limits: Limits) -> Result<Inventory> {
     }
     let active = active_starts(source, limits)?;
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     let mut frames = Vec::<Frame>::new();
     frames
         .try_reserve_exact(limits.max_depth.min(256))
@@ -119,7 +121,7 @@ pub(crate) fn parse(source: &[u8], limits: Limits) -> Result<Inventory> {
         .map_err(alloc("conflict MCE ProcessContent map"))?;
 
     loop {
-        let begin = pos(&reader)?;
+        let begin = pos(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
@@ -127,7 +129,7 @@ pub(crate) fn parse(source: &[u8], limits: Limits) -> Result<Inventory> {
             .into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
-        let end = pos(&reader)?;
+        let end = pos(&reader, origin)?;
         events = events
             .checked_add(1)
             .ok_or_else(|| invalid("conflict XML event counter overflow"))?;
@@ -589,6 +591,7 @@ fn retain_text_span(
 /// branch selection while retaining coordinates in the immutable source.
 fn active_starts(source: &[u8], limits: Limits) -> Result<HashSet<usize>> {
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     let mut offsets = Vec::<u32>::new();
     // Every semantic event gets an offset. This preserves selected branch and
     // ProcessContent topology for the inventory pass; inactive content cannot
@@ -613,7 +616,7 @@ fn active_starts(source: &[u8], limits: Limits) -> Result<HashSet<usize>> {
         .map_err(alloc("conflict MCE namespace map"))?;
     let mut namespace_bindings = 0usize;
     loop {
-        let start = pos(&reader)?;
+        let start = pos(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|e| Error::Xml(e.to_string()))?
@@ -1363,9 +1366,10 @@ fn ns(namespace: &ResolveResult<'_>) -> Ns {
         ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => Ns::Other,
     }
 }
-fn pos(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source_error| invalid("XML offset does not fit usize"))
+fn pos(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("XML offset does not fit usize"))
 }
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())

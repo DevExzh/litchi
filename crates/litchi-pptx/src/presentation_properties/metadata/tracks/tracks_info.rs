@@ -6,6 +6,7 @@
 
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -114,6 +115,7 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
     }
 
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut stack = Vec::new();
     let mut shape = None;
@@ -123,11 +125,11 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
     let mut nodes = 0usize;
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let namespace = namespace_kind(namespace);
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let event = event.into_owned();
 
         match event {
@@ -672,9 +674,10 @@ fn namespace_kind(value: ResolveResult<'_>) -> NamespaceKind {
     }
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| invalid("media tracks XML offset does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("media tracks XML offset does not fit usize"))
 }
 
 fn xml_error(error: quick_xml::Error) -> Error {

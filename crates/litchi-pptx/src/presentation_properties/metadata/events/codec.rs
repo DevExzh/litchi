@@ -14,6 +14,7 @@ use super::validation::{
 use crate::presentation_properties::metadata::is_presentationml_name;
 use crate::time::{Offset, ParseError as TimeParseError};
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_opc::Part;
@@ -640,6 +641,7 @@ fn locate_raw(source: &[u8]) -> Result<Located> {
         return Err(limit("slide XML bytes"));
     }
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);
     let mut stack = Vec::new();
     let mut spans = Vec::new();
@@ -652,15 +654,17 @@ fn locate_raw(source: &[u8]) -> Result<Located> {
     let mut nodes = 0usize;
 
     loop {
-        let before = usize::try_from(reader.buffer_position())
-            .map_err(|_err| invalid("slide XML offset overflow"))?;
+        let before = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("slide XML offset overflow"))?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let after = usize::try_from(reader.buffer_position())
-            .map_err(|_err| invalid("slide XML offset overflow"))?;
+        let after = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("slide XML offset overflow"))?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {

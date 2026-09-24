@@ -1,6 +1,7 @@
 use super::super::model::NamespaceDeclaration;
 use super::super::{MAX_BYTES, MAX_DEPTH, MAX_NODES, MAX_STRING_BYTES};
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -38,6 +39,7 @@ pub(super) fn scan(xml: &[u8], label: &str) -> Result<Scan> {
         return Err(limit(label));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut stack: Vec<Open> = Vec::new();
@@ -48,7 +50,9 @@ pub(super) fn scan(xml: &[u8], label: &str) -> Result<Scan> {
     let mut root_closed = false;
 
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XML source position exceeds usize"))?;
         let decoder = reader.decoder();
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
@@ -86,7 +90,11 @@ pub(super) fn scan(xml: &[u8], label: &str) -> Result<Scan> {
                     namespace,
                     local: local_name(&element)?,
                     attributes: attributes(&element, decoder)?,
-                    xml: xml[start..reader.buffer_position() as usize].to_vec(),
+                    xml: xml[start
+                        ..origin
+                            .offset(reader.buffer_position())
+                            .ok_or_else(|| invalid("XML source position exceeds usize"))?]
+                        .to_vec(),
                 };
                 if stack.is_empty() {
                     root_namespaces = namespace_declarations(&element, decoder)?;
@@ -104,7 +112,9 @@ pub(super) fn scan(xml: &[u8], label: &str) -> Result<Scan> {
                 if open.namespace != namespace || open.local != local {
                     return Err(invalid(format!("mismatched {label} element")));
                 }
-                let end = reader.buffer_position() as usize;
+                let end = origin
+                    .offset(reader.buffer_position())
+                    .ok_or_else(|| invalid("XML source position exceeds usize"))?;
                 if stack.is_empty() {
                     root = Some(Fragment {
                         namespace: open.namespace,

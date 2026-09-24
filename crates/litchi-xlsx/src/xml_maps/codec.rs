@@ -1,6 +1,7 @@
 //! XLSX compatibility forwarding for the shared XML Maps codec.
 
 use litchi_core::sheet::Result;
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 
@@ -52,12 +53,15 @@ enum Context {
 
 fn normalize_legacy_boolean_attributes(xml: &[u8]) -> Option<Vec<u8>> {
     let mut reader = NsReader::from_reader(xml);
+    // Replacements are byte ranges of `xml`, whose leading byte-order mark
+    // precedes reader position zero.
+    let origin = ReaderOrigin::of(xml);
     let mut stack = Vec::new();
     let mut replacements = Vec::new();
     loop {
-        let start = usize::try_from(reader.buffer_position()).ok()?;
+        let start = origin.offset(reader.buffer_position())?;
         let event = reader.read_event().ok()?;
-        let end = usize::try_from(reader.buffer_position()).ok()?;
+        let end = origin.offset(reader.buffer_position())?;
         match event {
             Event::Start(element) => {
                 let context = classify_context(

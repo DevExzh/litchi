@@ -18,6 +18,7 @@
 
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -478,19 +479,22 @@ struct Layout {
 
 fn scan(xml: &[u8]) -> Result<Layout> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut layout = Layout::default();
     let mut stack = Vec::new();
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_source_error| invalid("mail-merge XML offset is too large"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("mail-merge XML offset is too large"))?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_source_error| invalid("mail-merge XML offset is too large"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("mail-merge XML offset is too large"))?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {

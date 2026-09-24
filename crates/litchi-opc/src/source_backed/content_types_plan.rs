@@ -16,6 +16,7 @@ use crate::content_type::{ContentType, ContentTypeMap, validate_content_type};
 use crate::error::{OpcError, Result};
 use crate::limits::{ReadLimits, ReadResource};
 use crate::packuri::PackURI;
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
@@ -279,6 +280,9 @@ impl<'source> ContentTypesPlan<'source> {
         let mut reader = NsReader::from_reader(source);
         reader.config_mut().trim_text(false);
         reader.config_mut().check_end_names = true;
+        // Removal spans are byte offsets into `source`, whose leading
+        // byte-order mark precedes reader position zero.
+        let origin = ReaderOrigin::of(source);
         let mut depth = 0usize;
         let mut root_seen = false;
         let mut root_is_empty = false;
@@ -308,8 +312,9 @@ impl<'source> ContentTypesPlan<'source> {
                 event_count as u64,
                 limits.max_xml_events() as u64,
             )?;
-            let event_start = usize::try_from(reader.buffer_position())
-                .map_err(|_| overlay_unavailable("content-types XML position overflows usize"))?;
+            let event_start = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| overlay_unavailable("content-types XML position overflows usize"))?;
             let decoder = reader.decoder();
             let (matched_removal, reached_eof, root_start_event, root_empty_event) = {
                 let (resolved_namespace, event) = reader.read_resolved_event()?;
@@ -445,8 +450,9 @@ impl<'source> ContentTypesPlan<'source> {
             if reached_eof {
                 break;
             }
-            let event_end = usize::try_from(reader.buffer_position())
-                .map_err(|_| overlay_unavailable("content-types XML position overflows usize"))?;
+            let event_end = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| overlay_unavailable("content-types XML position overflows usize"))?;
             if event_end < event_start || event_end > source.len() {
                 return Err(invalid_structure(
                     "content-types XML event range is invalid",

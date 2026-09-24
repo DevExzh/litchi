@@ -8,6 +8,7 @@ use super::super::{
 };
 use super::model::{Anchor, AnchorIdentity, CommonSlidePhase, OwnerKind};
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::{OpcPackage, PackURI, Part as OpcPart};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -206,14 +207,15 @@ pub(super) fn has_non_namespace_attrs(element: &BytesStart<'_>) -> Result<bool> 
 
 pub(super) fn owner_anchor_uses(xml: &[u8], relationship_id: &str) -> Result<usize> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut nodes = 0usize;
     let mut uses = 0usize;
     loop {
-        let start = xml_position(&reader)?;
+        let start = xml_position(&reader, origin)?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let conformance = pml(&namespace);
         drop(namespace);
-        let end = xml_position(&reader)?;
+        let end = xml_position(&reader, origin)?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 bump_owner_node(&mut nodes)?;
@@ -466,9 +468,12 @@ pub(super) fn bump_graph_link(scanned: &mut usize) -> Result<()> {
     }
 }
 
-pub(super) fn xml_position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| invalid("tag-owner XML offset overflow"))
+/// The byte offset in the reader's input of its current position; `origin`
+/// is that input's [`ReaderOrigin`].
+pub(super) fn xml_position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("tag-owner XML offset overflow"))
 }
 
 pub(super) fn bump_owner_node(nodes: &mut usize) -> Result<()> {

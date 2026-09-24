@@ -1,5 +1,6 @@
 //! Lossless direct paragraph-child traversal.
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 
@@ -27,6 +28,7 @@ impl Paragraph {
         let source = self.xml_data.xml_ref()?;
         let _parser_admission = source.parser_admission()?;
         let mut reader = NsReader::from_reader(xml);
+        let origin = ReaderOrigin::of(xml);
         let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
         let mut paragraph_depth = None;
         let mut capture = None::<(bool, bool, usize, usize)>;
@@ -36,20 +38,18 @@ impl Paragraph {
         let mut nodes = 0usize;
 
         loop {
-            let event_start =
-                usize::try_from(reader.buffer_position()).map_err(|_conversion_error| {
-                    Error::InvalidFormat("Word inline offset does not fit usize".into())
-                })?;
+            let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+                Error::InvalidFormat("Word inline offset does not fit usize".into())
+            })?;
             let raw_event = reader
                 .read_event()
                 .map_err(|error| Error::Xml(error.to_string()))?
                 .into_owned();
             let resolver = reader.resolver();
             let (namespace, event) = resolver.resolve_event(raw_event);
-            let event_end =
-                usize::try_from(reader.buffer_position()).map_err(|_conversion_error| {
-                    Error::InvalidFormat("Word inline offset does not fit usize".into())
-                })?;
+            let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+                Error::InvalidFormat("Word inline offset does not fit usize".into())
+            })?;
 
             if matches!(event, Event::Start(_) | Event::Empty(_)) {
                 nodes = nodes.checked_add(1).ok_or_else(|| {

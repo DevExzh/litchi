@@ -6,6 +6,7 @@ use super::{
 };
 use crate::{Error, Result};
 use chrono::{DateTime, NaiveDateTime};
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::process_ooxml;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -380,18 +381,21 @@ fn process_comment_mce(xml: &[u8]) -> Result<Cow<'_, [u8]>> {
 
 fn processing_instruction_ranges(xml: &[u8]) -> Result<Vec<Range<usize>>> {
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut ranges = Vec::new();
     let mut buffer = Vec::new();
     loop {
-        let before = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("processing-instruction offset does not fit usize"))?;
+        let before = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("processing-instruction offset does not fit usize"))?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(xml_error)?
             .into_owned();
-        let after = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("processing-instruction offset does not fit usize"))?;
+        let after = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("processing-instruction offset does not fit usize"))?;
         if matches!(event, Event::PI(_)) {
             if ranges.len() >= MAX_NODES {
                 return Err(invalid(

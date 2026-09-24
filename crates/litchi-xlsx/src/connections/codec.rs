@@ -11,6 +11,7 @@ use super::model::{
 use super::namespace::{NamespaceContext, NamespaceDecl, NamespaceLimits};
 use crate::error::{Error as XlsxError, Result as XlsxResult};
 use litchi_core::sheet::Result;
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::{
     Reader, XmlVersion,
     encoding::Decoder,
@@ -522,13 +523,19 @@ fn preflight_element(
 
 fn strip_processing_instructions<'a>(xml: &'a [u8]) -> Result<Cow<'a, [u8]>> {
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    let position = |reader: &Reader<&[u8]>| {
+        origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("processing-instruction source offset exceeds usize"))
+    };
     let mut output: Option<Vec<u8>> = None;
     let mut cursor = 0;
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = position(&reader)?;
         match reader.read_event() {
             Ok(Event::PI(_)) => {
-                let end = reader.buffer_position() as usize;
+                let end = position(&reader)?;
                 if start < cursor || end < start || end > xml.len() {
                     return Err(invalid("invalid processing-instruction source span"));
                 }
@@ -566,13 +573,19 @@ pub(super) fn strip_processing_instructions_with_limit<'a>(
     max_temporary_bytes: usize,
 ) -> XlsxResult<Cow<'a, [u8]>> {
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    let position = |reader: &Reader<&[u8]>| {
+        origin.offset(reader.buffer_position()).ok_or_else(|| {
+            XlsxError::Invalid("processing-instruction source offset exceeds usize".into())
+        })
+    };
     let mut output: Option<Vec<u8>> = None;
     let mut cursor = 0usize;
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = position(&reader)?;
         match reader.read_event() {
             Ok(Event::PI(_)) => {
-                let end = reader.buffer_position() as usize;
+                let end = position(&reader)?;
                 if start < cursor || end < start || end > xml.len() {
                     return Err(XlsxError::Invalid(
                         "invalid processing-instruction source span".into(),
@@ -4909,13 +4922,21 @@ fn has_mce_namespace_declaration(source: &[u8]) -> Result<bool> {
 
 fn processing_instruction_ranges(source: &[u8], offsets: &mut [u32]) -> Result<()> {
     let mut reader = Reader::from_reader(source);
+    // `offsets` are byte offsets into `source`, whose leading byte-order mark
+    // precedes reader position zero.
+    let origin = ReaderOrigin::of(source);
+    let position = |reader: &Reader<&[u8]>| {
+        origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("processing-instruction source offset exceeds usize"))
+    };
     let mut offset_index = 0usize;
     let mut removed = 0usize;
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = position(&reader)?;
         match reader.read_event() {
             Ok(Event::PI(_)) => {
-                let end = reader.buffer_position() as usize;
+                let end = position(&reader)?;
                 if start > end || end > source.len() {
                     return Err(invalid("invalid processing-instruction source span"));
                 }

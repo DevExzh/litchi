@@ -1,6 +1,7 @@
 //! Bounded `SpreadsheetML` OLE markup codec.
 
 use crate::error::Result;
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -611,13 +612,15 @@ fn collect_raw_source(source: &[u8], conformance: OleObjectConformance) -> Resul
         return Err(limit("input XML bytes"));
     }
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);
     let mut stack: Vec<usize> = Vec::new();
     let mut elements: Vec<RawElement> = Vec::new();
     let mut nodes = 0usize;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("worksheet XML offset overflow"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("worksheet XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
@@ -637,8 +640,9 @@ fn collect_raw_source(source: &[u8], conformance: OleObjectConformance) -> Resul
                     stack.last().and_then(|id| elements[*id].object.clone())
                 };
                 let parent = stack.last().copied();
-                let end = usize::try_from(reader.buffer_position())
-                    .map_err(|_source| invalid("worksheet XML offset overflow"))?;
+                let end = origin
+                    .offset(reader.buffer_position())
+                    .ok_or_else(|| invalid("worksheet XML offset overflow"))?;
                 let attributes = raw_attributes(source, start, end, &reader, element)?;
                 let id = elements.len();
                 elements.push(RawElement {
@@ -646,8 +650,9 @@ fn collect_raw_source(source: &[u8], conformance: OleObjectConformance) -> Resul
                     name,
                     parent,
                     object,
-                    start_end: usize::try_from(reader.buffer_position())
-                        .map_err(|_source| invalid("worksheet XML offset overflow"))?,
+                    start_end: origin
+                        .offset(reader.buffer_position())
+                        .ok_or_else(|| invalid("worksheet XML offset overflow"))?,
                     end_start: None,
                     empty,
                     attributes,
@@ -1284,12 +1289,14 @@ pub(super) fn insert_collection(
         b"extLst",
     ];
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut position = None;
     let mut root = false;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("worksheet XML offset overflow"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("worksheet XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {

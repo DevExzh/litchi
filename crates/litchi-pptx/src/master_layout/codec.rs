@@ -1,6 +1,7 @@
 use super::model::{PlaceholderSpec, SlideLayoutKind};
 use crate::shape::{PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderTypeExtension};
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::fmt::{self, Write as FmtWrite};
@@ -493,10 +494,13 @@ pub(super) fn scan_element_span(
 ) -> Result<Option<ElementSpan>> {
     check_size(xml)?;
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut stack: Vec<(usize, String)> = Vec::new();
     let mut nodes = 0usize;
     loop {
-        let before = reader.buffer_position() as usize;
+        let before = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XML source position exceeds usize"))?;
         match reader.read_event() {
             Ok(Event::Start(element)) => {
                 nodes += 1;
@@ -517,7 +521,9 @@ pub(super) fn scan_element_span(
                 {
                     return Ok(Some(ElementSpan {
                         start: before,
-                        end: reader.buffer_position() as usize,
+                        end: origin
+                            .offset(reader.buffer_position())
+                            .ok_or_else(|| invalid("XML source position exceeds usize"))?,
                         close_start: before,
                         empty: true,
                     }));
@@ -530,7 +536,9 @@ pub(super) fn scan_element_span(
                 if stack.len() + 1 == depth && local == target {
                     return Ok(Some(ElementSpan {
                         start,
-                        end: reader.buffer_position() as usize,
+                        end: origin
+                            .offset(reader.buffer_position())
+                            .ok_or_else(|| invalid("XML source position exceeds usize"))?,
                         close_start: before,
                         empty: false,
                     }));
@@ -588,10 +596,13 @@ pub(super) fn insert_id_list_entry(
 pub(super) fn root_start_end(xml: &[u8]) -> Result<usize> {
     check_size(xml)?;
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     loop {
         match reader.read_event() {
             Ok(Event::Start(_) | Event::Empty(_)) => {
-                return Ok(reader.buffer_position() as usize);
+                return origin
+                    .offset(reader.buffer_position())
+                    .ok_or_else(|| invalid("XML source position exceeds usize"));
             },
             Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(invalid("DTDs and processing instructions are rejected"));
@@ -611,9 +622,12 @@ pub(super) fn remove_id_list_entry(
 ) -> Result<Vec<u8>> {
     check_size(xml)?;
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut nodes = 0usize;
     loop {
-        let before = reader.buffer_position() as usize;
+        let before = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XML source position exceeds usize"))?;
         match reader.read_event() {
             Ok(Event::Empty(element)) => {
                 nodes += 1;
@@ -625,7 +639,9 @@ pub(super) fn remove_id_list_entry(
                 {
                     let span = ElementSpan {
                         start: before,
-                        end: reader.buffer_position() as usize,
+                        end: origin
+                            .offset(reader.buffer_position())
+                            .ok_or_else(|| invalid("XML source position exceeds usize"))?,
                         close_start: before,
                         empty: true,
                     };
@@ -651,7 +667,9 @@ pub(super) fn remove_id_list_entry(
                                 if depth == 0 {
                                     let span = ElementSpan {
                                         start: before,
-                                        end: reader.buffer_position() as usize,
+                                        end: origin.offset(reader.buffer_position()).ok_or_else(
+                                            || invalid("XML source position exceeds usize"),
+                                        )?,
                                         close_start: before,
                                         empty: false,
                                     };

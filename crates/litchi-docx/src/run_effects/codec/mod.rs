@@ -15,6 +15,7 @@
 use std::fmt::Write as FmtWrite;
 
 use crate::error::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::xml::escape_xml;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -48,6 +49,7 @@ pub fn parse(xml: &[u8]) -> Result<super::model::Effects> {
         )));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut root_seen = false;
@@ -56,9 +58,9 @@ pub fn parse(xml: &[u8]) -> Result<super::model::Effects> {
     let mut effects = super::model::Effects::new();
 
     loop {
-        let start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
-            Error::InvalidFormat("Word run effects XML offset overflow".into())
-        })?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::InvalidFormat("Word run effects XML offset overflow".into()))?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -120,10 +122,9 @@ pub fn parse(xml: &[u8]) -> Result<super::model::Effects> {
                         ));
                     }
                 } else if rpr_depth == Some(depth) {
-                    let end =
-                        usize::try_from(reader.buffer_position()).map_err(|_source_error| {
-                            Error::InvalidFormat("Word run effects XML offset overflow".into())
-                        })?;
+                    let end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+                        Error::InvalidFormat("Word run effects XML offset overflow".into())
+                    })?;
                     consume_direct(&mut effects, &local, is_w14, &xml[start..end])?;
                 }
             },
@@ -135,7 +136,7 @@ pub fn parse(xml: &[u8]) -> Result<super::model::Effects> {
                     return Err(Error::InvalidFormat("mismatched Word run XML end".into()));
                 }
                 depth -= 1;
-                let end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+                let end = origin.offset(reader.buffer_position()).ok_or_else(|| {
                     Error::InvalidFormat("Word run effects XML offset overflow".into())
                 })?;
                 if frame.direct {

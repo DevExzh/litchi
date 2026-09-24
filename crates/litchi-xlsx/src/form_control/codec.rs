@@ -12,6 +12,7 @@ use std::ops::Deref;
 use std::ops::Range;
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -1383,6 +1384,7 @@ fn inspect_with_limits_owned(
         retained.charge_source(xml.len(), "retained source bytes")?;
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -1434,9 +1436,9 @@ fn inspect_with_limits_owned(
         if events > limits.max_events() {
             return Err(limit("XML event count", events, limits.max_events()));
         }
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let event = reader.read_event().map_err(xml_error)?;
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let resolver = reader.resolver();
 
         if let Some(opaque) = open_opaque.as_mut() {
@@ -2222,9 +2224,10 @@ enum OpaqueOwner {
     ItemList,
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|error| invalid(format!("form-control source position overflow: {error}")))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("form-control source position overflow"))
 }
 
 struct RetainedRange {

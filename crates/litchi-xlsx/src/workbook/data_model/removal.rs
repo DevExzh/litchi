@@ -6,6 +6,7 @@ use super::{
     MAX_XML_BYTES, SML, STRICT_CONNECTIONS_RELATIONSHIP_TYPE, STRICT_SML, X15, invalid, xml_error,
 };
 use crate::error::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::{OpcPackage, OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart, PackURI};
 use quick_xml::{events::Event, reader::NsReader};
 use std::collections::{HashMap, HashSet};
@@ -289,6 +290,7 @@ pub(super) fn prepare(
     } else {
         let before = source.ok_or_else(|| invalid("missing Connections source"))?;
         let mut reader = NsReader::from_reader(before.bytes());
+        let origin = ReaderOrigin::of(before.bytes());
         let mut depth = 0usize;
         let mut updates = Vec::new();
         updates
@@ -298,9 +300,13 @@ pub(super) fn prepare(
                 source,
             })?;
         loop {
-            let start = reader.buffer_position() as usize;
+            let start = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| invalid("Data Model XML offset exceeds usize"))?;
             let event = reader.read_event().map_err(xml_error)?;
-            let end = reader.buffer_position() as usize;
+            let end = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| invalid("Data Model XML offset exceeds usize"))?;
             let empty = matches!(&event, Event::Empty(_));
             match event {
                 Event::Start(element) | Event::Empty(element) => {

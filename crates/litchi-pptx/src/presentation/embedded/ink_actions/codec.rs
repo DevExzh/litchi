@@ -4,6 +4,7 @@
 
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::{BytesDecl, BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -177,6 +178,7 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
         ));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader
         .resolver_mut()
         .set_max_declarations_per_element(MAX_NAMESPACE_DECLARATIONS);
@@ -195,12 +197,12 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Candidate>> {
     let mut non_declaration_event_seen = false;
 
     loop {
-        let before = position(&reader)?;
+        let before = position(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let after = position(&reader)?;
+        let after = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (resolved, event) = resolver.resolve_event(event);
         if !matches!(&event, Event::Decl(_) | Event::Eof) {
@@ -1206,9 +1208,10 @@ fn is_xml_whitespace_byte(value: u8) -> bool {
     matches!(value, b' ' | b'\t' | b'\r' | b'\n')
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("ink-action owner XML offset does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("ink-action owner XML offset does not fit usize"))
 }
 
 #[cfg(test)]

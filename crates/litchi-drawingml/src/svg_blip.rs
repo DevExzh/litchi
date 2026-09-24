@@ -9,6 +9,7 @@
 
 use std::{fmt, io::Write, sync::Arc};
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::{relationships, xml::is_ncname};
 use quick_xml::{
     XmlVersion,
@@ -918,6 +919,7 @@ pub mod codec {
             return Err(limit("SVG blip XML bytes", MAX_XML_BYTES));
         }
         let mut reader = NsReader::from_reader(xml);
+        let origin = ReaderOrigin::of(xml);
         reader.config_mut().trim_text(false);
         reader.config_mut().check_end_names = true;
         reader.config_mut().check_comments = true;
@@ -927,13 +929,13 @@ pub mod codec {
         let mut value = None;
 
         loop {
-            let event_start = position(&reader, "SVG blip")?;
+            let event_start = position(&reader, origin, "SVG blip")?;
             let (resolved, event) = reader
                 .read_resolved_event_into(&mut buffer)
                 .map_err(xml_error)?;
             let resolved = resolved_namespace(&resolved)?;
             let event = event.into_owned();
-            let event_end = position(&reader, "SVG blip")?;
+            let event_end = position(&reader, origin, "SVG blip")?;
             match event {
                 Event::Decl(_) if !root_seen => {},
                 Event::Start(element) if !root_seen => {
@@ -941,7 +943,7 @@ pub mod codec {
                     require_root(&local, &namespace, element.name().prefix())?;
                     root_seen = true;
                     let root_start = event_start;
-                    let child_end = capture_element(&mut reader, &mut buffer)?;
+                    let child_end = capture_element(&mut reader, origin, &mut buffer)?;
                     value = Some(parse_root(
                         &element,
                         &reader,
@@ -1032,6 +1034,7 @@ pub mod codec {
             return Err(limit("SVG namespace context depth", MAX_CONTEXT_DEPTH));
         }
         let mut reader = Reader::from_reader(xml);
+        let origin = ReaderOrigin::of(xml);
         reader.config_mut().trim_text(false);
         reader.config_mut().check_end_names = true;
         let mut buffer = Vec::new();
@@ -1040,12 +1043,12 @@ pub mod codec {
         let mut value = None;
 
         loop {
-            let event_start = position(&reader, "SVG blip")?;
+            let event_start = position(&reader, origin, "SVG blip")?;
             let event = reader
                 .read_event_into(&mut buffer)
                 .map_err(xml_error)?
                 .into_owned();
-            let event_end = position(&reader, "SVG blip")?;
+            let event_end = position(&reader, origin, "SVG blip")?;
             match event {
                 Event::Decl(_) if !root_seen => {},
                 Event::Start(element) if !root_seen => {
@@ -1053,7 +1056,7 @@ pub mod codec {
                     let (local, namespace) = resolved_context_name(&resolver, &element.name())?;
                     require_root(&local, &namespace, element.name().prefix())?;
                     root_seen = true;
-                    let child_end = capture_plain_element(&mut reader, &mut buffer)?;
+                    let child_end = capture_plain_element(&mut reader, origin, &mut buffer)?;
                     value = Some(parse_contextual_root(
                         &element,
                         &reader,
@@ -1525,6 +1528,7 @@ pub mod codec {
             return Err(limit("SVG blip output bytes", maximum));
         }
         let mut reader = Reader::from_reader(fragment);
+        let origin = ReaderOrigin::of(fragment);
         reader.config_mut().trim_text(false);
         reader.config_mut().check_end_names = true;
         let mut buffer = Vec::new();
@@ -1534,7 +1538,7 @@ pub mod codec {
             Event::Start(element) | Event::Empty(element) => element,
             _ => return Err(invalid("SVG contextual fragment has no root element")),
         };
-        let root_end = position(&reader, "SVG contextual fragment")?;
+        let root_end = position(&reader, origin, "SVG contextual fragment")?;
         let insertion = if empty {
             root_end
                 .checked_sub(2)
@@ -1924,20 +1928,21 @@ pub mod codec {
 
     fn collect_children(xml: &[u8], children: &mut Vec<Child>) -> Result<()> {
         let mut reader = Reader::from_reader(xml);
+        let origin = ReaderOrigin::of(xml);
         reader.config_mut().trim_text(false);
         reader.config_mut().check_end_names = true;
         let mut buffer = Vec::new();
         next_element(&mut reader, &mut buffer)?;
         loop {
-            let start = position(&reader, "SVG blip child")?;
+            let start = position(&reader, origin, "SVG blip child")?;
             let event = reader
                 .read_event_into(&mut buffer)
                 .map_err(xml_error)?
                 .into_owned();
-            let end = position(&reader, "SVG blip child")?;
+            let end = position(&reader, origin, "SVG blip child")?;
             match event {
                 Event::Start(_) => {
-                    let end = capture_plain_element(&mut reader, &mut buffer)?;
+                    let end = capture_plain_element(&mut reader, origin, &mut buffer)?;
                     retain_child(xml, start, end, children)?;
                 },
                 Event::Empty(_) => {
@@ -1968,6 +1973,7 @@ pub mod codec {
         children: &mut Vec<Child>,
     ) -> Result<()> {
         let mut reader = Reader::from_reader(xml);
+        let origin = ReaderOrigin::of(xml);
         reader.config_mut().trim_text(false);
         reader.config_mut().check_end_names = true;
         let mut buffer = Vec::new();
@@ -1979,12 +1985,12 @@ pub mod codec {
         let mut root_closed = false;
 
         loop {
-            let start = position(&reader, "SVG contextual child")?;
+            let start = position(&reader, origin, "SVG contextual child")?;
             let event = reader
                 .read_event_into(&mut buffer)
                 .map_err(xml_error)?
                 .into_owned();
-            let end = position(&reader, "SVG contextual child")?;
+            let end = position(&reader, origin, "SVG contextual child")?;
             match event {
                 Event::Start(element) => {
                     if root_closed {
@@ -2580,6 +2586,7 @@ pub mod codec {
 
     fn capture_element<R: std::io::BufRead>(
         reader: &mut NsReader<R>,
+        origin: ReaderOrigin,
         buffer: &mut Vec<u8>,
     ) -> Result<usize> {
         let mut depth = 1usize;
@@ -2588,7 +2595,7 @@ pub mod codec {
             buffer.clear();
             let (_, event) = reader.read_resolved_event_into(buffer).map_err(xml_error)?;
             let event = event.into_owned();
-            let end = position(reader, "SVG blip")?;
+            let end = position(reader, origin, "SVG blip")?;
             match event {
                 Event::Start(_) => {
                     depth = depth
@@ -2631,6 +2638,7 @@ pub mod codec {
 
     fn capture_plain_element<R: std::io::BufRead>(
         reader: &mut Reader<R>,
+        origin: ReaderOrigin,
         buffer: &mut Vec<u8>,
     ) -> Result<usize> {
         let mut depth = 1usize;
@@ -2640,7 +2648,7 @@ pub mod codec {
                 .read_event_into(buffer)
                 .map_err(xml_error)?
                 .into_owned();
-            let end = position(reader, "SVG blip child")?;
+            let end = position(reader, origin, "SVG blip child")?;
             match event {
                 Event::Start(_) => {
                     depth = depth
@@ -2672,9 +2680,16 @@ pub mod codec {
         }
     }
 
-    fn position<R: std::io::BufRead>(reader: &Reader<R>, what: &str) -> Result<usize> {
-        usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid(format!("{what} offset exceeds usize")))
+    /// The byte offset in the reader's input of its current position;
+    /// `origin` is that input's [`ReaderOrigin`].
+    fn position<R: std::io::BufRead>(
+        reader: &Reader<R>,
+        origin: ReaderOrigin,
+        what: &str,
+    ) -> Result<usize> {
+        origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid(format!("{what} offset exceeds usize")))
     }
 
     fn validate(value: &SvgBlip) -> Result<()> {

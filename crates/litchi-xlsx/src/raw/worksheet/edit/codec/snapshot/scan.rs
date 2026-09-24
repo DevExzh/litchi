@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_sheet::{COLUMNS, Cell as Address, Column, ROWS, Rect};
 use quick_xml::encoding::Decoder;
@@ -232,6 +233,9 @@ pub(crate) fn scan_with_event_limit(content: &[u8], max_events: usize) -> Result
 fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
     let mut reader = NsReader::from_reader(content);
     reader.config_mut().check_end_names = true;
+    // Spans are document offsets: a leading byte-order mark precedes reader
+    // position zero.
+    let origin = ReaderOrigin::of(content).skipped();
     let mut scanner = Scanner::default();
     let mut stack = Vec::<Frame>::new();
     let mut events = 0usize;
@@ -245,7 +249,7 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
         &mut stack,
         &mut events,
         max_events,
-        0,
+        origin,
         lane_enabled.then_some(content),
     )? {
         let decoder = reader.decoder();
@@ -261,11 +265,13 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
                 let spliced = lane::splice_without_body(content, entry.position, resume)?;
                 let mut tail = NsReader::from_reader(spliced.as_slice());
                 tail.config_mut().check_end_names = true;
-                lane::skip_to(&mut tail, entry.position)?;
+                lane::skip_to(&mut tail, &spliced, entry.position)?;
                 // Positions past the entry lie `resume - position` bytes
-                // later in the real document than in the spliced one.
+                // later in the real document than in the spliced one, whose
+                // prefix keeps the document's byte-order mark.
                 let shift = resume
                     .checked_sub(entry.position)
+                    .and_then(|gap| gap.checked_add(ReaderOrigin::of(&spliced).skipped()))
                     .ok_or_else(|| invalid("worksheet lane resumed before its entry"))?;
                 if scanner
                     .drive(&mut tail, &mut stack, &mut events, max_events, shift, None)?
@@ -276,7 +282,14 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
             },
             None => {
                 if scanner
-                    .drive(&mut reader, &mut stack, &mut events, max_events, 0, None)?
+                    .drive(
+                        &mut reader,
+                        &mut stack,
+                        &mut events,
+                        max_events,
+                        origin,
+                        None,
+                    )?
                     .is_some()
                 {
                     return Err(invalid("worksheet lane resumed at a second entry"));
@@ -294,9 +307,10 @@ impl Scanner {
     /// Feed reader events to the scanner until end of file.
     ///
     /// `shift` is added to every reader position, so a reader over a spliced
-    /// document reports real document offsets. With `lane` set to the
-    /// reader's own input, stop right after the `<sheetData>` start tag
-    /// when its unprefixed children resolve to `SpreadsheetML`.
+    /// or byte-order-marked document reports real document offsets. With
+    /// `lane` set to the reader's own input, stop right after the
+    /// `<sheetData>` start tag when its unprefixed children resolve to
+    /// `SpreadsheetML`.
     #[allow(
         clippy::too_many_lines,
         reason = "the historical event loop is kept intact so its refusal order is unchanged"

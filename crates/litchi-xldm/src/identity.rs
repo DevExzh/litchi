@@ -2067,6 +2067,22 @@ fn relationship_xml_text_range(source: &[u8], start: usize, end: usize) -> (usiz
     (value_start, value_end)
 }
 
+/// Bytes of `source` before a quick-xml reader's position zero: the reader
+/// drops one leading UTF-8 byte-order mark before its first event without
+/// counting it, so each of its positions is this many bytes short of the byte
+/// offset in `source`.
+///
+/// This crate deliberately has no `litchi-core` dependency; the rule is
+/// `litchi_core::xml::ReaderOrigin`'s, and its tests pin the same reader
+/// behaviour.
+fn reader_origin(source: &[u8]) -> usize {
+    if source.starts_with(b"\xEF\xBB\xBF") {
+        3
+    } else {
+        0
+    }
+}
+
 fn scan_relationship_primary_table(
     source: &[u8],
     expected_name: &str,
@@ -2082,7 +2098,8 @@ fn scan_relationship_primary_table(
             OlapError::new(format!("cannot reserve relationship XML stack: {error}"))
         })?;
     let mut candidate = None;
-    let mut event_start = usize::from(source.starts_with(b"\xEF\xBB\xBF")) * 3;
+    let origin = reader_origin(source);
+    let mut event_start = origin;
     loop {
         let event = match reader.read_event() {
             Ok(event) => event,
@@ -2096,7 +2113,9 @@ fn scan_relationship_primary_table(
             },
         };
         let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| OlapError::new("relationship XML position exceeds host size"))?;
+            .ok()
+            .and_then(|position| position.checked_add(origin))
+            .ok_or_else(|| OlapError::new("relationship XML position exceeds host size"))?;
         if event_end > source.len() || event_start > event_end {
             return Err(OlapError::new("relationship XML event range is invalid"));
         }
@@ -2229,13 +2248,16 @@ fn find_xmobject_root_start(source: &[u8]) -> Result<usize, OlapError> {
     let mut reader = quick_xml::reader::Reader::from_reader(source);
     reader.config_mut().trim_text(false);
     reader.config_mut().enable_all_checks(true);
-    let mut event_start = usize::from(source.starts_with(b"\xEF\xBB\xBF")) * 3;
+    let origin = reader_origin(source);
+    let mut event_start = origin;
     loop {
         let event = reader.read_event().map_err(|error| {
             OlapError::new(format!("table metadata XML is not well-formed: {error}"))
         })?;
         let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| OlapError::new("table metadata XML position exceeds host size"))?;
+            .ok()
+            .and_then(|position| position.checked_add(origin))
+            .ok_or_else(|| OlapError::new("table metadata XML position exceeds host size"))?;
         if event_end > source.len() || event_start > event_end {
             return Err(OlapError::new("table metadata XML event range is invalid"));
         }
@@ -5729,6 +5751,54 @@ mod tests {
             changed,
             br#"<XMObject><Relationships><PrimaryTable> New&amp;Name </PrimaryTable><Extension><PrimaryTable>Other</PrimaryTable></Extension><PrimaryTable>Old&amp;More</PrimaryTable></Relationships><Unknown/></XMObject>"#
         );
+    }
+
+    /// Change 0765: quick-xml drops a leading UTF-8 byte-order mark before
+    /// its first event without counting it, so both scanners convert reader
+    /// positions with `reader_origin`. A marked part — with or without a
+    /// declaration before its root — is rewritten exactly like the unmarked
+    /// part, behind the same mark.
+    #[test]
+    fn byte_order_marked_sources_are_rewritten_like_unmarked_ones() {
+        const MARK: &[u8] = b"\xEF\xBB\xBF";
+        for (source, reader_skips) in [
+            (&b"<a/>"[..], 0),
+            (b"\xEF\xBB\xBF<a/>", 3),
+            (b"\xEF\xBB\xBF\xEF\xBB\xBF<a/>", 3),
+            (b"\xEF\xBB<a/>", 0),
+        ] {
+            assert_eq!(reader_origin(source), reader_skips, "{source:?}");
+            let mut reader = quick_xml::reader::Reader::from_reader(source);
+            let _ = reader.read_event().expect("event");
+            let first_event_bytes = usize::try_from(reader.buffer_position()).expect("fits");
+            assert!(first_event_bytes + reader_skips <= source.len());
+        }
+        let declaration = br#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        for prefix in [&b""[..], declaration] {
+            let relationships = [
+                prefix,
+                br#"<XMObject><Relationships><PrimaryTable> Old </PrimaryTable><PrimaryTable>Old&amp;More</PrimaryTable></Relationships></XMObject>"#,
+            ]
+            .concat();
+            let marked = [MARK, relationships.as_slice()].concat();
+            let plain = replace_relationship_primary_table(&relationships, "Old", "New&Name")
+                .expect("unmarked relationships");
+            let changed = replace_relationship_primary_table(&marked, "Old", "New&Name")
+                .expect("marked relationships");
+            assert_eq!(changed, [MARK, plain.as_slice()].concat());
+
+            let table = [
+                prefix,
+                br#"<XMObject class="XMSimpleTable" name="Old"><Unknown a="1"/></XMObject>"#,
+            ]
+            .concat();
+            let marked = [MARK, table.as_slice()].concat();
+            let plain = replace_table_name_attribute_variable(&table, "Old", "Longer&Name")
+                .expect("unmarked table");
+            let changed = replace_table_name_attribute_variable(&marked, "Old", "Longer&Name")
+                .expect("marked table");
+            assert_eq!(changed, [MARK, plain.as_slice()].concat());
+        }
     }
 
     #[test]

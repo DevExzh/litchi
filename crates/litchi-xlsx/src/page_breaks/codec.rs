@@ -9,6 +9,7 @@
 
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -188,6 +189,7 @@ struct OpenBreak {
 
 fn parse_selected(xml: &[u8]) -> Result<Parsed> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -214,10 +216,10 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
         if events > MAX_EVENTS {
             return Err(invalid("page-break XML exceeds the event limit"));
         }
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         reject_unknown_namespace(&namespace)?;
@@ -863,12 +865,10 @@ fn parse_usize(value: &str, what: &'static str) -> Result<usize> {
     usize::try_from(value).map_err(|error| invalid(format!("invalid {what}: {error}")))
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position()).map_err(|error| {
-        invalid(format!(
-            "page-break XML position does not fit usize: {error}"
-        ))
-    })
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("page-break XML position does not fit usize"))
 }
 
 fn copy_bytes(input: &[u8]) -> Result<Vec<u8>> {

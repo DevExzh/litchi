@@ -2,6 +2,7 @@
 
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::decode_xml_reference;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -395,6 +396,7 @@ struct ExtensionScan {
 
 fn scan_extension_spans(xml: &[u8]) -> Result<ExtensionScan> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut root_namespace = None;
     let mut matching_start = None;
@@ -402,8 +404,9 @@ fn scan_extension_spans(xml: &[u8]) -> Result<ExtensionScan> {
     let mut ext_list_close = None;
     let mut worksheet_close = None;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("worksheet XML offset exceeds usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("worksheet XML offset exceeds usize"))?;
         let event = reader
             .read_event()
             .map_err(|error| invalid(error.to_string()))?;
@@ -442,8 +445,9 @@ fn scan_extension_spans(xml: &[u8]) -> Result<ExtensionScan> {
                     if extension.is_some() || matching_start.is_some() {
                         return Err(invalid("duplicate worksheet webExtensions extension"));
                     }
-                    let end = usize::try_from(reader.buffer_position())
-                        .map_err(|_source| invalid("worksheet XML offset exceeds usize"))?;
+                    let end = origin
+                        .offset(reader.buffer_position())
+                        .ok_or_else(|| invalid("worksheet XML offset exceeds usize"))?;
                     extension = Some(start..end);
                 }
             },
@@ -461,8 +465,9 @@ fn scan_extension_spans(xml: &[u8]) -> Result<ExtensionScan> {
                     })?;
                     extension = Some(
                         begin
-                            ..usize::try_from(reader.buffer_position())
-                                .map_err(|_source| invalid("worksheet XML offset exceeds usize"))?,
+                            ..origin
+                                .offset(reader.buffer_position())
+                                .ok_or_else(|| invalid("worksheet XML offset exceeds usize"))?,
                     );
                 }
                 if local == b"extLst" && is_sml(&namespace) && depth == 1 {

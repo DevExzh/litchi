@@ -9,6 +9,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesDecl, BytesRef, BytesStart, Event};
@@ -400,6 +401,7 @@ fn namespace_context_bindings(context: &NamespaceContext) -> Result<Vec<(Vec<u8>
 
 fn root_fragment_namespace_info(fragment: &[u8]) -> Result<(usize, Vec<Vec<u8>>)> {
     let mut reader = Reader::from_reader(fragment);
+    let origin = ReaderOrigin::of(fragment);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
@@ -407,8 +409,9 @@ fn root_fragment_namespace_info(fragment: &[u8]) -> Result<(usize, Vec<Vec<u8>>)
         let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                let end = usize::try_from(reader.buffer_position())
-                    .map_err(|_| invalid("picture namespace root end exceeds usize"))?;
+                let end = origin
+                    .offset(reader.buffer_position())
+                    .ok_or_else(|| invalid("picture namespace root end exceeds usize"))?;
                 let mut declared = Vec::<Vec<u8>>::new();
                 for attribute in element.attributes().with_checks(true) {
                     let attribute = attribute.map_err(xml_error)?;
@@ -549,11 +552,7 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
     let decoder = reader.decoder();
-    let source_prefix = if xml.starts_with(b"\xEF\xBB\xBF") {
-        3
-    } else {
-        0
-    };
+    let origin = ReaderOrigin::of(xml);
     let mut namespaces = Namespaces::default();
     let mut frames = Vec::<Frame>::new();
     frames.try_reserve(32).map_err(|source| Error::Allocation {
@@ -571,9 +570,9 @@ pub(super) fn locate_all(xml: &[u8]) -> Result<Vec<PictureLayout>> {
     let mut active_capture = None::<usize>;
 
     loop {
-        let event_start = position(&reader, source_prefix)?;
+        let event_start = position(&reader, origin)?;
         let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
-        let event_end = position(&reader, source_prefix)?;
+        let event_end = position(&reader, origin)?;
         if event_end < event_start || event_end > xml.len() {
             return Err(invalid("XML event range is outside the source bytes"));
         }
@@ -1127,6 +1126,7 @@ pub(super) fn namespace_complete_element_fragment(
         return Ok(output);
     }
     let mut reader = Reader::from_reader(fragment);
+    let origin = ReaderOrigin::of(fragment);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
@@ -1134,8 +1134,9 @@ pub(super) fn namespace_complete_element_fragment(
         let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                let end = usize::try_from(reader.buffer_position())
-                    .map_err(|_| invalid("picture namespace root end exceeds usize"))?;
+                let end = origin
+                    .offset(reader.buffer_position())
+                    .ok_or_else(|| invalid("picture namespace root end exceeds usize"))?;
                 let mut declared = Vec::<Vec<u8>>::new();
                 for attribute in element.attributes().with_checks(true) {
                     let attribute = attribute.map_err(xml_error)?;
@@ -1636,12 +1637,10 @@ fn add_count(value: usize, limit_value: usize, resource: &'static str) -> Result
     }
 }
 
-fn position(reader: &Reader<&[u8]>, source_prefix: usize) -> Result<usize> {
-    let position = usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("XML source position exceeds usize"))?;
-    position
-        .checked_add(source_prefix)
-        .ok_or_else(|| invalid("XML source position overflows usize"))
+fn position(reader: &Reader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("XML source position exceeds usize"))
 }
 
 fn xml_error(error: impl std::fmt::Display) -> Error {

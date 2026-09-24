@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 
 use crate::error::{Result, allocation, invalid};
+use litchi_core::xml::ReaderOrigin;
 use litchi_sheet::Cell as Address;
 use quick_xml::Reader;
 use quick_xml::XmlVersion;
@@ -121,6 +122,7 @@ pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
         )));
     }
     let mut reader = NsReader::from_reader(bytes);
+    let origin = ReaderOrigin::of(bytes);
     reader.config_mut().trim_text(false);
     let mut builder = Builder::default();
     let mut current_sheet = None;
@@ -128,7 +130,7 @@ pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
     let mut closed_root = false;
     let mut saw_extensions = false;
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
@@ -165,8 +167,8 @@ pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
                     return Err(invalid("calculation cells must precede extLst"));
                 }
                 let cell = parse_cell(&element, decoder, &resolver, current_sheet)?;
-                let content_start = position(&reader)?;
-                consume_leaf(&mut reader, b"c", content_start)?;
+                let content_start = position(&reader, origin)?;
+                consume_leaf(&mut reader, origin, b"c", content_start)?;
                 current_sheet = Some(cell.sheet);
                 push_cell(&mut builder, cell)?;
             },
@@ -176,7 +178,7 @@ pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
                 if std::mem::replace(&mut saw_extensions, true) {
                     return Err(invalid("duplicate calculation-chain extLst"));
                 }
-                let end = position(&reader)?;
+                let end = position(&reader, origin)?;
                 builder.extension_list_xml = Some(raw_range(bytes, start, end)?);
             },
             Event::Start(element)
@@ -185,7 +187,7 @@ pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
                 if std::mem::replace(&mut saw_extensions, true) {
                     return Err(invalid("duplicate calculation-chain extLst"));
                 }
-                let end = consume_extension_list(&mut reader, start)?;
+                let end = consume_extension_list(&mut reader, origin, start)?;
                 builder.extension_list_xml = Some(raw_range(bytes, start, end)?);
             },
             Event::Start(element) | Event::Empty(element) if saw_root && !closed_root => {
@@ -424,9 +426,14 @@ fn push_cell(builder: &mut Builder, cell: Cell) -> Result<()> {
     Ok(())
 }
 
-fn consume_leaf(reader: &mut NsReader<&[u8]>, local: &[u8], start: usize) -> Result<()> {
+fn consume_leaf(
+    reader: &mut NsReader<&[u8]>,
+    origin: ReaderOrigin,
+    local: &[u8],
+    start: usize,
+) -> Result<()> {
     loop {
-        let event_start = position(reader)?;
+        let event_start = position(reader, origin)?;
         enforce_budget(
             start,
             event_start,
@@ -436,7 +443,7 @@ fn consume_leaf(reader: &mut NsReader<&[u8]>, local: &[u8], start: usize) -> Res
         let event = reader
             .read_event()
             .map_err(|error| invalid(format!("invalid calculation-cell XML: {error}")))?;
-        let event_end = position(reader)?;
+        let event_end = position(reader, origin)?;
         enforce_budget(
             start,
             event_end,
@@ -466,11 +473,15 @@ fn consume_leaf(reader: &mut NsReader<&[u8]>, local: &[u8], start: usize) -> Res
     }
 }
 
-fn consume_extension_list(reader: &mut NsReader<&[u8]>, start: usize) -> Result<usize> {
+fn consume_extension_list(
+    reader: &mut NsReader<&[u8]>,
+    origin: ReaderOrigin,
+    start: usize,
+) -> Result<usize> {
     let mut depth = 1usize;
     let mut nodes = 0usize;
     while depth != 0 {
-        let event_start = position(reader)?;
+        let event_start = position(reader, origin)?;
         enforce_budget(
             start,
             event_start,
@@ -480,7 +491,7 @@ fn consume_extension_list(reader: &mut NsReader<&[u8]>, start: usize) -> Result<
         let event = reader
             .read_event()
             .map_err(|error| invalid(format!("invalid extension XML: {error}")))?;
-        let event_end = position(reader)?;
+        let event_end = position(reader, origin)?;
         enforce_budget(
             start,
             event_end,
@@ -521,7 +532,7 @@ fn consume_extension_list(reader: &mut NsReader<&[u8]>, start: usize) -> Result<
             | Event::GeneralRef(_) => {},
         }
     }
-    position(reader)
+    position(reader, origin)
 }
 
 fn parse_reference(value: &str) -> Result<Address> {
@@ -747,9 +758,10 @@ fn push_u16(output: &mut String, mut value: u16) {
     }
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source| invalid("calculation-chain XML offset overflow"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("calculation-chain XML offset overflow"))
 }
 
 /// The `extLst` span of the processed part, with every namespace declaration it

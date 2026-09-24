@@ -4,6 +4,7 @@ use std::borrow::Cow;
 
 use crate::error::{Error, Result, invalid};
 use crate::raw::namespace::is_spreadsheetml_name;
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -76,6 +77,7 @@ struct Frame {
 
 pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut stack: Vec<Frame> = Vec::new();
     stack
@@ -108,10 +110,10 @@ pub(super) fn inspect_layout(xml: &[u8], limits: &Limits) -> Result<Layout> {
         if events > limits.max_events() {
             return Err(invalid("calculation metadata exceeds event count limit"));
         }
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         reject_unsafe_event(&event)?;
         let resolver = reader.resolver().clone();
         let (_namespace, event) = resolver.resolve_event(event);
@@ -1214,9 +1216,10 @@ fn check_attributes(element: &BytesStart<'_>, limits: &Limits) -> Result<()> {
     Ok(())
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source| invalid("XML position does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("XML position does not fit usize"))
 }
 
 fn is_xcalcf(namespace: &ResolveResult<'_>, local: &[u8], expected: &[u8]) -> bool {

@@ -12,6 +12,7 @@ use super::super::{
 };
 use super::{Limits, MAX_WEB_EXTENSION_ITEMS};
 use crate::Error;
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -957,13 +958,15 @@ struct AttributeRange {
 fn scan_xml_layout(xml: &[u8], limits: &Limits) -> Result<XmlLayout> {
     std::str::from_utf8(xml).map_err(|error| Error::Xml(error.to_string()))?;
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut stack = Vec::<LayoutFrame>::new();
     let mut nodes = 0usize;
     let mut layout = XmlLayout::default();
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("custom-function XML offset overflow".into()))?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Invalid("custom-function XML offset overflow".into()))?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -1010,8 +1013,9 @@ fn scan_xml_layout(xml: &[u8], limits: &Limits) -> Result<XmlLayout> {
             Event::DocType(_) => ScanEvent::DocType,
             Event::Eof => ScanEvent::Eof,
         };
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("custom-function XML offset overflow".into()))?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Invalid("custom-function XML offset overflow".into()))?;
         match event {
             ScanEvent::Start {
                 drawingml,

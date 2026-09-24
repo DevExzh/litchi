@@ -6,6 +6,7 @@ use super::super::{
 };
 use super::model::{Anchor, BlackWhiteMode};
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -66,6 +67,7 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
     };
     let processed = process_markup_compatibility(xml, &capabilities, &limits)?.xml;
     let mut reader = NsReader::from_reader(processed.as_ref());
+    let origin = ReaderOrigin::of(processed.as_ref());
     let mut frames = Vec::new();
     let mut content_frames = Vec::<ContentFrame>::new();
     let mut anchors = Vec::new();
@@ -75,12 +77,12 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
     let mut root_closed = false;
 
     loop {
-        let before = position(&reader)?;
+        let before = position(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let after = position(&reader)?;
+        let after = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, resolved_event) = resolver.resolve_event(event);
 
@@ -242,6 +244,7 @@ pub(crate) fn locate_content_parts(xml: &[u8]) -> Result<Vec<SourceAnchor>> {
         return Err(limit("content-part slide XML bytes", MAX_XML_BYTES));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut frames = Vec::new();
     let mut anchors = Vec::new();
@@ -251,13 +254,13 @@ pub(crate) fn locate_content_parts(xml: &[u8]) -> Result<Vec<SourceAnchor>> {
     let mut root_closed = false;
 
     loop {
-        let before = position(&reader)?;
+        let before = position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let after = position(&reader)?;
+        let after = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -733,6 +736,7 @@ pub(crate) fn rewrite_anchor_relationship_id(
 /// close tag. Content parts are valid group-shape children in this location.
 pub(crate) fn shape_tree_insertion(source: &[u8]) -> Result<usize> {
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     let mut tree_depth = None;
@@ -741,7 +745,7 @@ pub(crate) fn shape_tree_insertion(source: &[u8]) -> Result<usize> {
     let mut root_seen = false;
     let mut root_closed = false;
     loop {
-        let before = position(&reader)?;
+        let before = position(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
@@ -1038,9 +1042,10 @@ fn validate_attributes(element: &BytesStart<'_>) -> Result<()> {
     Ok(())
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| invalid("content-part XML offset does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("content-part XML offset does not fit usize"))
 }
 
 fn is_content_part(namespace: &ResolveResult<'_>, name: quick_xml::name::QName<'_>) -> bool {

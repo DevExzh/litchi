@@ -13,6 +13,7 @@ use super::inventory::{Inventory, RelationshipBinding, SourceSpan};
 use super::{Columns, Limits, Margins, PageSize, Section, Selector, Start};
 use crate::error::{Error, Result};
 use crate::namespace::is_wordprocessing_namespace;
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::{Position, SourceVersion};
 use litchi_opc::{SourceArtifact, SourceArtifactFingerprint, SourceLineage};
 use quick_xml::Reader;
@@ -833,6 +834,7 @@ impl FragmentAnalysis {
             ));
         }
         let mut reader = NsReader::from_reader(xml);
+        let origin = ReaderOrigin::of(xml);
         reader.config_mut().trim_text(false);
         let mut depth = 0usize;
         let mut events = 0usize;
@@ -842,11 +844,11 @@ impl FragmentAnalysis {
         let mut section_closed = false;
 
         loop {
-            let start = reader_offset(&reader)?;
+            let start = reader_offset(&reader, origin)?;
             let event = reader
                 .read_event()
                 .map_err(|error| Error::Xml(error.to_string()))?;
-            let end = reader_offset(&reader)?;
+            let end = reader_offset(&reader, origin)?;
             events = events
                 .checked_add(1)
                 .ok_or_else(|| Error::InvalidFormat("section event counter overflow".into()))?;
@@ -1625,14 +1627,16 @@ fn lexical_attributes(opening: &[u8]) -> Result<Vec<LexicalAttribute>> {
     Ok(attributes)
 }
 
-fn reader_offset(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_error| Error::InvalidFormat("section XML offset overflow".into()))
+fn reader_offset(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::InvalidFormat("section XML offset overflow".into()))
 }
 
-fn raw_reader_offset(reader: &Reader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_error| Error::InvalidFormat("section XML offset overflow".into()))
+fn raw_reader_offset(reader: &Reader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::InvalidFormat("section XML offset overflow".into()))
 }
 
 fn has_empty_default_namespace(opening: &[u8]) -> Result<bool> {
@@ -1648,17 +1652,18 @@ fn has_empty_default_namespace(opening: &[u8]) -> Result<bool> {
 
 fn direct_children(xml: &[u8]) -> Result<Vec<ChildSpan>> {
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let root_end = opening_tag_end(xml)?;
     let fragment_prefix = element_prefix(&xml[..root_end]);
     let mut depth = 0usize;
     let mut children = Vec::new();
     loop {
-        let start = raw_reader_offset(&reader)?;
+        let start = raw_reader_offset(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let end = raw_reader_offset(&reader)?;
+        let end = raw_reader_offset(&reader, origin)?;
         match event {
             Event::Start(element) => {
                 if depth == 1 {
@@ -1758,14 +1763,15 @@ fn direct_children_with_context(
 
 fn root_close_start(xml: &[u8]) -> Result<usize> {
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     loop {
-        let start = raw_reader_offset(&reader)?;
+        let start = raw_reader_offset(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let end = raw_reader_offset(&reader)?;
+        let end = raw_reader_offset(&reader, origin)?;
         match event {
             Event::Start(_) => {
                 depth = depth

@@ -296,11 +296,16 @@ fn compact_lane_cells_match_every_value_form() {
 }
 
 #[test]
-fn byte_order_marked_worksheets_keep_the_reader_with_identical_stores() {
+fn byte_order_marked_worksheets_take_the_lane_with_identical_stores() {
     let strings = shared_strings();
     let mut random = Lcg(0xB0B);
     for _ in 0..50 {
-        let document = format!("\u{feff}{}", worksheet(&generated_body(&mut random, false)));
-        assert!(!assert_parity(&document, &strings), "{document}");
+        let plain = worksheet(&generated_body(&mut random, false));
+        let document = format!("\u{feff}{plain}");
+        assert!(assert_parity(&document, &strings), "{document}");
+        // The mark changes no value: the store equals the unmarked one.
+        let marked = super::parse(document.as_bytes(), || Ok(Some(strings.as_slice())));
+        let unmarked = super::parse(plain.as_bytes(), || Ok(Some(strings.as_slice())));
+        assert_eq!(format!("{marked:?}"), format!("{unmarked:?}"), "{document}");
     }
 }

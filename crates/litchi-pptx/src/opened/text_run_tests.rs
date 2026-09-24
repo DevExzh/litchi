@@ -223,13 +223,13 @@ fn no_text_verb_panics_on_mutated_text_run_markup() -> Result<()> {
     Ok(())
 }
 
-/// A leading UTF-8 byte-order mark shifts every reader position by three
-/// bytes (quick-xml skips it without counting it), so text edits of such a
-/// slide are refused rather than applied. This pins that the edit is refused
-/// or correct, never corrupted and never a panic; the positional fix is a
-/// follow-up of change 0755.
+/// A leading UTF-8 byte-order mark is skipped by quick-xml without being
+/// counted in its positions. Change 0755 pinned that such a slide's text edit
+/// was refused, never corrupted and never a panic; change 0765 converts every
+/// position through the reader origin, so the edit now applies and the slide
+/// keeps its mark.
 #[test]
-fn a_byte_order_marked_slide_is_refused_or_edited_correctly_never_corrupted() -> Result<()> {
+fn a_byte_order_marked_slide_is_edited_correctly_and_keeps_its_mark() -> Result<()> {
     let mut package = text_box_package(&["My text"])?;
     let mut xml = vec![0xef, 0xbb, 0xbf];
     xml.extend_from_slice(slide_xml(&package)?.as_bytes());
@@ -237,24 +237,23 @@ fn a_byte_order_marked_slide_is_refused_or_edited_correctly_never_corrupted() ->
     let snapshot = package.opened_presentation()?;
     let mut edit = snapshot.edit();
     let outcome = catch_unwind(AssertUnwindSafe(|| edit.set_shape_text(0, 0, "edited")));
-    match outcome.expect("a byte-order mark must not panic") {
-        Err(_) => {},
-        Ok(_) => {
-            let commit = edit.commit()?;
-            let blob = commit
-                .snapshot()
-                .package
-                .get_part(&PackURI::new(SLIDE).map_err(Error::Invalid)?)?
-                .blob()
-                .to_vec();
-            let text = crate::shape::Scene::read(&blob)?
-                .at(0)
-                .map_err(|error| Error::Invalid(error.to_string()))?
-                .common()
-                .text()
-                .map(str::to_owned);
-            assert_eq!(text.as_deref(), Some("edited"));
-        },
-    }
+    outcome
+        .expect("a byte-order mark must not panic")
+        .expect("a byte-order-marked slide is edited");
+    let commit = edit.commit()?;
+    let blob = commit
+        .snapshot()
+        .package
+        .get_part(&PackURI::new(SLIDE).map_err(Error::Invalid)?)?
+        .blob()
+        .to_vec();
+    assert!(blob.starts_with(&[0xef, 0xbb, 0xbf]), "the mark is kept");
+    let text = crate::shape::Scene::read(&blob)?
+        .at(0)
+        .map_err(|error| Error::Invalid(error.to_string()))?
+        .common()
+        .text()
+        .map(str::to_owned);
+    assert_eq!(text.as_deref(), Some("edited"));
     Ok(())
 }

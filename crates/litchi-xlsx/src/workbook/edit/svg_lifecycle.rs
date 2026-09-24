@@ -10,6 +10,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::package::{ContentTypeEdit, RelationshipEdit};
 use litchi_opc::{
@@ -5165,12 +5166,17 @@ fn ranges_overlap(left: source::ByteRange, right: source::ByteRange) -> bool {
 fn opening_tag_range(source: &[u8], element: source::ByteRange) -> Result<std::ops::Range<usize>> {
     let bytes = element.slice(source)?;
     let mut reader = Reader::from_reader(bytes);
+    let origin = ReaderOrigin::of(bytes);
     let mut buffer = Vec::new();
-    let start = reader.buffer_position() as usize;
+    let start = origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("SVG owner XML offset exceeds usize"))?;
     let event = reader
         .read_event_into(&mut buffer)
         .map_err(|error| invalid(error.to_string()))?;
-    let end = reader.buffer_position() as usize;
+    let end = origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("SVG owner XML offset exceeds usize"))?;
     if !matches!(event, Event::Start(_) | Event::Empty(_)) || end <= start {
         return Err(invalid("SVG owner extension has no complete opening tag"));
     }
@@ -5185,6 +5191,7 @@ fn ext_list_contains_only_owner(
     let bytes = ext_list.range().slice(source)?;
     let selected = owner.extension_range();
     let mut reader = Reader::from_reader(bytes);
+    let origin = ReaderOrigin::of(bytes);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -5193,11 +5200,15 @@ fn ext_list_contains_only_owner(
     let mut child_end = None;
     let mut buffer = Vec::new();
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("SVG owner XML offset exceeds usize"))?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(|error| invalid(error.to_string()))?;
-        let end = reader.buffer_position() as usize;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("SVG owner XML offset exceeds usize"))?;
         match event {
             Event::Start(element) => {
                 if depth == 0 && element.attributes().next().is_some() {
@@ -5261,6 +5272,7 @@ fn ext_list_contains_only_owner_ranges(
 ) -> Result<bool> {
     let bytes = ext_list.slice(source)?;
     let mut reader = Reader::from_reader(bytes);
+    let origin = ReaderOrigin::of(bytes);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -5271,11 +5283,15 @@ fn ext_list_contains_only_owner_ranges(
         .map_err(|source| allocation("SVG lifecycle extension children", source))?;
     let mut buffer = Vec::new();
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("SVG owner XML offset exceeds usize"))?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(|error| invalid(error.to_string()))?;
-        let end = reader.buffer_position() as usize;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("SVG owner XML offset exceeds usize"))?;
         match event {
             Event::Start(element) => {
                 if depth == 0 && element.attributes().next().is_some() {

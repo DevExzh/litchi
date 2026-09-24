@@ -2,6 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
@@ -977,12 +978,14 @@ fn rewrite_integration_refs(
 ) -> Result<Vec<u8>> {
     let (core, rel) = root_namespaces(xml)?;
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut target: Option<(usize, usize)> = None;
     let mut open: Option<(usize, usize)> = None;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("XML offset overflow"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XML offset overflow"))?;
         let event = reader
             .read_event()
             .map_err(|e| invalid(e.to_string()))?
@@ -1016,8 +1019,9 @@ fn rewrite_integration_refs(
                 if target.is_some() || open.is_some() {
                     return Err(invalid("duplicate integration extension"));
                 }
-                let end = usize::try_from(reader.buffer_position())
-                    .map_err(|_source| invalid("XML offset overflow"))?;
+                let end = origin
+                    .offset(reader.buffer_position())
+                    .ok_or_else(|| invalid("XML offset overflow"))?;
                 target = Some((start, end));
             },
             Event::End(_) => {
@@ -1029,8 +1033,9 @@ fn rewrite_integration_refs(
                     let (begin, _) = open
                         .take()
                         .unwrap_or_else(|| crate::error::panic_missing_invariant("checked"));
-                    let end = usize::try_from(reader.buffer_position())
-                        .map_err(|_source| invalid("XML offset overflow"))?;
+                    let end = origin
+                        .offset(reader.buffer_position())
+                        .ok_or_else(|| invalid("XML offset overflow"))?;
                     target = Some((begin, end));
                 }
             },

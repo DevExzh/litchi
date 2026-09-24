@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_sheet::Row;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -163,20 +164,23 @@ fn row_tags(xml: &[u8]) -> Result<Vec<RowTag>> {
         ));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut tags = Vec::new();
     let mut previous_row = 0u32;
     let mut inside_sheet_data = false;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("row-visibility XML position does not fit usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("row-visibility XML position does not fit usize"))?;
         let event = reader
             .read_event()
             .map_err(|error| invalid(format!("row-visibility XML scan failed: {error}")))?
             .into_owned();
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("row-visibility XML position does not fit usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("row-visibility XML position does not fit usize"))?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {

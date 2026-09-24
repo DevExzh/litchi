@@ -24,6 +24,7 @@
 //! renderers.
 
 use crate::error::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml::{
     OMML_NAMESPACE_URI, decode_xml_reference, extract_omml_formulas, is_omml_name,
@@ -263,13 +264,15 @@ fn validate_fragment(xml: &str, expected_root: OfficeMathRoot) -> Result<RootRan
     }
 
     let mut reader = NsReader::from_reader(xml.as_bytes());
+    let origin = ReaderOrigin::of(xml.as_bytes());
     let mut root = None;
     let mut depth = 0usize;
     let mut root_complete = false;
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_source_error| invalid("Office Math XML offset does not fit usize"))?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Office Math XML offset does not fit usize"))?;
         let event = {
             let decoder = reader.decoder();
             let (namespace, event) = reader
@@ -312,8 +315,9 @@ fn validate_fragment(xml: &str, expected_root: OfficeMathRoot) -> Result<RootRan
                 Event::Eof => FragmentEvent::Eof,
             }
         };
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_source_error| invalid("Office Math XML offset does not fit usize"))?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Office Math XML offset does not fit usize"))?;
 
         match event {
             FragmentEvent::Start {

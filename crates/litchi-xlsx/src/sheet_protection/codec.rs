@@ -4,6 +4,7 @@ use std::ops::Range;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -1096,6 +1097,7 @@ fn apply_xml_edits(xml: &[u8], mut edits: Vec<(Range<usize>, Vec<u8>)>) -> Resul
 
 fn scan_protection_xml(xml: &[u8]) -> Result<ProtectionXmlScan> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     let mut previous = 0usize;
@@ -1114,8 +1116,9 @@ fn scan_protection_xml(xml: &[u8]) -> Result<ProtectionXmlScan> {
     loop {
         let start = previous;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("worksheet-protection XML offset exceeds platform size"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("worksheet-protection XML offset exceeds platform size"))?;
         previous = end;
         let decoder = reader.decoder();
         let resolver = reader.resolver().clone();

@@ -4,6 +4,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use litchi_cfb::{OleFile, OleWriter};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
 
@@ -295,6 +296,7 @@ fn property_attribute_spans(
     limits: &Limits,
 ) -> Result<(Option<Range<usize>>, Vec<Range<usize>>)> {
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -302,14 +304,16 @@ fn property_attribute_spans(
     let mut schema_references = Vec::new();
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_conversion_error| limit("Properties XML source offset overflows usize"))?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| limit("Properties XML source offset overflows usize"))?;
         buffer.clear();
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(|error| super::model::xml_error(error.to_string()))?;
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_conversion_error| limit("Properties XML source offset overflows usize"))?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| limit("Properties XML source offset overflows usize"))?;
         match event {
             Event::Start(element) => {
                 let local_name = element.local_name();

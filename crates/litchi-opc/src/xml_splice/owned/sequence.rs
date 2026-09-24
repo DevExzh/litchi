@@ -1,7 +1,10 @@
 //! Same-parent sequence publication without transplanting inherited context.
 
-use super::{MAX_EDITS, MAX_OWNED_XML_BYTES, OwnedXmlPart, invalid_source, validate_source_xml};
+use super::{
+    MAX_EDITS, MAX_OWNED_XML_BYTES, OwnedXmlPart, invalid_source, owned_offset, validate_source_xml,
+};
 use crate::{OpcError, ReadLimits, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::{events::Event, reader::NsReader};
 use std::{fmt, ops::Range, sync::Arc};
 
@@ -65,6 +68,7 @@ impl OwnedXmlPart {
                 source,
             })?;
         let mut reader = NsReader::from_reader(self.bytes.as_slice());
+        let origin = ReaderOrigin::of(self.bytes.as_slice());
         let mut depth = 0usize;
         let mut parent_depth = None;
         let mut parent_name = None;
@@ -73,11 +77,11 @@ impl OwnedXmlPart {
         let mut active_child: Option<(usize, usize)> = None;
         let mut next = 0usize;
         loop {
-            let start = reader.buffer_position() as usize;
+            let start = owned_offset(&reader, origin)?;
             let event = reader
                 .read_event()
                 .map_err(|error| invalid_source(error.to_string()))?;
-            let end = reader.buffer_position() as usize;
+            let end = owned_offset(&reader, origin)?;
             let paired = matches!(&event, Event::Start(_));
             match event {
                 Event::Start(element) | Event::Empty(element) => {

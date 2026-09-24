@@ -20,6 +20,7 @@ use crate::namespace::{
 };
 use crate::paragraph::{Paragraph, extract_word_text};
 use crate::table::Table;
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource, SourceVersion};
 use litchi_opc::part::Part;
 use quick_xml::events::Event;
@@ -630,6 +631,9 @@ pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32, Name
     const MAX_NODES: usize = 1_000_000;
 
     let mut reader = NsReader::from_reader(xml);
+    // Ranges are byte offsets into `xml`, whose leading byte-order mark
+    // precedes reader position zero.
+    let origin = ReaderOrigin::of(xml);
     let mut ranges = Vec::new();
     let mut namespace_capture = NamespaceCapture::default();
     let mut body_depth = None;
@@ -640,14 +644,14 @@ pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32, Name
     let mut root_closed = false;
 
     loop {
-        let start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+        let start = origin.offset(reader.buffer_position()).ok_or_else(|| {
             crate::Error::InvalidFormat("document XML offset does not fit usize".into())
         })?;
         let event = reader
             .read_event()
             .map_err(|error| crate::Error::Xml(error.to_string()))?;
         let (namespace, event) = reader.resolver().resolve_event(event);
-        let end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+        let end = origin.offset(reader.buffer_position()).ok_or_else(|| {
             crate::Error::InvalidFormat("document XML offset does not fit usize".into())
         })?;
 

@@ -2,6 +2,7 @@
 
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -60,6 +61,7 @@ struct Layout {
 
 fn scan(xml: &[u8], selected: &[u8], successors: &[&[u8]], context: &str) -> Result<Layout> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -70,9 +72,9 @@ fn scan(xml: &[u8], selected: &[u8], successors: &[&[u8]], context: &str) -> Res
     let mut root_close = None;
     let mut alternate_content = false;
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -165,9 +167,10 @@ fn scan(xml: &[u8], selected: &[u8], successors: &[&[u8]], context: &str) -> Res
     })
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source| invalid("worksheet XML position does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("worksheet XML position does not fit usize"))
 }
 
 fn sml(namespace: &ResolveResult<'_>) -> bool {

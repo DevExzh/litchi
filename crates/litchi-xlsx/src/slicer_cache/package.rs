@@ -9,6 +9,7 @@ use super::{
     Cache, Result, SLICER_CACHE_CONTENT_TYPE, SLICER_CACHE_RELATIONSHIP_TYPE, invalid, parse,
     validate, write,
 };
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -355,13 +356,15 @@ fn rewrite_or_insert(
 ) -> Result<Vec<u8>> {
     let (core, rel) = root_namespaces(xml)?;
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let decoder = reader.decoder();
     let mut depth = 0usize;
     let mut start = None;
     let mut end = None;
     loop {
-        let offset = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("Slicer Cache XML offset overflow"))?;
+        let offset = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Slicer Cache XML offset overflow"))?;
         let event = reader
             .read_resolved_event()
             .map_err(|error| invalid(format!("Slicer Cache integration XML: {error}")))?;
@@ -390,8 +393,9 @@ fn rewrite_or_insert(
                 }
                 start = Some(offset);
                 end = Some(
-                    usize::try_from(reader.buffer_position())
-                        .map_err(|_source| invalid("Slicer Cache XML offset overflow"))?,
+                    origin
+                        .offset(reader.buffer_position())
+                        .ok_or_else(|| invalid("Slicer Cache XML offset overflow"))?,
                 );
             },
             Event::End(element) => {
@@ -405,8 +409,9 @@ fn rewrite_or_insert(
                     && element.local_name().as_ref() == b"ext"
                 {
                     end = Some(
-                        usize::try_from(reader.buffer_position())
-                            .map_err(|_source| invalid("Slicer Cache XML offset overflow"))?,
+                        origin
+                            .offset(reader.buffer_position())
+                            .ok_or_else(|| invalid("Slicer Cache XML offset overflow"))?,
                     );
                 }
             },

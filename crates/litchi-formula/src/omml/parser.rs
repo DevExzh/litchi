@@ -37,6 +37,11 @@ impl<'arena> OmmlParser<'arena> {
 
         let mut reader = Reader::from_str(xml);
         reader.config_mut().trim_text(true);
+        // The reader drops a leading byte-order mark before its first event
+        // without counting it; error positions are byte offsets into `xml`.
+        // (The rule is `litchi_core::xml::ReaderOrigin`'s; this crate does not
+        // depend on `litchi-core`.)
+        let origin = if xml.starts_with('\u{feff}') { 3 } else { 0 };
 
         // Use high-performance element stack with capacity hint and context pooling
         let mut stack = ElementStack::with_capacity(64);
@@ -84,7 +89,7 @@ impl<'arena> OmmlParser<'arena> {
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => {
-                    let position = reader.buffer_position();
+                    let position = reader.buffer_position().saturating_add(origin);
                     return Err(OmmlError::XmlError(format!(
                         "XML parsing error at position {}: {}",
                         position, e

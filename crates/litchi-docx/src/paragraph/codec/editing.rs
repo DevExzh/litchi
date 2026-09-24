@@ -13,6 +13,7 @@
 //! Lossless-ish typed editing of direct paragraph spacing.
 
 use crate::error::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::Event;
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -111,6 +112,7 @@ fn rewrite_spacing(xml_bytes: &[u8], spacing: Option<ParagraphSpacing>) -> Resul
 
 fn locate_layout(xml_bytes: &[u8]) -> Result<Layout> {
     let mut reader = NsReader::from_reader(xml_bytes);
+    let origin = ReaderOrigin::of(xml_bytes);
     let mut layout = Layout::default();
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
     let mut depth = 0usize;
@@ -120,7 +122,7 @@ fn locate_layout(xml_bytes: &[u8]) -> Result<Layout> {
     let mut spacing_start = None;
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+        let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
             Error::InvalidFormat("paragraph XML offset does not fit usize".into())
         })?;
         let event = reader
@@ -129,7 +131,7 @@ fn locate_layout(xml_bytes: &[u8]) -> Result<Layout> {
             .into_owned();
         let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(event);
-        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+        let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
             Error::InvalidFormat("paragraph XML offset does not fit usize".into())
         })?;
 

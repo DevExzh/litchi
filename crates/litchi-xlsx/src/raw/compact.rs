@@ -1,5 +1,6 @@
 //! Compact publication form for changed SpreadsheetML XML parts.
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::Writer;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::reader::NsReader;
@@ -11,8 +12,11 @@ use crate::error::{Error, Result, allocation};
 /// Re-emit changed XML without declaration/root or inter-element formatting.
 ///
 /// Semantic text, entity events, and every `xml:space="preserve"` subtree are
-/// retained. Callers must compare with the exact source before invoking this
-/// function so unchanged producer XML keeps its OPC source provenance.
+/// retained. A leading UTF-8 byte-order mark, which the reader consumes before
+/// its first event, is carried to the output unchanged: it is a byte the
+/// producer wrote, not formatting. Callers must compare with the exact source
+/// before invoking this function so unchanged producer XML keeps its OPC
+/// source provenance.
 pub(crate) fn changed(input: &[u8], resource: &'static str) -> Result<Vec<u8>> {
     changed_observed(input, resource, &mut Unobserved).map(|(bytes, _admitted)| bytes)
 }
@@ -134,6 +138,9 @@ fn changed_observed(
     bytes
         .try_reserve_exact(input.len())
         .map_err(|source| allocation(resource, source))?;
+    // The reader drops a leading byte-order mark before its first event;
+    // carry it so the compacted part keeps the producer's mark.
+    bytes.extend_from_slice(&input[..ReaderOrigin::of(input).skipped()]);
     let mut writer = Writer::new(bytes);
     let mut preserve = Vec::new();
     let mut admitted = false;
@@ -156,7 +163,7 @@ fn changed_observed(
                 let mut tail = NsReader::from_reader(spliced.as_slice());
                 tail.config_mut().trim_text(false);
                 tail.config_mut().check_end_names = true;
-                lane::skip_to(&mut tail, entry.position)?;
+                lane::skip_to(&mut tail, &spliced, entry.position)?;
                 if compact_events(&mut tail, &mut writer, &mut preserve, observer, None)?.is_some()
                 {
                     return Err(invalid("compact lane resumed at a second entry"));
@@ -1023,15 +1030,29 @@ mod tests {
     }
 
     #[test]
-    fn lane_compaction_keeps_the_reader_for_byte_order_marked_worksheets() {
+    fn lane_compaction_carries_the_byte_order_mark_of_marked_worksheets() {
         use crate::raw::worksheet::lane::corpus::{Lcg, generated_body, worksheet};
         let mut random = Lcg(0xB0D);
         for _ in 0..50 {
-            let document = format!("\u{feff}{}", worksheet(&generated_body(&mut random, false)));
-            assert!(!assert_lane_parity(document.as_bytes()), "{document}");
+            let plain = worksheet(&generated_body(&mut random, false));
+            let document = format!("\u{feff}{plain}");
+            assert!(assert_lane_parity(document.as_bytes()), "{document}");
             let compacted = changed_worksheet(document.as_bytes(), "test XML").expect("compact");
-            assert!(!compacted.body_admitted());
+            assert!(compacted.body_admitted());
+            // The marked output is the unmarked output behind the mark.
+            let unmarked = changed_worksheet(plain.as_bytes(), "test XML").expect("compact");
+            assert_eq!(compacted.bytes().get(..3), Some(&b"\xEF\xBB\xBF"[..]));
+            assert_eq!(&compacted.bytes()[3..], unmarked.bytes(), "{document}");
+            assert_eq!(
+                changed(document.as_bytes(), "test XML").expect("compact"),
+                compacted.bytes()
+            );
         }
+        // A second mark is character data outside the root; compaction keeps
+        // refusing or emitting it exactly as the reader reports it, after the
+        // carried first mark.
+        let doubled = format!("\u{feff}\u{feff}{}", worksheet("<row r=\"1\"/>"));
+        let _ = assert_lane_parity(doubled.as_bytes());
     }
 
     #[test]

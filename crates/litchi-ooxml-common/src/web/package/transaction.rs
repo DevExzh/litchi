@@ -5,6 +5,7 @@ use super::super::{
     TASK_PANES_RELATIONSHIP, VecDeque, WEB_EXTENSION_NAMESPACE,
 };
 use super::{PlannedPart, PlannedRelationship, fold_part_name, folded_name_conflicts};
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::{
     BlobPart, OpcError, OwnedContentTypes, OwnedRelationships, OwnedXmlPart, TargetMode,
 };
@@ -598,15 +599,19 @@ fn read_proven_source_event(
     reader: &mut NsReader<&[u8]>,
     bytes: &[u8],
 ) -> Result<(usize, usize, ProvenSourceEvent)> {
-    let start =
-        usize::try_from(reader.buffer_position()).map_err(|error| Error::Xml(error.to_string()))?;
+    // `bytes` is the reader's input; event ranges are byte offsets into it.
+    let origin = ReaderOrigin::of(bytes);
+    let start = origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::Xml("source XML event offset exceeds usize".into()))?;
     let event = reader
         .read_event()
         .map_err(|error| Error::Xml(error.to_string()))?;
     let resolver = reader.resolver().clone();
     let (namespace, event) = resolver.resolve_event(event);
-    let end =
-        usize::try_from(reader.buffer_position()).map_err(|error| Error::Xml(error.to_string()))?;
+    let end = origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::Xml("source XML event offset exceeds usize".into()))?;
     if end < start || end > bytes.len() {
         return Err(Error::Xml("source XML event range is invalid".into()));
     }

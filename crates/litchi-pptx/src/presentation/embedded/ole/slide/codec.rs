@@ -5,6 +5,7 @@ use crate::presentation::embedded::{
     increment_nodes, invalid, limit,
 };
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
@@ -78,19 +79,20 @@ pub(crate) fn locate(source: &[u8]) -> Result<Document> {
 
 fn parse(source: &[u8]) -> Result<Node> {
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);
     let mut stack = Vec::new();
     let mut root = None;
     let mut nodes = 0usize;
     let mut root_seen = false;
     loop {
-        let before = position(&reader)?;
+        let before = position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let after = position(&reader)?;
+        let after = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -150,9 +152,10 @@ fn parse(source: &[u8]) -> Result<Node> {
     Ok(root)
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| invalid("OLE slide XML offset overflow"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("OLE slide XML offset overflow"))
 }
 
 fn make_node(

@@ -174,6 +174,10 @@ pub(crate) fn is_mce_name(
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == MCE)
 }
 
+/// The reader's position, which excludes a leading byte-order mark of its
+/// input; the scanner's `shift` adds that mark's [`ReaderOrigin`] length.
+///
+/// [`ReaderOrigin`]: litchi_core::xml::ReaderOrigin
 pub(crate) fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
         .map_err(|_source| invalid("worksheet XML position does not fit usize"))

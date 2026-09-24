@@ -9,6 +9,7 @@ use crate::hyperlink::Hyperlink;
 use crate::image::InlineImage;
 use crate::namespace::NamespaceBindings;
 use crate::run_effects::Effects;
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::{VerticalPosition, XmlSlice};
 use litchi_opc::{PartData, SourceXmlPart};
 use quick_xml::name::NamespaceResolver;
@@ -203,14 +204,17 @@ impl XmlRef {
             // before resolving the selected element, so a sibling's local
             // declaration cannot leak into this fragment.
             let mut owner_reader = NsReader::from_reader(full);
+            let origin = ReaderOrigin::of(full);
             loop {
                 if let Some(admission) = admission.as_ref() {
                     admission.check()?;
                 }
                 let event_start =
-                    usize::try_from(owner_reader.buffer_position()).map_err(|_| {
-                        Error::InvalidFormat("Word XML namespace offset exceeds usize".into())
-                    })?;
+                    origin
+                        .offset(owner_reader.buffer_position())
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("Word XML namespace offset exceeds usize".into())
+                        })?;
                 if event_start > start {
                     return Err(Error::InvalidFormat(
                         "Word XML namespace range starts inside an event".into(),
@@ -219,9 +223,11 @@ impl XmlRef {
                 let _event = owner_reader
                     .read_event()
                     .map_err(|error| Error::Xml(error.to_string()))?;
-                let event_end = usize::try_from(owner_reader.buffer_position()).map_err(|_| {
-                    Error::InvalidFormat("Word XML namespace offset exceeds usize".into())
-                })?;
+                let event_end = origin
+                    .offset(owner_reader.buffer_position())
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("Word XML namespace offset exceeds usize".into())
+                    })?;
                 if event_end > full.len() {
                     return Err(Error::InvalidFormat(
                         "Word XML namespace scan ended outside its owner".into(),

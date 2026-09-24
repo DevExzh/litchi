@@ -5,6 +5,7 @@
 //! and any extension content are preserved verbatim as inert XML; nothing is
 //! rendered.
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::{
     events::Event,
     name::{Namespace, ResolveResult},
@@ -192,6 +193,9 @@ impl Theme {
     /// Parse a theme part.
     pub fn parse(xml: &str) -> SheetResult<Self> {
         let mut reader = NsReader::from_str(xml);
+        // `format_scheme_xml` is sliced from `xml` at reader positions, which
+        // exclude a leading byte-order mark.
+        let origin = ReaderOrigin::of(xml.as_bytes());
         let mut buffer = Vec::new();
         let mut name = None;
         let mut color_scheme_name = String::new();
@@ -206,16 +210,18 @@ impl Theme {
 
         loop {
             let decoder = reader.decoder();
-            let event_start = usize::try_from(reader.buffer_position())
-                .map_err(|_source| invalid("theme XML offset exceeds platform size"))?;
+            let event_start = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| invalid("theme XML offset exceeds platform size"))?;
             let (namespace, event) = reader
                 .read_resolved_event_into(&mut buffer)
                 .map_err(|error| invalid(format!("theme XML error: {error}")))?;
             let drawingml =
                 matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == DRAWINGML);
             let event = event.into_owned();
-            let event_end = usize::try_from(reader.buffer_position())
-                .map_err(|_source| invalid("theme XML offset exceeds platform size"))?;
+            let event_end = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| invalid("theme XML offset exceeds platform size"))?;
             match event {
                 Event::Start(element) => {
                     let local_name = element.local_name();

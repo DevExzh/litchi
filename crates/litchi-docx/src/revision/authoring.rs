@@ -29,6 +29,7 @@ use std::{
     },
 };
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::{
     XmlVersion,
     events::Event,
@@ -1018,6 +1019,7 @@ struct OpenRange {
 
 fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);
     let mut frames = Vec::<Frame>::new();
     frames
@@ -1040,12 +1042,12 @@ fn parse(source: &[u8], limits: Limits) -> Result<Vec<Group>> {
     let mut saw_custom_xml_range = false;
 
     loop {
-        let begin = position(&reader)?;
+        let begin = position(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         if !matches!(event, Event::Eof) {
             events = events
                 .checked_add(1)
@@ -3093,9 +3095,10 @@ fn is_word_namespace(namespace: &ResolveResult<'_>) -> bool {
     namespace_kind(namespace) == NamespaceKind::Word
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("tracked revision XML offset does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("tracked revision XML offset does not fit usize"))
 }
 
 fn limit_error(resource: &'static str, actual: usize, maximum: usize) -> Error {

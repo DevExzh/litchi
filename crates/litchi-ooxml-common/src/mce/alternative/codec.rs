@@ -2,6 +2,7 @@
 
 use std::{io::BufRead, sync::Arc};
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
@@ -29,6 +30,7 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Alternatives, Error> {
     }
 
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut frames = Vec::new();
     let mut branches = Vec::new();
@@ -37,12 +39,12 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Alternatives, Error> {
     let mut nodes = 0usize;
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
         let namespace = NamespaceKind::from(namespace);
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
 
         if matches!(event, Event::Eof) {
             break;
@@ -409,12 +411,12 @@ fn is_xml_whitespace(text: &quick_xml::events::BytesText<'_>) -> Result<bool, Er
         .all(|character| matches!(character, ' ' | '\t' | '\r' | '\n')))
 }
 
-fn position<R: BufRead>(reader: &NsReader<R>) -> Result<usize, Error> {
-    usize::try_from(reader.buffer_position()).map_err(|error| {
-        invalid(format!(
-            "AlternateContent byte offset exceeds platform size: {error}"
-        ))
-    })
+/// The byte offset in the reader's input of its current position; `origin`
+/// is that input's [`ReaderOrigin`].
+fn position<R: BufRead>(reader: &NsReader<R>, origin: ReaderOrigin) -> Result<usize, Error> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("AlternateContent byte offset exceeds platform size"))
 }
 
 fn charge(current: &mut usize, max: usize, resource: &'static str) -> Result<(), Error> {

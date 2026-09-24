@@ -2,6 +2,7 @@
 
 use std::{fmt, io::Write, sync::Arc};
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml_name::is_qualified_name;
 use quick_xml::{
@@ -255,6 +256,7 @@ pub(crate) fn validate_general_ref(reference: &BytesRef<'_>) -> Result<Option<ch
 
 fn scan(xml: &[u8]) -> Result<Parsed> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
@@ -275,7 +277,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
     let mut pre_root_event_seen = false;
 
     loop {
-        let event_start = position(&reader, "theme family")?;
+        let event_start = position(&reader, origin, "theme family")?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(xml_error)?
@@ -292,7 +294,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
             _ => ResolveResult::Unbound,
         };
         let event_namespace = resolved_namespace(&resolved)?;
-        let event_end = position(&reader, "theme family")?;
+        let event_end = position(&reader, origin, "theme family")?;
         if !root_seen && !matches!(&event, Event::Decl(_) | Event::Eof) {
             pre_root_event_seen = true;
         }
@@ -1149,9 +1151,14 @@ fn escape_attribute(value: &str) -> String {
     output
 }
 
-fn position<R: std::io::BufRead>(reader: &NsReader<R>, what: &str) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid(format!("{what} offset exceeds usize")))
+fn position<R: std::io::BufRead>(
+    reader: &NsReader<R>,
+    origin: ReaderOrigin,
+    what: &str,
+) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid(format!("{what} offset exceeds usize")))
 }
 
 fn invalid(message: impl Into<String>) -> Error {

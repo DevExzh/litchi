@@ -6,6 +6,7 @@
 use super::model::{Data, Descriptor, Info, Kind, List, Namespace, Part};
 use crate::{Error, Result};
 use chrono::{DateTime, NaiveDateTime};
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::process_ooxml;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use quick_xml::encoding::Decoder;
@@ -250,6 +251,7 @@ fn parse_changes_information(xml: &[u8]) -> Result<Info> {
     }
     let bytes = selected.as_ref();
     let mut reader = NsReader::from_reader(bytes);
+    let origin = ReaderOrigin::of(bytes);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut stack = Vec::new();
@@ -268,7 +270,9 @@ fn parse_changes_information(xml: &[u8]) -> Result<Info> {
     let mut total_changes = 0usize;
 
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XML source position exceeds usize"))?;
         if let Some(slice) = pending.take() {
             let list = current_list
                 .as_mut()
@@ -590,7 +594,9 @@ fn parse_changes_information(xml: &[u8]) -> Result<Info> {
         buffer.clear();
     }
     if let Some(slice) = pending.take() {
-        let end = reader.buffer_position() as usize;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XML source position exceeds usize"))?;
         let list = current_list
             .as_mut()
             .ok_or_else(|| invalid("captured change XML outside docChgLst"))?;

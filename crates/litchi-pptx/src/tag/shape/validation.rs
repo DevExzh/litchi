@@ -3,6 +3,7 @@ use std::ops::Range;
 use super::codec::{MAX_OWNER_BYTES, MAX_OWNER_NODES, anchor_id, scan_layout, selected_raw_span};
 use crate::tag::pml;
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, OffsetLimits, active_offsets};
 use litchi_opc::Part as OpcPart;
 use quick_xml::events::{BytesStart, Event};
@@ -48,10 +49,11 @@ pub(super) fn validate_staged_anchor(
 
 pub(super) fn active_pml_offsets(xml: &[u8], span: &Range<usize>) -> Result<Vec<u32>> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut offsets = Vec::new();
     let mut nodes = 0usize;
     loop {
-        let start = xml_position(&reader)?;
+        let start = xml_position(&reader, origin)?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let profile = pml(&namespace);
         drop(namespace);
@@ -90,10 +92,11 @@ pub(super) fn preserved_anchor_uses(xml: &[u8], relationship_id: &str) -> Result
         });
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut nodes = 0usize;
     let mut uses = 0usize;
     loop {
-        let start = xml_position(&reader)?;
+        let start = xml_position(&reader, origin)?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let profile = pml(&namespace);
         drop(namespace);
@@ -108,7 +111,7 @@ pub(super) fn preserved_anchor_uses(xml: &[u8], relationship_id: &str) -> Result
                     &reader,
                     xml,
                     &element,
-                    start..xml_position(&reader)?,
+                    start..xml_position(&reader, origin)?,
                     profile,
                 )?;
                 if id == relationship_id {
@@ -191,9 +194,12 @@ pub(super) fn offset_u32(offset: usize) -> Result<u32> {
         .map_err(|_err| crate::tag::invalid("shape-tag XML offset does not fit u32"))
 }
 
-pub(super) fn xml_position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| crate::tag::invalid("shape-tag XML offset does not fit usize"))
+/// The byte offset in the reader's input of its current position; `origin`
+/// is that input's [`ReaderOrigin`].
+pub(super) fn xml_position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| crate::tag::invalid("shape-tag XML offset does not fit usize"))
 }
 
 pub(super) fn xml_error(error: impl std::fmt::Display) -> Error {

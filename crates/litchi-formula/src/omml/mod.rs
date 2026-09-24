@@ -51,6 +51,33 @@ mod tests {
     use super::*;
     use crate::ast::{AccentType, Fence, Formula, LargeOperator};
 
+    /// Change 0765: an error in a byte-order-marked input is reported at its
+    /// byte offset in the input, three bytes after the reader's position.
+    #[test]
+    fn a_marked_input_reports_errors_at_byte_offsets() {
+        let formula = Formula::new();
+        let parser = OmmlParser::new(formula.arena());
+        let plain = "<m:oMath><m:r></m:oMath>";
+        let marked = format!("\u{feff}{plain}");
+        let position = |xml: &str| match parser.parse(xml) {
+            Err(error) => {
+                let text = error.to_string();
+                let start = text.find("position ").expect("position") + "position ".len();
+                let digits: String = text[start..]
+                    .chars()
+                    .take_while(char::is_ascii_digit)
+                    .collect();
+                digits.parse::<usize>().expect("offset")
+            },
+            Ok(_) => panic!("mismatched end tag must fail"),
+        };
+        assert_eq!(position(&marked), position(plain) + 3);
+        let marked_nodes = parser
+            .parse("\u{feff}<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>")
+            .expect("a marked valid input parses");
+        assert_eq!(marked_nodes.len(), 1);
+    }
+
     #[test]
     fn test_parse_simple_text() {
         let formula = Formula::new();
