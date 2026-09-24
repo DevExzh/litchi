@@ -488,8 +488,12 @@ fn ensure_word_font_settings(
         (document_uri, target, relationship.is_some())
     };
 
-    let original = match package.get_part(&target) {
-        Ok(part) if exists => {
+    // Presence comes from metadata alone (ADR 0030): only an owned settings
+    // part is decoded, and its decode failure is reported as one rather than
+    // as a missing part or as room for a new one.
+    let original = match (package.part_metadata(&target).is_some(), exists) {
+        (true, true) => {
+            let part = package.get_part(&target)?;
             if part.content_type() != ct::WML_SETTINGS {
                 return Err(Error::InvalidFormat(format!(
                     "settings part has content type {:?}, expected {:?}",
@@ -500,15 +504,15 @@ fn ensure_word_font_settings(
             DocumentSettings::extract_from_part(part)?;
             part.blob().to_vec()
         },
-        Ok(_) => {
+        (true, false) => {
             return Err(Error::InvalidFormat(format!(
                 "unowned settings part collision at '{target}'"
             )));
         },
-        Err(_) if exists => {
+        (false, true) => {
             return Err(Error::PartNotFound(format!("settings part {target}")));
         },
-        Err(_) => {
+        (false, false) => {
             let word = match conformance {
                 font::Conformance::Transitional => TRANSITIONAL_WORD,
                 font::Conformance::Strict => STRICT_WORD,
@@ -864,5 +868,111 @@ impl Package {
     pub fn custom_props_mut(&mut self) -> &mut CustomProps {
         self.custom_props_dirty = true;
         &mut self.custom_props
+    }
+}
+
+#[cfg(all(test, feature = "automatic-fonts"))]
+mod font_settings_tests {
+    use soapberry_zip::office::StreamingArchiveWriter;
+
+    use super::*;
+
+    const SETTINGS_PAYLOAD: &[u8] =
+        br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#;
+
+    /// A lazily opened package with a stored `/word/settings.xml`, owned by a
+    /// settings relationship or not, and optionally corrupted so that only a
+    /// decode of its payload fails (ADR 0030).
+    fn package(settings: Option<(bool, bool)>) -> OpcPackage {
+        let content_types = format!(
+            r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="{}"/><Override PartName="/word/settings.xml" ContentType="{}"/></Types>"#,
+            ct::WML_DOCUMENT_MAIN,
+            ct::WML_SETTINGS
+        );
+        let owned = settings.is_some_and(|(owned, _)| owned);
+        let document_relationships = if owned {
+            r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/></Relationships>"#
+        } else {
+            r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#
+        };
+        let mut writer = StreamingArchiveWriter::new();
+        for (name, payload) in [
+            ("[Content_Types].xml", content_types.as_bytes()),
+            (
+                "_rels/.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+            ),
+            (
+                "word/document.xml",
+                br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#,
+            ),
+            ("word/_rels/document.xml.rels", document_relationships.as_bytes()),
+        ] {
+            writer.write_stored(name, payload).expect("archive member");
+        }
+        if settings.is_some() {
+            writer
+                .write_stored("word/settings.xml", SETTINGS_PAYLOAD)
+                .expect("settings");
+        }
+        let mut bytes = writer.finish_to_bytes().expect("archive");
+        if settings.is_some_and(|(_, corrupt)| corrupt) {
+            let offset = bytes
+                .windows(SETTINGS_PAYLOAD.len())
+                .position(|window| window == SETTINGS_PAYLOAD)
+                .expect("stored settings payload");
+            bytes[offset] ^= 1;
+        }
+        OpcPackage::from_vec(bytes).expect("deferred open")
+    }
+
+    // Found after the 0759 review: every settings lookup error read as
+    // absence, so a present settings part that failed to decode was reported
+    // as missing, or was taken for no settings part at all.
+    #[test]
+    fn font_settings_tell_absent_settings_from_undecodable_ones() {
+        let settings = PackURI::new("/word/settings.xml").expect("settings name");
+        let transitional = font::Conformance::Transitional;
+
+        // An unowned settings part is a collision whether or not it decodes,
+        // and the collision is found without decoding it.
+        for corrupt in [false, true] {
+            let mut unowned = package(Some((false, corrupt)));
+            let result = ensure_word_font_settings(&mut unowned, transitional, false);
+            assert!(
+                matches!(
+                    &result,
+                    Err(Error::InvalidFormat(message))
+                        if message.contains("unowned settings part collision")
+                ),
+                "corrupt = {corrupt}: {result:?}"
+            );
+            assert!(
+                !unowned
+                    .part_metadata(&settings)
+                    .expect("settings stays present")
+                    .payload_is_decoded()
+            );
+        }
+
+        // An owned settings part that fails to decode reports the decode
+        // failure, not a missing part.
+        let mut owned = package(Some((true, true)));
+        let result = ensure_word_font_settings(&mut owned, transitional, false);
+        assert!(
+            matches!(&result, Err(Error::Opc(litchi_opc::OpcError::ZipError(_)))),
+            "{result:?}"
+        );
+
+        // Only a truly absent settings part is created.
+        let mut absent = package(None);
+        assert!(ensure_word_font_settings(&mut absent, transitional, false).expect("created"));
+        assert_eq!(
+            absent
+                .get_part(&settings)
+                .expect("created settings")
+                .content_type(),
+            ct::WML_SETTINGS
+        );
     }
 }
