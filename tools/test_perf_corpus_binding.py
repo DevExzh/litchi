@@ -239,7 +239,7 @@ class PerfCorpusBindingTests(unittest.TestCase):
         )
 
         self.assertEqual(validate_binding(report, catalog), (len(catalog["corpora"]), 2))
-        self.assertEqual(len(catalog["corpora"]), 31)
+        self.assertEqual(len(catalog["corpora"]), 43)
 
     def test_duplicate_cache_dimension_binding_is_rejected(self) -> None:
         catalog = copy.deepcopy(self.catalog)
