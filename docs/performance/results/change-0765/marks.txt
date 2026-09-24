@@ -48,3 +48,9 @@ library regenerates from a model.
 - source_backed_cell_edits_of_marked_parts_match_unmarked_edits (indented=true): dropped []
 - source_backed_cell_edits_of_marked_parts_match_unmarked_edits (indented=false): dropped []
 
+# Added after the independent review (routes that regenerate a part from the
+# model and therefore drop its mark; none is a preserved part):
+# - put_shape_tags adding a tag part: [Content_Types].xml and the slide's rels (28 decks)
+# - XLSX eager cell edits removing calcChain: [Content_Types].xml and xl/_rels/workbook.xml.rels (45 workbooks)
+# - DOCX settings edits: settings rels, document rels and [Content_Types].xml
+# - signed-deck edits: _rels/.rels when the signature is stripped
