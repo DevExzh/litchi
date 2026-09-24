@@ -1,11 +1,13 @@
 //! Checked CFB storage paths for the inert object owner.
 //!
 //! `[MS-CFB]` identifies directory entries by their UTF-16 name length and a
-//! Unicode simple-uppercase comparison.  Keeping that rule beside target
-//! selection prevents invalid names and case-equivalent paths from reaching
-//! the package editor, while leaving the stored directory spelling untouched.
+//! simple-uppercase comparison of UTF-16 code points (2.6.4). Every
+//! comparison here uses `litchi-cfb`'s [`DirectoryNameKey`], so target
+//! selection agrees with the directory tree about which names are one entry.
+//! That keeps invalid names and case-equivalent paths from reaching the
+//! package editor, and leaves the stored directory spelling untouched.
 
-use litchi_cfb::{OleError, OleFile};
+use litchi_cfb::{DirectoryNameKey, OleError, OleFile};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::{Read, Seek};
@@ -105,56 +107,6 @@ impl CfbPath {
     }
 }
 
-/// Returns the `[MS-CFB]` 2.6.4 simple uppercase mapping of one scalar.
-///
-/// No ASCII scalar has a multi-character uppercase mapping, and its
-/// single-character mapping is the ASCII one, so the ASCII branch returns
-/// exactly what the general path returns while avoiding the Unicode
-/// case-mapping iterator. CFB path components are ASCII in practice.
-fn simple_uppercase(character: char) -> char {
-    if character.is_ascii() {
-        return character.to_ascii_uppercase();
-    }
-    let mut uppercase = character.to_uppercase();
-    let first = uppercase.next().unwrap_or(character);
-    if uppercase.next().is_some() {
-        // This is a multi-code-point mapping, not a simple mapping.
-        character
-    } else {
-        first
-    }
-}
-
-/// Iterates the Unicode simple-uppercase UTF-16 comparison units required by
-/// `[MS-CFB]` 2.6.4 without retaining a second copy of the component.
-struct UppercaseUnits<'a> {
-    input: std::str::Chars<'a>,
-    pending: [u16; 2],
-    pending_len: usize,
-    pending_index: usize,
-}
-
-impl Iterator for UppercaseUnits<'_> {
-    type Item = u16;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.pending_index < self.pending_len {
-            let value = self.pending[self.pending_index];
-            self.pending_index += 1;
-            return Some(value);
-        }
-
-        let character = self.input.next()?;
-        let simple = simple_uppercase(character);
-
-        self.pending = [0; 2];
-        let encoded = simple.encode_utf16(&mut self.pending);
-        self.pending_len = encoded.len();
-        self.pending_index = 1;
-        Some(self.pending[0])
-    }
-}
-
 fn validate_component(component: &str) -> Result<(), OleError> {
     if component.is_empty() {
         return Err(OleError::InvalidFormat(
@@ -199,30 +151,33 @@ pub(crate) fn same_path(left: &[String], right: &[String]) -> bool {
             .all(|(left, right)| same_component(left, right))
 }
 
+/// A hash consistent with [`same_path`]: equal paths hash equally.
 pub(crate) fn path_identity_hash(path: &[String]) -> u64 {
     let mut hash = DefaultHasher::new();
     path.len().hash(&mut hash);
     for component in path {
-        component.encode_utf16().count().hash(&mut hash);
-        for unit in uppercase_units(component) {
-            unit.hash(&mut hash);
+        match DirectoryNameKey::new(component) {
+            Ok(key) => {
+                true.hash(&mut hash);
+                key.hash(&mut hash);
+            },
+            // A name that cannot be a directory entry equals no name (see
+            // `same_component`), so any value keeps an index built on this
+            // hash sound; lookups confirm a match with `same_path`.
+            Err(_) => {
+                false.hash(&mut hash);
+                component.hash(&mut hash);
+            },
         }
     }
     hash.finish()
 }
 
+/// Whether two names are the same CFB directory entry, by the comparison
+/// `litchi-cfb` uses for its directory tree. A stored name that cannot be a
+/// directory entry equals no name; every requested name is validated first.
 fn same_component(left: &str, right: &str) -> bool {
-    left.encode_utf16().count() == right.encode_utf16().count()
-        && uppercase_units(left).eq(uppercase_units(right))
-}
-
-fn uppercase_units(value: &str) -> UppercaseUnits<'_> {
-    UppercaseUnits {
-        input: value.chars(),
-        pending: [0; 2],
-        pending_len: 0,
-        pending_index: 0,
-    }
+    litchi_cfb::directory_names_equal(left, right)
 }
 
 #[cfg(test)]
@@ -235,17 +190,40 @@ mod tests {
     use super::{CfbPath, path_identity_hash, same_component};
 
     #[test]
-    fn cfb_name_comparison_uses_simple_uppercase_without_expansion() {
+    fn cfb_name_comparison_is_litchi_cfbs_directory_comparison() {
         assert!(same_component("Pool", "pool"));
         assert!(same_component("Å", "å"));
         assert!(same_component("ſ", "S"));
-        assert!(same_component("𐐨", "𐐀"));
-        assert_eq!(
-            path_identity_hash(&["𐐨".to_string()]),
-            path_identity_hash(&["𐐀".to_string()])
-        );
         assert!(!same_component("ß", "SS"));
         assert!(!same_component("ß", "ẞ"));
+        // [MS-CFB] 2.6.4 compares UTF-16 code points and uppercases neither
+        // surrogate, so Deseret case pairs are distinct names. (The previous
+        // scalar-level fold treated them as one, disagreeing with the
+        // directory tree.)
+        assert!(!same_component("𐐨", "𐐀"));
+        // The iota-subscript letters have a one-code-point simple uppercase
+        // mapping although their full mapping expands.
+        assert!(same_component("\u{1F80}", "\u{1F88}"));
+        for (left, right) in [
+            ("Pool", "pool"),
+            ("𐐨", "𐐀"),
+            ("\u{1F80}", "\u{1F88}"),
+            ("ß", "ẞ"),
+        ] {
+            assert_eq!(
+                same_component(left, right),
+                litchi_cfb::directory_names_equal(left, right),
+                "{left:?} {right:?}"
+            );
+        }
+        assert_eq!(
+            path_identity_hash(&["Pool".to_string(), "\u{1F80}".to_string()]),
+            path_identity_hash(&["pool".to_string(), "\u{1F88}".to_string()])
+        );
+        // A stored name that cannot be a directory entry equals nothing, not
+        // even itself, and still hashes.
+        assert!(!same_component("bad/name", "bad/name"));
+        let _ = path_identity_hash(&["bad/name".to_string()]);
     }
 
     #[test]
@@ -262,56 +240,5 @@ mod tests {
         }
         assert!(CfbPath::new(vec!["😀".repeat(15)]).is_ok());
         assert!(CfbPath::new(vec!["😀".repeat(16)]).is_err());
-    }
-
-    fn unicode_simple_uppercase(character: char) -> char {
-        let mut uppercase = character.to_uppercase();
-        let first = uppercase.next().unwrap_or(character);
-        if uppercase.next().is_some() {
-            character
-        } else {
-            first
-        }
-    }
-
-    #[test]
-    fn uppercase_matches_unicode_mapping_for_every_char() {
-        // Exhaustive over the whole Unicode scalar range, so the ASCII branch
-        // is proven equal rather than sampled.
-        for scalar in 0..=u32::from(char::MAX) {
-            let Some(character) = char::from_u32(scalar) else {
-                continue;
-            };
-            assert_eq!(
-                super::simple_uppercase(character),
-                unicode_simple_uppercase(character),
-                "uppercase mapping diverges for U+{scalar:04X}"
-            );
-        }
-    }
-
-    #[test]
-    fn uppercase_units_match_the_unicode_mapping_for_representative_components() {
-        for component in [
-            "Workbook",
-            "WordDocument",
-            "PowerPoint Document",
-            "mixedCASE-123",
-            "\u{df}stra\u{df}e",
-            "\u{fb01}le",
-            "\u{130}stanbul",
-            "\u{1f600}",
-        ] {
-            let observed: Vec<u16> = super::uppercase_units(component).collect();
-            let expected: Vec<u16> = component
-                .chars()
-                .map(unicode_simple_uppercase)
-                .flat_map(|character| {
-                    let mut encoded = [0u16; 2];
-                    character.encode_utf16(&mut encoded).to_vec()
-                })
-                .collect();
-            assert_eq!(observed, expected, "units changed for {component:?}");
-        }
     }
 }

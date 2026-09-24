@@ -314,7 +314,13 @@ fn configured_capture_boundaries_remain_in_force_for_deletion() {
 }
 
 #[test]
-fn supplementary_plane_simple_uppercase_resolves_the_stored_stream_name() {
+fn supplementary_plane_case_pairs_are_distinct_stream_names() {
+    // [MS-CFB] 2.6.4 compares UTF-16 code points and uppercases neither
+    // surrogate of a supplementary scalar (see `litchi-cfb`'s
+    // `directory_name.rs`), so "𐐨" (U+10428) does not name the stored "𐐀"
+    // (U+10400). This test used to expect the opposite, from the scalar-level
+    // fold both crates shared before `litchi-cfb` adopted the code-point rule;
+    // the object owner now compares names with `litchi-cfb`'s key.
     let mut writer = OleWriter::new();
     writer.create_stream(&["𐐀"], b"deseret").unwrap();
     let mut output = Cursor::new(Vec::new());
@@ -322,8 +328,9 @@ fn supplementary_plane_simple_uppercase_resolves_the_stored_stream_name() {
     let source = output.into_inner();
 
     let mut editor = open(source);
+    assert_eq!(editor.remove_stream(&path(&["𐐨"])).unwrap(), None);
     assert_eq!(
-        editor.remove_stream(&path(&["𐐨"])).unwrap().as_deref(),
+        editor.remove_stream(&path(&["𐐀"])).unwrap().as_deref(),
         Some(&b"deseret"[..])
     );
     let output = editor.finish().unwrap();
