@@ -354,7 +354,9 @@ impl Package {
     }
 
     fn mail_merge_internal_targets(&self, snapshot: &SettingsPartSnapshot) -> Result<Vec<PackURI>> {
-        let Ok(part) = self.opc.get_part(&snapshot.target) else {
+        // Relationships are metadata: reading them never decodes the settings
+        // payload (ADR 0030), and only an absent settings part has no targets.
+        let Some(part) = self.opc.part_metadata(&snapshot.target) else {
             return Ok(Vec::new());
         };
         part.rels()
@@ -415,5 +417,100 @@ fn mail_merge_target_as_source(target: Target) -> Source {
                 extension,
             }
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use litchi_opc::OpcPackage;
+    use litchi_opc::constants::content_type as ct;
+    use soapberry_zip::office::StreamingArchiveWriter;
+
+    use super::*;
+
+    const SETTINGS_PAYLOAD: &[u8] =
+        br#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#;
+
+    /// A lazily opened package whose stored settings part owns one internal
+    /// mail-merge source relationship, optionally with the settings payload
+    /// corrupted so that only a decode of it fails (ADR 0030).
+    fn package(corrupt_settings: bool) -> Package {
+        let content_types = format!(
+            r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="{}"/><Override PartName="/word/settings.xml" ContentType="{}"/></Types>"#,
+            ct::WML_DOCUMENT_MAIN,
+            ct::WML_SETTINGS
+        );
+        let mut writer = StreamingArchiveWriter::new();
+        for (name, payload) in [
+            ("[Content_Types].xml", content_types.as_bytes()),
+            (
+                "_rels/.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+            ),
+            (
+                "word/document.xml",
+                br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#,
+            ),
+            (
+                "word/_rels/document.xml.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/></Relationships>"#,
+            ),
+            ("word/settings.xml", SETTINGS_PAYLOAD),
+            (
+                "word/_rels/settings.xml.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdMailMergeData1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/mailMergeSource" Target="mailMerge/data1.xml"/></Relationships>"#,
+            ),
+            ("word/mailMerge/data1.xml", b"<data/>"),
+        ] {
+            writer.write_stored(name, payload).expect("archive member");
+        }
+        let mut bytes = writer.finish_to_bytes().expect("archive");
+        if corrupt_settings {
+            let offset = bytes
+                .windows(SETTINGS_PAYLOAD.len())
+                .position(|window| window == SETTINGS_PAYLOAD)
+                .expect("stored settings payload");
+            bytes[offset] ^= 1;
+        }
+        Package::from_opc_package(OpcPackage::from_vec(bytes).expect("deferred open"))
+            .expect("the main document decodes")
+    }
+
+    // Review of the 0759 merge: the helper decoded the settings part only to
+    // read its relationships, and read a failed decode as "no targets".
+    #[test]
+    fn mail_merge_targets_are_read_from_metadata_without_decoding() {
+        let snapshot = SettingsPartSnapshot {
+            document_uri: PackURI::new("/word/document.xml").expect("document name"),
+            target: PackURI::new("/word/settings.xml").expect("settings name"),
+            relationship_exists: true,
+            content_type: ct::WML_SETTINGS.to_owned(),
+            xml: Vec::new(),
+            relationships: Vec::new(),
+        };
+        for corrupt_settings in [false, true] {
+            let package = package(corrupt_settings);
+            let decoded = package.opc.deferred_decode_counters();
+            assert_eq!(
+                package
+                    .mail_merge_internal_targets(&snapshot)
+                    .expect("targets"),
+                vec![PackURI::new("/word/mailMerge/data1.xml").expect("target name")],
+                "corrupt settings = {corrupt_settings}"
+            );
+            assert_eq!(package.opc.deferred_decode_counters(), decoded);
+        }
+
+        // Only an absent settings part has no targets.
+        let absent = SettingsPartSnapshot {
+            target: PackURI::new("/word/absent.xml").expect("absent name"),
+            ..snapshot
+        };
+        assert!(
+            package(false)
+                .mail_merge_internal_targets(&absent)
+                .expect("absent targets")
+                .is_empty()
+        );
     }
 }
