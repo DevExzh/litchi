@@ -28,6 +28,10 @@ name = "docx_replayable_tail_append"
 path = "src/bin/docx_replayable_tail_append.rs"
 
 [[bin]]
+name = "xml_attribute_bounds"
+path = "src/bin/xml_attribute_bounds.rs"
+
+[[bin]]
 name = "xlsb_crud"
 path = "src/bin/xlsb_crud.rs"
 required-features = ["xlsb-crud"]
