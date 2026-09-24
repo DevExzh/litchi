@@ -3729,6 +3729,9 @@ impl Edit {
     /// hyperlinks, and other structures whose ownership or dependency closure
     /// cannot be proven are refused before the edit changes state.
     ///
+    /// Like every operation other than direct paragraph text replacement, a
+    /// disposition is refused on a budget-managed transaction.
+    ///
     /// # Errors
     ///
     /// Returns a checked selector/refusal, resource-limit, or malformed XML
@@ -3738,6 +3741,57 @@ impl Edit {
         selector: RevisionSelector,
         action: RevisionAction,
     ) -> TransactionResult<&mut Self> {
+        self.apply_revision_as("apply_revision", selector, action)
+    }
+
+    /// Accept one direct inline tracked insertion or deletion.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same failures as [`Self::apply_revision`].
+    pub fn accept_revision(
+        &mut self,
+        paragraph: Position,
+        kind: RevisionKind,
+        revision: Position,
+    ) -> TransactionResult<&mut Self> {
+        self.apply_revision_as(
+            "accept_revision",
+            RevisionSelector::new(paragraph, kind, revision),
+            RevisionAction::Accept,
+        )
+    }
+
+    /// Reject one direct inline tracked insertion or deletion.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same failures as [`Self::apply_revision`].
+    pub fn reject_revision(
+        &mut self,
+        paragraph: Position,
+        kind: RevisionKind,
+        revision: Position,
+    ) -> TransactionResult<&mut Self> {
+        self.apply_revision_as(
+            "reject_revision",
+            RevisionSelector::new(paragraph, kind, revision),
+            RevisionAction::Reject,
+        )
+    }
+
+    /// Apply one revision disposition for the named public operation.
+    ///
+    /// The managed refusal comes first. A disposition rebuilds the projection
+    /// with [`Snapshot::from_xml`], which would drop a managed snapshot's
+    /// source identity and budget admission and publish uncharged bytes.
+    fn apply_revision_as(
+        &mut self,
+        operation: &'static str,
+        selector: RevisionSelector,
+        action: RevisionAction,
+    ) -> TransactionResult<&mut Self> {
+        self.ensure_unmanaged(operation)?;
         self.reserve_operation()?;
         let paragraph_range = self.range(selector.paragraph)?;
         let paragraph_start = checked_start(paragraph_range, "paragraph")?;
@@ -3783,32 +3837,6 @@ impl Edit {
         });
         self.projected = candidate;
         Ok(self)
-    }
-
-    /// Accept one direct inline tracked insertion or deletion.
-    pub fn accept_revision(
-        &mut self,
-        paragraph: Position,
-        kind: RevisionKind,
-        revision: Position,
-    ) -> TransactionResult<&mut Self> {
-        self.apply_revision(
-            RevisionSelector::new(paragraph, kind, revision),
-            RevisionAction::Accept,
-        )
-    }
-
-    /// Reject one direct inline tracked insertion or deletion.
-    pub fn reject_revision(
-        &mut self,
-        paragraph: Position,
-        kind: RevisionKind,
-        revision: Position,
-    ) -> TransactionResult<&mut Self> {
-        self.apply_revision(
-            RevisionSelector::new(paragraph, kind, revision),
-            RevisionAction::Reject,
-        )
     }
 
     /// Replace text inside one direct inline content control while retaining
@@ -4733,6 +4761,9 @@ impl Edit {
         before: &Arc<Vec<u8>>,
         after: &Arc<Vec<u8>>,
     ) -> TransactionResult<&mut Self> {
+        // Replay rebuilds the projection the same way as `apply_revision_as`,
+        // so it carries the same managed refusal.
+        self.ensure_unmanaged("apply_revision")?;
         self.reserve_operation()?;
         let range = self.range(selector.paragraph)?;
         let start = checked_start(range, "paragraph")?;
@@ -11452,6 +11483,70 @@ mod tests {
         ));
         assert_eq!(replay.projected().xml_bytes(), source.xml_bytes());
         assert!(replay.operations.is_empty());
+    }
+
+    #[test]
+    fn managed_revision_replay_is_refused_before_any_state_change() {
+        use litchi_core::{Budget, CancellationSource, ExecutionLimits, Limits, OwnedSource};
+        use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+        use litchi_opc::{BlobPart, OpcPackage, PackageWriter};
+
+        let xml = document(
+            "<w:p><w:ins w:id=\"1\" w:author=\"A\"><w:r><w:t>added</w:t></w:r></w:ins></w:p>",
+        );
+        // An ordinary unmanaged edit of the same bytes records the operation
+        // that the managed edit is then asked to replay.
+        let mut unmanaged = Snapshot::from_xml(xml.clone()).unwrap().edit();
+        unmanaged
+            .accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+            .unwrap();
+        let recorded = unmanaged.operations[0].clone();
+        assert!(matches!(recorded, Operation::ApplyRevision { .. }));
+
+        let mut opc = OpcPackage::new();
+        opc.try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/word/document.xml").unwrap(),
+            ct::WML_DOCUMENT_MAIN.to_owned(),
+            xml,
+        )))
+        .unwrap();
+        opc.relate_to("word/document.xml", rt::OFFICE_DOCUMENT);
+        let memory = 1 << 20;
+        let budget = Budget::root(
+            "docx-managed-revision-replay",
+            Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (_cancellation_source, cancellation) = CancellationSource::pair();
+        let limits = ExecutionLimits::new(
+            std::num::NonZeroUsize::MIN,
+            std::num::NonZeroUsize::MIN,
+            std::num::NonZeroU64::new(memory).unwrap(),
+            0,
+        )
+        .unwrap();
+        let package = crate::source_backed::Package::from_read_at_with_execution_context(
+            Arc::new(OwnedSource::new(PackageWriter::to_bytes(&opc).unwrap())),
+            crate::ReadLimits::default(),
+            ExecutionContext::new(budget.clone(), cancellation, limits),
+        )
+        .unwrap();
+        let mut managed = package.edit_document().unwrap();
+        assert!(managed.projected.is_managed());
+        let projected = managed.projected().xml_bytes().to_vec();
+        let reserved = budget.used(Resource::Memory);
+
+        assert!(matches!(
+            managed.apply_operation(&recorded),
+            Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "apply_revision",
+                ..
+            }))
+        ));
+        assert!(managed.projected.is_managed());
+        assert_eq!(managed.projected().xml_bytes(), projected.as_slice());
+        assert!(managed.operations.is_empty());
+        assert_eq!(budget.used(Resource::Memory), reserved);
     }
 
     #[test]

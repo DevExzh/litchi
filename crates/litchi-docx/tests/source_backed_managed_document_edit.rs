@@ -17,7 +17,9 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
     OwnedSource, Position, ReadAt, Resource, SourceVersion,
 };
-use litchi_docx::document::{Commit, TransactionError};
+use litchi_docx::document::{
+    Commit, RevisionAction, RevisionKind, RevisionSelector, TransactionError,
+};
 use litchi_docx::paragraph::{Collapsed, Inline, Symbols};
 use litchi_docx::{Error, ReadLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -968,6 +970,146 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
         )))
     ));
     assert!(output.is_empty());
+}
+
+/// One paragraph holding a direct tracked insertion and a direct tracked
+/// deletion, so each revision disposition has a selectable target.
+fn tracked_revision_document() -> Vec<u8> {
+    format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>keep </w:t></w:r><w:ins w:id="1" w:author="A"><w:r><w:t>inserted</w:t></w:r></w:ins><w:del w:id="2" w:author="A"><w:r><w:delText>deleted</w:delText></w:r></w:del></w:p><w:sectPr/></w:body></w:document>"#
+    )
+    .into_bytes()
+}
+
+fn tracked_revision_fixture(signed: bool) -> Vec<u8> {
+    let media: Vec<u8> = (0_u8..=u8::MAX)
+        .cycle()
+        .take(4096)
+        .map(|byte| byte.wrapping_mul(37))
+        .collect();
+    let opaque: Vec<u8> = (0_u8..=u8::MAX)
+        .cycle()
+        .take(8192)
+        .map(|byte| byte.wrapping_mul(13))
+        .collect();
+    archive_fixture(&tracked_revision_document(), &media, &opaque, None, signed)
+}
+
+// Review of the 0759 merge: the incoming revision dispositions skipped the
+// managed-transaction rule every other non-text operation follows. They were
+// committed and published uncharged, through a snapshot rebuilt without its
+// source identity or admission.
+#[test]
+fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
+    let insertion =
+        RevisionSelector::new(Position::new(0), RevisionKind::Insertion, Position::new(0));
+    let deletion =
+        RevisionSelector::new(Position::new(0), RevisionKind::Deletion, Position::new(0));
+    // Unsigned sources capture a source-backed snapshot; signed sources
+    // capture a managed `PartData` snapshot. Both are budget-managed.
+    for signed in [false, true] {
+        let source = tracked_revision_fixture(signed);
+        let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
+        let mut edit = package.edit_document().unwrap();
+        let projected = edit.projected().xml_bytes().to_vec();
+        let reserved = budget.used(Resource::Memory);
+
+        let reference = edit
+            .replace_revision_text(
+                Position::new(0),
+                RevisionKind::Insertion,
+                Position::new(0),
+                "x",
+            )
+            .map(|_| ())
+            .unwrap_err();
+        let TransactionError::Document(Error::UnsafeEdit {
+            format: "DOCX",
+            operation: "replace_revision_text",
+            reason: expected_reason,
+        }) = reference
+        else {
+            panic!("managed revision text replacement must be refused: {reference:?}");
+        };
+
+        let attempts = [
+            (
+                "accept_revision",
+                edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+                    .map(|_| ()),
+            ),
+            (
+                "reject_revision",
+                edit.reject_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+                    .map(|_| ()),
+            ),
+            (
+                "accept_revision",
+                edit.accept_revision(Position::new(0), RevisionKind::Deletion, Position::new(0))
+                    .map(|_| ()),
+            ),
+            (
+                "reject_revision",
+                edit.reject_revision(Position::new(0), RevisionKind::Deletion, Position::new(0))
+                    .map(|_| ()),
+            ),
+            (
+                "apply_revision",
+                edit.apply_revision(insertion, RevisionAction::Accept)
+                    .map(|_| ()),
+            ),
+            (
+                "apply_revision",
+                edit.apply_revision(deletion, RevisionAction::Reject)
+                    .map(|_| ()),
+            ),
+        ];
+        for (expected_operation, result) in attempts {
+            match result {
+                Err(TransactionError::Document(Error::UnsafeEdit {
+                    format: "DOCX",
+                    operation,
+                    reason,
+                })) => {
+                    assert_eq!(operation, expected_operation, "signed = {signed}");
+                    assert_eq!(reason, expected_reason, "signed = {signed}");
+                },
+                other => panic!(
+                    "managed {expected_operation} must be refused like revision text replacement \
+                     (signed = {signed}): {other:?}"
+                ),
+            }
+        }
+
+        // Every refusal happened before any state change or admission.
+        assert_eq!(edit.projected().xml_bytes(), projected.as_slice());
+        assert_eq!(budget.used(Resource::Memory), reserved);
+        let commit = edit.commit().unwrap();
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 0);
+        let mut output = Vec::new();
+        package
+            .publish_document_commit_to_stream(&mut output, &commit)
+            .unwrap();
+        assert_eq!(output, source);
+        drop(commit);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    // The same dispositions remain available on an unmanaged source-backed
+    // edit of the same bytes.
+    let package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+        tracked_revision_fixture(false),
+    )))
+    .unwrap();
+    let mut edit = package.edit_document().unwrap();
+    edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+        .unwrap();
+    edit.apply_revision(deletion, RevisionAction::Reject)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().operations(), 2);
 }
 
 #[test]
