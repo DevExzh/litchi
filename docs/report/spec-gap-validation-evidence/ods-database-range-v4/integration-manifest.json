@@ -1,0 +1,126 @@
+{
+  "schema": "litchi.ods.v4.integration-candidate.v1",
+  "created_utc": "2026-09-10T13:15:12.371840+00:00",
+  "candidate_root": "/var/tmp/litchi-ods-database-range-validation-v4-integration-clean-20260910",
+  "evidence_root": "/var/tmp/litchi-ods-database-range-validation-v4-integration-evidence-20260910",
+  "primary_worktree": "/home/zhuhe/code/litchi-spec-gaps",
+  "base_commit": "52519031b4c877032553bf5d4ea4393f3e0e60d1",
+  "construction": "git archive of 52519031b followed by exact 22-path V4 overlay; explicit untracked Cargo.lock copied only as locked build input",
+  "git_archive_tar_sha256": "0b848faa4bdbb2d6c98bdfc87bcf453bbbcd9af7e67b9f982d0dda0b773115c1",
+  "v4_root": "/var/tmp/litchi-ods-database-range-validation-v4-20260910",
+  "v4_manifest": "/var/tmp/litchi-ods-database-range-validation-v4-20260910-manifest.json",
+  "v4_manifest_sha256": "457753a6f1ca290e36ed8b1a220dac9377fd94dc4015010261718156e92d973e",
+  "owned_path_count": 22,
+  "owned_paths_all_match": true,
+  "candidate_has_git_metadata": false,
+  "explicit_lock_input": {
+    "source": "/var/tmp/litchi-odg-v8-integration-base-clean-20260910/Cargo.lock",
+    "destination": "/var/tmp/litchi-ods-database-range-validation-v4-integration-clean-20260910/Cargo.lock",
+    "sha256": "8248c6b7787a9726e9f99396a5de147bc2f68acf0afef44b710a6392f940bd88",
+    "bytes": 138848,
+    "source_kind": "file",
+    "candidate_sha256": "8248c6b7787a9726e9f99396a5de147bc2f68acf0afef44b710a6392f940bd88",
+    "candidate_bytes": 138848,
+    "candidate_kind": "file",
+    "tracked_in_base_commit": false
+  },
+  "committed_odg_common_reconciliation": {
+    "parent_commit": "8076d72455ecebb4bfbe3d479f9f219aeaa1550e",
+    "path_count": 17,
+    "all_candidate_hashes_match_base_commit": true,
+    "owned_scope_overlap_count": 0,
+    "paths": [
+      "crates/litchi-odf-common/src/core/family.rs",
+      "crates/litchi-odf-common/src/core/package.rs",
+      "crates/litchi-odg/docs/FEATURE_MATRIX.md",
+      "crates/litchi-odg/src/facade/mod.rs",
+      "crates/litchi-odg/src/flat.rs",
+      "crates/litchi-odg/src/lib.rs",
+      "crates/litchi-odg/src/model/auxiliary.rs",
+      "crates/litchi-odg/src/model/enhanced.rs",
+      "crates/litchi-odg/src/model/mod.rs",
+      "crates/litchi-odg/src/model/page.rs",
+      "crates/litchi-odg/src/model/shape.rs",
+      "crates/litchi-odg/src/model/transition.rs",
+      "crates/litchi-odg/src/package/mod.rs",
+      "crates/litchi-odg/src/package/snapshot.rs",
+      "crates/litchi-odg/tests/allocation_admission.rs",
+      "crates/litchi-odg/tests/package_snapshot.rs",
+      "crates/litchi-odg/tests/page_transitions.rs"
+    ]
+  },
+  "primary_pending_status_sha256": "da699f0ad0a1554ed8a09f3fbd510da1806c548318d53b2c791e4391d375eede",
+  "primary_pending_status_record_count": 134,
+  "primary_pending_expanded_file_count": 4202,
+  "primary_pending_owned_overlay_count": 0,
+  "primary_pending_odg_common_status_count": 0,
+  "primary_pending_odg_common_file_count": 0,
+  "primary_pending_preimages_all_excluded_or_head_preserved": true,
+  "primary_status_unchanged_after_capture": true,
+  "primary_pending_content_unchanged_after_capture": true,
+  "root_gate_status": "not run; root owns final integration gate and should avoid duplicate full gates when source identity is unchanged",
+  "no_stage_or_commit_performed": true,
+  "primary_worktree_modified_by_this_task": false,
+  "evidence": [
+    {
+      "path": "clean-base-generation.json",
+      "bytes": 3525,
+      "sha256": "4072a04ffb0246178f43470042d26e55f426c5e05b918bb17f720b09e9920d4d"
+    },
+    {
+      "path": "owned-preimages-and-base.json",
+      "bytes": 16570,
+      "sha256": "2c1575907b1dc9698fd537f93e963469188a6f4c1a4bc841219dbfd5aabb9ff9"
+    },
+    {
+      "path": "owned-path-overlay-receipt.json",
+      "bytes": 8086,
+      "sha256": "6fc142fbffd5cf0594d916788095e006ff983dbe31bca5f86bea5122c99a18fb"
+    },
+    {
+      "path": "primary-pending-preimages.json",
+      "bytes": 2752115,
+      "sha256": "c3909eb3dfd932fcf6373e3890092d6099be4a40b9f211047186da2b5c4a94ae"
+    },
+    {
+      "path": "committed-odg-common-preservation.json",
+      "bytes": 7083,
+      "sha256": "61b2a88a0ecd213aadf7b1514f37cb2f4aad6fbd52fff8ae0d81cf939438b212"
+    },
+    {
+      "path": "pending-preservation-review.json",
+      "bytes": 2280,
+      "sha256": "16f5174c15bc3f9d0be8475215ec22726f1a859e2476ca2430769d59bb719cb0"
+    },
+    {
+      "path": "primary-status-drift.json",
+      "bytes": 309,
+      "sha256": "c404fd5eba142c831478b814f5b4f800ec743522634ee5fecf6985dbad1f77f6"
+    },
+    {
+      "path": "primary-content-drift.json",
+      "bytes": 391,
+      "sha256": "ee54264ae97734133f9ddd4e50b836d3b8e3ecb9b9a49650fdf2f9a0c3734da1"
+    },
+    {
+      "path": "primary-status.porcelain0",
+      "bytes": 7774,
+      "sha256": "da699f0ad0a1554ed8a09f3fbd510da1806c548318d53b2c791e4391d375eede"
+    },
+    {
+      "path": "primary-status-after.porcelain0",
+      "bytes": 7774,
+      "sha256": "da699f0ad0a1554ed8a09f3fbd510da1806c548318d53b2c791e4391d375eede"
+    },
+    {
+      "path": "build_provenance.py",
+      "bytes": 13560,
+      "sha256": "0e55542d79af86ba0cdef7dd7f61b27a521f2010666ac591ece904e9d2c59d59"
+    },
+    {
+      "path": "make_receipts.py",
+      "bytes": 7919,
+      "sha256": "fea37d45f93944d541eb11219b7cd1f3b719f9cf39214a859173370d98873d23"
+    }
+  ]
+}

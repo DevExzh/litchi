@@ -1,0 +1,26 @@
+--- a/crates/litchi-xlsx/src/connections/embedded_data.rs
++++ b/crates/litchi-xlsx/src/connections/embedded_data.rs
+@@ -485,6 +485,12 @@
+     limits: CustomDataLimits,
+ ) -> Result<Vec<Edge>> {
+     let mut edges = Vec::new();
++    edges
++        .try_reserve(limits.max_relationships().min(MAX_CONNECTIONS))
++        .map_err(|source| Error::Allocation {
++            resource: "Custom Data connection relationships",
++            source,
++        })?;
+     for (source, relationships) in std::iter::once(("/", package.rels())).chain(
+         package
+             .iter_parts()
+@@ -506,10 +512,6 @@
+                         MAX_CONNECTIONS.min(limits.max_relationships()),
+                     ));
+                 }
+-                edges.try_reserve(1).map_err(|source| Error::Allocation {
+-                    resource: "Custom Data connection relationships",
+-                    source,
+-                })?;
+                 edges.push(Edge {
+                     source: source.into(),
+                     id: relationship.r_id().into(),

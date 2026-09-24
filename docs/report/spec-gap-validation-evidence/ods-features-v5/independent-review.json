@@ -1,0 +1,17 @@
+{
+  "reviewer": "xlsb_model",
+  "verdict": "CLEAR for V5 delta after V4 prior findings resolved",
+  "candidate_manifest_sha256": "cdb66be2b8cc692c2e1546c608f3fb66844650b948bf93ad1c4c16a49a4af0f4",
+  "scope": [
+    "literal cellRangeAddress alternatives and dollar sheet-name disambiguation",
+    "scenario ownership, count/aggregate budgets, malformed entry admission, no-op/inverse",
+    "template office:styles ownership, required axes/body, legacy source preserve-or-refuse",
+    "worksheet metadata guarded fallback"
+  ],
+  "review_method": "independent local ODF RNG/source review; Cargo not rerun by reviewer",
+  "root_tests": 488,
+  "root_doctests": 0,
+  "direct_range_constructor": "rejects surrounding whitespace by explicit API normalization; source lists split before validation",
+  "native_evidence_boundary": "new transaction fixtures are synthetic XML; no native packaged scenario/template claim",
+  "integration": "pending current-tree reconciliation"
+}

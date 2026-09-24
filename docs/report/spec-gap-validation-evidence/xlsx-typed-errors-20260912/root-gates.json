@@ -1,0 +1,83 @@
+{
+  "base_head": "c4575deba31cd26940142f8bc01ad4875f831ff4",
+  "source_sha256": {
+    "crates/litchi-xlsx/src/error.rs": "d55ab29168077934667f01baf3edcb3975cde69f8e97cc75aea1fdd14692b078"
+  },
+  "reviewed_git_blob": "5a58f0726028721bfa93d844cfe6275adc283686",
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "environment": {
+    "TMPDIR": "/var/tmp",
+    "RUSTFLAGS": "unset",
+    "RUSTDOCFLAGS_for_rustdoc": "-D warnings"
+  },
+  "gates": [
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--offline",
+        "--lib",
+        "error::tests"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "90001ad964ec153b6184fb53937497549c37465fb68d3bd15327d3d89b5a7fb3"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--offline",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "4d69aa1b83706befbc2112258c9ed07c52db57616145b3ad5a1341ed988a01ea"
+    },
+    {
+      "name": "rustdoc",
+      "command": [
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--offline",
+        "--no-deps"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "704ac12d3cc0093e3f64895dfcf23d9e9ea14425e331825b933c7496326b729c"
+    },
+    {
+      "name": "rustfmt",
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2024",
+        "--check",
+        "crates/litchi-xlsx/src/error.rs"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "lock_sha256": "9886ab7f4458ddcf4286fa686a420d9351f4cfc278552484c64791dd159fc282",
+  "lock_resolution": {
+    "command": [
+      "cargo",
+      "generate-lockfile",
+      "--offline"
+    ],
+    "exit_code": 0,
+    "raw_log_sha256": "e13f3710e83d862f5be9e02f3f0dd4ba10027a0b63844fba9f2f6aac0d552c4d"
+  }
+}

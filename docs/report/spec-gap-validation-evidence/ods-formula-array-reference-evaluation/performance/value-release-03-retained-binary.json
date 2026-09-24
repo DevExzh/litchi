@@ -1,0 +1,7 @@
+{
+  "source": "/home/zhuhe/code/litchi-array-target/release/ods-formula-array-reference-evaluation-value-profile",
+  "retained": "/home/zhuhe/code/litchi-array-target/retained/value-release-03",
+  "sha256": "ff20e65b8f4326b7fe2c924313c98a1e113543047bfd28aa369986b3be28e0f7",
+  "capture": "diagnostics/candidate-release-03.tar.gz",
+  "purpose": "Preserve the exact diagnostic candidate for later paired comparisons before further release builds."
+}

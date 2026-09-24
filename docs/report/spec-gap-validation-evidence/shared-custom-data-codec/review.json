@@ -1,0 +1,20 @@
+{
+  "verdict": "held despite passing gates",
+  "codec_sha256": "0173046040bf4088e7261c6c1d44bad7c5820c5b279800b25780e0fca30020fc",
+  "reviewer": "/root/custom_data_common_final_review",
+  "required_corrections": [
+    "core SML direct ext namespace",
+    "optional ext uri and exactly one wildcard child",
+    "XML S whitespace rather than Unicode trim",
+    "reject unbound prefixes without actual inherited context",
+    "consistent UTF-16 UID-unit limit",
+    "explicit event and UID-unit caller caps",
+    "root probe confirms raw < in root and opaque attributes is accepted; reject raw delimiter while preserving escaped &lt;"
+  ],
+  "root_raw_delimiter_probe": {
+    "raw_lt_id": "accepted (invalid XML)",
+    "raw_lt_opaque_attr": "accepted (invalid XML)",
+    "escaped_lt_id": "accepted (valid)",
+    "temporary_files_removed": true
+  }
+}

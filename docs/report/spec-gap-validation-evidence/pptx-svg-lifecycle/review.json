@@ -1,0 +1,52 @@
+{
+  "verdict": "approved",
+  "scope": "Source-backed attach/detach of SVG on existing direct slide pictures with internal PNG fallback; source/graph preservation, changed-closure commit validation, exact in-memory inverse, bounded XML and inert media.",
+  "source_hashes": {
+    "crates/litchi-drawingml/src/svg_blip.rs": "5c1356e53014af620ac2a5d9c9998096700515ffc7fe4e219c89f13e37e39a26",
+    "crates/litchi-opc/src/source_backed.rs": "cf001af64320c54aea46376c834c8a4612e7d06f6c0782891ceba4a68cd178be",
+    "crates/litchi-opc/src/xml_splice.rs": "2a7aaaeae776c87033db6aff18786ce55c349ae527df30860e03d45cb235c7e8",
+    "crates/litchi-pptx/src/lib.rs": "fc0f59310a83d8cb8f8e5faa4340f5587adc3c06a54bfaf443c77809a53d6ead",
+    "crates/litchi-pptx/src/presentation/mod.rs": "e2b00960560433d7179737f7bc15479cd1918138d7fb3f3342f652c067340657",
+    "crates/litchi-pptx/src/presentation/source.rs": "64fc9d360311af9347d2b523ab6bf051509d3a9748835b939f0c86a74123d9b3",
+    "crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs": "13f14f752a286ca288ff682c55b29ce3891e136c303f430f501519c960d75a46",
+    "crates/litchi-pptx/src/presentation/source/svg_lifecycle/owner.rs": "5d06ae7165581d13a438ee1ea12c69ab35d3c2bf4c5ad2d776f0b10c1a9e75be",
+    "crates/litchi-pptx/tests/source_backed_svg_lifecycle.rs": "327642e6f8a935b2d13ceea08f2af949f0195185f6cf0541be67f71e43626dd3",
+    "crates/litchi-pptx/docs/FEATURE_MATRIX.md": "939040edba5b8b33f29bc41f265a4bc71a7a323d345f6114b99673b0c381901f"
+  },
+  "reviews": [
+    {
+      "reviewer": "svg_lifecycle_design",
+      "verdict": "approved",
+      "scope": "BOM offsets, wrapper namespace metadata, opaque PI/MCE and standard-namespace lookalikes, direct MCE refusal, public reexports and feature scope; final frozen source reviewed."
+    },
+    {
+      "reviewer": "svg_lifecycle_resource_review",
+      "verdict": "approved",
+      "scope": "Configured source/editor limits including package constructor, nested namespace completion, shared namespace context retention, checked preflight/reserves, and batched owner scans; final frozen source reviewed."
+    },
+    {
+      "reviewer": "svg_lifecycle_commit_review",
+      "verdict": "approved",
+      "scope": "Borrowed editor edit, fallible commit with before/after execution checks, all original direct-picture closure validation, strict target readback, exact inverse and publication freshness. Root verified final limit-plumbing delta retains that architecture."
+    },
+    {
+      "reviewer": "root",
+      "verdict": "approved",
+      "scope": "OPC read_limits accessor is a read-only copy of the captured policy; compilation, strict Clippy and formatting passed. Existing OPC splice and shared SVG namespace prerequisite reviews remain applicable to unchanged logic."
+    }
+  ],
+  "prerequisite_reviews": [
+    "opc-review.json",
+    "svg-namespace-review.json"
+  ],
+  "validation_scope": "Review approval is separate from final compile-first gates, generated output schema receipts and measured performance; all are required to close the batch.",
+  "resource_residual": "Namespace flattening may temporarily copy inherited bindings shadowed at the picture root. It is bounded by the 32 MiB owner source cap plus at most 16,384 binding allocation overheads, processed one picture at a time and not retained across pictures. No fully linear runtime or exact resident-memory budget is claimed.",
+  "exclusions": [
+    "Native Office acceptance of generated files",
+    "SVG rendering or image grammar validation",
+    "External resource fetching",
+    "New picture creation or reordering",
+    "Ambiguous or MCE-wrapped typed picture ownership",
+    "Durable cross-process inverse transport"
+  ]
+}

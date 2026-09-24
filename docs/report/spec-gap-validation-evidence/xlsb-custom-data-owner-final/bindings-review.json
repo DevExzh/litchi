@@ -1,0 +1,16 @@
+{
+  "reviewer": "xlsb_bindings_final_review",
+  "reviewed_sha256": "2f2059b1e0dd6f69e105d78d83f1b800d89a683a13ff921a06d3895c318267af",
+  "final_sha256": "eae641966ba8d3b32f82503d8cd0c1538a73e93fc4d601a1599a21da142e6acb",
+  "independent_probe_tests": 13,
+  "findings_cleared": [
+    "collision work/cancellation",
+    "precharged UID allocation",
+    "tighter rewrite limits",
+    "complete opaque ranges",
+    "combined AC/FRT depth",
+    "invalid FRT context"
+  ],
+  "subsequent_changes": "Ignored error identifiers and checked fixture conversions only; root inspected deltas and final strict gates pass.",
+  "caveat": "UTF-16 length validation performs a bounded pass (at most 65535 units) before aggregate work charge; cancellation is not per code unit."
+}

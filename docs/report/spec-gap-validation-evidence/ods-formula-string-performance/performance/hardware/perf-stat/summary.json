@@ -1,0 +1,89 @@
+{
+  "events": [
+    "cycles",
+    "instructions",
+    "branches",
+    "branch-misses",
+    "cache-misses"
+  ],
+  "warmups": 3,
+  "iterations": 15,
+  "rows": [
+    {
+      "side": "baseline",
+      "case": "literal-many-short-4096",
+      "repeat": 1,
+      "status": 0,
+      "binary_sha256": "52fc5e50b1a8ddebc0dc04fcdde8ef9062728b0bf33e45d39b3a5e2182b550bb",
+      "counters": {
+        "cycles": "51800353",
+        "instructions": "100102171",
+        "branches": "19548696",
+        "branch-misses": "44616",
+        "cache-misses": "354420"
+      },
+      "started_at": "2026-09-13T09:06:38.790024Z",
+      "finished_at": "2026-09-13T09:06:38.859948Z",
+      "stdout": "hardware/perf-stat/baseline-literal-many-short-4096.stdout",
+      "stderr": "hardware/perf-stat/baseline-literal-many-short-4096.stderr",
+      "command": "hardware/perf-stat/baseline-literal-many-short-4096.command"
+    },
+    {
+      "side": "candidate",
+      "case": "literal-many-short-4096",
+      "repeat": 1,
+      "status": 0,
+      "binary_sha256": "d9dcf284a1b311191bbd1b959ec9c0c6915dec5a585f4c5e588ef29e570839d5",
+      "counters": {
+        "cycles": "30597847",
+        "instructions": "67625786",
+        "branches": "12919252",
+        "branch-misses": "23603",
+        "cache-misses": "104153"
+      },
+      "started_at": "2026-09-13T09:06:38.861119Z",
+      "finished_at": "2026-09-13T09:06:38.882395Z",
+      "stdout": "hardware/perf-stat/candidate-literal-many-short-4096.stdout",
+      "stderr": "hardware/perf-stat/candidate-literal-many-short-4096.stderr",
+      "command": "hardware/perf-stat/candidate-literal-many-short-4096.command"
+    },
+    {
+      "side": "baseline",
+      "case": "literal-single-doubled-quote-64k",
+      "repeat": 8,
+      "status": 0,
+      "binary_sha256": "52fc5e50b1a8ddebc0dc04fcdde8ef9062728b0bf33e45d39b3a5e2182b550bb",
+      "counters": {
+        "cycles": "19392366",
+        "instructions": "131108940",
+        "branches": "30256774",
+        "branch-misses": "18901",
+        "cache-misses": "50302"
+      },
+      "started_at": "2026-09-13T09:06:38.883447Z",
+      "finished_at": "2026-09-13T09:06:38.900760Z",
+      "stdout": "hardware/perf-stat/baseline-literal-single-doubled-quote-64k.stdout",
+      "stderr": "hardware/perf-stat/baseline-literal-single-doubled-quote-64k.stderr",
+      "command": "hardware/perf-stat/baseline-literal-single-doubled-quote-64k.command"
+    },
+    {
+      "side": "candidate",
+      "case": "literal-single-doubled-quote-64k",
+      "repeat": 8,
+      "status": 0,
+      "binary_sha256": "d9dcf284a1b311191bbd1b959ec9c0c6915dec5a585f4c5e588ef29e570839d5",
+      "counters": {
+        "cycles": "26864507",
+        "instructions": "169452018",
+        "branches": "45596314",
+        "branch-misses": "18648",
+        "cache-misses": "46563"
+      },
+      "started_at": "2026-09-13T09:06:38.901586Z",
+      "finished_at": "2026-09-13T09:06:38.919830Z",
+      "stdout": "hardware/perf-stat/candidate-literal-single-doubled-quote-64k.stdout",
+      "stderr": "hardware/perf-stat/candidate-literal-single-doubled-quote-64k.stderr",
+      "command": "hardware/perf-stat/candidate-literal-single-doubled-quote-64k.command"
+    }
+  ]
+}

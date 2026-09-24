@@ -235,6 +235,8 @@ def sha256(value: bytes) -> str:
 
 def format_slug(value: str) -> str:
     slug = re.sub(r"[^A-Za-z0-9]+", "-", value).strip("-")
+    if not slug:
+        raise ValueError("package_format must contain an ASCII letter or digit")
     return slug.lower()
 
 

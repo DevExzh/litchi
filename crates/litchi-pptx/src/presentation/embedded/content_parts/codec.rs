@@ -4,15 +4,16 @@ use super::super::{
     MAX_ATTRIBUTE_BYTES, MAX_XML_ATTRIBUTES, MAX_XML_BYTES, MAX_XML_DEPTH, increment_nodes,
     invalid, is_presentationml_name, limit, relationship_value, validate_root,
 };
-use super::model::Anchor;
+use super::model::{Anchor, BlackWhiteMode};
 use crate::{Error, Result};
-use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::ops::Range;
 
 const P14: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2010/main";
+const P14_URI: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
 const P15: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2012/main";
 const MAX_RELATIONSHIP_ID_BYTES: usize = 4 * 1024;
 
@@ -44,6 +45,8 @@ struct ContentFrame {
     start: usize,
     depth: usize,
     relationship_id: String,
+    bw_mode: Option<BlackWhiteMode>,
+    bw_mode_key: Option<Box<[u8]>>,
 }
 
 /// Scan one slide owner and retain each active content-part anchor exactly.
@@ -51,7 +54,17 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(limit("content-part slide XML bytes", MAX_XML_BYTES));
     }
-    let processed = process_ooxml(xml)?;
+    let mut capabilities = Capabilities::ooxml_baseline();
+    capabilities.understand_namespace(P14_URI);
+    let limits = MceLimits {
+        max_input_bytes: MAX_XML_BYTES,
+        max_output_bytes: MAX_XML_BYTES,
+        max_depth: MAX_XML_DEPTH,
+        max_namespace_bindings: 4096,
+        max_directive_tokens: 4096,
+        max_choices_per_alternate: 1024,
+    };
+    let processed = process_markup_compatibility(xml, &capabilities, &limits)?.xml;
     let mut reader = NsReader::from_reader(processed.as_ref());
     let mut frames = Vec::new();
     let mut content_frames = Vec::<ContentFrame>::new();
@@ -99,10 +112,14 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
                         return Err(limit("content-part count", maximum));
                     }
                     let relationship_id = relationship_id(&element, reader.decoder(), &resolver)?;
+                    let (bw_mode, bw_mode_key) =
+                        black_white_mode(&element, reader.decoder(), &resolver)?;
                     content_frames.push(ContentFrame {
                         start: before,
                         depth,
                         relationship_id,
+                        bw_mode,
+                        bw_mode_key,
                     });
                 }
             },
@@ -128,9 +145,14 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
                         return Err(limit("content-part count", maximum));
                     }
                     let relationship_id = relationship_id(&element, reader.decoder(), &resolver)?;
+                    let (bw_mode, bw_mode_key) =
+                        black_white_mode(&element, reader.decoder(), &resolver)?;
                     anchors.push(Anchor {
                         relationship_id,
                         xml: processed[before..after].to_vec(),
+                        bw_mode,
+                        bw_mode_key,
+                        bw_mode_namespace_added: false,
                     });
                 }
             },
@@ -157,6 +179,9 @@ pub(crate) fn scan_slide(xml: &[u8], maximum: usize) -> Result<Vec<Anchor>> {
                     anchors.push(Anchor {
                         relationship_id: content.relationship_id,
                         xml: processed[content.start..after].to_vec(),
+                        bw_mode: content.bw_mode,
+                        bw_mode_key: content.bw_mode_key,
+                        bw_mode_namespace_added: false,
                     });
                 }
                 depth -= 1;
@@ -359,17 +384,11 @@ pub(crate) fn locate_content_parts(xml: &[u8]) -> Result<Vec<SourceAnchor>> {
 }
 
 /// Validate one detached anchor fragment and return its relationship ID.
-pub(crate) fn validate_anchor_xml(xml: &[u8]) -> Result<String> {
+pub(crate) fn validate_anchor_xml_with_key(xml: &[u8], key: Option<&[u8]>) -> Result<String> {
     if xml.is_empty() || xml.len() > MAX_XML_BYTES {
         return Err(invalid("content-part anchor XML is empty or too large"));
     }
-    let prefix = format!(
-        "<p:sld xmlns:p=\"{}\" xmlns:r=\"{}\" xmlns:p14=\"{}\" xmlns:p15=\"{}\">",
-        String::from_utf8_lossy(super::super::PML),
-        String::from_utf8_lossy(super::super::REL),
-        String::from_utf8_lossy(P14),
-        String::from_utf8_lossy(P15),
-    );
+    let prefix = detached_slide_prefix(key)?;
     let mut wrapped = Vec::with_capacity(prefix.len() + xml.len() + 8);
     wrapped.extend_from_slice(prefix.as_bytes());
     let offset = wrapped.len();
@@ -393,16 +412,286 @@ pub(crate) fn validate_anchor_xml(xml: &[u8]) -> Result<String> {
     Ok(anchor.relationship_id.clone())
 }
 
+/// Read the typed `p14:bwMode` attribute from one detached anchor.
+pub(crate) fn anchor_bw_mode(xml: &[u8]) -> Result<(Option<BlackWhiteMode>, Option<Box<[u8]>>)> {
+    anchor_bw_mode_with_declaration(xml, None)
+}
+
+fn anchor_bw_mode_with_declaration(
+    xml: &[u8],
+    key: Option<&[u8]>,
+) -> Result<(Option<BlackWhiteMode>, Option<Box<[u8]>>)> {
+    if xml.is_empty() || xml.len() > MAX_XML_BYTES {
+        return Err(invalid("content-part anchor XML is empty or too large"));
+    }
+    let prefix = detached_slide_prefix(key)?;
+    let mut wrapped = Vec::with_capacity(prefix.len() + xml.len() + 8);
+    wrapped.extend_from_slice(prefix.as_bytes());
+    wrapped.extend_from_slice(xml);
+    wrapped.extend_from_slice(b"</p:sld>");
+    let mut reader = NsReader::from_reader(wrapped.as_slice());
+    let mut found = None;
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if is_content_part(&namespace, element.name()) =>
+            {
+                if found.is_some() {
+                    return Err(invalid(
+                        "content-part anchor contains multiple contentPart elements",
+                    ));
+                }
+                found = Some(black_white_mode(&element, reader.decoder(), &resolver)?);
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid(
+                    "content-part anchor rejects DTDs and processing instructions",
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    found.ok_or_else(|| invalid("content-part anchor has no contentPart element"))
+}
+
+fn detached_slide_prefix(key: Option<&[u8]>) -> Result<String> {
+    let mut prefix = format!(
+        "<p:sld xmlns:p=\"{}\" xmlns:r=\"{}\" xmlns:p14=\"{}\" xmlns:p15=\"{}\"",
+        String::from_utf8_lossy(super::super::PML),
+        String::from_utf8_lossy(super::super::REL),
+        String::from_utf8_lossy(P14),
+        String::from_utf8_lossy(P15),
+    );
+    if let Some(key) = key {
+        let prefix_name = key
+            .strip_suffix(b":bwMode")
+            .filter(|prefix| !prefix.is_empty() && !prefix.contains(&b':'))
+            .ok_or_else(|| invalid("content-part p14:bwMode attribute name is invalid"))?;
+        let prefix_name = std::str::from_utf8(prefix_name)
+            .map_err(|_error| invalid("content-part p14:bwMode prefix is not UTF-8"))?;
+        if prefix_name != "p14" {
+            prefix.push_str(" xmlns:");
+            prefix.push_str(prefix_name);
+            prefix.push_str("=\"");
+            prefix.push_str(
+                std::str::from_utf8(P14)
+                    .map_err(|_error| invalid("content-part p14 namespace is not UTF-8"))?,
+            );
+            prefix.push('"');
+        }
+    }
+    prefix.push('>');
+    Ok(prefix)
+}
+
+pub(crate) fn anchor_bw_mode_with_key(
+    xml: &[u8],
+    key: Option<&[u8]>,
+) -> Result<(Option<BlackWhiteMode>, Option<Box<[u8]>>)> {
+    let parsed = anchor_bw_mode_with_declaration(xml, key)?;
+    if parsed.0.is_some() || key.is_none() {
+        return Ok(parsed);
+    }
+    let (start, end) = content_part_start_tag(xml)?;
+    let tag = &xml[start..end];
+    let Some(attribute) = raw_attribute_span(tag, key.unwrap_or_default()) else {
+        return Ok((None, None));
+    };
+    let value = std::str::from_utf8(&tag[attribute.value])
+        .map_err(|_err| invalid("content-part p14:bwMode value is not UTF-8"))?;
+    let value =
+        quick_xml::escape::unescape(value).map_err(|error| Error::Xml(error.to_string()))?;
+    Ok((
+        Some(BlackWhiteMode::parse(&value)?),
+        Some(key.unwrap_or_default().into()),
+    ))
+}
+
+/// Rewrite only the typed `p14:bwMode` attribute in one detached anchor.
+pub(crate) fn rewrite_anchor_bw_mode(
+    xml: &[u8],
+    current_key: Option<&[u8]>,
+    namespace_added: bool,
+    value: Option<BlackWhiteMode>,
+) -> Result<(Vec<u8>, Option<Box<[u8]>>, bool)> {
+    let (parsed, parsed_key) = anchor_bw_mode_with_key(xml, current_key)?;
+    let key = parsed_key.or_else(|| current_key.map(Into::into));
+    if parsed.is_some() && key.is_none() {
+        return Err(invalid("content-part p14:bwMode attribute name is missing"));
+    }
+    if value.is_none() && key.is_none() {
+        return Ok((xml.to_vec(), None, false));
+    }
+
+    let (start, end) = content_part_start_tag(xml)?;
+    let tag = &xml[start..end];
+    let attribute = key.as_deref().and_then(|key| raw_attribute_span(tag, key));
+    let mut output = xml.to_vec();
+    let mut namespace_added = namespace_added;
+    match (value, attribute) {
+        (Some(value), Some(attribute)) => {
+            let begin = start
+                .checked_add(attribute.value.start)
+                .ok_or_else(|| invalid("content-part p14:bwMode span overflow"))?;
+            let finish = start
+                .checked_add(attribute.value.end)
+                .ok_or_else(|| invalid("content-part p14:bwMode span overflow"))?;
+            output.splice(begin..finish, value.as_str().as_bytes().iter().copied());
+        },
+        (None, Some(attribute)) => {
+            let begin = start
+                .checked_add(attribute.full.start)
+                .ok_or_else(|| invalid("content-part p14:bwMode span overflow"))?;
+            let finish = start
+                .checked_add(attribute.full.end)
+                .ok_or_else(|| invalid("content-part p14:bwMode span overflow"))?;
+            output.splice(begin..finish, std::iter::empty());
+            if namespace_added {
+                let (namespace_start, namespace_end) = content_part_start_tag(&output)?;
+                let namespace_tag = &output[namespace_start..namespace_end];
+                if let Some(namespace_attr) = raw_attribute_span(namespace_tag, b"xmlns:p14") {
+                    let begin = namespace_start
+                        .checked_add(namespace_attr.full.start)
+                        .ok_or_else(|| invalid("content-part p14 namespace span overflow"))?;
+                    let finish = namespace_start
+                        .checked_add(namespace_attr.full.end)
+                        .ok_or_else(|| invalid("content-part p14 namespace span overflow"))?;
+                    output.splice(begin..finish, std::iter::empty());
+                }
+                namespace_added = false;
+            }
+        },
+        (Some(value), None) => {
+            let mut insertion = end
+                .checked_sub(1)
+                .ok_or_else(|| invalid("content-part start tag is truncated"))?;
+            while insertion > start && output[insertion - 1].is_ascii_whitespace() {
+                insertion -= 1;
+            }
+            if insertion > start && output[insertion - 1] == b'/' {
+                insertion -= 1;
+            }
+            let mut addition = format!(" p14:bwMode=\"{}\"", value.as_str());
+            if raw_attribute_span(tag, b"xmlns:p14").is_none() {
+                addition.push_str(" xmlns:p14=\"");
+                addition.push_str(
+                    std::str::from_utf8(P14)
+                        .map_err(|_err| invalid("content-part p14 namespace is not UTF-8"))?,
+                );
+                addition.push('"');
+                namespace_added = true;
+            }
+            output.splice(insertion..insertion, addition.into_bytes());
+        },
+        (None, None) => {},
+    }
+    if output.len() > MAX_XML_BYTES {
+        return Err(limit("content-part anchor XML bytes", MAX_XML_BYTES));
+    }
+    let (result, result_key) = anchor_bw_mode_with_key(&output, key.as_deref())?;
+    if result != value {
+        return Err(invalid(
+            "content-part p14:bwMode rewrite did not round-trip",
+        ));
+    }
+    Ok((output, result_key, namespace_added))
+}
+
+struct RawAttributeSpan {
+    full: Range<usize>,
+    value: Range<usize>,
+}
+
+fn content_part_start_tag(xml: &[u8]) -> Result<(usize, usize)> {
+    let start = xml
+        .iter()
+        .position(|byte| *byte == b'<')
+        .ok_or_else(|| invalid("content-part anchor start tag is missing"))?;
+    let mut quote = None;
+    for (offset, byte) in xml.iter().enumerate().skip(start + 1) {
+        match (quote, *byte) {
+            (Some(value), byte) if byte == value => quote = None,
+            (None, b'\'' | b'\"') => quote = Some(*byte),
+            (None, b'>') => return Ok((start, offset + 1)),
+            _ => {},
+        }
+    }
+    Err(invalid("content-part anchor start tag is unterminated"))
+}
+
+fn raw_attribute_span(tag: &[u8], selected: &[u8]) -> Option<RawAttributeSpan> {
+    let mut index = 0usize;
+    while index < tag.len()
+        && !tag[index].is_ascii_whitespace()
+        && !matches!(tag[index], b'>' | b'/')
+    {
+        index += 1;
+    }
+    while index < tag.len() {
+        let whitespace_start = index;
+        while index < tag.len() && tag[index].is_ascii_whitespace() {
+            index += 1;
+        }
+        if index >= tag.len() || tag[index] == b'>' || tag[index] == b'/' {
+            break;
+        }
+        let name_start = index;
+        while index < tag.len()
+            && !tag[index].is_ascii_whitespace()
+            && !matches!(tag[index], b'=' | b'>' | b'/')
+        {
+            index += 1;
+        }
+        let name = &tag[name_start..index];
+        while index < tag.len() && tag[index].is_ascii_whitespace() {
+            index += 1;
+        }
+        if tag.get(index) != Some(&b'=') {
+            return None;
+        }
+        index += 1;
+        while index < tag.len() && tag[index].is_ascii_whitespace() {
+            index += 1;
+        }
+        let quote = *tag.get(index)?;
+        if quote != b'\'' && quote != b'\"' {
+            return None;
+        }
+        index += 1;
+        let value_start = index;
+        while index < tag.len() && tag[index] != quote {
+            index += 1;
+        }
+        let value_end = index;
+        if index >= tag.len() {
+            return None;
+        }
+        index += 1;
+        if name == selected {
+            return Some(RawAttributeSpan {
+                full: whitespace_start..index,
+                value: value_start..value_end,
+            });
+        }
+    }
+    None
+}
+
 /// Rewrite only the relationship value in one detached anchor fragment.
-pub(crate) fn rewrite_anchor_relationship_id(xml: &[u8], value: &str) -> Result<Vec<u8>> {
+pub(crate) fn rewrite_anchor_relationship_id(
+    xml: &[u8],
+    value: &str,
+    bw_mode_key: Option<&[u8]>,
+) -> Result<Vec<u8>> {
     let anchors = {
-        let prefix = format!(
-            "<p:sld xmlns:p=\"{}\" xmlns:r=\"{}\" xmlns:p14=\"{}\" xmlns:p15=\"{}\">",
-            String::from_utf8_lossy(super::super::PML),
-            String::from_utf8_lossy(super::super::REL),
-            String::from_utf8_lossy(P14),
-            String::from_utf8_lossy(P15),
-        );
+        let prefix = detached_slide_prefix(bw_mode_key)?;
         let mut wrapped = Vec::with_capacity(prefix.len() + xml.len() + 8);
         wrapped.extend_from_slice(prefix.as_bytes());
         let offset = wrapped.len();
@@ -436,7 +725,7 @@ pub(crate) fn rewrite_anchor_relationship_id(xml: &[u8], value: &str) -> Result<
         anchors.relationship_span,
         escape_attribute(value).into_bytes(),
     );
-    validate_anchor_xml(&output)?;
+    validate_anchor_xml_with_key(&output, bw_mode_key)?;
     Ok(output)
 }
 
@@ -693,6 +982,38 @@ fn relationship_id(
         return Err(invalid("PresentationML contentPart has an invalid r:id"));
     }
     Ok(value)
+}
+
+fn black_white_mode(
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    resolver: &quick_xml::name::NamespaceResolver,
+) -> Result<(Option<BlackWhiteMode>, Option<Box<[u8]>>)> {
+    let mut value = None;
+    let mut key = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let (namespace, local) = resolver.resolve_attribute(attribute.key);
+        if local.as_ref() != b"bwMode"
+            || !matches!(
+                namespace,
+                ResolveResult::Bound(Namespace(value)) if *value == *P14
+            )
+        {
+            continue;
+        }
+        if value.is_some() {
+            return Err(invalid(
+                "PresentationML contentPart has duplicate p14:bwMode attributes",
+            ));
+        }
+        let text = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        value = Some(BlackWhiteMode::parse(&text)?);
+        key = Some(attribute.key.as_ref().into());
+    }
+    Ok((value, key))
 }
 
 fn validate_attributes(element: &BytesStart<'_>) -> Result<()> {

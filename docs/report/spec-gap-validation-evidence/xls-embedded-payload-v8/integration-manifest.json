@@ -1,0 +1,479 @@
+{
+  "base_commit": "fd95ae50a6ee30b95c52dc2ded7440d6b59d5de7",
+  "clean_overlay": {
+    "path": "/var/tmp/litchi-xls-embedded-payload-v8-clean-fd95-20260910",
+    "source_file_count": 29,
+    "source_hashes": [
+      {
+        "bytes": 181793,
+        "exists": true,
+        "path": "crates/litchi-cfb/src/file.rs",
+        "sha256": "6d281b6fb04b4608eca0cdbeaf943a3f866c24a9e490aff51bb8891b0a7d3642"
+      },
+      {
+        "bytes": 8102,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/object/cfb_path.rs",
+        "sha256": "645f3b2d38607f12de0209061400042a2cf29afd4ad2e1e8934c44af717d2c11"
+      },
+      {
+        "bytes": 37379,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/object/codec.rs",
+        "sha256": "50c138dda17d354f4efc47bef18c58bcb9f3f1e969d98481f3f1d62570742450"
+      },
+      {
+        "bytes": 2375,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/object/discovery.rs",
+        "sha256": "830fa39ca65ef5073d14dabcc60513bca6a1f221eaaa1e28e62e9644bbeffdea"
+      },
+      {
+        "bytes": 34494,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/object/editor.rs",
+        "sha256": "cbbc9bcde202316efb8b56eb61fc1623dad6a0c145315fb0eed778c478c11e2c"
+      },
+      {
+        "bytes": 19315,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/object/model.rs",
+        "sha256": "83389ca205916eb65b36607bb2f15f13541821989f20abfd1e6b3236ef6aa352"
+      },
+      {
+        "bytes": 5900,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/object/target.rs",
+        "sha256": "6296e06b7c1276caf05ccc6f932e65f2ed94082c7b425e837d4d408243c57d69"
+      },
+      {
+        "bytes": 8144,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/property_set/codec/editor.rs",
+        "sha256": "4d3054b85ca61cc288ae8bea6931483625f6f35ccfef505517b864db0b1909ae"
+      },
+      {
+        "bytes": 5010,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/protection.rs",
+        "sha256": "4d58bd0a51d6020702f3f4098e3389ae8410c873f37da66f5314f0a1f68b618c"
+      },
+      {
+        "bytes": 36537,
+        "exists": true,
+        "path": "crates/litchi-ole-common/tests/object.rs",
+        "sha256": "770b94894decab0b28681d1a65c1b0e683d45a466fc4cd105ba9ad701eec9482"
+      },
+      {
+        "bytes": 20807,
+        "exists": true,
+        "path": "crates/litchi-xls/docs/FEATURE_MATRIX.md",
+        "sha256": "2a3a9de268e58ca5c92280ebb3290801820c74d4a28c73c006a15ab18ae0f26a"
+      },
+      {
+        "bytes": 26056,
+        "exists": true,
+        "path": "crates/litchi-xls/src/lib.rs",
+        "sha256": "98edf44c1231439297a2cd81a0d4cc00acbee85b3b3f6a53abe731b362bff386"
+      },
+      {
+        "bytes": 187,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/codec/mod.rs",
+        "sha256": "c8cfff8d0ee770efa3692a774072149a0b54b1a63c9087fc326092a324057d1b"
+      },
+      {
+        "bytes": 23576,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/codec/obj.rs",
+        "sha256": "161ac9b57d6463e9c5bd38d23d0296f9eacabd3bba476012978fa7f850631854"
+      },
+      {
+        "bytes": 8522,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/edit/transaction.rs",
+        "sha256": "4624b5894a8e0c93676860aaacf4be68d838ab044d2d75c03f8650cd0e173d97"
+      },
+      {
+        "bytes": 42033,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/package/transaction.rs",
+        "sha256": "b3818082fb6d00d820e761d253f8e12146b21bd583d25e268c9c9f6d5e76979b"
+      },
+      {
+        "bytes": 4096,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/semantic/metadata.rs",
+        "sha256": "d26ba7cee35bc582a7527b1c72f09fb1a6826eefe2ebf78acff5cbd552b291e1"
+      },
+      {
+        "bytes": 595,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/semantic/mod.rs",
+        "sha256": "af0e1c78bad6cb7e670952f4ed89f4b128544ba01b2ca26d27b30065bdf4a52d"
+      },
+      {
+        "bytes": 8323,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/semantic/obj.rs",
+        "sha256": "a0cec6ff0c26cc608117844d09d603081aa58a3358fbd9fbfa76b431133e9565"
+      },
+      {
+        "bytes": 15688,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/semantic/payload.rs",
+        "sha256": "9cc6669e8527df1c1803d559f18d77b79714ae0b7a79bac7f210cd1e4aaa58aa"
+      },
+      {
+        "bytes": 6644,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/tests/codec.rs",
+        "sha256": "bff987200a32faf31fcc37f8cfdd552e6b9c0b5f193c2792a79ac04564700ab8"
+      },
+      {
+        "bytes": 11679,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/tests/package.rs",
+        "sha256": "68efc5e9b7395ad484a1b2243c7385dcebbc6acd250ab3395829655c121b6c09"
+      },
+      {
+        "bytes": 40392,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/tests/transaction.rs",
+        "sha256": "d447e420a20285915caaa4a2631d3c432107aacf727e6c7caa5d5b69a01c7e3e"
+      },
+      {
+        "bytes": 9779,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/tests/validation.rs",
+        "sha256": "6c2ba4ba4099391407f4dcea7ea64a3a169762036313931a7d36890da557970b"
+      },
+      {
+        "bytes": 138,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/validation/mod.rs",
+        "sha256": "ea054ebd3fe2ffc97d2067772d9411986c8cb5008e04db39a31abf94527f894b"
+      },
+      {
+        "bytes": 10852,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/validation/obj.rs",
+        "sha256": "aa76a03529b13f2efb265db5b179de02c5fc60e9bd66c5391ffb279350daf5cb"
+      },
+      {
+        "bytes": 2797,
+        "exists": true,
+        "path": "crates/litchi-xls/tests/v7_review_probe.rs",
+        "sha256": "acb684f6e97b681193205f25bcf0ee9cd4ed8a6cb85a1bc3c380803b5a6ec30b"
+      },
+      {
+        "bytes": 20992,
+        "exists": true,
+        "path": "crates/litchi-xls/tests/xls_form_controls.rs",
+        "sha256": "8e8d2c5211a4529cc890293c66e34478920cec36e82377ff6d72740328711a74"
+      },
+      {
+        "bytes": 6716,
+        "exists": true,
+        "path": "crates/litchi-xls/tests/xls_ole_objects.rs",
+        "sha256": "3cb31abfea1559f4b151e1f1e77954f27d22e6985204ce4f19d3832ebde04f40"
+      }
+    ]
+  },
+  "clean_overlay_source_fingerprint_sha256": "14b76c7096fc3c807cbb3147de3f862f6753eb4ec839bc9ff2690a9a54ba491a",
+  "current_worktree_overlap": {
+    "cfb_or_ole_common_dirty_closure_paths": [],
+    "dirty_closure_status": [
+      " M crates/litchi-xls/src/lib.rs"
+    ],
+    "doc_protection_overlap": "none; committed DOC protection changes are outside the 29-path V8 closure",
+    "scope_note": "The clean overlay is based on fd95 HEAD. The mixed overlay is a three-way merge against the current dirty worktree and preserves the pending user_names export/module.",
+    "tracked_dirty_closure_paths": [
+      "crates/litchi-xls/src/lib.rs"
+    ],
+    "untracked_pending_paths_preserved_outside_closure": [
+      {
+        "bytes": 11706,
+        "path": "crates/litchi-xls/src/user_names/codec.rs",
+        "sha256": "585d53edbfed756641f59efd46cf60827529470e4c0d4975626864937b13abc6"
+      },
+      {
+        "bytes": 21898,
+        "path": "crates/litchi-xls/src/user_names/edit.rs",
+        "sha256": "cb183f06894e45a5eb3f887a795e1f416b298e6b967e0776d6e1a567711dfca4"
+      },
+      {
+        "bytes": 1136,
+        "path": "crates/litchi-xls/src/user_names/mod.rs",
+        "sha256": "4b375d3f917b2f4d1ccfecf887d43f2aa1f6375b46d6b9a1dbc18cd78877e322"
+      },
+      {
+        "bytes": 7845,
+        "path": "crates/litchi-xls/src/user_names/model.rs",
+        "sha256": "de0bca8421d075f0796c5d205c2dbc99f7bf9fa415fb935e68cf8f27d2559e5b"
+      },
+      {
+        "bytes": 10494,
+        "path": "crates/litchi-xls/src/user_names/package.rs",
+        "sha256": "794a371437545efab3494d41153d75c96e294f414b9c431a187838383041ffe9"
+      },
+      {
+        "bytes": 16425,
+        "path": "crates/litchi-xls/src/user_names/publication.rs",
+        "sha256": "0468f0891443c04028cea856dfc29b292a96f7602b0b2a0b16886db270c9175a"
+      },
+      {
+        "bytes": 5351,
+        "path": "crates/litchi-xls/src/user_names/tests.rs",
+        "sha256": "5e846fd026b6ab9cd74c914a795b304108625e9f269ff4c11a739065e798f3f8"
+      }
+    ]
+  },
+  "feature": "V8 XLS embedded inert payload clean integration overlay",
+  "frozen_feature_manifest": {
+    "candidate": "/var/tmp/litchi-xls-embedded-payload-validation-v8-20260910",
+    "path": "/var/tmp/litchi-xls-embedded-payload-validation-v8-20260910-manifest.json",
+    "sha256": "76e71aa3b291bac47a25df632a3563063c45980065418b27b838eefbbc5b2f8b",
+    "source_file_count": 29
+  },
+  "manifest_sha256": "8f767335d05860d6885483f9345e8f06715c03616fd3a09b1d4f6b49da17a356",
+  "mixed_overlay_source_fingerprint_sha256": "f3cea917747a1a9f96e09fbffd6dc03f7653afc9854d52699173de3767e47daa",
+  "mixed_pending_overlay": {
+    "expected_difference_from_frozen_v8": [
+      "crates/litchi-xls/src/lib.rs"
+    ],
+    "path": "/var/tmp/litchi-xls-embedded-payload-v8-overlay-fd95-20260910",
+    "source_file_count": 29,
+    "source_hashes": [
+      {
+        "bytes": 181793,
+        "exists": true,
+        "path": "crates/litchi-cfb/src/file.rs",
+        "sha256": "6d281b6fb04b4608eca0cdbeaf943a3f866c24a9e490aff51bb8891b0a7d3642"
+      },
+      {
+        "bytes": 8102,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/object/cfb_path.rs",
+        "sha256": "645f3b2d38607f12de0209061400042a2cf29afd4ad2e1e8934c44af717d2c11"
+      },
+      {
+        "bytes": 37379,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/object/codec.rs",
+        "sha256": "50c138dda17d354f4efc47bef18c58bcb9f3f1e969d98481f3f1d62570742450"
+      },
+      {
+        "bytes": 2375,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/object/discovery.rs",
+        "sha256": "830fa39ca65ef5073d14dabcc60513bca6a1f221eaaa1e28e62e9644bbeffdea"
+      },
+      {
+        "bytes": 34494,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/object/editor.rs",
+        "sha256": "cbbc9bcde202316efb8b56eb61fc1623dad6a0c145315fb0eed778c478c11e2c"
+      },
+      {
+        "bytes": 19315,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/object/model.rs",
+        "sha256": "83389ca205916eb65b36607bb2f15f13541821989f20abfd1e6b3236ef6aa352"
+      },
+      {
+        "bytes": 5900,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/object/target.rs",
+        "sha256": "6296e06b7c1276caf05ccc6f932e65f2ed94082c7b425e837d4d408243c57d69"
+      },
+      {
+        "bytes": 8144,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/property_set/codec/editor.rs",
+        "sha256": "4d3054b85ca61cc288ae8bea6931483625f6f35ccfef505517b864db0b1909ae"
+      },
+      {
+        "bytes": 5010,
+        "exists": true,
+        "path": "crates/litchi-ole-common/src/protection.rs",
+        "sha256": "4d58bd0a51d6020702f3f4098e3389ae8410c873f37da66f5314f0a1f68b618c"
+      },
+      {
+        "bytes": 36537,
+        "exists": true,
+        "path": "crates/litchi-ole-common/tests/object.rs",
+        "sha256": "770b94894decab0b28681d1a65c1b0e683d45a466fc4cd105ba9ad701eec9482"
+      },
+      {
+        "bytes": 20807,
+        "exists": true,
+        "path": "crates/litchi-xls/docs/FEATURE_MATRIX.md",
+        "sha256": "2a3a9de268e58ca5c92280ebb3290801820c74d4a28c73c006a15ab18ae0f26a"
+      },
+      {
+        "bytes": 26393,
+        "exists": true,
+        "path": "crates/litchi-xls/src/lib.rs",
+        "sha256": "72a82009ef33c3f44c390bb944495f93b357b202f8916bba059771656166eabb"
+      },
+      {
+        "bytes": 187,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/codec/mod.rs",
+        "sha256": "c8cfff8d0ee770efa3692a774072149a0b54b1a63c9087fc326092a324057d1b"
+      },
+      {
+        "bytes": 23576,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/codec/obj.rs",
+        "sha256": "161ac9b57d6463e9c5bd38d23d0296f9eacabd3bba476012978fa7f850631854"
+      },
+      {
+        "bytes": 8522,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/edit/transaction.rs",
+        "sha256": "4624b5894a8e0c93676860aaacf4be68d838ab044d2d75c03f8650cd0e173d97"
+      },
+      {
+        "bytes": 42033,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/package/transaction.rs",
+        "sha256": "b3818082fb6d00d820e761d253f8e12146b21bd583d25e268c9c9f6d5e76979b"
+      },
+      {
+        "bytes": 4096,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/semantic/metadata.rs",
+        "sha256": "d26ba7cee35bc582a7527b1c72f09fb1a6826eefe2ebf78acff5cbd552b291e1"
+      },
+      {
+        "bytes": 595,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/semantic/mod.rs",
+        "sha256": "af0e1c78bad6cb7e670952f4ed89f4b128544ba01b2ca26d27b30065bdf4a52d"
+      },
+      {
+        "bytes": 8323,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/semantic/obj.rs",
+        "sha256": "a0cec6ff0c26cc608117844d09d603081aa58a3358fbd9fbfa76b431133e9565"
+      },
+      {
+        "bytes": 15688,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/semantic/payload.rs",
+        "sha256": "9cc6669e8527df1c1803d559f18d77b79714ae0b7a79bac7f210cd1e4aaa58aa"
+      },
+      {
+        "bytes": 6644,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/tests/codec.rs",
+        "sha256": "bff987200a32faf31fcc37f8cfdd552e6b9c0b5f193c2792a79ac04564700ab8"
+      },
+      {
+        "bytes": 11679,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/tests/package.rs",
+        "sha256": "68efc5e9b7395ad484a1b2243c7385dcebbc6acd250ab3395829655c121b6c09"
+      },
+      {
+        "bytes": 40392,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/tests/transaction.rs",
+        "sha256": "d447e420a20285915caaa4a2631d3c432107aacf727e6c7caa5d5b69a01c7e3e"
+      },
+      {
+        "bytes": 9779,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/tests/validation.rs",
+        "sha256": "6c2ba4ba4099391407f4dcea7ea64a3a169762036313931a7d36890da557970b"
+      },
+      {
+        "bytes": 138,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/validation/mod.rs",
+        "sha256": "ea054ebd3fe2ffc97d2067772d9411986c8cb5008e04db39a31abf94527f894b"
+      },
+      {
+        "bytes": 10852,
+        "exists": true,
+        "path": "crates/litchi-xls/src/ole_object/validation/obj.rs",
+        "sha256": "aa76a03529b13f2efb265db5b179de02c5fc60e9bd66c5391ffb279350daf5cb"
+      },
+      {
+        "bytes": 2797,
+        "exists": true,
+        "path": "crates/litchi-xls/tests/v7_review_probe.rs",
+        "sha256": "acb684f6e97b681193205f25bcf0ee9cd4ed8a6cb85a1bc3c380803b5a6ec30b"
+      },
+      {
+        "bytes": 20992,
+        "exists": true,
+        "path": "crates/litchi-xls/tests/xls_form_controls.rs",
+        "sha256": "8e8d2c5211a4529cc890293c66e34478920cec36e82377ff6d72740328711a74"
+      },
+      {
+        "bytes": 6716,
+        "exists": true,
+        "path": "crates/litchi-xls/tests/xls_ole_objects.rs",
+        "sha256": "3cb31abfea1559f4b151e1f1e77954f27d22e6985204ce4f19d3832ebde04f40"
+      }
+    ]
+  },
+  "patches": {
+    "clean_current_head": {
+      "apply_check": "patch --dry-run -p1 passed; applying to an fd95 archive reproduced all 29 clean-overlay source bytes",
+      "bytes": 179588,
+      "path": "/var/tmp/litchi-xls-embedded-payload-v8-clean-fd95-20260910.patch",
+      "sha256": "f26faeed77879fbe0cb60ebba8fb0574d1b2912991ed18c82e58fdc00f4ecc10"
+    },
+    "pending_preserving_delta": {
+      "apply_check": "patch --dry-run -p1 passed; applying to captured working-tree preimages reproduced all 29 mixed-overlay source bytes",
+      "bytes": 179588,
+      "path": "/var/tmp/litchi-xls-embedded-payload-v8-pending-preserving-delta-20260910.patch",
+      "sha256": "ada7cdce274f91d12f2edb4a0b632636584175722011347a9ed61da6e3d27b8e"
+    }
+  },
+  "preimages": {
+    "fd95_head_dir": "/var/tmp/litchi-xls-embedded-payload-v8-overlay-fd95-20260910-preimages/head",
+    "metadata_path": "/var/tmp/litchi-xls-embedded-payload-v8-overlay-fd95-20260910-preimages.json",
+    "metadata_sha256": "fc335f901b9eb8357a654f672a51f40b9fdaa3e5060151cc8f277c1a97ff515d",
+    "working_tree_dir": "/var/tmp/litchi-xls-embedded-payload-v8-overlay-fd95-20260910-preimages"
+  },
+  "source_worktree": "/home/zhuhe/code/litchi-spec-gaps",
+  "staged_or_committed": false,
+  "validation": [
+    {
+      "command": "cargo +1.95.0 test -p litchi-xls --no-default-features",
+      "log": "/var/tmp/litchi-xls-v8-clean-fd95-tests-20260910.log",
+      "overlay": "/var/tmp/litchi-xls-embedded-payload-v8-clean-fd95-20260910",
+      "result": "1381 passed, 0 failed, 1 ignored"
+    },
+    {
+      "command": "cargo +1.95.0 test -p litchi-cfb -p litchi-ole-common --no-default-features",
+      "log": "/var/tmp/litchi-xls-v8-clean-fd95-ole-tests-20260910.log",
+      "overlay": "/var/tmp/litchi-xls-embedded-payload-v8-clean-fd95-20260910",
+      "result": "586 passed, 0 failed, 2 ignored"
+    },
+    {
+      "command": "cargo +1.95.0 check -p litchi-xls --no-default-features",
+      "log": "/var/tmp/litchi-xls-v8-mixed-fd95-check-20260910.log",
+      "overlay": "/var/tmp/litchi-xls-embedded-payload-v8-overlay-fd95-20260910",
+      "result": "pass; pending user_names merge compiles"
+    },
+    {
+      "command": "cargo +stable clippy -p litchi-xls -p litchi-cfb -p litchi-ole-common --no-default-features --all-targets -- -D warnings -A clippy::chunks_exact_to_as_chunks",
+      "log": "/var/tmp/litchi-xls-v8-clean-fd95-clippy-20260910.log",
+      "overlay": "/var/tmp/litchi-xls-embedded-payload-v8-clean-fd95-20260910",
+      "result": "pass"
+    },
+    {
+      "command": "RUSTDOCFLAGS='-D warnings' cargo +1.95.0 doc -p litchi-xls -p litchi-cfb -p litchi-ole-common --no-default-features --no-deps",
+      "log": "/var/tmp/litchi-xls-v8-clean-fd95-rustdoc-20260910.log",
+      "overlay": "/var/tmp/litchi-xls-embedded-payload-v8-clean-fd95-20260910",
+      "result": "pass"
+    }
+  ],
+  "validation_note": "Commands ran without --offline or --locked. Cargo target directories were kept outside overlays. No source worktree, V8 frozen candidate, or git index was modified."
+}

@@ -1,0 +1,8 @@
+{
+  "source": "3rdparty/specs/OpenDocument-v1.4-os.zip",
+  "entry": "part4-formula/OpenDocument-v1.4-os-part4-formula.html",
+  "entry_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+  "base_commit": "c32455df83ea67f840a6d4f8da8953f113b590f4",
+  "scope": "ODF1.4 Part4 section6.6 all five bitwise functions over scalar values; Integer conversion truncates toward zero and operands/results use48bits.",
+  "performance_hypothesis": "Reuse bounded eager scheduling without new frame variants or allocation pathways; measure old scalar/logical lanes and input-scaled bitwise evaluation separately."
+}

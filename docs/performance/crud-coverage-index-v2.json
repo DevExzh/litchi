@@ -1,0 +1,3660 @@
+{
+  "schema_version": 2,
+  "index_kind": "crud-coverage-index",
+  "scope": {
+    "included_formats": "all supported non-iWork formats",
+    "excluded_formats": [
+      "iWork"
+    ]
+  },
+  "taxonomy": {
+    "source": "docs/CRUD_Scenario_Checklist.md",
+    "category_count": 15,
+    "category_ids": [
+      "content-reading-extraction",
+      "structural-queries-analysis",
+      "conversion-export",
+      "creation-from-scratch",
+      "template-filling-targeted-replacement",
+      "append-incremental-generation",
+      "structural-editing",
+      "content-deletion-sanitization",
+      "cross-document-copying-assembly",
+      "merging-splitting",
+      "comparison-patching-three-way-merge",
+      "validation-repair-normalization",
+      "dynamic-content-calculation-refresh",
+      "security-protection-encryption-signing",
+      "low-level-package-part-relationship-stream-extension"
+    ]
+  },
+  "selector_registry": {
+    "source": "tools/perf-baseline/src/lib.rs",
+    "registry_format": "case-name-utf8-newline-v1",
+    "minimum_selectable_cases": 533,
+    "selector_count": 533,
+    "selector_names_sha256": "fcbd9d80c9c32e6e98c80b44d5a3253e0252efff4bad16304e9517c0e108c1ec",
+    "selector_names": [
+      "zip_index",
+      "zip_read_one",
+      "opc_open",
+      "opc_open_owned",
+      "opc_serial_eager_open",
+      "opc_relationship_open",
+      "opc_noop_save",
+      "opc_mutated_save",
+      "opc_source_open",
+      "opc_source_open_main_read",
+      "opc_source_materialize",
+      "opc_source_materialize_accounted",
+      "opc_source_cached_main_read",
+      "opc_source_concurrent_same_part",
+      "opc_source_cache_budget_boundary",
+      "opc_source_cache_control_contention",
+      "opc_source_cache_managed_contention",
+      "opc_part_add_lifecycle",
+      "opc_part_add_plain_lifecycle",
+      "opc_source_overlay_one_part_save",
+      "opc_source_overlay_multi_part_changed",
+      "opc_source_overlay_multi_part_noop",
+      "opc_source_overlay_multi_part_mixed",
+      "opc_casefold_eager_open",
+      "opc_casefold_owned_open",
+      "opc_casefold_source_open",
+      "opc_casefold_eager_lookup",
+      "opc_casefold_source_lookup",
+      "opc_casefold_source_exact_lookup",
+      "opc_casefold_source_case_alias_lookup",
+      "opc_casefold_source_genuine_miss_lookup",
+      "opc_file_eager_open",
+      "opc_file_source_open",
+      "opc_file_eager_one_part_atomic_save",
+      "opc_file_source_one_part_atomic_save",
+      "provider_file_read_at",
+      "provider_atomic_save",
+      "cfb_file_same_length_overlay_atomic_save",
+      "cfb_file_owned_same_length_overlay_atomic_save",
+      "pptx_file_eager_open",
+      "pptx_file_source_open",
+      "pptx_file_eager_list_slides",
+      "pptx_file_source_list_slides",
+      "pptx_file_eager_slide_count",
+      "pptx_file_source_slide_count",
+      "pptx_file_eager_selected_slide",
+      "pptx_file_source_selected_slide",
+      "pptx_file_eager_open_slide_count_lifecycle",
+      "pptx_file_source_open_slide_count_lifecycle",
+      "pptx_file_eager_open_selected_slide_lifecycle",
+      "pptx_file_source_open_selected_slide_lifecycle",
+      "docx_file_eager_open",
+      "docx_file_source_open",
+      "docx_file_eager_paragraph_count",
+      "docx_file_source_paragraph_count",
+      "docx_file_eager_list_paragraphs",
+      "docx_file_source_list_paragraphs",
+      "docx_file_eager_full_text",
+      "docx_file_source_full_text",
+      "docx_file_eager_open_paragraph_count_lifecycle",
+      "docx_file_source_open_paragraph_count_lifecycle",
+      "docx_file_eager_open_full_text_lifecycle",
+      "docx_file_source_open_full_text_lifecycle",
+      "odt_file_eager_open",
+      "odt_file_source_open",
+      "odt_file_eager_open_full_text_lifecycle",
+      "odt_file_source_open_full_text_lifecycle",
+      "docx_source_backed_one_edit_save",
+      "docx_source_backed_existing_section_layout_edit_save",
+      "docx_story_hyperlink_plan",
+      "docx_story_hyperlink_noop_save",
+      "docx_story_hyperlink_redaction_save",
+      "pptx_source_backed_one_edit_save",
+      "omml_formula_range_scan",
+      "omml_formula_extract",
+      "pptx_drawingml_extract",
+      "pptx_drawingml_range_scan",
+      "pptx_eager_batch_edit_save",
+      "pptx_source_backed_batch_edit_save",
+      "pptx_eager_multi_slide_batch_edit_save",
+      "pptx_source_backed_multi_slide_batch_edit_save",
+      "pptx_cross_copy_plain",
+      "pptx_cross_copy_media_rich",
+      "pptx_cross_copy_plain_lifecycle",
+      "pptx_cross_copy_media_rich_lifecycle",
+      "pptx_source_backed_cross_copy_plain",
+      "pptx_source_backed_cross_copy_plain_lifecycle",
+      "pptx_source_backed_cross_copy_media_rich_lifecycle",
+      "pptx_source_backed_images_query",
+      "pptx_source_backed_image_query",
+      "pptx_source_backed_read_image_query",
+      "pptx_slide_remove_boundary_save",
+      "pptx_slide_move_boundary_save",
+      "xlsx_eager_calculation_metadata_edit_save",
+      "xlsx_source_backed_calculation_metadata_edit_save",
+      "xlsx_eager_defined_names_edit_save",
+      "xlsx_source_backed_defined_names_edit_save",
+      "xlsx_eager_page_break_edit_save",
+      "xlsx_source_backed_page_break_edit_save",
+      "xlsx_worksheet_repeated_page_breaks",
+      "xlsx_package_repeated_page_breaks",
+      "xlsx_eager_page_margin_edit_save",
+      "xlsx_source_backed_page_margin_edit_save",
+      "xlsx_eager_page_setup_edit_save",
+      "xlsx_source_backed_page_setup_edit_save",
+      "xlsx_eager_print_options_edit_save",
+      "xlsx_source_backed_print_options_edit_save",
+      "xlsx_eager_sheet_protection_edit_save",
+      "xlsx_source_backed_sheet_protection_edit_save",
+      "xlsx_eager_data_validation_edit_save",
+      "xlsx_source_backed_data_validation_edit_save",
+      "xlsx_eager_auto_filter_edit_save",
+      "xlsx_source_backed_auto_filter_edit_save",
+      "xlsx_eager_conditional_formatting_edit_save",
+      "xlsx_source_backed_conditional_formatting_edit_save",
+      "xlsx_eager_merge_commit_save",
+      "xlsx_eager_unmerge_commit_save",
+      "xlsx_join_disjoint_commit_save",
+      "xlsx_join_conflict_plan",
+      "xlsx_three_way_disjoint_commit_save",
+      "xlsx_three_way_conflict_resolve_save",
+      "xlsx_eager_cell_values_one_edit_save",
+      "xlsx_source_backed_cell_values_one_edit_save",
+      "xlsx_eager_cell_values_one_percent_edit_save",
+      "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "xlsx_eager_cell_values_batch_edit_save",
+      "xlsx_source_backed_cell_values_batch_edit_save",
+      "xlsx_source_backed_cell_values_multi_sheet_edit_save",
+      "xlsx_source_backed_managed_cell_values_one_edit_save",
+      "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "xlsx_source_backed_managed_cell_values_batch_edit_save",
+      "xlsx_source_backed_managed_cell_values_multi_sheet_edit_save",
+      "xlsx_eager_cell_clear_edit_save",
+      "xlsx_source_backed_cell_clear_edit_save",
+      "xlsx_eager_cell_remove_edit_save",
+      "xlsx_source_backed_cell_remove_edit_save",
+      "xlsx_eager_row_visibility_edit_save",
+      "xlsx_source_backed_row_visibility_edit_save",
+      "xlsx_eager_row_visibility_batch_edit_save",
+      "xlsx_source_backed_row_visibility_batch_edit_save",
+      "cfb_open",
+      "cfb_list_streams",
+      "cfb_read_one",
+      "cfb_create_stream_borrowed",
+      "cfb_create_stream_owned",
+      "ole_common_open",
+      "ole_common_put_stream_publish",
+      "ole_common_finish_render",
+      "ole_common_one_edit_save",
+      "cfb_shared_open",
+      "cfb_shared_read_one",
+      "cfb_shared_concurrent_reads",
+      "cfb_selective_mini_legacy_read",
+      "cfb_selective_mini_shared_read",
+      "cfb_selective_mini_4095_legacy_read",
+      "cfb_selective_mini_4095_shared_read",
+      "cfb_selective_fat_legacy_read",
+      "cfb_selective_fat_shared_read",
+      "cfb_selective_simulated_mini_legacy_read",
+      "cfb_selective_simulated_mini_shared_read",
+      "cfb_selective_simulated_mini_4095_legacy_read",
+      "cfb_selective_simulated_mini_4095_shared_read",
+      "cfb_selective_simulated_fat_legacy_read",
+      "cfb_selective_simulated_fat_shared_read",
+      "cfb_open_stream_mini_shared_one_shot",
+      "cfb_open_stream_mini_shared_repeat",
+      "cfb_open_stream_mini_shared_repeat8",
+      "cfb_open_stream_mini_shared_different_sid",
+      "cfb_open_stream_mini_shared_bulk",
+      "cfb_open_stream_mini_shared_concurrent",
+      "cfb_open_stream_mini_4095_shared_one_shot",
+      "cfb_open_stream_mini_4095_shared_repeat",
+      "cfb_open_stream_mini_4095_shared_repeat8",
+      "cfb_open_stream_mini_4095_shared_different_sid",
+      "cfb_open_stream_mini_4095_shared_bulk",
+      "cfb_open_stream_mini_4095_shared_concurrent",
+      "cfb_open_stream_simulated_mini_shared_one_shot",
+      "cfb_open_stream_simulated_mini_shared_repeat",
+      "cfb_open_stream_simulated_mini_shared_repeat8",
+      "cfb_open_stream_simulated_mini_4095_shared_one_shot",
+      "cfb_open_stream_simulated_mini_4095_shared_repeat",
+      "cfb_open_stream_simulated_mini_4095_shared_repeat8",
+      "doc_fresh_write_to",
+      "xls_fresh_write_to",
+      "ppt_fresh_write_to",
+      "doc_semantic_open",
+      "doc_semantic_list_paragraphs",
+      "doc_semantic_paragraph_count",
+      "doc_semantic_one_paragraph",
+      "doc_semantic_one_paragraph_at",
+      "doc_semantic_full_text",
+      "doc_semantic_noop_edit_save",
+      "doc_semantic_one_edit_save",
+      "doc_body_snapshot_list_paragraphs",
+      "doc_owner_public_phases",
+      "xls_semantic_open",
+      "xls_semantic_list_worksheets",
+      "xls_semantic_one_cell",
+      "xls_semantic_full_cell_scan",
+      "xls_semantic_noop_edit_save",
+      "xls_semantic_one_edit_save",
+      "xls_source_backed_open",
+      "xls_eager_open_list_worksheets",
+      "xls_source_backed_open_list_worksheets",
+      "xls_eager_open_one_cell",
+      "xls_source_backed_open_one_cell",
+      "xls_owned_source_open",
+      "xls_owned_source_open_list_worksheets",
+      "xls_owned_source_open_one_cell",
+      "xls_range_source_open",
+      "xls_range_source_open_list_worksheets",
+      "xls_range_source_open_one_cell",
+      "xls_range_source_open_all_cells",
+      "xls_range_source_open_full_text",
+      "xls_owned_source_control_open",
+      "xls_owned_source_control_open_list_worksheets",
+      "xls_owned_source_control_open_one_cell",
+      "xls_owned_source_control_open_all_cells",
+      "xls_owned_source_control_open_full_text",
+      "xlsb_semantic_open",
+      "xlsb_semantic_list_worksheets",
+      "xlsb_semantic_one_cell",
+      "xlsb_semantic_full_cell_scan",
+      "xlsb_semantic_workbook_structure_edit_save",
+      "xls_validation_report",
+      "xls_comments_eager_edit_save",
+      "xls_comments_source_backed_edit_save",
+      "xls_comments_eager_batch_edit_save",
+      "xls_comments_source_backed_batch_edit_save",
+      "xls_numeric_eager_number_edit_save",
+      "xls_numeric_source_backed_number_edit_save",
+      "xls_numeric_eager_rk_mulrk_edit_save",
+      "xls_numeric_source_backed_rk_mulrk_edit_save",
+      "xls_numeric_plan_only_number_edit_save",
+      "xls_numeric_plan_only_rk_mulrk_edit_save",
+      "xls_visibility_eager_edit_save",
+      "xls_visibility_source_backed_edit_save",
+      "xls_visibility_eager_batch_edit_save",
+      "xls_visibility_source_backed_batch_edit_save",
+      "ppt_semantic_open",
+      "ppt_semantic_list_slides",
+      "ppt_semantic_one_shape_text",
+      "ppt_source_backed_one_shape_text",
+      "ppt_semantic_repeated_shape_text",
+      "ppt_source_backed_repeated_shape_text",
+      "ppt_semantic_fresh_open_one_shape_text",
+      "ppt_source_backed_fresh_open_one_shape_text",
+      "ppt_range_source_open",
+      "ppt_range_source_open_one_shape_text",
+      "ppt_owned_source_control_open",
+      "ppt_owned_source_control_open_one_shape_text",
+      "doc_facade_file_open",
+      "doc_facade_file_full_text",
+      "doc_facade_file_one_paragraph",
+      "ppt_facade_file_open",
+      "ppt_facade_file_full_text",
+      "ppt_facade_file_one_slide_text",
+      "ppt_semantic_full_text",
+      "ppt_slide_order_snapshot_open",
+      "ppt_text_edit_one_edit_save",
+      "ppt_semantic_noop_edit_save",
+      "ppt_semantic_one_edit_save",
+      "ppt_pictures_eager_open",
+      "ppt_pictures_source_backed_open",
+      "ppt_pictures_eager_first_image",
+      "ppt_pictures_source_backed_first_image",
+      "ppt_pictures_eager_cached_repeat",
+      "ppt_pictures_source_backed_cached_repeat",
+      "ppt_pictures_eager_open_all_images",
+      "ppt_pictures_source_backed_open_all_images",
+      "xlsx_open_owned",
+      "xlsx_list_sheets",
+      "xlsx_eager_named_sheet_lookup_4",
+      "xlsx_source_named_sheet_lookup_4",
+      "xlsx_eager_named_sheet_lookup_64",
+      "xlsx_source_named_sheet_lookup_64",
+      "xlsx_eager_named_sheet_lookup_large",
+      "xlsx_source_named_sheet_lookup_large",
+      "xlsx_first_cell",
+      "xlsx_full_cell_scan",
+      "xlsx_narrow_column_range_scan",
+      "xlsx_noop_commit",
+      "xlsx_noop_commit_save",
+      "xlsx_one_cell_commit",
+      "xlsx_one_cell_commit_first_read",
+      "xlsx_one_cell_commit_save",
+      "xlsx_one_percent_commit",
+      "xlsx_one_percent_commit_save",
+      "xlsx_source_open",
+      "xlsx_source_list_sheets",
+      "xlsx_source_first_cell",
+      "xlsx_source_narrow_column_range_scan",
+      "xlsx_file_open",
+      "xlsx_file_open_lifecycle",
+      "xlsx_file_selected_cell",
+      "xlsx_source_repeated_store_medium",
+      "xlsx_source_repeated_store_medium_reacquisition_control",
+      "xlsx_source_repeated_store_oversized",
+      "xlsx_source_repeated_store_oversized_reacquisition_control",
+      "xlsx_bytes_open",
+      "xlsx_bytes_open_lifecycle",
+      "xlsx_producer_medium_source_open",
+      "xlsx_producer_medium_source_selected_cell",
+      "xlsx_producer_medium_source_planning",
+      "xlsx_producer_medium_source_one_edit_save",
+      "xlsx_producer_dense_source_open",
+      "xlsx_producer_dense_source_selected_cell",
+      "xlsx_producer_dense_source_planning",
+      "xlsx_producer_dense_source_one_edit_save",
+      "xlsx_producer_medium_control_selected_cell",
+      "xlsx_producer_medium_control_planning",
+      "xlsx_producer_dense_control_selected_cell",
+      "xlsx_producer_dense_control_planning",
+      "xlsx_real_file_source_open",
+      "xlsx_real_file_source_selected_cell",
+      "docx_producer_source_selected_paragraph",
+      "pptx_producer_source_selected_slide",
+      "docx_ordinary_save_lifecycle",
+      "docx_ordinary_save_edit",
+      "docx_ordinary_save_atomic_publish",
+      "docx_ordinary_save_counting_publish",
+      "docx_real_file_ordinary_save_lifecycle",
+      "docx_real_file_ordinary_save_edit",
+      "docx_real_file_ordinary_save_atomic_publish",
+      "docx_real_file_ordinary_save_counting_publish",
+      "xlsx_ordinary_save_lifecycle",
+      "xlsx_ordinary_save_edit",
+      "xlsx_ordinary_save_atomic_publish",
+      "xlsx_ordinary_save_counting_publish",
+      "xlsx_real_file_ordinary_save_lifecycle",
+      "xlsx_real_file_ordinary_save_edit",
+      "xlsx_real_file_ordinary_save_atomic_publish",
+      "xlsx_real_file_ordinary_save_counting_publish",
+      "pptx_ordinary_save_lifecycle",
+      "pptx_ordinary_save_edit",
+      "pptx_ordinary_save_atomic_publish",
+      "pptx_ordinary_save_counting_publish",
+      "pptx_real_file_ordinary_save_lifecycle",
+      "pptx_real_file_ordinary_save_edit",
+      "pptx_real_file_ordinary_save_atomic_publish",
+      "pptx_real_file_ordinary_save_counting_publish",
+      "pptx_marker_eager_full_text",
+      "pptx_marker_source_full_text",
+      "pptx_marker_control_eager_full_text",
+      "pptx_marker_control_source_full_text",
+      "docx_marker_eager_full_text",
+      "docx_marker_source_full_text",
+      "docx_marker_control_eager_full_text",
+      "docx_marker_control_source_full_text",
+      "docx_marker_ordinary_save_lifecycle",
+      "docx_marker_ordinary_save_edit",
+      "docx_marker_ordinary_save_atomic_publish",
+      "docx_marker_ordinary_save_counting_publish",
+      "docx_marker_control_ordinary_save_lifecycle",
+      "docx_marker_control_ordinary_save_edit",
+      "docx_marker_control_ordinary_save_atomic_publish",
+      "docx_marker_control_ordinary_save_counting_publish",
+      "pptx_marker_ordinary_save_lifecycle",
+      "pptx_marker_ordinary_save_edit",
+      "pptx_marker_ordinary_save_atomic_publish",
+      "pptx_marker_ordinary_save_counting_publish",
+      "pptx_marker_control_ordinary_save_lifecycle",
+      "pptx_marker_control_ordinary_save_edit",
+      "pptx_marker_control_ordinary_save_atomic_publish",
+      "pptx_marker_control_ordinary_save_counting_publish",
+      "docx_semantic_text_to_sink",
+      "docx_source_text_to_sink",
+      "xlsx_streaming_create",
+      "opc_range_source_open",
+      "opc_range_source_open_main_read",
+      "provider_range_read_at",
+      "provider_nonseek_write",
+      "xlsx_range_source_open",
+      "xlsx_range_source_list_sheets",
+      "xlsx_range_source_first_cell",
+      "xlsx_range_source_narrow_column_range_scan",
+      "opc_open_session_scaling",
+      "cfb_bulk_read_scaling",
+      "rtf_file_open",
+      "rtf_file_open_lifecycle",
+      "rtf_semantic_open",
+      "rtf_semantic_paragraph_count",
+      "rtf_semantic_list_paragraphs",
+      "rtf_semantic_collect_paragraphs",
+      "rtf_semantic_one_paragraph",
+      "rtf_semantic_full_text",
+      "rtf_semantic_text_to_sink",
+      "rtf_semantic_stream_save",
+      "rtf_semantic_noop_edit_save",
+      "rtf_semantic_one_edit_save",
+      "rtf_semantic_one_percent_edit_save",
+      "rtf_semantic_remove_paragraph_save",
+      "rtf_semantic_move_paragraph_save",
+      "rtf_semantic_split_paragraph_save",
+      "rtf_semantic_merge_paragraph_save",
+      "rtf_logical_tail_append",
+      "rtf_logical_tail_noop_save",
+      "rtf_logical_tail_commit_append",
+      "rtf_logical_tail_plan_append",
+      "rtf_logical_tail_commit_noop_save",
+      "rtf_logical_tail_plan_noop_save",
+      "rtf_validation_report",
+      "rtf_streaming_create",
+      "rtf_picture_payload_batch_replace",
+      "rtf_picture_batch_remove",
+      "docx_semantic_open",
+      "docx_semantic_list_paragraphs",
+      "docx_semantic_one_paragraph",
+      "docx_semantic_one_paragraph_text",
+      "docx_semantic_full_text",
+      "docx_semantic_create_small",
+      "docx_streaming_create",
+      "docx_semantic_noop_edit_save",
+      "docx_semantic_one_edit_save",
+      "docx_semantic_one_percent_edit_save",
+      "docx_validation_report",
+      "docx_section_inventory",
+      "pptx_semantic_open",
+      "pptx_semantic_list_slides",
+      "pptx_semantic_one_slide",
+      "pptx_semantic_full_text",
+      "pptx_semantic_create_small",
+      "pptx_streaming_create",
+      "pptx_semantic_noop_edit_save",
+      "pptx_semantic_one_edit_save",
+      "pptx_semantic_one_percent_edit_save",
+      "pptx_semantic_opened_transaction_phases",
+      "pptx_named_one_edit_save",
+      "pptx_named_repeated_edit_save",
+      "pptx_numeric_repeated_edit_save",
+      "pptx_validation_report",
+      "odt_semantic_open",
+      "odt_semantic_list_paragraphs",
+      "odt_semantic_one_paragraph",
+      "odt_semantic_full_text",
+      "odt_semantic_text_to_sink",
+      "odt_semantic_create_small",
+      "odt_buffered_create",
+      "odt_streaming_create",
+      "odt_semantic_noop_edit_save",
+      "odt_semantic_one_edit_save",
+      "odt_semantic_one_percent_edit_save",
+      "odt_mixed_model_content_scalar_edit_save",
+      "odt_mixed_model_content_batch_edit_save",
+      "odf_validation_report",
+      "odf_mimetype_repair_plan",
+      "detect_odt_bytes",
+      "detect_odt_reader",
+      "detect_odt_polyglot",
+      "detect_odt_catalog_alias",
+      "odt_media_paragraph_edit_save",
+      "odt_media_line_break_edit_save",
+      "odt_media_append_run_edit_save",
+      "odt_media_append_hyperlink_edit_save",
+      "odt_media_insert_paragraph_edit_save",
+      "odt_media_remove_paragraph_edit_save",
+      "odt_embedded_resource_scalar_replace_save",
+      "odt_embedded_resource_batch_replace_save",
+      "odt_content_cow_owned_rebuild",
+      "odt_content_cow_positional",
+      "odt_source_backed_repeated_text_uncached",
+      "odt_source_backed_repeated_text_cached",
+      "odt_source_backed_catalog_open",
+      "odt_source_backed_catalog_list",
+      "odt_source_backed_catalog_query",
+      "ods_semantic_open",
+      "ods_semantic_list_sheets",
+      "ods_semantic_one_cell",
+      "ods_semantic_cell_sweep",
+      "ods_semantic_full_cell_text",
+      "ods_semantic_text_to_sink",
+      "ods_semantic_create_small",
+      "ods_buffered_create",
+      "ods_streaming_create",
+      "ods_semantic_noop_edit_save",
+      "ods_semantic_one_edit_save",
+      "ods_semantic_one_percent_edit_save",
+      "ods_source_eager_one_edit_save",
+      "ods_source_backed_one_edit_save",
+      "ods_source_eager_one_percent_edit_save",
+      "ods_source_backed_one_percent_edit_save",
+      "ods_source_backed_repeated_edit",
+      "ods_media_one_edit_save",
+      "ods_content_cow_owned_rebuild",
+      "ods_content_cow_positional",
+      "detect_ods_bytes",
+      "detect_ods_reader",
+      "detect_ods_polyglot",
+      "detect_ods_catalog_alias",
+      "odp_semantic_open",
+      "odp_semantic_list_slides",
+      "odp_semantic_one_slide",
+      "odp_semantic_full_text",
+      "odp_semantic_text_to_sink",
+      "odp_semantic_create_small",
+      "odp_buffered_create",
+      "odp_streaming_create",
+      "odp_existing_append_lifecycle",
+      "odp_source_tail_append_lifecycle",
+      "odp_semantic_noop_edit_save",
+      "odp_semantic_one_edit_save",
+      "odp_media_textbox_edit_save",
+      "odp_media_textbox_scalar_replace_save",
+      "odp_media_textbox_batch_replace_save",
+      "odp_content_cow_owned_rebuild",
+      "odp_content_cow_positional",
+      "odp_media_eager_open",
+      "odp_media_source_backed_open",
+      "odp_media_eager_one_slide",
+      "odp_media_source_backed_one_slide",
+      "detect_odp_bytes",
+      "detect_odp_reader",
+      "detect_odp_polyglot",
+      "detect_odp_catalog_alias",
+      "odp_file_eager_open",
+      "odp_file_source_open",
+      "odp_file_eager_selected_slide",
+      "odp_file_source_selected_slide",
+      "odp_source_backed_repeated_text_uncached",
+      "odp_source_backed_repeated_text_cached",
+      "odp_source_backed_catalog_open",
+      "odp_source_backed_catalog_list",
+      "odp_source_backed_catalog_query",
+      "ods_file_eager_open",
+      "ods_file_source_open",
+      "ods_file_eager_selected_cell",
+      "ods_file_source_selected_cell",
+      "ods_file_eager_selected_media",
+      "ods_file_source_selected_media",
+      "ods_file_eager_cell_sweep",
+      "ods_file_source_cell_sweep",
+      "ods_file_eager_cell_batch_sweep",
+      "ods_file_source_cell_batch_sweep"
+    ],
+    "coverage": {
+      "mapped": [
+        {
+          "selector": "cfb_list_streams",
+          "category_id": "low-level-package-part-relationship-stream-extension",
+          "status": "measured"
+        },
+        {
+          "selector": "cfb_read_one",
+          "category_id": "low-level-package-part-relationship-stream-extension",
+          "status": "measured"
+        },
+        {
+          "selector": "doc_fresh_write_to",
+          "category_id": "creation-from-scratch",
+          "status": "measured"
+        },
+        {
+          "selector": "docx_story_hyperlink_redaction_save",
+          "category_id": "content-deletion-sanitization",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "odf_mimetype_repair_plan",
+          "category_id": "validation-repair-normalization",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "odf_validation_report",
+          "category_id": "validation-repair-normalization",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "odp_existing_append_lifecycle",
+          "category_id": "append-incremental-generation",
+          "status": "measured"
+        },
+        {
+          "selector": "odp_semantic_text_to_sink",
+          "category_id": "conversion-export",
+          "status": "measured"
+        },
+        {
+          "selector": "ods_semantic_text_to_sink",
+          "category_id": "conversion-export",
+          "status": "measured"
+        },
+        {
+          "selector": "odt_semantic_text_to_sink",
+          "category_id": "conversion-export",
+          "status": "measured"
+        },
+        {
+          "selector": "opc_open",
+          "category_id": "low-level-package-part-relationship-stream-extension",
+          "status": "measured"
+        },
+        {
+          "selector": "ppt_fresh_write_to",
+          "category_id": "creation-from-scratch",
+          "status": "measured"
+        },
+        {
+          "selector": "pptx_cross_copy_media_rich",
+          "category_id": "cross-document-copying-assembly",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "pptx_source_backed_cross_copy_media_rich_lifecycle",
+          "category_id": "cross-document-copying-assembly",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "pptx_source_backed_cross_copy_plain",
+          "category_id": "cross-document-copying-assembly",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "pptx_source_backed_cross_copy_plain_lifecycle",
+          "category_id": "cross-document-copying-assembly",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "rtf_semantic_split_paragraph_save",
+          "category_id": "merging-splitting",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "rtf_semantic_text_to_sink",
+          "category_id": "conversion-export",
+          "status": "measured"
+        },
+        {
+          "selector": "rtf_streaming_create",
+          "category_id": "append-incremental-generation",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "xls_fresh_write_to",
+          "category_id": "creation-from-scratch",
+          "status": "measured"
+        },
+        {
+          "selector": "xls_validation_report",
+          "category_id": "security-protection-encryption-signing",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "xlsx_eager_cell_remove_edit_save",
+          "category_id": "content-deletion-sanitization",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "xlsx_eager_defined_names_edit_save",
+          "category_id": "structural-editing",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "xlsx_eager_merge_commit_save",
+          "category_id": "merging-splitting",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "xlsx_eager_row_visibility_edit_save",
+          "category_id": "structural-editing",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "xlsx_eager_sheet_protection_edit_save",
+          "category_id": "security-protection-encryption-signing",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "xlsx_full_cell_scan",
+          "category_id": "content-reading-extraction",
+          "status": "measured"
+        },
+        {
+          "selector": "xlsx_join_disjoint_commit_save",
+          "category_id": "comparison-patching-three-way-merge",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "xlsx_list_sheets",
+          "category_id": "structural-queries-analysis",
+          "status": "measured"
+        },
+        {
+          "selector": "xlsx_one_cell_commit",
+          "category_id": "template-filling-targeted-replacement",
+          "status": "measured"
+        },
+        {
+          "selector": "xlsx_one_percent_commit",
+          "category_id": "template-filling-targeted-replacement",
+          "status": "measured"
+        },
+        {
+          "selector": "xlsx_streaming_create",
+          "category_id": "append-incremental-generation",
+          "status": "correctness-only"
+        },
+        {
+          "selector": "xlsx_three_way_disjoint_commit_save",
+          "category_id": "comparison-patching-three-way-merge",
+          "status": "correctness-only"
+        }
+      ],
+      "excluded": [
+        {
+          "selector": "cfb_bulk_read_scaling",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_create_stream_borrowed",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_create_stream_owned",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_file_owned_same_length_overlay_atomic_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_file_same_length_overlay_atomic_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_mini_4095_shared_bulk",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_mini_4095_shared_concurrent",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_mini_4095_shared_different_sid",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_mini_4095_shared_one_shot",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_mini_4095_shared_repeat",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_mini_4095_shared_repeat8",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_mini_shared_bulk",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_mini_shared_concurrent",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_mini_shared_different_sid",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_mini_shared_one_shot",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_mini_shared_repeat",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_mini_shared_repeat8",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_simulated_mini_4095_shared_one_shot",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_simulated_mini_4095_shared_repeat",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_simulated_mini_4095_shared_repeat8",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_simulated_mini_shared_one_shot",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_simulated_mini_shared_repeat",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_open_stream_simulated_mini_shared_repeat8",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_selective_fat_legacy_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_selective_fat_shared_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_selective_mini_4095_legacy_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_selective_mini_4095_shared_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_selective_mini_legacy_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_selective_mini_shared_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_selective_simulated_fat_legacy_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_selective_simulated_fat_shared_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_selective_simulated_mini_4095_legacy_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_selective_simulated_mini_4095_shared_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_selective_simulated_mini_legacy_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_selective_simulated_mini_shared_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_shared_concurrent_reads",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_shared_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "cfb_shared_read_one",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odp_bytes",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odp_catalog_alias",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odp_polyglot",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odp_reader",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_ods_bytes",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_ods_catalog_alias",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_ods_polyglot",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_ods_reader",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odt_bytes",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odt_catalog_alias",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odt_polyglot",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "detect_odt_reader",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_body_snapshot_list_paragraphs",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_facade_file_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_facade_file_one_paragraph",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_facade_file_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_owner_public_phases",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_semantic_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_semantic_list_paragraphs",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_semantic_noop_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_semantic_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_semantic_one_paragraph",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_semantic_one_paragraph_at",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_semantic_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "doc_semantic_paragraph_count",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_eager_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_eager_list_paragraphs",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_eager_open_full_text_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_eager_open_paragraph_count_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_eager_paragraph_count",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_source_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_source_list_paragraphs",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_source_open_full_text_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_source_open_paragraph_count_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_file_source_paragraph_count",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_marker_control_eager_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_marker_control_ordinary_save_atomic_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_marker_control_ordinary_save_counting_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_marker_control_ordinary_save_edit",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_marker_control_ordinary_save_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_marker_control_source_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_marker_eager_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_marker_ordinary_save_atomic_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_marker_ordinary_save_counting_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_marker_ordinary_save_edit",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_marker_ordinary_save_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_marker_source_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_ordinary_save_atomic_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_ordinary_save_counting_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_ordinary_save_edit",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_ordinary_save_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_producer_source_selected_paragraph",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_real_file_ordinary_save_atomic_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_real_file_ordinary_save_counting_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_real_file_ordinary_save_edit",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_real_file_ordinary_save_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_section_inventory",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_semantic_create_small",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_semantic_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_semantic_list_paragraphs",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_semantic_noop_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_semantic_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_semantic_one_paragraph",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_semantic_one_paragraph_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_semantic_one_percent_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_semantic_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_semantic_text_to_sink",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_source_backed_existing_section_layout_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_source_backed_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_source_text_to_sink",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_story_hyperlink_noop_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_story_hyperlink_plan",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_streaming_create",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "docx_validation_report",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_buffered_create",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_content_cow_owned_rebuild",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_content_cow_positional",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_file_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_file_eager_selected_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_file_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_file_source_selected_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_media_eager_one_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_media_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_media_source_backed_one_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_media_source_backed_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_media_textbox_batch_replace_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_media_textbox_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_media_textbox_scalar_replace_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_semantic_create_small",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_semantic_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_semantic_list_slides",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_semantic_noop_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_semantic_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_semantic_one_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_semantic_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_source_backed_catalog_list",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_source_backed_catalog_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_source_backed_catalog_query",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_source_backed_repeated_text_cached",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_source_backed_repeated_text_uncached",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_source_tail_append_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odp_streaming_create",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_buffered_create",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_content_cow_owned_rebuild",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_content_cow_positional",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_file_eager_cell_batch_sweep",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_file_eager_cell_sweep",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_file_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_file_eager_selected_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_file_eager_selected_media",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_file_source_cell_batch_sweep",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_file_source_cell_sweep",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_file_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_file_source_selected_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_file_source_selected_media",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_media_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_semantic_cell_sweep",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_semantic_create_small",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_semantic_full_cell_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_semantic_list_sheets",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_semantic_noop_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_semantic_one_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_semantic_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_semantic_one_percent_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_semantic_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_source_backed_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_source_backed_one_percent_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_source_backed_repeated_edit",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_source_eager_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_source_eager_one_percent_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ods_streaming_create",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_buffered_create",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_content_cow_owned_rebuild",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_content_cow_positional",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_embedded_resource_batch_replace_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_embedded_resource_scalar_replace_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_file_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_file_eager_open_full_text_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_file_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_file_source_open_full_text_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_media_append_hyperlink_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_media_append_run_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_media_insert_paragraph_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_media_line_break_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_media_paragraph_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_media_remove_paragraph_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_mixed_model_content_batch_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_mixed_model_content_scalar_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_semantic_create_small",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_semantic_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_semantic_list_paragraphs",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_semantic_noop_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_semantic_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_semantic_one_paragraph",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_semantic_one_percent_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_semantic_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_source_backed_catalog_list",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_source_backed_catalog_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_source_backed_catalog_query",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_source_backed_repeated_text_cached",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_source_backed_repeated_text_uncached",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "odt_streaming_create",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ole_common_finish_render",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ole_common_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ole_common_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ole_common_put_stream_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "omml_formula_extract",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "omml_formula_range_scan",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_casefold_eager_lookup",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_casefold_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_casefold_owned_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_casefold_source_case_alias_lookup",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_casefold_source_exact_lookup",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_casefold_source_genuine_miss_lookup",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_casefold_source_lookup",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_casefold_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_file_eager_one_part_atomic_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_file_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_file_source_one_part_atomic_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_file_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_mutated_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_noop_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_open_owned",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_open_session_scaling",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_part_add_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_part_add_plain_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_range_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_range_source_open_main_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_relationship_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_serial_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_source_cache_budget_boundary",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_source_cache_control_contention",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_source_cache_managed_contention",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_source_cached_main_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_source_concurrent_same_part",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_source_materialize",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_source_materialize_accounted",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_source_open_main_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_source_overlay_multi_part_changed",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_source_overlay_multi_part_mixed",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_source_overlay_multi_part_noop",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "opc_source_overlay_one_part_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_facade_file_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_facade_file_one_slide_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_facade_file_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_owned_source_control_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_owned_source_control_open_one_shape_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_pictures_eager_cached_repeat",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_pictures_eager_first_image",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_pictures_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_pictures_eager_open_all_images",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_pictures_source_backed_cached_repeat",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_pictures_source_backed_first_image",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_pictures_source_backed_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_pictures_source_backed_open_all_images",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_range_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_range_source_open_one_shape_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_semantic_fresh_open_one_shape_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_semantic_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_semantic_list_slides",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_semantic_noop_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_semantic_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_semantic_one_shape_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_semantic_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_semantic_repeated_shape_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_slide_order_snapshot_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_source_backed_fresh_open_one_shape_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_source_backed_one_shape_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_source_backed_repeated_shape_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "ppt_text_edit_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_cross_copy_media_rich_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_cross_copy_plain",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_cross_copy_plain_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_drawingml_extract",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_drawingml_range_scan",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_eager_batch_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_eager_multi_slide_batch_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_eager_list_slides",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_eager_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_eager_open_selected_slide_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_eager_open_slide_count_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_eager_selected_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_eager_slide_count",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_source_list_slides",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_source_open_selected_slide_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_source_open_slide_count_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_source_selected_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_file_source_slide_count",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_marker_control_eager_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_marker_control_ordinary_save_atomic_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_marker_control_ordinary_save_counting_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_marker_control_ordinary_save_edit",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_marker_control_ordinary_save_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_marker_control_source_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_marker_eager_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_marker_ordinary_save_atomic_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_marker_ordinary_save_counting_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_marker_ordinary_save_edit",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_marker_ordinary_save_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_marker_source_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_named_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_named_repeated_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_numeric_repeated_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_ordinary_save_atomic_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_ordinary_save_counting_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_ordinary_save_edit",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_ordinary_save_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_producer_source_selected_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_real_file_ordinary_save_atomic_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_real_file_ordinary_save_counting_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_real_file_ordinary_save_edit",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_real_file_ordinary_save_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_semantic_create_small",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_semantic_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_semantic_list_slides",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_semantic_noop_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_semantic_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_semantic_one_percent_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_semantic_one_slide",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_semantic_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_semantic_opened_transaction_phases",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_slide_move_boundary_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_slide_remove_boundary_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_source_backed_batch_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_source_backed_image_query",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_source_backed_images_query",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_source_backed_multi_slide_batch_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_source_backed_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_source_backed_read_image_query",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_streaming_create",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "pptx_validation_report",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "provider_atomic_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "provider_file_read_at",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "provider_nonseek_write",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "provider_range_read_at",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_file_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_file_open_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_logical_tail_append",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_logical_tail_commit_append",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_logical_tail_commit_noop_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_logical_tail_noop_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_logical_tail_plan_append",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_logical_tail_plan_noop_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_picture_batch_remove",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_picture_payload_batch_replace",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_semantic_collect_paragraphs",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_semantic_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_semantic_list_paragraphs",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_semantic_merge_paragraph_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_semantic_move_paragraph_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_semantic_noop_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_semantic_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_semantic_one_paragraph",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_semantic_one_percent_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_semantic_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_semantic_paragraph_count",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_semantic_remove_paragraph_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_semantic_stream_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "rtf_validation_report",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_comments_eager_batch_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_comments_eager_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_comments_source_backed_batch_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_comments_source_backed_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_eager_open_list_worksheets",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_eager_open_one_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_numeric_eager_number_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_numeric_eager_rk_mulrk_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_numeric_plan_only_number_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_numeric_plan_only_rk_mulrk_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_numeric_source_backed_number_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_numeric_source_backed_rk_mulrk_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_owned_source_control_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_owned_source_control_open_all_cells",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_owned_source_control_open_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_owned_source_control_open_list_worksheets",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_owned_source_control_open_one_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_owned_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_owned_source_open_list_worksheets",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_owned_source_open_one_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_range_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_range_source_open_all_cells",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_range_source_open_full_text",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_range_source_open_list_worksheets",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_range_source_open_one_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_semantic_full_cell_scan",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_semantic_list_worksheets",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_semantic_noop_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_semantic_one_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_semantic_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_semantic_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_source_backed_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_source_backed_open_list_worksheets",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_source_backed_open_one_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_visibility_eager_batch_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_visibility_eager_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_visibility_source_backed_batch_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xls_visibility_source_backed_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsb_semantic_full_cell_scan",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsb_semantic_list_worksheets",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsb_semantic_one_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsb_semantic_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsb_semantic_workbook_structure_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_bytes_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_bytes_open_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_auto_filter_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_calculation_metadata_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_cell_clear_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_cell_values_batch_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_cell_values_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_cell_values_one_percent_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_conditional_formatting_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_data_validation_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_named_sheet_lookup_4",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_named_sheet_lookup_64",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_named_sheet_lookup_large",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_page_break_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_page_margin_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_page_setup_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_print_options_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_row_visibility_batch_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_eager_unmerge_commit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_file_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_file_open_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_file_selected_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_first_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_join_conflict_plan",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_narrow_column_range_scan",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_noop_commit",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_noop_commit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_one_cell_commit_first_read",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_one_cell_commit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_one_percent_commit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_open_owned",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_ordinary_save_atomic_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_ordinary_save_counting_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_ordinary_save_edit",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_ordinary_save_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_package_repeated_page_breaks",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_producer_dense_control_planning",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_producer_dense_control_selected_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_producer_dense_source_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_producer_dense_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_producer_dense_source_planning",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_producer_dense_source_selected_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_producer_medium_control_planning",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_producer_medium_control_selected_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_producer_medium_source_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_producer_medium_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_producer_medium_source_planning",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_producer_medium_source_selected_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_range_source_first_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_range_source_list_sheets",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_range_source_narrow_column_range_scan",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_range_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_real_file_ordinary_save_atomic_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_real_file_ordinary_save_counting_publish",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_real_file_ordinary_save_edit",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_real_file_ordinary_save_lifecycle",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_real_file_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_real_file_source_selected_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_auto_filter_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_calculation_metadata_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_cell_clear_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_cell_remove_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_cell_values_batch_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_cell_values_multi_sheet_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_cell_values_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_conditional_formatting_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_data_validation_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_defined_names_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_managed_cell_values_batch_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_managed_cell_values_multi_sheet_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_managed_cell_values_one_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_page_break_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_page_margin_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_page_setup_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_print_options_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_row_visibility_batch_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_row_visibility_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_backed_sheet_protection_edit_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_first_cell",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_list_sheets",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_named_sheet_lookup_4",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_named_sheet_lookup_64",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_named_sheet_lookup_large",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_narrow_column_range_scan",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_open",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_repeated_store_medium",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_repeated_store_medium_reacquisition_control",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_repeated_store_oversized",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_source_repeated_store_oversized_reacquisition_control",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_three_way_conflict_resolve_save",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "xlsx_worksheet_repeated_page_breaks",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "zip_index",
+          "reason": "not-selected-in-representative-matrix"
+        },
+        {
+          "selector": "zip_read_one",
+          "reason": "not-selected-in-representative-matrix"
+        }
+      ]
+    }
+  },
+  "checked_catalog": {
+    "path": "docs/performance/results/perf-corpus-manifest-v2.json",
+    "catalog_id": "litchi-perf-corpus-v2",
+    "catalog_sha256": "f03c9f56846f3c7a22d012189e40126dd65be50efbfd24275c3f9ab40854e41a",
+    "content_set_sha256": "8e629fef89f7eccf023ebc6a6e8b8aebdbcf91207f6d6dfedd2e2fe59c3452a5"
+  },
+  "status_values": [
+    "measured",
+    "correctness-only",
+    "unsupported",
+    "not-applicable"
+  ],
+  "status_semantics": {
+    "measured": "default-baseline timing contract: static identity binding is not timing evidence; scheduled/manual full runs must validate actual report rows",
+    "correctness-only": "selector or API evidence is retained without a baseline timing claim; emitted timing is not claimed here",
+    "unsupported": "no selector-backed evidence is claimed and an explicit reason is required",
+    "not-applicable": "the capability is deliberately outside this non-iWork coverage scope and an explicit reason is required"
+  },
+  "coverage_claim": "representative checklist mappings; this index is not an exhaustive certification of every checklist row",
+  "categories": [
+    {
+      "id": "content-reading-extraction",
+      "name": "Content reading and extraction",
+      "checklist_refs": [
+        "Open valid input",
+        "Malformed input is covered"
+      ],
+      "status": "measured",
+      "measurement": {
+        "kind": "full-run-timing-contract",
+        "identity_artifact": "docs/performance/results/perf-regression-default-manifest-v1.json",
+        "run_report": "target/perf/container-baseline.json",
+        "minimum_samples": 15
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_full_cell_scan",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "xlsx_full_cell_scan",
+            "ids": [
+              "xlsx-opc-zip:sha256:5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+              "xlsx-opc-zip:sha256:69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+              "xlsx-opc-zip:sha256:9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+            ],
+            "shapes": [
+              "dense-wide",
+              "medium",
+              "tiny"
+            ]
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "structural-queries-analysis",
+      "name": "Structural queries and document analysis",
+      "checklist_refs": [
+        "Selection is checked",
+        "Snapshot is immutable",
+        "Unknown data is bounded"
+      ],
+      "status": "measured",
+      "measurement": {
+        "kind": "full-run-timing-contract",
+        "identity_artifact": "docs/performance/results/perf-regression-default-manifest-v1.json",
+        "run_report": "target/perf/container-baseline.json",
+        "minimum_samples": 15
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_list_sheets",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "xlsx_list_sheets",
+            "ids": [
+              "xlsx-opc-zip:sha256:5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+              "xlsx-opc-zip:sha256:69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+              "xlsx-opc-zip:sha256:9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+            ],
+            "shapes": [
+              "dense-wide",
+              "medium",
+              "tiny"
+            ]
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "conversion-export",
+      "name": "Conversion and export",
+      "checklist_refs": [
+        "Scope is explicit",
+        "Performance claims are measured"
+      ],
+      "status": "measured",
+      "measurement": {
+        "kind": "full-run-timing-contract",
+        "identity_artifact": "docs/performance/results/perf-regression-default-manifest-v1.json",
+        "run_report": "target/perf/container-baseline.json",
+        "minimum_samples": 15
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "rtf_semantic_text_to_sink",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "rtf_semantic_text_to_sink",
+            "ids": [
+              "rtf:sha256:48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+              "rtf:sha256:957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+              "rtf:sha256:ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328"
+            ],
+            "shapes": [
+              "large",
+              "medium",
+              "tiny"
+            ]
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "odt_semantic_text_to_sink",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "odt_semantic_text_to_sink",
+            "ids": [
+              "odt-odf-zip:sha256:39662778e7a17d1909848487afcfd68e9d9945118769709bbde6f156a257bae4",
+              "odt-odf-zip:sha256:5f4741273e40a5e847662d8a7af03e72bb0481ad5260f7d8efeed358a662eb48",
+              "odt-odf-zip:sha256:81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7"
+            ],
+            "shapes": [
+              "large",
+              "medium",
+              "tiny"
+            ]
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "ods_semantic_text_to_sink",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "ods_semantic_text_to_sink",
+            "ids": [
+              "ods-odf-zip:sha256:3318bdf143965aaf3a780658d076c2d63c60574dcbb95a86bc00d5666d08a2d3",
+              "ods-odf-zip:sha256:e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+              "ods-odf-zip:sha256:f4d7a31785e734db61b7c99194a61d446ad5de2dab81f8e7e1ea7197c2715e67"
+            ],
+            "shapes": [
+              "large",
+              "medium",
+              "tiny"
+            ]
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "odp_semantic_text_to_sink",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "odp_semantic_text_to_sink",
+            "ids": [
+              "odp-odf-zip:sha256:08389eff98c92ec9ce0c989a0ed353e5be8013651a756a5167ea3a6ebee67eff",
+              "odp-odf-zip:sha256:8efa67b515572855143622f3dab0ba29eaafd39af5f72f441527b07af614562c",
+              "odp-odf-zip:sha256:b047dec931b6252e9b43e71321a60c4ede396d419a818907680ed64d952c114d"
+            ],
+            "shapes": [
+              "large",
+              "medium",
+              "tiny"
+            ]
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "creation-from-scratch",
+      "name": "Creation from scratch",
+      "checklist_refs": [
+        "Minimal valid artifact",
+        "Deterministic output",
+        "Package topology is valid"
+      ],
+      "status": "measured",
+      "measurement": {
+        "kind": "full-run-timing-contract",
+        "identity_artifact": "docs/performance/results/perf-regression-default-manifest-v1.json",
+        "run_report": "target/perf/container-baseline.json",
+        "minimum_samples": 15
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "doc_fresh_write_to",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "doc_fresh_write_to",
+            "ids": [
+              "doc-cfb:sha256:3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
+              "doc-cfb:sha256:707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
+              "doc-cfb:sha256:ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+            ],
+            "shapes": [
+              "large",
+              "payload-heavy",
+              "tiny"
+            ]
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "xls_fresh_write_to",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "xls_fresh_write_to",
+            "ids": [
+              "xls-cfb:sha256:228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb",
+              "xls-cfb:sha256:cdc133bd87aaa60a91ea5e94df6ff8da0eb6bb0f2432afa4bfdb13cf70c0298b",
+              "xls-cfb:sha256:f0bec5d6a82d5d739a0993704751fb4da906183a4105b159d10e9b73969491fc"
+            ],
+            "shapes": [
+              "large",
+              "payload-heavy",
+              "tiny"
+            ]
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "ppt_fresh_write_to",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "ppt_fresh_write_to",
+            "ids": [
+              "ppt-cfb:sha256:229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52",
+              "ppt-cfb:sha256:51686d86b2ca22c444c382565d065be7d92aecd9b6f7fdfb8597a2593d155ffb",
+              "ppt-cfb:sha256:e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+            ],
+            "shapes": [
+              "large",
+              "payload-heavy",
+              "tiny"
+            ]
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "template-filling-targeted-replacement",
+      "name": "Template filling and targeted replacement",
+      "checklist_refs": [
+        "Update each field family",
+        "Read after create"
+      ],
+      "status": "measured",
+      "measurement": {
+        "kind": "full-run-timing-contract",
+        "identity_artifact": "docs/performance/results/perf-regression-default-manifest-v1.json",
+        "run_report": "target/perf/container-baseline.json",
+        "minimum_samples": 15
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_one_cell_commit",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "xlsx_one_cell_commit",
+            "ids": [
+              "xlsx-opc-zip:sha256:5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+              "xlsx-opc-zip:sha256:69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+              "xlsx-opc-zip:sha256:9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+            ],
+            "shapes": [
+              "dense-wide",
+              "medium",
+              "tiny"
+            ]
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "xlsx_one_percent_commit",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "xlsx_one_percent_commit",
+            "ids": [
+              "xlsx-opc-zip:sha256:5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+              "xlsx-opc-zip:sha256:69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+              "xlsx-opc-zip:sha256:9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+            ],
+            "shapes": [
+              "dense-wide",
+              "medium",
+              "tiny"
+            ]
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "append-incremental-generation",
+      "name": "Append-only and incremental generation",
+      "checklist_refs": [
+        "Authoring is bounded",
+        "Minimal valid artifact"
+      ],
+      "status": "measured",
+      "measurement": {
+        "kind": "full-run-timing-contract",
+        "identity_artifact": "docs/performance/results/perf-regression-default-manifest-v1.json",
+        "run_report": "target/perf/container-baseline.json",
+        "minimum_samples": 15
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_streaming_create",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "large",
+              "medium",
+              "tiny"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "rtf_streaming_create",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "large",
+              "medium",
+              "tiny"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "odp_existing_append_lifecycle",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "odp_existing_append_lifecycle",
+            "ids": [
+              "odp-odf-zip:sha256:62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
+              "odp-odf-zip:sha256:92321a679c82b333416a478f7b1ab52b5876abad071a2298a1417e1ff0213e75",
+              "odp-odf-zip:sha256:bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c"
+            ],
+            "shapes": [
+              "large",
+              "medium",
+              "tiny"
+            ]
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "structural-editing",
+      "name": "Structural editing",
+      "checklist_refs": [
+        "Create semantic owner",
+        "Reorder or move",
+        "Atomic failure"
+      ],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_eager_defined_names_edit_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "media-rich"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "xlsx_eager_row_visibility_edit_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "large",
+              "medium"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "content-deletion-sanitization",
+      "name": "Content deletion and document sanitization",
+      "checklist_refs": [
+        "Delete first/middle/last/only",
+        "Unknown content survives",
+        "Lossless-or-refuse is enforced"
+      ],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_eager_cell_remove_edit_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "dense-sparse",
+              "medium"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "docx_story_hyperlink_redaction_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "media-rich"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cross-document-copying-assembly",
+      "name": "Cross-document copying and assembly",
+      "checklist_refs": [
+        "Package topology is valid",
+        "Unknown content survives"
+      ],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "pptx_source_backed_cross_copy_plain",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "plain"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "pptx_source_backed_cross_copy_plain_lifecycle",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "plain"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "pptx_source_backed_cross_copy_media_rich_lifecycle",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "media-rich"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "pptx_cross_copy_media_rich",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "media-rich"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "merging-splitting",
+      "name": "Merging and splitting",
+      "checklist_refs": [
+        "Reorder or move",
+        "Reversible patch"
+      ],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_eager_merge_commit_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "sparse-a1-b2"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "rtf_semantic_split_paragraph_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "large",
+              "medium",
+              "tiny"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "comparison-patching-three-way-merge",
+      "name": "Comparison, patching, and three-way merge",
+      "checklist_refs": [
+        "Reversible patch",
+        "Concurrent composition"
+      ],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_join_disjoint_commit_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "medium"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "xlsx_three_way_disjoint_commit_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "medium"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "validation-repair-normalization",
+      "name": "Validation, repair, and normalization",
+      "checklist_refs": [
+        "Malformed input is covered",
+        "Unsupported states are explicit",
+        "Diff and generated XML are audited"
+      ],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "odf_validation_report",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "large",
+              "medium",
+              "tiny"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "odf_mimetype_repair_plan",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "large",
+              "medium",
+              "tiny"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dynamic-content-calculation-refresh",
+      "name": "Dynamic content calculation and refresh",
+      "checklist_refs": [
+        "Formula behavior is capability-bound",
+        "External targets remain inert"
+      ],
+      "status": "unsupported",
+      "measurement": {
+        "kind": "unsupported",
+        "reason": "No selector-backed evidence is claimed; explicit capability is required."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "status": "unsupported",
+          "reason": "No selector evaluates formulas or refreshes external content; those operations require an explicit caller capability and remain outside the inert performance harness."
+        }
+      ]
+    },
+    {
+      "id": "security-protection-encryption-signing",
+      "name": "Security, protection, encryption, and signing",
+      "checklist_refs": [
+        "Signature policy is explicit",
+        "Encryption policy is explicit",
+        "Macros and VBA remain inert"
+      ],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xls_validation_report",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "large",
+              "tiny"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "xlsx_eager_sheet_protection_edit_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": [
+              "media-rich"
+            ],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "low-level-package-part-relationship-stream-extension",
+      "name": "Low-level package, Part, Relationship, stream, and extension operations",
+      "checklist_refs": [
+        "Package topology is valid",
+        "Unknown content survives"
+      ],
+      "status": "measured",
+      "measurement": {
+        "kind": "full-run-timing-contract",
+        "identity_artifact": "docs/performance/results/perf-regression-default-manifest-v1.json",
+        "run_report": "target/perf/container-baseline.json",
+        "minimum_samples": 15
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "cfb_list_streams",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "cfb_list_streams",
+            "ids": [
+              "cfb-ole2:sha256:186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8",
+              "cfb-ole2:sha256:2d26fb024fc844112843ca76e615e9402d722efd72aec35737c17085c80e5115",
+              "cfb-ole2:sha256:4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+              "cfb-ole2:sha256:50af945fdf091648da751193b28621eda6c5f80f9980fbceae4baf9014d8d6d8",
+              "cfb-ole2:sha256:6475ba52d3a442956caa0ca08f0e3dfad4ae93729baa179eee13b1ba0176515f",
+              "cfb-ole2:sha256:84f1dcb6b2f35b87a9abb4aa783cc9988172b368cb72956d72b11c0a0ec5f282",
+              "cfb-ole2:sha256:b9b1216d01da16665f0e2412c07cabc6fcc23905e9582f2cdb0f6121257227fe",
+              "cfb-ole2:sha256:dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c"
+            ],
+            "shapes": [
+              "few-large",
+              "many-small",
+              "tiny",
+              "wide-root"
+            ]
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "cfb_read_one",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "cfb_read_one",
+            "ids": [
+              "cfb-ole2:sha256:186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8",
+              "cfb-ole2:sha256:2d26fb024fc844112843ca76e615e9402d722efd72aec35737c17085c80e5115",
+              "cfb-ole2:sha256:4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+              "cfb-ole2:sha256:50af945fdf091648da751193b28621eda6c5f80f9980fbceae4baf9014d8d6d8",
+              "cfb-ole2:sha256:6475ba52d3a442956caa0ca08f0e3dfad4ae93729baa179eee13b1ba0176515f",
+              "cfb-ole2:sha256:84f1dcb6b2f35b87a9abb4aa783cc9988172b368cb72956d72b11c0a0ec5f282",
+              "cfb-ole2:sha256:b9b1216d01da16665f0e2412c07cabc6fcc23905e9582f2cdb0f6121257227fe",
+              "cfb-ole2:sha256:dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c"
+            ],
+            "shapes": [
+              "few-large",
+              "many-small",
+              "tiny",
+              "wide-root"
+            ]
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        },
+        {
+          "selector": "opc_open",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "opc_open",
+            "ids": [
+              "opc-zip:sha256:08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40",
+              "opc-zip:sha256:183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+              "opc-zip:sha256:1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+              "opc-zip:sha256:879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+              "opc-zip:sha256:a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+              "opc-zip:sha256:b8ed826dc5627314aa1f2442b6313158ef48bab7622dce0994b94afe8cc2cfd7",
+              "opc-zip:sha256:c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb",
+              "opc-zip:sha256:c89c13841d987233e00cbf0fd9f40f35a56c463c5eb3aadd551fce1e008a9d35"
+            ],
+            "shapes": [
+              "few-large",
+              "many-small",
+              "tiny",
+              "wide-root"
+            ]
+          },
+          "evidence": [
+            "tools/perf-baseline/README.md",
+            "docs/performance/CRUD_COVERAGE.md"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,742 @@
+--- pre-accounting/source/mod.rs
++++ crates/litchi-ods/src/sheet_metadata/mod.rs
+@@ -640,8 +640,44 @@
+             enforce_context_lineage,
+         })
+     }
+ 
++    /// Reopen a retained target under the destination snapshot's policy.
++    ///
++    /// A patch target may have been accepted under another profile or
++    /// cancellation token.  Reusing its retained snapshot would therefore
++    /// bypass destination admission.  The exact target bytes are checked and
++    /// parsed again under the destination context, with a destination-owned
++    /// output reservation retained by the returned snapshot.
++    fn reopen_for_destination(&self, destination: &Self) -> Result<Self> {
++        self.context.check().map_err(map_execution)?;
++        destination.context.check().map_err(map_execution)?;
++        let target_bytes = self.source.len();
++        if target_bytes > destination.limits.max_output_bytes() {
++            return Err(limit(
++                "output bytes",
++                target_bytes,
++                destination.limits.max_output_bytes(),
++            ));
++        }
++        let output = destination
++            .context
++            .reserve(
++                Resource::OutputBytes,
++                u64::try_from(target_bytes)
++                    .map_err(|_| invalid("ODS metadata target size overflows u64"))?,
++            )
++            .map_err(map_execution)?;
++        let mut target = Self::parse_arc_with_context(
++            Arc::clone(&self.source),
++            destination.limits,
++            &destination.context,
++            destination.enforce_context_lineage,
++        )?;
++        target._source_output = Some(Arc::new(output));
++        Ok(target)
++    }
++
+     /// Exact content.xml source bytes retained by this snapshot.
+     #[must_use]
+     pub fn source_xml(&self) -> &str {
+         &self.source
+@@ -683,9 +719,29 @@
+     pub fn cell_metadata<'a>(
+         &'a self,
+         selector: CellSelector<'_>,
+     ) -> Result<Option<CellMetadataView<'a>>> {
+-        match self.catalog.cell_for_selector(&selector)? {
++        self.catalog
++            .cell_for_selector(&selector, &self.context, self.limits)
++            .and_then(|physical| self.cell_metadata_for_physical(physical))
++    }
++
++    fn cell_metadata_with_budget<'a>(
++        &'a self,
++        selector: CellSelector<'_>,
++        selector_budget: &mut index::SelectorBudget,
++    ) -> Result<Option<CellMetadataView<'a>>> {
++        let physical = self
++            .catalog
++            .cell_for_selector_with_budget(&selector, selector_budget)?;
++        self.cell_metadata_for_physical(physical)
++    }
++
++    fn cell_metadata_for_physical<'a>(
++        &'a self,
++        physical: index::PhysicalCell,
++    ) -> Result<Option<CellMetadataView<'a>>> {
++        match physical {
+             index::PhysicalCell::Missing => Ok(None),
+             index::PhysicalCell::ImplicitCovered {
+                 anchor,
+                 rows,
+@@ -763,11 +819,16 @@
+     column: usize,
+ }
+ 
+ impl CellKey {
+-    fn from_selector(catalog: &index::Catalog, selector: CellSelector<'_>) -> Result<Self> {
++    fn from_selector_with_budget(
++        catalog: &index::Catalog,
++        selector: CellSelector<'_>,
++        selector_budget: &mut index::SelectorBudget,
++    ) -> Result<Self> {
+         Ok(Self {
+-            table_index: catalog.table_index_for_selector(&selector)?,
++            table_index: catalog
++                .table_index_for_selector_with_budget(&selector, selector_budget)?,
+             row: selector.row,
+             column: selector.column,
+         })
+     }
+@@ -1121,18 +1182,28 @@
+     pub fn edit_detective<F>(&mut self, selector: CellSelector<'_>, update: F) -> Result<()>
+     where
+         F: FnOnce(&mut Detective) -> Result<()>,
+     {
+-        self.ensure_cell_target(selector, false)?;
+-        let existing = self.effective_cell_detective(selector)?;
++        let mut selector_budget = self.selector_budget();
++        self.ensure_cell_target_with_budget(selector, false, &mut selector_budget)?;
++        let existing = self.effective_cell_detective_with_budget(selector, &mut selector_budget)?;
+         let clone_memory = existing
+             .map(detective_size_bound)
+             .transpose()?
+             .map(|size| self.reserve_staging_bytes(size))
+             .transpose()?;
+         let mut value = existing.cloned().unwrap_or_else(Detective::new);
+         update(&mut value)?;
+-        let result = self.set_detective(selector, value);
++        validate_detective_limits(&value, self.before.limits)?;
++        if value.highlighted_ranges().len() > self.before.limits.max_detective_ranges()
++            || value.operations().len() > self.before.limits.max_detective_operations()
++        {
++            return Err(Error::Unsupported(
++                "ODS detective collection limit exceeded".to_string(),
++            ));
++        }
++        let result =
++            self.stage_cell_detective_with_budget(selector, Some(value), &mut selector_budget);
+         drop(clone_memory);
+         result
+     }
+ 
+@@ -1140,13 +1211,23 @@
+         &mut self,
+         selector: CellSelector<'_>,
+         value: Option<CellRange>,
+     ) -> Result<()> {
+-        self.ensure_cell_target(selector, value.is_none())?;
+-        let baseline = self.baseline_cell_source(selector)?;
+-        let effective = self.effective_cell_source(selector)?;
++        let mut selector_budget = self.selector_budget();
++        self.stage_cell_source_with_budget(selector, value, &mut selector_budget)
++    }
++
++    fn stage_cell_source_with_budget(
++        &mut self,
++        selector: CellSelector<'_>,
++        value: Option<CellRange>,
++        selector_budget: &mut index::SelectorBudget,
++    ) -> Result<()> {
++        self.ensure_cell_target_with_budget(selector, value.is_none(), selector_budget)?;
++        let baseline = self.baseline_cell_source_with_budget(selector, selector_budget)?;
++        let effective = self.effective_cell_source_with_budget(selector, selector_budget)?;
+         if baseline == value.as_ref() {
+-            self.clear_staged_cell_field(selector, CellField::Source)?;
++            self.clear_staged_cell_field(selector, CellField::Source, selector_budget)?;
+             return Ok(());
+         }
+         if effective == value.as_ref() {
+             return Ok(());
+@@ -1157,9 +1238,10 @@
+             Some(self.reserve_staging_bytes(cell_range_size_bound(value)?)?)
+         } else {
+             None
+         };
+-        let key = CellKey::from_selector(&self.before.catalog, selector)?;
++        let key =
++            CellKey::from_selector_with_budget(&self.before.catalog, selector, selector_budget)?;
+         self.bump_operation()?;
+         self.retain_staging(key_memory);
+         if let Some(value_memory) = value_memory {
+             self.retain_staging(value_memory);
+@@ -1171,13 +1253,23 @@
+         &mut self,
+         selector: CellSelector<'_>,
+         value: Option<Detective>,
+     ) -> Result<()> {
+-        self.ensure_cell_target(selector, value.is_none())?;
+-        let baseline = self.baseline_cell_detective(selector)?;
+-        let effective = self.effective_cell_detective(selector)?;
++        let mut selector_budget = self.selector_budget();
++        self.stage_cell_detective_with_budget(selector, value, &mut selector_budget)
++    }
++
++    fn stage_cell_detective_with_budget(
++        &mut self,
++        selector: CellSelector<'_>,
++        value: Option<Detective>,
++        selector_budget: &mut index::SelectorBudget,
++    ) -> Result<()> {
++        self.ensure_cell_target_with_budget(selector, value.is_none(), selector_budget)?;
++        let baseline = self.baseline_cell_detective_with_budget(selector, selector_budget)?;
++        let effective = self.effective_cell_detective_with_budget(selector, selector_budget)?;
+         if baseline == value.as_ref() {
+-            self.clear_staged_cell_field(selector, CellField::Detective)?;
++            self.clear_staged_cell_field(selector, CellField::Detective, selector_budget)?;
+             return Ok(());
+         }
+         if effective == value.as_ref() {
+             return Ok(());
+@@ -1188,9 +1280,10 @@
+             Some(self.reserve_staging_bytes(detective_size_bound(value)?)?)
+         } else {
+             None
+         };
+-        let key = CellKey::from_selector(&self.before.catalog, selector)?;
++        let key =
++            CellKey::from_selector_with_budget(&self.before.catalog, selector, selector_budget)?;
+         self.bump_operation()?;
+         self.retain_staging(key_memory);
+         if let Some(value_memory) = value_memory {
+             self.retain_staging(value_memory);
+@@ -1198,63 +1291,92 @@
+         self.cell_ops.entry(key).or_default().detective = Some(value);
+         Ok(())
+     }
+ 
+-    fn cell_op(&self, selector: CellSelector<'_>) -> Result<Option<&CellOp>> {
+-        let key = CellKey::from_selector(&self.before.catalog, selector)?;
++    fn selector_budget(&self) -> index::SelectorBudget {
++        index::SelectorBudget::new(&self.before.context, self.before.limits)
++    }
++
++    fn cell_op_with_budget(
++        &self,
++        selector: CellSelector<'_>,
++        selector_budget: &mut index::SelectorBudget,
++    ) -> Result<Option<&CellOp>> {
++        let key =
++            CellKey::from_selector_with_budget(&self.before.catalog, selector, selector_budget)?;
+         Ok(self.cell_ops.get(&key))
+     }
+ 
+-    fn baseline_cell_source(&self, selector: CellSelector<'_>) -> Result<Option<&CellRange>> {
++    fn baseline_cell_source_with_budget(
++        &self,
++        selector: CellSelector<'_>,
++        selector_budget: &mut index::SelectorBudget,
++    ) -> Result<Option<&CellRange>> {
+         Ok(self
+             .before
+-            .cell_metadata(selector)?
++            .cell_metadata_with_budget(selector, selector_budget)?
+             .and_then(|view| view.range_source()))
+     }
+ 
+-    fn baseline_cell_detective(&self, selector: CellSelector<'_>) -> Result<Option<&Detective>> {
++    fn baseline_cell_detective_with_budget(
++        &self,
++        selector: CellSelector<'_>,
++        selector_budget: &mut index::SelectorBudget,
++    ) -> Result<Option<&Detective>> {
+         Ok(self
+             .before
+-            .cell_metadata(selector)?
++            .cell_metadata_with_budget(selector, selector_budget)?
+             .and_then(|view| view.detective()))
+     }
+ 
+-    fn effective_cell_source(&self, selector: CellSelector<'_>) -> Result<Option<&CellRange>> {
+-        if let Some(op) = self.cell_op(selector)?
++    fn effective_cell_source_with_budget(
++        &self,
++        selector: CellSelector<'_>,
++        selector_budget: &mut index::SelectorBudget,
++    ) -> Result<Option<&CellRange>> {
++        if let Some(op) = self.cell_op_with_budget(selector, selector_budget)?
+             && let Some(value) = &op.source
+         {
+             return Ok(value.as_ref());
+         }
+-        self.baseline_cell_source(selector)
+-    }
+-
+-    fn effective_cell_detective(&self, selector: CellSelector<'_>) -> Result<Option<&Detective>> {
+-        if let Some(op) = self.cell_op(selector)?
++        self.baseline_cell_source_with_budget(selector, selector_budget)
++    }
++
++    fn effective_cell_detective_with_budget(
++        &self,
++        selector: CellSelector<'_>,
++        selector_budget: &mut index::SelectorBudget,
++    ) -> Result<Option<&Detective>> {
++        if let Some(op) = self.cell_op_with_budget(selector, selector_budget)?
+             && let Some(value) = &op.detective
+         {
+             return Ok(value.as_ref());
+         }
+-        self.baseline_cell_detective(selector)
++        self.baseline_cell_detective_with_budget(selector, selector_budget)
+     }
+ 
+     fn clear_staged_cell_field(
+         &mut self,
+         selector: CellSelector<'_>,
+         field: CellField,
++        selector_budget: &mut index::SelectorBudget,
+     ) -> Result<()> {
+-        let has_field = self.cell_op(selector)?.is_some_and(|op| match field {
+-            CellField::Source => op.source.is_some(),
+-            CellField::Detective => op.detective.is_some(),
+-        });
++        let has_field = self
++            .cell_op_with_budget(selector, selector_budget)?
++            .is_some_and(|op| match field {
++                CellField::Source => op.source.is_some(),
++                CellField::Detective => op.detective.is_some(),
++            });
+         if !has_field {
+             return Ok(());
+         }
+ 
+         // The key is recreated only after its allocation has been charged. It
+         // is a temporary lookup key; the existing map node and its retained
+         // value reservation remain owned by the edit until rollback/drop.
+         let key_memory = self.reserve_staging_bytes(cell_key_size()?)?;
+-        let key = CellKey::from_selector(&self.before.catalog, selector)?;
++        let key =
++            CellKey::from_selector_with_budget(&self.before.catalog, selector, selector_budget)?;
+         if let Some(op) = self.cell_ops.get_mut(&key) {
+             match field {
+                 CellField::Source => op.source = None,
+                 CellField::Detective => op.detective = None,
+@@ -1276,10 +1398,19 @@
+         if self.cell_ops.is_empty() && !self.consolidation_staged && !self.labels_staged {
+             self.staging_memory = None;
+         }
+     }
+-    fn ensure_cell_target(&self, selector: CellSelector<'_>, allow_missing: bool) -> Result<()> {
+-        match self.before.catalog.cell_for_selector(&selector)? {
++    fn ensure_cell_target_with_budget(
++        &self,
++        selector: CellSelector<'_>,
++        allow_missing: bool,
++        selector_budget: &mut index::SelectorBudget,
++    ) -> Result<()> {
++        match self
++            .before
++            .catalog
++            .cell_for_selector_with_budget(&selector, selector_budget)?
++        {
+             index::PhysicalCell::Missing if allow_missing => Ok(()),
+             index::PhysicalCell::Missing => Err(Error::InvalidFormat("ODS metadata cell selector did not match a physical cell".to_string())),
+             index::PhysicalCell::ImplicitCovered { .. } => Err(Error::Unsupported("UnsupportedImplicitCoveredCell: ODS metadata cannot materialize an implicit covered cell".to_string())),
+             index::PhysicalCell::Stored(index) => {
+@@ -1389,9 +1520,9 @@
+             self.before.limits,
+             context,
+             self.before.enforce_context_lineage,
+         )?;
+-        verify_readback(&target, self)?;
++        verify_readback(&target, self, context)?;
+         Ok(Commit {
+             snapshot: target.clone(),
+             patch: Patch {
+                 source: self.before.clone(),
+@@ -1489,12 +1620,15 @@
+                 patch: self.clone(),
+                 changed: false,
+             });
+         }
+-        self.target.context.check().map_err(map_execution)?;
++        let target = self.target.reopen_for_destination(snapshot)?;
+         Ok(Commit {
+-            snapshot: self.target.clone(),
+-            patch: self.clone(),
++            snapshot: target.clone(),
++            patch: Patch {
++                source: snapshot.clone(),
++                target,
++            },
+             changed: self.changed(),
+         })
+     }
+ }
+@@ -1863,23 +1997,26 @@
+                 changed: false,
+             });
+         }
+         // The accepted target was fully reopened during the originating
+-        // commit and is retained by this patch.  Reusing it avoids a second
+-        // complete content.xml parse and preserves the same bounded source
+-        // lineage.  The second fence closes the read/apply race: a source
+-        // change while the checks above or this handoff are in progress must
+-        // not yield a commit carrying an old source version.
+-        let inner = self.target_inner.clone();
+-        inner.context.check().map_err(map_execution)?;
++        // commit and is retained by this patch.  A source-backed owner may
++        // still expose multiple snapshots with different destination
++        // profiles, so revalidate the exact target under the destination
++        // context before handing it back.  This also keeps the returned
++        // reversible patch bound to that destination snapshot.
++        let inner = self.target_inner.reopen_for_destination(&snapshot.inner)?;
++        let patch_target = inner.clone();
+         snapshot.check_source()?;
+         Ok(SourceMetadataCommit {
+             snapshot: SourceMetadataSnapshot {
+                 owner: snapshot.owner,
+                 inner,
+                 source_version: snapshot.source_version,
+             },
+-            patch: self.clone(),
++            patch: SourceMetadataPatch {
++                before: snapshot.clone(),
++                target_inner: patch_target,
++            },
+             changed: self.changed(),
+         })
+     }
+ }
+@@ -1955,15 +2092,18 @@
+     if labels_changed && edit.labels_present {
+         add_temporary(&mut temporary, labels_size_bound(edit.current_labels())?, 2)?;
+     }
+ 
++    let mut selector_budget = index::SelectorBudget::new(context, before.limits);
+     for (key, op) in &edit.cell_ops {
+         render_step(context, 1)?;
+         if op.source.is_none() && op.detective.is_none() {
+             continue;
+         }
+         let selector = key.selector();
+-        let physical = before.catalog.cell_for_selector(&selector)?;
++        let physical = before
++            .catalog
++            .cell_for_selector_with_budget(&selector, &mut selector_budget)?;
+         let index::PhysicalCell::Stored(cell_index) = physical else {
+             return Err(Error::Unsupported(
+                 "UnsupportedImplicitCoveredCell: metadata edit has no physical owner".to_string(),
+             ));
+@@ -2181,8 +2321,9 @@
+             resource: "ODS metadata replacement list",
+             source,
+         })?;
+     let catalog = &before.catalog;
++    let mut selector_budget = index::SelectorBudget::new(context, before.limits);
+     let old_consolidation = catalog.consolidation.as_ref().map(|value| &value.value);
+     if old_consolidation != edit.staged_consolidation() {
+         render_step(context, 1)?;
+         let replacement = match (&catalog.consolidation, edit.staged_consolidation()) {
+@@ -2279,9 +2420,9 @@
+         if op.source.is_none() && op.detective.is_none() {
+             continue;
+         }
+         let selector = key.selector();
+-        let physical = catalog.cell_for_selector(&selector)?;
++        let physical = catalog.cell_for_selector_with_budget(&selector, &mut selector_budget)?;
+         let index::PhysicalCell::Stored(cell_index) = physical else {
+             return Err(Error::Unsupported(
+                 "UnsupportedImplicitCoveredCell: metadata edit has no physical owner".to_string(),
+             ));
+@@ -2566,9 +2707,9 @@
+     offset: usize,
+     value: String,
+ }
+ 
+-fn verify_readback(target: &Snapshot, edit: &Edit) -> Result<()> {
++fn verify_readback(target: &Snapshot, edit: &Edit, context: &ExecutionContext) -> Result<()> {
+     if target.consolidation()?.cloned() != edit.staged_consolidation().cloned() {
+         return Err(invalid(
+             "ODS sheet metadata consolidation readback differs from staged value",
+         ));
+@@ -2579,11 +2720,12 @@
+         return Err(invalid(
+             "ODS sheet metadata label-range readback differs from staged value",
+         ));
+     }
++    let mut selector_budget = index::SelectorBudget::new(context, target.limits);
+     for (key, op) in &edit.cell_ops {
+         let view = target
+-            .cell_metadata(key.selector())?
++            .cell_metadata_with_budget(key.selector(), &mut selector_budget)?
+             .ok_or_else(|| invalid("ODS metadata target cell disappeared during readback"))?;
+         if let Some(source) = &op.source {
+             if view.range_source() != source.as_ref() {
+                 return Err(invalid(
+--- pre-accounting/source/index.rs
++++ crates/litchi-ods/src/sheet_metadata/index.rs
+@@ -26,8 +26,53 @@
+ pub(crate) const TEXT_NS: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+ pub(crate) const MC_NS: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+ const MAX_LOGICAL_ROWS: usize = 1_048_576;
+ const MAX_LOGICAL_COLUMNS: usize = 1_048_576;
++pub(crate) const SELECTOR_COMPARISON_WORK: u64 = 8;
++
++/// Bounded execution ledger for one selector lookup.
++///
++/// The ledger stays on the caller's stack. Successful comparisons only update
++/// the retained context's work counter; no per-comparison object or allocation
++/// is created. Callers may share one ledger across the several selector
++/// resolutions that make up a staging operation so the metadata work ceiling
++/// applies to the complete operation.
++pub(crate) struct SelectorBudget {
++    context: ExecutionContext,
++    maximum: u64,
++    used: u64,
++}
++
++impl SelectorBudget {
++    pub(crate) fn new(context: &ExecutionContext, limits: crate::sheet_metadata::Limits) -> Self {
++        Self {
++            context: context.clone(),
++            maximum: limits.max_work_units(),
++            used: 0,
++        }
++    }
++
++    pub(crate) fn check(&self) -> Result<()> {
++        self.context.check().map_err(map_execution)
++    }
++
++    /// Charge one selector candidate comparison and check cancellation.
++    pub(crate) fn comparison(&mut self) -> Result<()> {
++        self.check()?;
++        let next = self
++            .used
++            .checked_add(SELECTOR_COMPARISON_WORK)
++            .ok_or_else(|| invalid("ODS metadata selector work units overflow"))?;
++        if next > self.maximum {
++            return Err(limit_u64("selector work units", next, self.maximum));
++        }
++        self.context
++            .consume(Resource::Work, SELECTOR_COMPARISON_WORK)
++            .map_err(map_execution)?;
++        self.used = next;
++        Ok(())
++    }
++}
+ 
+ #[derive(Clone, Debug)]
+ pub(crate) struct Span {
+     pub(crate) parent: Option<usize>,
+@@ -137,20 +182,19 @@
+     pub(crate) _index_memory: Option<Arc<Reservation>>,
+ }
+ 
+ impl Catalog {
+-    /// Resolve the selector's sheet component to the immutable source-order
+-    /// table index.  Keeping this resolution in the catalog gives transaction
+-    /// code one canonical identity for name and position selectors that refer
+-    /// to the same physical worksheet.
+-    pub(crate) fn table_index_for_selector<'a>(
++    pub(crate) fn table_index_for_selector_with_budget<'a>(
+         &self,
+         selector: &crate::sheet_metadata::CellSelector<'a>,
++        budget: &mut SelectorBudget,
+     ) -> Result<usize> {
++        budget.check()?;
+         match selector.sheet() {
+             crate::sheet_metadata::SheetSelector::Name(name) => {
+                 let mut found = None;
+                 for (index, table) in self.tables.iter().enumerate() {
++                    budget.comparison()?;
+                     if table.name == name {
+                         if found.replace(index).is_some() {
+                             return Err(Error::InvalidFormat(format!(
+                                 "ODS metadata worksheet name '{name}' is ambiguous"
+@@ -163,8 +207,9 @@
+                 })
+             },
+             crate::sheet_metadata::SheetSelector::Position(position) => {
+                 let index = position.get();
++                budget.comparison()?;
+                 if index >= self.tables.len() {
+                     return Err(Error::InvalidFormat(format!(
+                         "ODS metadata worksheet position {index} is outside {} sheets",
+                         self.tables.len()
+@@ -177,10 +222,22 @@
+ 
+     pub(crate) fn cell_for_selector<'a>(
+         &self,
+         selector: &crate::sheet_metadata::CellSelector<'a>,
++        context: &ExecutionContext,
++        limits: crate::sheet_metadata::Limits,
+     ) -> Result<PhysicalCell> {
+-        let table_index = self.table_index_for_selector(selector)?;
++        let mut budget = SelectorBudget::new(context, limits);
++        self.cell_for_selector_with_budget(selector, &mut budget)
++    }
++
++    pub(crate) fn cell_for_selector_with_budget<'a>(
++        &self,
++        selector: &crate::sheet_metadata::CellSelector<'a>,
++        budget: &mut SelectorBudget,
++    ) -> Result<PhysicalCell> {
++        budget.check()?;
++        let table_index = self.table_index_for_selector_with_budget(selector, budget)?;
+         let table = self.tables.get(table_index).ok_or_else(|| {
+             Error::InvalidFormat("ODS metadata worksheet index disappeared".to_string())
+         })?;
+         for row_index in &table.rows {
+@@ -189,10 +246,12 @@
+             })?;
+             let row_end = row.logical_start.checked_add(row.repeat).ok_or_else(|| {
+                 Error::InvalidFormat("ODS metadata logical row address overflows".to_string())
+             })?;
++            budget.comparison()?;
+             if selector.row() < row_end && selector.row() >= row.logical_start {
+                 for cell_index in &row.cells {
++                    budget.comparison()?;
+                     let cell = self.cells.get(*cell_index).ok_or_else(|| {
+                         Error::InvalidFormat("ODS metadata cell index disappeared".to_string())
+                     })?;
+                     let end = cell
+@@ -241,8 +300,9 @@
+                 }
+                 // A merge anchor may cover later rows that have no physical
+                 // row/cell object.  Keep this lookup sparse and bounded.
+                 for cell_index in &self.cells {
++                    budget.comparison()?;
+                     if cell_index.table != table_index {
+                         continue;
+                     }
+                     if let Merge::Span { rows, columns } = cell_index.merge {
+@@ -275,8 +335,9 @@
+                 return Ok(PhysicalCell::Missing);
+             }
+         }
+         for cell in &self.cells {
++            budget.comparison()?;
+             if cell.table != table_index {
+                 continue;
+             }
+             if let Merge::Span { rows, columns } = cell.merge {
+@@ -2035,8 +2096,81 @@
+     fn scan_fixture(source: &str) -> Result<Catalog> {
+         scan(source, crate::sheet_metadata::Limits::default(), &context())
+     }
+ 
++    fn selector_limits(max_work_units: u64) -> crate::sheet_metadata::Limits {
++        crate::sheet_metadata::Limits::new(1, 1024, 128, 1024, max_work_units)
++            .expect("selector work test limits")
++    }
++
++    #[test]
++    fn selector_work_budget_has_below_exact_and_above_boundaries() {
++        let source = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table table:name="Data"><table:table-row><table:table-cell/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
++        let catalog = scan_fixture(source).expect("selector fixture");
++        let selector =
++            crate::sheet_metadata::CellSelector::by_position(litchi_core::Position::new(0), 0, 0);
++
++        let below = context();
++        assert!(
++            catalog
++                .cell_for_selector(&selector, &below, selector_limits(23))
++                .is_err()
++        );
++        assert_eq!(below.budget().used(Resource::Work), 16);
++
++        let exact = context();
++        assert!(matches!(
++            catalog.cell_for_selector(&selector, &exact, selector_limits(24)),
++            Ok(PhysicalCell::Stored(_))
++        ));
++        assert_eq!(exact.budget().used(Resource::Work), 24);
++
++        let above = context();
++        assert!(matches!(
++            catalog.cell_for_selector(&selector, &above, selector_limits(25)),
++            Ok(PhysicalCell::Stored(_))
++        ));
++        assert_eq!(above.budget().used(Resource::Work), 24);
++    }
++
++    #[test]
++    fn selector_read_checks_cancellation_before_comparing_candidates() {
++        let source = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table table:name="Data"><table:table-row><table:table-cell/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
++        let catalog = scan_fixture(source).expect("selector fixture");
++        let (cancellation, context) = {
++            let budget = Budget::root(
++                "ods-metadata-index-cancel-tests",
++                CoreLimits::for_profile(Profile::TrustedBatch),
++            );
++            let (cancellation, token) = CancellationSource::pair();
++            let context = ExecutionContext::new(
++                budget,
++                token,
++                ExecutionLimits::new(
++                    NonZeroUsize::new(1).unwrap(),
++                    NonZeroUsize::new(1).unwrap(),
++                    NonZeroU64::new(1024 * 1024).unwrap(),
++                    0,
++                )
++                .unwrap(),
++            );
++            (cancellation, context)
++        };
++        cancellation.cancel();
++        let selector =
++            crate::sheet_metadata::CellSelector::by_position(litchi_core::Position::new(0), 0, 0);
++        assert!(
++            catalog
++                .cell_for_selector(
++                    &selector,
++                    &context,
++                    crate::sheet_metadata::Limits::default()
++                )
++                .is_err()
++        );
++        assert_eq!(context.budget().used(Resource::Work), 0);
++    }
++
+     #[test]
+     fn admits_only_the_direct_document_content_spreadsheet_ancestry() {
+         let valid = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table table:name="Data"/></office:spreadsheet></office:body></office:document-content>"#;
+         assert!(scan_fixture(valid).is_ok());
+--- pre-accounting/source/ods_sheet_metadata_transactions.rs
++++ crates/litchi-ods/tests/ods_sheet_metadata_transactions.rs
+@@ -1253,8 +1253,35 @@
+     );
+ }
+ 
+ #[test]
++fn metadata_cell_staging_checks_selector_cancellation_before_comparing_candidates() {
++    let (budget, cancellation, context) = managed_context("ods-sheet-metadata-selector-stage");
++    let snapshot = metadata::Snapshot::parse_with_context(
++        &canonical_content(),
++        metadata::Limits::default(),
++        &context,
++    )
++    .expect("managed metadata snapshot");
++    let mut edit = snapshot.edit();
++    let before_work = budget.used(Resource::Work);
++
++    cancellation.cancel();
++    let error = edit
++        .set_cell_range_source(
++            metadata::CellSelector::by_name("Data", 0, 0),
++            range_source("Data.A1"),
++        )
++        .expect_err("cancelled selector staging must stop before scanning candidates");
++    assert!(error.to_string().to_ascii_lowercase().contains("cancel"));
++    assert_eq!(budget.used(Resource::Work), before_work);
++    assert!(
++        edit.is_no_op(),
++        "cancelled staging must leave the edit unchanged"
++    );
++}
++
++#[test]
+ fn managed_label_staging_honors_retained_cancellation_and_releases_memory() {
+     let (budget, cancellation, context) = managed_context("ods-sheet-metadata-staging");
+     let snapshot = metadata::Snapshot::parse_with_context(
+         ABSENT_CONTENT,

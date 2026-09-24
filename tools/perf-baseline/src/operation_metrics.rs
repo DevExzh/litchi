@@ -346,6 +346,7 @@ pub(crate) struct InProcessSourceObservation {
 const ALIGNMENT: &str = "elapsed_ns.samples_by_elapsed_then_sample_index";
 const LATENCY_CLAIM: &str = "evidence_only_filesystem_selector";
 const COMPARABLE_LATENCY_CLAIM: &str = "comparable_timed_operation";
+const ALLOCATOR_LATENCY_CLAIM: &str = "allocator_instrumented_elapsed_not_latency_claim";
 const OPC_SOURCE_MATERIALIZATION_LATENCY_CLAIM: &str = "evidence_only_opc_source_materialization";
 const SOURCE_SCOPE: &str = "operation_logical_read_at";
 const IN_PROCESS_SOURCE_SCOPE: &str = "in_process_instrumented_source_read_at";
@@ -706,12 +707,22 @@ pub(crate) fn from_sink_observation(
     sample_count: usize,
     observation: SinkObservation,
 ) -> Result<OperationMetrics, Box<dyn Error>> {
-    if sample_count == 0 {
-        return Err("operation metrics sink observation cannot have zero samples".into());
-    }
+    let sample_indices = (0..sample_count).collect::<Vec<_>>();
+    from_sink_observation_with_sample_indices(&sample_indices, observation)
+}
+
+/// Builds a sink envelope using the caller's actual elapsed/sample identity
+/// order. The order must be a permutation of the retained sample indices;
+/// sink values are deterministic and are repeated in that same order.
+pub(crate) fn from_sink_observation_with_sample_indices(
+    sample_indices: &[usize],
+    observation: SinkObservation,
+) -> Result<OperationMetrics, Box<dyn Error>> {
+    validate_sample_indices(sample_indices)?;
+    let sample_count = sample_indices.len();
     Ok(OperationMetrics {
         sample_count,
-        sample_indices: (0..sample_count).collect(),
+        sample_indices: sample_indices.to_vec(),
         alignment: ALIGNMENT,
         latency_claim: COMPARABLE_LATENCY_CLAIM,
         source: SourceMetrics {
@@ -779,7 +790,8 @@ pub(crate) fn from_in_process_observations(
     sink: SinkObservation,
 ) -> Result<OperationMetrics, Box<dyn Error>> {
     let mut metrics = aggregate_in_process_observations(observations)?;
-    metrics.set_sink_observation(observations.len(), sink)?;
+    let sample_indices = metrics.sample_indices.clone();
+    metrics.set_sink_observation(&sample_indices, sink)?;
     Ok(metrics)
 }
 
@@ -835,7 +847,19 @@ fn aggregate_in_process_observations(
         .map(|observation| observation.elapsed_ns)
         .collect::<Vec<_>>();
     let mut metrics = aggregate(&samples, "warm", &elapsed)?;
-    metrics.latency_claim = COMPARABLE_LATENCY_CLAIM;
+    // An explicit unavailable sample is what a binary without the allocator
+    // wrapper records (see `allocation_metrics::unavailable_sample`); only a
+    // row that the wrapper actually observed gives up the latency claim.
+    metrics.latency_claim = if observations.iter().any(|observation| {
+        observation
+            .allocation_metrics
+            .as_ref()
+            .is_some_and(|sample| sample.status != crate::allocation_metrics::Status::Unavailable)
+    }) {
+        ALLOCATOR_LATENCY_CLAIM
+    } else {
+        COMPARABLE_LATENCY_CLAIM
+    };
     relabel_in_process_scopes(&mut metrics.process);
     Ok(metrics)
 }
@@ -1076,20 +1100,23 @@ impl OperationMetrics {
     /// operation's measured elapsed samples or any existing metric vectors.
     pub(crate) fn set_sink_observation(
         &mut self,
-        sample_count: usize,
+        sample_indices: &[usize],
         observation: SinkObservation,
     ) -> Result<(), Box<dyn Error>> {
-        if sample_count == 0 {
-            return Err("operation metrics sink observation cannot have zero samples".into());
-        }
-        if self.sample_count != sample_count {
+        validate_sample_indices(sample_indices)?;
+        if self.sample_count != sample_indices.len() {
             return Err(format!(
-                "operation metrics sink observation sample count {sample_count} does not match envelope sample count {}",
-                self.sample_count
+                "operation metrics sink observation sample count {} does not match envelope sample count {}",
+                sample_indices.len(), self.sample_count
             )
             .into());
         }
-        let observed = sink_metrics_for_observation(sample_count, observation);
+        if self.sample_indices != sample_indices {
+            return Err(
+                "operation metrics sink observation sample order disagrees with envelope".into(),
+            );
+        }
+        let observed = sink_metrics_for_observation(sample_indices.len(), observation);
         self.sink.write_status = observed.write_status;
         self.sink.accepted_bytes = observed.accepted_bytes;
         self.sink.write_calls = observed.write_calls;
@@ -1097,6 +1124,18 @@ impl OperationMetrics {
         self.sink.write_size_buckets = observed.write_size_buckets;
         Ok(())
     }
+}
+
+fn validate_sample_indices(sample_indices: &[usize]) -> Result<(), Box<dyn Error>> {
+    if sample_indices.is_empty() {
+        return Err("operation metrics sink observation cannot have zero samples".into());
+    }
+    let mut sorted = sample_indices.to_vec();
+    sorted.sort_unstable();
+    if sorted != (0..sample_indices.len()).collect::<Vec<_>>() {
+        return Err("operation metrics sink observation sample order is not a permutation".into());
+    }
+    Ok(())
 }
 
 fn sink_metrics_for_observation(sample_count: usize, observation: SinkObservation) -> SinkMetrics {
@@ -1444,6 +1483,7 @@ mod tests {
         InProcessObservation, InProcessSourceObservation, MetricStatus, MetricVector,
         SinkObservation, aggregate, from_in_process_materialization_observations,
         from_in_process_observations, from_sink_observation,
+        from_sink_observation_with_sample_indices,
     };
     use crate::filesystem::{
         CfbPhaseEvidence, CfbPhaseSample, ColdAdvice, ReadPattern, ReadSizeBuckets, SampleEvidence,
@@ -1863,7 +1903,10 @@ mod tests {
 
         assert_eq!(envelope.sample_count, 2);
         assert_eq!(envelope.sample_indices, vec![1, 0]);
-        assert_eq!(envelope.latency_claim, "comparable_timed_operation");
+        assert_eq!(
+            envelope.latency_claim,
+            "allocator_instrumented_elapsed_not_latency_claim"
+        );
         assert_eq!(
             envelope.source.counter_scope,
             "not_applicable_in_process_sink"
@@ -1895,6 +1938,34 @@ mod tests {
             serde_json::json!([5, 7])
         );
         assert_eq!(json["sink"]["write_status"], "measured");
+    }
+
+    #[test]
+    fn uninstrumented_unavailable_allocation_samples_keep_the_latency_claim() {
+        // A normal binary records an explicit unavailable sample for cases that
+        // publish an allocation envelope; the wrapper never ran, so the row is
+        // still a comparable timed operation.
+        let observations = [30, 10].map(|elapsed_ns| InProcessObservation {
+            elapsed_ns,
+            process_metrics: None,
+            allocation_metrics: Some(crate::allocation_metrics::unavailable_sample()),
+        });
+        let envelope = from_in_process_observations(
+            &observations,
+            SinkObservation {
+                accepted_bytes: 1,
+                write_calls: 1,
+                largest_write: 1,
+                bytes_0: 0,
+                bytes_1_to_512: 1,
+                bytes_513_to_4096: 0,
+                bytes_4097_to_16384: 0,
+                bytes_16385_to_65536: 0,
+                bytes_over_65536: 0,
+            },
+        )
+        .unwrap();
+        assert_eq!(envelope.latency_claim, "comparable_timed_operation");
     }
 
     #[test]
@@ -2152,6 +2223,40 @@ mod tests {
         };
         let error = from_sink_observation(0, observation).unwrap_err();
         assert!(error.to_string().contains("zero samples"));
+    }
+
+    #[test]
+    fn sink_observation_preserves_tied_elapsed_order_and_rejects_disagreement() {
+        let observation = SinkObservation {
+            accepted_bytes: 17,
+            write_calls: 2,
+            largest_write: 11,
+            bytes_0: 0,
+            bytes_1_to_512: 2,
+            bytes_513_to_4096: 0,
+            bytes_4097_to_16384: 0,
+            bytes_16385_to_65536: 0,
+            bytes_over_65536: 0,
+        };
+        let explicit = from_sink_observation_with_sample_indices(&[1, 2, 0], observation).unwrap();
+        assert_eq!(explicit.sample_indices, vec![1, 2, 0]);
+        assert_eq!(explicit.sink.accepted_bytes.values, Some(vec![17, 17, 17]));
+        assert!(
+            from_sink_observation_with_sample_indices(&[0, 0, 1], observation).is_err(),
+            "duplicate sample identities must be rejected"
+        );
+
+        let observations = [20, 10, 10].map(|elapsed_ns| InProcessObservation {
+            elapsed_ns,
+            process_metrics: None,
+            allocation_metrics: None,
+        });
+        let mut envelope = from_in_process_observations(&observations, observation).unwrap();
+        assert_eq!(envelope.sample_indices, vec![1, 2, 0]);
+        let error = envelope
+            .set_sink_observation(&[2, 1, 0], observation)
+            .unwrap_err();
+        assert!(error.to_string().contains("disagrees with envelope"));
     }
 
     #[test]

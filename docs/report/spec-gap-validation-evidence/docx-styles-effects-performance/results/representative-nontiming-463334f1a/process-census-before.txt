@@ -1,0 +1,490 @@
+      1       0  1-10:37:36 Ss    0.0  0.0 /sbin/init
+      2       0  1-10:37:36 S     0.0  0.0 [kthreadd]
+      3       2  1-10:37:36 S     0.0  0.0 [pool_workqueue_release]
+      4       2  1-10:37:36 I<    0.0  0.0 [kworker/R-rcu_gp]
+      5       2  1-10:37:36 I<    0.0  0.0 [kworker/R-sync_wq]
+      6       2  1-10:37:36 I<    0.0  0.0 [kworker/R-kvfree_rcu_reclaim]
+      7       2  1-10:37:36 I<    0.0  0.0 [kworker/R-slub_flushwq]
+      8       2  1-10:37:36 I<    0.0  0.0 [kworker/R-netns]
+     10       2  1-10:37:36 I<    0.0  0.0 [kworker/0:0H-kblockd]
+     12       2  1-10:37:36 I     0.0  0.0 [kworker/u128:0-ipv6_addrconf]
+     13       2  1-10:37:36 I<    0.0  0.0 [kworker/R-mm_percpu_wq]
+     14       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/0]
+     15       2  1-10:37:36 S<    0.0  0.0 [pr/ttyS0]
+     16       2  1-10:37:36 I     0.0  0.0 [rcu_sched]
+     17       2  1-10:37:36 S     0.0  0.0 [rcu_exp_par_gp_kthread_worker/1]
+     18       2  1-10:37:36 S     0.0  0.0 [rcu_exp_gp_kthread_worker]
+     19       2  1-10:37:36 S     0.0  0.0 [migration/0]
+     20       2  1-10:37:36 S     0.0  0.0 [kprobe-optimizer]
+     21       2  1-10:37:36 S     0.0  0.0 [idle_inject/0]
+     22       2  1-10:37:36 S     0.0  0.0 [cpuhp/0]
+     23       2  1-10:37:36 S     0.0  0.0 [cpuhp/1]
+     24       2  1-10:37:36 S     0.0  0.0 [idle_inject/1]
+     25       2  1-10:37:36 S     0.0  0.0 [migration/1]
+     26       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/1]
+     28       2  1-10:37:36 I<    0.0  0.0 [kworker/1:0H-kblockd]
+     29       2  1-10:37:36 S     0.0  0.0 [cpuhp/2]
+     30       2  1-10:37:36 S     0.0  0.0 [idle_inject/2]
+     31       2  1-10:37:36 S     0.0  0.0 [migration/2]
+     32       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/2]
+     34       2  1-10:37:36 I<    0.0  0.0 [kworker/2:0H-kblockd]
+     35       2  1-10:37:36 S     0.0  0.0 [cpuhp/3]
+     36       2  1-10:37:36 S     0.0  0.0 [idle_inject/3]
+     37       2  1-10:37:36 S     0.0  0.0 [migration/3]
+     38       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/3]
+     40       2  1-10:37:36 I<    0.0  0.0 [kworker/3:0H-kblockd]
+     41       2  1-10:37:36 S     0.0  0.0 [cpuhp/4]
+     42       2  1-10:37:36 S     0.0  0.0 [idle_inject/4]
+     43       2  1-10:37:36 S     0.0  0.0 [migration/4]
+     44       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/4]
+     46       2  1-10:37:36 I<    0.0  0.0 [kworker/4:0H-kblockd]
+     47       2  1-10:37:36 S     0.0  0.0 [cpuhp/5]
+     48       2  1-10:37:36 S     0.0  0.0 [idle_inject/5]
+     49       2  1-10:37:36 S     0.0  0.0 [migration/5]
+     50       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/5]
+     52       2  1-10:37:36 I<    0.0  0.0 [kworker/5:0H-kblockd]
+     53       2  1-10:37:36 S     0.0  0.0 [cpuhp/6]
+     54       2  1-10:37:36 S     0.0  0.0 [idle_inject/6]
+     55       2  1-10:37:36 S     0.0  0.0 [migration/6]
+     56       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/6]
+     58       2  1-10:37:36 I<    0.0  0.0 [kworker/6:0H-kblockd]
+     59       2  1-10:37:36 S     0.0  0.0 [cpuhp/7]
+     60       2  1-10:37:36 S     0.0  0.0 [idle_inject/7]
+     61       2  1-10:37:36 S     0.0  0.0 [migration/7]
+     62       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/7]
+     64       2  1-10:37:36 I<    0.0  0.0 [kworker/7:0H-kblockd]
+     65       2  1-10:37:36 S     0.0  0.0 [cpuhp/8]
+     66       2  1-10:37:36 S     0.0  0.0 [idle_inject/8]
+     67       2  1-10:37:36 S     0.0  0.0 [migration/8]
+     68       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/8]
+     70       2  1-10:37:36 I<    0.0  0.0 [kworker/8:0H-kblockd]
+     71       2  1-10:37:36 S     0.0  0.0 [cpuhp/9]
+     72       2  1-10:37:36 S     0.0  0.0 [idle_inject/9]
+     73       2  1-10:37:36 S     0.0  0.0 [migration/9]
+     74       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/9]
+     76       2  1-10:37:36 I<    0.0  0.0 [kworker/9:0H-kblockd]
+     77       2  1-10:37:36 S     0.0  0.0 [cpuhp/10]
+     78       2  1-10:37:36 S     0.0  0.0 [idle_inject/10]
+     79       2  1-10:37:36 S     0.0  0.0 [migration/10]
+     80       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/10]
+     82       2  1-10:37:36 I<    0.0  0.0 [kworker/10:0H-kblockd]
+     83       2  1-10:37:36 S     0.0  0.0 [cpuhp/11]
+     84       2  1-10:37:36 S     0.0  0.0 [idle_inject/11]
+     85       2  1-10:37:36 S     0.0  0.0 [migration/11]
+     86       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/11]
+     88       2  1-10:37:36 I<    0.0  0.0 [kworker/11:0H-kblockd]
+     89       2  1-10:37:36 S     0.0  0.0 [cpuhp/12]
+     90       2  1-10:37:36 S     0.0  0.0 [idle_inject/12]
+     91       2  1-10:37:36 S     0.0  0.0 [migration/12]
+     92       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/12]
+     94       2  1-10:37:36 I<    0.0  0.0 [kworker/12:0H-kblockd]
+     95       2  1-10:37:36 S     0.0  0.0 [cpuhp/13]
+     96       2  1-10:37:36 S     0.0  0.0 [idle_inject/13]
+     97       2  1-10:37:36 S     0.0  0.0 [migration/13]
+     98       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/13]
+    100       2  1-10:37:36 I<    0.0  0.0 [kworker/13:0H-kblockd]
+    101       2  1-10:37:36 S     0.0  0.0 [cpuhp/14]
+    102       2  1-10:37:36 S     0.0  0.0 [idle_inject/14]
+    103       2  1-10:37:36 S     0.0  0.0 [migration/14]
+    104       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/14]
+    106       2  1-10:37:36 I<    0.0  0.0 [kworker/14:0H-kblockd]
+    107       2  1-10:37:36 S     0.0  0.0 [cpuhp/15]
+    108       2  1-10:37:36 S     0.0  0.0 [idle_inject/15]
+    109       2  1-10:37:36 S     0.0  0.0 [migration/15]
+    110       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/15]
+    112       2  1-10:37:36 I<    0.0  0.0 [kworker/15:0H-kblockd]
+    113       2  1-10:37:36 S     0.0  0.0 [cpuhp/16]
+    114       2  1-10:37:36 S     0.0  0.0 [idle_inject/16]
+    115       2  1-10:37:36 S     0.0  0.0 [migration/16]
+    116       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/16]
+    118       2  1-10:37:36 I<    0.0  0.0 [kworker/16:0H-kblockd]
+    119       2  1-10:37:36 S     0.0  0.0 [rcu_exp_par_gp_kthread_worker/2]
+    120       2  1-10:37:36 S     0.0  0.0 [cpuhp/17]
+    121       2  1-10:37:36 S     0.0  0.0 [idle_inject/17]
+    122       2  1-10:37:36 S     0.0  0.0 [migration/17]
+    123       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/17]
+    125       2  1-10:37:36 I<    0.0  0.0 [kworker/17:0H-kblockd]
+    126       2  1-10:37:36 S     0.0  0.0 [cpuhp/18]
+    127       2  1-10:37:36 S     0.0  0.0 [idle_inject/18]
+    128       2  1-10:37:36 S     0.0  0.0 [migration/18]
+    129       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/18]
+    131       2  1-10:37:36 I<    0.0  0.0 [kworker/18:0H-kblockd]
+    132       2  1-10:37:36 S     0.0  0.0 [cpuhp/19]
+    133       2  1-10:37:36 S     0.0  0.0 [idle_inject/19]
+    134       2  1-10:37:36 S     0.0  0.0 [migration/19]
+    135       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/19]
+    137       2  1-10:37:36 I<    0.0  0.0 [kworker/19:0H-kblockd]
+    138       2  1-10:37:36 S     0.0  0.0 [cpuhp/20]
+    139       2  1-10:37:36 S     0.0  0.0 [idle_inject/20]
+    140       2  1-10:37:36 S     0.0  0.0 [migration/20]
+    141       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/20]
+    143       2  1-10:37:36 I<    0.0  0.0 [kworker/20:0H-kblockd]
+    144       2  1-10:37:36 S     0.0  0.0 [cpuhp/21]
+    145       2  1-10:37:36 S     0.0  0.0 [idle_inject/21]
+    146       2  1-10:37:36 S     0.0  0.0 [migration/21]
+    147       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/21]
+    149       2  1-10:37:36 I<    0.0  0.0 [kworker/21:0H-kblockd]
+    150       2  1-10:37:36 S     0.0  0.0 [cpuhp/22]
+    151       2  1-10:37:36 S     0.0  0.0 [idle_inject/22]
+    152       2  1-10:37:36 S     0.0  0.0 [migration/22]
+    153       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/22]
+    155       2  1-10:37:36 I<    0.0  0.0 [kworker/22:0H-kblockd]
+    156       2  1-10:37:36 S     0.0  0.0 [cpuhp/23]
+    157       2  1-10:37:36 S     0.0  0.0 [idle_inject/23]
+    158       2  1-10:37:36 S     0.0  0.0 [migration/23]
+    159       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/23]
+    161       2  1-10:37:36 I<    0.0  0.0 [kworker/23:0H-kblockd]
+    162       2  1-10:37:36 S     0.0  0.0 [cpuhp/24]
+    163       2  1-10:37:36 S     0.0  0.0 [idle_inject/24]
+    164       2  1-10:37:36 S     0.0  0.0 [migration/24]
+    165       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/24]
+    167       2  1-10:37:36 I<    0.0  0.0 [kworker/24:0H-kblockd]
+    168       2  1-10:37:36 S     0.0  0.0 [cpuhp/25]
+    169       2  1-10:37:36 S     0.0  0.0 [idle_inject/25]
+    170       2  1-10:37:36 S     0.0  0.0 [migration/25]
+    171       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/25]
+    173       2  1-10:37:36 I<    0.0  0.0 [kworker/25:0H-kblockd]
+    174       2  1-10:37:36 S     0.0  0.0 [cpuhp/26]
+    175       2  1-10:37:36 S     0.0  0.0 [idle_inject/26]
+    176       2  1-10:37:36 S     0.0  0.0 [migration/26]
+    177       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/26]
+    179       2  1-10:37:36 I<    0.0  0.0 [kworker/26:0H-kblockd]
+    180       2  1-10:37:36 S     0.0  0.0 [cpuhp/27]
+    181       2  1-10:37:36 S     0.0  0.0 [idle_inject/27]
+    182       2  1-10:37:36 S     0.0  0.0 [migration/27]
+    183       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/27]
+    185       2  1-10:37:36 I<    0.0  0.0 [kworker/27:0H-kblockd]
+    186       2  1-10:37:36 S     0.0  0.0 [cpuhp/28]
+    187       2  1-10:37:36 S     0.0  0.0 [idle_inject/28]
+    188       2  1-10:37:36 S     0.0  0.0 [migration/28]
+    189       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/28]
+    191       2  1-10:37:36 I<    0.0  0.0 [kworker/28:0H-kblockd]
+    192       2  1-10:37:36 S     0.0  0.0 [cpuhp/29]
+    193       2  1-10:37:36 S     0.0  0.0 [idle_inject/29]
+    194       2  1-10:37:36 S     0.0  0.0 [migration/29]
+    195       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/29]
+    197       2  1-10:37:36 I<    0.0  0.0 [kworker/29:0H-kblockd]
+    198       2  1-10:37:36 S     0.0  0.0 [cpuhp/30]
+    199       2  1-10:37:36 S     0.0  0.0 [idle_inject/30]
+    200       2  1-10:37:36 S     0.0  0.0 [migration/30]
+    201       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/30]
+    203       2  1-10:37:36 I<    0.0  0.0 [kworker/30:0H-kblockd]
+    204       2  1-10:37:36 S     0.0  0.0 [cpuhp/31]
+    205       2  1-10:37:36 S     0.0  0.0 [idle_inject/31]
+    206       2  1-10:37:36 S     0.0  0.0 [migration/31]
+    207       2  1-10:37:36 S     0.0  0.0 [ksoftirqd/31]
+    209       2  1-10:37:36 I<    0.0  0.0 [kworker/31:0H-kblockd]
+    214       2  1-10:37:36 S     0.0  0.0 [kdevtmpfs]
+    215       2  1-10:37:36 I<    0.0  0.0 [kworker/R-inet_frag_wq]
+    216       2  1-10:37:36 I     0.0  0.0 [rcu_tasks_kthread]
+    217       2  1-10:37:36 I     0.0  0.0 [rcu_tasks_rude_kthread]
+    218       2  1-10:37:36 S     0.0  0.0 [kauditd]
+    219       2  1-10:37:36 S     0.0  0.0 [khungtaskd]
+    220       2  1-10:37:36 S     0.0  0.0 [oom_reaper]
+    223       2  1-10:37:36 I<    0.0  0.0 [kworker/R-writeback]
+    224       2  1-10:37:36 S     0.1  0.0 [kcompactd0]
+    225       2  1-10:37:36 SN    0.0  0.0 [ksmd]
+    226       2  1-10:37:36 SN    0.0  0.0 [khugepaged]
+    227       2  1-10:37:36 I<    0.0  0.0 [kworker/R-kblockd]
+    228       2  1-10:37:36 I<    0.0  0.0 [kworker/R-blkcg_punt_bio]
+    229       2  1-10:37:36 I<    0.0  0.0 [kworker/R-kintegrityd]
+    231       2  1-10:37:36 S     0.0  0.0 [irq/9-acpi]
+    236       2  1-10:37:36 I<    0.0  0.0 [kworker/R-tpm_dev_wq]
+    237       2  1-10:37:36 I<    0.0  0.0 [kworker/R-ata_sff]
+    238       2  1-10:37:36 I<    0.0  0.0 [kworker/R-md_bitmap]
+    239       2  1-10:37:36 I<    0.0  0.0 [kworker/R-md_llbitmap_io]
+    240       2  1-10:37:36 I<    0.0  0.0 [kworker/R-md_llbitmap_unplug]
+    241       2  1-10:37:36 I<    0.0  0.0 [kworker/R-edac-poller]
+    242       2  1-10:37:36 I     0.0  0.0 [kworker/u128:1-ipv6_addrconf]
+    243       2  1-10:37:36 I<    0.0  0.0 [kworker/R-devfreq_wq]
+    244       2  1-10:37:36 S     0.0  0.0 [watchdogd]
+    247       2  1-10:37:36 I<    0.0  0.0 [kworker/R-quota_events_unbound]
+    249       2  1-10:37:36 S     0.2  0.0 [kswapd0]
+    250       2  1-10:37:36 S     0.0  0.0 [ecryptfs-kthread]
+    252       2  1-10:37:36 I<    0.0  0.0 [kworker/R-kthrotld]
+    253       2  1-10:37:36 S     0.0  0.0 [irq/24-pciehp]
+    254       2  1-10:37:36 S     0.0  0.0 [irq/25-pciehp]
+    255       2  1-10:37:36 S     0.0  0.0 [irq/26-pciehp]
+    256       2  1-10:37:36 S     0.0  0.0 [irq/27-pciehp]
+    257       2  1-10:37:36 S     0.0  0.0 [irq/28-pciehp]
+    258       2  1-10:37:36 S     0.0  0.0 [irq/29-pciehp]
+    259       2  1-10:37:36 S     0.0  0.0 [irq/30-pciehp]
+    260       2  1-10:37:36 S     0.0  0.0 [irq/31-pciehp]
+    261       2  1-10:37:36 S     0.0  0.0 [irq/32-pciehp]
+    262       2  1-10:37:36 S     0.0  0.0 [irq/33-pciehp]
+    263       2  1-10:37:36 S     0.0  0.0 [irq/34-pciehp]
+    264       2  1-10:37:36 S     0.0  0.0 [irq/35-pciehp]
+    265       2  1-10:37:36 S     0.0  0.0 [irq/36-pciehp]
+    266       2  1-10:37:36 S     0.0  0.0 [irq/37-pciehp]
+    267       2  1-10:37:36 S     0.0  0.0 [irq/38-pciehp]
+    268       2  1-10:37:36 S     0.0  0.0 [irq/39-pciehp]
+    269       2  1-10:37:36 S     0.0  0.0 [irq/40-pciehp]
+    270       2  1-10:37:36 S     0.0  0.0 [irq/41-pciehp]
+    271       2  1-10:37:36 S     0.0  0.0 [irq/42-pciehp]
+    272       2  1-10:37:36 S     0.0  0.0 [irq/43-pciehp]
+    273       2  1-10:37:36 S     0.0  0.0 [irq/44-pciehp]
+    274       2  1-10:37:36 S     0.0  0.0 [irq/45-pciehp]
+    275       2  1-10:37:36 S     0.0  0.0 [irq/46-pciehp]
+    276       2  1-10:37:36 S     0.0  0.0 [irq/47-pciehp]
+    277       2  1-10:37:36 S     0.0  0.0 [irq/48-pciehp]
+    278       2  1-10:37:36 S     0.0  0.0 [irq/49-pciehp]
+    279       2  1-10:37:36 S     0.0  0.0 [irq/50-pciehp]
+    280       2  1-10:37:36 S     0.0  0.0 [irq/51-pciehp]
+    281       2  1-10:37:36 S     0.0  0.0 [irq/52-pciehp]
+    282       2  1-10:37:36 S     0.0  0.0 [irq/53-pciehp]
+    283       2  1-10:37:36 S     0.0  0.0 [irq/54-pciehp]
+    284       2  1-10:37:36 S     0.0  0.0 [irq/55-pciehp]
+    285       2  1-10:37:36 S     0.0  0.0 [irq/56-pciehp]
+    286       2  1-10:37:36 S     0.0  0.0 [irq/57-pciehp]
+    287       2  1-10:37:36 S     0.0  0.0 [irq/58-pciehp]
+    288       2  1-10:37:36 S     0.0  0.0 [irq/59-pciehp]
+    289       2  1-10:37:36 S     0.0  0.0 [irq/60-pciehp]
+    290       2  1-10:37:36 S     0.0  0.0 [irq/61-pciehp]
+    291       2  1-10:37:36 S     0.0  0.0 [irq/62-pciehp]
+    292       2  1-10:37:36 S     0.0  0.0 [irq/63-pciehp]
+    293       2  1-10:37:36 S     0.0  0.0 [irq/64-pciehp]
+    294       2  1-10:37:36 S     0.0  0.0 [irq/65-pciehp]
+    295       2  1-10:37:36 S     0.0  0.0 [irq/66-pciehp]
+    296       2  1-10:37:36 S     0.0  0.0 [irq/67-pciehp]
+    297       2  1-10:37:36 S     0.0  0.0 [irq/68-pciehp]
+    298       2  1-10:37:36 I<    0.0  0.0 [kworker/R-acpi_thermal_pm]
+    299       2  1-10:37:36 I<    0.0  0.0 [kworker/R-nvme-wq]
+    300       2  1-10:37:36 I<    0.0  0.0 [kworker/R-nvme-reset-wq]
+    301       2  1-10:37:36 I<    0.0  0.0 [kworker/R-nvme-delete-wq]
+    302       2  1-10:37:36 I<    0.0  0.0 [kworker/R-nvme-auth-wq]
+    303       2  1-10:37:36 I<    0.0  0.0 [kworker/R-mld]
+    304       2  1-10:37:36 I<    0.0  0.0 [kworker/R-ipv6_addrconf]
+    305       2  1-10:37:36 I<    0.0  0.0 [kworker/R-kstrp]
+    319       2  1-10:37:36 I<    0.0  0.0 [kworker/u133:0]
+    320       2  1-10:37:36 I<    0.0  0.0 [kworker/u134:0]
+    321       2  1-10:37:36 I<    0.0  0.0 [kworker/u135:0]
+    322       2  1-10:37:36 I<    0.0  0.0 [kworker/u136:0]
+    323       2  1-10:37:36 I<    0.0  0.0 [kworker/u137:0]
+    335       2  1-10:37:36 I<    0.0  0.0 [kworker/R-charger_manager]
+    337       2  1-10:37:35 S     0.0  0.0 [jbd2/nvme0n1p1-8]
+    338       2  1-10:37:35 I<    0.0  0.0 [kworker/R-ext4-rsv-conversion]
+    388       2  1-10:37:34 I<    0.0  0.0 [kworker/16:1H-kblockd]
+    393       2  1-10:37:34 S     0.0  0.0 [psimon]
+    399       1  1-10:37:34 S<s   0.0  0.0 /usr/lib/systemd/systemd-journald
+    416       2  1-10:37:34 I<    0.0  0.0 [kworker/R-kmpathd]
+    417       2  1-10:37:34 I<    0.0  0.0 [kworker/R-kmpath_handlerd]
+    438       2  1-10:37:34 I<    0.0  0.0 [kworker/R-tls-strp]
+    453       1  1-10:37:34 SLsl  0.0  0.0 /usr/sbin/multipathd -d -s
+    462       2  1-10:37:34 I<    0.0  0.0 [kworker/0:1H-kblockd]
+    472       1  1-10:37:33 Ss    0.0  0.0 /usr/lib/systemd/systemd-resolved
+    478       1  1-10:37:33 Ss    0.0  0.0 /usr/lib/systemd/systemd-udevd
+    479       2  1-10:37:33 S     0.0  0.0 [psimon]
+    582       2  1-10:37:33 I<    0.0  0.0 [kworker/R-ena]
+    632       2  1-10:37:33 S     0.0  0.0 [jbd2/nvme0n1p13-8]
+    633       2  1-10:37:33 I<    0.0  0.0 [kworker/R-ext4-rsv-conversion]
+    942       2  1-10:37:32 I<    0.0  0.0 [kworker/R-cfg80211]
+    949       2  1-10:37:32 I<    0.0  0.0 [kworker/31:1H-kblockd]
+    959       2  1-10:37:32 I<    0.0  0.0 [kworker/14:1H-kblockd]
+    965       2  1-10:37:31 I<    0.0  0.0 [kworker/15:1H-kblockd]
+    966       2  1-10:37:31 I<    0.0  0.0 [kworker/18:1H-kblockd]
+    967       2  1-10:37:31 I<    0.0  0.0 [kworker/17:1H-kblockd]
+    984       1  1-10:37:31 Ss    0.0  0.0 /usr/lib/systemd/systemd-networkd
+   1033       1  1-10:37:31 Ss    0.0  0.0 /usr/sbin/acpid
+   1035       1  1-10:37:31 Ss    0.0  0.0 /bin/sh /usr/lib/systemd/scripts/chronyd-starter.sh -n -F 1
+   1037       1  1-10:37:31 Ss    0.0  0.0 /usr/sbin/cron -f -P
+   1041       1  1-10:37:31 Ss    0.0  0.0 @dbus-daemon --system --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only
+   1049       1  1-10:37:31 Ssl   0.0  0.0 /usr/sbin/irqbalance
+   1055       1  1-10:37:31 Ss    0.0  0.0 /usr/bin/python3 /usr/bin/networkd-dispatcher --run-startup-triggers
+   1056       1  1-10:37:31 Ssl   0.0  0.0 /usr/lib/polkit-1/polkitd --no-debug --log-level=notice
+   1059       1  1-10:37:31 Ssl   0.0  0.0 /snap/amazon-ssm-agent/13349/amazon-ssm-agent
+   1063       1  1-10:37:31 Ssl   0.0  0.0 /snap/snapd/current/usr/lib/snapd/snapd
+   1070       1  1-10:37:31 Ss    0.0  0.0 /usr/lib/systemd/systemd-logind
+   1079       1  1-10:37:31 Ssl   0.0  0.0 /usr/libexec/udisks2/udisksd
+   1085       1  1-10:37:31 Ssl   0.0  0.0 /usr/sbin/rsyslogd -n -iNONE
+   1086       1  1-10:37:31 Ss    0.0  0.0 sshd: /usr/sbin/sshd -D -o AuthorizedKeysCommand /usr/share/ec2-instance-connect/eic_run_authorized_keys %u %f -o AuthorizedKeysCommandUser ec2-instance-connect [listener] 0 of 10-100 startups
+   1122       1  1-10:37:31 Ssl   0.0  0.0 /usr/bin/python3 /usr/share/unattended-upgrades/unattended-upgrade-shutdown --wait-for-signal
+   1151       2  1-10:37:31 I<    0.0  0.0 [kworker/19:1H-kblockd]
+   1152       2  1-10:37:31 I<    0.0  0.0 [kworker/20:1H-kblockd]
+   1156    1035  1-10:37:31 S     0.0  0.0 /usr/sbin/chronyd -n -F 1
+   1157       2  1-10:37:31 I<    0.0  0.0 [kworker/21:1H-kblockd]
+   1159       2  1-10:37:31 I<    0.0  0.0 [kworker/22:1H-kblockd]
+   1160       2  1-10:37:31 I<    0.0  0.0 [kworker/23:1H-kblockd]
+   1161       2  1-10:37:31 I<    0.0  0.0 [kworker/24:1H-kblockd]
+   1165       2  1-10:37:31 I<    0.0  0.0 [kworker/25:1H-kblockd]
+   1167       2  1-10:37:31 I<    0.0  0.0 [kworker/26:1H-kblockd]
+   1168       2  1-10:37:31 I<    0.0  0.0 [kworker/27:1H-kblockd]
+   1172       2  1-10:37:31 I<    0.0  0.0 [kworker/28:1H-kblockd]
+   1176    1156  1-10:37:31 S     0.0  0.0 /usr/sbin/chronyd -n -F 1
+   1179       2  1-10:37:31 I<    0.0  0.0 [kworker/29:1H-kblockd]
+   1180       2  1-10:37:31 I<    0.0  0.0 [kworker/30:1H-kblockd]
+   1198       1  1-10:37:31 Ss+   0.0  0.0 /usr/sbin/agetty --noreset --noclear --issue-file=/etc/issue:/etc/issue.d:/run/issue.d:/usr/lib/issue.d --keep-baud 115200,57600,38400,9600 - vt220
+   1276       1  1-10:37:30 Ssl   0.0  0.0 /usr/bin/containerd
+   1283       1  1-10:37:30 Ssl   0.0  0.0 /usr/sbin/ModemManager
+   1288       1  1-10:37:30 Ss+   0.0  0.0 /usr/sbin/agetty --noreset --noclear --issue-file=/etc/issue:/etc/issue.d:/run/issue.d:/usr/lib/issue.d - linux
+   1295       1  1-10:37:30 Ss    0.0  0.0 /usr/sbin/lighttpd -D -f /etc/lighttpd/lighttpd.conf
+   1349       2  1-10:37:30 I<    0.0  0.0 [kworker/8:1H-kblockd]
+   1368       2  1-10:37:30 I<    0.0  0.0 [kworker/9:1H-kblockd]
+   1391       1  1-10:37:30 Ssl   0.0  0.0 /usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
+   1398       2  1-10:37:30 I<    0.0  0.0 [kworker/2:1H-kblockd]
+   1418       2  1-10:37:30 I<    0.0  0.0 [kworker/1:1H-kblockd]
+   1432       2  1-10:37:30 I<    0.0  0.0 [kworker/11:1H-kblockd]
+   1505       2  1-10:37:29 I<    0.0  0.0 [kworker/3:1H-kblockd]
+   1530       2  1-10:37:29 I<    0.0  0.0 [kworker/10:1H-kblockd]
+   1749       1  1-10:37:29 Sl    0.0  0.0 /usr/bin/containerd-shim-runc-v2 -namespace moby -id c2c03a47d870f767e9d96c582aa1fcfdb1eb4805a74b323366ed424ba39fb96b -address /run/containerd/containerd.sock
+   1802    1749  1-10:37:29 Ssl   0.0  0.0 /watchtower --label-enable --cleanup --include-restarting --interval 3600
+   1962       2  1-10:37:19 I<    0.0  0.0 [kworker/4:1H-kblockd]
+   1963       2  1-10:37:19 I<    0.0  0.0 [kworker/5:1H-kblockd]
+   1964       2  1-10:37:19 I<    0.0  0.0 [kworker/6:1H-kblockd]
+   1965       2  1-10:37:19 I<    0.0  0.0 [kworker/7:1H-kblockd]
+   1992    1086  1-10:37:00 Ss    0.0  0.0 sshd-session: zhuhe [priv]
+   2028       1  1-10:36:58 Ss    0.0  0.0 /usr/lib/systemd/systemd --user
+   2030    2028  1-10:36:58 S     0.0  0.0 (sd-pam)
+   2146    1992  1-10:36:58 S     0.0  0.0 sshd-session: zhuhe@pts/0
+   2147    2146  1-10:36:58 Ss    0.0  0.0 -bash
+   2206       2  1-10:36:48 I<    0.0  0.0 [kworker/12:1H-kblockd]
+   2207       2  1-10:36:48 I<    0.0  0.0 [kworker/13:1H-kblockd]
+   2276       1  1-10:36:23 Ss    0.9  0.0 tmux new -s office
+   2277    2276  1-10:36:23 Ss    0.0  0.0 -bash
+   2278    2028  1-10:36:23 Ss    0.0  0.0 /usr/bin/dbus-daemon --session --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only
+   2348    2147  1-10:36:12 S+    0.0  0.0 tmux new -s browser
+   2349    2276  1-10:36:12 Ss    0.0  0.0 -bash
+   2690    2276  1-10:33:42 Ss    0.0  0.0 -bash
+ 157968    2277  1-10:23:25 Sl+   2.1  1.9 codex --yolo
+ 159068    2690  1-10:23:13 Sl+   0.0  0.2 kimi-code
+ 159285  159068  1-10:23:10 Sl+   0.4  0.3 kimi-code
+ 160207    1086  1-10:22:45 Ss    0.0  0.0 sshd-session: zhuhe [priv]
+ 160262  160207  1-10:22:43 S     0.0  0.0 sshd-session: zhuhe@notty
+ 160263  160262  1-10:22:43 Ss    0.0  0.0 -bash
+ 160279  160263  1-10:22:42 S     0.0  0.0 sh
+ 160297  160279  1-10:22:42 Sl    0.2  0.0 /home/zhuhe/.vscode-server/code-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5 command-shell --cli-data-dir /home/zhuhe/.vscode-server/cli --parent-process-id 160279 --on-host=127.0.0.1 --on-port
+ 160387  160297  1-10:22:41 Ssl   0.0  0.0 /home/zhuhe/.vscode-server/code-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5 --cli-data-dir /home/zhuhe/.vscode-server/cli agent host
+ 160425  160297  1-10:22:41 S     0.0  0.0 sh /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/bin/code-server --connection-token=remotessh --accept-server-license-terms --agent-host-bridge-port=34263 --agent-host-bridge-host=127.0.0.1 --agent-host-bridge-connection-token=d07ba42c-c27f-4949-b74e-6778ed84ca5d --start-server --enable-remote-auto-shutdown --socket-path=/tmp/code-193ac877-cb3f-4dd4-8a57-a67c3eacebd1
+ 160429  160425  1-10:22:41 Sl    0.0  0.1 /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/node /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/out/server-main.js --connection-token=remotessh --accept-server-license-terms --agent-host-bridge-port=34263 --agent-host-bridge-host=127.0.0.1 --agent-host-bridge-connection-token=d07ba42c-c27f-4949-b74e-6778ed84ca5d --start-server --enable-remote-auto-shutdown --socket-path=/tmp/code-193ac877-cb3f-4dd4-8a57-a67c3eacebd1
+ 160625  160429  1-10:22:23 Sl    0.0  0.0 /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/node /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/out/bootstrap-fork --type=ptyHost --logsPath /home/zhuhe/.vscode-server/data/logs/20260911T064718
+ 163296    2276  1-10:18:45 Ss    0.0  0.0 -bash
+ 163347  163296  1-10:18:42 S+    0.0  0.0 nvim .
+ 163348  163347  1-10:18:41 Ss    0.2  0.0 nvim --embed .
+ 163502    2276  1-10:18:41 Ss    0.0  0.0 -bash
+ 174890       1  1-09:47:47 Ssl   0.0  0.0 /usr/libexec/upowerd
+ 177106  157968  1-09:35:53 Sl    0.0  0.0 /home/zhuhe/.codex/packages/standalone/releases/0.154.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host
+ 227101    2276  1-09:22:04 Ss    0.0  0.0 -bash
+ 227721    2349  1-09:21:39 Sl+   0.3  0.1 codex --yolo
+ 297017    2276  1-08:39:02 Ss+   0.0  0.0 -bash
+ 298594  163502  1-08:33:30 Sl+   7.7  5.0 codex --yolo
+ 300332  298594  1-08:29:42 Sl    0.1  0.0 /home/zhuhe/.codex/packages/standalone/releases/0.154.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host
+ 409695       1  1-07:37:16 Sl    0.0  0.0 /usr/bin/containerd-shim-runc-v2 -namespace moby -id 43136e8b624e115e1ad797ca5fe990ce6ca9ee7bed73c008a6dc3e451a7d75f5 -address /run/containerd/containerd.sock
+ 409718  409695  1-07:37:16 Ss    0.0  0.0 /usr/bin/tini -- run-pipeline3 --disable-web-server pipeline.py --concurrent 5 DevExzh
+ 409803  409718  1-07:37:16 S     0.3  0.0 /usr/local/bin/python3.9 /usr/local/bin/run-pipeline3 --disable-web-server pipeline.py --concurrent 5 DevExzh
+ 431932       2  1-07:19:59 I     0.0  0.0 [kworker/11:1-events]
+ 463387       1  1-07:09:19 Sl    0.0  0.0 /home/zhuhe/code/peculiar/target/peculiar-linux-x64/peculiar_shell
+ 560330  463387  1-06:52:59 Ssl   1.1  0.0 /home/zhuhe/code/peculiar/target/tmp-service/peculiar-runtime-SPF2PM/peculiar_shell --peculiar-browser-child --disable-background-networking --disable-quic --proxy-server=127.0.0.1:33165 --disable-features=DnsOverHttpsUpgrade --host-resolver-rules=MAP * ^NOTFOUND, EXCLUDE localhost, EXCLUDE *.localhost, EXCLUDE <loopback> --disable-component-update --disable-default-apps --disable-sync --enable-unsafe-swiftshader --enable-features=PeculiarOnDemandSoftwareDisplay --enable-bfcache --metrics-recording-only --no-default-browser-check --no-first-run --no-sandbox --no-system-proxy-config-service --enable-unsafe-webgpu --window-size=1920x1080
+ 560337  560330  1-06:52:59 S     0.0  0.0 /home/zhuhe/code/peculiar/target/tmp-service/peculiar-runtime-SPF2PM/peculiar_shell --type=zygote --no-zygote-sandbox --no-sandbox --headless=old
+ 560338  560330  1-06:52:59 S     0.0  0.0 /home/zhuhe/code/peculiar/target/tmp-service/peculiar-runtime-SPF2PM/peculiar_shell --type=zygote --no-sandbox --headless=old
+ 560353  560337  1-06:52:59 Sl    1.6  0.0 /home/zhuhe/code/peculiar/target/tmp-service/peculiar-runtime-SPF2PM/peculiar_shell --type=gpu-process --gpu-recent-crash-count=0 --no-sandbox --headless=old --ozone-platform=headless --use-angle=swiftshader-webgl --enable-unsafe-swiftshader --gpu-preferences=YAAAAAAAAAAgAAAEAAAAAAAAAAAAAGAASAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAGAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAMAAAAAQAAAAAAAAAAAAAACAAAAAAAAAAIAAAAAAAAAA== --shared-files --field-trial-handle=3,i,17875282983276018628,2709091972832008174,262144 --enable-features=PeculiarOnDemandSoftwareDisplay --disable-features=DnsOverHttpsUpgrade,PaintHolding --variations-seed-version --pseudonymization-salt-handle=7,i,11458559994724806018,9062978855751633139,4 --trace-process-track-uuid=3190708988185955192
+ 560378  560330  1-06:52:59 Sl    0.0  0.0 /home/zhuhe/code/peculiar/target/tmp-service/peculiar-runtime-SPF2PM/peculiar_shell --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US@posix --service-sandbox-type=none --host-resolver-rules=MAP * ^NOTFOUND, EXCLUDE localhost, EXCLUDE *.localhost, EXCLUDE <loopback> --no-sandbox --use-angle=swiftshader-webgl --use-gl=angle --disable-quic --headless=old --shared-files --field-trial-handle=3,i,17875282983276018628,2709091972832008174,262144 --enable-features=PeculiarOnDemandSoftwareDisplay --disable-features=DnsOverHttpsUpgrade,PaintHolding --variations-seed-version --pseudonymization-salt-handle=7,i,11458559994724806018,9062978855751633139,4 --trace-process-track-uuid=3190708989122997041
+ 560487  560330  1-06:52:57 Sl    0.0  0.0 /home/zhuhe/code/peculiar/target/tmp-service/peculiar-runtime-SPF2PM/peculiar_shell --type=utility --utility-sub-type=audio.mojom.AudioService --lang=en-US@posix --service-sandbox-type=none --host-resolver-rules=MAP * ^NOTFOUND, EXCLUDE localhost, EXCLUDE *.localhost, EXCLUDE <loopback> --no-sandbox --use-angle=swiftshader-webgl --use-gl=angle --disable-quic --headless=old --shared-files --field-trial-handle=3,i,17875282983276018628,2709091972832008174,262144 --enable-features=PeculiarOnDemandSoftwareDisplay --disable-features=DnsOverHttpsUpgrade,PaintHolding --variations-seed-version --pseudonymization-salt-handle=7,i,11458559994724806018,9062978855751633139,4 --trace-process-track-uuid=3190708992871164437
+ 702359       2    11:43:30 I     0.0  0.0 [kworker/19:0-events]
+ 893575    2276  1-03:55:04 Ss+   0.0  0.0 -bash
+ 984149  160429  1-02:56:18 Sl    0.1  0.1 /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/node --dns-result-order=ipv4first /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/out/bootstrap-fork --type=extensionHost --transformURIs --useHostProxy=false
+ 984164  160429  1-02:56:17 Sl   11.5  0.8 /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/node /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/out/bootstrap-fork --type=fileWatcher
+ 984404  160625  1-02:56:05 Ss+   0.0  0.0 /bin/bash --init-file /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/out/vs/workbench/contrib/terminal/common/scripts/shellIntegration-bash.sh
+ 985679  560338  1-02:55:47 Sl    0.5  0.0 /home/zhuhe/code/peculiar/target/tmp-service/peculiar-runtime-SPF2PM/peculiar_shell --type=renderer --headless=old --no-sandbox --enable-unsafe-webgpu --allow-pre-commit-input --ozone-platform=headless --disable-gpu-compositing --lang=en-US@posix --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=68 --launch-time-ticks=27709959429 --shared-files --field-trial-handle=3,i,17875282983276018628,2709091972832008174,262144 --enable-features=PeculiarOnDemandSoftwareDisplay --disable-features=DnsOverHttpsUpgrade,PaintHolding --variations-seed-version --pseudonymization-salt-handle=7,i,11458559994724806018,9062978855751633139,4 --trace-process-track-uuid=3190709050030717226
+ 988754  984149  1-02:55:12 Sl    0.0  0.0 /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/node /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/extensions/markdown-language-features/dist/serverWorkerMain --node-ipc --clientProcessId=984149
+ 988896  984149  1-02:55:11 Sl    0.0  0.0 /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/node --max-old-space-size=3072 /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/extensions/node_modules/typescript/lib/tsserver.js --serverMode partialSemantic --useInferredProjectPerProjectRoot --disableAutomaticTypingAcquisition --cancellationPipeName /tmp/vscode-typescript1001/dd5de200d77c69d69166/tscancellation-1721fd54add4ac78fbeb.tmp* --locale en --noGetErrOnBackgroundUpdate --canUseWatchEvents --validateDefaultNpmLocation --useNodeIpc
+ 988919  984149  1-02:55:11 Sl    0.0  0.0 /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/node --max-old-space-size=3072 /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/extensions/node_modules/typescript/lib/tsserver.js --useInferredProjectPerProjectRoot --enableTelemetry --cancellationPipeName /tmp/vscode-typescript1001/dd5de200d77c69d69166/tscancellation-70d7562ad1b3acda1dca.tmp* --locale en --noGetErrOnBackgroundUpdate --canUseWatchEvents --validateDefaultNpmLocation --useNodeIpc
+ 989203  988919  1-02:55:11 Sl    0.0  0.0 /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/node /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/extensions/node_modules/typescript/lib/typingsInstaller.js --globalTypingsCacheLocation /home/zhuhe/.cache/typescript/6.0 --enableTelemetry --typesMapLocation /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/extensions/node_modules/typescript/lib/typesMap.json --validateDefaultNpmLocation
+1266204       2    09:41:47 I     0.0  0.0 [kworker/17:0-mm_percpu_wq]
+1470825       2    08:59:59 I     0.0  0.0 [kworker/20:2-cgroup_free]
+1491881       1    23:56:02 Ssl   0.0  0.0 /home/zhuhe/.codex/packages/standalone/current/bin/codex app-server --listen unix://
+1504448       2    08:49:59 I     0.0  0.0 [kworker/9:2-events]
+1561033  298594    08:34:05 Ssl+  0.0  0.0 codex agents
+1571361       2    08:29:59 I     0.0  0.0 [kworker/0:2-cgroup_free]
+1592954       2    08:23:08 I     0.0  0.0 [kworker/18:0-mm_percpu_wq]
+1629326  227101    23:02:21 S+    0.0  0.0 nvim .
+1629327 1629326    23:02:21 Ssl   0.2  0.0 nvim --embed .
+1667379  227721    22:51:24 Sl    0.0  0.0 /home/zhuhe/.codex/packages/standalone/releases/0.154.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host
+1826839       2    07:34:20 I     0.0  0.0 [kworker/28:1-events]
+1996544       2    06:49:59 I     0.0  0.0 [kworker/24:0-mm_percpu_wq]
+2070502       2    06:32:03 I     0.0  0.0 [kworker/7:2-mm_percpu_wq]
+2157881       2    06:09:59 I     0.0  0.0 [kworker/18:1-cgroup_free]
+2224980       2    05:49:59 I     0.0  0.0 [kworker/21:2-cgroup_free]
+2250441       2    05:39:59 I     0.0  0.0 [kworker/8:0]
+2282382       2    05:29:59 I     0.0  0.0 [kworker/28:2-events]
+2315319       2    05:20:09 I     0.0  0.0 [kworker/21:0-events]
+2366192       2    05:06:58 I     0.0  0.0 [kworker/29:2-events]
+2424283       2    04:49:59 I     0.0  0.0 [kworker/0:1-mm_percpu_wq]
+2424284       2    04:49:59 I     0.0  0.0 [kworker/23:0-cgroup_free]
+2440163       2    04:44:10 I     0.0  0.0 [kworker/10:2-cgroup_free]
+2444999  298594    04:41:13 Ss    0.0  0.0 /bin/bash -c while ps -eo cmd= | rg -q 'tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline'; do sleep 10; done ps -eo pid,etime,cmd | rg 'cargo|rustc' || true
+2446902       2    04:39:59 I     0.0  0.0 [kworker/14:0-cgroup_free]
+2448047  298594    04:39:20 Ss    0.0  0.0 /bin/bash -c while ps -eo cmd= | rg -q 'cargo (build|test)|rustc --crate-name'; do sleep 10; done printf '%s\n' 'cargo jobs idle' git status --short -- crates/litchi-xlsx/src/form_control/owner.rs crates/litchi-xlsx/tests/form_control_owner_read.rs
+2455783       2    04:34:27 I     0.0  0.0 [kworker/15:0-events]
+2497508       2    04:19:59 I     0.0  0.0 [kworker/25:2-cgroup_free]
+2589758       2    03:49:59 I     0.0  0.0 [kworker/2:2-mm_percpu_wq]
+2618280       2    03:40:00 I     0.0  0.0 [kworker/24:1]
+2618449       2    03:39:59 I     0.0  0.0 [kworker/29:1]
+2652261       2    03:29:59 I     0.0  0.0 [kworker/6:0]
+2659749       2    03:25:47 I     0.0  0.0 [kworker/22:1-cgroup_free]
+2671873       2    03:20:47 I     0.0  0.0 [kworker/10:0-mm_percpu_wq]
+2743678       2    02:59:59 I     0.0  0.0 [kworker/8:1-mm_percpu_wq]
+2819852       2    02:29:59 I     0.0  0.0 [kworker/9:0-events]
+2854046       2    02:19:59 I     0.0  0.0 [kworker/12:2-mm_percpu_wq]
+2866993       2    02:15:20 I     0.0  0.0 [kworker/13:0-events]
+2871509       2    02:12:57 I     0.0  0.0 [kworker/4:1-cgroup_release]
+2877445       2    02:09:59 I     0.0  0.0 [kworker/5:1]
+2896775       2    02:07:17 I     0.0  0.0 [kworker/19:1]
+2918220       2    01:59:59 I     0.0  0.0 [kworker/16:0-events]
+2918221       2    01:59:59 I     0.0  0.0 [kworker/2:0]
+2954020       2    01:49:59 I     0.0  0.0 [kworker/27:2-events]
+2954022       2    01:49:59 I     0.0  0.0 [kworker/7:1]
+2978240  163348    01:40:51 Ssl+  0.8  0.0 /home/zhuhe/go/bin/lazygit
+2980576       2    01:39:59 I     0.0  0.0 [kworker/30:1]
+3001674  298594    01:35:23 Ss    0.0  0.0 /bin/bash -c while ps -eo cmd= | rg -q 'cargo (build|test)|rustc --crate-name'; do sleep 5; done; printf '%s\n' 'cargo jobs idle'
+3018383       2    01:29:59 I     0.0  0.0 [kworker/5:0-events]
+3018384       2    01:29:59 I     0.0  0.0 [kworker/31:2-events]
+3062691       2    01:19:59 I     0.0  0.0 [kworker/31:0-events]
+3070595       2    01:18:10 I     0.0  0.0 [kworker/11:2-cgroup_free]
+3086470       2    01:13:09 I     0.0  0.0 [kworker/17:2]
+3093511       2    01:09:59 I     0.0  0.0 [kworker/30:2-mm_percpu_wq]
+3093512       2    01:09:59 I     0.0  0.0 [kworker/1:1]
+3134760       2    01:01:28 I     0.0  0.0 [kworker/u129:3-ext4-rsv-conversion]
+3137894       2    01:00:14 I     0.0  0.0 [kworker/u131:3-events_unbound]
+3138504       2       59:59 I     0.0  0.0 [kworker/25:1-events]
+3141161       2       59:15 I     0.0  0.0 [kworker/u132:3-events_unbound]
+3150506  298594       56:49 Ss    0.0  0.0 /bin/bash -c while ps -eo cmd= | rg -q 'cargo (check|test|clippy)|cargo-clippy'; do sleep 5; done; echo cargo-jobs-idle
+3173514       2       49:59 I     0.0  0.0 [kworker/23:2-events]
+3173515       2       49:59 I     0.0  0.0 [kworker/27:0]
+3187750       2       45:38 I     0.0  0.0 [kworker/u130:3-events_unbound]
+3204033       2       40:06 I     0.0  0.0 [kworker/u130:2-events_unbound]
+3204204       2       40:01 I     0.0  0.0 [kworker/u131:2-events_unbound]
+3204264       2       39:59 I     0.0  0.0 [kworker/1:0-mm_percpu_wq]
+3219118       2       33:51 I     0.0  0.0 [kworker/u129:1-events_unbound]
+3234131       2       30:08 I     0.0  0.0 [kworker/u130:1-events_unbound]
+3234460       2       29:59 I     0.0  0.0 [kworker/6:1-mm_percpu_wq]
+3234461       2       29:59 I     0.0  0.0 [kworker/12:1]
+3244393       2       26:43 I     0.0  0.0 [kworker/u132:1-events_unbound]
+3248787       2       25:14 I     0.0  0.0 [kworker/14:1-mm_percpu_wq]
+3259384       2       22:44 I     0.0  0.0 [kworker/16:2]
+3267080       2       20:34 I     0.0  0.0 [kworker/u129:4-events_power_efficient]
+3269327       2       19:59 I     0.0  0.0 [kworker/3:0-mm_percpu_wq]
+3269328       2       19:59 I     0.0  0.0 [kworker/13:2]
+3273147       2       19:10 I     0.0  0.0 [kworker/26:2-cgroup_free]
+3291051       2       14:09 I     0.0  0.0 [kworker/3:2-cgroup_free]
+3294851       2       13:43 I     0.0  0.0 [kworker/4:2-mm_percpu_wq]
+3301738       2       12:51 I     0.0  0.0 [kworker/15:2]
+3302215       2       12:50 I     0.0  0.0 [kworker/u132:0-events_unbound]
+3322018       2       09:59 I     0.0  0.0 [kworker/20:1-mm_percpu_wq]
+3330821       2       07:20 I     0.0  0.0 [kworker/u131:0-events_unbound]
+3345079       2       04:55 I     0.0  0.0 [kworker/u129:0-events_unbound]
+3346962       2       03:43 I     0.0  0.0 [kworker/19:2-events]
+3347684  157968       03:27 Ss    0.1  0.0 python3 -B docs/performance/results/change-0534/capture_candidate.py
+3347689 3347684       03:27 Sl    0.0  0.0 /home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo build --release --locked --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline --target-dir /home/zhuhe/litchi-goal-0534-target
+3350968  160279       01:41 S     0.0  0.0 sleep 180
+3354922 3347689       00:31 Sl    100  0.5 /home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name litchi_ppt --edition=2024 /home/zhuhe/code/litchi/crates/litchi-ppt/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=3 -C embed-bitcode=no --deny=clippy::all --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs --deny=rustdoc::unescaped_backticks --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints --deny=rustdoc::redundant_explicit_links --deny=rustdoc::private_intra_doc_links --deny=non_ascii_idents --allow=clippy::needless_return --allow=clippy::manual_saturating_arithmetic --allow=clippy::manual_is_multiple_of --deny=rustdoc::invalid_rust_codeblocks --deny=rustdoc::invalid_html_tags --deny=rustdoc::invalid_codeblock_attributes --allow=clippy::if_same_then_else --allow=clippy::collapsible_match --allow=clippy::collapsible_if --deny=rustdoc::broken_intra_doc_links --deny=rustdoc::bare_urls --cfg feature="default" --check-cfg cfg(docsrs,test) --check-cfg cfg(feature, values("automatic-fonts", "default", "encryption", "font-discovery", "font-subset", "fonts", "formula", "sign", "vba-inspection")) -C metadata=20f69f29ab3dd5a0 -C extra-filename=-88fa538944b6ad64 --out-dir /home/zhuhe/litchi-goal-0534-target/release/deps -C strip=debuginfo -L dependency=/home/zhuhe/litchi-goal-0534-target/release/deps --extern bitflags=/home/zhuhe/litchi-goal-0534-target/release/deps/libbitflags-0a6cbb8028e92d7a.rmeta --extern chrono=/home/zhuhe/litchi-goal-0534-target/release/deps/libchrono-923d05d52347106a.rmeta --extern flate2=/home/zhuhe/litchi-goal-0534-target/release/deps/libflate2-2f785c4409df5f80.rmeta --extern litchi_cfb=/home/zhuhe/litchi-goal-0534-target/release/deps/liblitchi_cfb-45d4ebe94fa1ff19.rmeta --extern litchi_codepage=/home/zhuhe/litchi-goal-0534-target/release/deps/liblitchi_codepage-c43ec7aa738d655d.rmeta --extern litchi_core=/home/zhuhe/litchi-goal-0534-target/release/deps/liblitchi_core-e8220bd94e4515f6.rmeta --extern litchi_odraw=/home/zhuhe/litchi-goal-0534-target/release/deps/liblitchi_odraw-bdd50ac7ea4fc636.rmeta --extern litchi_ograph=/home/zhuhe/litchi-goal-0534-target/release/deps/liblitchi_ograph-70dcbcd6988cef20.rmeta --extern litchi_ole_common=/home/zhuhe/litchi-goal-0534-target/release/deps/liblitchi_ole_common-8ea1689f41e09645.rmeta --extern litchi_opc=/home/zhuhe/litchi-goal-0534-target/release/deps/liblitchi_opc-f4681c55af69734b.rmeta --extern once_cell=/home/zhuhe/litchi-goal-0534-target/release/deps/libonce_cell-03f6b6692108e37b.rmeta --extern quick_xml=/home/zhuhe/litchi-goal-0534-target/release/deps/libquick_xml-ae3e1ccbce7b36c0.rmeta --extern serde_json=/home/zhuhe/litchi-goal-0534-target/release/deps/libserde_json-731066589a75e81a.rmeta --extern url=/home/zhuhe/litchi-goal-0534-target/release/deps/liburl-082bde4f6062d618.rmeta --extern zerocopy=/home/zhuhe/litchi-goal-0534-target/release/deps/libzerocopy-0ff1ec17f2850d88.rmeta --extern zerocopy_derive=/home/zhuhe/litchi-goal-0534-target/release/deps/libzerocopy_derive-13cf188c70272a08.so --extern zeroize=/home/zhuhe/litchi-goal-0534-target/release/deps/libzeroize-aae9d4cc004a0aa3.rmeta
+3355221 2978240       00:25 S+    0.0  0.0 git log --graph --color=always --abbrev-commit --decorate --date=relative --pretty=medium refs/heads/feat/office-format-completeness --
+3355766 2448047       00:07 S     0.0  0.0 sleep 10
+3355880 3347689       00:01 Sl   99.3  0.3 /home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name litchi_xlsb --edition=2024 /home/zhuhe/code/litchi/crates/litchi-xlsb/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=3 -C embed-bitcode=no --deny=clippy::all --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs --deny=rustdoc::unescaped_backticks --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints --deny=rustdoc::redundant_explicit_links --deny=rustdoc::private_intra_doc_links --deny=non_ascii_idents --allow=clippy::needless_return --allow=clippy::manual_saturating_arithmetic --allow=clippy::manual_is_multiple_of --deny=rustdoc::invalid_rust_codeblocks --deny=rustdoc::invalid_html_tags --deny=rustdoc::invalid_codeblock_attributes --allow=clippy::if_same_then_else --allow=clippy::collapsible_match --allow=clippy::collapsible_if --deny=rustdoc::broken_intra_doc_links --deny=rustdoc::bare_urls --cfg feature="default" --check-cfg cfg(docsrs,test) --check-cfg cfg(feature, values("default", "sign", "vba-inspection")) -C metadata=a80dba0af91982ae -C extra-filename=-5164ee1813f3ea7e --out-dir /home/zhuhe/litchi-goal-0534-target/release/deps -C strip=debuginfo -L dependency=/home/zhuhe/litchi-goal-0534-target/release/deps --extern bitflags=/home/zhuhe/litchi-goal-0534-target/release/deps/libbitflags-0a6cbb8028e92d7a.rmeta --extern chrono=/home/zhuhe/litchi-goal-0534-target/release/deps/libchrono-923d05d52347106a.rmeta --extern litchi_core=/home/zhuhe/litchi-goal-0534-target/release/deps/liblitchi_core-e8220bd94e4515f6.rmeta --extern litchi_drawingml=/home/zhuhe/litchi-goal-0534-target/release/deps/liblitchi_drawingml-1f66c1427f8a3317.rmeta --extern litchi_ooxml_common=/home/zhuhe/litchi-goal-0534-target/release/deps/liblitchi_ooxml_common-d994c9ebe7555b3d.rmeta --extern litchi_opc=/home/zhuhe/litchi-goal-0534-target/release/deps/liblitchi_opc-f4681c55af69734b.rmeta --extern litchi_sheet=/home/zhuhe/litchi-goal-0534-target/release/deps/liblitchi_sheet-fe313fa3abfce749.rmeta --extern litchi_spreadsheet_drawing=/home/zhuhe/litchi-goal-0534-target/release/deps/liblitchi_spreadsheet_drawing-528fc9140c4d89dc.rmeta --extern once_cell=/home/zhuhe/litchi-goal-0534-target/release/deps/libonce_cell-03f6b6692108e37b.rmeta --extern quick_xml=/home/zhuhe/litchi-goal-0534-target/release/deps/libquick_xml-ae3e1ccbce7b36c0.rmeta --extern thiserror=/home/zhuhe/litchi-goal-0534-target/release/deps/libthiserror-cb784385ddc0bcce.rmeta
+3355925 2444999       00:01 S     0.0  0.0 sleep 10
+3355952  298594       00:00 Ss+  62.5  0.0 /bin/bash -lc set -euo pipefail ROOT=/var/tmp/litchi-docx-styles-effects-profile-projection-reuse-d000-c4ac-frozen463 RESULTS=/var/tmp/litchi-docx-styles-effects-profile-representative-results-463334f1a-20260912-a TARGET=/var/tmp/litchi-docx-styles-effects-profile-representative-target-463334f1a-20260912-a if [[ -e "$RESULTS" || -L "$RESULTS" || -e "$TARGET" || -L "$TARGET" ]]; then echo 'fresh representative path already exists' >&2; exit 2; fi mkdir -p "$RESULTS" "$TARGET" {   printf 'timestamp_start_utc='; date -u +%Y-%m-%dT%H:%M:%SZ   printf 'git_head='; git -C "$ROOT" rev-parse HEAD   printf 'git_status='; git -C "$ROOT" status --porcelain --untracked-files=all   printf 'production_source=d000d977b99e03f8542c7dae74acf767a91b1feb\ncurrent_smoke_commit=c4ac516353591f88a9b797349002d05737614e78\n'   printf 'results=%s\ntarget=%s\n' "$RESULTS" "$TARGET"   printf 'cpus='; getconf _NPROCESSORS_ONLN   printf 'loadavg='; cat /proc/loadavg   rustc -vV   cargo -V   printf 'env=CARGO_INCREMENTAL=0 TMPDIR=/var/tmp RUSTFLAGS=unset CARGO_ENCODED_RUSTFLAGS=unset RUSTC_BOOTSTRAP=unset RUSTDOCFLAGS=unset\n' } >"$RESULTS/source-provenance-before.txt" ps -eo pid=,ppid=,etime=,stat=,pcpu=,pmem=,args= --sort=pid >"$RESULTS/process-census-before.txt" printf 'cargo build --locked --offline --manifest-path docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/profile-harness/Cargo.toml\n' >"$RESULTS/commands.txt" export CARGO_TARGET_DIR="$TARGET" export CARGO_INCREMENTAL=0 export TMPDIR=/var/tmp export PYTHONDONTWRITEBYTECODE=1 unset RUSTFLAGS CARGO_ENCODED_RUSTFLAGS RUSTC_BOOTSTRAP RUSTDOCFLAGS (cd "$ROOT" && cargo build --locked --offline --manifest-path docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/profile-harness/Cargo.toml) >"$RESULTS/build.log" 2>&1 BIN="$TARGET/debug/docx-styles-effects-profile" [[ -x "$BIN" ]] printf 'binary=%s\n' "$BIN" >>"$RESULTS/source-provenance-before.txt" sha256sum "$BIN" >"$RESULTS/binary.sha256" printf 'run=%s --lane replace_main --scale native --warmup 0 --samples 1\n' "$BIN" >>"$RESULTS/commands.txt" DOCX_PROFILE_PROCESS_INDEX=1 "$BIN" --lane replace_main --scale native --warmup 0 --samples 1 >"$RESULTS/replace_main-native.json" 2>"$RESULTS/replace_main-native.stderr.log" printf 'run=%s --lane replace_glossary --scale native --warmup 0 --samples 1\n' "$BIN" >>"$RESULTS/commands.txt" DOCX_PROFILE_PROCESS_INDEX=1 "$BIN" --lane replace_glossary --scale native --warmup 0 --samples 1 >"$RESULTS/replace_glossary-native.json" 2>"$RESULTS/replace_glossary-native.stderr.log" python3 -B - <<'PY' import json from pathlib import Path p=Path('/var/tmp/litchi-docx-styles-effects-profile-representative-results-463334f1a-20260912-a') for name in ('replace_main-native.json','replace_glossary-native.json'):     v=json.loads((p/name).read_text())     assert v['source_commit']=='d000d977b99e03f8542c7dae74acf767a91b1feb'     assert v['actual_success'] and v['semantic_ok'] and v['opaque_ok'] and v['exact_inverse_ok']     assert v['source_backed_api'] is True     assert v['alloc_balance_ok'] and not v['alloc_invalid'] and v['allocation_failed']==0     print(name, 'actual_success=',v['actual_success'],'allocation_calls=',v['allocation_calls'],'requested_alloc_bytes=',v['requested_alloc_bytes'],'peak_live_delta=',v['peak_live_delta'],'output_bytes=',v['output_bytes']) PY {   printf 'timestamp_end_utc='; date -u +%Y-%m-%dT%H:%M:%SZ   printf 'cpus='; getconf _NPROCESSORS_ONLN   printf 'loadavg='; cat /proc/loadavg } >"$RESULTS/source-provenance-after.txt" ps -eo pid=,ppid=,etime=,stat=,pcpu=,pmem=,args= --sort=pid >"$RESULTS/process-census-after.txt" printf 'status=passed\nprofile_mode=representative_non_timing\nlatency_claim=false\nrss_claim=false\n' >"$RESULTS/status.txt" find "$TARGET" -depth -delete [[ ! -e "$TARGET" && ! -L "$TARGET" ]] printf 'target_removed_after_receipt_validation=true\n' >>"$RESULTS/status.txt"
+3355982 3150506       00:00 S     0.0  0.0 sleep 5
+3355984 3001674       00:00 S     0.0  0.0 sleep 5
+3356029 3355952       00:00 R+    0.0  0.0 ps -eo pid=,ppid=,etime=,stat=,pcpu=,pmem=,args= --sort=pid
+3671215       2    15:34:42 I     0.0  0.0 [kworker/26:0-events]
+3777410       2    15:09:59 I     0.0  0.0 [kworker/22:2-events]
+3870805    2276    14:52:07 Ss+   0.0  0.0 -bash
+3872452       1    14:51:33 Sl    0.0  0.0 bun build/index.js

@@ -63,6 +63,7 @@ fn empty_workbook() -> Workbook {
         structured_tables: Vec::new(),
         chart_sheets: Vec::new(),
         sheet_drawings: Vec::new(),
+        drawing_load_policy: super::model::DrawingLoadPolicy::Eager,
         connections: None,
     }
 }
@@ -73,6 +74,42 @@ fn generated_workbook() -> Workbook {
     let mut bytes = Cursor::new(Vec::new());
     writer.save(&mut bytes).unwrap();
     Workbook::new(Cursor::new(bytes.into_inner())).unwrap()
+}
+
+#[test]
+fn drawing_parse_state_is_distinct_from_empty_inventory() {
+    let mut workbook = empty_workbook();
+    assert!(workbook.sheet_drawings().is_empty());
+    assert!(workbook.drawings_parsed());
+
+    workbook.drawing_load_policy = super::model::DrawingLoadPolicy::Skipped;
+    assert!(workbook.sheet_drawings().is_empty());
+    assert!(!workbook.drawings_parsed());
+}
+
+#[test]
+fn durable_patch_decode_can_opt_into_skipped_drawing_projection() {
+    let workbook = generated_workbook();
+    let commit = workbook
+        .edit_workbook_structure()
+        .unwrap()
+        .commit()
+        .unwrap();
+    let encoded = commit
+        .patch()
+        .to_bytes(crate::cell_values::TransferLimits::DEFAULT)
+        .unwrap();
+    let decoded = crate::cell_values::WorkbookPatch::from_bytes_without_drawing_parse(
+        &encoded,
+        crate::cell_values::TransferLimits::DEFAULT,
+    )
+    .unwrap();
+    assert_eq!(decoded.operation_count(), 0);
+
+    let package_bytes = litchi_opc::PackageWriter::to_bytes(workbook.opc_package()).unwrap();
+    let mut skipped = Workbook::new_without_drawing_parse(Cursor::new(package_bytes)).unwrap();
+    decoded.apply(&mut skipped).unwrap();
+    assert!(!skipped.drawings_parsed());
 }
 
 #[test]
@@ -213,6 +250,7 @@ fn parse_external_link_with_relationship_type(
         structured_tables: Vec::new(),
         chart_sheets: Vec::new(),
         sheet_drawings: Vec::new(),
+        drawing_load_policy: super::model::DrawingLoadPolicy::Eager,
         connections: None,
     };
     let mut budget = ExternalLinkLimits::default().budget();
@@ -1152,6 +1190,7 @@ fn reads_external_book_metadata_from_local_fixture() {
         structured_tables: Vec::new(),
         chart_sheets: Vec::new(),
         sheet_drawings: Vec::new(),
+        drawing_load_policy: super::model::DrawingLoadPolicy::Eager,
         connections: None,
     };
     let uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
@@ -1558,6 +1597,7 @@ fn workbook_projection(workbook: &Workbook) -> String {
         structured_tables,
         chart_sheets,
         sheet_drawings,
+        drawing_load_policy,
         connections,
     } = workbook;
     let package = package_digest(package).join("\n  ");
@@ -1570,7 +1610,8 @@ fn workbook_projection(workbook: &Workbook) -> String {
          shared_strings={shared_strings:?}\nstyles={styles}\ncalc={calc:?}\nis_1904={is_1904:?}\n\
          pivot_cache_definitions={pivot_cache_definitions:?}\n\
          structured_tables={structured_tables:?}\nchart_sheets={chart_sheets:?}\n\
-         sheet_drawings={sheet_drawings:?}\nconnections={connections:?}"
+         sheet_drawings={sheet_drawings:?}\ndrawing_load_policy={drawing_load_policy:?}\n\
+         connections={connections:?}"
     )
 }
 

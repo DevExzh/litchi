@@ -1,5 +1,153 @@
 //! Focused tests for the document owner.
 
+#[cfg(test)]
+mod lazy_auxiliary_tests {
+    use crate::package::Package;
+    use crate::parts::fib::FileInformationBlock;
+    use crate::tracked_revision::Limits;
+    use crate::writer::Writer;
+    use litchi_ole_common::object::{Editor as PackageEditor, Targets};
+    use std::io::Cursor;
+
+    #[test]
+    fn malformed_optional_auxiliary_tables_are_deferred_until_access() {
+        let mut writer = Writer::new();
+        writer.add_paragraph("Body").expect("fixture paragraph");
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).expect("fixture DOC");
+        let mut package =
+            PackageEditor::open(output.into_inner(), Targets::default(), Limits::default())
+                .expect("fixture package");
+        let word_path = ["WordDocument".to_string()];
+        let mut word = package
+            .stream(&word_path)
+            .expect("WordDocument stream")
+            .to_vec();
+        for index in [27usize, 28, 29, 30, 60, 99, 109] {
+            let pair = 154 + index * 8;
+            word[pair..pair + 4].copy_from_slice(&0u32.to_le_bytes());
+            word[pair + 4..pair + 8].copy_from_slice(&1u32.to_le_bytes());
+        }
+        let pgp_pair = 154 + crate::parts::paragraph_groups::FIB_INDEX_PGP * 8;
+        word[pgp_pair + 4..pgp_pair + 8].copy_from_slice(
+            &u32::try_from(crate::parts::paragraph_groups::MAX_PGP_BYTES + 1)
+                .expect("PGP limit")
+                .to_le_bytes(),
+        );
+        let dofr_pair = 154 + crate::parts::dofr::FIB_INDEX_RG_DOFR * 8;
+        word[dofr_pair..dofr_pair + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+        package
+            .put_stream(&word_path, word)
+            .expect("malformed optional pointers");
+        let bytes = package.finish().expect("fixture package finish");
+
+        let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+        let document = package
+            .document()
+            .expect("unrelated document open must not parse optional tables");
+        assert!(document.paragraph_groups_source.is_err());
+        assert!(document.dofr_records_source.is_err());
+        assert!(document.saved_selection().is_err());
+        let paragraph_error = document
+            .paragraph_groups()
+            .expect_err("malformed PGP metadata");
+        assert_eq!(
+            document
+                .paragraph_groups()
+                .expect_err("cached malformed PGP metadata")
+                .to_string(),
+            paragraph_error.to_string()
+        );
+        let dofr_error = document
+            .dofr_records()
+            .expect_err("malformed RgDofr metadata");
+        assert_eq!(
+            document
+                .dofr_records()
+                .expect_err("cached malformed RgDofr metadata")
+                .to_string(),
+            dofr_error.to_string()
+        );
+        let print_error = document
+            .print_environment()
+            .expect_err("malformed print metadata");
+        assert_eq!(
+            document
+                .print_environment()
+                .expect_err("cached malformed print metadata")
+                .to_string(),
+            print_error.to_string()
+        );
+        assert!(document.vba_signatures().is_err());
+    }
+
+    #[test]
+    fn deferred_auxiliary_sources_retain_only_selected_ranges() {
+        let mut writer = Writer::new();
+        writer.add_paragraph("Body").expect("fixture paragraph");
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).expect("fixture DOC");
+        let mut package =
+            PackageEditor::open(output.into_inner(), Targets::default(), Limits::default())
+                .expect("fixture package");
+        let word_path = ["WordDocument".to_string()];
+        let mut word = package
+            .stream(&word_path)
+            .expect("WordDocument stream")
+            .to_vec();
+        let fib = FileInformationBlock::parse(&word).expect("fixture FIB");
+        let table_name = if fib.which_table_stream() {
+            "1Table"
+        } else {
+            "0Table"
+        };
+        let table_path = [table_name.to_string()];
+        let mut table = package.stream(&table_path).expect("table stream").to_vec();
+        let pgp_offset = u32::try_from(table.len()).expect("table offset");
+        let pgp = [0u8, 0u8];
+        table.extend_from_slice(&pgp);
+        table.extend(std::iter::repeat_n(0xA5, 1024 * 1024));
+        package
+            .put_stream(&table_path, table.clone())
+            .expect("expanded table stream");
+
+        for index in [
+            crate::parts::print_environment::FIB_INDEX_PR_DRVR,
+            crate::parts::print_environment::FIB_INDEX_PR_ENV_PORT,
+            crate::parts::print_environment::FIB_INDEX_PR_ENV_LAND,
+            crate::parts::dofr::FIB_INDEX_RG_DOFR,
+        ] {
+            let pointer = 154 + index * 8;
+            word[pointer..pointer + 8].fill(0);
+        }
+        let pointer = 154 + crate::parts::paragraph_groups::FIB_INDEX_PGP * 8;
+        word[pointer..pointer + 4].copy_from_slice(&pgp_offset.to_le_bytes());
+        word[pointer + 4..pointer + 8]
+            .copy_from_slice(&(u32::try_from(pgp.len()).expect("PGP length")).to_le_bytes());
+        package.put_stream(&word_path, word).expect("PGP pointer");
+        let bytes = package.finish().expect("fixture package finish");
+
+        let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+        let document = package.document().expect("document open");
+        let source = document
+            .paragraph_groups_source
+            .as_ref()
+            .expect("PGP range capture")
+            .as_ref()
+            .expect("PGP range present");
+        assert_eq!(source, &pgp);
+        assert!(source.len() < table.len());
+        assert!(
+            document
+                .paragraph_groups()
+                .expect("lazy PGP parse")
+                .expect("PGP metadata")
+                .is_empty()
+        );
+        assert!(matches!(&document.dofr_records_source, Ok(None)));
+    }
+}
+
 #[cfg(all(test, feature = "formula"))]
 mod owned_mtef_tests {
     use crate::Document;
@@ -90,7 +238,7 @@ fn opened_document_exposes_versioned_document_properties() {
         properties
             .versioned()
             .expect("valid versioned Dop extension"),
-        crate::VersionedDocumentProperties::Word97(_)
+        crate::VersionedDocumentProperties::Word2002(_)
     ));
 }
 

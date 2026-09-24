@@ -1,0 +1,28 @@
+# XLSX form-control owner read performance characterization
+
+This directory records candidate-only measurements for the committed form-control owner read implementation at `1ae5d7b4504a248ea24ac52cb2bdd1f08859ddd7`. The source was built from an exact detached checkout with a private Cargo target. The parent checkout's in-progress scalar-write edits were not used.
+
+The [performance scope](performance-scope.md) defines the semantic assertions and workload boundaries. Accepted lanes cover a native one-control fixture, a native two-control fixture, a deterministic admitted 16-control fixture, and an admitted mirror-diagnostic fixture. A foreign-wrapper graph is measured under a separate refusal lane. The synthetic package generators are retained beside the harness and their XLSX and ZIP-member hashes are retained in the run.
+
+The final replay emitted 294 receipts: five correctness records (four accepted and one refusal), seven repetitions, and the paired eager/source-backed package-open, owner-projection, warm query, no-op clone, and refusal lanes. The harness checks equal control order, names, typed object tokens, shape identity, exact properties bytes, profiles, and per-view diagnostics across eager and source-backed reads. It also checks source version/read-set provenance and compares retained worksheet, DrawingML, VML, and properties bytes with the fixture archive. Warm query and clone phases retain the source-backed collection and report zero allocator events and zero source reads.
+
+The headline values below are medians over seven repetitions from the final run. They are scoped observations, not a baseline or speedup claim. `requested bytes` is cumulative successful allocation/reallocation request bytes. `peak live` is the allocator-observed live-byte increase above the phase baseline; RSS is recorded separately and is not inferred from allocator counters.
+
+| case | controls | eager open ns | source open ns | eager projection ns | source projection ns | eager projection requested bytes | source projection requested bytes | eager projection peak live | source projection peak live |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| button-small | 1 | 226,861 | 163,581 | 632,862 | 626,422 | 2,562,901 | 2,956,916 | 64,454 | 126,690 |
+| tdf60673-medium | 2 | 324,741 | 237,480 | 1,075,214 | 1,071,564 | 4,714,859 | 5,186,380 | 112,943 | 159,905 |
+| many-controls-16 (synthetic admitted) | 16 | 367,001 | 249,411 | 6,574,174 | 6,547,334 | 32,967,529 | 34,526,604 | 757,816 | 759,682 |
+| diagnostic-mirror (admitted) | 2 | 266,911 | 178,451 | 1,062,184 | 1,060,544 | 4,848,060 | 5,319,581 | 111,156 | 161,904 |
+
+The source-backed package-open/projection lanes also retain logical read counters. For the one-control case, the medians were 3,049 and 3,071 returned bytes for open and projection; the 16-control case returned 4,338 and 6,422 bytes. Warm selection and clone lanes retained source version/read-set state while recording zero source reads, zero allocation calls, zero requested event bytes, zero live-byte delta, and zero peak-live increase in every repetition. The refusal fixture returned the same `invalid` error variant from both public facades in all correctness checks; its separate timing lanes are not included in accepted projection summaries.
+
+The raw repeated receipts and machine checks from the independent replay are in [`runs/replay-20260912T222637Z.LW83lz/`](runs/replay-20260912T222637Z.LW83lz/). [Replay](replay.sh) creates a fresh detached worktree at the pinned commit, installs the retained source lock, uses an isolated target, and invokes the relocatable harness. The source manifest, source lock, harness lock, selected source gate, generator scripts, harness source, and replay instructions are retained for independent verification. The temporary target, restored source checkout, and generated fixture files were removed after the run.
+
+This evidence does not measure save/rewrite, cold page-cache behavior, concurrency, native Office behavior, or decompression in isolation. It does not claim a runtime baseline, a before/after improvement, or a general graph-support guarantee.
+
+Root independently replayed the retained harness in a fresh checkout and target; see [root replay](runs/root-replay/). All 294 receipts matched the prior replay in every field except elapsed time and RSS, and all fixture hashes matched. The logical allocator peak excludes allocator overhead and transient physical old-plus-new storage during reallocation. The historical `source-state-after.json` is a copy of the pre-run verification, not an independent post-run rehash. The pinned private checkout and source manifest establish the source used for this capture.
+
+Measurement limits: eager package-open timing includes the caller-side `bytes.to_vec()` input copy, whereas source-backed input materialization occurs before timing. These open lanes therefore have asymmetric input preparation and must not be used as a direct efficiency comparison. All timed phases run with atomic global-allocator instrumentation enabled; elapsed values include that overhead and are not uninstrumented production latency. Seven repetitions supply medians only, without benchmark warm-up, tail percentiles, or uncertainty intervals. “Warm” denotes queries against retained objects, not discarded benchmark warm-up iterations.
+
+The harness uses in-memory `ReadAt` input. Exact retained-byte assertions do not independently establish zero-copy backing, raw relationship-member preservation, or MCE provenance; those remain separate owner-test coverage. This is candidate characterization, not full ADR 0005 performance certification. See [independent review](independent-review.md).

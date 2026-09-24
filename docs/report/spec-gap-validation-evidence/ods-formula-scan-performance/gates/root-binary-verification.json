@@ -1,0 +1,21 @@
+{
+  "utc": "2026-09-13T08:25:21.185911+00:00",
+  "binaries": {
+    "baseline": {
+      "sha256": "421a788fe9c2199bc4b224f4bcc05bb19c15c0ea6d0b61bf56ffe45f764bd274",
+      "bytes": 1171152,
+      "captured_path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/baseline/ods-formula-reference-profile"
+    },
+    "annotation-removals": {
+      "sha256": "e1054973ab6da8068f90728a2714d9cf505bafb8a37de8cd78280d231a224460",
+      "bytes": 1172256,
+      "captured_path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/annotation-removals/ods-formula-reference-profile"
+    },
+    "candidate": {
+      "sha256": "507c989691190554711c023ebe19796e62388bdc27fe942ab8015e862c49689f",
+      "bytes": 1171720,
+      "captured_path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/candidate/ods-formula-reference-profile",
+      "utc": "2026-09-13T08:27:16.438679+00:00"
+    }
+  }
+}

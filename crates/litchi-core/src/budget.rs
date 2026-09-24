@@ -329,6 +329,39 @@ impl Reservation {
         self.resource
     }
 
+    /// Merges another already-charged reservation into this token.
+    ///
+    /// The reservations can be merged only when they charge the same
+    /// resource through the exact same budget-node chain.  A successful merge
+    /// keeps one chain and makes the consumed token inert, so the combined
+    /// amount is released exactly once when this token is dropped.  The
+    /// counters are already charged by both reservations and therefore do not
+    /// change during a merge.
+    ///
+    /// # Errors
+    ///
+    /// Returns `other` unchanged when either reservation has a different
+    /// resource or node chain, or when their amounts cannot be added.  `self`
+    /// is unchanged on every error path.
+    pub fn try_merge(&mut self, mut other: Reservation) -> Result<(), Reservation> {
+        // A token holds only the node it charged, and that node owns its
+        // ancestors through immutable parent links, so two tokens charge the
+        // exact same chain precisely when they hold the same node.
+        if self.resource != other.resource || !Arc::ptr_eq(&self.node, &other.node) {
+            return Err(other);
+        }
+
+        let Some(amount) = self.amount.checked_add(other.amount) else {
+            return Err(other);
+        };
+
+        self.amount = amount;
+        // A zero amount makes the consumed token inert: its `Drop` releases
+        // nothing, so the combined amount is released once, by `self`.
+        other.amount = 0;
+        Ok(())
+    }
+
     /// Commits at most the reserved amount as cumulative usage.
     ///
     /// A reservation normally releases all of its charge when dropped.  A
@@ -479,6 +512,157 @@ mod tests {
         assert!(reservation.commit(3));
         assert_eq!(budget.used(Resource::Memory), 3);
         assert!(budget.reserve(Resource::Memory, 7).is_ok());
+    }
+
+    #[test]
+    fn reservations_merge_for_clone_handles_without_changing_counters() {
+        let budget = Budget::root("document", limits(20));
+        let mut first = budget.reserve(Resource::Memory, 7).expect("first reserve");
+        let second = budget
+            .clone()
+            .reserve(Resource::Memory, 5)
+            .expect("clone reserve");
+        assert_eq!(budget.used(Resource::Memory), 12);
+
+        assert!(first.try_merge(second).is_ok());
+        assert_eq!(first.amount(), 12);
+        assert_eq!(budget.used(Resource::Memory), 12);
+
+        drop(first);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn reservations_merge_preserves_parent_and_child_accounting() {
+        let root = Budget::root("document", limits(20));
+        let child = root.child("worksheet", limits(20));
+        let mut first = child
+            .reserve(Resource::OutputBytes, 7)
+            .expect("first reserve");
+        let second = child
+            .clone()
+            .reserve(Resource::OutputBytes, 5)
+            .expect("clone reserve");
+        assert_eq!(root.used(Resource::OutputBytes), 12);
+        assert_eq!(child.used(Resource::OutputBytes), 12);
+
+        assert!(first.try_merge(second).is_ok());
+        assert_eq!(first.amount(), 12);
+        assert_eq!(root.used(Resource::OutputBytes), 12);
+        assert_eq!(child.used(Resource::OutputBytes), 12);
+
+        drop(first);
+        assert_eq!(root.used(Resource::OutputBytes), 0);
+        assert_eq!(child.used(Resource::OutputBytes), 0);
+    }
+
+    #[test]
+    fn reservations_refuse_different_chains_and_resources_without_accounting_changes() {
+        let root = Budget::root("document", limits(20));
+        let left = root.child("left", limits(20));
+        let right = root.child("right", limits(20));
+        let mut sibling = left.reserve(Resource::Memory, 2).expect("left reserve");
+        let sibling_other = right.reserve(Resource::Memory, 3).expect("right reserve");
+        assert_eq!(root.used(Resource::Memory), 5);
+        let sibling_other = sibling
+            .try_merge(sibling_other)
+            .expect_err("sibling chains must not merge");
+        assert_eq!(sibling.amount(), 2);
+        assert_eq!(sibling_other.amount(), 3);
+        assert_eq!(root.used(Resource::Memory), 5);
+        assert_eq!(left.used(Resource::Memory), 2);
+        assert_eq!(right.used(Resource::Memory), 3);
+        drop(sibling);
+        drop(sibling_other);
+        assert_eq!(root.used(Resource::Memory), 0);
+
+        let scoped_left = Budget::root("scope-left", limits(20));
+        let scoped_right = Budget::root("scope-right", limits(20));
+        let mut scoped = scoped_left
+            .reserve(Resource::Memory, 2)
+            .expect("scoped left reserve");
+        let scoped_other = scoped_right
+            .reserve(Resource::Memory, 3)
+            .expect("scoped right reserve");
+        let scoped_other = scoped
+            .try_merge(scoped_other)
+            .expect_err("different scope chains must not merge");
+        assert_eq!(scoped.amount(), 2);
+        assert_eq!(scoped_other.amount(), 3);
+        assert_eq!(scoped_left.used(Resource::Memory), 2);
+        assert_eq!(scoped_right.used(Resource::Memory), 3);
+        drop(scoped);
+        drop(scoped_other);
+
+        let mut memory = root.reserve(Resource::Memory, 2).expect("memory reserve");
+        let input = root
+            .reserve(Resource::InputBytes, 3)
+            .expect("input reserve");
+        let input = memory
+            .try_merge(input)
+            .expect_err("different resources must not merge");
+        assert_eq!(memory.amount(), 2);
+        assert_eq!(memory.resource(), Resource::Memory);
+        assert_eq!(input.amount(), 3);
+        assert_eq!(input.resource(), Resource::InputBytes);
+        assert_eq!(root.used(Resource::Memory), 2);
+        assert_eq!(root.used(Resource::InputBytes), 3);
+        drop(memory);
+        drop(input);
+        assert_eq!(root.used(Resource::Memory), 0);
+        assert_eq!(root.used(Resource::InputBytes), 0);
+    }
+
+    #[test]
+    fn zero_amount_reservations_merge_without_charging() {
+        let budget = Budget::root("document", limits(20));
+        let mut first = budget.reserve(Resource::Memory, 0).expect("first reserve");
+        let second = budget.reserve(Resource::Memory, 0).expect("second reserve");
+
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert!(first.try_merge(second).is_ok());
+        assert_eq!(first.amount(), 0);
+        assert_eq!(budget.used(Resource::Memory), 0);
+
+        drop(first);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn merged_reservation_can_commit_part_of_combined_amount() {
+        let budget = Budget::root("document", limits(20));
+        let mut first = budget.reserve(Resource::Memory, 7).expect("first reserve");
+        let second = budget.reserve(Resource::Memory, 5).expect("second reserve");
+        assert!(first.try_merge(second).is_ok());
+        assert_eq!(budget.used(Resource::Memory), 12);
+
+        assert!(first.commit(4));
+        assert_eq!(budget.used(Resource::Memory), 4);
+        assert!(budget.reserve(Resource::Memory, 16).is_ok());
+    }
+
+    #[test]
+    fn merge_refuses_amount_overflow_without_mutating_either_token() {
+        let budget = Budget::root("document", limits(u64::MAX));
+        // Tokens built directly on one node: the charge-free construction
+        // isolates the checked amount addition (releases saturate at zero).
+        let mut first = Reservation {
+            node: Arc::clone(&budget.node),
+            resource: Resource::Memory,
+            amount: u64::MAX,
+        };
+        let second = Reservation {
+            node: Arc::clone(&budget.node),
+            resource: Resource::Memory,
+            amount: 1,
+        };
+
+        let second = first
+            .try_merge(second)
+            .expect_err("amount addition must be checked");
+        assert_eq!(first.amount(), u64::MAX);
+        assert_eq!(second.amount(), 1);
+        assert_eq!(budget.used(Resource::Memory), 0);
     }
 
     #[test]

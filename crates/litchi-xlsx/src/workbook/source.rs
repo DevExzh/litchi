@@ -636,6 +636,57 @@ impl SourceWorksheet {
         self.data.kind
     }
 
+    /// Read the worksheet's admitted SpreadsheetML form controls.
+    pub fn form_controls(&self) -> Result<crate::form_control::FormControlCollection> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name.clone(),
+            });
+        }
+        crate::form_control::source_form_controls_for_sheet(
+            &self.owner.package,
+            &self.data.part_uri,
+        )
+    }
+
+    /// Read this worksheet's form controls under a caller-owned bounded
+    /// owner policy.
+    pub fn form_controls_with_limits(
+        &self,
+        limits: crate::form_control::OwnerLimits,
+    ) -> Result<crate::form_control::FormControlCollection> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name.clone(),
+            });
+        }
+        crate::form_control::source_form_controls_for_sheet_with_limits(
+            &self.owner.package,
+            &self.data.part_uri,
+            limits,
+        )
+    }
+
+    /// Resolve one form control by checked position or exact authored name.
+    pub fn form_control<'a>(
+        &self,
+        selector: impl Into<crate::form_control::ControlSelector<'a>>,
+    ) -> Result<Option<crate::form_control::FormControlView>> {
+        Ok(self.form_controls()?.get(selector)?.cloned())
+    }
+
+    /// Resolve one form control under a caller-owned bounded owner policy.
+    pub fn form_control_with_limits<'a>(
+        &self,
+        selector: impl Into<crate::form_control::ControlSelector<'a>>,
+        limits: crate::form_control::OwnerLimits,
+    ) -> Result<Option<crate::form_control::FormControlView>> {
+        Ok(self
+            .form_controls_with_limits(limits)?
+            .get(selector)?
+            .cloned())
+    }
+
     /// Retained visibility state.
     #[must_use]
     pub fn visibility(&self) -> &Visibility {

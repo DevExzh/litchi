@@ -7,16 +7,37 @@ use litchi_cfb::OleWriter;
 use litchi_core::Position;
 use litchi_doc::body_text::{
     CharacterProperty, DrawingDependency, Error, Projection, Refusal, Snapshot, Story, TextTarget,
+    TransactionLimits,
 };
+use litchi_doc::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
+use litchi_doc::tracked_revision::Limits;
 use litchi_doc::writer::{FloatingPosition, Kind, Picture, Shape, Writer};
 use litchi_doc::{HeaderKind, Package};
 use std::io::Cursor;
 use std::path::PathBuf;
 
+mod common;
+
 fn fixture(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .join(relative)
+}
+
+fn authorized_fixture(bytes: &[u8]) -> Snapshot {
+    let authorization = ProtectionAuthorization::audited(
+        "doc-body-transaction-tests",
+        "exercise edits on producer fixtures with legacy protection metadata",
+    )
+    .expect("fixture authorization");
+    let normalized = common::with_valid_word97_dop(bytes.to_vec());
+    Snapshot::open_bounded_with_policy(
+        normalized,
+        Limits::default(),
+        TransactionLimits::default(),
+        ProtectionPolicy::allow_protected(authorization),
+    )
+    .expect("fixture has a safe edit basis")
 }
 
 #[test]
@@ -27,7 +48,7 @@ fn real_multi_generation_docs_resize_and_fully_reopen() {
     ];
     for (relative, expected_nfib) in fixtures {
         let bytes = std::fs::read(fixture(relative)).expect("real DOC fixture");
-        let source = Snapshot::parse(&bytes).expect("fixture has a safe edit basis");
+        let source = authorized_fixture(&bytes);
         let paragraphs = source
             .paragraphs(Projection::All)
             .expect("fixture paragraphs");
@@ -58,14 +79,12 @@ fn real_multi_generation_docs_resize_and_fully_reopen() {
 
 #[test]
 fn durable_stale_source_is_rejected_without_mutation() {
-    let first = Snapshot::parse(
+    let first = authorized_fixture(
         &std::fs::read(fixture("test-data/ole/doc/NoHeadFoot.doc")).expect("first fixture"),
-    )
-    .expect("first snapshot");
-    let second = Snapshot::parse(
+    );
+    let second = authorized_fixture(
         &std::fs::read(fixture("test-data/ole/doc/ThreeColHeadFoot.doc")).expect("second fixture"),
-    )
-    .expect("second snapshot");
+    );
     let paragraph = first
         .paragraphs(Projection::All)
         .expect("paragraphs")
@@ -95,7 +114,7 @@ fn durable_stale_source_is_rejected_without_mutation() {
 fn real_story_field_and_table_targets_fully_reopen() {
     let header_bytes =
         std::fs::read(fixture("test-data/ole/doc/ThreeColHeadFoot.doc")).expect("header fixture");
-    let header_source = Snapshot::parse(&header_bytes).expect("header snapshot");
+    let header_source = authorized_fixture(&header_bytes);
     let header = header_source
         .story_paragraphs(Story::Header)
         .expect("header story")
@@ -126,7 +145,7 @@ fn real_story_field_and_table_targets_fully_reopen() {
 
     let field_bytes =
         std::fs::read(fixture("test-data/ole/doc/hyperlink.doc")).expect("field fixture");
-    let field_source = Snapshot::parse(&field_bytes).expect("field snapshot");
+    let field_source = authorized_fixture(&field_bytes);
     let field = field_source
         .field_results()
         .expect("field results")
@@ -156,7 +175,7 @@ fn real_story_field_and_table_targets_fully_reopen() {
 
     let table_bytes =
         std::fs::read(fixture("test-data/ole/doc/commented-table.doc")).expect("table fixture");
-    let table_source = Snapshot::parse(&table_bytes).expect("table snapshot");
+    let table_source = authorized_fixture(&table_bytes);
     let cell = table_source
         .table_cells()
         .expect("simple real table cells")
@@ -190,8 +209,7 @@ fn genuine_embedded_object_transfer_closes_cfb_field_preview_and_storage() {
     preview.extend_from_slice(&7_701u32.to_le_bytes());
     preview.extend_from_slice(&[0; 4]);
     let mut donor_owner =
-        litchi_doc::Editor::open(donor_base, litchi_doc::embedded_object::Limits::default())
-            .expect("real donor embedded owner");
+        litchi_doc::Editor::open(donor_base, Limits::default()).expect("real donor embedded owner");
     donor_owner
         .add(litchi_doc::WriteOptions::new(
             7_701,
@@ -199,14 +217,12 @@ fn genuine_embedded_object_transfer_closes_cfb_field_preview_and_storage() {
             preview,
         ))
         .expect("seed inert resource on genuine donor");
-    let donor = Snapshot::parse(&donor_owner.finish().expect("genuine donor publication"))
-        .expect("genuine donor root snapshot");
+    let donor = authorized_fixture(&donor_owner.finish().expect("genuine donor publication"));
 
-    let receiver = Snapshot::parse(
+    let receiver = authorized_fixture(
         &std::fs::read(fixture("test-data/ole/doc/documentProperties.doc"))
             .expect("real receiver fixture"),
-    )
-    .expect("real receiver snapshot");
+    );
     let plan = receiver
         .plan_embedded_transfer_from(&donor, 7_701, 9_001)
         .expect("genuine dependency-closed transfer plan");
@@ -313,13 +329,12 @@ fn genuine_receivers_accept_pictures_beside_main_and_header_drawings() {
         writer
             .write_to(&mut donor_bytes)
             .expect("picture donor DOC");
-        let donor = Snapshot::parse(&donor_bytes.into_inner()).expect("picture donor snapshot");
+        let donor = authorized_fixture(&donor_bytes.into_inner());
 
-        let receiver = Snapshot::parse(
+        let receiver = authorized_fixture(
             &std::fs::read(fixture("test-data/ole/doc/documentProperties.doc"))
                 .expect("genuine receiver fixture"),
-        )
-        .expect("genuine receiver snapshot");
+        );
         let destination = receiver
             .paragraphs(Projection::All)
             .expect("genuine receiver paragraphs")
@@ -402,16 +417,14 @@ fn genuine_receivers_accept_pictures_beside_main_and_header_drawings() {
 
 #[test]
 fn genuine_word97_noncanonical_picture_graphs_are_typed_refusals() {
-    let donor = Snapshot::parse(
+    let donor = authorized_fixture(
         &std::fs::read(fixture("test-data/ole/doc/FloatingPictures.doc"))
             .expect("genuine Word 97 picture donor"),
-    )
-    .expect("genuine donor snapshot");
-    let receiver = Snapshot::parse(
+    );
+    let receiver = authorized_fixture(
         &std::fs::read(fixture("test-data/ole/doc/documentProperties.doc"))
             .expect("genuine receiver fixture"),
-    )
-    .expect("genuine receiver snapshot");
+    );
     let destination = receiver
         .paragraphs(Projection::All)
         .expect("genuine receiver paragraphs")

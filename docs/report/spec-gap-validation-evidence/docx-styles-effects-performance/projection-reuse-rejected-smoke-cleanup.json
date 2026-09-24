@@ -1,0 +1,12 @@
+{
+  "retention_commit": "84b191733a3d578019e1065d19fc637a7674c94d",
+  "retained_files_git_byte_verified": 172,
+  "original_raw_files_verified": 166,
+  "original_raw_bytes_verified": 1771338,
+  "removed_original_results": "/var/tmp/litchi-docx-styles-effects-projection-reuse-smoke-results-901994438-20260912-a",
+  "original_results_absent": true,
+  "runner_target": "/var/tmp/litchi-docx-styles-effects-projection-reuse-smoke-target-901994438-20260912-a",
+  "runner_target_already_absent": true,
+  "source_worktree_preserved": true,
+  "scope": "Rejected smoke provenance only; no correctness or timing claim."
+}

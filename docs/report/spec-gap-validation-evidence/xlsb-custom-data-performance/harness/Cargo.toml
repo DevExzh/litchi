@@ -1,0 +1,19 @@
+[package]
+name = "litchi-xlsb-custom-data-performance"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.89"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "xlsb-custom-data-performance"
+path = "main.rs"
+
+[dependencies]
+litchi-core = { path = "../../../../../crates/litchi-core" }
+litchi-opc = { path = "../../../../../crates/litchi-opc" }
+litchi-xlsb = { path = "../../../../../crates/litchi-xlsb" }
+serde_json = "1"
+sha2 = "0.11"

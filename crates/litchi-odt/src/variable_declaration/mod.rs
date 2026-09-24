@@ -25,8 +25,13 @@ pub(super) const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
 
 pub(crate) use codec::splice_publication;
 pub use codec::{remove_xml, set_xml};
+#[allow(unused_imports)]
+pub(crate) use codec::{
+    remove_xml_with_limit, remove_xml_with_limit_and_budget, set_xml_with_limit,
+    set_xml_with_limit_and_budget,
+};
 pub use model::{
     Body, DateValue, Declaration, Declarations, Group, HeaderFooter, Kind, Part, Scope, Value,
     ValueType,
 };
-pub(crate) use package::parse_parts;
+pub(crate) use package::{parse_parts, parse_parts_with_budget};

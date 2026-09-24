@@ -1,0 +1,13 @@
+{
+  "sha256": {
+    "clippy-exit.json": "f0a453be5b77103b0afbb1d63160e1b51278b9ebbe759180e17ef60e324e065a",
+    "README.md": "8b48e5fba2ac02dcb87b502e71ed2996a9a0d427a2b5b6a3c7932fe9826fd8ca",
+    "Cargo.lock.gz": "d3473f6d569ad44006c97d7002c71a052d802bf5c2fe1d6dc1334b5a979e146b",
+    "tests.log.gz": "35947a197031b35fc232796285ce7904a97f626ecea45c7e6956212b4a699b5f",
+    "rustdoc.log.gz": "68a638074a2078a1fcab64d9cd98cd79995b5f0fd83b8ff65025f78209f85144",
+    "clippy.log.gz": "02469f328791b58b0e1883ed534b039014f03cec6e22f7b1f66d0bfbc05cfa19",
+    "rustdoc-exit.json": "b8770d6b453d4c274fbed4271a26c84bf2bee80d3343baf5262691713d40b0fd",
+    "tests-exit.json": "6dba280dbc9eb7bf715845827831c30ead45edef29fd621c9dd54800427496f1",
+    "source.json": "ed80b61cf9a50380318d4c07f6d667b975b4518ca3320bc6948a5b685fb20db5"
+  }
+}

@@ -4127,6 +4127,34 @@ creation and small CFB-read penalties. The record includes every original flag,
 repeat, source/binary binding and limitation. This is scoped progress toward
 the full non-iWork goal, which remains open.
 
+## Evidence scope as of 2026-09-10
+
+The [0470 authority record](changes/0470-performance-authority-reconciliation.md)
+binds each published measurement to its source and keeps the full performance
+program open. The allocator publication proves its 201-row resource contract;
+its instrumented elapsed values are excluded from latency claims. The older
+normal report measures `1b3f2c2d`, and the three-repeat normal control measures
+`995bdaf09`. These code snapshots predate later feature changes. Documentation
+commits do not themselves invalidate a measurement; release evidence must match
+the measured production source and binary identities.
+
+The [accepted XLSX optimization](results/xlsx-plain-cell-tag-20260910/README.md)
+records 5.568% lower pooled normal p50, 20.559% fewer allocation calls and
+7.079% fewer allocated bytes for one dense-wide commit/save workload against
+historical base `995bdaf09`. Region peak increased by four bytes. The separate
+[paired scaling publication](results/paired-scaling-cf98-20260910/README.md)
+retains descriptive fixed-work and simulated-range evidence without a common
+Amdahl or production-wide scaling claim.
+
+The [provider/sink implementation](results/provider-sinks-validation-v3-20260910/README.md)
+is committed with four opt-in axes and unchanged default selection. Its
+correctness checks are available; measured provider captures remain pending.
+The [dated 264-row audit](results/performance-requirements-audit-20260910/README.md)
+retains its original counts (10 complete, 99 incomplete, 116 weak, 39 missing),
+not a current completion score. The authority record lists eight remaining
+work classes. ADR-0005 and ADR-0008 remain open for their full applicable
+latency, resource, I/O, corpus, native/readback, scaling and release evidence.
+
 ## Current investigation: dense XLSX commit/save (0466)
 
 [0466](changes/0466-xlsx-dense-commit-profile.md) retains same-source CPU,
@@ -6438,6 +6466,26 @@ contracts remain inherited. This is correctness-only evidence with no latency,
 allocation, RSS, decompression, physical-I/O, or producer claim.
 
 Crate-scoped formatting evidence: `cargo fmt --package soapberry-zip --package litchi-opc -- --check` passed after formatting.
+
+## Verified-cold per-file before/after observations (change 0496)
+
+[Change 0496](changes/0496-cold-verified-cache-post-observation.md) extends
+the existing opt-in `cold-verified` harness path. Each fresh child keeps the
+pre-operation `fincore` admission proof, then records one strict post-operation
+per-file observation immediately after the timed interval and process-I/O
+snapshot; both external probes remain outside timing. The additive
+`fincore_post` object retains size, resident, dirty, writeback, and
+privacy-preserving tool provenance. Post residency is observational and is not
+required to be zero. Missing, malformed, size-mismatched, or changed
+provenance post evidence is `ineligible_post_fincore` with no fallback to
+`cold-requested` or `warm`.
+
+The review-host private-file probe confirmed the existing ext4,
+`posix_fadvise(DONTNEED)`, and util-linux `fincore` path without global cache
+eviction. Focused harness tests, 90 strict Python validator tests, formatting,
+`cargo check --lib`, and warning-denied Clippy pass on the isolated candidate
+based at `fcb03ce72`. This is harness capability evidence only: no workload,
+cold-cache speedup, physical-I/O, or program-completion claim follows.
 
 ## DOCX source-backed selected-story text lifecycle (change 0352)
 

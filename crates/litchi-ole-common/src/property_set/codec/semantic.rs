@@ -3,7 +3,8 @@
 use super::super::model::{
     AsciiInsensitive, CodePage, DEFAULT_CODEPAGE, PID_BEHAVIOR, PID_CODEPAGE, PID_DOC_PARTS,
     PID_HEADING_PAIRS, Section, Stream, Value, invalid, try_hash_set_with_capacity,
-    valid_named_property_identifier, valid_property_identifier, validate_property_name,
+    valid_named_property_identifier, valid_property_identifier,
+    validate_indirect_value_for_property, validate_property_name,
 };
 use litchi_cfb::OleError;
 
@@ -50,6 +51,7 @@ pub(super) fn validate_section(section: &Section, version: u16) -> Result<(), Ol
         }
     }
     for (identifier, property) in &section.properties {
+        validate_indirect_value_for_property(*identifier, property)?;
         let required_version = minimum_property_set_version(property);
         if required_version > version {
             return Err(invalid(format!(

@@ -1,0 +1,90 @@
+{
+  "schema": "xlsx-svg-lifecycle-corpus-v1",
+  "status": "recipe-only-until-api-freeze",
+  "description": "Deterministic bounded recipes for ordinary worksheet direct-picture SVG lifecycle profiling.",
+  "source_fixture": {
+    "path": "docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/fixtures/tdf169496_hidden_graphic.xlsx",
+    "original_path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx",
+    "sha256": "0b647da300a085f39914fdfae961463ae9e54ffe772b2e0eb9860a841ab93f72",
+    "use": "read/capture topology only; never mutate or treat as Office acceptance evidence"
+  },
+  "package_shape": {
+    "worksheet_count": 1,
+    "multisheet_fixture": "multisheet_attach_detach uses two ordinary worksheets and two independent drawings; all other synthetic lanes use one worksheet",
+    "multisheet_worksheet_count": 2,
+    "drawing_relationship_count": 1,
+    "multisheet_drawing_relationship_count": 2,
+    "direct_picture_owner": true,
+    "raster_fallback_content_type": "image/png",
+    "svg_content_type": "image/svg+xml",
+    "svg_payload_is_opaque": true,
+    "strict_host_relationships": "strict worksheet/drawing and image relationship types are asserted in dedicated lifecycle lanes",
+    "incoming_edge_fixture": "an opaque package part may retain an internal edge to a shared SVG leaf after final drawing-owner detach",
+    "opaque_fragment_preservation": "exact extension and descendant fragment bytes plus occurrence counts are checked after lifecycle operations"
+  },
+  "payloads": {
+    "small": {
+      "svg_bytes": 512,
+      "raster_bytes": 1024,
+      "generation": "repeat deterministic byte pattern seeded by lane id"
+    },
+    "large": {
+      "svg_bytes": 65536,
+      "raster_bytes": 65536,
+      "generation": "repeat deterministic byte pattern seeded by lane id"
+    }
+  },
+  "inventory": {
+    "counts": [256, 1024],
+    "raster_relationship": "one shared internal PNG relationship",
+    "shared_svg": "one SVG relationship and media leaf referenced by every direct picture",
+    "distinct_svg": "one internal SVG relationship and media leaf per direct picture",
+    "picture_order": "source order, zero based",
+    "anchor_cycle": ["two_cell", "one_cell", "absolute"]
+  },
+  "namespace_heavy": {
+    "inherited_bindings": 252,
+    "opaque_descendants": 1024,
+    "fixed_root_bindings": 7,
+    "limit_case": "probe the admitted source policy and binary-search the first refused active namespace-binding count; record generated declarations, total active bindings including seven fixed root declarations, and the refused active limit"
+  },
+  "lanes": [
+    {"id": "capture_native_fixture", "source_fixture": "source_fixture", "state": "producer_attached_read_only"},
+    {"id": "capture_raster_{anchor}_{size}", "anchors": ["two_cell", "one_cell", "absolute"], "sizes": ["small", "large"], "state": "raster_only"},
+    {"id": "capture_attached_{anchor}_{size}", "anchors": ["two_cell", "one_cell", "absolute"], "sizes": ["small", "large"], "state": "svg_attached"},
+    {"id": "clone_raster_{size}", "sizes": ["small", "large"], "state": "raster_only", "clone_scope": "immutable workbook source snapshot"},
+    {"id": "clone_attached_{size}", "sizes": ["small", "large"], "state": "svg_attached", "clone_scope": "immutable workbook source snapshot"},
+    {"id": "clone_captured_owner_{size}", "sizes": ["small", "large"], "state": "svg_attached", "clone_scope": "pre-capture and validate once; measure clone of one captured PictureSource only; no workbook open/save"},
+    {"id": "inventory_shared_{count}", "counts": [256, 1024], "state": "svg_attached", "target_topology": "shared"},
+    {"id": "inventory_distinct_{count}", "counts": [256, 1024], "state": "svg_attached", "target_topology": "distinct"},
+    {"id": "namespace_heavy", "state": "raster_only", "namespace_heavy": true, "opaque_descendants": 1024, "preservation": "exact descendant fragment bytes and count"},
+    {"id": "namespace_limit_refusal", "state": "raster_only", "expected": "typed_limit_refusal", "boundary": "derived first refused active-binding count"},
+    {"id": "attach_end_to_end_{anchor}_{size}", "anchors": ["two_cell", "one_cell", "absolute"], "sizes": ["small", "large"], "state": "raster_only", "operation": "attach"},
+    {"id": "strict_attach_end_to_end_two_cell_small", "state": "raster_only", "dialect": "strict", "operation": "attach_and_reopen", "checks": ["strict_worksheet_relationship", "strict_drawing_relationships"]},
+    {"id": "inverse_attach_detach_{anchor}_{size}", "anchors": ["two_cell", "one_cell", "absolute"], "sizes": ["small", "large"], "state": "raster_only", "operation": "attach_then_in_memory_inverse", "checks": ["reopen_forward", "exact_source_restore", "replay_refusal"]},
+    {"id": "detach_end_to_end_shared_first_{anchor}", "anchors": ["two_cell", "one_cell", "absolute"], "state": "svg_attached", "target_topology": "shared", "owner_phase": "first"},
+    {"id": "detach_end_to_end_shared_final_{anchor}", "anchors": ["two_cell", "one_cell", "absolute"], "state": "svg_attached", "target_topology": "shared", "owner_phase": "final", "fixture": "directly construct one selected owner; no production detach preparation"},
+    {"id": "strict_detach_end_to_end_shared_final_two_cell", "state": "svg_attached", "target_topology": "shared", "owner_phase": "final", "dialect": "strict", "checks": ["strict_worksheet_relationship", "strict_drawing_relationships", "SVG_cleanup"]},
+    {"id": "incoming_edge_shared_final_two_cell", "state": "svg_attached", "target_topology": "shared", "owner_phase": "final", "incoming_edge": "opaque-owner.xml retains internal relationship to image2.svg", "checks": ["selected_drawing_svg_relationship_removed", "incoming_edge_retained", "SVG_leaf_retained"]},
+    {"id": "detach_end_to_end_distinct_{anchor}_{size}", "anchors": ["two_cell", "one_cell", "absolute"], "sizes": ["small", "large"], "state": "svg_attached", "target_topology": "distinct", "operation": "detach"},
+    {"id": "same_picture_attach_detach_{anchor}", "anchors": ["two_cell", "one_cell", "absolute"], "sizes": ["small"], "state": "raster_only", "operation": "attach_commit_then_detach_commit_same_picture", "checks": ["anchor_preserved", "exact_source_members_restored", "graph_closed"]},
+    {"id": "multisheet_attach_detach", "worksheets": ["Sheet1", "Sheet2"], "drawings": ["drawing1.xml", "drawing2.xml"], "state": "raster_only", "operation": "attach_each_sheet_then_detach_each_sheet", "checks": ["semantic_sheet_selection", "independent_svg_parts", "two_cell_and_one_cell_geometry", "graph_cleanup"]},
+    {"id": "noop_detach_{anchor}", "anchors": ["two_cell", "one_cell", "absolute"], "state": "raster_only", "operation": "detach_noop"},
+    {"id": "limit_{size}", "sizes": ["small", "large"], "state": "raster_only", "expected": "caller_budget_refusal"},
+    {"id": "mixed_caps_rejection", "state": "svg_attached", "target_topology": "shared", "operation": "mixed_detach_attach_under_each_retained_limit", "expected": "atomic_refusal", "caps": ["parts", "total_part_bytes", "total_relationships", "total_relationship_xml_bytes", "total_relationship_xml_events", "content_type_mappings"]},
+    {"id": "malformed_duplicate_owner", "expected": "ambiguous_owner_refusal"},
+    {"id": "malformed_mce_owner", "expected": "mce_ancestry_refusal"},
+    {"id": "malformed_linked_owner", "expected": "linked_owner_refusal"},
+    {"id": "malformed_unknown_uri", "expected": "inert_unknown_extension_noop"},
+    {"id": "multi_picture_same_drawing_{count}", "counts": [16, 64, 256], "state": "raster_only", "operation": "attach_all_in_one_transaction", "scope": "one_drawing_per_intent_rescan"},
+    {"id": "multi_picture_same_drawing_detach_{topology}_{count}", "counts": [16, 64, 256], "topologies": ["shared", "distinct"], "state": "svg_attached", "operation": "detach_all_in_one_transaction", "scope": "exploratory-only; one_drawing_per_intent_rescan"},
+    {"id": "inventory_shared_root_namespace_32", "count": 32, "state": "svg_attached", "target_topology": "distinct", "root_namespace_bindings": 128, "root_binding_payload_bytes": 1000, "operation": "source_inventory_only", "checks": ["raw_source_for_all_32_owners", "namespace_context_for_all_32_owners", "shared_context_storage"], "scope": "exploratory-only; retained SVG source amplification probe"}
+  ],
+  "limits": {
+    "drawing_xml_bytes": "existing_xlsx_scanner_bound",
+    "svg_fragment": "shared_svg_blip_codec_bounds",
+    "aggregate_edit_bytes": "caller_visible_budget",
+    "precharge_required": true,
+    "allocation_policy": "reject before constructing an oversized replacement buffer"
+  }
+}

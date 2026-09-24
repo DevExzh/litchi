@@ -1,0 +1,10 @@
+{
+  "source_basis": "../../candidate-09/source.tar.gz",
+  "baseline_basis": "../../../ods-formula-matrix-functions/performance/common-01/receipt.json",
+  "archives": {
+    "build.tar.gz": "b28c7a1490e785ae04c83ebcd836af02f64386eb889d05d7bc5ca5cd25bdf368",
+    "capture.tar.gz": "87d2dcfdd0ff91531cd80de6b3aa227f4e426c89a0af91fc1e61d34bf0b281a5"
+  },
+  "children": 162,
+  "deterministic_mismatches": 0
+}

@@ -72,10 +72,14 @@ impl Target {
         self.path.as_slice()
     }
 
-    pub(crate) fn resolve<R: Read + Seek>(&self, ole: &OleFile<R>) -> Result<Self, OleError> {
+    pub(crate) fn resolve<R: Read + Seek>(
+        &self,
+        ole: &OleFile<R>,
+        max_entries: usize,
+    ) -> Result<Self, OleError> {
         Ok(Self {
             key: self.key.clone(),
-            path: CfbPath::new(self.path.resolve(ole)?)?,
+            path: CfbPath::new(self.path.resolve(ole, max_entries)?)?,
         })
     }
 }

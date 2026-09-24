@@ -12,6 +12,7 @@
 //! records around any linked `DrawingML` theme resources.
 
 pub mod codec;
+pub mod family;
 pub mod model;
 
 pub use model::{Color, Face, FontSet, Override, Palette, Script, Slot, System, Theme};

@@ -501,6 +501,22 @@ evidence. This is fresh plain-text creation, not logical append, package Part
 addition or arbitrary editing/repackaging. Other streaming, native, source and
 scaling obligations remain open.
 
+## 2026-09-10: exact current selector registry binding
+
+The active machine-readable [`crud-coverage-index-v2.json`](crud-coverage-index-v2.json)
+maps the fifteen Phase-1 CRUD categories to exact harness selectors, checked
+schema-2 corpus identities or generated-per-run shapes, and explicit
+`measured`, `correctness-only`, `unsupported`, or `not-applicable` statuses.
+Version 2 binds the exact `Case::name` order, count, and newline-delimited
+selector-name SHA-256 from the current Rust registry. Its coverage section
+accounts for all 443 current selectors as either a representative mapping or
+an explicit exclusion reason. The historical
+[`crud-coverage-index-v1.json`](crud-coverage-index-v1.json) remains unchanged
+for old publication replay. This is a registry and matrix identity contract;
+it adds no timing evidence. `measured` still requires a validated full-run
+report, while `correctness-only` and `unsupported` remain non-timing statuses.
+Validate it with `python3 tools/validate_crud_coverage_index.py`.
+
 ## 2026-09-07: change 0465 checks ordinary ODP append in the default matrix
 
 0465 promotes the existing `odp_existing_append_lifecycle` scenario to the

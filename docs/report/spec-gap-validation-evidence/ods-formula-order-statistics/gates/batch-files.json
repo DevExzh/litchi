@@ -1,0 +1,12 @@
+[
+  "crates/litchi-ods/src/codec/formula/evaluation.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/order.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/rounding.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value/order.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value/matrix.rs",
+  "crates/litchi-ods/tests/ods_formula_order_evaluation.rs",
+  "crates/litchi-ods/tests/ods_formula_order_limits.rs",
+  "crates/litchi-ods/tests/ods_formula_order_native.rs",
+  "crates/litchi-ods/tests/ods_formula_order_oracle.rs"
+]

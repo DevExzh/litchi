@@ -1,0 +1,149 @@
+{
+  "candidate_frozen": true,
+  "candidate_manifest": "/var/tmp/litchi-odb-v7-integration-evidence-20260910/integration-manifest.json",
+  "candidate_manifest_sha256": "fbf57af50fc3dcd09c7cd42185997fdfca107873c413dc3dcbde07f533ee55b9",
+  "candidate_root": "/var/tmp/litchi-odb-v7-integration-clean-20260910",
+  "created_utc": "2026-09-10T13:34:27.307794+00:00",
+  "eff_commit": "eff351997f11e4017bd1504cce0b6ebb646ee58e",
+  "eff_to_0194_odb_tree_equal": true,
+  "intentional_test_replacements": [
+    {
+      "reason": "V7 preserves the opaque markup and rejects the invalid required container atomically; the earlier test expected publication of an invalid empty modeled container and is intentionally superseded.",
+      "removed_primary_test": "removing_modeled_filters_does_not_drop_unknown_container_markup",
+      "replacement_candidate_test": "removing_modeled_filters_rejects_an_invalid_required_container_atomically"
+    }
+  ],
+  "no_primary_edits_by_this_task": true,
+  "no_primary_only_implementation_symbols": true,
+  "no_primary_only_work_would_be_lost": true,
+  "no_stage_or_commit_performed": true,
+  "owned_path_count": 13,
+  "owned_paths_all_match_v7_source": true,
+  "owned_paths_not_pending_in_primary": [
+    "crates/litchi-odb/src/codec/content.rs",
+    "crates/litchi-odb/src/model/connection.rs",
+    "crates/litchi-odb/tests/schema_catalog.rs"
+  ],
+  "primary_base_commit": "0194fde207b7c23f4106c8e7c6070d2df00daac6",
+  "primary_only_odb_paths": [],
+  "primary_pending_odb_path_count": 10,
+  "primary_pending_odb_paths": [
+    {
+      "base_git_blob": "ea8f31fc5835cc411c0cacf63073bca5adb086cf",
+      "path": "crates/litchi-odb/docs/FEATURE_MATRIX.md",
+      "status": " M",
+      "worktree": {
+        "bytes": 7274,
+        "kind": "file",
+        "sha256": "385ef305d6adab316fd66a4a0cfbef7b082ac291b1c391b9fa434f30e50e6ff1"
+      }
+    },
+    {
+      "base_git_blob": "83bad374e21ec35100d8fb05b0c39bfe1cfeee52",
+      "path": "crates/litchi-odb/src/authoring/composition.rs",
+      "status": " M",
+      "worktree": {
+        "bytes": 11843,
+        "kind": "file",
+        "sha256": "d71d792f4e223fb7049b4d48613a1ab8ae6caea6746a0c3990295a69a6e02e14"
+      }
+    },
+    {
+      "base_git_blob": "f21d836114d4431f0c30922a433f92ca61509b66",
+      "path": "crates/litchi-odb/src/authoring/durable.rs",
+      "status": " M",
+      "worktree": {
+        "bytes": 12699,
+        "kind": "file",
+        "sha256": "3daa67231db9978ac9d785b4316179f9137a47032544978a4ac0368c3604146d"
+      }
+    },
+    {
+      "base_git_blob": "007fcd4be6082600f612346bf0f92e4c190b6ba1",
+      "path": "crates/litchi-odb/src/authoring/transaction.rs",
+      "status": " M",
+      "worktree": {
+        "bytes": 177581,
+        "kind": "file",
+        "sha256": "0ac17e21fc734fcb0d4b790768e8028587179537fa62e8c5b6256c2c0583c26a"
+      }
+    },
+    {
+      "base_git_blob": "9f9be7ff69cfc1fc6b40b92b1c96ecbdfb4e40d9",
+      "path": "crates/litchi-odb/src/facade/mod.rs",
+      "status": " M",
+      "worktree": {
+        "bytes": 16914,
+        "kind": "file",
+        "sha256": "d49aef34e5989cb246875f9455e41f12f0e470044a489026f3548b5f876b41d1"
+      }
+    },
+    {
+      "base_git_blob": "920872c0044a0c743e1e7d6aad751ce9e7c564dd",
+      "path": "crates/litchi-odb/src/lib.rs",
+      "status": " M",
+      "worktree": {
+        "bytes": 2399,
+        "kind": "file",
+        "sha256": "b705a0ac0b809d9352a3c1553f015c17f02f6c4835a9957403eff71644d176da"
+      }
+    },
+    {
+      "base_git_blob": "5b269408704711370452620cd5bdc195d9ad92cb",
+      "path": "crates/litchi-odb/src/model/catalog.rs",
+      "status": " M",
+      "worktree": {
+        "bytes": 50294,
+        "kind": "file",
+        "sha256": "c51a5a6c003f23e39e0d91b444dea1a22f77cf7d5945ab6a196237ea2b7365f2"
+      }
+    },
+    {
+      "base_git_blob": "ea1c05cc61959c010919649265508c07a8bfcbfb",
+      "path": "crates/litchi-odb/src/model/mod.rs",
+      "status": " M",
+      "worktree": {
+        "bytes": 1155,
+        "kind": "file",
+        "sha256": "3687689d4588e64ff899db3aec9c4cbe6fc0eb1932ced8ac9af7a2eed5f3d775"
+      }
+    },
+    {
+      "base_git_blob": null,
+      "path": "crates/litchi-odb/src/model/settings.rs",
+      "status": "??",
+      "worktree": {
+        "bytes": 55529,
+        "kind": "file",
+        "sha256": "a13cc993075a64f28adf2e6d8a90c3dcf3682deea43155bfc79fbdffa94c6163"
+      }
+    },
+    {
+      "base_git_blob": null,
+      "path": "crates/litchi-odb/tests/settings.rs",
+      "status": "??",
+      "worktree": {
+        "bytes": 17437,
+        "kind": "file",
+        "sha256": "5445f031f7776210cc3d7bf7049a63f692745bea57d9e1efcea0e2acdcc47c92"
+      }
+    }
+  ],
+  "primary_status": {
+    "full_status_sha256": "56e0ffe23cf9dc1bd2668fb3276d05362b11adc49ae8552d0b0fbc4a29192fea",
+    "odb_status_record_count": 10,
+    "odb_status_sha256": "fc6ce2659131cca40553d9e1543f742e613ac9ea6a06d5526f45d5d2dd459d42",
+    "status_same_before_after_capture": true
+  },
+  "primary_worktree": "/home/zhuhe/code/litchi-spec-gaps",
+  "prior_wrong_primary_receipt": {
+    "original_path": "/var/tmp/litchi-odb-v7-integration-evidence-20260910/integration-manifest.json",
+    "preserved_as_history": true,
+    "preserved_copy": "/var/tmp/litchi-odb-v7-spec-gaps-preservation-revision-20260910/prior-wrong-primary-integration-manifest.json",
+    "sha256": "fbf57af50fc3dcd09c7cd42185997fdfca107873c413dc3dcbde07f533ee55b9"
+  },
+  "revision_reason": "Correct the primary-root identity from the earlier receipt and reconcile the frozen clean V7 candidate against the actual spec-gaps primary.",
+  "root_gate_status": "not run; root owns final integration gate and should avoid duplicate full gates when source identity is unchanged",
+  "same_feature_replacements": true,
+  "schema": "litchi.odb.v7.integration-preservation-revision.v1"
+}

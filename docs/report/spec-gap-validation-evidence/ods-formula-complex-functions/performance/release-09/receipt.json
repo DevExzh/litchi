@@ -1,0 +1,10 @@
+{
+  "source_basis": "../../candidate-09/source.tar.gz",
+  "runs": 225,
+  "failed_runs": 0,
+  "archives": {
+    "build.tar.gz": "7b7a9401055548a0c1e17cc8941a5c2895b8f2b0bd411743c4452ca8f3ce970e",
+    "capture.tar.gz": "c7fef30c78c80bf656841464f7686eccb5056e167017b1cdb81d920f876e57e6"
+  },
+  "binary_sha256": "3d0b0443e4d1a70688d82291ec2f51b67099207e203c75e4e1e0f76bb00a6953"
+}

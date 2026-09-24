@@ -92,6 +92,20 @@ fn validate_cell_batch_len(length: usize) -> Result<()> {
     Ok(())
 }
 
+fn map_sheet_metadata_execution(error: litchi_core::ExecutionError) -> litchi_core::Error {
+    match error {
+        litchi_core::ExecutionError::ResourceLimit(value) => {
+            litchi_core::Error::ResourceLimit(value)
+        },
+        litchi_core::ExecutionError::Cancelled => {
+            litchi_core::Error::Unsupported("ODS metadata operation cancelled".to_string())
+        },
+        other => litchi_core::Error::Unsupported(format!(
+            "ODS metadata execution policy rejected operation: {other}"
+        )),
+    }
+}
+
 /// Immutable ODS document facade.
 pub struct Spreadsheet {
     package: Arc<crate::package::Package>,
@@ -193,10 +207,21 @@ impl Spreadsheet {
     }
 
     pub(crate) fn from_shared_package(package: Arc<crate::package::Package>) -> Result<Self> {
-        let definitions = package.definitions()?;
-        let sheets = package.sheets()?;
+        // Keep ordinary and source-backed opening on the same namespace-aware
+        // content reader.  Besides avoiding five independent tokenizations,
+        // this admits semantically normalized namespace declarations (for
+        // example an entity-escaped `xmlns:xml` URI) without changing the
+        // source bytes retained by the package.
+        let (settings, outputs) =
+            crate::open_parse::OpenParse::run(package.content_xml())?.finish()?;
+        let definitions = outputs.definitions;
+        let mut sheets = outputs.sheets;
+        // `OpenParse` owns the fused worksheet pass, while table title and
+        // description are deliberately applied in the small metadata pass
+        // shared with the source-backed facade.  Keep this post-pass here so
+        // ordinary and source-backed opens expose the same Sheet metadata.
+        crate::worksheet::codec::apply_table_metadata(package.content_xml(), &mut sheets)?;
         let metadata = package.metadata_snapshot()?;
-        let settings = package.calculation_settings()?;
         Ok(Self {
             package,
             definitions,
@@ -303,6 +328,48 @@ impl Spreadsheet {
         self.package.styles_xml()
     }
 
+    /// Capture the standalone table-template catalog from styles.xml.
+    ///
+    /// The snapshot retains the exact styles source for no-op, stale-source,
+    /// and inverse transaction checks.
+    pub fn table_templates(&self) -> Result<crate::styles::table_template::Snapshot> {
+        crate::styles::table_template::Snapshot::from_source(self.package.styles_xml())
+    }
+
+    /// Apply an exact-source table-template patch and rehydrate the facade.
+    pub fn apply_table_template_patch(
+        &mut self,
+        patch: &crate::styles::table_template::Patch,
+    ) -> Result<()> {
+        let snapshot = self.table_templates()?;
+        let commit = patch.apply(&snapshot)?;
+        if commit.changed() {
+            let package = self
+                .package
+                .replace_styles_xml(commit.snapshot().source_xml())?;
+            *self = Self::from_package(package)?;
+        }
+        Ok(())
+    }
+
+    /// Stage a source-checked table-template edit and publish it atomically.
+    pub fn edit_table_templates<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::styles::table_template::Edit) -> Result<()>,
+    {
+        let snapshot = self.table_templates()?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        if commit.changed() {
+            let package = self
+                .package
+                .replace_styles_xml(commit.snapshot().source_xml())?;
+            *self = Self::from_package(package)?;
+        }
+        Ok(())
+    }
+
     /// Capture document, sheet, and automatic cell-protection metadata in a
     /// source-checked immutable snapshot.
     ///
@@ -387,11 +454,93 @@ impl Spreadsheet {
     /// Returns an error when the content XML has invalid or over-budget DDE
     /// metadata.
     pub fn dde(&self) -> Result<crate::dde::Snapshot> {
-        crate::dde::Snapshot::parse(self.package.content_xml()).map_err(|error| {
-            litchi_core::Error::InvalidFormat(format!(
-                "ODS DDE metadata inspection failed: {error}"
-            ))
-        })
+        crate::dde::Snapshot::parse(self.package.content_xml()).map_err(Into::into)
+    }
+
+    /// Capture inert DDE declarations and cached tables under explicit limits.
+    pub fn dde_with(
+        &self,
+        limits: crate::dde::Limits,
+        context: &litchi_core::ExecutionContext,
+    ) -> Result<crate::dde::Snapshot> {
+        crate::dde::Snapshot::parse_with_context(self.package.content_xml(), limits, context)
+            .map_err(Into::into)
+    }
+
+    /// Stage and publish a failure-atomic DDE metadata transaction.
+    ///
+    /// Sources remain inert; publication never refreshes cached data.
+    pub fn edit_dde<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::dde::Edit) -> Result<()>,
+    {
+        self.edit_dde_with_context(
+            crate::dde::Limits::default(),
+            &crate::dde::default_context(),
+            update,
+        )
+    }
+
+    /// Edit DDE metadata with explicit parsing, staging, and readback budgets.
+    ///
+    /// Package replacement and facade rehydration use the package policy. The
+    /// supplied context is checked after rehydration and before publication.
+    pub fn edit_dde_with_context<F>(
+        &mut self,
+        limits: crate::dde::Limits,
+        context: &litchi_core::ExecutionContext,
+        update: F,
+    ) -> Result<()>
+    where
+        F: FnOnce(&mut crate::dde::Edit) -> Result<()>,
+    {
+        let snapshot = self.dde_with(limits, context)?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit(context)?;
+        if commit.changed() {
+            self.ensure_dde_publication_allowed()?;
+            let package = self
+                .package
+                .replace_content_xml(commit.snapshot().source_xml())?;
+            let candidate = Self::from_package(package)?;
+            context.check().map_err(map_sheet_metadata_execution)?;
+            *self = candidate;
+        }
+        Ok(())
+    }
+
+    /// Apply an exact-source DDE patch and rehydrate the accepted package.
+    pub fn apply_dde_patch(&mut self, patch: &crate::dde::Patch) -> Result<()> {
+        let context = crate::dde::default_context();
+        let snapshot = self.dde_with(crate::dde::Limits::default(), &context)?;
+        let commit = patch.apply(&snapshot)?;
+        if commit.changed() {
+            self.ensure_dde_publication_allowed()?;
+            let package = self
+                .package
+                .replace_content_xml(commit.snapshot().source_xml())?;
+            let candidate = Self::from_package(package)?;
+            context.check().map_err(map_sheet_metadata_execution)?;
+            *self = candidate;
+        }
+        Ok(())
+    }
+
+    fn ensure_dde_publication_allowed(&self) -> Result<()> {
+        if self
+            .package
+            .package()
+            .files()?
+            .into_iter()
+            .any(|path| litchi_odf_common::core::package::is_signature_owner_path(&path))
+        {
+            return Err(litchi_core::Error::Unsupported(
+                "signed-source refusal: changed ODS DDE metadata requires explicit unsign/resign policy"
+                    .to_string(),
+            ));
+        }
+        Ok(())
     }
 
     /// Inspect typed scenario declarations without applying their values.
@@ -406,6 +555,141 @@ impl Spreadsheet {
                 "ODS scenario metadata inspection failed: {error}"
             ))
         })
+    }
+
+    /// Apply an exact-source, inert scenario metadata patch and rehydrate the
+    /// package only after the candidate has passed typed readback.
+    ///
+    /// Scenario declarations are metadata only.  This method never applies a
+    /// what-if scenario, evaluates a formula, or refreshes external data.
+    pub fn apply_scenario_patch(&mut self, patch: &crate::scenario::Patch) -> Result<()> {
+        let snapshot = self.scenarios()?;
+        let commit = patch.apply(&snapshot)?;
+        if commit.changed() {
+            let package = self
+                .package
+                .replace_content_xml(commit.snapshot().source_xml())?;
+            *self = Self::from_package(package)?;
+        }
+        Ok(())
+    }
+
+    /// Stage and publish one failure-atomic scenario metadata edit.
+    ///
+    /// The closure edits typed declarations selected by exact worksheet name
+    /// or source order.  A failed closure, stale source, invalid XML, or typed
+    /// readback leaves this spreadsheet unchanged.
+    pub fn edit_scenarios<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::scenario::Edit) -> Result<()>,
+    {
+        let snapshot = self.scenarios()?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        if commit.changed() {
+            let package = self
+                .package
+                .replace_content_xml(commit.snapshot().source_xml())?;
+            *self = Self::from_package(package)?;
+        }
+        Ok(())
+    }
+
+    /// Capture the source-backed consolidation, label-range, cell-source, and
+    /// detective metadata catalog for this owned spreadsheet.
+    pub fn sheet_metadata(&self) -> Result<crate::sheet_metadata::Snapshot> {
+        crate::sheet_metadata::Snapshot::parse(self.package.content_xml())
+    }
+
+    /// Capture sheet metadata under explicit finite limits and execution context.
+    pub fn sheet_metadata_with(
+        &self,
+        limits: crate::sheet_metadata::Limits,
+        context: &litchi_core::ExecutionContext,
+    ) -> Result<crate::sheet_metadata::Snapshot> {
+        crate::sheet_metadata::Snapshot::parse_with_context(
+            self.package.content_xml(),
+            limits,
+            context,
+        )
+    }
+
+    /// Stage and publish one failure-atomic sheet metadata edit.
+    pub fn edit_sheet_metadata<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::sheet_metadata::Edit) -> Result<()>,
+    {
+        self.edit_sheet_metadata_with_context(
+            crate::sheet_metadata::Limits::default(),
+            &crate::sheet_metadata::default_context(),
+            update,
+        )
+    }
+
+    /// Stage and publish sheet metadata under explicit limits and context.
+    ///
+    /// The supplied context governs metadata parsing, staging, candidate
+    /// rendering, and target readback. Owned package replacement and facade
+    /// rehydration use the package's own bounded policy; the context is
+    /// checked again after rehydration and before this spreadsheet is replaced.
+    pub fn edit_sheet_metadata_with_context<F>(
+        &mut self,
+        limits: crate::sheet_metadata::Limits,
+        context: &litchi_core::ExecutionContext,
+        update: F,
+    ) -> Result<()>
+    where
+        F: FnOnce(&mut crate::sheet_metadata::Edit) -> Result<()>,
+    {
+        let snapshot = self.sheet_metadata_with(limits, context)?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit(context)?;
+        if commit.changed() {
+            self.ensure_sheet_metadata_publication_allowed()?;
+            let package = self
+                .package
+                .replace_content_xml(commit.snapshot().source_xml())?;
+            let candidate = Self::from_package(package)?;
+            context.check().map_err(map_sheet_metadata_execution)?;
+            *self = candidate;
+        }
+        Ok(())
+    }
+
+    /// Apply an exact source patch and rehydrate the owned spreadsheet only
+    /// after the candidate passes complete metadata readback.
+    pub fn apply_sheet_metadata_patch(
+        &mut self,
+        patch: &crate::sheet_metadata::Patch,
+    ) -> Result<()> {
+        let snapshot = self.sheet_metadata()?;
+        let commit = patch.apply(&snapshot)?;
+        if commit.changed() {
+            self.ensure_sheet_metadata_publication_allowed()?;
+            let package = self
+                .package
+                .replace_content_xml(commit.snapshot().source_xml())?;
+            *self = Self::from_package(package)?;
+        }
+        Ok(())
+    }
+
+    fn ensure_sheet_metadata_publication_allowed(&self) -> Result<()> {
+        let signed = self
+            .package
+            .package()
+            .files()?
+            .into_iter()
+            .any(|path| litchi_odf_common::core::package::is_signature_owner_path(&path));
+        if signed {
+            return Err(litchi_core::Error::Unsupported(
+                "signed-source refusal: changed ODS sheet metadata requires explicit unsign/resign policy"
+                    .to_string(),
+            ));
+        }
+        Ok(())
     }
 
     /// Stage, validate, rebuild, and fully rehydrate one inert tracked-change edit.
@@ -498,6 +782,75 @@ impl Spreadsheet {
     /// Returns an error when the operation cannot be completed.
     pub fn data_pilot_snapshot(&self) -> Result<crate::data_pilot::Snapshot> {
         crate::data_pilot::Snapshot::from_bytes(self.package.package().as_bytes().to_vec())
+    }
+
+    /// Discover inert database-range declarations owned by this spreadsheet.
+    ///
+    /// Database sources, filters, sorting, and subtotals are metadata only;
+    /// this method never opens a database, refreshes a range, or evaluates a
+    /// filter or subtotal.
+    ///
+    /// # Errors
+    /// Returns an error when the content owner is malformed or over budget.
+    pub fn database_ranges(&self) -> Result<crate::database_range::Catalog<'_>> {
+        crate::database_range::Catalog::load(&self.package)
+    }
+
+    /// Capture database-range metadata as an immutable, exact-package
+    /// snapshot for explicit Snapshot → Edit → Commit → Patch workflows.
+    ///
+    /// # Errors
+    /// Returns an error when the package or typed owner exceeds its finite
+    /// admission limits.
+    pub fn database_range_snapshot(&self) -> Result<crate::database_range::Snapshot> {
+        crate::database_range::Snapshot::from_package(&self.package)
+    }
+
+    /// Alias with a plural noun for callers that use the owner name.
+    pub fn database_ranges_snapshot(&self) -> Result<crate::database_range::Snapshot> {
+        self.database_range_snapshot()
+    }
+
+    /// Apply an exact-source database-range patch and rehydrate the full
+    /// spreadsheet only after typed readback succeeds.
+    ///
+    /// # Errors
+    /// Returns an error for stale lineage, invalid metadata, or failed
+    /// candidate readback.
+    pub fn apply_database_range_patch(
+        &mut self,
+        patch: &crate::database_range::Patch,
+    ) -> Result<()> {
+        let commit = patch.apply(&self.database_range_snapshot()?)?;
+        if commit.changed() {
+            *self = Self::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+        }
+        Ok(())
+    }
+
+    /// Clone-stage inert database-range CRUD and publish one package edit.
+    ///
+    /// Unknown markup inside the owned XML is retained by no-op transactions
+    /// and causes a changed transaction to fail before package bytes are
+    /// rebuilt.
+    ///
+    /// # Errors
+    /// Returns an error when the closure, source checks, package rebuild, or
+    /// typed readback fails.
+    pub fn edit_database_ranges<F>(&mut self, edit: F) -> Result<()>
+    where
+        F: for<'source> FnOnce(&mut crate::database_range::Editor<'_, 'source>) -> Result<()>,
+    {
+        let commit = {
+            let catalog = self.database_ranges()?;
+            let mut transaction = catalog.transaction();
+            edit(&mut transaction.editor())?;
+            transaction.commit()?
+        };
+        if commit.changed() {
+            *self = Self::from_bytes(commit.into_owned_bytes())?;
+        }
+        Ok(())
     }
 
     /// Return the typed worksheet graph in document order.

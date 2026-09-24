@@ -1,0 +1,7 @@
+{
+  "scope": "ReferenceList function/lazy operand regression on committed64a9/e351",
+  "result": "XOR on reference-list intersection is misclassified as Array; IFERROR operand wrongly refuses instead of catching scalarValue error and selectingref",
+  "archive": "planner-list-kind-40.tar.gz",
+  "sha256": "36bca28f9011ef325978c5fe282b13f01e892dccae3d35fffa2c7615864a318e",
+  "status": 101
+}

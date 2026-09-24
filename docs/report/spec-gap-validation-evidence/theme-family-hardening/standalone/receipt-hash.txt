@@ -1,0 +1,1 @@
+7a76d72c6ee87705fc4e21175947abeebe8d869be5eee9b553d643c34c1e2394  docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/receipt.json

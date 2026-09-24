@@ -226,6 +226,13 @@ pub enum OpcError {
         field: &'static str,
     },
 
+    /// A source-backed read session was given a [`crate::PartView`] borrowed
+    /// from a different package. The view is rejected before its index is
+    /// inspected, so this boundary cannot turn a foreign index into a local
+    /// part access.
+    #[error("source-backed OPC PartView belongs to a different package")]
+    ForeignPartView,
+
     /// An owned source package cannot preserve its physical ZIP layout after
     /// an exact-source authorization was revoked. Falling back to the normal
     /// writer would silently discard opaque source members or framing bytes.
@@ -541,6 +548,7 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::OperationAccountingOverflow { .. }
             | OpcError::CentralDirectorySpool { .. }
             | OpcError::CentralDirectorySpoolLimitExceeded { .. }
+            | OpcError::ForeignPartView
             | OpcError::PackageNotFound(_)
             | OpcError::InvalidPackUri(_)
             | OpcError::DuplicatePartName(_)

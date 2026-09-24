@@ -1,0 +1,7 @@
+   Compiling xml-minifier-macros v0.1.0 (/tmp/litchi-inspection-gates-zqihzwk9/checkout/crates/xml-minifier-macros)
+    Checking soapberry-zip v0.0.1 (/tmp/litchi-inspection-gates-zqihzwk9/checkout/crates/soapberry-zip)
+    Checking litchi-core v0.0.1 (/tmp/litchi-inspection-gates-zqihzwk9/checkout/crates/litchi-core)
+    Checking xml-minifier v0.1.0 (/tmp/litchi-inspection-gates-zqihzwk9/checkout/crates/xml-minifier)
+    Checking litchi-odf-common v0.0.1 (/tmp/litchi-inspection-gates-zqihzwk9/checkout/crates/litchi-odf-common)
+    Checking litchi-ods v0.0.1 (/tmp/litchi-inspection-gates-zqihzwk9/checkout/crates/litchi-ods)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.20s

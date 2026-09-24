@@ -1,0 +1,25 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/performance/scalar-harness/run.py",
+    "--binary",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/performance/baseline/ods-formula-array-reference-evaluation-scalar-profile",
+    "--output",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/performance/baseline",
+    "--revision",
+    "baseline",
+    "--group",
+    "all",
+    "--phase",
+    "all"
+  ],
+  "cwd": "/home/zhuhe/code/litchi-array-worktree",
+  "environment": {
+    "TMPDIR": "/home/zhuhe/code/litchi-array-tmp",
+    "profile_cpu": 6
+  },
+  "started_at": "2026-09-13T15:32:07.750780319Z",
+  "finished_at": "2026-09-13T15:32:10.402049949Z",
+  "status": 0
+}

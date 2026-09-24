@@ -1,0 +1,15 @@
+{
+  "head": "de80c38248ff797501564886c5df0987088f430c",
+  "base": "5953a2ed1",
+  "compiled_opc_core_zip_package_committed_diff_empty": true,
+  "owned_paths": [
+    "crates/litchi-opc/fuzz/Cargo.toml",
+    "crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+    "crates/litchi-opc/fuzz/fuzz_targets/opc_harness.rs",
+    "crates/litchi-opc/fuzz/fuzz_targets/smoke_opc.rs"
+  ],
+  "primary_preimages_match": true,
+  "candidate_hashes_match": true,
+  "corpus_files_verified": 352,
+  "smoke_seed_files_verified": 7
+}

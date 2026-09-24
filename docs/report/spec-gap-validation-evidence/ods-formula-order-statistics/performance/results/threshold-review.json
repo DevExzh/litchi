@@ -1,0 +1,438 @@
+{
+  "candidate_only_note": "Order-statistics reducer rows have no baseline implementation and are reported as absolute measurements.",
+  "flag_count": 1,
+  "flags": [
+    {
+      "assessment": "This is a retained review trigger in the matched SUMIFS control, not a claim about the candidate order-statistics reducers. The raw samples overlap materially, the evaluate phase is only +0.53%, and work, resolver reads, checksums, and allocation counts are unchanged. No additional diagnostic rerun was made after the final capture; the raw receipts remain authoritative and the result does not establish a product regression.",
+      "baseline_distribution": {
+        "elapsed_ns": [
+          161111,
+          149181,
+          161101,
+          167140,
+          149241,
+          166771,
+          149331,
+          148911,
+          149501,
+          148781,
+          149031,
+          158950,
+          161571,
+          149641,
+          159031
+        ],
+        "max": 167140,
+        "mean": 155286.2,
+        "median": 149641,
+        "min": 148781,
+        "q1": 149211.0,
+        "q3": 161106.0,
+        "raw_stdout": [
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-01.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-02.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-03.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-04.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-05.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-06.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-07.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-08.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-09.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-10.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-11.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-12.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-13.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-14.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-15.stdout.json"
+        ],
+        "raw_time": [
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-01.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-02.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-03.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-04.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-05.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-06.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-07.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-08.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-09.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-10.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-11.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-12.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-13.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-14.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-15.time.txt"
+        ],
+        "sample_count": 15,
+        "stdev": 7090.26765765178
+      },
+      "baseline_ns_per_repeat": 74820,
+      "baseline_raw_median_ns": 149641,
+      "bootstrap_uncertainty": {
+        "interpretation": "The retained sample does not identify a stable direction at this host and workload; this is descriptive uncertainty evidence, not a causal attribution or a no-regression proof.",
+        "interval_percent": [
+          -5.7691097829506095,
+          8.189860109421353
+        ],
+        "median_ratio_percent": 1.5746343163071774,
+        "method": "Independent seeded bootstrap of the retained 15 raw elapsed_ns samples per side; 20,000 resamples, 15 observations per resample, median per resample, candidate/base ratio minus one.",
+        "percentile_indices": {
+          "2.5_percent": 499,
+          "97.5_percent": 19499
+        },
+        "resamples": 20000,
+        "sample_size": 15,
+        "seed": 20260919
+      },
+      "candidate_distribution": {
+        "elapsed_ns": [
+          162661,
+          149111,
+          159201,
+          160831,
+          149780,
+          150271,
+          163070,
+          161561,
+          149141,
+          151591,
+          159550,
+          163041,
+          166511,
+          149001,
+          158081
+        ],
+        "max": 166511,
+        "mean": 156893.46666666667,
+        "median": 159201,
+        "min": 149001,
+        "q1": 150025.5,
+        "q3": 162111.0,
+        "raw_stdout": [
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-01.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-02.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-03.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-04.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-05.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-06.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-07.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-08.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-09.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-10.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-11.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-12.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-13.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-14.stdout.json",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-15.stdout.json"
+        ],
+        "raw_time": [
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-01.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-02.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-03.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-04.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-05.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-06.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-07.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-08.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-09.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-10.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-11.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-12.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-13.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-14.time.txt",
+          "raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-15.time.txt"
+        ],
+        "sample_count": 15,
+        "stdev": 6315.0526054439015
+      },
+      "candidate_ns_per_repeat": 79600,
+      "candidate_raw_median_ns": 159201,
+      "case": "reference-conditional-256x4-sumifs",
+      "disposition": "accepted-with-flag",
+      "metric": "elapsed_ns_per_repeat",
+      "normalized_delta_percent": 6.388666132050254,
+      "operation": "SUMIFS",
+      "phase": "parse-evaluate",
+      "phase_contrast": {
+        "evaluate": {
+          "baseline_distribution": {
+            "elapsed_ns": [
+              157431,
+              148011,
+              157531,
+              157680,
+              164931,
+              159700,
+              148001,
+              160201,
+              147471,
+              159391,
+              159591,
+              154980,
+              157901,
+              147721,
+              147851
+            ],
+            "max": 164931,
+            "mean": 155226.13333333333,
+            "median": 157531,
+            "min": 147471,
+            "q1": 148006.0,
+            "q3": 159491.0,
+            "raw_stdout": [
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-01.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-02.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-03.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-04.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-05.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-06.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-07.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-08.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-09.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-10.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-11.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-12.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-13.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-14.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-15.stdout.json"
+            ],
+            "raw_time": [
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-01.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-02.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-03.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-04.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-05.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-06.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-07.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-08.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-09.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-10.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-11.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-12.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-13.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-14.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-15.time.txt"
+            ],
+            "sample_count": 15,
+            "stdev": 5817.956242366837
+          },
+          "baseline_ns_per_repeat": 78765,
+          "baseline_raw_median_ns": 157531,
+          "candidate_distribution": {
+            "elapsed_ns": [
+              157511,
+              171190,
+              157761,
+              161341,
+              170911,
+              149161,
+              147650,
+              158371,
+              158271,
+              149731,
+              158701,
+              159981,
+              165021,
+              157751,
+              159740
+            ],
+            "max": 171190,
+            "mean": 158872.8,
+            "median": 158371,
+            "min": 147650,
+            "q1": 157631.0,
+            "q3": 160661.0,
+            "raw_stdout": [
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-01.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-02.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-03.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-04.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-05.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-06.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-07.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-08.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-09.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-10.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-11.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-12.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-13.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-14.stdout.json",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-15.stdout.json"
+            ],
+            "raw_time": [
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-01.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-02.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-03.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-04.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-05.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-06.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-07.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-08.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-09.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-10.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-11.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-12.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-13.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-14.time.txt",
+              "raw/reference-conditional-256x4-sumifs.evaluate.sample-15.time.txt"
+            ],
+            "sample_count": 15,
+            "stdev": 6820.868788400157
+          },
+          "candidate_ns_per_repeat": 79185,
+          "candidate_raw_median_ns": 158371,
+          "normalized_delta_percent": 0.5332317653780232
+        },
+        "parse_evaluate": {
+          "baseline_ns_per_repeat": 74820,
+          "baseline_raw_median_ns": 149641,
+          "candidate_ns_per_repeat": 79600,
+          "candidate_raw_median_ns": 159201,
+          "normalized_delta_percent": 6.388666132050254
+        }
+      },
+      "raw_delta_ns": 9560,
+      "raw_delta_percent": 6.388623438763441,
+      "raw_evidence": {
+        "baseline_measurements": "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/measurements.jsonl",
+        "baseline_raw_stdout": [
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-01.stdout.json",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-02.stdout.json",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-03.stdout.json",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-04.stdout.json",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-05.stdout.json",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-06.stdout.json",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-07.stdout.json",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-08.stdout.json",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-09.stdout.json",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-10.stdout.json",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-11.stdout.json",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-12.stdout.json",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-13.stdout.json",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-14.stdout.json",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-15.stdout.json"
+        ],
+        "baseline_raw_time": [
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-01.time.txt",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-02.time.txt",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-03.time.txt",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-04.time.txt",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-05.time.txt",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-06.time.txt",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-07.time.txt",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-08.time.txt",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-09.time.txt",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-10.time.txt",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-11.time.txt",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-12.time.txt",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-13.time.txt",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-14.time.txt",
+          "baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-15.time.txt"
+        ],
+        "candidate_measurements": "candidate-final/measurements.jsonl",
+        "candidate_raw_stdout": [
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-01.stdout.json",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-02.stdout.json",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-03.stdout.json",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-04.stdout.json",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-05.stdout.json",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-06.stdout.json",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-07.stdout.json",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-08.stdout.json",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-09.stdout.json",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-10.stdout.json",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-11.stdout.json",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-12.stdout.json",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-13.stdout.json",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-14.stdout.json",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-15.stdout.json"
+        ],
+        "candidate_raw_time": [
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-01.time.txt",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-02.time.txt",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-03.time.txt",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-04.time.txt",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-05.time.txt",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-06.time.txt",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-07.time.txt",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-08.time.txt",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-09.time.txt",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-10.time.txt",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-11.time.txt",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-12.time.txt",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-13.time.txt",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-14.time.txt",
+          "candidate-final/raw/reference-conditional-256x4-sumifs.parse-evaluate.sample-15.time.txt"
+        ]
+      },
+      "repeat": 2,
+      "resource_metric_deltas_percent": {
+        "allocator_calls": 0.0,
+        "peak_live_bytes": 0.19006889997624138,
+        "requested_bytes": 0.15621948838117555,
+        "rss_kib": 0.0
+      },
+      "status": "review-trigger",
+      "unchanged_work_reads_checksum": {
+        "allocator_calls": {
+          "baseline": 68,
+          "candidate": 68
+        },
+        "checksum": {
+          "baseline": 612489549322388490,
+          "candidate": 612489549322388490
+        },
+        "reference_reads": {
+          "baseline": 1792,
+          "candidate": 1792
+        },
+        "work_per_repeat": {
+          "baseline": 1839,
+          "candidate": 1839
+        }
+      }
+    }
+  ],
+  "matched_p50_delta_ranges_percent": {
+    "allocator_calls": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "elapsed_ns_per_repeat": {
+      "max": 6.388666132050254,
+      "min": -2.5553662691652472
+    },
+    "peak_live_bytes": {
+      "max": 0.3081664098613251,
+      "min": 0.0
+    },
+    "reference_reads": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "requested_bytes": {
+      "max": 0.2766251728907331,
+      "min": 0.0
+    },
+    "rss_kib": {
+      "max": 1.871345029239766,
+      "min": -6.375442739079102
+    },
+    "work_per_repeat": {
+      "max": 0.0,
+      "min": 0.0
+    }
+  },
+  "metrics": [
+    "time_ns_per_repeat",
+    "allocator_calls",
+    "requested_bytes",
+    "released_bytes",
+    "peak_live_bytes",
+    "result_live_budget",
+    "work_per_repeat",
+    "reference_reads",
+    "rss_kib"
+  ],
+  "scope": "matched controls; p50 normalized metrics from performance-report.json with raw child receipts retained",
+  "threshold_percent": 5.0
+}

@@ -1,0 +1,7 @@
+lane	input_bytes	elapsed_ns	requested_alloc_bytes	peak_live_delta	semantic_ok	output_exact
+multi_picture_same_drawing_detach_shared_16	4654	5845534	7119087	567718	True	True
+multi_picture_same_drawing_detach_shared_64	5405	66955833	54256690	757997	True	True
+multi_picture_same_drawing_detach_shared_256	8223	1006415956	776245335	1909792	True	True
+multi_picture_same_drawing_detach_distinct_16	12242	6661957	7722264	618464	True	True
+multi_picture_same_drawing_detach_distinct_64	37316	73567270	59088918	978362	True	True
+multi_picture_same_drawing_detach_distinct_256	137369	1090813930	831189490	3085369	True	True

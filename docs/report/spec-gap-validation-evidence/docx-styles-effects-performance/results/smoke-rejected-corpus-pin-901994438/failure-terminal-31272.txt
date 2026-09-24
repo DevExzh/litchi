@@ -1,0 +1,18 @@
+operator_session=31272
+exit_code=1
+
+command=PROFILE_MODE=smoke PYTHONDONTWRITEBYTECODE=1 TMPDIR=/var/tmp DOCX_STYLES_EFFECTS_RESULTS=/var/tmp/litchi-docx-styles-effects-projection-reuse-smoke-results-901994438-20260912-a DOCX_STYLES_EFFECTS_TARGET_DIR=/var/tmp/litchi-docx-styles-effects-projection-reuse-smoke-target-901994438-20260912-a bash docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/run_current_smoke.sh
+
+terminal_output:
+Traceback (most recent call last):
+  File "/var/tmp/litchi-docx-styles-effects-profile-projection-reuse-d000d977b/docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/verify_current_smoke.py", line 13, in <module>
+    verify.main()
+    ~~~~~~~~~~~^^^
+  File "/var/tmp/litchi-docx-styles-effects-profile-projection-reuse-d000d977b/docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/verify.py", line 840, in main
+    corpus = verify_corpus(args.corpus, root, evidence)
+  File "/var/tmp/litchi-docx-styles-effects-profile-projection-reuse-d000d977b/docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/verify.py", line 398, in verify_corpus
+    require(corpus.get("source_commit") == SOURCE_COMMIT, "corpus source commit changed")
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/var/tmp/litchi-docx-styles-effects-profile-projection-reuse-d000d977b/docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/verify.py", line 161, in require
+    raise AssertionError(message)
+AssertionError: corpus source commit changed

@@ -1,0 +1,14 @@
+Baseline commit: 5347801fc2e8086d67fc6c140a023aeedd260c91
+Candidate: detached baseline checkout with only the nine final ODS implementation/test files overlaid.
+Unrelated OPC/XLSX changes from the shared workspace were excluded.
+All nine candidate files were independently compared with gates/source-after-gates.json before cleanup.
+Source manifest: source-hashes.sha256 (18 paths); verified against retained artifact/current scoped source.
+Patch: dde-api.diff, zero-context unified diff; apply with git apply --unidiff-zero.
+Root replayed the patch against the baseline and compared all nine output hashes with the final gated source.
+Release build: CARGO_TARGET_DIR=/var/tmp/ods-dde-candidate-target cargo build --manifest-path docs/report/spec-gap-validation-evidence/ods-dde-transactions/candidate/harness/Cargo.toml --release --locked --offline
+Build working directory: /var/tmp/ods-dde-candidate-5347801fc
+Final timing commands: commands.txt; exact run interval: run-start.txt and run-end.txt.
+Final binary SHA-256 was independently verified against binary.sha256 before deletion.
+Post-timing isolated check: CARGO_TARGET_DIR=/var/tmp/ods-dde-candidate-target cargo test --locked --offline -p litchi-ods --all-features --test ods_dde_transactions --test ods_dde_facades
+Isolated result: 45 passed across 2 targets; scoped-tests-final.log.
+Root all-target checks used the shared working tree; the isolated check independently validates committed baseline dependencies.

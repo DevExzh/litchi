@@ -1,0 +1,21 @@
+binary=/var/tmp/litchi-xlsx-svg-lifecycle-target-ab954d91d-20260912T041327Z/release/xlsx-svg-lifecycle-profile
+76c82487bb04cf89df28adf185e049e61bf86ce8488be2b1bf537388edf64abd  /var/tmp/litchi-xlsx-svg-lifecycle-target-ab954d91d-20260912T041327Z/release/xlsx-svg-lifecycle-profile
+rustc -vV:
+rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: x86_64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2
+cargo=cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+target=/var/tmp/litchi-xlsx-svg-lifecycle-target-ab954d91d-20260912T041327Z
+cargo_incremental=0
+allocator=CountingAllocator (process-local GlobalAlloc observer)
+api_binding=reviewed XLSX source-backed owner adapter (set by wiring change)
+os=Linux 7.0.0-1012-aws x86_64
+cpu_model=AMD EPYC 9R45
+core_count=32
+memory_total=129447068 kB
+storage=/dev/root       2033087068 723231660 1309839024      36% /
+environment=CARGO_TARGET_DIR=/var/tmp/litchi-xlsx-svg-lifecycle-target-ab954d91d-20260912T041327Z CARGO_INCREMENTAL=0

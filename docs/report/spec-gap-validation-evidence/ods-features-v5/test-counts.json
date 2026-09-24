@@ -1,0 +1,14 @@
+{
+  "tests": {
+    "passed": 488,
+    "failed": 0,
+    "ignored": 0,
+    "suites": 36
+  },
+  "doctests": {
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "suites": 1
+  }
+}

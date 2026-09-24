@@ -21,6 +21,11 @@ use std::mem::size_of;
 use std::ops::Range;
 use std::sync::Arc;
 
+mod owned;
+pub use owned::{
+    OwnedAttributeUpdate, OwnedChildElement, OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart,
+};
+
 const MAX_FRAGMENT_BYTES: usize = 256 * 1024;
 const MAX_SOURCE_XML_ATTRIBUTES_PER_ELEMENT: usize = 4096;
 const MAX_SOURCE_XML_NAMESPACE_DECLARATIONS_PER_ELEMENT: usize = 256;
@@ -359,6 +364,16 @@ impl fmt::Debug for AuthoredXmlFragment {
 }
 
 impl AuthoredXmlFragment {
+    /// Construct an audited zero-byte fragment for an exact source deletion.
+    ///
+    /// Empty fragments are intentionally separate from [`Self::text`]: they
+    /// carry no XML character data and therefore cannot introduce a schema
+    /// content-model token while a source range is removed.
+    #[must_use]
+    pub fn empty() -> Self {
+        Self { bytes: Vec::new() }
+    }
+
     /// Audit one or more compact authored markup nodes.
     pub fn markup(bytes: impl Into<Vec<u8>>) -> Result<Self> {
         let bytes = bytes.into();
@@ -1041,6 +1056,20 @@ fn validate_source_xml(
     Ok(())
 }
 
+/// Validate complete source XML with the bounded namespace-aware grammar used
+/// by source-preserving OPC publication.
+///
+/// The public wrapper intentionally does not issue a source token. It lets a
+/// format owner validate an opaque XML resource before retaining its own
+/// source handle while keeping the execution-context hook crate-private.
+pub fn validate_source_xml_bytes(
+    partname: &PackURI,
+    bytes: &[u8],
+    limits: ReadLimits,
+) -> Result<()> {
+    validate_source_xml(partname, bytes, limits, None)
+}
+
 fn consume_work_from_context(context: Option<&ExecutionContext>, bytes: usize) -> Result<()> {
     let Some(context) = context else {
         return Ok(());
@@ -1181,7 +1210,7 @@ fn validate_source_element(
         let key_name = reader.decoder().decode(key).map_err(|error| {
             invalid_source(format!("source XML attribute name is invalid: {error}"))
         })?;
-        validate_xml_qname(&key_name, "attribute")?;
+        validate_source_attribute_key(reader, attribute.key)?;
         if attribute.value.as_ref().contains(&b'<') {
             return Err(invalid_source(
                 "source XML attribute contains a literal '<'",
@@ -1238,6 +1267,34 @@ fn validate_source_element(
     Ok(())
 }
 
+/// Validate an XML attribute QName and its namespace prefix against the
+/// resolver state for the current element. Namespace declaration values are
+/// checked by the caller because they need the decoded value as well.
+///
+/// This small shared seam keeps source-backed relationship splices subject to
+/// the same QName and unbound-prefix rules as ordinary source XML ingress.
+pub(crate) fn validate_source_attribute_key(
+    reader: &NsReader<&[u8]>,
+    key: quick_xml::name::QName<'_>,
+) -> Result<()> {
+    let key_name = reader.decoder().decode(key.as_ref()).map_err(|error| {
+        invalid_source(format!("source XML attribute name is invalid: {error}"))
+    })?;
+    validate_xml_qname(&key_name, "attribute")?;
+    if key_name == "xmlns" || key_name.starts_with("xmlns:") {
+        return Ok(());
+    }
+    if matches!(
+        reader.resolver().resolve_attribute(key).0,
+        ResolveResult::Unknown(_)
+    ) {
+        return Err(invalid_source(
+            "source XML attribute uses an unbound namespace prefix",
+        ));
+    }
+    Ok(())
+}
+
 fn validate_source_qname(reader: &NsReader<&[u8]>, raw: &[u8], kind: &str) -> Result<()> {
     let name = reader
         .decoder()
@@ -1288,7 +1345,7 @@ fn validate_xml_qname(value: &str, kind: &str) -> Result<()> {
     }
 }
 
-fn validate_namespace_binding(name: &str, value: &str) -> Result<()> {
+pub(crate) fn validate_namespace_binding(name: &str, value: &str) -> Result<()> {
     let prefix = name.strip_prefix("xmlns:");
     if name != "xmlns" && prefix.is_none_or(|prefix| !is_xml_id(prefix)) {
         return Err(invalid_source(
@@ -1317,7 +1374,7 @@ fn validate_xml_string(value: &str) -> Result<()> {
     }
 }
 
-fn xml10_character(value: char) -> bool {
+pub(crate) fn xml10_character(value: char) -> bool {
     matches!(value, '\u{9}' | '\u{a}' | '\u{d}')
         || ('\u{20}'..='\u{d7ff}').contains(&value)
         || ('\u{e000}'..='\u{fffd}').contains(&value)

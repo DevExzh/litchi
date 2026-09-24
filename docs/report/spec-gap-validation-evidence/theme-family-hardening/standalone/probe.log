@@ -1,0 +1,4 @@
+    Blocking waiting for file lock on artifact directory
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.21s
+     Running `target/debug/litchi-theme-family-hardening-probe`
+theme-family hardening probe passed 17 cases

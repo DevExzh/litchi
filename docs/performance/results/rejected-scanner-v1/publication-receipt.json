@@ -1,0 +1,11 @@
+{
+  "archive_sha256": "3c29403cc629bd2f55942602de1246027b918ce1476bc190b4797ce8d7d2905d",
+  "archive_bytes": 93967,
+  "archive_regular_files": 41,
+  "source_base": "cf4f383c4c203381880d4c2e8445d2616a53d283",
+  "publication_candidate_base": "42be13576f97958c81526d9b239351c72d179fa8",
+  "root_verifier_exit_code": 0,
+  "independent_raw_review": "normal_baseline_review: raw-vector recomputation and source/capture bindings passed in place and from a fresh extraction",
+  "performance_verdict": "rejected",
+  "archive_digest_algorithm": "SHA-256"
+}

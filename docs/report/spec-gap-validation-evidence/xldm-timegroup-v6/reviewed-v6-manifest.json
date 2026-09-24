@@ -1,0 +1,240 @@
+{
+  "candidate": "/var/tmp/litchi-xldm-identity-writer-v6-timegroup-proof-20260910",
+  "comparison_base": "/var/tmp/litchi-xldm-identity-writer-v5-timegroup-proof-20260910",
+  "git_head": "565493105cb97f8b6d2f1410e1259486fc0da7a5",
+  "scope": "V6 XLDM physical time-group proof/publication boundary; no primary edits, staging, or commits",
+  "owned_delta_paths": [
+    {
+      "path": "crates/litchi-xldm/src/identity.rs",
+      "v5": {
+        "sha256": "099fb34d20338bdeccc43e25a57ee9d2726b9d3573a329b0bc6e4c4742409363",
+        "bytes": 204029
+      },
+      "v6": {
+        "sha256": "e749ab853970ec6ec379d29d37e648f6d2a3c2b1b17283975f1e8c6439682c44",
+        "bytes": 218157
+      },
+      "diff": {
+        "added_lines": 263,
+        "removed_lines": 44
+      }
+    },
+    {
+      "path": "crates/litchi-xldm/src/olapproof.rs",
+      "v5": {
+        "sha256": "3ce217e35986b612e533d9f3c3c2b2d9f8f3c611c51cb9424b8ac3e9f69dfd14",
+        "bytes": 148978
+      },
+      "v6": {
+        "sha256": "acbd8cbd8f8b2d97c8f3b13b0938a754cef2d195a37cc4e337b51190be43a5b2",
+        "bytes": 149768
+      },
+      "diff": {
+        "added_lines": 29,
+        "removed_lines": 11
+      }
+    },
+    {
+      "path": "crates/litchi-xldm/src/metadata/codec.rs",
+      "v5": {
+        "sha256": "7bbfe614e28db15ad4640771891ceb165f6d4972c3e5e96b73c8afbe83e8aa8a",
+        "bytes": 59957
+      },
+      "v6": {
+        "sha256": "2d3dbbe3482afcf2f01029cca9adae4798539c76b7b5ae0f846819ad9c2041de",
+        "bytes": 61405
+      },
+      "diff": {
+        "added_lines": 40,
+        "removed_lines": 8
+      }
+    },
+    {
+      "path": "crates/litchi-xldm/src/validation.rs",
+      "v5": {
+        "sha256": "5e394465c86ee2beedf353c9ef098f6d1fb61b32dfcfb467fc856ce0c6676e85",
+        "bytes": 21605
+      },
+      "v6": {
+        "sha256": "abfa01911d328e42f78ce36333382211d56e1b32d43db9dbd762d7043e7a415b",
+        "bytes": 21846
+      },
+      "diff": {
+        "added_lines": 12,
+        "removed_lines": 9
+      }
+    },
+    {
+      "path": "crates/litchi-xldm/src/generated.rs",
+      "v5": {
+        "sha256": "838ae9f6c4e9ff3b571b786de40ae3bb9aa48dee27ecadf405f720a26e8e461d",
+        "bytes": 20228
+      },
+      "v6": {
+        "sha256": "994276da46b844f6c90d781f232eae2c33c87286a05d9696018ef34d03784d9c",
+        "bytes": 20307
+      },
+      "diff": {
+        "added_lines": 5,
+        "removed_lines": 1
+      }
+    },
+    {
+      "path": "crates/litchi-xldm/src/tests.rs",
+      "v5": {
+        "sha256": "319f3f5876533f4e754f6818a2ae88634679a28911327e4af499689d3ab8237f",
+        "bytes": 21144
+      },
+      "v6": {
+        "sha256": "484079d2202e1e88061beb7b93696d0a7a2485b154f0c799d4561d889bf7e17e",
+        "bytes": 21113
+      },
+      "diff": {
+        "added_lines": 3,
+        "removed_lines": 4
+      }
+    },
+    {
+      "path": "crates/litchi-xlsb/src/data_model/mod.rs",
+      "v5": {
+        "sha256": "21811c0a885f5d0b2e0e5788afd4a6ab075f43edf21f05fccfffacc861aff34a",
+        "bytes": 1398
+      },
+      "v6": {
+        "sha256": "7e9f90f2e9e720b899c598a6e178d7ad650d1be89afabb90e2d6f9c8eb38abdc",
+        "bytes": 1471
+      },
+      "diff": {
+        "added_lines": 3,
+        "removed_lines": 1
+      }
+    },
+    {
+      "path": "crates/litchi-xlsb/src/data_model/package.rs",
+      "v5": {
+        "sha256": "2fc9f676e7c674d90399772c5541a13acace20277751005ed811c997084a8522",
+        "bytes": 18001
+      },
+      "v6": {
+        "sha256": "6e62f8373b8e800e99b65d8a58b93be0ae08bca6ea747031efb0040a107bf97a",
+        "bytes": 18941
+      },
+      "diff": {
+        "added_lines": 23,
+        "removed_lines": 1
+      }
+    },
+    {
+      "path": "crates/litchi-xlsb/src/data_model/transaction.rs",
+      "v5": {
+        "sha256": "6489e0ad49c1bda671458549ee580479e00421d25c323e734016b8e4c5b9d955",
+        "bytes": 15645
+      },
+      "v6": {
+        "sha256": "e827fbf90bd1e354a5fa6e7f1fde998513da94a3e8cc10d0c70e7e73545cb6cb",
+        "bytes": 16113
+      },
+      "diff": {
+        "added_lines": 13,
+        "removed_lines": 4
+      }
+    },
+    {
+      "path": "crates/litchi-xlsb/src/writer/workbook/model.rs",
+      "v5": {
+        "sha256": "62376312e227bd4925ca99d82db2e2b86a4e4f604dbb617a7cd921a8dab32f19",
+        "bytes": 16957
+      },
+      "v6": {
+        "sha256": "e22e29fc05b9ef60170a1dc0d56fb793af7893adaab2d103a1c4ea71ddbd8f55",
+        "bytes": 17031
+      },
+      "diff": {
+        "added_lines": 1,
+        "removed_lines": 0
+      }
+    },
+    {
+      "path": "crates/litchi-xlsb/src/writer/workbook/package.rs",
+      "v5": {
+        "sha256": "acf1f6259dd04d9bc3189a6f23defdef92f1e6b700aba2026095e8b540636f25",
+        "bytes": 42386
+      },
+      "v6": {
+        "sha256": "106bb6fa5bf36ed1d2e7921908b1db1c70e0aeb8bfba39f9b2423c66108809d9",
+        "bytes": 42320
+      },
+      "diff": {
+        "added_lines": 1,
+        "removed_lines": 4
+      }
+    },
+    {
+      "path": "crates/litchi-xlsb/tests/data_model.rs",
+      "v5": {
+        "sha256": "aa97488d0fd63fdd117833b12f73517208407c774217db5f1fe0d379790e9e5d",
+        "bytes": 31543
+      },
+      "v6": {
+        "sha256": "d9e0dd62f733f26064394cf7b00e8e19626690a3a997eb5eafeef27f6a16d336",
+        "bytes": 31055
+      },
+      "diff": {
+        "added_lines": 8,
+        "removed_lines": 23
+      }
+    }
+  ],
+  "inherited_or_unrelated_worktree_paths": [
+    "crates/litchi-keynote/src/document.rs",
+    "crates/litchi-xldm/src/codec.rs",
+    "crates/litchi-xldm/src/lib.rs",
+    "crates/litchi-xldm/src/model.rs",
+    "crates/litchi-xldm/src/native.rs",
+    "crates/litchi-xldm/src/olap.rs",
+    "crates/litchi-xlsb/Cargo.toml",
+    "crates/litchi-xlsb/src/data_model/snapshot.rs",
+    "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+    "crates/litchi-xlsx/src/package.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/codec.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/mod.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/model.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/package.rs"
+  ],
+  "untracked_nonowned_paths": [
+    "crates/litchi-xlsb/src/data_model/proof.rs"
+  ],
+  "validation": [
+    {
+      "command": "rustup run stable cargo fmt --all -- --check",
+      "result": "pass"
+    },
+    {
+      "command": "taskset -c 8-31 cargo test -p litchi-xldm --lib --no-fail-fast",
+      "result": "103 passed"
+    },
+    {
+      "command": "taskset -c 8-31 cargo test -p litchi-xldm --lib identity::tests::physical_complete_fixture_binds_source_and_calculated_time_grouping --no-fail-fast",
+      "result": "1 passed"
+    },
+    {
+      "command": "taskset -c 8-31 cargo test -p litchi-xlsb --test data_model --no-fail-fast",
+      "result": "17 passed"
+    },
+    {
+      "command": "rustup run stable cargo clippy -p litchi-xldm -p litchi-xlsb --all-targets -- -D warnings -A clippy::chunks-exact-to-as-chunks",
+      "result": "pass"
+    },
+    {
+      "command": "RUSTDOCFLAGS='-D warnings' taskset -c 8-31 rustup run stable cargo doc -p litchi-xldm -p litchi-xlsb --no-deps",
+      "result": "pass"
+    }
+  ],
+  "normative_scope": [
+    "FileGroup PersistLocation is checked against Database PersistLocation; individual object folders such as T1.0.dim remain distinct.",
+    "The public grouping descriptor list supplies the source-to-calculated edge because XLDM 140 does not persist a model-time-grouping formula.",
+    "XLDM corroboration requires distinct table-local XMRawColumn identities, calculated Settings bits, XMColumnStats/DBType, section-2.6 Attribute closure, native IDF members, generated POS_TO_ID members, and complete OLAP/file-group proof.",
+    "The positive fixture is parsed through outer storage, metadata, native, generated, OLAP, and closure inspectors; it contains physical source/calculated IDF and POS_TO_ID members.",
+    "Native/generated value rewrites and broader variable structural mutations remain refused until a complete semantic regeneration/inverse exists."
+  ]
+}

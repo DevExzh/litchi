@@ -1,0 +1,171 @@
+{
+  "units": "KiB",
+  "median_across_nine_snapshots_per_slot": {
+    "A": {
+      "binary": 1372,
+      "heap": 96,
+      "other": 56,
+      "shared libraries": 2044,
+      "stack": 24,
+      "total": 3592
+    },
+    "B": {
+      "binary": 1432,
+      "heap": 96,
+      "other": 56,
+      "shared libraries": 2044,
+      "stack": 24,
+      "total": 3644
+    }
+  },
+  "snapshots": {
+    "A": [
+      {
+        "binary": 1436,
+        "heap": 96,
+        "shared libraries": 2044,
+        "other": 56,
+        "stack": 28,
+        "total": 3660
+      },
+      {
+        "binary": 1436,
+        "heap": 96,
+        "shared libraries": 2044,
+        "other": 56,
+        "stack": 28,
+        "total": 3660
+      },
+      {
+        "binary": 1436,
+        "heap": 96,
+        "shared libraries": 2044,
+        "other": 56,
+        "stack": 28,
+        "total": 3660
+      },
+      {
+        "binary": 1320,
+        "heap": 96,
+        "shared libraries": 2040,
+        "other": 56,
+        "stack": 24,
+        "total": 3536
+      },
+      {
+        "binary": 1320,
+        "heap": 96,
+        "shared libraries": 2040,
+        "other": 56,
+        "stack": 24,
+        "total": 3536
+      },
+      {
+        "binary": 1320,
+        "heap": 96,
+        "shared libraries": 2040,
+        "other": 56,
+        "stack": 24,
+        "total": 3536
+      },
+      {
+        "binary": 1372,
+        "heap": 96,
+        "shared libraries": 2044,
+        "other": 56,
+        "stack": 24,
+        "total": 3592
+      },
+      {
+        "binary": 1372,
+        "heap": 96,
+        "shared libraries": 2044,
+        "other": 56,
+        "stack": 24,
+        "total": 3592
+      },
+      {
+        "binary": 1372,
+        "heap": 96,
+        "shared libraries": 2044,
+        "other": 56,
+        "stack": 24,
+        "total": 3592
+      }
+    ],
+    "B": [
+      {
+        "binary": 1432,
+        "other": 56,
+        "heap": 96,
+        "shared libraries": 2044,
+        "stack": 24,
+        "total": 3652
+      },
+      {
+        "binary": 1432,
+        "other": 56,
+        "heap": 96,
+        "shared libraries": 2044,
+        "stack": 24,
+        "total": 3652
+      },
+      {
+        "binary": 1432,
+        "other": 56,
+        "heap": 96,
+        "shared libraries": 2044,
+        "stack": 24,
+        "total": 3652
+      },
+      {
+        "binary": 1304,
+        "other": 56,
+        "heap": 96,
+        "shared libraries": 2044,
+        "stack": 24,
+        "total": 3524
+      },
+      {
+        "binary": 1304,
+        "other": 56,
+        "heap": 96,
+        "shared libraries": 2044,
+        "stack": 24,
+        "total": 3524
+      },
+      {
+        "binary": 1304,
+        "other": 56,
+        "heap": 96,
+        "shared libraries": 2044,
+        "stack": 24,
+        "total": 3524
+      },
+      {
+        "binary": 1476,
+        "other": 56,
+        "heap": 96,
+        "shared libraries": 1992,
+        "stack": 24,
+        "total": 3644
+      },
+      {
+        "binary": 1476,
+        "other": 56,
+        "heap": 96,
+        "shared libraries": 1992,
+        "stack": 24,
+        "total": 3644
+      },
+      {
+        "binary": 1476,
+        "other": 56,
+        "heap": 96,
+        "shared libraries": 1992,
+        "stack": 24,
+        "total": 3644
+      }
+    ]
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "schema": "litchi.odg.v8.integration-base-owned-preimages.v1",
+  "primary_root": "/home/zhuhe/code/litchi-spec-gaps",
+  "base_commit": "5953a2ed1a036179042b55f96a4ee333e554b659",
+  "captured_utc": "2026-09-10T12:55:21Z",
+  "primary_status_sha256": "46bf2ac08b12802b61edd13e387c15400af0cda799c5c9f937860bac3d893dee",
+  "primary_status_line_count": 4214,
+  "v8_manifest_sha256": "958c5fea4a4e40d6fbf43bd68b0aa464b23f331f5fea0ac58e8367b08569615c",
+  "paths": [
+    {
+      "path": "crates/litchi-odf-common/src/core/family.rs",
+      "pending_in_primary": false,
+      "primary_worktree_sha256": "2944d1e31770db86e781a8dbf368a8dce4b5d1e6245ffd275fd2b041e98d0c94",
+      "primary_head_5953_sha256": "2944d1e31770db86e781a8dbf368a8dce4b5d1e6245ffd275fd2b041e98d0c94",
+      "candidate_from_archive_before_overlay_sha256": "b39b0b375579fa5610ce21cd53fbe6eee937dbbab88e7117893ff7d1ff7b21d1",
+      "frozen_v8_sha256": "b39b0b375579fa5610ce21cd53fbe6eee937dbbab88e7117893ff7d1ff7b21d1",
+      "primary_equals_head": true,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odf-common/src/core/package.rs",
+      "pending_in_primary": false,
+      "primary_worktree_sha256": "e896d014b4280c8e490787722a6ec57c3963632351790c089826b3a6015a7011",
+      "primary_head_5953_sha256": "e896d014b4280c8e490787722a6ec57c3963632351790c089826b3a6015a7011",
+      "candidate_from_archive_before_overlay_sha256": "d78a3eeff08ae95a70f039b427ce1e44e9c28084bf6df68383c93861df637df7",
+      "frozen_v8_sha256": "d78a3eeff08ae95a70f039b427ce1e44e9c28084bf6df68383c93861df637df7",
+      "primary_equals_head": true,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odg/docs/FEATURE_MATRIX.md",
+      "pending_in_primary": true,
+      "primary_worktree_sha256": "40cc233b17738772dfebef81e39a5c4739126cbf460b448d498821945f316a04",
+      "primary_head_5953_sha256": "ab9783917c3a8a414cd27c03d6d327f24f6d100d84017232f84725a53ee7c9f6",
+      "candidate_from_archive_before_overlay_sha256": "45b46b9be99d3912f63fac07a23a633953e766af44c9c78a2e185ea7e1032838",
+      "frozen_v8_sha256": "45b46b9be99d3912f63fac07a23a633953e766af44c9c78a2e185ea7e1032838",
+      "primary_equals_head": false,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odg/src/facade/mod.rs",
+      "pending_in_primary": true,
+      "primary_worktree_sha256": "607bd92870078f1420f7d74e14e6c3a4170d63dcf1e0e9949cbe1b1eac65631d",
+      "primary_head_5953_sha256": "f28fafdc2f11f9350b0a8fc1ebc5eb502db9b914a499d063141b269a049064f3",
+      "candidate_from_archive_before_overlay_sha256": "607bd92870078f1420f7d74e14e6c3a4170d63dcf1e0e9949cbe1b1eac65631d",
+      "frozen_v8_sha256": "607bd92870078f1420f7d74e14e6c3a4170d63dcf1e0e9949cbe1b1eac65631d",
+      "primary_equals_head": false,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odg/src/flat.rs",
+      "pending_in_primary": false,
+      "primary_worktree_sha256": "39baff5c7a9bb9b539da9d9bd797787c4ef8321bb64907221a12c3c8a20fa987",
+      "primary_head_5953_sha256": "39baff5c7a9bb9b539da9d9bd797787c4ef8321bb64907221a12c3c8a20fa987",
+      "candidate_from_archive_before_overlay_sha256": "2a07b8c5a7165e3dace8d57b1956421399eff6e42fa0258828273d38c4ca786f",
+      "frozen_v8_sha256": "2a07b8c5a7165e3dace8d57b1956421399eff6e42fa0258828273d38c4ca786f",
+      "primary_equals_head": true,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odg/src/lib.rs",
+      "pending_in_primary": true,
+      "primary_worktree_sha256": "d907c7b0578bb76321cbaa9863fd77ae8bef82b37c11005fdfc6031b209b0c52",
+      "primary_head_5953_sha256": "9d2a0b8357e9e3a3925f638e5e74e64a601a76ecbe3d74bd6f545f6977721aba",
+      "candidate_from_archive_before_overlay_sha256": "d907c7b0578bb76321cbaa9863fd77ae8bef82b37c11005fdfc6031b209b0c52",
+      "frozen_v8_sha256": "d907c7b0578bb76321cbaa9863fd77ae8bef82b37c11005fdfc6031b209b0c52",
+      "primary_equals_head": false,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odg/src/model/auxiliary.rs",
+      "pending_in_primary": true,
+      "primary_worktree_sha256": "ab5e419e8600d921ff3509016ade8130713a9914df115ffaafd79d90dd4c3ce5",
+      "primary_head_5953_sha256": null,
+      "candidate_from_archive_before_overlay_sha256": "5f170ff65d36c900f47b837b9f6928a067b3d2e11e0a38b801003ea80e101d3a",
+      "frozen_v8_sha256": "5f170ff65d36c900f47b837b9f6928a067b3d2e11e0a38b801003ea80e101d3a",
+      "primary_equals_head": false,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odg/src/model/enhanced.rs",
+      "pending_in_primary": true,
+      "primary_worktree_sha256": "435eda96a1e495f87c1d89106c04a2e0096afc43fcd96e854581bb26cf59a927",
+      "primary_head_5953_sha256": null,
+      "candidate_from_archive_before_overlay_sha256": "5c75f1139ec78254e7ad900723cda2727263de954971088cb30fbcd1266ca989",
+      "frozen_v8_sha256": "5c75f1139ec78254e7ad900723cda2727263de954971088cb30fbcd1266ca989",
+      "primary_equals_head": false,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odg/src/model/mod.rs",
+      "pending_in_primary": true,
+      "primary_worktree_sha256": "4a712ad5620f025d77063ad9b9b9a44a870a3b8c51457cc7a4d109b1a860a532",
+      "primary_head_5953_sha256": "5e37fb5577fb3d23d1485fb7e6c1bd05756fb3aa4a3b2a60de3660872db873c1",
+      "candidate_from_archive_before_overlay_sha256": "4a712ad5620f025d77063ad9b9b9a44a870a3b8c51457cc7a4d109b1a860a532",
+      "frozen_v8_sha256": "4a712ad5620f025d77063ad9b9b9a44a870a3b8c51457cc7a4d109b1a860a532",
+      "primary_equals_head": false,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odg/src/model/page.rs",
+      "pending_in_primary": true,
+      "primary_worktree_sha256": "69a75b72145f95188ca497d3058e72753bbd8419da9ae5496b0fecb09ecd75ac",
+      "primary_head_5953_sha256": "13997a0f575ab7b3bc5af3687d869bd784c6daa3f1d7c3a0335ea0ef199ea60e",
+      "candidate_from_archive_before_overlay_sha256": "6a968f5e860522066f5f82996ba9d0925581e3bc6763f54c986d488097846e44",
+      "frozen_v8_sha256": "6a968f5e860522066f5f82996ba9d0925581e3bc6763f54c986d488097846e44",
+      "primary_equals_head": false,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odg/src/model/shape.rs",
+      "pending_in_primary": true,
+      "primary_worktree_sha256": "8ee559360e28f39902232e6d86c94dc965550d6da666b1c3613a538a0f5a86a0",
+      "primary_head_5953_sha256": "2e26ebba46ad1357b41284a63f946e1d2f861620cfe5b876406a68b76251a14e",
+      "candidate_from_archive_before_overlay_sha256": "da080b99ea07fda89f2da8dd9fa42ff3007e231ea1b3e388ae45f73b4e12dbb9",
+      "frozen_v8_sha256": "da080b99ea07fda89f2da8dd9fa42ff3007e231ea1b3e388ae45f73b4e12dbb9",
+      "primary_equals_head": false,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odg/src/model/transition.rs",
+      "pending_in_primary": true,
+      "primary_worktree_sha256": "d4477acd8198d1fb2aee1eba64f21f1e99586e7f1b425365fe12c4fbc5aa13a8",
+      "primary_head_5953_sha256": null,
+      "candidate_from_archive_before_overlay_sha256": "31e707ad0464f8e3293ae662751ac7e9c994d12cc6b13598ed54a837a9548f8b",
+      "frozen_v8_sha256": "31e707ad0464f8e3293ae662751ac7e9c994d12cc6b13598ed54a837a9548f8b",
+      "primary_equals_head": false,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odg/src/package/mod.rs",
+      "pending_in_primary": true,
+      "primary_worktree_sha256": "379154a3b53d0e0edca2afa777b49f7cc8bc65efff83ea58869ffa753f12567c",
+      "primary_head_5953_sha256": "ac20f8a3d4eebf7fc6fbce36f0b542f2ab14a7b828997afd3c2c79eb493befe0",
+      "candidate_from_archive_before_overlay_sha256": "379154a3b53d0e0edca2afa777b49f7cc8bc65efff83ea58869ffa753f12567c",
+      "frozen_v8_sha256": "379154a3b53d0e0edca2afa777b49f7cc8bc65efff83ea58869ffa753f12567c",
+      "primary_equals_head": false,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odg/src/package/snapshot.rs",
+      "pending_in_primary": true,
+      "primary_worktree_sha256": "8e8a6eda3b7ca2fa4d64c5735676562773f350cb4a00b2548aaec591bb5a6fb6",
+      "primary_head_5953_sha256": "0f5e3ca9d1fb387ee41efade45db082599c7776b560c63373b69e82f0b1b2c5f",
+      "candidate_from_archive_before_overlay_sha256": "d9962781fae823b8eb7213f4a4ced4efb2b47b500cf193b15d1005659c71eed1",
+      "frozen_v8_sha256": "d9962781fae823b8eb7213f4a4ced4efb2b47b500cf193b15d1005659c71eed1",
+      "primary_equals_head": false,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odg/tests/allocation_admission.rs",
+      "pending_in_primary": false,
+      "primary_worktree_sha256": null,
+      "primary_head_5953_sha256": null,
+      "candidate_from_archive_before_overlay_sha256": "667187f49c8e4f225e3da05986cf4d7d19f04cfdfc8b474ed56d7d4f5d8248f7",
+      "frozen_v8_sha256": "667187f49c8e4f225e3da05986cf4d7d19f04cfdfc8b474ed56d7d4f5d8248f7",
+      "primary_equals_head": true,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odg/tests/package_snapshot.rs",
+      "pending_in_primary": false,
+      "primary_worktree_sha256": "9dad1a14b2ab842c92194f69e23b9a62769d4edf1d1b02355956d9caa2915fee",
+      "primary_head_5953_sha256": "9dad1a14b2ab842c92194f69e23b9a62769d4edf1d1b02355956d9caa2915fee",
+      "candidate_from_archive_before_overlay_sha256": "e1deee17ccfc42d55e5aed1b16cfa22bffbe71a8b17b8ff35d8f96845a7946c5",
+      "frozen_v8_sha256": "e1deee17ccfc42d55e5aed1b16cfa22bffbe71a8b17b8ff35d8f96845a7946c5",
+      "primary_equals_head": true,
+      "candidate_equals_head_before_overlay": false
+    },
+    {
+      "path": "crates/litchi-odg/tests/page_transitions.rs",
+      "pending_in_primary": true,
+      "primary_worktree_sha256": "f9a2d5454c234150af125f0ededc716c8ef595e5fa96d065d9afd3a7930cb473",
+      "primary_head_5953_sha256": null,
+      "candidate_from_archive_before_overlay_sha256": "8ad5e34e4524bedcad494c31d5493fcdb60366189431699291f6e192fcb239e7",
+      "frozen_v8_sha256": "8ad5e34e4524bedcad494c31d5493fcdb60366189431699291f6e192fcb239e7",
+      "primary_equals_head": false,
+      "candidate_equals_head_before_overlay": false
+    }
+  ]
+}

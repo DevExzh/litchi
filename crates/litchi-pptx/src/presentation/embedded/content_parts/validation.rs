@@ -52,10 +52,17 @@ pub(crate) fn validate_id(value: &str, label: &'static str) -> Result<()> {
 }
 
 pub(crate) fn validate_anchor(anchor: &super::model::Anchor) -> Result<()> {
-    let parsed = codec::validate_anchor_xml(anchor.xml())?;
+    let parsed = codec::validate_anchor_xml_with_key(anchor.xml(), anchor.bw_mode_key.as_deref())?;
     if parsed != anchor.relationship_id() {
         return Err(invalid(
             "content-part anchor relationship ID does not match its XML",
+        ));
+    }
+    let (bw_mode, bw_mode_key) =
+        codec::anchor_bw_mode_with_key(anchor.xml(), anchor.bw_mode_key.as_deref())?;
+    if bw_mode != anchor.bw_mode || bw_mode_key != anchor.bw_mode_key {
+        return Err(invalid(
+            "content-part anchor p14:bwMode metadata does not match its XML",
         ));
     }
     validate_id(anchor.relationship_id(), "content-part relationship ID")
@@ -124,6 +131,15 @@ pub(crate) fn validate_parts(parts: &[ContentPart]) -> Result<()> {
     let mut payloads = Vec::new();
     for part in parts {
         validate_anchor(part.anchor())?;
+        let (bw_mode, _) = codec::anchor_bw_mode_with_key(
+            part.anchor().xml(),
+            part.anchor().bw_mode_key.as_deref(),
+        )?;
+        if bw_mode.is_some() && bw_mode != part.bw_mode {
+            return Err(invalid(
+                "content-part p14:bwMode metadata does not match its anchor",
+            ));
+        }
         validate_relationship(part.relationship())?;
         if part.relationship_id() != part.relationship().id() {
             return Err(invalid(

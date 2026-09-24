@@ -85,10 +85,21 @@ fn stored_payload_offset(archive: &[u8], name: &str) -> usize {
 }
 
 fn mark_encrypted(archive: &mut [u8], name: &str) {
+    mark_encrypted_with_flags(archive, name, 1, 1);
+}
+
+fn mark_encrypted_with_flags(
+    archive: &mut [u8],
+    name: &str,
+    local_flags_to_set: u16,
+    central_flags_to_set: u16,
+) {
     let local = local_header_offset(archive, name);
     let central = central_header_offset(archive, name);
-    let local_flags = u16::from_le_bytes([archive[local + 6], archive[local + 7]]) | 1;
-    let central_flags = u16::from_le_bytes([archive[central + 8], archive[central + 9]]) | 1;
+    let local_flags =
+        u16::from_le_bytes([archive[local + 6], archive[local + 7]]) | local_flags_to_set;
+    let central_flags =
+        u16::from_le_bytes([archive[central + 8], archive[central + 9]]) | central_flags_to_set;
     archive[local + 6..local + 8].copy_from_slice(&local_flags.to_le_bytes());
     archive[central + 8..central + 10].copy_from_slice(&central_flags.to_le_bytes());
 }
@@ -182,6 +193,48 @@ fn phys_pkg_borrowed_rejects_encrypted_store_and_deflate() {
             .expect_err("encrypted members must never publish borrowed bytes");
         assert_zip_refusal(error);
     }
+}
+
+#[test]
+fn phys_pkg_owned_reads_reject_strong_and_local_only_encryption() {
+    for local_only in [false, true] {
+        for encrypted_flag in [1u16, 1 << 6] {
+            let mut archive = mixed_archive();
+            mark_encrypted_with_flags(
+                &mut archive,
+                DEFLATED_MEMBER,
+                encrypted_flag,
+                if local_only { 0 } else { encrypted_flag },
+            );
+            let reader = PhysPkgReader::new(&archive).expect("encrypted fixture must parse");
+            assert_zip_refusal(
+                reader
+                    .blob_for(&pack(DEFLATED_URI))
+                    .expect_err("encrypted parts must not materialize"),
+            );
+            assert_zip_refusal(
+                reader
+                    .read_member(DEFLATED_MEMBER)
+                    .expect_err("encrypted members must not be read"),
+            );
+        }
+    }
+}
+
+#[test]
+fn phys_pkg_target_reads_preserve_unrelated_encryption_behavior() {
+    let mut archive = mixed_archive();
+    mark_encrypted(&mut archive, STORED_MEMBER);
+    let reader = PhysPkgReader::new(&archive).expect("encrypted fixture must parse");
+
+    assert_eq!(
+        reader.blob_for(&pack(DEFLATED_URI)).unwrap(),
+        DEFLATED_PAYLOAD
+    );
+    assert_eq!(
+        reader.read_member(DEFLATED_MEMBER).unwrap(),
+        DEFLATED_PAYLOAD
+    );
 }
 
 #[test]

@@ -1,0 +1,112 @@
+[
+  {
+    "name": "ods-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "-p",
+      "litchi-ods"
+    ],
+    "exit_code": 0,
+    "seconds": 14.440310001373291,
+    "log_sha256": "4d7823e3669ea805ee5b42739d577d4553f2a5c57bb76da4295fce29cc787cf3"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "-p",
+      "litchi-ods",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 7.69008207321167,
+    "log_sha256": "9d772605e8cebaaf40f116f7177fbf895f0b68cb966a846422a0ae12d37c3c01"
+  },
+  {
+    "name": "rustdoc",
+    "command": [
+      "cargo",
+      "doc",
+      "--locked",
+      "--offline",
+      "-p",
+      "litchi-ods",
+      "--no-deps"
+    ],
+    "exit_code": 0,
+    "seconds": 2.9474785327911377,
+    "log_sha256": "c574c494ed0e246ff00c09862cd963831858b5edfd54fbd530305123fe3ea656"
+  },
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-ods",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 1.1516735553741455,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "batch-format",
+    "command": [
+      "rustfmt",
+      "--edition",
+      "2024",
+      "--check",
+      "--config",
+      "skip_children=true",
+      "crates/litchi-ods/src/codec/formula/evaluation.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/value/scalar.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/text.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/text/core.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/text/format.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/text/fraction.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/text/search.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/text/unicode.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/text/width.rs",
+      "crates/litchi-ods/tests/ods_formula_text_evaluation.rs",
+      "crates/litchi-ods/tests/ods_formula_text_limits.rs",
+      "crates/litchi-ods/tests/ods_formula_text_native.rs",
+      "crates/litchi-ods/tests/ods_formula_text_oracle.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.20376944541931152,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "boundaries",
+    "command": [
+      "python3",
+      "tools/check_crate_boundaries.py"
+    ],
+    "exit_code": 0,
+    "seconds": 227.58567810058594,
+    "log_sha256": "cdea9514ba7c77c1608a6e73b2eeaf093accc70aefd1c3591af13d73e8b871fa"
+  },
+  {
+    "name": "diff-check",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 0.14149808883666992,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

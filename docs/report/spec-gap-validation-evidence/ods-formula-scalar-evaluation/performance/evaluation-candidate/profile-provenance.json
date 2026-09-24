@@ -1,0 +1,8 @@
+{
+  "profile": "evaluation",
+  "source_manifest": "source-sha256.json",
+  "harness_manifest": "harness-sha256.txt",
+  "gate_results": "../../gates/results.json",
+  "source_count": 210,
+  "captured_at": "2026-09-13T11:46:52.903755Z"
+}

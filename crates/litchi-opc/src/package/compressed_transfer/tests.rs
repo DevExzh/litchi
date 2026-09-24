@@ -739,7 +739,16 @@ fn a_data_descriptor_that_disagrees_is_refused() {
         end
     };
     archive[crc] ^= 0xff;
-    assert_refused(archive);
+    // Every ingress now validates each member's local framing before it
+    // admits the member's encryption flags (merge record 0759 carries the
+    // spec-gap branch's admission check onto the deferred open). A descriptor
+    // that disagrees with its central record is therefore refused at open,
+    // with a typed error, and can never reach a transfer.
+    let error = OpcPackage::from_vec(archive).expect_err("a disagreeing descriptor is refused");
+    assert!(
+        matches!(error, OpcError::ZipError(_)),
+        "the refusal is typed: {error:?}"
+    );
 }
 
 #[test]

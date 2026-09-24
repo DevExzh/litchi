@@ -175,9 +175,14 @@ impl Workbook {
         let original = self.package.get_part(&uri)?.blob().to_vec();
         let updated = crate::package::scenarios::replace_worksheet(&original, Some(&scenarios))?;
         crate::package::scenarios::parse_worksheet(&updated)?;
-        self.package.unsign();
-        self.package.get_part_mut(&uri)?.set_blob(updated);
-        Ok(())
+        if updated == original {
+            return Ok(());
+        }
+        self.edit_opc(|package| {
+            crate::worksheet_index::maintain(package, &uri, &original, &updated)?;
+            package.get_part_mut(&uri)?.set_blob(updated);
+            Ok(())
+        })
     }
 
     /// Atomically remove a worksheet's Scenario Manager.
@@ -192,8 +197,11 @@ impl Workbook {
             return Ok(false);
         }
         crate::package::scenarios::parse_worksheet(&updated)?;
-        self.package.unsign();
-        self.package.get_part_mut(&uri)?.set_blob(updated);
+        self.edit_opc(|package| {
+            crate::worksheet_index::maintain(package, &uri, &original, &updated)?;
+            package.get_part_mut(&uri)?.set_blob(updated);
+            Ok(())
+        })?;
         Ok(true)
     }
 
@@ -251,8 +259,14 @@ impl Workbook {
         updated.extend_from_slice(&replacement);
         updated.extend_from_slice(&original[end..]);
         Self::inspect_merge_block(&updated)?;
-        self.package.get_part_mut(&uri)?.set_blob(updated);
-        Ok(())
+        if updated == original {
+            return Ok(());
+        }
+        self.edit_opc(|package| {
+            crate::worksheet_index::maintain(package, &uri, &original, &updated)?;
+            package.get_part_mut(&uri)?.set_blob(updated);
+            Ok(())
+        })
     }
 
     /// Atomically replace all merged ranges in a worksheet selected by name.

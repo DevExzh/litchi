@@ -1,0 +1,411 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling typenum v1.20.1
+   Compiling stable_deref_trait v1.2.1
+   Compiling serde_core v1.0.229
+   Compiling cfg-if v1.0.4
+   Compiling version_check v0.9.5
+   Compiling libc v0.2.189
+   Compiling crossbeam-utils v0.8.23
+   Compiling autocfg v1.5.1
+   Compiling writeable v0.6.4
+   Compiling litemap v0.8.3
+   Compiling crossbeam-epoch v0.9.21
+   Compiling smallvec v1.16.1
+   Compiling getrandom v0.4.3
+   Compiling rand_core v0.10.1
+   Compiling memchr v2.8.3
+   Compiling icu_normalizer_data v2.3.0
+   Compiling cpufeatures v0.3.1
+   Compiling serde v1.0.229
+   Compiling crossbeam-deque v0.8.8
+   Compiling utf8_iter v1.0.4
+   Compiling zmij v1.0.23
+   Compiling thiserror v2.0.20
+   Compiling icu_properties_data v2.3.0
+   Compiling zerocopy v0.8.57
+   Compiling const-oid v0.10.2
+   Compiling serde_json v1.0.151
+   Compiling rayon-core v1.13.0
+   Compiling crc32fast v1.5.1
+   Compiling rustversion v1.0.23
+   Compiling iana-time-zone v0.1.65
+   Compiling once_cell v1.21.4
+   Compiling itoa v1.0.18
+   Compiling chacha20 v0.10.2
+   Compiling rustix v1.1.4
+   Compiling base64 v0.22.1
+   Compiling cpufeatures v0.2.17
+   Compiling tinyvec_macros v0.1.1
+   Compiling fast-float2 v0.2.4
+   Compiling zlib-rs v0.6.7
+   Compiling either v1.18.0
+   Compiling linux-raw-sys v0.12.1
+   Compiling tinyvec v1.13.2
+   Compiling percent-encoding v2.3.2
+   Compiling fastrand v2.5.0
+   Compiling debug_unsafe v0.1.4
+   Compiling ryu v1.0.23
+   Compiling generic-array v0.14.7
+   Compiling form_urlencoded v1.2.2
+   Compiling num-traits v0.2.19
+   Compiling quick-xml v0.41.0
+   Compiling atoi_simd v0.18.1
+   Compiling unicode-normalization v0.1.25
+   Compiling syn v3.0.5
+   Compiling syn v2.0.119
+   Compiling hybrid-array v0.4.15
+   Compiling caseless v0.2.2
+   Compiling rand v0.10.2
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling rayon v1.12.0
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling digest v0.11.3
+   Compiling sha2 v0.11.0
+   Compiling bitflags v2.13.2
+   Compiling synstructure v0.13.2
+   Compiling zerovec-derive v0.11.6
+   Compiling displaydoc v0.2.7
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling xml-minifier-macros v0.1.0 (/var/tmp/litchi-xlsx-svg-phase-ac288-historical/crates/xml-minifier-macros)
+   Compiling zerofrom-derive v0.1.7
+   Compiling yoke-derive v0.8.2
+   Compiling flate2 v1.1.10
+   Compiling xml-minifier v0.1.0 (/var/tmp/litchi-xlsx-svg-phase-ac288-historical/crates/xml-minifier)
+   Compiling zerofrom v0.1.8
+   Compiling yoke v0.8.3
+   Compiling litchi-xldm v0.0.1 (/var/tmp/litchi-xlsx-svg-phase-ac288-historical/crates/litchi-xldm)
+   Compiling zerovec v0.11.8
+   Compiling zerotrie v0.2.5
+   Compiling soapberry-zip v0.0.1 (/var/tmp/litchi-xlsx-svg-phase-ac288-historical/crates/soapberry-zip)
+   Compiling tinystr v0.8.4
+   Compiling potential_utf v0.1.6
+   Compiling icu_collections v2.3.0
+   Compiling tempfile v3.27.0
+   Compiling icu_locale_core v2.3.0
+   Compiling chrono v0.4.45
+   Compiling icu_provider v2.3.1
+   Compiling icu_normalizer v2.3.0
+   Compiling icu_properties v2.3.0
+   Compiling idna_adapter v1.2.2
+   Compiling litchi-core v0.0.1 (/var/tmp/litchi-xlsx-svg-phase-ac288-historical/crates/litchi-core)
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling litchi-opc v0.0.1 (/var/tmp/litchi-xlsx-svg-phase-ac288-historical/crates/litchi-opc)
+   Compiling litchi-sheet v0.0.1 (/var/tmp/litchi-xlsx-svg-phase-ac288-historical/crates/litchi-sheet)
+   Compiling litchi-ooxml-common v0.0.1 (/var/tmp/litchi-xlsx-svg-phase-ac288-historical/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/var/tmp/litchi-xlsx-svg-phase-ac288-historical/crates/litchi-drawingml)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/var/tmp/litchi-xlsx-svg-phase-ac288-historical/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-xlsx v0.0.1 (/var/tmp/litchi-xlsx-svg-phase-ac288-historical/crates/litchi-xlsx)
+   Compiling litchi-xlsx-svg-lifecycle-profile v0.0.0 (/var/tmp/litchi-xlsx-svg-phase-ac288-historical/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness)
+warning: constant `LANES` is never used
+  --> adapter.rs:33:11
+   |
+33 | pub const LANES: &[&str] = &[
+   |           ^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `EXPLORATORY_LANES` is never used
+   --> adapter.rs:107:11
+    |
+107 | pub const EXPLORATORY_LANES: &[&str] = &[
+    |           ^^^^^^^^^^^^^^^^^
+
+warning: function `is_known_lane` is never used
+   --> adapter.rs:117:8
+    |
+117 | pub fn is_known_lane(lane: &str) -> bool {
+    |        ^^^^^^^^^^^^^
+
+warning: multiple fields are never read
+   --> adapter.rs:210:9
+    |
+202 | pub struct Fixture {
+    |            ------- fields in this struct
+...
+210 |     pub expected_success: bool,
+    |         ^^^^^^^^^^^^^^^^
+211 |     pub picture: usize,
+    |         ^^^^^^^
+212 |     pub strict: bool,
+    |         ^^^^^^
+213 |     pub incoming_svg_edge: bool,
+    |         ^^^^^^^^^^^^^^^^^
+...
+216 |     pub namespace_generated_bindings: Option<usize>,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+217 |     pub namespace_active_bindings: Option<usize>,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+218 |     pub namespace_active_limit: Option<usize>,
+    |         ^^^^^^^^^^^^^^^^^^^^^^
+219 |     pub multisheet: bool,
+    |         ^^^^^^^^^^
+220 |     pub caller_limit_profile: Option<&'static str>,
+    |         ^^^^^^^^^^^^^^^^^^^^
+221 |     pub caller_limit_ceilings: Option<Vec<CallerLimitCeiling>>,
+    |         ^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `Execution` is never constructed
+   --> adapter.rs:231:8
+    |
+231 | struct Execution {
+    |        ^^^^^^^^^
+
+warning: variants `CallerLimit`, `DuplicateOwner`, `MceAncestry`, `LinkedOwner`, and `MixedLimit` are never constructed
+   --> adapter.rs:240:5
+    |
+238 | enum RefusalKind {
+    |      ----------- variants in this enum
+239 |     NamespaceLimit,
+240 |     CallerLimit,
+    |     ^^^^^^^^^^^
+241 |     DuplicateOwner,
+    |     ^^^^^^^^^^^^^^
+242 |     MceAncestry,
+    |     ^^^^^^^^^^^
+243 |     LinkedOwner,
+    |     ^^^^^^^^^^^
+244 |     MixedLimit,
+    |     ^^^^^^^^^^
+    |
+    = note: `RefusalKind` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: method `as_str` is never used
+   --> adapter.rs:248:14
+    |
+247 | impl RefusalKind {
+    | ---------------- method in this implementation
+248 |     const fn as_str(self) -> &'static str {
+    |              ^^^^^^
+
+warning: struct `ExpectedRefusal` is never constructed
+   --> adapter.rs:261:8
+    |
+261 | struct ExpectedRefusal {
+    |        ^^^^^^^^^^^^^^^
+
+warning: enum `LaneExecution` is never used
+   --> adapter.rs:267:6
+    |
+267 | enum LaneExecution {
+    |      ^^^^^^^^^^^^^
+
+warning: struct `ErrorInfo` is never constructed
+   --> adapter.rs:273:8
+    |
+273 | struct ErrorInfo {
+    |        ^^^^^^^^^
+
+warning: enum `Outcome` is never used
+   --> adapter.rs:278:6
+    |
+278 | enum Outcome {
+    |      ^^^^^^^
+
+warning: function `checked_refusal` is never used
+    --> adapter.rs:1062:4
+     |
+1062 | fn checked_refusal(
+     |    ^^^^^^^^^^^^^^^
+
+warning: function `validate_malformed_owner_state` is never used
+    --> adapter.rs:1099:4
+     |
+1099 | fn validate_malformed_owner_state(fixture: &Fixture, kind: RefusalKind) -> Result<()> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_namespace_limit_refusal` is never used
+    --> adapter.rs:1120:4
+     |
+1120 | fn execute_namespace_limit_refusal(fixture: &Fixture) -> Result<LaneExecution> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_caller_limit_refusal` is never used
+    --> adapter.rs:1143:4
+     |
+1143 | fn execute_caller_limit_refusal(fixture: &Fixture) -> Result<LaneExecution> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `run` is never used
+    --> adapter.rs:1160:8
+     |
+1160 | pub fn run(lane: &str, warmup: usize, samples: usize) -> Result<String> {
+     |        ^^^
+
+warning: function `run_captured_owner_clone` is never used
+    --> adapter.rs:1219:4
+     |
+1219 | fn run_captured_owner_clone(
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_lane` is never used
+    --> adapter.rs:1292:4
+     |
+1292 | fn execute_lane(lane: &str, fixture: &Fixture) -> Result<LaneExecution> {
+     |    ^^^^^^^^^^^^
+
+warning: function `execute_capture` is never used
+    --> adapter.rs:1371:4
+     |
+1371 | fn execute_capture(lane: &str, fixture: &Fixture) -> Result<Execution> {
+     |    ^^^^^^^^^^^^^^^
+
+warning: function `execute_clone` is never used
+    --> adapter.rs:1422:4
+     |
+1422 | fn execute_clone(lane: &str, fixture: &Fixture) -> Result<Execution> {
+     |    ^^^^^^^^^^^^^
+
+warning: function `validate_captured_owner_clone` is never used
+    --> adapter.rs:1457:4
+     |
+1457 | fn validate_captured_owner_clone(
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_inventory` is never used
+    --> adapter.rs:1475:4
+     |
+1475 | fn execute_inventory(lane: &str, fixture: &Fixture) -> Result<Execution> {
+     |    ^^^^^^^^^^^^^^^^^
+
+warning: function `execute_inventory_root_namespace` is never used
+    --> adapter.rs:1522:4
+     |
+1522 | fn execute_inventory_root_namespace(fixture: &Fixture) -> Result<Execution> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_attach` is never used
+    --> adapter.rs:1584:4
+     |
+1584 | fn execute_attach(fixture: &Fixture) -> Result<Execution> {
+     |    ^^^^^^^^^^^^^^
+
+warning: function `execute_inverse` is never used
+    --> adapter.rs:1624:4
+     |
+1624 | fn execute_inverse(fixture: &Fixture) -> Result<Execution> {
+     |    ^^^^^^^^^^^^^^^
+
+warning: function `execute_detach` is never used
+    --> adapter.rs:1664:4
+     |
+1664 | fn execute_detach(lane: &str, fixture: &Fixture) -> Result<Execution> {
+     |    ^^^^^^^^^^^^^^
+
+warning: function `execute_same_picture_attach_detach` is never used
+    --> adapter.rs:1723:4
+     |
+1723 | fn execute_same_picture_attach_detach(fixture: &Fixture) -> Result<Execution> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_multisheet_attach_detach` is never used
+    --> adapter.rs:1787:4
+     |
+1787 | fn execute_multisheet_attach_detach(fixture: &Fixture) -> Result<Execution> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_expected_refusal` is never used
+    --> adapter.rs:1877:4
+     |
+1877 | fn execute_expected_refusal(fixture: &Fixture, kind: RefusalKind) -> Result<LaneExecution> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `read_limits_for_ceiling` is never used
+    --> adapter.rs:2014:4
+     |
+2014 | fn read_limits_for_ceiling(ceiling: CallerLimitCeiling) -> Result<ReadLimits> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_mixed_caps` is never used
+    --> adapter.rs:2037:4
+     |
+2037 | fn execute_mixed_caps(fixture: &Fixture) -> Result<LaneExecution> {
+     |    ^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_multi_picture_attach` is never used
+    --> adapter.rs:2079:4
+     |
+2079 | fn execute_multi_picture_attach(fixture: &Fixture) -> Result<Execution> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_multi_picture_detach` is never used
+    --> adapter.rs:2399:4
+     |
+2399 | fn execute_multi_picture_detach(fixture: &Fixture) -> Result<Execution> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `content_types_member` is never used
+    --> adapter.rs:2448:4
+     |
+2448 | fn content_types_member(bytes: &[u8]) -> Result<Vec<u8>> {
+     |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `source_anchors_match` is never used
+    --> adapter.rs:2452:4
+     |
+2452 | fn source_anchors_match(original: &SourceDrawing, candidate: &SourceDrawing) -> bool {
+     |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `validate_strict_host` is never used
+    --> adapter.rs:2531:4
+     |
+2531 | fn validate_strict_host(bytes: &[u8], expected_svg_parts: usize) -> Result<()> {
+     |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `validate_incoming_svg_edge` is never used
+    --> adapter.rs:2585:4
+     |
+2585 | fn validate_incoming_svg_edge(bytes: &[u8]) -> Result<()> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `validate_selected_drawing_svg_edge_removed` is never used
+    --> adapter.rs:2601:4
+     |
+2601 | fn validate_selected_drawing_svg_edge_removed(bytes: &[u8]) -> Result<()> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `svg_payload_matches` is never used
+    --> adapter.rs:2777:4
+     |
+2777 | fn svg_payload_matches(bytes: &[u8], expected: &[u8]) -> bool {
+     |    ^^^^^^^^^^^^^^^^^^^
+
+warning: function `has_svg_part` is never used
+    --> adapter.rs:2787:4
+     |
+2787 | fn has_svg_part(bytes: &[u8]) -> bool {
+     |    ^^^^^^^^^^^^
+
+warning: function `anchor_kind` is never used
+    --> adapter.rs:2802:4
+     |
+2802 | fn anchor_kind(anchor: &DrawingAnchor) -> &'static str {
+     |    ^^^^^^^^^^^
+
+warning: function `lane_anchor_kind` is never used
+    --> adapter.rs:2810:4
+     |
+2810 | fn lane_anchor_kind(lane: &str) -> Option<&'static str> {
+     |    ^^^^^^^^^^^^^^^^
+
+warning: function `sample_json` is never used
+    --> adapter.rs:2822:4
+     |
+2822 | fn sample_json(
+     |    ^^^^^^^^^^^
+
+warning: function `receipt_json` is never used
+    --> adapter.rs:2911:4
+     |
+2911 | fn receipt_json(lane: &str, fixture: &Fixture, warmup: usize, samples: &[String]) -> String {
+     |    ^^^^^^^^^^^^
+
+warning: `litchi-xlsx-svg-lifecycle-profile` (bin "xlsx-svg-lifecycle-phase-profile") generated 44 warnings
+    Finished `release` profile [optimized] target(s) in 36.83s

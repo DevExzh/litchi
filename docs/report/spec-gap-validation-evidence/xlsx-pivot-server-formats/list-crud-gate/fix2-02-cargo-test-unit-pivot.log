@@ -1,0 +1,19 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running unittests src/lib.rs (/var/tmp/xlsx-pivot-server-formats-gate.6rNu9B/cargo-target/debug/deps/litchi_xlsx-d7f16153dbbac40b)
+
+running 12 tests
+test pivot::server_formats::relationships::tests::archive_part_name_budget_excludes_packuri_root_slash ... ok
+test pivot::server_formats::relationships::tests::canonical_part_order_is_ascii_case_insensitive_and_stable ... ok
+test pivot::server_formats::relationships::tests::relationship_event_metrics_ignore_whitespace_text_like_ingress ... ok
+test pivot::server_formats::relationships::tests::graph_node_budget_accepts_exact_cap_and_rejects_one_over_before_mutation ... ok
+test pivot::server_formats::tests::worksheet_metadata_deduplicates_canonical_target_edges ... ok
+test pivot::server_formats::tests::ordered_list_refuses_removing_required_final_child ... ok
+test pivot::server_formats::tests::source_noop_is_empty ... ok
+test pivot::server_formats::tests::ordered_list_reorder_preserves_leaf_source_and_count_lexical_bytes ... ok
+test pivot::server_formats::tests::ordered_list_edits_update_count_and_round_trip_exactly ... ok
+test pivot::server_formats::tests::ordinary_workbook_structural_edit_uses_same_public_path ... ok
+test pivot::server_formats::tests::workbook_contextual_edit_returns_immutable_commit_and_patch ... ok
+test pivot::server_formats::tests::reads_and_edits_server_formats ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 1119 filtered out; finished in 0.01s
+

@@ -1,0 +1,13 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--release",
+    "--manifest-path",
+    "/var/tmp/ods-formula-baseline-21ad/docs/report/spec-gap-validation-evidence/ods-formula-functions/performance/harness/Cargo.toml"
+  ],
+  "cwd": "/var/tmp/ods-formula-baseline-21ad",
+  "CARGO_TARGET_DIR": "/var/tmp/ods-formula-baseline-target"
+}

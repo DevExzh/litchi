@@ -1,0 +1,14 @@
+{
+  "status": "verified-rejected-capture-retention",
+  "retention_commit": "55c10ad9ef9fe750a05182cc376b1fcd8132377e",
+  "verified_git_files": 126,
+  "verified_raw_files": 124,
+  "verified_raw_bytes": 4982051,
+  "binary_sha256": "83319e9ff652d6b15ae118303773b105392ba7e7c8fb4951bd7317614f70ab59",
+  "removed_after_git_byte_audit": [
+    "/var/tmp/pptx-ink-actions-3e9ef2d01-correctness.a2sTcr",
+    "/var/tmp/pptx-ink-actions-3e9ef2d01-target-parent.onUULP"
+  ],
+  "source_worktree_preserved": true,
+  "scenario_success_claim": false
+}

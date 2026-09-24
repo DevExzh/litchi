@@ -1,0 +1,12 @@
+{
+  "reviewer": "/root/ods_owner_review_resume",
+  "revision": "v9",
+  "verdict": "APPROVED",
+  "scope": [
+    "aggregate graph size validated before Graph::to_xml",
+    "complete candidate XML preflight for existing, self-closing, and missing owners",
+    "source-qualified content.xml ranges",
+    "owner/facade selectors, staging, signatures, graph closure, metadata"
+  ],
+  "source_manifest": "source.json"
+}

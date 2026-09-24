@@ -41,6 +41,22 @@ owns shared OOXML package vocabulary and services,
 host-neutral DrawingML, and [`litchi-opc`](../../crates/litchi-opc/Cargo.toml)
 owns physical OPC packaging.
 
+Spreadsheet Data Model storage is a separate shared branch owned by
+[`litchi-xldm`](../../crates/litchi-xldm/Cargo.toml):
+
+```text
+litchi-xldm
+├── litchi-xlsb
+└── litchi-xlsx
+```
+
+The XLDM crate is dependency-free within the workspace and owns the bounded,
+source-sharing storage, metadata, identity, and OLAP-proof layers. The XLSB
+and XLSX crates retain their format-specific package bindings and expose the
+shared owner only through their contextual data-model/package surfaces. Both
+edges are normal runtime dependencies; neither workbook crate reimplements or
+owns a second XLDM storage model.
+
 The root [`litchi` manifest](../../crates/litchi/Cargo.toml) retains the
 `ooxml` feature gate, but its public facade exposes the standalone owners
 directly as `litchi::{docx, pptx, xlsx, xlsb}` (alongside `opc` and
@@ -4655,3 +4671,42 @@ The existing Numbers package constructor still materializes its semantic
 cell projection. The host's archive-wide raw-ID merge compatibility reader
 and merge mutations remain migration debt; the new rooted API does not
 silently replace their broader selection contract.
+
+## 2026-09-11 amendment: shared XLDM topology registration
+
+The extracted [`litchi-xldm`](../../crates/litchi-xldm/Cargo.toml) crate is now
+registered as the neutral shared Spreadsheet Data Model owner. Its source
+surface owns bounded storage inspection and writing plus metadata, generated
+path, native, identity, and OLAP-closure projections while retaining borrowed
+source bytes. `litchi-xlsx` keeps its historical `package::xldm` facade and
+error mapping for API compatibility; `litchi-xlsb` uses the same owner for its
+data-model identity and closure proof. Package binding and workbook-specific
+transactions remain in those two concrete crates.
+
+The topology policy records exactly two normal XLDM edges,
+`litchi-xlsb -> litchi-xldm` and `litchi-xlsx -> litchi-xldm`; the shared owner
+has no workspace dependencies and no development-only edge. This keeps the
+storage model single-owner and prevents a format host from growing a private
+duplicate implementation.
+
+The current inventory is 65 workspace packages, 241 internal dependency
+declarations, 230 canonical edges, 12 development-only edges, 11 ordered
+migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
+migration host.
+
+## 2026-09-24 amendment: inventory after merging the spec-gap branch
+
+Merge record [0759](../performance/0759-spec-gap-branch-merge.md) joins
+`feat/spec-gap-implementation` (`a67a38abf2`) into
+`feat/office-format-completeness` (`e6cca92db2`). Each branch changed the policy
+independently from the common base (64 packages, 238 declarations): the
+performance branch added three normal edges (`litchi-docx -> xml-minifier`,
+`litchi-numbers-wire -> litchi-iwa-protos` and
+`litchi-pages -> litchi-numbers-wire`), and the spec-gap branch registered
+`litchi-xldm` with its two normal edges from the preceding amendment plus the
+development-only `litchi-xlsb -> soapberry-zip`. Both sets are kept, so the
+preceding amendment's counts describe the spec-gap branch alone. The merged
+tree's inventory is 65 workspace packages, 244 internal dependency
+declarations, 233 canonical edges, 12 development-only edges, 11 ordered
+migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
+migration host.

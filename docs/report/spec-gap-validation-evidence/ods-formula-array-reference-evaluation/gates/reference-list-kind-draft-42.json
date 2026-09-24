@@ -1,0 +1,19 @@
+{
+  "archive": "reference-list-kind-draft-42.tar.gz",
+  "sha256": "dd9c800cec038c97ff10429dd2e86838479d106a161a7cc5c69bdc61255095e1",
+  "description": "Draft ReferenceList kind fix passes original 62 tests; expanded list/array controls expose three nested planner mismatches. Initial invocation named nonexistent test target and ran no tests.",
+  "draft_sha256": "3b6df59430a392ba241afa85438185bba6d77811525b6b4b8527084e93d33c78",
+  "test_snapshot": "Contains four controls added after the passing 41 run; 42 ran this exact test snapshot.",
+  "results": {
+    "41_initial": 101,
+    "41_corrected": 0,
+    "42": 101
+  },
+  "files": {
+    "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "3b6df59430a392ba241afa85438185bba6d77811525b6b4b8527084e93d33c78",
+    "crates/litchi-ods/tests/ods_formula_array_reference_evaluation.rs": "827dddc91d3da01b452268494af9f084aa15f8ebfcb94ffbc930655320b3c167",
+    "list-kind-41.log": "70543aed60e3a06ce16a0dc37923e0cea93d5be99a20f9a6878d1e67401a404d",
+    "list-kind-41-corrected.log": "1bf82e76c36113b2275e695d732af243f40395ee7b01e6587cdb4d63712e182e",
+    "list-kind-42.log": "0b86df9bd83d67d7664e7e1a6a272a54dda2d24868fb69f05b58e139a2e43782"
+  }
+}

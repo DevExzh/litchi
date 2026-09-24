@@ -1,0 +1,15 @@
+{
+  "measured_source": "cf98bee37455e8e6d0e73002ff2e94299ef546cb",
+  "publication_preparation_base": "cf4f383c4c203381880d4c2e8445d2616a53d283",
+  "inner_sealed_files": 103,
+  "archive_regular_files": 104,
+  "inner_receipt_sha256": "009e0697f3c7a7c27654af82af12828f5b596c2d34535f530e4f1778cbe3e6a8",
+  "archive_sha256": "2d220a1a81d1a76e1e9e9e80fb30984a1bc1ead6ee412191a4ec2ad9d6f53006",
+  "root_verifier_exit_code": 0,
+  "root_verifier_log_sha256": "22b5be95dcefc0cce20bd09416639f27198b91b66b6c7a19bfaa6ded22aad454",
+  "root_command": "taskset -c 8-31 env PYTHONDONTWRITEBYTECODE=1 TMPDIR=/var/tmp/litchi-spec-gap-gate-tmp python3 scripts/verify.py --binary /var/tmp/litchi-current-head-scaling-paired-v2-20260910/litchi-perf-baseline",
+  "independent_review": "opc_capture_review cleared revised fresh-validator implementation and exact bundle; tested with and without external binary from temporary copy",
+  "binary_embedded": false,
+  "root_verifier_log_path": "root-verifier.log.gz",
+  "root_verifier_log_sha256_scope": "uncompressed bytes"
+}

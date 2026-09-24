@@ -1,0 +1,1 @@
+{"command": ["cargo", "clippy", "--locked", "-p", "litchi-ods", "-p", "litchi-odt", "-p", "litchi-odf-common", "--all-targets", "--offline", "--", "-D", "warnings"], "exit_code": 0}

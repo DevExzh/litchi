@@ -21,7 +21,7 @@ pub use transaction::{
     Commit, CompactionPolicy, Composition, CompositionLimits, Diagnostics, Edit, History,
     HistoryLimits, HyperlinkTextReplacement, JoinError, MergeChoice, Operation,
     ParagraphHyperlinkAddress, ParagraphTextReplacement, ParagraphTransfer, Patch, PreparedEdit,
-    Refusal, RevisionKind, Snapshot, SubEditConflict, SubEditJoinFailure, TableCellAddress,
-    ThreeWayError, ThreeWayMergeFailure, ThreeWayPlan, TransactionError, TransactionResult,
-    TransferGraph, TransferRefusal,
+    Refusal, RevisionAction, RevisionKind, RevisionSelector, Snapshot, SubEditConflict,
+    SubEditJoinFailure, TableCellAddress, ThreeWayError, ThreeWayMergeFailure, ThreeWayPlan,
+    TransactionError, TransactionResult, TransferGraph, TransferRefusal,
 };

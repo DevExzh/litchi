@@ -143,6 +143,12 @@ struct DirectoryEntryBuilder {
     sid_child: u32,
     /// CLSID (Class ID) - 16 bytes, optional
     clsid: Option<[u8; 16]>,
+    /// User-defined state bits.
+    state_bits: u32,
+    /// Exact Windows FILETIME creation value.
+    creation_time: u64,
+    /// Exact Windows FILETIME modification value.
+    modified_time: u64,
     name_utf16: SmallVec<[u16; 32]>,
     comparison_name: SmallVec<[u16; 32]>,
     node_color: NodeColor,
@@ -167,6 +173,9 @@ impl DirectoryEntryBuilder {
             sid_right: NOSTREAM,
             sid_child: NOSTREAM,
             clsid: None,
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
             name_utf16,
             comparison_name,
             node_color: NodeColor::Black,
@@ -206,6 +215,9 @@ impl DirectoryEntryBuilder {
             sid_right: NOSTREAM,
             sid_child: NOSTREAM,
             clsid: None,
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
             name_utf16,
             comparison_name,
             node_color: NodeColor::Black,
@@ -224,6 +236,9 @@ impl DirectoryEntryBuilder {
             sid_right: NOSTREAM,
             sid_child: NOSTREAM,
             clsid: None,
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
             name_utf16,
             comparison_name,
             node_color: NodeColor::Black,
@@ -269,11 +284,9 @@ impl DirectoryEntryBuilder {
         }
         // Otherwise data[80..96] remains zeros
 
-        // State bits (all zeros)
-        // data[96..100] already zeros
-
-        // Creation and modification times (all zeros for now)
-        // data[100..116] already zeros
+        data[96..100].copy_from_slice(&self.state_bits.to_le_bytes());
+        data[100..108].copy_from_slice(&self.creation_time.to_le_bytes());
+        data[108..116].copy_from_slice(&self.modified_time.to_le_bytes());
 
         // Starting sector
         data[116..120].copy_from_slice(&self.start_sector.to_le_bytes());
@@ -355,6 +368,38 @@ impl DirectoryBuilder {
         }
     }
 
+    /// Set the root storage state bits.
+    pub(crate) fn set_root_state_bits(&mut self, state_bits: u32) {
+        if let Some(root) = self.entries.first_mut() {
+            root.state_bits = state_bits;
+        }
+    }
+
+    /// Set the fresh root storage creation time, which must be zero.
+    pub(crate) fn set_root_creation_time(&mut self, creation_time: u64) -> Result<(), OleError> {
+        if creation_time != 0 {
+            return Err(OleError::InvalidData(
+                "CFB fresh root creation time must be zero".to_string(),
+            ));
+        }
+        self.set_root_creation_time_from_source(0);
+        Ok(())
+    }
+
+    /// Set the root storage creation time exactly as supplied by a source.
+    pub(crate) fn set_root_creation_time_from_source(&mut self, creation_time: u64) {
+        if let Some(root) = self.entries.first_mut() {
+            root.creation_time = creation_time;
+        }
+    }
+
+    /// Set the root storage modification time.
+    pub(crate) fn set_root_modified_time(&mut self, modified_time: u64) {
+        if let Some(root) = self.entries.first_mut() {
+            root.modified_time = modified_time;
+        }
+    }
+
     /// Set the CLSID for an existing storage path.
     pub(crate) fn set_storage_clsid(
         &mut self,
@@ -365,6 +410,55 @@ impl DirectoryBuilder {
             OleError::InvalidData(format!("CFB storage path {path:?} does not exist"))
         })?;
         self.entries[sid as usize].set_clsid(clsid);
+        Ok(())
+    }
+
+    /// Set the raw state and FILETIME fields for an existing storage.
+    pub(crate) fn set_storage_metadata(
+        &mut self,
+        path: &[String],
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let sid = self.path_to_sid.get(path).copied().ok_or_else(|| {
+            OleError::InvalidData(format!("CFB storage path {path:?} does not exist"))
+        })?;
+        let entry = self.entries.get_mut(sid as usize).ok_or_else(|| {
+            OleError::InvalidData("CFB storage metadata SID is out of range".to_string())
+        })?;
+        if entry.entry_type != STGTY_STORAGE {
+            return Err(OleError::InvalidData(
+                "CFB directory metadata target is not a storage".to_string(),
+            ));
+        }
+        entry.state_bits = state_bits;
+        entry.creation_time = creation_time;
+        entry.modified_time = modified_time;
+        Ok(())
+    }
+
+    /// Set the raw state and FILETIME fields for an entry just added as a
+    /// stream. The SID returned by [`Self::add_stream_path`] avoids retaining
+    /// a cloned full stream path in the storage-only path index.
+    pub(crate) fn set_stream_metadata_sid(
+        &mut self,
+        sid: u32,
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let entry = self.entries.get_mut(sid as usize).ok_or_else(|| {
+            OleError::InvalidData("CFB stream metadata SID is out of range".to_string())
+        })?;
+        if entry.entry_type != STGTY_STREAM {
+            return Err(OleError::InvalidData(
+                "CFB directory metadata target is not a stream".to_string(),
+            ));
+        }
+        entry.state_bits = state_bits;
+        entry.creation_time = creation_time;
+        entry.modified_time = modified_time;
         Ok(())
     }
 

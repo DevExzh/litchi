@@ -1,0 +1,18 @@
+{
+  "candidate_only_note": "Candidate-only dispersion rows have no before/after baseline and are reported as absolute profile measurements.",
+  "flag_count": 0,
+  "flags": [],
+  "metrics": [
+    "time_ns_per_repeat",
+    "allocator_calls",
+    "requested_bytes",
+    "released_bytes",
+    "peak_live_bytes",
+    "result_live_budget",
+    "work_per_repeat",
+    "reference_reads",
+    "rss_kib"
+  ],
+  "scope": "matched controls; p50 metrics in performance-report.json",
+  "threshold_percent": 5.0
+}

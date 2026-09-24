@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "9aa761f071b37edfbb898664338e2819c81e728d",
+  "toolchain": "1.95.0",
+  "source_files": {
+    "crates/litchi-xlsx/src/package/xldm/codec.rs": "911227d46b9f4f687f9273e44e1eab1d77d187c4dc95b2ef2ba8120950feeee2",
+    "crates/litchi-xlsx/src/package/xldm/compression.rs": "d70f54ab8f83190120a4012c9df0f2fa39ba2287d497b06eba781693f096a387",
+    "crates/litchi-xlsx/src/package/xldm/generated.rs": "970e8634eda90e74db63fad0153442066ffb46f1ad4dfb736dac6be0cbae99ba",
+    "crates/litchi-xlsx/src/package/xldm/metadata/codec.rs": "7bbfe614e28db15ad4640771891ceb165f6d4972c3e5e96b73c8afbe83e8aa8a",
+    "crates/litchi-xlsx/src/package/xldm/mod.rs": "d19580f4a093a2064e5a9543829d2a3394d6cbcb591dc8d0d0ff1ec96a9332bc",
+    "crates/litchi-xlsx/src/package/xldm/model.rs": "dfb092adda9327ff25ab53e7fa06ba9db39acc14adab2aa6a9a2b41f14625630",
+    "crates/litchi-xlsx/src/package/xldm/native.rs": "e95deeaad8d09dfae95201d0a1cc159e575bede8ff4733ddf405ac261224ae07",
+    "crates/litchi-xlsx/src/package/xldm/olap.rs": "022532640d71bcb0ac02462b49d93cc511fe7a4981fcde5464d0c882bac8a740",
+    "crates/litchi-xlsx/src/package/xldm/semantic.rs": "7dcc83f633c0abb8f129af68acbfa35ce86667bcf1a0121c668b3928765f4adb",
+    "crates/litchi-xlsx/src/package/xldm/tests.rs": "c9e8204b9373dee0db6a781770ab66c22a16e199af45157b375f003e24bb36cd",
+    "crates/litchi-xlsx/src/package/xldm/validation.rs": "2790407f8d480a1fd58cc98bdb4579382c49bf32d44d0fb804c2865d83f0f502",
+    "crates/litchi-xlsx/src/package/xldm/tabular_paths.rs": "a54233efad8b34cba55e9c21c85dea311bbd3c20debb9e6a2c39aaf1075a1244",
+    "crates/litchi-xlsx/src/package/xldm/compression/xpress_stream.rs": "28a17e3b085d0a44a62171070e62002fe13651ebd1a9d8c6f822fb3caad2e4b4",
+    "crates/litchi-xlsx/tests/xldm_native_storage.rs": "c39f42a3118697dbe59778fc18946903567f9fcd8b7fdd7a1e8ef7ab426e80e7",
+    "crates/litchi-xlsx/tests/data/data_model/tdf167689_x15_namespace.xlsx": "b9064db5694c5e60928a7b6732aabf440c7d2f997d907834e38f927342ec8688",
+    "crates/litchi-xlsx/tests/data/data_model/README.md": "09e64c1f18b35bba8061992321b0fb4105da70fc70f1d420bb71fff05480b869",
+    "crates/litchi-xlsx/tests/data/data_model/COPYING": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+    "crates/litchi-xlsx/tests/data/data_model/COPYING.LGPL": "a853c2ffec17057872340eee242ae4d96cbf2b520ae27d903e1b2fef1a5f9d1c",
+    "crates/litchi-xlsx/tests/data/data_model/COPYING.MPL": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
+    "crates/litchi-xlsx/tests/data/data_model/native_tabular_members.py": "a82e5746ecc223c9ca1df644c9bafce248e7a5b23bc7af283c3fc57f4c90d3e1"
+  },
+  "scope": "Borrowed exact XLDM outer storage; canonical version 140 plus fixture-backed Tabular150 profile; allocation ranges and CRC validation; bounded explicitly selected WUSP32/Tabular16 XPRESS framing. No model evaluation or semantic authoring claim. XML encoded size and UTF-16 decoded expansion are checked before retained allocation; no intermediate UTF-16 word vector.",
+  "commands": [
+    {
+      "command": "cargo +1.95.0 test --offline --locked -p litchi-xlsx --all-features",
+      "exit_code": 0,
+      "log": "tests.log.gz",
+      "tests_passed": 1268,
+      "doctests_passed": 2
+    },
+    {
+      "command": "cargo +1.95.0 clippy --offline --locked -p litchi-xlsx --all-targets --all-features -- -D warnings",
+      "exit_code": 0,
+      "log": "clippy.log.gz"
+    },
+    {
+      "command": "python3 crates/litchi-xlsx/tests/data/data_model/native_tabular_members.py",
+      "exit_code": 0,
+      "output": "native-inventory.json"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 --config skip_children=true (changed Rust files)",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --cached --check -- . :(exclude)crates/litchi-xlsx/tests/data/data_model/COPYING.LGPL",
+      "exit_code": 0
+    }
+  ],
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "d7c2b7f2f6fd116e4d7e44bdf99c4e96ca7ae65e1878106082af4eca1945a8c4",
+      "uncompressed_sha256": "d271cb6070538e5f33a4ccaa1efa1701d2aae17b35d88828495680d300ff77b0"
+    },
+    "clippy.log.gz": {
+      "sha256": "309009921a54e6203e293b30870c5647a5e3b24d8680bfcb63bc05cac88e4d3d",
+      "uncompressed_sha256": "bd35252276d59febb1a799a2b5fbc021f13836e8b2537b5da57b4b27a14ddfc5"
+    }
+  },
+  "native_inventory": {
+    "path": "native-inventory.json",
+    "sha256": "b7ef226a165806e07901674658d69e4217b065db50523f54f05d0b1c1de0924c",
+    "allocations_crc_checked": 48,
+    "members_decoded_by_rust_test": 46,
+    "xpress_frames": 78,
+    "compressed_frames": 75,
+    "raw_frames": 3
+  },
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  },
+  "license_whitespace": "COPYING.LGPL is retained verbatim, including two trailing spaces in the upstream license text; excluded from the whitespace-only check."
+}

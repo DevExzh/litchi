@@ -1,0 +1,27 @@
+{
+  "scope": "OPC noncanonical relationship removal prerequisite; not approval of the in-progress PPTX SVG lifecycle",
+  "reviewer": "svg_opc_removal_review",
+  "verdict": "APPROVED",
+  "source_sha256": {
+    "crates/litchi-opc/src/source_backed.rs": "336cf6e4486790d00cb874470a3f614e9003dea16f2a2197e001dc1988a42358",
+    "crates/litchi-opc/src/xml_splice.rs": "2a7aaaeae776c87033db6aff18786ce55c349ae527df30860e03d45cb235c7e8"
+  },
+  "root_validation": {
+    "command": "cargo test --locked -p litchi-opc --lib topology_noncanonical_relationship -- --nocapture",
+    "passed": 9,
+    "failed": 0,
+    "log": "opc-focused.log",
+    "log_sha256": "f04e7592af26a62fbf5adcb9d6951d3068f6dac88499074c8bba3236905b13ae"
+  },
+  "author_reported_validation": [
+    "OPC library: 387 passed",
+    "cargo check --locked -p litchi-opc --lib passed",
+    "clippy all targets/all features -D warnings passed"
+  ],
+  "limitations": [
+    "Noncanonical sources permit append-only or removal-only edits; mixed/replacement edits require canonical source.",
+    "Encoded namespace declaration URI values are refused by this bounded lexical profile.",
+    "Empty relationship members retain their source wrappers and opaque context.",
+    "No final PPTX lifecycle or performance approval is implied."
+  ]
+}

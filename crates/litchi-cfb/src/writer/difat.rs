@@ -11,7 +11,7 @@
 //! - For 512-byte sectors: 127 FAT sector IDs + 1 next pointer (128 * 4 = 512)
 //! - For 4096-byte sectors: 1023 FAT sector IDs + 1 next pointer (1024 * 4 = 4096)
 
-use super::super::consts::{ENDOFCHAIN, MAXREGSECT};
+use super::super::consts::{ENDOFCHAIN, MAXREGSECT, RANGE_LOCK_SECTOR_V4, SECTOR_SIZE_V4};
 use super::super::file::OleError;
 
 /// DIFAT builder for large file support
@@ -120,7 +120,7 @@ impl DifatBuilder {
 
         let ids_per_difat_sector = (self.sector_size / 4) - 1;
         let num_difat_sectors = self.calculate_difat_sector_count()?;
-        checked_sector_end(first_difat_sector, num_difat_sectors)?;
+        checked_sector_end(first_difat_sector, num_difat_sectors, self.sector_size)?;
         let count = usize::try_from(num_difat_sectors).map_err(|_err| {
             OleError::InvalidData("DIFAT sector count does not fit usize".to_string())
         })?;
@@ -144,9 +144,7 @@ impl DifatBuilder {
                 let next_offset = u32::try_from(difat_idx + 1).map_err(|_err| {
                     OleError::InvalidData("DIFAT sector offset exceeds u32".to_string())
                 })?;
-                first_difat_sector.checked_add(next_offset).ok_or_else(|| {
-                    OleError::InvalidData("DIFAT sector index overflows u32".to_string())
-                })?
+                allocated_sector_at(first_difat_sector, next_offset, self.sector_size)?
             } else {
                 ENDOFCHAIN
             };
@@ -165,16 +163,41 @@ impl DifatBuilder {
     }
 }
 
-fn checked_sector_end(start: u32, count: u32) -> Result<u32, OleError> {
+fn checked_sector_end(start: u32, count: u32, sector_size: usize) -> Result<u32, OleError> {
     let end = start
         .checked_add(count)
         .ok_or_else(|| OleError::InvalidData("DIFAT sector count overflows u32".to_string()))?;
-    if end > MAXREGSECT {
+    let physical_end = if sector_size == SECTOR_SIZE_V4
+        && start <= RANGE_LOCK_SECTOR_V4
+        && RANGE_LOCK_SECTOR_V4 < end
+    {
+        end.checked_add(1).ok_or_else(|| {
+            OleError::InvalidData("DIFAT range-lock sector overflows u32".to_string())
+        })?
+    } else {
+        end
+    };
+    if physical_end > MAXREGSECT {
         return Err(OleError::InvalidData(
             "DIFAT sector count exceeds MAXREGSECT".to_string(),
         ));
     }
     Ok(end)
+}
+
+fn allocated_sector_at(start: u32, index: u32, sector_size: usize) -> Result<u32, OleError> {
+    let mut sector = start
+        .checked_add(index)
+        .ok_or_else(|| OleError::InvalidData("DIFAT sector index overflows u32".to_string()))?;
+    if sector_size == SECTOR_SIZE_V4
+        && start <= RANGE_LOCK_SECTOR_V4
+        && sector >= RANGE_LOCK_SECTOR_V4
+    {
+        sector = sector.checked_add(1).ok_or_else(|| {
+            OleError::InvalidData("DIFAT range-lock sector overflows u32".to_string())
+        })?;
+    }
+    Ok(sector)
 }
 
 fn filled_sector(size: usize) -> Result<Vec<u8>, OleError> {
@@ -287,8 +310,11 @@ mod tests {
 
     #[test]
     fn difat_sector_range_is_checked_without_allocation() {
-        assert_eq!(checked_sector_end(MAXREGSECT - 1, 1).unwrap(), MAXREGSECT);
-        assert!(checked_sector_end(MAXREGSECT, 1).is_err());
+        assert_eq!(
+            checked_sector_end(MAXREGSECT - 1, 1, 512).unwrap(),
+            MAXREGSECT
+        );
+        assert!(checked_sector_end(MAXREGSECT, 1, 512).is_err());
     }
 
     #[test]

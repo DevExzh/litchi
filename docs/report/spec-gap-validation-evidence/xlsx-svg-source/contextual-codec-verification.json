@@ -1,0 +1,58 @@
+{
+  "scope": "Shared contextual SvgBlip prerequisite; host integration and performance acceptance excluded",
+  "base_commit": "4050647096bd9965af09af249523c6e74e8306b4",
+  "source_sha256": {
+    "crates/litchi-drawingml/src/svg_blip.rs": "e8a1e480d249b834f286e0deec083f8044257faf3b95905fb5b771e83f71605a",
+    "crates/litchi-drawingml/tests/svg_blip.rs": "53c9b12d2bd1ba04421ee0d0134b2a0bded1eac756905ec65529a410a7ceb94a"
+  },
+  "independent_review": {
+    "agent": "/root/svg_namespace_review",
+    "verdict": "approved",
+    "verified": [
+      "descendant namespace validation",
+      "unprefixed attributes exclude default namespace",
+      "local relationship-prefix shadowing",
+      "empty named-prefix rejection",
+      "context depth and binding bounds",
+      "export declaration and output preflight limits"
+    ]
+  },
+  "root_gates": [
+    {
+      "command": "cargo test --locked --offline -p litchi-drawingml --test svg_blip",
+      "result": "17 passed"
+    },
+    {
+      "command": "cargo test --locked --offline -p litchi-drawingml --tests -p litchi-pptx --test source_backed_svg_lifecycle",
+      "result": "exit 0; DrawingML and PPTX library and integration targets passed"
+    },
+    {
+      "command": "rustfmt --edition 2024 --check crates/litchi-drawingml/src/svg_blip.rs crates/litchi-drawingml/tests/svg_blip.rs",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check -- crates/litchi-drawingml/src/svg_blip.rs crates/litchi-drawingml/tests/svg_blip.rs",
+      "result": "passed"
+    }
+  ],
+  "reviewer_gates": [
+    {
+      "command": "cargo test --locked -p litchi-drawingml",
+      "result": "passed"
+    },
+    {
+      "command": "cargo clippy --locked -p litchi-drawingml --all-targets -- -D warnings",
+      "result": "passed"
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed"
+    }
+  ],
+  "remaining": [
+    "Integrate persistent contexts into host scanners without per-owner scope flattening",
+    "Profile independent picture-count and namespace-size growth using retained baseline",
+    "Run integrated source preservation and lifecycle final gates"
+  ],
+  "performance_claim": null
+}

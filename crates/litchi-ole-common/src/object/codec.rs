@@ -19,6 +19,7 @@ use std::sync::Arc;
 pub(crate) struct Package {
     sector_size: usize,
     root_clsid: Option<Guid>,
+    root_directory: Option<directory::Metadata>,
     storages: Vec<Storage>,
     streams: Vec<Stream>,
 }
@@ -28,17 +29,53 @@ impl Package {
         ole: &mut OleFile<R>,
         limits: Limits,
     ) -> Result<Self, OleError> {
+        Self::capture_with_budget(
+            ole,
+            limits,
+            limits.max_package_storages(),
+            limits.max_streams,
+            limits.max_total_size,
+            true,
+        )
+    }
+
+    /// Captures a standalone replacement/object compound file.  The file is
+    /// one selected object, so its storage ceiling is the per-object depth
+    /// limit rather than the aggregate package product.
+    pub(crate) fn capture_object<R: Read + Seek>(
+        ole: &mut OleFile<R>,
+        limits: Limits,
+    ) -> Result<Self, OleError> {
+        Self::capture_with_budget(
+            ole,
+            limits,
+            limits.max_object_storages(),
+            limits.max_object_streams(),
+            limits.max_object_size,
+            false,
+        )
+    }
+
+    fn capture_with_budget<R: Read + Seek>(
+        ole: &mut OleFile<R>,
+        limits: Limits,
+        max_storages: usize,
+        max_streams: usize,
+        max_bytes: u64,
+        retain_root: bool,
+    ) -> Result<Self, OleError> {
+        let root_directory = ole.root_entry().map(directory::decode).transpose()?;
         let mut package = Self {
             sector_size: ole.sector_size(),
-            root_clsid: ole
-                .root_entry()
-                .map(directory::decode)
-                .transpose()?
-                .and_then(directory::Metadata::class_id),
+            root_clsid: root_directory.and_then(directory::Metadata::class_id),
+            root_directory,
             storages: Vec::new(),
             streams: Vec::new(),
         };
-        let mut budget = Budget::new(limits.max_streams, limits.max_total_size);
+        if !retain_root {
+            package.root_directory = None;
+        }
+        let mut budget = Budget::new(max_storages, max_streams, max_bytes);
         capture_container(ole, &[], &mut package, &mut budget, limits)?;
         Ok(package)
     }
@@ -53,15 +90,28 @@ impl Package {
                 "object target path exceeds storage depth limit".into(),
             ));
         }
-        let resolved_target = target.resolve(ole)?;
-        let storage = find_storage(ole, resolved_target.path())?;
+        let resolved_target = target.resolve(ole, limits.max_package_directory_entries())?;
+        let storage = find_storage(
+            ole,
+            resolved_target.path(),
+            limits.max_package_directory_entries(),
+        )?;
         let mut package = Self {
             sector_size: ole.sector_size(),
             root_clsid: storage.class_id(),
+            // A selected storage is promoted into a standalone compound
+            // file.  Its directory metadata remains attached to the
+            // selected Object, but it is not the standalone file's root
+            // directory metadata.
+            root_directory: None,
             storages: Vec::new(),
             streams: Vec::new(),
         };
-        let mut budget = Budget::new(limits.max_streams_per_object, limits.max_object_size);
+        let mut budget = Budget::new(
+            limits.max_object_storages(),
+            limits.max_object_streams(),
+            limits.max_object_size,
+        );
         capture_subtree(
             ole,
             resolved_target.path(),
@@ -85,6 +135,10 @@ impl Package {
         let object_package = Self {
             sector_size: self.sector_size,
             root_clsid: storage.class_id(),
+            // The selected storage is promoted to a fresh standalone root.
+            // Keep the source storage metadata on `Object::storage()` rather
+            // than projecting storage-only fields onto the new root.
+            root_directory: None,
             storages: self
                 .storages
                 .iter()
@@ -357,33 +411,109 @@ impl Package {
         replacement: &Self,
         limits: Limits,
     ) -> Result<(), OleError> {
-        let root = self
+        limits.validate()?;
+        let root_index = self
             .storages
-            .iter_mut()
-            .find(|storage| storage.path() == path)
+            .iter()
+            .position(|storage| storage.path() == path)
             .ok_or_else(|| OleError::InvalidFormat(format!("object storage {path:?} not found")))?;
-        let root_directory = root.directory().with_class_id(replacement.root_clsid);
-        *root = Storage::new(path.to_vec(), root_directory);
+        let removed_storages = self
+            .storages
+            .iter()
+            .filter(|storage| storage.path() != path && storage.path().starts_with(path))
+            .count();
+        let storage_count = self
+            .storages
+            .len()
+            .checked_sub(removed_storages)
+            .and_then(|count| count.checked_add(replacement.storages.len()))
+            .ok_or_else(|| OleError::InvalidFormat("CFB storage count overflow".into()))?;
+        let removed_bytes = stream_bytes_total(
+            self.streams
+                .iter()
+                .filter(|stream| stream.path().starts_with(path)),
+        )?;
+        let current_bytes = stream_bytes_total(self.streams.iter())?;
+        let replacement_bytes = stream_bytes_total(replacement.streams.iter())?;
+        let total_bytes = current_bytes
+            .checked_sub(removed_bytes)
+            .and_then(|value| value.checked_add(replacement_bytes))
+            .ok_or_else(|| OleError::InvalidFormat("CFB capture size overflow".into()))?;
+        let stream_count = self
+            .streams
+            .len()
+            .checked_sub(
+                self.streams
+                    .iter()
+                    .filter(|stream| stream.path().starts_with(path))
+                    .count(),
+            )
+            .and_then(|count| count.checked_add(replacement.streams.len()))
+            .ok_or_else(|| OleError::InvalidFormat("CFB stream count overflow".into()))?;
+        check_counts(limits, storage_count, stream_count, total_bytes)?;
+
+        // Build every replacement path before changing the current package.
+        // This keeps path and vector allocation failures outside the mutation
+        // window, while the count/byte preflight above keeps limit failures
+        // atomic as well.
+        let root_directory = self.storages[root_index]
+            .directory()
+            .with_class_id(replacement.root_clsid);
+        let replacement_root = Storage::new(clone_path(path)?, root_directory);
+        let mut replacement_storages = Vec::new();
+        replacement_storages
+            .try_reserve_exact(replacement.storages.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "CFB replacement storages",
+                source,
+            })?;
+        for storage in &replacement.storages {
+            replacement_storages.push(Storage::new(
+                join_checked(path, storage.path())?,
+                *storage.directory(),
+            ));
+        }
+        let mut replacement_streams = Vec::new();
+        replacement_streams
+            .try_reserve_exact(replacement.streams.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "CFB replacement streams",
+                source,
+            })?;
+        for stream in &replacement.streams {
+            replacement_streams.push(Stream::new(
+                join_checked(path, stream.path())?,
+                stream.bytes_shared(),
+                stream.directory().copied(),
+            ));
+        }
+        self.storages
+            .try_reserve_exact(replacement_storages.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "CFB replacement storage capacity",
+                source,
+            })?;
+        self.streams
+            .try_reserve_exact(replacement_streams.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "CFB replacement stream capacity",
+                source,
+            })?;
+
+        // Replacing an object changes its class identity intentionally, while
+        // the existing target storage remains the same directory object in
+        // the containing file.  Preserve its state and timestamps by default;
+        // replacement root metadata belongs to the standalone source file.
+        self.storages[root_index] = replacement_root;
         self.storages.retain(|storage| {
             storage.path() == path
                 || !(storage.path().len() > path.len() && storage.path().starts_with(path))
         });
         self.streams
             .retain(|stream| !stream.path().starts_with(path));
-        for storage in &replacement.storages {
-            self.storages.push(Storage::new(
-                join(path, storage.path()),
-                *storage.directory(),
-            ));
-        }
-        for stream in &replacement.streams {
-            self.streams.push(Stream::new(
-                join(path, stream.path()),
-                stream.bytes_shared(),
-                stream.directory().copied(),
-            ));
-        }
-        self.check(limits)
+        self.storages.extend(replacement_storages);
+        self.streams.extend(replacement_streams);
+        Ok(())
     }
 
     pub(crate) fn add_object(
@@ -392,6 +522,7 @@ impl Package {
         replacement: &Self,
         limits: Limits,
     ) -> Result<(), OleError> {
+        limits.validate()?;
         if self
             .storages
             .iter()
@@ -412,24 +543,69 @@ impl Package {
                 "new object storage parent is missing".into(),
             ));
         }
-        self.storages.push(Storage::new(
-            target.path().to_vec(),
-            directory::Metadata::staged_storage(replacement.root_clsid),
-        ));
+        let storage_count = self
+            .storages
+            .len()
+            .checked_add(1)
+            .and_then(|count| count.checked_add(replacement.storages.len()))
+            .ok_or_else(|| OleError::InvalidFormat("CFB storage count overflow".into()))?;
+        let stream_count = self
+            .streams
+            .len()
+            .checked_add(replacement.streams.len())
+            .ok_or_else(|| OleError::InvalidFormat("CFB stream count overflow".into()))?;
+        let total_bytes = stream_bytes_total(self.streams.iter())?
+            .checked_add(stream_bytes_total(replacement.streams.iter())?)
+            .ok_or_else(|| OleError::InvalidFormat("CFB capture size overflow".into()))?;
+        check_counts(limits, storage_count, stream_count, total_bytes)?;
+
+        let root_directory = directory::Metadata::staged_storage(replacement.root_clsid);
+        // A newly added target is a fresh storage in the containing file.
+        // Use normative storage defaults; source root state/times are not
+        // meaningful storage metadata.
+        let mut added_storages = Vec::new();
+        added_storages
+            .try_reserve_exact(replacement.storages.len().saturating_add(1))
+            .map_err(|source| OleError::Allocation {
+                resource: "CFB added storages",
+                source,
+            })?;
+        added_storages.push(Storage::new(clone_path(target.path())?, root_directory));
         for storage in &replacement.storages {
-            self.storages.push(Storage::new(
-                join(target.path(), storage.path()),
+            added_storages.push(Storage::new(
+                join_checked(target.path(), storage.path())?,
                 *storage.directory(),
             ));
         }
+        let mut added_streams = Vec::new();
+        added_streams
+            .try_reserve_exact(replacement.streams.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "CFB added streams",
+                source,
+            })?;
         for stream in &replacement.streams {
-            self.streams.push(Stream::new(
-                join(target.path(), stream.path()),
+            added_streams.push(Stream::new(
+                join_checked(target.path(), stream.path())?,
                 stream.bytes_shared(),
                 stream.directory().copied(),
             ));
         }
-        self.check(limits)
+        self.storages
+            .try_reserve_exact(added_storages.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "CFB added storage capacity",
+                source,
+            })?;
+        self.streams
+            .try_reserve_exact(added_streams.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "CFB added stream capacity",
+                source,
+            })?;
+        self.storages.extend(added_storages);
+        self.streams.extend(added_streams);
+        Ok(())
     }
 
     pub(crate) fn remove_object(
@@ -474,6 +650,25 @@ impl Package {
         // otherwise the source-layout planner would preserve the old bytes and
         // make a directory transaction that removed a CLSID ineffective.
         writer.set_root_clsid(self.root_clsid.map_or([0; 16], |clsid| *clsid.as_bytes()));
+        if let Some(root) = self
+            .root_directory
+            .filter(|root| root.kind() == EntryKind::Root)
+        {
+            // Only a captured SID-zero root may project its raw directory
+            // fields onto the rendered root.  Promoted nested storages use
+            // the writer's normative fresh-root defaults.
+            writer.set_root_state_bits(root.state_bits());
+            writer.set_root_modified_time(root.modified_time());
+            writer.set_root_creation_time_from_source(root.creation_time());
+        } else {
+            // Supply the fresh-root defaults explicitly as well. The package's
+            // directory metadata is then authoritative for every entry, so a
+            // reused source layout can never publish source state or
+            // timestamps that this package does not hold.
+            writer.set_root_state_bits(0);
+            writer.set_root_modified_time(0);
+            writer.set_root_creation_time(0)?;
+        }
         let mut storages = self.storages.clone();
         storages.sort_by(|left, right| {
             left.path()
@@ -490,9 +685,36 @@ impl Package {
                     .class_id()
                     .map_or([0; 16], |clsid| *clsid.as_bytes()),
             )?;
+            let directory = storage.directory();
+            if directory.state_bits() != 0
+                || directory.creation_time() != 0
+                || directory.modified_time() != 0
+            {
+                writer.set_storage_metadata(
+                    &refs,
+                    directory.state_bits(),
+                    directory.creation_time(),
+                    directory.modified_time(),
+                )?;
+            }
         }
         for stream in &self.streams {
             let refs = path_refs(stream.path());
+            if let Some(directory) = stream.directory() {
+                if directory.state_bits() != 0
+                    || directory.creation_time() != 0
+                    || directory.modified_time() != 0
+                {
+                    writer.create_stream_shared_with_metadata(
+                        &refs,
+                        stream.bytes_shared(),
+                        directory.state_bits(),
+                        directory.creation_time(),
+                        directory.modified_time(),
+                    )?;
+                    continue;
+                }
+            }
             writer.create_stream_shared(&refs, stream.bytes_shared())?;
         }
         let mut output = Cursor::new(Vec::new());
@@ -608,8 +830,12 @@ impl Package {
         if self.streams.len() > limits.max_streams {
             return Ok(None);
         }
+        // The overlay republishes the source directory image unchanged, so
+        // any directory difference, including the root entry's state bits and
+        // timestamps, declines to the layout writer.
         if self.sector_size != baseline.sector_size
             || self.root_clsid != baseline.root_clsid
+            || self.root_directory != baseline.root_directory
             || self.storages != baseline.storages
             || self.streams.len() != baseline.streams.len()
         {
@@ -659,24 +885,21 @@ impl Package {
 
     pub(crate) fn check(&self, limits: Limits) -> Result<(), OleError> {
         limits.validate()?;
-        if self.storages.len() > limits.max_objects.saturating_mul(limits.max_storage_depth) {
+        check_counts(
+            limits,
+            self.storages.len(),
+            self.streams.len(),
+            stream_bytes_total(self.streams.iter())?,
+        )
+    }
+
+    pub(crate) fn check_object_limits(&self, limits: Limits) -> Result<(), OleError> {
+        limits.validate()?;
+        if self.storages.len() > limits.max_object_storages()
+            || self.streams.len() > limits.max_object_streams()
+        {
             return Err(OleError::InvalidFormat(
-                "CFB storage count exceeds object capture limit".into(),
-            ));
-        }
-        if self.streams.len() > limits.max_streams {
-            return Err(OleError::InvalidFormat(
-                "CFB stream count exceeds package capture limit".into(),
-            ));
-        }
-        let total = self.streams.iter().try_fold(0u64, |total, stream| {
-            total
-                .checked_add(stream.bytes().len() as u64)
-                .ok_or_else(|| OleError::InvalidFormat("CFB capture size overflow".into()))
-        })?;
-        if total > limits.max_total_size {
-            return Err(OleError::InvalidFormat(
-                "CFB captured stream bytes exceed total size limit".into(),
+                "selected object exceeds capture limits".into(),
             ));
         }
         Ok(())
@@ -688,8 +911,8 @@ impl Package {
         storage: Storage,
         limits: Limits,
     ) -> Result<Object, OleError> {
-        if self.storages.len() > limits.max_storage_depth
-            || self.streams.len() > limits.max_streams_per_object
+        if self.storages.len() > limits.max_object_storages()
+            || self.streams.len() > limits.max_object_streams()
         {
             return Err(OleError::InvalidFormat(
                 "selected object exceeds capture limits".into(),
@@ -876,20 +1099,38 @@ fn source_v3_stream_size_needs_normalization(source: &[u8]) -> Result<bool, OleE
 }
 
 struct Budget {
+    storages: usize,
     streams: usize,
     bytes: u64,
+    max_storages: usize,
     max_streams: usize,
     max_bytes: u64,
 }
 
 impl Budget {
-    fn new(max_streams: usize, max_bytes: u64) -> Self {
+    fn new(max_storages: usize, max_streams: usize, max_bytes: u64) -> Self {
         Self {
+            storages: 0,
             streams: 0,
             bytes: 0,
+            max_storages,
             max_streams,
             max_bytes,
         }
+    }
+
+    fn max_directory_entries(&self) -> usize {
+        self.max_storages.saturating_add(self.max_streams)
+    }
+
+    fn charge_storage(&mut self) -> Result<(), OleError> {
+        if self.storages >= self.max_storages {
+            return Err(OleError::InvalidFormat(
+                "CFB storage count exceeds capture limit".into(),
+            ));
+        }
+        self.storages += 1;
+        Ok(())
     }
 
     fn charge(&mut self, size: u64) -> Result<(), OleError> {
@@ -920,15 +1161,17 @@ fn capture_container<R: Read + Seek>(
     budget: &mut Budget,
     limits: Limits,
 ) -> Result<(), OleError> {
-    let entries = ole
-        .list_directory_entries(&path_refs(path))?
-        .into_iter()
-        .cloned()
-        .collect::<Vec<_>>();
-    for entry in entries {
-        let metadata = directory::decode(&entry)?;
+    let max_entries = budget.max_directory_entries();
+    let refs = path_refs(path);
+    ole.visit_directory_entries(&refs, max_entries, |ole, sid| {
+        let (metadata, name, size) = {
+            let entry = ole.directory_entry_by_sid(sid).ok_or_else(|| {
+                OleError::CorruptedFile("directory visitor returned an unknown SID".into())
+            })?;
+            (directory::decode(entry)?, entry.name.clone(), entry.size)
+        };
         let mut child = path.to_vec();
-        child.push(entry.name);
+        child.push(name);
         match metadata.kind() {
             EntryKind::Storage => {
                 if child.len() > limits.max_storage_depth {
@@ -936,30 +1179,45 @@ fn capture_container<R: Read + Seek>(
                         "CFB storage nesting limit exceeded".into(),
                     ));
                 }
+                budget.charge_storage()?;
+                package
+                    .storages
+                    .try_reserve(1)
+                    .map_err(|source| OleError::Allocation {
+                        resource: "CFB storage capture",
+                        source,
+                    })?;
                 package.storages.push(Storage::new(child.clone(), metadata));
                 capture_container(ole, &child, package, budget, limits)?;
             },
             EntryKind::Stream => {
-                if entry.size > limits.max_stream_size {
+                if size > limits.max_stream_size {
                     return Err(OleError::InvalidFormat(format!(
                         "stream {child:?} exceeds size limit"
                     )));
                 }
-                budget.charge(entry.size)?;
+                budget.charge(size)?;
                 let data = ole.open_stream(&path_refs(&child))?;
-                if data.len() as u64 != entry.size {
+                if data.len() as u64 != size {
                     return Err(OleError::InvalidFormat(format!(
                         "stream {child:?} size changed during capture"
                     )));
                 }
                 package
                     .streams
+                    .try_reserve(1)
+                    .map_err(|source| OleError::Allocation {
+                        resource: "CFB stream capture",
+                        source,
+                    })?;
+                package
+                    .streams
                     .push(Stream::new(child, Arc::<[u8]>::from(data), Some(metadata)));
             },
             EntryKind::Root => {},
         }
-    }
-    Ok(())
+        Ok(())
+    })
 }
 
 fn capture_subtree<R: Read + Seek>(
@@ -976,15 +1234,17 @@ fn capture_subtree<R: Read + Seek>(
         ));
     }
     let current = join(absolute, relative);
-    let entries = ole
-        .list_directory_entries(&path_refs(&current))?
-        .into_iter()
-        .cloned()
-        .collect::<Vec<_>>();
-    for entry in entries {
-        let metadata = directory::decode(&entry)?;
+    let max_entries = budget.max_directory_entries();
+    let refs = path_refs(&current);
+    ole.visit_directory_entries(&refs, max_entries, |ole, sid| {
+        let (metadata, name, size) = {
+            let entry = ole.directory_entry_by_sid(sid).ok_or_else(|| {
+                OleError::CorruptedFile("directory visitor returned an unknown SID".into())
+            })?;
+            (directory::decode(entry)?, entry.name.clone(), entry.size)
+        };
         let mut child = relative.to_vec();
-        child.push(entry.name);
+        child.push(name);
         match metadata.kind() {
             EntryKind::Storage => {
                 if child.len() > limits.max_storage_depth {
@@ -992,42 +1252,69 @@ fn capture_subtree<R: Read + Seek>(
                         "object storage nesting limit exceeded".into(),
                     ));
                 }
+                budget.charge_storage()?;
+                package
+                    .storages
+                    .try_reserve(1)
+                    .map_err(|source| OleError::Allocation {
+                        resource: "CFB storage capture",
+                        source,
+                    })?;
                 package.storages.push(Storage::new(child.clone(), metadata));
                 capture_subtree(ole, absolute, &child, package, budget, limits)?;
             },
             EntryKind::Stream => {
-                if entry.size > limits.max_stream_size {
+                if size > limits.max_stream_size {
                     return Err(OleError::InvalidFormat(
                         "object stream size exceeds limit".into(),
                     ));
                 }
-                budget.charge(entry.size)?;
+                budget.charge(size)?;
                 let data = ole.open_stream(&path_refs(&join(absolute, &child)))?;
-                if data.len() as u64 != entry.size {
+                if data.len() as u64 != size {
                     return Err(OleError::InvalidFormat(
                         "object stream size changed during capture".into(),
                     ));
                 }
                 package
                     .streams
+                    .try_reserve(1)
+                    .map_err(|source| OleError::Allocation {
+                        resource: "CFB stream capture",
+                        source,
+                    })?;
+                package
+                    .streams
                     .push(Stream::new(child, Arc::<[u8]>::from(data), Some(metadata)));
             },
             EntryKind::Root => {},
         }
-    }
-    Ok(())
+        Ok(())
+    })
 }
 
-fn find_storage<R: Read + Seek>(ole: &OleFile<R>, path: &[String]) -> Result<Storage, OleError> {
+fn find_storage<R: Read + Seek>(
+    ole: &mut OleFile<R>,
+    path: &[String],
+    max_entries: usize,
+) -> Result<Storage, OleError> {
     let (name, parent) = path
         .split_last()
         .ok_or_else(|| OleError::InvalidFormat("object target path is empty".into()))?;
-    let entry = ole
-        .list_directory_entries(&path_refs(parent))?
-        .into_iter()
-        .find(|entry| entry.entry_type == EntryKind::Storage.raw() && entry.name == *name)
+    let refs = path_refs(parent);
+    let mut metadata = None;
+    ole.visit_directory_entries(&refs, max_entries, |ole, sid| {
+        let entry = ole.directory_entry_by_sid(sid).ok_or_else(|| {
+            OleError::CorruptedFile("directory visitor returned an unknown SID".into())
+        })?;
+        if metadata.is_none() && entry.entry_type == EntryKind::Storage.raw() && entry.name == *name
+        {
+            metadata = Some(directory::decode(entry)?);
+        }
+        Ok::<(), OleError>(())
+    })?;
+    let metadata = metadata
         .ok_or_else(|| OleError::InvalidFormat(format!("object storage {path:?} not found")))?;
-    let metadata = directory::decode(entry)?;
     if metadata.kind() != EntryKind::Storage {
         return Err(OleError::InvalidFormat(format!(
             "object target path {path:?} is not a storage"
@@ -1036,8 +1323,8 @@ fn find_storage<R: Read + Seek>(ole: &OleFile<R>, path: &[String]) -> Result<Sto
     Ok(Storage::new(path.to_vec(), metadata))
 }
 
-pub(crate) fn open<R: Read + Seek>(ole: &OleFile<R>) -> Result<(), OleError> {
-    reject_protected_container(ole, "object editing")
+pub(crate) fn open<R: Read + Seek>(ole: &OleFile<R>, max_entries: usize) -> Result<(), OleError> {
+    reject_protected_container(ole, "object editing", max_entries)
 }
 
 fn path_refs(path: &[String]) -> Vec<&str> {
@@ -1046,4 +1333,66 @@ fn path_refs(path: &[String]) -> Vec<&str> {
 
 fn join(left: &[String], right: &[String]) -> Vec<String> {
     left.iter().chain(right).cloned().collect()
+}
+
+fn clone_path(path: &[String]) -> Result<Vec<String>, OleError> {
+    join_checked(&[], path)
+}
+
+fn join_checked(left: &[String], right: &[String]) -> Result<Vec<String>, OleError> {
+    let count = left
+        .len()
+        .checked_add(right.len())
+        .ok_or_else(|| OleError::InvalidFormat("CFB path component count overflow".into()))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(count)
+        .map_err(|source| OleError::Allocation {
+            resource: "CFB object path",
+            source,
+        })?;
+    for component in left.iter().chain(right) {
+        let mut value = String::new();
+        value
+            .try_reserve_exact(component.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "CFB object path component",
+                source,
+            })?;
+        value.push_str(component);
+        output.push(value);
+    }
+    Ok(output)
+}
+
+fn stream_bytes_total<'a>(mut streams: impl Iterator<Item = &'a Stream>) -> Result<u64, OleError> {
+    streams.try_fold(0u64, |total, stream| {
+        total
+            .checked_add(stream.bytes().len() as u64)
+            .ok_or_else(|| OleError::InvalidFormat("CFB capture size overflow".into()))
+    })
+}
+
+fn check_counts(
+    limits: Limits,
+    storage_count: usize,
+    stream_count: usize,
+    total_bytes: u64,
+) -> Result<(), OleError> {
+    if storage_count > limits.max_objects.saturating_mul(limits.max_storage_depth) {
+        return Err(OleError::InvalidFormat(
+            "CFB storage count exceeds object capture limit".into(),
+        ));
+    }
+    if stream_count > limits.max_streams {
+        return Err(OleError::InvalidFormat(
+            "CFB stream count exceeds package capture limit".into(),
+        ));
+    }
+    if total_bytes > limits.max_total_size {
+        return Err(OleError::InvalidFormat(
+            "CFB captured stream bytes exceed total size limit".into(),
+        ));
+    }
+    Ok(())
 }

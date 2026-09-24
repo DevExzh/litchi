@@ -1,0 +1,23 @@
+{
+  "source_basis": "candidate-09",
+  "source_path": "crates/litchi-ods/src/codec/formula/evaluation/value/database.rs",
+  "original_sha256": "99df2353ba7086dc8bedd08a12e979f415ef281f484133b78257a0651421a281",
+  "mutated_sha256": "7fefd82af71208418b75300316dfad6f1fac0966434d868aac9a37fd7341a651",
+  "replace_from": "RuntimeElement::Missing => Self::Error(ScalarError::NotAvailable),",
+  "replace_to": "RuntimeElement::Missing => Self::Empty,",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-ods",
+    "--all-features",
+    "--test",
+    "ods_formula_database_evaluation",
+    "computed_database_and_criteria_missing_broadcast_cells_preserve_not_available"
+  ],
+  "status": 0,
+  "source_restored": true,
+  "log_sha256": "475aa365b9d2799013962d8bd09a651a1b2a460c2501a0e7a3764f57d36303f9"
+}

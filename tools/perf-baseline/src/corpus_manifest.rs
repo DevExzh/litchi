@@ -551,6 +551,12 @@ pub(crate) struct CaseCorpusBindingV2 {
     pub(crate) legacy_name: String,
     pub(crate) legacy_archive_sha256: String,
     pub(crate) role: String,
+    /// Experiment dimensions distinguish repeated observations of the same
+    /// content, such as filesystem cache state.  They belong to the binding,
+    /// not to the content-addressed corpus entry, so a warm/cold pair retains
+    /// one corpus object and two independently keyed bindings.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) dimensions: BTreeMap<String, String>,
 }
 
 /// Owned JSON input keeps this module independent of the private report types.
@@ -558,6 +564,7 @@ pub(crate) struct CaseCorpusBindingV2 {
 pub(crate) struct LegacyCaseCorpus {
     pub(crate) case: String,
     pub(crate) corpus: Value,
+    pub(crate) dimensions: BTreeMap<String, String>,
 }
 
 fn generator_parameters(
@@ -809,7 +816,7 @@ impl CorpusCatalogV2 {
         for record in records {
             let legacy: LegacyCorpusManifestV1 = serde_json::from_value(record.corpus.clone())
                 .map_err(|error| ManifestError::new(format!("invalid V1 corpus: {error}")))?;
-            let id = content_id(&legacy.package_format, &legacy.archive_sha256);
+            let id = content_id(&legacy.package_format, &legacy.archive_sha256)?;
             let mut corpus = CorpusManifestV2::from_legacy(legacy.clone())?;
             corpus.coverage.timed_cases.push(record.case.clone());
             corpus.coverage.timed_cases.sort();
@@ -828,11 +835,11 @@ impl CorpusCatalogV2 {
                 corpora.insert(id.clone(), corpus);
             }
 
-            let binding_key = (record.case.clone(), id.clone());
+            let binding_key = (record.case.clone(), id.clone(), record.dimensions.clone());
             if !binding_keys.insert(binding_key) {
                 return Err(ManifestError::new(format!(
-                    "duplicate case/corpus binding: {} / {id}",
-                    record.case
+                    "duplicate case/corpus/dimensions binding: {} / {id} / {:?}",
+                    record.case, record.dimensions
                 )));
             }
             bindings.push(CaseCorpusBindingV2 {
@@ -841,6 +848,7 @@ impl CorpusCatalogV2 {
                 legacy_name: legacy.name,
                 legacy_archive_sha256: legacy.archive_sha256,
                 role: "timed".to_owned(),
+                dimensions: record.dimensions.clone(),
             });
         }
 
@@ -862,6 +870,7 @@ impl CorpusCatalogV2 {
             left.case
                 .cmp(&right.case)
                 .then_with(|| left.corpus_id.cmp(&right.corpus_id))
+                .then_with(|| left.dimensions.cmp(&right.dimensions))
         });
         catalog.refresh_hashes()?;
         catalog.validate()?;
@@ -928,6 +937,7 @@ impl CorpusCatalogV2 {
             previous = Some(&corpus.id);
         }
         let mut binding_keys = BTreeSet::new();
+        let mut previous_binding = None;
         for binding in &self.case_bindings {
             if !ids.contains(&binding.corpus_id) {
                 return Err(ManifestError::new(format!(
@@ -935,12 +945,22 @@ impl CorpusCatalogV2 {
                     binding.corpus_id
                 )));
             }
-            if !binding_keys.insert((&binding.case, &binding.corpus_id)) {
+            validate_dimensions(&binding.dimensions)?;
+            if !binding_keys.insert((&binding.case, &binding.corpus_id, &binding.dimensions)) {
                 return Err(ManifestError::new(format!(
-                    "duplicate case/corpus binding {} / {}",
-                    binding.case, binding.corpus_id
+                    "duplicate case/corpus/dimensions binding {} / {} / {:?}",
+                    binding.case, binding.corpus_id, binding.dimensions
                 )));
             }
+            let current_binding = (&binding.case, &binding.corpus_id, &binding.dimensions);
+            if let Some(previous_binding) = previous_binding
+                && previous_binding > current_binding
+            {
+                return Err(ManifestError::new(
+                    "case_bindings must be sorted by case, corpus id, and dimensions",
+                ));
+            }
+            previous_binding = Some(current_binding);
         }
         let expected_content_set_sha256 = content_set_sha256(self)?;
         if expected_content_set_sha256 != self.content_set_sha256 {
@@ -969,7 +989,7 @@ impl CorpusManifestV2 {
             .map_err(|_| ManifestError::new("entry byte count does not fit u64"))?;
         let target_payload_bytes = u64::try_from(legacy.target_payload_bytes)
             .map_err(|_| ManifestError::new("target byte count does not fit u64"))?;
-        let id = content_id(&legacy.package_format, &legacy.archive_sha256);
+        let id = content_id(&legacy.package_format, &legacy.archive_sha256)?;
         let family = family_metadata(&legacy.generator).filter(|_| {
             !(legacy.generator == "litchi-rtf-semantic-v2"
                 && legacy.rtf_variant.as_deref() == Some("watermark"))
@@ -1177,9 +1197,19 @@ fn validate_corpus(corpus: &CorpusManifestV2) -> Result<(), ManifestError> {
             corpus.id
         )));
     }
-    if !corpus.id.ends_with(&corpus.bytes.archive_sha256) {
+    let expected_id = content_id(
+        &corpus.legacy_v1.package_format,
+        &corpus.bytes.archive_sha256,
+    )?;
+    if corpus.id != expected_id {
         return Err(ManifestError::new(format!(
-            "content id does not contain archive hash for {}",
+            "content id does not match package_format/archive_sha256 for {}",
+            corpus.id
+        )));
+    }
+    if corpus.format != corpus.legacy_v1.package_format {
+        return Err(ManifestError::new(format!(
+            "format does not match legacy_v1 package_format for {}",
             corpus.id
         )));
     }
@@ -1201,11 +1231,37 @@ fn validate_corpus(corpus: &CorpusManifestV2) -> Result<(), ManifestError> {
     Ok(())
 }
 
-fn content_id(package_format: &str, archive_sha256: &str) -> String {
-    format!("{}:sha256:{archive_sha256}", format_slug(package_format))
+fn validate_dimensions(dimensions: &BTreeMap<String, String>) -> Result<(), ManifestError> {
+    for (key, value) in dimensions {
+        if key != "cache_state" {
+            return Err(ManifestError::new(format!(
+                "unsupported binding dimension {key:?}"
+            )));
+        }
+        if value.is_empty() {
+            return Err(ManifestError::new(format!(
+                "binding dimension {key:?} must not be empty"
+            )));
+        }
+        if key == "cache_state"
+            && !matches!(value.as_str(), "warm" | "cold-requested" | "cold-verified")
+        {
+            return Err(ManifestError::new(format!(
+                "unsupported cache_state dimension {value:?}"
+            )));
+        }
+    }
+    Ok(())
 }
 
-fn format_slug(value: &str) -> String {
+fn content_id(package_format: &str, archive_sha256: &str) -> Result<String, ManifestError> {
+    Ok(format!(
+        "{}:sha256:{archive_sha256}",
+        format_slug(package_format)?
+    ))
+}
+
+fn format_slug(value: &str) -> Result<String, ManifestError> {
     let mut slug = String::new();
     for character in value.chars() {
         if character.is_ascii_alphanumeric() {
@@ -1214,7 +1270,13 @@ fn format_slug(value: &str) -> String {
             slug.push('-');
         }
     }
-    slug.trim_matches('-').to_owned()
+    let slug = slug.trim_matches('-').to_owned();
+    if slug.is_empty() {
+        return Err(ManifestError::new(
+            "package_format must contain an ASCII letter or digit",
+        ));
+    }
+    Ok(slug)
 }
 
 fn catalog_sha256(catalog: &CorpusCatalogV2) -> Result<String, ManifestError> {
@@ -1249,11 +1311,18 @@ fn content_set_sha256(catalog: &CorpusCatalogV2) -> Result<String, ManifestError
         .case_bindings
         .iter()
         .map(|binding| {
-            json!({
+            let mut value = json!({
                 "case": binding.case,
                 "corpus_id": binding.corpus_id,
                 "role": binding.role,
-            })
+            });
+            if !binding.dimensions.is_empty() {
+                value
+                    .as_object_mut()
+                    .expect("binding projection is an object")
+                    .insert("dimensions".to_owned(), json!(binding.dimensions));
+            }
+            value
         })
         .collect::<Vec<_>>();
     let value = json!({
@@ -1371,6 +1440,7 @@ mod tests {
             .map(|case| LegacyCaseCorpus {
                 case: (*case).to_owned(),
                 corpus: serde_json::to_value(legacy()).unwrap(),
+                dimensions: BTreeMap::new(),
             })
             .collect::<Vec<_>>();
         CorpusCatalogV2::from_legacy_results(
@@ -1394,6 +1464,18 @@ mod tests {
         assert_eq!(migrated.security.encryption.state, "unknown");
         assert_eq!(migrated.provenance.source_kind, "generated");
         assert_eq!(migrated.limits.profile_id, None);
+    }
+
+    #[test]
+    fn package_format_without_ascii_alphanumeric_is_rejected() {
+        let mut corpus = legacy();
+        corpus.package_format = "!!!".to_owned();
+        let error = CorpusManifestV2::from_legacy(corpus).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("package_format must contain an ASCII letter or digit")
+        );
     }
 
     #[test]
@@ -1527,15 +1609,24 @@ mod tests {
     }
 
     #[test]
+    fn legacy_bindings_omit_empty_dimensions_when_serialized() {
+        let catalog = build(&["zip_index"]);
+        let value = serde_json::to_value(catalog).unwrap();
+        assert!(value["case_bindings"][0].get("dimensions").is_none());
+    }
+
+    #[test]
     fn duplicate_case_binding_is_rejected() {
         let records = vec![
             LegacyCaseCorpus {
                 case: "zip_index".to_owned(),
                 corpus: serde_json::to_value(legacy()).unwrap(),
+                dimensions: BTreeMap::new(),
             },
             LegacyCaseCorpus {
                 case: "zip_index".to_owned(),
                 corpus: serde_json::to_value(legacy()).unwrap(),
+                dimensions: BTreeMap::new(),
             },
         ];
         assert!(
@@ -1550,6 +1641,87 @@ mod tests {
                 },
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn distinct_cache_states_share_one_corpus_and_bind_twice() {
+        let corpus = serde_json::to_value(legacy()).unwrap();
+        let records = [
+            LegacyCaseCorpus {
+                case: "opc_file_eager_open".to_owned(),
+                corpus: corpus.clone(),
+                dimensions: BTreeMap::from([("cache_state".to_owned(), "warm".to_owned())]),
+            },
+            LegacyCaseCorpus {
+                case: "opc_file_eager_open".to_owned(),
+                corpus,
+                dimensions: BTreeMap::from([(
+                    "cache_state".to_owned(),
+                    "cold-requested".to_owned(),
+                )]),
+            },
+        ];
+        let catalog = CorpusCatalogV2::from_legacy_results(
+            &records,
+            BuildIdentityV2 {
+                tool: "tool".to_owned(),
+                tool_version: "version".to_owned(),
+                git_revision: None,
+                git_worktree_dirty: None,
+                source_files: Vec::new(),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(catalog.corpora.len(), 1);
+        assert_eq!(catalog.case_bindings.len(), 2);
+        assert_eq!(
+            catalog
+                .case_bindings
+                .iter()
+                .map(|binding| binding.dimensions["cache_state"].as_str())
+                .collect::<Vec<_>>(),
+            ["cold-requested", "warm"]
+        );
+        catalog.validate().unwrap();
+    }
+
+    #[test]
+    fn unsupported_binding_dimension_is_rejected() {
+        let records = [LegacyCaseCorpus {
+            case: "opc_file_eager_open".to_owned(),
+            corpus: serde_json::to_value(legacy()).unwrap(),
+            dimensions: BTreeMap::from([("host".to_owned(), "runner-1".to_owned())]),
+        }];
+        assert!(
+            CorpusCatalogV2::from_legacy_results(
+                &records,
+                BuildIdentityV2 {
+                    tool: "tool".to_owned(),
+                    tool_version: "version".to_owned(),
+                    git_revision: None,
+                    git_worktree_dirty: None,
+                    source_files: Vec::new(),
+                },
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn content_id_requires_exact_normalized_package_format_prefix() {
+        let mut catalog = build(&["zip_index"]);
+        let archive_sha256 = catalog.corpora[0].bytes.archive_sha256.clone();
+        let replacement_id = format!("wrong-format:sha256:{archive_sha256}");
+        catalog.corpora[0].id = replacement_id.clone();
+        catalog.case_bindings[0].corpus_id = replacement_id;
+        catalog.refresh_hashes().unwrap();
+        let error = catalog.validate().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("does not match package_format/archive_sha256")
         );
     }
 }

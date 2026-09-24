@@ -1,7 +1,8 @@
 use super::consts::{
     DIFSECT, DIRENTRY_SIZE, ENDOFCHAIN, FATSECT, FREESECT, HEADER_DIFAT_ENTRIES,
-    HEADER_DIFAT_OFFSET, MAGIC, MAXREGSECT, MINIMAL_OLEFILE_SIZE, NOSTREAM, SECTOR_SIZE_V3,
-    SECTOR_SIZE_V4, STGTY_EMPTY, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM,
+    HEADER_DIFAT_OFFSET, MAGIC, MAXREGSECT, MINIMAL_OLEFILE_SIZE, NOSTREAM, RANGE_LOCK_SECTOR_V4,
+    SECTOR_SIZE_V3, SECTOR_SIZE_V4, STGTY_EMPTY, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM,
+    TWO_GIB_BYTES,
 };
 use crate::directory_name::{DirectoryNameData, ascii_lookup_key, directory_name_data};
 use smallvec::SmallVec;
@@ -167,6 +168,7 @@ enum PhysicalSectorRole {
     MiniFat,
     MiniStream,
     RegularStream,
+    RangeLock,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -187,6 +189,7 @@ impl PhysicalSectorRole {
             Self::MiniFat => "MiniFAT",
             Self::MiniStream => "mini stream",
             Self::RegularStream => "regular stream",
+            Self::RangeLock => "range lock",
         }
     }
 }
@@ -295,6 +298,14 @@ pub struct DirectoryEntry {
     pub sid_child: u32,
     /// CLSID of this entry
     pub clsid: String,
+    /// User-defined state bits from the CFB directory entry.
+    pub state_bits: u32,
+    /// Exact Windows FILETIME creation value stored in the directory entry.
+    /// Values are retained verbatim, including values emitted by legacy
+    /// producers that do not satisfy the stream-field recommendation.
+    pub creation_time: u64,
+    /// Exact Windows FILETIME modification value stored in the directory entry.
+    pub modified_time: u64,
     /// First sector of the stream
     pub start_sector: u32,
     /// Size of the stream in bytes
@@ -357,21 +368,34 @@ pub enum OleError {
 /// The input limit is checked immediately after obtaining the reader length and
 /// before the parser allocates its physical-sector map or traverses any CFB
 /// metadata. The directory limit is checked before the directory stream and
-/// derived directory-entry allocations. Both defaults are deliberately finite
-/// and the shared reader carries the same policy.
+/// derived directory-entry allocations. The allocation-table limit is checked
+/// from the header counts before the physical-sector map or FAT/DIFAT/MiniFAT
+/// tables are reserved. All defaults are deliberately finite and the shared
+/// reader carries the same policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OleFileLimits {
     max_input_bytes: u64,
     max_directory_bytes: u64,
+    max_allocation_table_bytes: u64,
 }
 
 impl OleFileLimits {
-    /// Largest source accepted by the low-level CFB reader.
-    pub const MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    /// Default source ceiling; larger version-4 files require explicit limits.
+    pub const DEFAULT_MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    /// Largest source admitted by this reader's bounded input profile.
+    ///
+    /// This 32-GiB resource ceiling is deliberately below the format maximum.
+    /// Version-3 files remain limited to 2 GiB even with a larger input ceiling.
+    pub const MAX_INPUT_BYTES: u64 = 32 * 1024 * 1024 * 1024;
     /// Default directory stream ceiling used by the low-level CFB reader.
     pub const DEFAULT_MAX_DIRECTORY_BYTES: u64 = 64 * 1024 * 1024;
     /// Largest directory stream ceiling accepted by the low-level CFB reader.
     pub const MAX_DIRECTORY_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    /// Default combined decoded FAT/DIFAT/MiniFAT table ceiling.
+    pub const DEFAULT_MAX_ALLOCATION_TABLE_BYTES: u64 = 64 * 1024 * 1024;
+    /// Largest combined decoded FAT/DIFAT/MiniFAT table ceiling accepted by
+    /// the low-level CFB reader.
+    pub const MAX_ALLOCATION_TABLE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
     /// Largest v4 artifact a checked writer plan can describe. This is kept
     /// separate from the public ingress ceiling so ordinary untrusted input
@@ -384,7 +408,9 @@ impl OleFileLimits {
     /// Builds limits for a checked writer candidate. The writer has already
     /// bounded its sector count and supplies the exact directory image size,
     /// so validation may use the v4 representable bound and avoid the public
-    /// default's 64 MiB directory ceiling.
+    /// default's 64 MiB directory ceiling. The candidate's allocation tables
+    /// were built by the writer as well, so they are checked against the
+    /// reader's hard allocation-table ceiling rather than the public default.
     pub(crate) fn for_writer(
         max_input_bytes: u64,
         max_directory_bytes: u64,
@@ -406,6 +432,7 @@ impl OleFileLimits {
         Ok(Self {
             max_input_bytes,
             max_directory_bytes,
+            max_allocation_table_bytes: Self::MAX_ALLOCATION_TABLE_BYTES,
         })
     }
 
@@ -414,8 +441,8 @@ impl OleFileLimits {
     /// # Errors
     ///
     /// Returns [`OleError::InvalidLimit`] if the ceiling is zero or exceeds
-    /// the low-level CFB hard ingress ceiling. Use
-    /// [`Self::with_max_directory_bytes`] to select a directory ceiling.
+    /// the low-level CFB hard ingress ceiling. Use the `with_max_*` methods to
+    /// select directory and allocation-table ceilings.
     pub const fn new(max_input_bytes: u64) -> Result<Self, OleError> {
         if max_input_bytes == 0 || max_input_bytes > Self::MAX_INPUT_BYTES {
             return Err(OleError::InvalidLimit {
@@ -427,6 +454,7 @@ impl OleFileLimits {
         Ok(Self {
             max_input_bytes,
             max_directory_bytes: Self::DEFAULT_MAX_DIRECTORY_BYTES,
+            max_allocation_table_bytes: Self::DEFAULT_MAX_ALLOCATION_TABLE_BYTES,
         })
     }
 
@@ -463,13 +491,50 @@ impl OleFileLimits {
     pub const fn max_directory_bytes(self) -> u64 {
         self.max_directory_bytes
     }
+
+    /// Selects the combined decoded FAT/DIFAT/MiniFAT table ceiling accepted
+    /// while parsing one CFB source.
+    ///
+    /// The observed value includes the declared FAT, DIFAT, and MiniFAT
+    /// sector bytes plus the `u32` location vectors used for those sectors.
+    /// It excludes the directory stream, physical-sector role map, chain
+    /// scratch, source bytes, and total process memory.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::InvalidLimit`] if the ceiling is zero or exceeds
+    /// [`Self::MAX_ALLOCATION_TABLE_BYTES`].
+    pub const fn with_max_allocation_table_bytes(
+        mut self,
+        max_allocation_table_bytes: u64,
+    ) -> Result<Self, OleError> {
+        if max_allocation_table_bytes == 0
+            || max_allocation_table_bytes > Self::MAX_ALLOCATION_TABLE_BYTES
+        {
+            return Err(OleError::InvalidLimit {
+                resource: "CFB allocation table bytes",
+                value: max_allocation_table_bytes,
+                maximum: Self::MAX_ALLOCATION_TABLE_BYTES,
+            });
+        }
+        self.max_allocation_table_bytes = max_allocation_table_bytes;
+        Ok(self)
+    }
+
+    /// Maximum combined decoded FAT/DIFAT/MiniFAT table bytes accepted during
+    /// parsing.
+    #[must_use]
+    pub const fn max_allocation_table_bytes(self) -> u64 {
+        self.max_allocation_table_bytes
+    }
 }
 
 impl Default for OleFileLimits {
     fn default() -> Self {
         Self {
-            max_input_bytes: Self::MAX_INPUT_BYTES,
+            max_input_bytes: Self::DEFAULT_MAX_INPUT_BYTES,
             max_directory_bytes: Self::DEFAULT_MAX_DIRECTORY_BYTES,
+            max_allocation_table_bytes: Self::DEFAULT_MAX_ALLOCATION_TABLE_BYTES,
         }
     }
 }
@@ -593,6 +658,25 @@ impl From<OleError> for litchi_core::Error {
 }
 
 impl<R: Read + Seek> OleFile<R> {
+    /// Borrows the reader retained by this parsed CFB view.
+    ///
+    /// The reader is the source used for the bounded parse. Callers that need
+    /// to retain source bytes should do so only after completing their own
+    /// validation of the parsed view.
+    #[must_use]
+    pub fn get_ref(&self) -> &R {
+        &self.reader
+    }
+
+    /// Consumes this parsed CFB view and returns its reader.
+    ///
+    /// Parsed index state is discarded. This is useful when an owner has
+    /// completed validation and wants to retain the original reader without
+    /// copying it.
+    pub fn into_inner(self) -> R {
+        self.reader
+    }
+
     /// Discard the cursor and validation-only state, retaining the parsed CFB
     /// index for the crate's immutable positional reader.
     pub(crate) fn into_parsed_index(self) -> ParsedOleIndex {
@@ -691,6 +775,13 @@ impl<R: Read + Seek> OleFile<R> {
                 )));
             },
         };
+        // A larger caller budget admits v4 sources, but cannot relax the
+        // version-3 compatibility limit in MS-CFB 2.9. Check before indexing.
+        if dll_version == 3 && file_size > TWO_GIB_BYTES {
+            return Err(OleError::InvalidFormat(
+                "Version 3 CFB input cannot exceed 2 GiB".to_string(),
+            ));
+        }
         if sector_shift != expected_sector_shift {
             return Err(OleError::InvalidFormat(format!(
                 "Invalid sector shift {sector_shift} for CFB version {dll_version}"
@@ -768,6 +859,19 @@ impl<R: Read + Seek> OleFile<R> {
                 "Declared directory sector count exceeds the physical file".to_string(),
             ));
         }
+        let allocation_table_bytes = checked_allocation_table_bytes(
+            sector_size,
+            num_fat_sectors,
+            num_difat_sectors,
+            num_minifat_sectors,
+        )?;
+        if allocation_table_bytes > limits.max_allocation_table_bytes() {
+            return Err(OleError::LimitExceeded {
+                resource: "allocation table bytes",
+                observed: allocation_table_bytes,
+                maximum: limits.max_allocation_table_bytes(),
+            });
+        }
         let sector_roles = try_filled_vec(
             physical_sector_count,
             PhysicalSectorRole::Unclaimed,
@@ -798,6 +902,7 @@ impl<R: Read + Seek> OleFile<R> {
             first_difat_sector,
             num_difat_sectors,
         )?;
+        ole.validate_range_lock_sector(first_dir_sector, first_minifat_sector, first_difat_sector)?;
 
         // Load directory
         ole.load_directory(
@@ -994,6 +1099,63 @@ impl<R: Read + Seek> OleFile<R> {
         Ok(())
     }
 
+    /// Validate the fixed version-4 range-lock sector before any directory
+    /// or stream chain is traversed.  Reserving its physical role up front
+    /// prevents a later chain loader from silently treating the lock bytes as
+    /// user data.
+    fn validate_range_lock_sector(
+        &mut self,
+        first_dir_sector: u32,
+        first_minifat_sector: u32,
+        first_difat_sector: u32,
+    ) -> Result<(), OleError> {
+        if self.sector_size != SECTOR_SIZE_V4 {
+            return Ok(());
+        }
+        let lock = RANGE_LOCK_SECTOR_V4;
+        let lock_index = usize::try_from(lock).map_err(|_err| {
+            OleError::CorruptedFile("range-lock sector index is too large".to_string())
+        })?;
+        if lock_index >= self.sector_roles.len() {
+            // A v4 file below the lock offset has no physical range-lock
+            // sector.  A file beyond 2 GiB cannot take this branch because
+            // its physical sector count necessarily includes the fixed ID.
+            if self.file_size > TWO_GIB_BYTES {
+                return Err(OleError::CorruptedFile(
+                    "CFB file beyond 2 GiB is missing its range-lock sector".to_string(),
+                ));
+            }
+            return Ok(());
+        }
+        let marker = *self.fat.get(lock_index).ok_or_else(|| {
+            OleError::CorruptedFile("FAT is missing the range-lock sector entry".to_string())
+        })?;
+        if self.file_size > TWO_GIB_BYTES {
+            if marker != ENDOFCHAIN {
+                return Err(OleError::CorruptedFile(
+                    "range-lock sector must be marked ENDOFCHAIN beyond 2 GiB".to_string(),
+                ));
+            }
+        } else if !matches!(marker, FREESECT | ENDOFCHAIN) {
+            return Err(OleError::CorruptedFile(
+                "range-lock sector has a non-terminal FAT marker".to_string(),
+            ));
+        }
+        if first_dir_sector == lock || first_minifat_sector == lock || first_difat_sector == lock {
+            return Err(OleError::CorruptedFile(
+                "CFB metadata chain points to the range-lock sector".to_string(),
+            ));
+        }
+        for (sector, &next) in self.fat.iter().take(self.sector_roles.len()).enumerate() {
+            if next == lock {
+                return Err(OleError::CorruptedFile(format!(
+                    "FAT chain at sector {sector} points to the range-lock sector"
+                )));
+            }
+        }
+        self.claim_sector(lock, PhysicalSectorRole::RangeLock)
+    }
+
     /// Load the Mini FAT (for small streams)
     fn load_minifat(
         &mut self,
@@ -1159,6 +1321,11 @@ impl<R: Read + Seek> OleFile<R> {
             .ok_or_else(|| OleError::CorruptedFile("Missing root directory entry".to_string()))?;
         let root_start = root.start_sector;
         let root_size = root.size;
+        if self.sector_size == SECTOR_SIZE_V4 && root_start == RANGE_LOCK_SECTOR_V4 {
+            return Err(OleError::CorruptedFile(
+                "root mini stream points to the range-lock sector".to_string(),
+            ));
+        }
         let root_sector_count = usize::try_from(root_size.div_ceil(self.sector_size as u64))
             .map_err(|_err| OleError::CorruptedFile("Root mini stream is too large".to_string()))?;
         let root_chain = collect_sector_chain_exact(
@@ -1192,6 +1359,14 @@ impl<R: Read + Seek> OleFile<R> {
             }
             let (is_minifat, start_sector, size) =
                 (entry.is_minifat, entry.start_sector, entry.size);
+            if self.sector_size == SECTOR_SIZE_V4
+                && !is_minifat
+                && start_sector == RANGE_LOCK_SECTOR_V4
+            {
+                return Err(OleError::CorruptedFile(
+                    "regular stream points to the range-lock sector".to_string(),
+                ));
+            }
             if is_minifat {
                 let sector_count = usize::try_from(size.div_ceil(self.mini_sector_size as u64))
                     .map_err(|_err| {
@@ -1475,6 +1650,11 @@ impl<R: Read + Seek> OleFile<R> {
         // what `DirectoryEntry` reading already does.
         let stream_size = mask_v3_stream_size(raw.stream_size.get(), sector_size);
 
+        // Keep the raw state and FILETIME words available to source-preserving
+        // callers. New writers emit zeroes for stream timestamps, but rejecting
+        // legacy entries here would make an otherwise readable Office file
+        // impossible to round-trip without normalization.
+
         match raw.entry_type {
             STGTY_ROOT if sid != 0 => {
                 return Err(OleError::CorruptedFile(
@@ -1566,6 +1746,9 @@ impl<R: Read + Seek> OleFile<R> {
             sid_right: raw.sid_right.get(),
             sid_child: raw.sid_child.get(),
             clsid,
+            state_bits: raw.state_bits.get(),
+            creation_time: raw.creation_time.get(),
+            modified_time: raw.modified_time.get(),
             start_sector: raw.start_sector.get(),
             size,
             is_minifat,
@@ -2413,6 +2596,238 @@ impl<R: Read + Seek> OleFile<R> {
         Ok(entries)
     }
 
+    /// Visit the direct children of one storage without first materializing a
+    /// sibling vector.
+    ///
+    /// The callback receives the parsed file and the child SID.  It may read
+    /// the entry through [`Self::directory_entry_by_sid`] and may open a
+    /// stream before returning.  The visitor is deliberately mutable because
+    /// cursor-backed stream reads need exclusive access to the CFB reader.
+    ///
+    /// `max_entries` bounds the number of callbacks and the number of
+    /// directory SIDs discovered. Each SID is charged before the traversal
+    /// stack reserves space, so an unbalanced ordered tree cannot force a
+    /// full left-spine allocation before the caller's budget is applied.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same path and CFB validation errors as
+    /// [`Self::list_directory_entries`], or [`OleError::LimitExceeded`] when
+    /// the selected directory has more than `max_entries` children.
+    pub fn visit_directory_entries<F, E>(
+        &mut self,
+        path: &[&str],
+        max_entries: usize,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        E: From<OleError>,
+        F: FnMut(&mut Self, u32) -> Result<(), E>,
+    {
+        let first_child = {
+            let directory = if path.is_empty() {
+                self.root
+                    .as_ref()
+                    .ok_or(OleError::StreamNotFound)
+                    .map_err(E::from)?
+            } else {
+                self.find_entry(path).map_err(E::from)?
+            };
+            if directory.entry_type != STGTY_STORAGE && directory.entry_type != STGTY_ROOT {
+                return Err(E::from(OleError::InvalidFormat(
+                    "Not a directory".to_string(),
+                )));
+            }
+            directory.sid_child
+        };
+
+        let mut pending = Vec::new();
+        let mut current = first_child;
+        let mut discovered = 0usize;
+        while current != NOSTREAM || !pending.is_empty() {
+            while current != NOSTREAM {
+                if discovered >= max_entries {
+                    return Err(E::from(OleError::LimitExceeded {
+                        resource: "directory entries",
+                        observed: u64::try_from(discovered)
+                            .unwrap_or(u64::MAX)
+                            .saturating_add(1),
+                        maximum: u64::try_from(max_entries).unwrap_or(u64::MAX),
+                    }));
+                }
+                let current_index = usize::try_from(current).map_err(|_error| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID does not fit usize".to_string(),
+                    ))
+                })?;
+                let entry = self
+                    .dir_entries
+                    .get(current_index)
+                    .and_then(Option::as_ref)
+                    .ok_or_else(|| {
+                        E::from(OleError::CorruptedFile(
+                            "directory SID has no entry".to_string(),
+                        ))
+                    })?;
+                let left = entry.sid_left;
+                discovered = discovered.checked_add(1).ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory entry count overflow".to_string(),
+                    ))
+                })?;
+                pending.try_reserve_exact(1).map_err(|source| {
+                    E::from(OleError::allocation("directory traversal stack", source))
+                })?;
+                pending.push(current);
+                current = left;
+            }
+
+            let sid = pending.pop().ok_or_else(|| {
+                E::from(OleError::CorruptedFile(
+                    "directory traversal stack underflow".to_string(),
+                ))
+            })?;
+            let sid_index = usize::try_from(sid).map_err(|_error| {
+                E::from(OleError::CorruptedFile(
+                    "directory SID does not fit usize".to_string(),
+                ))
+            })?;
+            let right = self
+                .dir_entries
+                .get(sid_index)
+                .and_then(Option::as_ref)
+                .ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID has no entry".to_string(),
+                    ))
+                })?
+                .sid_right;
+            visit(self, sid)?;
+            current = right;
+        }
+        Ok(())
+    }
+
+    /// Visit the direct children of one storage without first materializing a
+    /// sibling vector when the callback only needs directory metadata.
+    ///
+    /// This read-only form is used by path resolution and host-owned CFB
+    /// admission code that must retain an immutable borrow of the parsed
+    /// file. The discovered-SID and pending-stack bounds are identical to
+    /// [`Self::visit_directory_entries`].
+    pub fn visit_directory_entry_refs<F, E>(
+        &self,
+        path: &[&str],
+        max_entries: usize,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        E: From<OleError>,
+        F: FnMut(&DirectoryEntry) -> Result<(), E>,
+    {
+        let first_child = {
+            let directory = if path.is_empty() {
+                self.root
+                    .as_ref()
+                    .ok_or(OleError::StreamNotFound)
+                    .map_err(E::from)?
+            } else {
+                self.find_entry(path).map_err(E::from)?
+            };
+            if directory.entry_type != STGTY_STORAGE && directory.entry_type != STGTY_ROOT {
+                return Err(E::from(OleError::InvalidFormat(
+                    "Not a directory".to_string(),
+                )));
+            }
+            directory.sid_child
+        };
+
+        let mut pending = Vec::new();
+        let mut current = first_child;
+        let mut discovered = 0usize;
+        while current != NOSTREAM || !pending.is_empty() {
+            while current != NOSTREAM {
+                if discovered >= max_entries {
+                    return Err(E::from(OleError::LimitExceeded {
+                        resource: "directory entries",
+                        observed: u64::try_from(discovered)
+                            .unwrap_or(u64::MAX)
+                            .saturating_add(1),
+                        maximum: u64::try_from(max_entries).unwrap_or(u64::MAX),
+                    }));
+                }
+                let current_index = usize::try_from(current).map_err(|_error| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID does not fit usize".to_string(),
+                    ))
+                })?;
+                let entry = self
+                    .dir_entries
+                    .get(current_index)
+                    .and_then(Option::as_ref)
+                    .ok_or_else(|| {
+                        E::from(OleError::CorruptedFile(
+                            "directory SID has no entry".to_string(),
+                        ))
+                    })?;
+                let left = entry.sid_left;
+                discovered = discovered.checked_add(1).ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory entry count overflow".to_string(),
+                    ))
+                })?;
+                pending.try_reserve_exact(1).map_err(|source| {
+                    E::from(OleError::allocation("directory traversal stack", source))
+                })?;
+                pending.push(current);
+                current = left;
+            }
+
+            let sid = pending.pop().ok_or_else(|| {
+                E::from(OleError::CorruptedFile(
+                    "directory traversal stack underflow".to_string(),
+                ))
+            })?;
+            let sid_index = usize::try_from(sid).map_err(|_error| {
+                E::from(OleError::CorruptedFile(
+                    "directory SID does not fit usize".to_string(),
+                ))
+            })?;
+            let entry = self
+                .dir_entries
+                .get(sid_index)
+                .and_then(Option::as_ref)
+                .ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID has no entry".to_string(),
+                    ))
+                })?;
+            let right = entry.sid_right;
+            visit(entry)?;
+            current = right;
+        }
+        Ok(())
+    }
+
+    /// Return one validated directory entry by its SID.
+    ///
+    /// SIDs are supplied by [`Self::visit_directory_entries`].  Returning an
+    /// option keeps this accessor defensive for callers that retain a SID
+    /// beyond the visitor callback.
+    #[must_use]
+    pub fn directory_entry_by_sid(&self, sid: u32) -> Option<&DirectoryEntry> {
+        let index = usize::try_from(sid).ok()?;
+        self.dir_entries.get(index).and_then(Option::as_ref)
+    }
+
+    /// Returns the number of validated directory slots retained by this
+    /// parsed CFB view.  This is a finite upper bound for bounded metadata
+    /// visitors that do not have a format-owner resource budget.
+    #[must_use]
+    pub fn directory_entry_count(&self) -> usize {
+        self.dir_entries.len()
+    }
+
     /// Collect all children from a directory (as references - zero-copy).
     ///
     /// The sibling tree is untrusted input, so this uses an explicit stack
@@ -3066,6 +3481,38 @@ fn checked_directory_data_len(sector_count: usize, sector_size: usize) -> Result
         .ok_or_else(|| OleError::CorruptedFile("directory data size overflow".to_string()))
 }
 
+/// Computes the combined bytes charged for the decoded FAT/DIFAT/MiniFAT
+/// sectors and the `u32` vectors that retain their sector locations.
+///
+/// DIFAT sectors are decoded through one reusable sector buffer rather than an
+/// aggregate byte allocation, but their declared sector bytes are charged as
+/// part of this conservative metadata budget. The charge is intentionally
+/// independent of total process memory.
+fn checked_allocation_table_bytes(
+    sector_size: usize,
+    num_fat_sectors: u32,
+    num_difat_sectors: u32,
+    num_minifat_sectors: u32,
+) -> Result<u64, OleError> {
+    let sector_size = u64::try_from(sector_size)
+        .map_err(|_err| OleError::CorruptedFile("sector size does not fit u64".to_string()))?;
+    let sector_count = u64::from(num_fat_sectors)
+        .checked_add(u64::from(num_difat_sectors))
+        .and_then(|value| value.checked_add(u64::from(num_minifat_sectors)))
+        .ok_or_else(|| {
+            OleError::CorruptedFile("allocation table sector count overflow".to_string())
+        })?;
+    let decoded_bytes = sector_count.checked_mul(sector_size).ok_or_else(|| {
+        OleError::CorruptedFile("allocation table byte count overflow".to_string())
+    })?;
+    let location_bytes = sector_count.checked_mul(4).ok_or_else(|| {
+        OleError::CorruptedFile("allocation table location count overflow".to_string())
+    })?;
+    decoded_bytes
+        .checked_add(location_bytes)
+        .ok_or_else(|| OleError::CorruptedFile("allocation table byte count overflow".to_string()))
+}
+
 fn enforce_directory_limit(data_len: usize, maximum: u64) -> Result<(), OleError> {
     let observed = u64::try_from(data_len).map_err(|_err| {
         OleError::CorruptedFile("directory data size does not fit u64".to_string())
@@ -3717,6 +4164,31 @@ mod tests {
         output.into_inner()
     }
 
+    #[test]
+    fn preserves_nonzero_stream_directory_timestamps_from_legacy_sources() {
+        let mut data = sample_file();
+        let name = [b'D', 0, b'a', 0, b't', 0, b'a', 0];
+        let entry_name = data
+            .windows(name.len())
+            .position(|window| window == name)
+            .expect("stream name should be present in directory");
+        let creation_time = entry_name + 100;
+        data[creation_time..creation_time + 8].copy_from_slice(&1_u64.to_le_bytes());
+        let file = OleFile::open(Cursor::new(data)).expect("legacy stream metadata is readable");
+        let stream = file
+            .list_streams()
+            .into_iter()
+            .find(|path| path == &["Data".to_string()])
+            .expect("sample stream should remain reachable");
+        let entry = file
+            .list_directory_entries(&[])
+            .expect("root directory entries")
+            .into_iter()
+            .find(|entry| entry.name == stream[0])
+            .expect("sample stream directory entry");
+        assert_eq!(entry.creation_time, 1);
+    }
+
     fn file_with_streams<I, S>(names: I) -> OleFile<Cursor<Vec<u8>>>
     where
         I: IntoIterator<Item = S>,
@@ -3739,6 +4211,61 @@ mod tests {
         for name in &names {
             assert_eq!(file.stream_len(&[name]).unwrap(), 0);
         }
+    }
+
+    #[test]
+    fn bounded_directory_visitor_stops_before_collecting_wide_siblings() {
+        let names: Vec<_> = (0..257).map(|index| format!("Entry {index:03}")).collect();
+        let mut file = file_with_streams(&names);
+        let mut visited = Vec::new();
+        let error = file.visit_directory_entries(&[], 3, |file, sid| {
+            visited.push(
+                file.directory_entry_by_sid(sid)
+                    .expect("visitor SID should resolve")
+                    .name
+                    .clone(),
+            );
+            Ok(())
+        });
+        assert!(matches!(
+            error,
+            Err(OleError::LimitExceeded {
+                resource: "directory entries",
+                ..
+            })
+        ));
+        assert!(visited.len() <= 3);
+    }
+
+    #[test]
+    fn bounded_directory_visitor_charges_zero_budget_before_reserving() {
+        let mut file = file_with_streams(["Left", "Right"]);
+        let mut callbacks = 0;
+        let error = file.visit_directory_entries(&[], 0, |_file, _sid| {
+            callbacks += 1;
+            Ok::<(), OleError>(())
+        });
+        assert!(matches!(
+            error,
+            Err(OleError::LimitExceeded {
+                resource: "directory entries",
+                maximum: 0,
+                ..
+            })
+        ));
+        assert_eq!(callbacks, 0);
+    }
+
+    #[test]
+    fn read_only_directory_visitor_resolves_without_sibling_materialization() {
+        let file = file_with_streams(["Alpha", "Bravo", "Charlie"]);
+        let mut names = Vec::new();
+        file.visit_directory_entry_refs(&[], 3, |entry| {
+            names.push(entry.name.clone());
+            Ok::<(), OleError>(())
+        })
+        .expect("bounded read-only visit should succeed");
+        assert_eq!(names.len(), 3);
     }
 
     #[test]
@@ -4108,6 +4635,61 @@ mod tests {
         assert!(result.as_ref().is_ok_and(Result::is_err));
     }
 
+    fn synthetic_v4_range_lock_file(file_size: u64, marker: u32) -> OleFile<Cursor<Vec<u8>>> {
+        let physical_count =
+            usize::try_from(file_size / u64::try_from(SECTOR_SIZE_V4).unwrap() - 1).unwrap();
+        let lock = usize::try_from(RANGE_LOCK_SECTOR_V4).unwrap();
+        let mut fat = vec![FREESECT; physical_count];
+        fat[lock] = marker;
+        OleFile {
+            reader: Cursor::new(Vec::new()),
+            file_size,
+            sector_size: SECTOR_SIZE_V4,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat,
+            minifat: Vec::new(),
+            root_chain: Vec::new(),
+            first_dir_sector: 0,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: vec![PhysicalSectorRole::Unclaimed; physical_count],
+        }
+    }
+
+    #[test]
+    fn validates_v4_range_lock_marker_and_rejects_chain_pointers() {
+        let exact_two_gib =
+            (u64::from(RANGE_LOCK_SECTOR_V4) + 2) * u64::try_from(SECTOR_SIZE_V4).unwrap();
+        let mut below = synthetic_v4_range_lock_file(exact_two_gib, FREESECT);
+        below
+            .validate_range_lock_sector(0, ENDOFCHAIN, ENDOFCHAIN)
+            .unwrap();
+        assert_eq!(
+            below.sector_roles[usize::try_from(RANGE_LOCK_SECTOR_V4).unwrap()],
+            PhysicalSectorRole::RangeLock
+        );
+
+        let beyond_two_gib =
+            (u64::from(RANGE_LOCK_SECTOR_V4) + 3) * u64::try_from(SECTOR_SIZE_V4).unwrap();
+        let mut malformed = synthetic_v4_range_lock_file(beyond_two_gib, FREESECT);
+        assert!(matches!(
+            malformed.validate_range_lock_sector(0, ENDOFCHAIN, ENDOFCHAIN),
+            Err(OleError::CorruptedFile(message))
+                if message.contains("must be marked ENDOFCHAIN")
+        ));
+
+        let mut pointed = synthetic_v4_range_lock_file(beyond_two_gib, ENDOFCHAIN);
+        pointed.fat[1] = RANGE_LOCK_SECTOR_V4;
+        assert!(matches!(
+            pointed.validate_range_lock_sector(0, ENDOFCHAIN, ENDOFCHAIN),
+            Err(OleError::CorruptedFile(message))
+                if message.contains("points to the range-lock sector")
+        ));
+    }
+
     #[test]
     fn fat_stream_reads_only_the_declared_logical_size() {
         let mut bytes = vec![0u8; 3 * 512];
@@ -4381,6 +4963,9 @@ mod tests {
             sid_right: NOSTREAM,
             sid_child: 1,
             clsid: String::new(),
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
             start_sector: ENDOFCHAIN,
             size: root_size,
             is_minifat: false,
@@ -4394,6 +4979,9 @@ mod tests {
             sid_right: NOSTREAM,
             sid_child: NOSTREAM,
             clsid: String::new(),
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
             start_sector,
             size: stream_size,
             is_minifat,
@@ -5477,6 +6065,9 @@ mod tests {
                 sid_right: right,
                 sid_child: NOSTREAM,
                 clsid: String::new(),
+                state_bits: 0,
+                creation_time: 0,
+                modified_time: 0,
                 start_sector: ENDOFCHAIN,
                 size: 0,
                 is_minifat: false,
@@ -5502,6 +6093,9 @@ mod tests {
                 sid_right: NOSTREAM,
                 sid_child: 1,
                 clsid: String::new(),
+                state_bits: 0,
+                creation_time: 0,
+                modified_time: 0,
                 start_sector: ENDOFCHAIN,
                 size: 0,
                 is_minifat: false,

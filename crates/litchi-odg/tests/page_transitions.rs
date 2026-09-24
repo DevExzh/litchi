@@ -2,6 +2,7 @@
 
 use litchi_odf_common::core::PackageWriter;
 use litchi_odg::{Drawing, Transition, TransitionSound, page::Page};
+use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_AUTOMATIC: &str = r##"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xml="http://www.w3.org/XML/1998/namespace" xmlns:foo="urn:example:unknown" office:version="1.4"><office:automatic-styles><style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties presentation:transition-type="automatic" presentation:transition-style="fade-from-left" presentation:transition-speed="fast" smil:type="fade" smil:subtype="crossfade" smil:direction="forward" smil:fadeColor="#010203" presentation:duration="PT2S"><presentation:sound xlink:type="simple" xlink:href="media/transition.wav" xlink:actuate="onRequest" xlink:show="replace" presentation:play-full="true" xml:id="sound1"/><foo:unknown foo:value="keep"/></style:drawing-page-properties></style:style></office:automatic-styles><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1"/></office:drawing></office:body></office:document-content>"##;
 
@@ -14,6 +15,7 @@ const CONTENT_3D: &str = r##"<?xml version="1.0" encoding="UTF-8"?><office:docum
 const CONTENT_ENHANCED: &str = r##"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Page 1"><draw:custom-shape draw:name="Custom"><draw:enhanced-geometry draw:type="rectangle" svg:viewBox="0 0 21600 21600"><draw:equation draw:name="f0" draw:formula="width/2"/><draw:handle draw:handle-position="$0 0"/></draw:enhanced-geometry></draw:custom-shape></draw:page></office:drawing></office:body></office:document-content>"##;
 
 const CONTENT_AUXILIARY: &str = r##"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Page 1"><draw:frame draw:name="Picture"><draw:image xlink:type="simple" xlink:href="media/picture.png"/><draw:glue-point draw:id="0" svg:x="1cm" svg:y="2cm" draw:escape-direction="auto"/><draw:image-map><draw:area-rectangle svg:x="0cm" svg:y="0cm" svg:width="2cm" svg:height="3cm" xlink:type="simple" xlink:href="https://example.org/target" xlink:show="replace" office:name="area-1"/><draw:area-polygon svg:x="0cm" svg:y="0cm" svg:width="2cm" svg:height="3cm" svg:viewBox="0 0 100 100" draw:points="0,0 100,0 50,100" draw:nohref="nohref"/></draw:image-map><draw:contour-polygon draw:recreate-on-edit="true" svg:width="2cm" svg:height="3cm" svg:viewBox="0 0 100 100" draw:points="0,0 100,0 50,100"/></draw:frame></draw:page></office:drawing></office:body></office:document-content>"##;
+const CONTENT_TRANSFER_NAMESPACE: &str = r##"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:foo="urn:example:libre&amp;producer" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Page 1"><draw:rect draw:name="Source"><foo:metadata foo:value="retained"/></draw:rect></draw:page></office:drawing></office:body></office:document-content>"##;
 
 const STYLES_NAMED: &str = r##"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" office:version="1.4"><office:styles><style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties presentation:transition-type="manual" smil:type="fade"/></style:style></office:styles></office:document-styles>"##;
 
@@ -30,6 +32,53 @@ fn package(content: &str, styles: Option<&str>) -> Vec<u8> {
         writer.add_file("styles.xml", styles.as_bytes()).unwrap();
     }
     writer.finish_to_bytes().unwrap()
+}
+
+fn raw_package(content: &str) -> Vec<u8> {
+    const MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.graphics";
+    const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.graphics"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
+    let mut writer = StreamingArchiveWriter::new();
+    writer.write_stored("mimetype", MIMETYPE).unwrap();
+    writer
+        .write_stored("content.xml", content.as_bytes())
+        .unwrap();
+    writer
+        .write_stored("META-INF/manifest.xml", MANIFEST)
+        .unwrap();
+    writer.finish_to_bytes().unwrap()
+}
+
+fn patch_member_uncompressed_size(mut bytes: Vec<u8>, member: &[u8], size: u32) -> Vec<u8> {
+    let mut found_local = false;
+    for offset in bytes
+        .windows(4)
+        .enumerate()
+        .filter_map(|(offset, marker)| (marker == b"PK\x03\x04").then_some(offset))
+    {
+        let name_len = u16::from_le_bytes(bytes[offset + 26..offset + 28].try_into().unwrap());
+        let name_start = offset + 30;
+        if &bytes[name_start..name_start + usize::from(name_len)] == member {
+            bytes[offset + 22..offset + 26].copy_from_slice(&size.to_le_bytes());
+            found_local = true;
+            break;
+        }
+    }
+    let mut found_central = false;
+    for offset in bytes
+        .windows(4)
+        .enumerate()
+        .filter_map(|(offset, marker)| (marker == b"PK\x01\x02").then_some(offset))
+    {
+        let name_len = u16::from_le_bytes(bytes[offset + 28..offset + 30].try_into().unwrap());
+        let name_start = offset + 46;
+        if &bytes[name_start..name_start + usize::from(name_len)] == member {
+            bytes[offset + 24..offset + 28].copy_from_slice(&size.to_le_bytes());
+            found_central = true;
+            break;
+        }
+    }
+    assert!(found_local && found_central);
+    bytes
 }
 
 fn replacement_transition() -> Transition {
@@ -95,6 +144,52 @@ fn reads_smil_transition_and_reopens_source_bound_edit() {
     assert_eq!(replayed.as_bytes(), output.as_bytes());
     let restored = durable.inverse().apply(&replayed).unwrap();
     assert_eq!(restored.as_bytes(), source.as_bytes());
+}
+
+#[test]
+fn oversized_external_styles_member_is_rejected_before_materialization() {
+    let bytes = patch_member_uncompressed_size(
+        package(CONTENT_SHARED, Some(STYLES_NAMED)),
+        b"styles.xml",
+        256 * 1024 * 1024 + 1,
+    );
+    let error = match Drawing::from_bytes(bytes) {
+        Ok(_) => panic!("oversized styles member was accepted"),
+        Err(error) => error,
+    };
+    assert!(
+        matches!(error, litchi_core::Error::InvalidFormat(reason) if reason.contains("styles.xml") && reason.contains("family limit"))
+    );
+}
+
+#[test]
+fn oversized_external_content_member_is_rejected_before_materialization() {
+    let bytes = patch_member_uncompressed_size(
+        package(CONTENT_SHARED, None),
+        b"content.xml",
+        256 * 1024 * 1024 + 1,
+    );
+    let error = match Drawing::from_bytes(bytes) {
+        Ok(_) => panic!("oversized content member was accepted"),
+        Err(error) => error,
+    };
+    assert!(
+        matches!(error, litchi_core::Error::InvalidFormat(reason) if reason.contains("content.xml") && reason.contains("family limit"))
+    );
+}
+
+#[test]
+fn oversized_ignored_event_is_rejected_before_parser_ownership() {
+    let comment = "x".repeat(16 * 1024 * 1024 + 1);
+    let content =
+        CONTENT_SHARED.replace("<office:body>", &format!("<!--{comment}--><office:body>"));
+    let error = match Drawing::from_bytes(raw_package(&content)) {
+        Ok(_) => panic!("oversized ignored XML event was accepted"),
+        Err(error) => error,
+    };
+    assert!(
+        matches!(error, litchi_core::Error::InvalidFormat(reason) if reason.contains("event") && reason.contains("limit"))
+    );
 }
 
 #[test]
@@ -185,15 +280,27 @@ fn recognizes_inert_dr3d_shape_owners() {
 }
 
 #[test]
-fn rejects_non_3d_dr3d_scene_children() {
+fn rejects_misplaced_dr3d_shape_owners() {
+    // ODF 1.4 lets `draw:g` and `dr3d:scene` own a `dr3d:scene` (`shape` and
+    // `shapes3d` both include `dr3d-scene`); `review_regressions.rs` accepts
+    // those owners. A `draw:rect` has no shape children, so a scene there is
+    // still a misplaced owner.
+    let scene_in_rect = CONTENT_3D
+        .replace(
+            r#"<dr3d:scene draw:name="Scene">"#,
+            r#"<draw:rect draw:name="Host"><dr3d:scene draw:name="Scene">"#,
+        )
+        .replace(r#"</dr3d:scene>"#, r#"</dr3d:scene></draw:rect>"#);
     let non_3d_scene_child = CONTENT_3D.replace(
         r#"<dr3d:light dr3d:direction="(0 0 1)"/>"#,
         r#"<draw:rect/>"#,
     );
-    assert!(matches!(
-        Drawing::from_bytes(package(&non_3d_scene_child, None)),
-        Err(litchi_core::Error::InvalidFormat(_))
-    ));
+    for content in [scene_in_rect, non_3d_scene_child] {
+        assert!(matches!(
+            Drawing::from_bytes(package(&content, None)),
+            Err(litchi_core::Error::InvalidFormat(_))
+        ));
+    }
 }
 
 #[test]
@@ -436,6 +543,26 @@ fn refuses_generic_mutation_of_inert_3d_and_preserves_detached_source_identity()
 }
 
 #[test]
+fn escapes_decoded_unknown_namespace_uri_when_closing_transfer() {
+    let source = Drawing::from_bytes(package(CONTENT_TRANSFER_NAMESPACE, None)).unwrap();
+    let transfer = source.prepare_shape_transfer(0, 0).unwrap();
+    let mut edit = source.edit();
+    edit.insert_shape_transfer(0, 1, &transfer).unwrap();
+    let output = edit.commit().unwrap().into_snapshot();
+    assert!(
+        output
+            .content_xml()
+            .contains(r#"xmlns:foo="urn:example:libre&amp;producer""#)
+    );
+    assert!(
+        !output
+            .content_xml()
+            .contains(r#"urn:example:libre&producer""#)
+    );
+    assert!(Drawing::from_bytes(output.as_bytes().to_vec()).is_ok());
+}
+
+#[test]
 fn enforces_frame_and_scene_child_order_and_lexical_domains() {
     let title_before_map = CONTENT_AUXILIARY.replace(
         "<draw:image-map>",
@@ -495,7 +622,7 @@ fn accepts_empty_anyiri_transition_sound_and_scopes_xml_ids_per_part() {
     let source = Drawing::from_bytes(package(&content, Some(STYLES_NAMED))).unwrap();
     let mut transition = Transition::new();
     transition.set_transition_type(Some("automatic")).unwrap();
-    transition.set_duration(Some("PT.5S")).unwrap();
+    transition.set_duration(Some("PT0.5S")).unwrap();
     let sound = TransitionSound::new("")
         .unwrap()
         .with_xml_id(Some("sound1"))
@@ -513,7 +640,7 @@ fn accepts_empty_anyiri_transition_sound_and_scopes_xml_ids_per_part() {
             .transition()
             .unwrap()
             .duration(),
-        Some("PT.5S")
+        Some("PT0.5S")
     );
 }
 
@@ -523,7 +650,7 @@ fn inserts_detached_page_with_owned_transition_style_and_inverts_exactly() {
     let mut transition = Transition::new();
     transition.set_transition_type(Some("automatic")).unwrap();
     transition.set_style(Some("dissolve")).unwrap();
-    transition.set_duration(Some("PT1.S")).unwrap();
+    transition.set_duration(Some("PT1.0S")).unwrap();
     transition.set_sound(Some(TransitionSound::new("").unwrap()));
     let mut edit = source.edit();
     edit.insert_page(1, Page::new("Inserted").with_transition(transition.clone()))

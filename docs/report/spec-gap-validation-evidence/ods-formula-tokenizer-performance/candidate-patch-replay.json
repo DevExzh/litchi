@@ -1,0 +1,13 @@
+{
+  "base": "b88341bf4175daa409dd12d3d5ed665b33bbaf78",
+  "patch": "candidate.patch",
+  "patch_sha256": "1be6d396f4042b81463e318456dba08608d393cdfc29d52efa3f273ad43df7db",
+  "files": [
+    "crates/litchi-ods/src/codec/formula.rs",
+    "crates/litchi-ods/src/codec/formula/reference.rs",
+    "crates/litchi-ods/tests/ods_formula_tokenizer_regression.rs"
+  ],
+  "check_status": 0,
+  "apply_status": 0,
+  "byte_match": true
+}

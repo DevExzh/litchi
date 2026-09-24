@@ -8,11 +8,14 @@
 //! not recoverable from that API.
 
 use super::{Error, Result};
+use crate::parts::fib::FileInformationBlock;
+use crate::parts::protection::{EditProtection, ProtectionPolicy, classify};
 use crate::user_defined_hyperlinks::{Limits, MutationError, UserDefinedHyperlinks};
 use litchi_cfb::{OleError, OleFile};
 use litchi_ole_common::property_set::{
     self, Binding, PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
+use litchi_ole_common::vba_signature;
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -20,15 +23,24 @@ use std::sync::Arc;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Snapshot {
     bytes: Arc<[u8]>,
+    protection: EditProtection,
 }
 
 impl Snapshot {
     /// Parses and validates an owned DOC compound-file artifact.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         validate_host(&bytes)?;
+        let protection = classify_host(&bytes)?;
         Ok(Self {
             bytes: Arc::from(bytes.into_boxed_slice()),
+            protection,
         })
+    }
+
+    /// Parses a source and returns its observed Word protection state.
+    #[must_use]
+    pub const fn protection(&self) -> EditProtection {
+        self.protection
     }
 
     /// Parses a borrowed DOC artifact while retaining an owned source copy.
@@ -64,6 +76,30 @@ impl Snapshot {
         property_set::document_summary::Snapshot::from_stream(&stream)
             .map(Some)
             .map_err(Into::into)
+    }
+
+    /// Reads the inert VBA `DigSigBlob` stored in PIDDSI
+    /// `DocumentSummaryInformation`.
+    ///
+    /// The returned owner validates the `[MS-OSHARED]` container and retains
+    /// exact source bytes. The PKCS#7 `SignedData` payload and its
+    /// `SpcIndirectDataContent`/`SpcIndirectDataContentV2` `contentInfo` form
+    /// remain opaque. It never verifies certificate trust, opens a VBA
+    /// project, or executes code. `None` means the property stream or the
+    /// `DigitalSignature` property is absent.
+    pub fn vba_signature(&self) -> Result<Option<vba_signature::Snapshot>> {
+        self.vba_signature_with(vba_signature::Limits::default())
+    }
+
+    /// Reads the inert VBA signature with explicit payload and blob limits.
+    pub fn vba_signature_with(
+        &self,
+        limits: vba_signature::Limits,
+    ) -> Result<Option<vba_signature::Snapshot>> {
+        let Some(summary) = self.document_summary_information()? else {
+            return Ok(None);
+        };
+        summary.vba_signature_with(limits).map_err(Into::into)
     }
 
     /// Returns the generic user-defined section, when present.
@@ -106,7 +142,12 @@ impl Snapshot {
     /// The common editor rejects signed or encrypted containers before any
     /// mutation can be staged.
     pub fn transaction(&self) -> Result<Transaction> {
-        Transaction::new(self.clone())
+        self.transaction_with_policy(ProtectionPolicy::default())
+    }
+
+    /// Starts a property-set transaction with an explicit protected-edit policy.
+    pub fn transaction_with_policy(&self, policy: ProtectionPolicy) -> Result<Transaction> {
+        Transaction::new(self.clone(), policy)
     }
 
     /// Consumes the snapshot into its owned source bytes.
@@ -121,15 +162,17 @@ pub struct Transaction {
     source: Snapshot,
     editor: property_set::Editor,
     changed: bool,
+    protection_policy: ProtectionPolicy,
 }
 
 impl Transaction {
-    fn new(source: Snapshot) -> Result<Self> {
+    fn new(source: Snapshot, protection_policy: ProtectionPolicy) -> Result<Self> {
         let editor = property_set::Editor::new(source.bytes.to_vec())?;
         Ok(Self {
             source,
             editor,
             changed: false,
+            protection_policy,
         })
     }
 
@@ -164,6 +207,82 @@ impl Transaction {
         property_set::document_summary::Snapshot::from_section(&section)
             .map(Some)
             .map_err(Into::into)
+    }
+
+    /// Reads the current transaction-local inert VBA `DigSigBlob`.
+    pub fn vba_signature(&self) -> Result<Option<vba_signature::Snapshot>> {
+        self.vba_signature_with(vba_signature::Limits::default())
+    }
+
+    /// Reads the current transaction-local VBA signature with explicit limits.
+    pub fn vba_signature_with(
+        &self,
+        limits: vba_signature::Limits,
+    ) -> Result<Option<vba_signature::Snapshot>> {
+        let Some(summary) = self.document_summary_information()? else {
+            return Ok(None);
+        };
+        summary.vba_signature_with(limits).map_err(Into::into)
+    }
+
+    /// Replaces PIDDSI `DigitalSignature` with an already validated inert
+    /// `DigSigBlob` snapshot. Its nested PKCS#7 `SignedData` and
+    /// `contentInfo` form remain opaque to this package owner.
+    pub fn set_vba_signature(&mut self, signature: &vba_signature::Snapshot) -> Result<bool> {
+        self.edit_document_summary_information(|edit| edit.set_vba_signature(signature))
+    }
+
+    /// Removes PIDDSI `DigitalSignature`, when the property is present.
+    pub fn remove_vba_signature(&mut self) -> Result<bool> {
+        if self
+            .editor
+            .property_set(Binding::DocumentSummaryInformation)?
+            .is_none()
+        {
+            return Ok(false);
+        }
+        self.edit_document_summary_information(|edit| {
+            edit.remove_vba_signature();
+            Ok(())
+        })
+    }
+
+    /// Edits the opaque PKCS#7 signature and certificate-store payloads
+    /// atomically. ASN.1 content form and certificate trust remain outside
+    /// this inert storage owner.
+    ///
+    /// The nested transaction rewrites only those payloads and preserves
+    /// producer-specific gaps and padding. Its closure never receives a
+    /// cryptographic verifier or a VBA execution context.
+    pub fn edit_vba_signature<F>(&mut self, edit: F) -> Result<bool>
+    where
+        F: FnOnce(&mut vba_signature::Transaction) -> std::result::Result<(), vba_signature::Error>,
+    {
+        self.edit_vba_signature_with_limits(vba_signature::Limits::default(), edit)
+    }
+
+    /// Edits the opaque VBA signature using explicit nested-blob limits.
+    pub fn edit_vba_signature_with_limits<F>(
+        &mut self,
+        limits: vba_signature::Limits,
+        edit: F,
+    ) -> Result<bool>
+    where
+        F: FnOnce(&mut vba_signature::Transaction) -> std::result::Result<(), vba_signature::Error>,
+    {
+        let signature = self.vba_signature_with(limits)?.ok_or_else(|| {
+            Error::InvalidFormat(
+                "DocumentSummaryInformation has no VBA DigitalSignature blob".to_string(),
+            )
+        })?;
+        let mut transaction = signature.edit();
+        edit(&mut transaction).map_err(|error| {
+            Error::InvalidFormat(format!("invalid VBA signature edit: {error}"))
+        })?;
+        let commit = transaction.commit().map_err(|error| {
+            Error::InvalidFormat(format!("invalid VBA signature edit: {error}"))
+        })?;
+        self.set_vba_signature(commit.snapshot())
     }
 
     /// Returns the current transaction-local user-defined section.
@@ -330,6 +449,10 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit> {
         let before = self.source.bytes.clone();
         let bytes = self.editor.finish()?;
+        let changed = bytes.as_slice() != before.as_ref();
+        if changed {
+            self.protection_policy.authorize(self.source.protection)?;
+        }
         // The editor can finish without staged changes, or a sequence of
         // edits can restore the complete source artifact byte-for-byte.  The
         // source was already validated at transaction creation, so retain
@@ -338,6 +461,7 @@ impl Transaction {
         let snapshot = if bytes.as_slice() == before.as_ref() {
             Snapshot {
                 bytes: Arc::clone(&before),
+                protection: self.source.protection,
             }
         } else {
             Snapshot::from_bytes(bytes)?
@@ -422,20 +546,48 @@ impl Patch {
 
     /// Applies the patch only to the exact source snapshot it was created from.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+        // The destination owns the default publication policy. Reusing the
+        // policy captured by an authorized transaction would let a protected
+        // patch cross into an enforcing snapshot without an explicit caller
+        // authorization at this boundary.
+        self.apply_with_policy(source, ProtectionPolicy::default())
+    }
+
+    /// Applies the patch with an explicit protected-edit policy.
+    pub fn apply_with_policy(
+        &self,
+        source: &Snapshot,
+        policy: ProtectionPolicy,
+    ) -> Result<Snapshot> {
         if source.bytes.as_ref() != self.source.as_ref() {
             return Err(Error::InvalidFormat(
                 "DOC property-set patch source does not match".to_string(),
             ));
+        }
+        if source.bytes.as_ref() != self.replacement.as_ref() {
+            policy.authorize(source.protection)?;
         }
         Snapshot::from_bytes(self.replacement.to_vec())
     }
 
     /// Reverts the patch only from its exact replacement snapshot.
     pub fn revert(&self, replacement: &Snapshot) -> Result<Snapshot> {
+        self.revert_with_policy(replacement, ProtectionPolicy::default())
+    }
+
+    /// Reverts the patch with an explicit protected-edit policy.
+    pub fn revert_with_policy(
+        &self,
+        replacement: &Snapshot,
+        policy: ProtectionPolicy,
+    ) -> Result<Snapshot> {
         if replacement.bytes.as_ref() != self.replacement.as_ref() {
             return Err(Error::InvalidFormat(
                 "DOC property-set patch replacement does not match".to_string(),
             ));
+        }
+        if replacement.bytes.as_ref() != self.source.as_ref() {
+            policy.authorize(replacement.protection)?;
         }
         Snapshot::from_bytes(self.source.to_vec())
     }
@@ -451,6 +603,39 @@ fn validate_host(bytes: &[u8]) -> Result<()> {
     Ok(())
 }
 
+fn classify_host(bytes: &[u8]) -> Result<EditProtection> {
+    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let word = match ole.open_stream(&["WordDocument"]) {
+        Ok(word) => word,
+        Err(OleError::StreamNotFound) => return Ok(EditProtection::Unknown),
+        Err(error) => return Err(error.into()),
+    };
+    let fib = match FileInformationBlock::parse(&word) {
+        Ok(fib) => fib,
+        Err(_) => return Ok(EditProtection::Unknown),
+    };
+    let table_name = if fib.which_table_stream() {
+        "1Table"
+    } else {
+        "0Table"
+    };
+    let table = match ole.open_stream(&[table_name]) {
+        Ok(table) => table,
+        Err(OleError::StreamNotFound) => return Ok(EditProtection::Unknown),
+        Err(error) => return Err(error.into()),
+    };
+    // Property-set callers may still inspect a structurally valid legacy host
+    // whose DOP uses an observed producer-specific length. Keep that source
+    // readable, but do not turn an unparseable protection record into `None`:
+    // changed publication remains fail-closed as `Unrecognized`, including
+    // when a caller supplies the protected-edit capability.
+    match classify(&fib, &table) {
+        Ok(protection) => Ok(protection),
+        Err(Error::Corrupted(_)) => Ok(EditProtection::Unrecognized),
+        Err(error) => Err(error),
+    }
+}
+
 fn read_stream(bytes: &[u8], binding: Binding) -> Result<Option<Stream>> {
     let mut ole = OleFile::open(Cursor::new(bytes))?;
     match ole.property_set(binding) {
@@ -463,6 +648,7 @@ fn read_stream(bytes: &[u8], binding: Binding) -> Result<Option<Stream>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parts::protection::{EditProtection, ProtectionAuthorization, ProtectionPolicy};
     use litchi_cfb::{OleFile, OleWriter};
     use litchi_ole_common::property_set::{
         CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, SUMMARY_INFORMATION_FMTID, Section,
@@ -483,8 +669,29 @@ mod tests {
             .unwrap();
         let document_summary = PropertyStream::new(document_summary).to_bytes().unwrap();
 
+        const DOP_INDEX: usize = 31;
+        const POINTER_COUNT: usize = 136;
+        let pointer_end = 154 + POINTER_COUNT * 8;
+        let mut word = vec![0u8; pointer_end + 4];
+        word[0..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
+        // FibBase.csw and cslw are fixed MS-DOC counts.
+        word[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+        word[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
+        word[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
+        word[152..154].copy_from_slice(&(POINTER_COUNT as u16).to_le_bytes());
+        word[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+        word[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
+
+        let table = crate::parts::document_properties::DocumentProperties::writer_bytes(
+            false, false, false, true,
+        );
+        let dop_pointer = 154 + DOP_INDEX * 8;
+        word[dop_pointer..dop_pointer + 4].copy_from_slice(&0u32.to_le_bytes());
+        word[dop_pointer + 4..dop_pointer + 8].copy_from_slice(&594u32.to_le_bytes());
+
         let mut writer = OleWriter::new();
-        writer.create_stream(&["WordDocument"], b"word").unwrap();
+        writer.create_stream(&["WordDocument"], &word).unwrap();
+        writer.create_stream(&["0Table"], &table).unwrap();
         writer
             .create_stream(&["\u{0005}SummaryInformation"], &summary)
             .unwrap();
@@ -497,6 +704,47 @@ mod tests {
         if let Some(name) = extra_stream {
             writer.create_stream(&[name], b"marker").unwrap();
         }
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    }
+
+    fn protected_package_bytes() -> Vec<u8> {
+        const DOP_INDEX: usize = 31;
+        const POINTER_COUNT: usize = 136;
+        let dop_offset = 16usize;
+        let mut table = vec![0x5a; dop_offset];
+        let mut dop = crate::parts::document_properties::DocumentProperties::writer_bytes(
+            false, false, false, true,
+        );
+        dop[6] = 0x10;
+        table.extend_from_slice(&dop);
+
+        let pointer_end = 154 + POINTER_COUNT * 8;
+        let mut word = vec![0u8; pointer_end + 4];
+        word[0..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
+        // FibBase.csw and cslw are fixed MS-DOC counts.
+        word[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+        word[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
+        word[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
+        word[152..154].copy_from_slice(&(POINTER_COUNT as u16).to_le_bytes());
+        word[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+        word[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
+        let pointer = 154 + DOP_INDEX * 8;
+        word[pointer..pointer + 4].copy_from_slice(&(dop_offset as u32).to_le_bytes());
+        word[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
+
+        let mut summary = Section::new(SUMMARY_INFORMATION_FMTID);
+        summary.set_page(CodePage::Utf16Le);
+        summary.add(2, Value::Lpwstr("before".to_string())).unwrap();
+        let summary = PropertyStream::new(summary).to_bytes().unwrap();
+
+        let mut writer = OleWriter::new();
+        writer.create_stream(&["WordDocument"], &word).unwrap();
+        writer.create_stream(&["0Table"], &table).unwrap();
+        writer
+            .create_stream(&["\u{0005}SummaryInformation"], &summary)
+            .unwrap();
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
         output.into_inner()
@@ -579,5 +827,113 @@ mod tests {
                 .transaction()
                 .is_err()
         );
+    }
+
+    #[test]
+    fn protected_property_edits_require_authorization_and_keep_patch_capability() {
+        let source = protected_package_bytes();
+        let snapshot = Snapshot::from_bytes(source.clone()).unwrap();
+        assert_eq!(snapshot.protection(), EditProtection::Document);
+
+        let no_op = snapshot.transaction().unwrap().commit().unwrap();
+        assert!(!no_op.changed());
+        assert_eq!(no_op.snapshot().bytes(), source.as_slice());
+
+        let mut denied = snapshot.transaction().unwrap();
+        denied
+            .edit_summary_information(|edit| edit.set_title("after"))
+            .unwrap();
+        assert!(matches!(
+            denied.commit(),
+            Err(Error::ProtectionDenied(EditProtection::Document))
+        ));
+
+        let authorization =
+            ProtectionAuthorization::audited("test-suite", "approved metadata repair").unwrap();
+        let policy = ProtectionPolicy::allow_protected(authorization);
+        let mut allowed = snapshot.transaction_with_policy(policy.clone()).unwrap();
+        allowed
+            .edit_summary_information(|edit| edit.set_title("after"))
+            .unwrap();
+        let commit = allowed.commit().unwrap();
+        assert!(commit.changed());
+        assert!(matches!(
+            commit.patch().apply(&snapshot),
+            Err(Error::ProtectionDenied(EditProtection::Document))
+        ));
+        let applied = commit
+            .patch()
+            .apply_with_policy(&snapshot, policy.clone())
+            .unwrap();
+        assert_eq!(applied.bytes(), commit.snapshot().bytes());
+        assert!(matches!(
+            commit.patch().revert(&applied),
+            Err(Error::ProtectionDenied(EditProtection::Document))
+        ));
+        assert_eq!(
+            commit
+                .patch()
+                .revert_with_policy(&applied, policy)
+                .unwrap()
+                .bytes(),
+            source
+        );
+    }
+
+    #[test]
+    fn malformed_or_incomplete_word_hosts_are_unknown_and_fail_closed() {
+        let mut malformed = OleWriter::new();
+        malformed
+            .create_stream(&["WordDocument"], b"not-a-fib")
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
+        malformed.write_to(&mut output).unwrap();
+        let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
+        assert_eq!(snapshot.protection(), EditProtection::Unknown);
+        let mut transaction = snapshot.transaction().unwrap();
+        transaction
+            .edit_user_defined_properties(|section| {
+                section.add(2, Value::Lpwstr("blocked".to_string()))?;
+                Ok(())
+            })
+            .unwrap();
+        assert!(matches!(
+            transaction.commit(),
+            Err(Error::ProtectionDenied(EditProtection::Unknown))
+        ));
+        let authorization =
+            ProtectionAuthorization::audited("test-suite", "inspect malformed host").unwrap();
+        let mut transaction = snapshot
+            .transaction_with_policy(ProtectionPolicy::allow_protected(authorization))
+            .unwrap();
+        transaction
+            .edit_user_defined_properties(|section| {
+                section.add(2, Value::Lpwstr("still blocked".to_string()))?;
+                Ok(())
+            })
+            .unwrap();
+        assert!(matches!(
+            transaction.commit(),
+            Err(Error::ProtectionDenied(EditProtection::Unknown))
+        ));
+
+        let mut missing_selected_table = OleWriter::new();
+        let mut word = vec![0u8; 154 + 38 * 8];
+        word[0..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
+        // FibBase.csw and cslw are fixed MS-DOC counts.
+        word[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+        word[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
+        word[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
+        word[152..154].copy_from_slice(&38u16.to_le_bytes());
+        missing_selected_table
+            .create_stream(&["WordDocument"], &word)
+            .unwrap();
+        missing_selected_table
+            .create_stream(&["1Table"], &[])
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
+        missing_selected_table.write_to(&mut output).unwrap();
+        let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
+        assert_eq!(snapshot.protection(), EditProtection::Unknown);
     }
 }

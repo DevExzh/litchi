@@ -1,0 +1,33 @@
+{
+  "command": [
+    "cargo",
+    "clippy",
+    "--offline",
+    "--locked",
+    "-p",
+    "litchi-ods",
+    "--lib",
+    "--tests",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "status": 0,
+  "seconds": 7.6390540599823,
+  "baseline_context_sha256": "5b2320a6204b96185b6e91eaa27d3f166ac19555e71b307c79a0600329975cf4",
+  "bridge_before_sha256": "4e133e7ccab7e3c4632d955a2479f2660bff30da0a494cde565b812ba4940b07",
+  "bridge_after_sha256": "4e133e7ccab7e3c4632d955a2479f2660bff30da0a494cde565b812ba4940b07",
+  "restored_baseline": true,
+  "scope": "isolated scalar bridge warning-denied Clippy; complete value VM not built",
+  "cwd": "/home/zhuhe/code/litchi-array-worktree",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-array-target",
+    "TMPDIR": "/home/zhuhe/code/litchi-array-tmp",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "compiler_verified_after": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "context_append_sha256": "d215ceb67cd03c664b2cd4cb28cd400e95ef0911cde3ce6927e505225b4eab44",
+  "workspace_lock_sha256": "aa945c79965460e74a64063e1c45396eaae7a68e71072730e2bc426cded22f02"
+}

@@ -1,4 +1,5 @@
-//! Bounded, source-preserving edits for ordinary main-story DOC paragraphs.
+//! Bounded, source-preserving edits for ordinary main-story DOC paragraphs and
+//! selected inert auxiliary tables.
 //!
 //! Length-changing replacements append Unicode text, rebuild the CLX and CHPX
 //! FKPs, shift modeled main-story PLCFs, and update the FIB story length. The
@@ -24,6 +25,12 @@ pub mod source;
 
 use crate::DateTime;
 use crate::package::Error as PackageError;
+use crate::parts::dofr::{DofrArray, DofrPatch};
+use crate::parts::protection::ProtectionPolicy;
+use crate::parts::saved_selection::{
+    FIB_INDEX_WSS, SavedSelection, SavedSelectionPatch, SavedSelectionSpliceError,
+    SavedSelectionTransaction,
+};
 use crate::tracked_revision::{Limits, Revision, RevisionEditor, RevisionKind, RevisionMetadata};
 use litchi_core::Position;
 use litchi_core::patch::{
@@ -353,6 +360,16 @@ pub enum Refusal {
     ResourceNotFound { storage_id: u32 },
     /// This disposition would delete text or require restoring prior formatting.
     DestructiveRevisionDisposition { kind: RevisionKind },
+    /// A changed DOC publication would leave retained binary signature
+    /// metadata stale.
+    SignedSource,
+    /// Document or range protection is active for this edit policy.
+    Protected,
+    /// Protection metadata is malformed or outside the supported grammar.
+    UnknownProtection,
+    /// Opaque auxiliary-table bytes cannot be merged by the semantic
+    /// three-way body plan without silently dropping one side.
+    AuxiliaryThreeWayMergeUnsupported,
     /// The configured operation count was exhausted.
     OperationLimit { observed: usize, limit: usize },
     /// One or all replacement payloads exceed the configured UTF-16 bound.
@@ -430,6 +447,18 @@ impl std::fmt::Display for Refusal {
                 formatter,
                 "{kind:?} revision disposition is destructive and outside reversible mark editing"
             ),
+            Self::SignedSource => {
+                formatter.write_str("changed DOC edits are refused for signed sources")
+            },
+            Self::Protected => {
+                formatter.write_str("protected DOC sources require explicit edit authorization")
+            },
+            Self::UnknownProtection => formatter.write_str(
+                "DOC protection metadata is malformed or outside the supported grammar",
+            ),
+            Self::AuxiliaryThreeWayMergeUnsupported => formatter.write_str(
+                "three-way body plans do not merge opaque auxiliary-table changes",
+            ),
             Self::OperationLimit { observed, limit } => write!(
                 formatter,
                 "body transaction requested {observed} operations; limit is {limit}"
@@ -490,6 +519,17 @@ impl From<CompositionError> for Error {
 impl From<PatchError> for Error {
     fn from(error: PatchError) -> Self {
         Self::Durable(error)
+    }
+}
+
+fn map_protection_error(error: PackageError) -> Error {
+    match error {
+        PackageError::ProtectionDenied(
+            crate::parts::protection::EditProtection::Unknown
+            | crate::parts::protection::EditProtection::Unrecognized,
+        ) => Error::Refused(Refusal::UnknownProtection),
+        PackageError::ProtectionDenied(_) => Error::Refused(Refusal::Protected),
+        error => Error::Invalid(error),
     }
 }
 
@@ -571,6 +611,7 @@ pub struct Snapshot {
     fingerprint_cache: OnceLock<u64>,
     limits: Limits,
     transaction_limits: TransactionLimits,
+    protection_policy: ProtectionPolicy,
 }
 
 impl Clone for Snapshot {
@@ -586,6 +627,7 @@ impl Clone for Snapshot {
             fingerprint_cache,
             limits: self.limits,
             transaction_limits: self.transaction_limits,
+            protection_policy: self.protection_policy.clone(),
         }
     }
 }
@@ -612,14 +654,38 @@ impl Snapshot {
         limits: Limits,
         transaction_limits: TransactionLimits,
     ) -> Result<Self> {
+        Self::open_bounded_with_policy(
+            input,
+            limits,
+            transaction_limits,
+            ProtectionPolicy::default(),
+        )
+    }
+
+    /// Opens an owned DOC source with an explicit protected-edit policy.
+    ///
+    /// Protected sources remain readable and support exact no-op publication
+    /// under the default policy. Supplying
+    /// [`ProtectionPolicy::AllowProtected`] is an explicit capability that
+    /// authorizes changed publication.
+    pub fn open_bounded_with_policy(
+        input: impl Into<Vec<u8>>,
+        limits: Limits,
+        transaction_limits: TransactionLimits,
+        protection_policy: ProtectionPolicy,
+    ) -> Result<Self> {
         let bytes = input.into();
         crate::Package::<Cursor<Vec<u8>>>::validate_source_len(
             bytes.len(),
             crate::package::Limits::default(),
         )
         .map_err(Error::Invalid)?;
-        let (_strict_editor, mut ole) =
-            RevisionEditor::open_with_ole_file(bytes.clone(), limits).map_err(Error::Invalid)?;
+        let (_strict_editor, mut ole) = RevisionEditor::open_with_ole_file_with_policy(
+            bytes.clone(),
+            limits,
+            protection_policy.clone(),
+        )
+        .map_err(Error::Invalid)?;
         crate::Package::validate_ole_file(&mut ole, crate::package::Limits::default())
             .map_err(Error::Invalid)?;
         Ok(Self {
@@ -627,6 +693,7 @@ impl Snapshot {
             fingerprint_cache: OnceLock::new(),
             limits,
             transaction_limits,
+            protection_policy,
         })
     }
 
@@ -736,6 +803,7 @@ impl Snapshot {
             fingerprint_cache: OnceLock::new(),
             limits,
             transaction_limits,
+            protection_policy: ProtectionPolicy::default(),
         })
     }
 
@@ -831,6 +899,27 @@ impl Snapshot {
     /// Lists tracked main-story ranges in stable CP/kind order.
     pub fn revisions(&self) -> Result<Vec<Revision>> {
         self.editor()?.revisions().map_err(Error::Invalid)
+    }
+
+    /// Reads the optional inert `Selsf` cache through the strict DOC owner.
+    ///
+    /// The public value exposes only the fixed record bytes, while its private
+    /// owner handle keeps source-bound edits tied to this immutable snapshot.
+    /// No selection is applied to document or host UI state.
+    pub fn saved_selection(&self) -> Result<Option<SavedSelection>> {
+        self.editor()?
+            .saved_selection()
+            .map(|selection| selection.map(|selection| selection.with_owner(self.bytes_shared())))
+            .map_err(Error::Invalid)
+    }
+
+    /// Reads the optional bounded `RgDofr` frame-set/list records through the
+    /// strict DOC owner. Frame names and paths remain inert bytes.
+    pub fn dofr_records(&self) -> Result<Option<DofrArray>> {
+        self.editor()?
+            .dofr_records()
+            .map(|records| records.map(|records| records.with_owner(self.bytes_shared())))
+            .map_err(Error::Invalid)
     }
 
     /// Starts a staged bounded body text-and-formatting transaction.
@@ -1214,9 +1303,16 @@ impl Snapshot {
     }
 
     /// Non-mutating three-way plan for two patches based on this exact source.
+    ///
+    /// Opaque `RgDofr` and `Selsf` auxiliary-table changes are refused because
+    /// this plan merges semantic body changes and cannot combine those byte
+    /// ranges without silently dropping one side.
     pub fn plan_three_way(&self, left: &Patch, right: &Patch) -> Result<ThreeWayPlan> {
         if left.before != *self || right.before != *self {
             return Err(Error::Conflict);
+        }
+        if left.has_auxiliary_changes() || right.has_auxiliary_changes() {
+            return Err(Error::Refused(Refusal::AuxiliaryThreeWayMergeUnsupported));
         }
         Ok(ThreeWayPlan::new(self.clone(), left, right))
     }
@@ -1228,8 +1324,12 @@ impl Snapshot {
     }
 
     fn editor(&self) -> Result<RevisionEditor> {
-        let mut editor = RevisionEditor::open(self.source.as_ref().to_vec(), self.limits)
-            .map_err(Error::Invalid)?;
+        let mut editor = RevisionEditor::open_with_policy(
+            self.source.as_ref().to_vec(),
+            self.limits,
+            self.protection_policy.clone(),
+        )
+        .map_err(Error::Invalid)?;
         editor.set_retained_render_limit(self.transaction_limits.max_retained_render_bytes());
         Ok(editor)
     }
@@ -1269,23 +1369,37 @@ impl Eq for Snapshot {}
 pub struct Edit {
     source: Snapshot,
     editor: RevisionEditor,
+    signed: bool,
     changes: Vec<Change>,
     replacement_units: usize,
+    auxiliary_changed: bool,
+    auxiliary_operations: usize,
 }
 
 impl Edit {
     fn new(source: Snapshot) -> Result<Self> {
         let editor = source.editor()?;
+        let signed = editor.dofr_source_is_signed();
         Ok(Self {
             source,
             editor,
+            signed,
             changes: Vec::new(),
             replacement_units: 0,
+            auxiliary_changed: false,
+            auxiliary_operations: 0,
         })
     }
 
+    /// Reopens a complete candidate rendered by a resource owner under this
+    /// transaction's protection policy and retained-render ceiling.
     fn reopen_editor(&self, bytes: Vec<u8>) -> Result<RevisionEditor> {
-        let mut editor = RevisionEditor::open(bytes, self.source.limits).map_err(Error::Invalid)?;
+        let mut editor = RevisionEditor::open_with_policy(
+            bytes,
+            self.source.limits,
+            self.source.protection_policy.clone(),
+        )
+        .map_err(Error::Invalid)?;
         editor
             .set_retained_render_limit(self.source.transaction_limits.max_retained_render_bytes());
         Ok(editor)
@@ -1298,9 +1412,12 @@ impl Edit {
     ) -> Result<T> {
         let previous = self.source.transaction_limits;
         let effective = previous.intersect(incoming);
-        if self.changes.len() > effective.operations {
+        // Auxiliary-table edits count against the operation limit exactly as
+        // `ensure_operation_capacity` counts them.
+        let operations = self.changes.len().saturating_add(self.auxiliary_operations);
+        if operations > effective.operations {
             return Err(Error::Refused(Refusal::OperationLimit {
-                observed: self.changes.len(),
+                observed: operations,
                 limit: effective.operations,
             }));
         }
@@ -1322,6 +1439,71 @@ impl Edit {
         result
     }
 
+    /// Render a candidate through the lower package owner while preserving
+    /// this facade's typed signed-source refusal. The lower public editor
+    /// guard intentionally reports a package error for direct callers; this
+    /// owner compares the exact retained bytes before publication so body
+    /// callers keep [`Refusal::SignedSource`].
+    fn finish_candidate(&self) -> Result<Vec<u8>> {
+        let bytes = self
+            .editor
+            .clone()
+            .finish_unchecked()
+            .map_err(Error::Invalid)?;
+        self.authorize_candidate(bytes)
+    }
+
+    /// Commit-time form of [`Self::finish_candidate`].
+    ///
+    /// A validated render that the editor retained under this transaction's
+    /// ceiling is moved out instead of rendering the candidate a second time
+    /// (performance change 0730); otherwise the candidate is rendered as
+    /// [`Self::finish_candidate`] renders it. Both routes return the same
+    /// bytes and apply the same authorization and signed-source checks.
+    fn take_candidate(&mut self) -> Result<Vec<u8>> {
+        let bytes = match self.editor.take_retained_render() {
+            Some(rendered) => rendered,
+            None => self
+                .editor
+                .clone()
+                .finish_unchecked()
+                .map_err(Error::Invalid)?,
+        };
+        self.authorize_candidate(bytes)
+    }
+
+    fn authorize_candidate(&self, bytes: Vec<u8>) -> Result<Vec<u8>> {
+        self.editor
+            .authorize_rendered(&bytes)
+            .map_err(Error::Invalid)?;
+        if self.signed && bytes != self.source.bytes() {
+            return Err(Error::Refused(Refusal::SignedSource));
+        }
+        Ok(bytes)
+    }
+
+    fn prepare_saved_selection_length_change(
+        &self,
+        start: u32,
+        end: u32,
+        added: usize,
+    ) -> Result<()> {
+        let added = u32::try_from(added).map_err(|_error| {
+            Error::Invalid(PackageError::Corrupted(
+                "Selsf splice length exceeds u32".to_string(),
+            ))
+        })?;
+        match self.editor.saved_selection_splice(start, end, added) {
+            Ok(Some(_)) | Ok(None) => Ok(()),
+            Err(SavedSelectionSpliceError::Invalid(error)) => Err(Error::Invalid(error)),
+            Err(SavedSelectionSpliceError::Ambiguous) => {
+                Err(Error::Refused(Refusal::PositionDependency {
+                    fib_index: FIB_INDEX_WSS,
+                }))
+            },
+        }
+    }
+
     /// Immutable source snapshot that authorizes this transaction.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
@@ -1340,6 +1522,118 @@ impl Edit {
     /// a new output under the transaction's ceiling.
     pub fn release_retained_render(&mut self) {
         self.editor.release_retained_render();
+    }
+
+    /// Applies a source-checked same-length `Selsf` patch to this staged DOC
+    /// edit through the normal package owner. A changed patch must have been
+    /// produced from this exact immutable snapshot; the component patch also
+    /// checks the FIB-selected record before cloning the table stream.
+    pub fn apply_saved_selection_patch(&mut self, patch: &SavedSelectionPatch) -> Result<bool> {
+        let changed = self
+            .editor
+            .preflight_saved_selection_patch(patch)
+            .map_err(Error::Invalid)?;
+        if !changed {
+            return Ok(false);
+        }
+        let owner = self.source.bytes_shared();
+        if !patch.owner_matches(&owner) {
+            return Err(Error::Conflict);
+        }
+        if self.signed {
+            return Err(Error::Refused(Refusal::SignedSource));
+        }
+        self.ensure_operation_capacity()?;
+        let changed = self
+            .editor
+            .apply_saved_selection_patch(patch)
+            .map_err(Error::Invalid)?;
+        self.auxiliary_changed |= changed;
+        if changed {
+            self.auxiliary_operations = self.auxiliary_operations.saturating_add(1);
+        }
+        Ok(changed)
+    }
+
+    /// Runs a checked same-length edit over the optional `Selsf` record.
+    ///
+    /// The closure receives the typed transaction and returns the package
+    /// error produced by its field setters. A document without `Selsf` is
+    /// reported as a missing semantic target.
+    pub fn edit_saved_selection(
+        &mut self,
+        edit: impl FnOnce(&mut SavedSelectionTransaction) -> crate::package::Result<()>,
+    ) -> Result<bool> {
+        let source = self
+            .editor
+            .saved_selection()
+            .map_err(Error::Invalid)?
+            .ok_or(Error::Refused(Refusal::TargetNotFound))?
+            .with_owner(self.source.bytes_shared());
+        let mut transaction = source.transaction();
+        edit(&mut transaction).map_err(Error::Invalid)?;
+        let commit = transaction.commit().map_err(Error::Invalid)?;
+        self.apply_saved_selection_patch(commit.patch())
+    }
+
+    /// Applies a source-checked same-length `RgDofr` patch to this staged DOC
+    /// edit through the normal package owner. A changed patch must have been
+    /// produced from this exact immutable snapshot; the lower-level component
+    /// patch methods intentionally retain their narrower `RgDofr` source
+    /// checks.
+    pub fn apply_dofr_patch(&mut self, patch: &DofrPatch) -> Result<bool> {
+        let changed = self
+            .editor
+            .preflight_dofr_patch(patch)
+            .map_err(Error::Invalid)?;
+        if !changed {
+            return Ok(false);
+        }
+        let owner = self.source.bytes_shared();
+        if !patch.owner_matches(&owner) {
+            return Err(Error::Conflict);
+        }
+        if self.signed {
+            return Err(Error::Refused(Refusal::SignedSource));
+        }
+        self.ensure_operation_capacity()?;
+        let changed = self
+            .editor
+            .apply_dofr_patch(patch)
+            .map_err(Error::Invalid)?;
+        self.auxiliary_changed |= changed;
+        if changed {
+            self.auxiliary_operations = self.auxiliary_operations.saturating_add(1);
+        }
+        Ok(changed)
+    }
+
+    /// Replaces one complete, validated `RgDofr` record in this staged edit.
+    /// Record size and frame-set/list sequence invariants are checked before
+    /// the candidate table stream is published.
+    pub fn replace_dofr_record(&mut self, index: usize, replacement: &[u8]) -> Result<bool> {
+        let source = self
+            .editor
+            .dofr_records()
+            .map_err(Error::Invalid)?
+            .ok_or(Error::Refused(Refusal::TargetNotFound))?
+            .with_owner(self.source.bytes_shared());
+        let changed = source
+            .preflight_record_replacement(index, replacement)
+            .map_err(Error::Invalid)?;
+        if !changed {
+            return Ok(false);
+        }
+        if self.signed {
+            return Err(Error::Refused(Refusal::SignedSource));
+        }
+        self.ensure_operation_capacity()?;
+        let mut transaction = source.transaction();
+        transaction
+            .replace_record_bytes(index, replacement)
+            .map_err(Error::Invalid)?;
+        let commit = transaction.commit().map_err(Error::Invalid)?;
+        self.apply_dofr_patch(commit.patch())
     }
 
     /// Replaces text in one ordinary source-body paragraph.
@@ -1368,8 +1662,10 @@ impl Edit {
     }
 
     /// Replaces one checked ordinary paragraph, simple table-cell value, or
-    /// simple field cached result. Main-story targets may change length;
-    /// non-main story paragraphs require equal UTF-16 length.
+    /// simple field cached result. Main-story targets may change length when
+    /// every `Selsf` CP has a deterministic splice-boundary mapping; an
+    /// interior or insertion-point ambiguity is refused. Non-main story
+    /// paragraphs require equal UTF-16 length.
     pub fn replace_text(&mut self, target: TextTarget, replacement: &str) -> Result<()> {
         let span = resolve_target(&self.editor, target)?;
         if let Some(dependency) = drawing_dependency(&span.text) {
@@ -1405,6 +1701,9 @@ impl Edit {
         }
         if story != Story::Main && !self.editor.is_unicode_range(span.start_cp, span.end_cp) {
             return Err(Error::Refused(Refusal::CompressedPiece));
+        }
+        if story == Story::Main && actual != expected {
+            self.prepare_saved_selection_length_change(span.start_cp, span.end_cp, actual)?;
         }
         if actual != expected
             && let Some(&fib_index) = self.editor.unmodeled_length_dependencies().first()
@@ -1529,7 +1828,6 @@ impl Edit {
         }
         let actual = 1;
         self.ensure_replacement_capacity(actual)?;
-        self.ensure_operation_capacity()?;
         if !self
             .editor
             .has_uniform_character_format(span.start_cp, span.end_cp)
@@ -1538,11 +1836,15 @@ impl Edit {
             return Err(Error::Refused(Refusal::FormattingDependency));
         }
         let expected = span.text.encode_utf16().count();
+        if expected != actual {
+            self.prepare_saved_selection_length_change(span.start_cp, span.end_cp, actual)?;
+        }
         if expected != actual
             && let Some(&fib_index) = self.editor.unmodeled_length_dependencies().first()
         {
             return Err(Error::Refused(Refusal::PositionDependency { fib_index }));
         }
+        self.ensure_operation_capacity()?;
         let before = PictureSlot::Text(span.text);
         let installed = self
             .editor
@@ -1585,12 +1887,15 @@ impl Edit {
         }
         let actual = replacement.encode_utf16().count();
         self.ensure_replacement_capacity(actual)?;
-        self.ensure_operation_capacity()?;
+        if actual != 1 {
+            self.prepare_saved_selection_length_change(span.start_cp, span.end_cp, actual)?;
+        }
         if actual != 1
             && let Some(&fib_index) = self.editor.unmodeled_length_dependencies().first()
         {
             return Err(Error::Refused(Refusal::PositionDependency { fib_index }));
         }
+        self.ensure_operation_capacity()?;
         self.editor
             .replace_picture_graph_with_text(span.start_cp, span.end_cp, &graph, &replacement)
             .map_err(Error::Invalid)?;
@@ -1611,9 +1916,13 @@ impl Edit {
     ) -> Result<()> {
         let storage_id = options.storage_id;
         options.instruction = format!(" EMBED LITCHI_OBJECT _{storage_id} ");
-        let bytes = self.editor.clone().finish().map_err(Error::Invalid)?;
-        let snapshot = crate::embedded_object::Snapshot::open(bytes, self.source.limits)
-            .map_err(Error::Invalid)?;
+        let bytes = self.finish_candidate()?;
+        let snapshot = crate::embedded_object::Snapshot::open_with_policy(
+            bytes,
+            self.source.limits,
+            self.source.protection_policy.clone(),
+        )
+        .map_err(Error::Invalid)?;
         if snapshot
             .inventory()
             .map_err(Error::Invalid)?
@@ -1645,9 +1954,13 @@ impl Edit {
     /// `ObjectPool` storage. The exact dependency closure is retained in the
     /// reversible patch.
     pub fn remove_embedded_object(&mut self, storage_id: u32) -> Result<()> {
-        let bytes = self.editor.clone().finish().map_err(Error::Invalid)?;
-        let snapshot = crate::embedded_object::Snapshot::open(bytes, self.source.limits)
-            .map_err(Error::Invalid)?;
+        let bytes = self.finish_candidate()?;
+        let snapshot = crate::embedded_object::Snapshot::open_with_policy(
+            bytes,
+            self.source.limits,
+            self.source.protection_policy.clone(),
+        )
+        .map_err(Error::Invalid)?;
         if snapshot
             .inventory()
             .map_err(Error::Invalid)?
@@ -1721,9 +2034,13 @@ impl Edit {
     /// embedded object through the dedicated `ObjectPool` owner, then reopens the
     /// complete candidate into this root transaction.
     pub fn set_embedded_display_as_icon(&mut self, storage_id: u32, enabled: bool) -> Result<()> {
-        let bytes = self.editor.clone().finish().map_err(Error::Invalid)?;
-        let snapshot = crate::embedded_object::Snapshot::open(bytes, self.source.limits)
-            .map_err(Error::Invalid)?;
+        let bytes = self.finish_candidate()?;
+        let snapshot = crate::embedded_object::Snapshot::open_with_policy(
+            bytes,
+            self.source.limits,
+            self.source.protection_policy.clone(),
+        )
+        .map_err(Error::Invalid)?;
         let inventory = snapshot.inventory().map_err(Error::Invalid)?;
         let before = inventory
             .get(storage_id)
@@ -1763,15 +2080,30 @@ impl Edit {
     /// # Errors
     ///
     /// Returns [`Error::Invalid`] when the rendered candidate cannot be
-    /// reopened with the original safety limits.
-    pub fn commit(self) -> Result<Commit> {
-        let bytes = self.editor.finish().map_err(Error::Invalid)?;
+    /// reopened with the original safety limits, or
+    /// `Error::Refused(Refusal::SignedSource)` when a changed candidate
+    /// would leave retained signature metadata stale.
+    pub fn commit(mut self) -> Result<Commit> {
+        let bytes = self.take_candidate()?;
         let snapshot = if bytes == self.source.bytes() {
             self.source.clone()
         } else {
-            Snapshot::open_bounded(bytes, self.source.limits, self.source.transaction_limits)?
+            self.editor
+                .authorize_rendered(&bytes)
+                .map_err(map_protection_error)?;
+            Snapshot::open_bounded_with_policy(
+                bytes,
+                self.source.limits,
+                self.source.transaction_limits,
+                self.source.protection_policy.clone(),
+            )?
         };
-        let patch = Patch::new(self.source, snapshot.clone(), self.changes);
+        let patch = Patch::new(
+            self.source,
+            snapshot.clone(),
+            self.changes,
+            self.auxiliary_changed,
+        );
         Ok(Commit { snapshot, patch })
     }
 
@@ -1796,12 +2128,17 @@ impl Edit {
     /// strict-owner and public-reader validation failures, while the phase
     /// helper test locks the finish-error event contract.
     /// The ordinary commit path is unchanged and the observer cannot alter the
-    /// returned document semantics.
+    /// returned document semantics. Auxiliary `RgDofr` and `Selsf` changes
+    /// remain outside the semantic three-way merge boundary and are refused by
+    /// [`Snapshot::plan_three_way`].
     ///
     /// # Errors
     ///
-    /// Returns the same error as [`Self::commit`]. A failed phase is closed
-    /// before the error is returned.
+    /// Returns the same error as [`Self::commit`], including
+    /// `Error::Refused(Refusal::SignedSource)`. A failed phase is closed
+    /// before the error is returned. Auxiliary `RgDofr` and `Selsf` changes
+    /// remain outside the semantic three-way merge boundary and are refused by
+    /// [`Snapshot::plan_three_way`].
     #[cfg(feature = "performance-diagnostics")]
     pub fn commit_profiled(self, mut observer: impl FnMut(DiagnosticEvent)) -> Result<Commit> {
         self.commit_profiled_with_cfb_observer(&mut observer, |_| {})
@@ -1824,19 +2161,31 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns the same error as [`Self::commit`]. Failed phases and physical
+    /// Returns the same error as [`Self::commit`], including
+    /// `Error::Refused(Refusal::SignedSource)`. Failed phases and physical
     /// parses close their respective observer events before the error is
-    /// returned.
+    /// returned. Auxiliary `RgDofr` and `Selsf` changes remain outside the
+    /// semantic three-way merge boundary and are refused by
+    /// [`Snapshot::plan_three_way`].
     #[cfg(feature = "performance-diagnostics")]
     pub fn commit_profiled_with_cfb_observer(
-        self,
+        mut self,
         observer: impl FnMut(DiagnosticEvent),
         mut cfb_observer: impl FnMut(CfbParseEvent),
     ) -> Result<Commit> {
         let mut observer = observer;
+        let signed = self.signed;
         let bytes = observe_phase(&mut observer, DiagnosticPhase::Finish, || {
-            self.editor.finish().map_err(Error::Invalid)
+            self.take_candidate()
         })?;
+        if bytes != self.source.bytes() {
+            if signed {
+                return Err(Error::Refused(Refusal::SignedSource));
+            }
+            self.editor
+                .authorize_rendered(&bytes)
+                .map_err(map_protection_error)?;
+        }
         let snapshot = if bytes == self.source.bytes() {
             observe_phase(&mut observer, DiagnosticPhase::ExactNoOp, || {
                 Ok(self.source.clone())
@@ -1848,16 +2197,29 @@ impl Edit {
                 self.source.transaction_limits,
                 &mut observer,
                 &mut cfb_observer,
-            )?
+            )
+            .map(|mut snapshot| {
+                snapshot.protection_policy = self.source.protection_policy.clone();
+                snapshot
+            })?
         };
         let patch = observe_phase(&mut observer, DiagnosticPhase::Patch, || {
-            Ok(Patch::new(self.source, snapshot.clone(), self.changes))
+            Ok(Patch::new(
+                self.source,
+                snapshot.clone(),
+                self.changes,
+                self.auxiliary_changed,
+            ))
         })?;
         Ok(Commit { snapshot, patch })
     }
 
     fn ensure_operation_capacity(&self) -> Result<()> {
-        let observed = self.changes.len().saturating_add(1);
+        let observed = self
+            .changes
+            .len()
+            .saturating_add(self.auxiliary_operations)
+            .saturating_add(1);
         let limit = self.source.transaction_limits.operations;
         if observed > limit {
             Err(Error::Refused(Refusal::OperationLimit { observed, limit }))
@@ -1968,14 +2330,21 @@ pub struct Patch {
     before: Snapshot,
     after: Snapshot,
     changes: Vec<Change>,
+    auxiliary_changed: bool,
 }
 
 impl Patch {
-    fn new(before: Snapshot, after: Snapshot, changes: Vec<Change>) -> Self {
+    fn new(
+        before: Snapshot,
+        after: Snapshot,
+        changes: Vec<Change>,
+        auxiliary_changed: bool,
+    ) -> Self {
         Self {
             before,
             after,
             changes,
+            auxiliary_changed,
         }
     }
 
@@ -1983,6 +2352,16 @@ impl Patch {
     #[must_use]
     pub fn changes(&self) -> impl ExactSizeIterator<Item = ChangeRef<'_>> {
         self.changes.iter().map(Change::as_ref)
+    }
+
+    /// Whether this in-memory patch changed a supported inert auxiliary table.
+    ///
+    /// Auxiliary bytes remain fully covered by exact-source apply/inverse
+    /// operations; the durable semantic envelope intentionally refuses them
+    /// until it has a dedicated wire vocabulary.
+    #[must_use]
+    pub const fn has_auxiliary_changes(&self) -> bool {
+        self.auxiliary_changed
     }
 
     /// Exact source snapshot required for application.
@@ -2035,23 +2414,24 @@ impl Patch {
             .transaction_limits
             .intersect(self.before.transaction_limits)
             .intersect(self.after.transaction_limits);
-        if same_source_allocation(&source.source, &self.before.source) {
-            return Ok(if self.is_noop() {
-                source.with_transaction_limits(transaction_limits)
-            } else {
-                self.after.with_transaction_limits(transaction_limits)
-            });
-        }
-        if source.fingerprint() != self.before.fingerprint()
-            || source.bytes() != self.before.bytes()
+        // The same-allocation shortcut skips only the byte comparison; a
+        // changed patch is still authorized under the source's protection
+        // policy before its target is published.
+        let same_allocation = same_source_allocation(&source.source, &self.before.source);
+        if !same_allocation
+            && (source.fingerprint() != self.before.fingerprint()
+                || source.bytes() != self.before.bytes())
         {
             return Err(Error::Conflict);
         }
-        Ok(if self.is_noop() {
-            source.with_transaction_limits(transaction_limits)
-        } else {
-            self.after.with_transaction_limits(transaction_limits)
-        })
+        if self.is_noop() {
+            return Ok(source.with_transaction_limits(transaction_limits));
+        }
+        source
+            .editor()?
+            .authorize_rendered(self.after.bytes())
+            .map_err(map_protection_error)?;
+        Ok(self.after.with_transaction_limits(transaction_limits))
     }
 
     /// Exact inverse patch.
@@ -2061,6 +2441,7 @@ impl Patch {
             before: self.after.clone(),
             after: self.before.clone(),
             changes: self.changes.iter().rev().map(Change::inverse).collect(),
+            auxiliary_changed: self.auxiliary_changed,
         }
     }
 
@@ -2070,11 +2451,18 @@ impl Patch {
     /// # Errors
     ///
     /// Returns [`PatchError`] when the requested wire limits cannot represent
-    /// every semantic operation and inverse.
+    /// every semantic operation and inverse. In-memory auxiliary-table edits
+    /// are intentionally refused until the durable envelope has a matching
+    /// binary-table vocabulary.
     pub fn to_durable(
         &self,
         limits: PatchLimits,
     ) -> std::result::Result<litchi_core::patch::Patch<Reversible>, PatchError> {
+        if self.auxiliary_changed {
+            return Err(PatchError::InvalidText {
+                field: "DOC auxiliary-table durable patch",
+            });
+        }
         let before_artifact = BlobId::of(self.before.bytes()).as_hex();
         let after_artifact = BlobId::of(self.after.bytes()).as_hex();
         let mut forward_blobs = BlobBundle::new(limits.blobs());
@@ -3381,9 +3769,13 @@ fn apply_durable_embedded_display(edit: &mut Edit, operation: &PatchOperation) -
 }
 
 fn embedded_display_value(edit: &Edit, storage_id: u32) -> Result<bool> {
-    let bytes = edit.editor.clone().finish().map_err(Error::Invalid)?;
-    let snapshot = crate::embedded_object::Snapshot::open(bytes, edit.source.limits)
-        .map_err(Error::Invalid)?;
+    let bytes = edit.finish_candidate()?;
+    let snapshot = crate::embedded_object::Snapshot::open_with_policy(
+        bytes,
+        edit.source.limits,
+        edit.source.protection_policy.clone(),
+    )
+    .map_err(Error::Invalid)?;
     snapshot
         .inventory()
         .map_err(Error::Invalid)?
@@ -3509,9 +3901,13 @@ fn embedded_object_value(
     edit: &Edit,
     storage_id: u32,
 ) -> Result<Option<crate::embedded_object::WriteOptions>> {
-    let bytes = edit.editor.clone().finish().map_err(Error::Invalid)?;
-    let snapshot = crate::embedded_object::Snapshot::open(bytes, edit.source.limits)
-        .map_err(Error::Invalid)?;
+    let bytes = edit.finish_candidate()?;
+    let snapshot = crate::embedded_object::Snapshot::open_with_policy(
+        bytes,
+        edit.source.limits,
+        edit.source.protection_policy.clone(),
+    )
+    .map_err(Error::Invalid)?;
     if snapshot
         .inventory()
         .map_err(Error::Invalid)?
@@ -4055,6 +4451,8 @@ mod tests {
         CharacterProperty, DrawingDependency, Error, Projection, Refusal, RevisionDisposition,
         Snapshot, Story, TextTarget, TransactionLimits, fingerprint,
     };
+    use crate::parts::dofr::{DofrFrameKind, DofrPayload};
+    use crate::parts::fib::FileInformationBlock;
     use crate::tracked_revision::{Limits, RevisionEditor};
     use crate::writer::{
         CharacterFormatting, FloatingPosition, ParagraphFormatting, Picture, TextRevision, Writer,
@@ -4083,7 +4481,64 @@ mod tests {
         writer
             .write_to(&mut output)
             .expect("fixture DOC must serialize");
-        output.into_inner()
+        normalize_word2002_dop(output.into_inner())
+    }
+
+    fn normalize_word2002_dop(bytes: Vec<u8>) -> Vec<u8> {
+        let mut package = PackageEditor::open(bytes, Targets::default(), Limits::default())
+            .expect("fixture package should open");
+        let word_path = ["WordDocument".to_string()];
+        let word = package.stream(&word_path).expect("WordDocument");
+        let fib = FileInformationBlock::parse(word).expect("fixture FIB");
+        let table_name = if fib.which_table_stream() {
+            "1Table"
+        } else {
+            "0Table"
+        };
+        let table_path = [table_name.to_string()];
+        let mut word = word.to_vec();
+        let mut table = package
+            .stream(&table_path)
+            .expect("selected table stream")
+            .to_vec();
+        let (offset, length) = fib.get_table_pointer(31).expect("DOP pointer");
+        let offset = usize::try_from(offset).expect("DOP offset");
+        let length = usize::try_from(length).expect("DOP length");
+        let mut dop = crate::parts::document_properties::DocumentProperties::word97_writer_bytes(
+            false, false, false,
+        );
+        dop.resize(594, 0);
+        if length < dop.len() {
+            let insertion = offset + length;
+            let extra = dop.len() - length;
+            table.splice(insertion..insertion, std::iter::repeat_n(0, extra));
+            let count = fib.table_pointer_count().expect("FIB pointer count");
+            for index in 0..count {
+                let pointer = 154 + index * 8;
+                let current = usize::try_from(u32::from_le_bytes(
+                    word[pointer..pointer + 4]
+                        .try_into()
+                        .expect("FIB pointer offset"),
+                ))
+                .expect("FIB pointer offset");
+                if current >= insertion {
+                    let shifted = u32::try_from(current + extra).expect("shifted FIB pointer");
+                    word[pointer..pointer + 4].copy_from_slice(&shifted.to_le_bytes());
+                }
+            }
+        }
+        assert!(table.len() >= offset + dop.len());
+        table[offset..offset + dop.len()].copy_from_slice(&dop);
+        let pointer = 154 + 31 * 8;
+        word[pointer + 4..pointer + 8]
+            .copy_from_slice(&u32::try_from(dop.len()).expect("DOP length").to_le_bytes());
+        package
+            .put_stream(&word_path, word)
+            .expect("normalized WordDocument stream");
+        package
+            .put_stream(&table_path, table)
+            .expect("normalized table stream");
+        package.finish().expect("normalized fixture publication")
     }
 
     fn doc_with_opaque_stream(paragraphs: &[&str]) -> Vec<u8> {
@@ -4093,6 +4548,81 @@ mod tests {
         package
             .add_stream(vec!["OpaqueVendorData".to_string()], b"untouched".to_vec())
             .expect("opaque stream should be admitted");
+        package.finish().expect("fixture package should finish")
+    }
+
+    fn dofr_record(kind: u32, payload: &[u8]) -> Vec<u8> {
+        let size = u32::try_from(8usize + payload.len()).expect("Dofr record fits");
+        let mut record = Vec::with_capacity(usize::try_from(size).expect("record size fits"));
+        record.extend_from_slice(&size.to_le_bytes());
+        record.extend_from_slice(&kind.to_le_bytes());
+        record.extend_from_slice(payload);
+        record
+    }
+
+    fn doc_with_auxiliary_tables() -> Vec<u8> {
+        let mut package =
+            PackageEditor::open(doc(&["alpha bravo"]), Targets::default(), Limits::default())
+                .expect("fixture package should open");
+        let word_path = ["WordDocument".to_string()];
+        let mut word = package
+            .stream(&word_path)
+            .expect("WordDocument stream")
+            .to_vec();
+        let fib = FileInformationBlock::parse(&word).expect("fixture FIB");
+        assert!(fib.table_pointer_count().expect("FIB pair count") > 99);
+        let table_name = if fib.which_table_stream() {
+            "1Table"
+        } else {
+            "0Table"
+        };
+        let table_path = [table_name.to_string()];
+        let mut table = package.stream(&table_path).expect("table stream").to_vec();
+
+        let mut selection = vec![0u8; 36];
+        selection[2] = 1;
+        selection[4..8].copy_from_slice(&4i32.to_le_bytes());
+        selection[8..12].copy_from_slice(&8i32.to_le_bytes());
+        selection[20..24].copy_from_slice(&4i32.to_le_bytes());
+        selection[24..26].copy_from_slice(&1u16.to_le_bytes());
+        selection[32..34].copy_from_slice(&(-100i16).to_le_bytes());
+        selection[34..36].copy_from_slice(&100i16.to_le_bytes());
+        let selection_offset = u32::try_from(table.len()).expect("table offset fits");
+        table.extend_from_slice(&selection);
+
+        let mut frame_payload = vec![0u8; 36];
+        frame_payload[12..16].copy_from_slice(&2u32.to_le_bytes());
+        let mut dofr = dofr_record(0, &[]);
+        dofr.extend_from_slice(&dofr_record(1, &frame_payload));
+        let dofr_offset = u32::try_from(table.len()).expect("table offset fits");
+        table.extend_from_slice(&dofr);
+
+        for (index, offset, length) in [
+            (30usize, selection_offset, selection.len()),
+            (99usize, dofr_offset, dofr.len()),
+        ] {
+            let pair = 154usize
+                .checked_add(index.checked_mul(8).expect("FIB pair offset"))
+                .expect("FIB pair offset");
+            word[pair..pair + 4].copy_from_slice(&offset.to_le_bytes());
+            word[pair + 4..pair + 8].copy_from_slice(
+                &u32::try_from(length)
+                    .expect("table length fits")
+                    .to_le_bytes(),
+            );
+        }
+        package
+            .put_stream(&word_path, word)
+            .expect("replace WordDocument stream");
+        package
+            .put_stream(&table_path, table)
+            .expect("replace table stream");
+        package
+            .add_stream(
+                vec!["OpaqueVendorData".to_string()],
+                b"untouched auxiliary stream".to_vec(),
+            )
+            .expect("opaque auxiliary stream");
         package.finish().expect("fixture package should finish")
     }
 
@@ -4113,7 +4643,7 @@ mod tests {
         }
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).expect("picture DOC");
-        output.into_inner()
+        normalize_word2002_dop(output.into_inner())
     }
 
     fn formatted_picture_receiver_doc() -> Vec<u8> {
@@ -4135,7 +4665,7 @@ mod tests {
         writer
             .write_to(&mut output)
             .expect("formatted receiver DOC");
-        output.into_inner()
+        normalize_word2002_dop(output.into_inner())
     }
 
     fn structured_doc() -> Vec<u8> {
@@ -4155,7 +4685,7 @@ mod tests {
         writer.set_odd_header("Header");
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).expect("structured DOC");
-        output.into_inner()
+        normalize_word2002_dop(output.into_inner())
     }
 
     fn embedded_doc() -> Vec<u8> {
@@ -4239,7 +4769,6 @@ mod tests {
         package.finish().expect("fixture package should finish")
     }
 
-    #[cfg(feature = "performance-diagnostics")]
     fn protected_dop_doc() -> Vec<u8> {
         let mut package =
             PackageEditor::open(doc(&["alpha"]), Targets::default(), Limits::default())
@@ -4279,6 +4808,30 @@ mod tests {
             .put_stream(&table_path, table)
             .expect("protected DOP should remain a valid package");
         package.finish().expect("fixture package should finish")
+    }
+
+    #[test]
+    fn protected_snapshot_reads_and_noops_by_default_but_changed_commit_is_denied() {
+        let bytes = protected_dop_doc();
+        let snapshot = Snapshot::open(bytes.clone(), Limits::default()).expect("protected open");
+        assert_eq!(snapshot.finish(), bytes);
+        let mut edit = snapshot.edit().expect("protected snapshot edit");
+        assert!(matches!(
+            edit.replace_paragraph(Position::new(0), "omega"),
+            Err(Error::Invalid(crate::package::Error::ProtectionDenied(_)))
+        ));
+        assert!(matches!(
+            edit.commit(),
+            Ok(commit) if !commit.changed()
+        ));
+
+        let noop = snapshot
+            .edit()
+            .expect("protected snapshot edit")
+            .commit()
+            .expect("protected no-op");
+        assert!(!noop.changed());
+        assert_eq!(noop.snapshot().finish(), bytes);
     }
 
     #[cfg(feature = "performance-diagnostics")]
@@ -4470,7 +5023,7 @@ mod tests {
 
     #[cfg(feature = "performance-diagnostics")]
     #[test]
-    fn profiled_open_native_dop_refusal_stays_strict_first() {
+    fn profiled_open_protected_dop_is_readable_and_balances_success_phases() {
         let bytes = protected_dop_doc();
         let ordinary =
             Snapshot::open(bytes.clone(), Limits::default()).map_err(|error| error.to_string());
@@ -4495,7 +5048,7 @@ mod tests {
             ]
         );
         assert_eq!(profiled, ordinary);
-        assert!(profiled.is_err());
+        assert!(profiled.is_ok());
         assert_eq!(
             events,
             vec![
@@ -4504,7 +5057,21 @@ mod tests {
                 },
                 DiagnosticEvent::Finished {
                     phase: DiagnosticPhase::StrictOwnerValidation,
-                    outcome: DiagnosticOutcome::Error,
+                    outcome: DiagnosticOutcome::Success,
+                },
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::PublicReaderValidation,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::PublicReaderValidation,
+                    outcome: DiagnosticOutcome::Success,
+                },
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::SourceRetention,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::SourceRetention,
+                    outcome: DiagnosticOutcome::Success,
                 },
             ]
         );
@@ -4714,6 +5281,131 @@ mod tests {
 
         let other = Snapshot::open(doc(&["other"]), Limits::default()).expect("other source");
         assert!(matches!(commit.patch().apply(&other), Err(Error::Conflict)));
+    }
+
+    #[test]
+    fn auxiliary_tables_publish_through_body_commit_and_reopen() {
+        let source =
+            Snapshot::open(doc_with_auxiliary_tables(), Limits::default()).expect("auxiliary DOC");
+        let selection = source
+            .saved_selection()
+            .expect("saved-selection read")
+            .expect("saved-selection record");
+        assert_eq!(selection.cp_first(), 4);
+        let dofr = source
+            .dofr_records()
+            .expect("Dofr read")
+            .expect("Dofr records");
+        assert_eq!(dofr.len(), 2);
+
+        let mut no_op = source.edit().expect("no-op body edit");
+        assert!(
+            !no_op
+                .edit_saved_selection(|_| Ok(()))
+                .expect("no-op Selsf edit")
+        );
+        let no_op_commit = no_op.commit().expect("no-op auxiliary commit");
+        assert!(!no_op_commit.changed());
+        assert_eq!(no_op_commit.snapshot().bytes(), source.bytes());
+
+        let mut edit = source.edit().expect("body edit");
+        assert!(
+            edit.edit_saved_selection(|transaction| {
+                transaction.set_cp_anchor(5)?.set_range(5, 9).map(|_| ())
+            })
+            .expect("Selsf edit")
+        );
+        let mut replacement = dofr.get(1).expect("frame record").bytes().to_vec();
+        replacement[20..24].copy_from_slice(&1u32.to_le_bytes());
+        assert!(
+            edit.replace_dofr_record(1, &replacement)
+                .expect("Dofr edit")
+        );
+        let commit = edit.commit().expect("auxiliary commit");
+        assert!(commit.changed());
+        assert!(commit.patch().has_auxiliary_changes());
+        assert!(commit.patch().to_durable(patch_limits()).is_err());
+        let published = commit.snapshot();
+        let package =
+            PackageEditor::open(published.finish(), Targets::default(), Limits::default())
+                .expect("published package");
+        assert_eq!(
+            package
+                .stream(&["OpaqueVendorData".to_string()])
+                .expect("opaque stream"),
+            b"untouched auxiliary stream"
+        );
+        assert_eq!(
+            published
+                .saved_selection()
+                .expect("published Selsf")
+                .expect("published record")
+                .cp_first(),
+            5
+        );
+        let published_dofr = published
+            .dofr_records()
+            .expect("published Dofr")
+            .expect("published records");
+        let DofrPayload::Frame(frame) = published_dofr
+            .get(1)
+            .expect("published frame")
+            .payload()
+            .expect("published frame payload")
+        else {
+            panic!("expected frame payload");
+        };
+        assert_eq!(frame.frame_kind(), DofrFrameKind::FrameSet);
+
+        let reopened =
+            Snapshot::open(published.finish(), Limits::default()).expect("reopen published DOC");
+        assert_eq!(
+            reopened
+                .saved_selection()
+                .expect("reopened Selsf")
+                .expect("reopened record")
+                .cp_first(),
+            5
+        );
+        let reopened_dofr = reopened
+            .dofr_records()
+            .expect("reopened Dofr")
+            .expect("reopened records");
+        let DofrPayload::Frame(frame) = reopened_dofr
+            .get(1)
+            .expect("reopened frame")
+            .payload()
+            .expect("reopened payload")
+        else {
+            panic!("expected reopened frame payload");
+        };
+        assert_eq!(frame.frame_kind(), DofrFrameKind::FrameSet);
+
+        let inverse = commit.patch().inverse();
+        let reverted = inverse.apply(published).expect("inverse auxiliary patch");
+        assert_eq!(reverted.bytes(), source.bytes());
+
+        let mut stale = published.edit().expect("stale edit");
+        assert!(
+            stale
+                .edit_saved_selection(|transaction| {
+                    transaction.set_cp_anchor(6)?.set_range(6, 10).map(|_| ())
+                })
+                .expect("second selection edit")
+        );
+        let stale_commit = stale.commit().expect("second edit");
+        let mut mismatched = stale_commit.snapshot().edit().expect("mismatched edit");
+        let source_patch = selection
+            .transaction()
+            .commit()
+            .expect("no-op selection patch")
+            .patch()
+            .clone();
+        assert!(
+            mismatched
+                .apply_saved_selection_patch(&source_patch)
+                .is_err()
+        );
     }
 
     #[test]
@@ -4986,7 +5678,8 @@ mod tests {
             .expect("fixture paragraph");
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).expect("fixture DOC");
-        let snapshot = Snapshot::parse(&output.into_inner()).expect("snapshot");
+        let bytes = normalize_word2002_dop(output.into_inner());
+        let snapshot = Snapshot::parse(&bytes).expect("snapshot");
         assert_eq!(
             snapshot.paragraphs(Projection::Accepted).expect("accepted")[0].text(),
             "kept  new"
@@ -5467,7 +6160,8 @@ mod tests {
             .expect("floating shape");
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).expect("drawing DOC");
-        let drawing = Snapshot::parse(&output.into_inner()).expect("drawing snapshot");
+        let bytes = normalize_word2002_dop(output.into_inner());
+        let drawing = Snapshot::parse(&bytes).expect("drawing snapshot");
         let anchor = drawing
             .paragraphs(Projection::All)
             .expect("drawing paragraphs")
@@ -5500,7 +6194,8 @@ mod tests {
             .expect("revision paragraph");
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).expect("revision DOC");
-        let source = Snapshot::parse(&output.into_inner()).expect("revision snapshot");
+        let bytes = normalize_word2002_dop(output.into_inner());
+        let source = Snapshot::parse(&bytes).expect("revision snapshot");
         let position = source
             .revisions()
             .expect("revisions")
@@ -5816,7 +6511,8 @@ mod tests {
         writer
             .write_to(&mut output)
             .expect("mixed drawing donor DOC");
-        let shared = Snapshot::parse(&output.into_inner()).expect("mixed shared-store donor");
+        let bytes = normalize_word2002_dop(output.into_inner());
+        let shared = Snapshot::parse(&bytes).expect("mixed shared-store donor");
         for (position, floating) in [(Position::new(4), false), (Position::new(5), true)] {
             let empty = Snapshot::parse(&doc(&["placeholder"])).expect("empty receiver");
             let plan = empty

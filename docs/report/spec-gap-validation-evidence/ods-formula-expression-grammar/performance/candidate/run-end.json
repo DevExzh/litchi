@@ -1,0 +1,15 @@
+{
+  "label": "candidate-comparable",
+  "group": "comparable",
+  "binary_sha256": "841a11f5464af5b2fc6cf76ee40fd56124f46818ac4ae3ef217b6cc2e1171a14",
+  "harness": "harness/run.py",
+  "output": "candidate/raw.csv",
+  "warmups": 3,
+  "iterations": 15,
+  "started_at": null,
+  "finished_at": null,
+  "elapsed_seconds": null,
+  "status": 0,
+  "raw_sha256": "a5721bfcf75f36d9cbc7fd9b02eb3e22a0839347d8d02d2eec76146655ce5551",
+  "row_count": 12
+}

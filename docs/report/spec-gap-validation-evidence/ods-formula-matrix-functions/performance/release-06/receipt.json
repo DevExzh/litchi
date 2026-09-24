@@ -1,0 +1,76 @@
+{
+  "source_basis": "../../candidate-06/source.tar.gz",
+  "gates_basis": "../../candidate-06/gates.json",
+  "archive_sha256": "7d0e7f9c5795cfd8b0eaef05d10a518568dbaa4181d3fe62cc426d5abc42c476",
+  "binary_sha256": "fe9d4e7350b25df8f56e90dcd42b6d9dc3b89cef87daea30463afd9edad018f5",
+  "binary_retained": "/home/zhuhe/code/litchi-array-target/retained/matrix-functions-06",
+  "runs": 99,
+  "failed_runs": 0,
+  "within_capture_deterministic_mismatches": [],
+  "deterministic_changes_from_05": [],
+  "review_flags_from_05": [
+    {
+      "case": "munit-2",
+      "p50_delta_percent": -0.5053340819764163,
+      "p95_delta_percent": -1.9146608315098512,
+      "rss_delta_percent": 7.552870090634434
+    },
+    {
+      "case": "minverse-8",
+      "p50_delta_percent": 0.3008061605101586,
+      "p95_delta_percent": 0.7478353627398793,
+      "rss_delta_percent": 8.446455505279026
+    },
+    {
+      "case": "mmult-8",
+      "p50_delta_percent": -0.973897151651415,
+      "p95_delta_percent": -1.2840106647627914,
+      "rss_delta_percent": 6.602475928473184
+    },
+    {
+      "case": "mdeterm-16",
+      "p50_delta_percent": -1.581888022348965,
+      "p95_delta_percent": -0.2855856152722325,
+      "rss_delta_percent": 6.868131868131866
+    },
+    {
+      "case": "mmult-rect-4x8x2",
+      "p50_delta_percent": -0.45572916666667407,
+      "p95_delta_percent": -0.3231017770597644,
+      "rss_delta_percent": 7.239819004524883
+    },
+    {
+      "case": "transpose-rect-2x8",
+      "p50_delta_percent": -0.6293706293706292,
+      "p95_delta_percent": -0.552104899930983,
+      "rss_delta_percent": 8.295625942684758
+    },
+    {
+      "case": "mdeterm-nonsquare-2x1",
+      "p50_delta_percent": -0.8467023172905597,
+      "p95_delta_percent": -0.705778561976178,
+      "rss_delta_percent": 5.1359516616314105
+    },
+    {
+      "case": "if-selected-mdeterm-8",
+      "p50_delta_percent": -2.922227335480909,
+      "p95_delta_percent": -2.2690809076323704,
+      "rss_delta_percent": 6.184012066365008
+    },
+    {
+      "case": "if-selected-minverse-8",
+      "p50_delta_percent": -0.2726410621147535,
+      "p95_delta_percent": -2.5669395884045043,
+      "rss_delta_percent": 5.507246376811592
+    },
+    {
+      "case": "if-selected-transpose-8",
+      "p50_delta_percent": -4.363842448285626,
+      "p95_delta_percent": -3.962317210348698,
+      "rss_delta_percent": 7.518796992481214
+    }
+  ],
+  "cpu": 6,
+  "build_command": "TMPDIR=/home/zhuhe/code/litchi-array-tmp CARGO_TARGET_DIR=/home/zhuhe/code/litchi-array-target CARGO_INCREMENTAL=0 cargo build --release --locked --offline --manifest-path docs/report/spec-gap-validation-evidence/ods-formula-matrix-functions/performance/harness/Cargo.toml",
+  "compiler_basis": "../../candidate-06/gates.json#toolchain"
+}

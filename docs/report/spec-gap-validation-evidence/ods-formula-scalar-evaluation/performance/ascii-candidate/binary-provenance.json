@@ -1,0 +1,10 @@
+{
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/performance/ascii-candidate/ods-formula-expression-profile",
+  "target_binary": "/var/tmp/ods-scalar-target/release/ods-formula-expression-profile",
+  "sha256": "5be86d8b7c3d7d2d77cc7844fa905f4e203df40e31d80fb570596dc2be732149",
+  "size_bytes": 1074104,
+  "base_commit": "9072e969e34263be73d5b8d2eb2700478d182101",
+  "source_manifest": "source-sha256.json",
+  "build_status": 0,
+  "experiment": "ASCII names.rs only"
+}

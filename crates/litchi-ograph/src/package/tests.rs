@@ -128,6 +128,92 @@ fn package(workbook: Option<&[u8]>, extras: &[(&str, &[u8])]) -> Vec<u8> {
     output.into_inner()
 }
 
+fn authored_graph_chart() -> chart::Chart {
+    let mut chart = chart::Chart::new_graph_authoring(chart::GraphFamily::Pie, Limits::default())
+        .expect("Graph scaffold");
+    let count = chart::Count::new(2).expect("count");
+    let row = chart::RowCol::new(1).expect("row");
+    let series = chart::Series {
+        category_kind: chart::DataKind::Text,
+        category_count: count,
+        value_count: count,
+        bubble_count: chart::Count::ZERO,
+        owner: chart::Owner::PRIMARY,
+        ai: chart::Ai::new(
+            chart::Binding::new(
+                chart::Link::graph(chart::Role::Name, chart::Source::Literal, row),
+                Some("Slices".into()),
+            ),
+            chart::Binding::new(
+                chart::Link::graph(chart::Role::Values, chart::Source::Literal, row),
+                None,
+            ),
+            chart::Binding::new(
+                chart::Link::graph(
+                    chart::Role::Categories,
+                    chart::Source::Literal,
+                    chart::RowCol::ZERO,
+                ),
+                None,
+            ),
+            chart::Binding::new(
+                chart::Link::graph(
+                    chart::Role::Bubbles,
+                    chart::Source::Automatic,
+                    chart::RowCol::ZERO,
+                ),
+                None,
+            ),
+        )
+        .expect("AI"),
+    };
+    chart.add_series(series).expect("series");
+    chart
+        .add_cache(chart::Cache::graph(
+            row,
+            chart::RowCol::ZERO,
+            chart::cache::Ifmt::new(0),
+            chart::Value::Text("Slices".into()),
+        ))
+        .expect("series name cache");
+    for (col, value) in [(1, "A"), (2, "B")] {
+        chart
+            .add_cache(chart::Cache::graph(
+                chart::RowCol::ZERO,
+                chart::RowCol::new(col).expect("column"),
+                chart::cache::Ifmt::new(0),
+                chart::Value::Text(value.into()),
+            ))
+            .expect("category cache");
+    }
+    for (col, value) in [(1, 1.0), (2, 2.0)] {
+        chart
+            .add_cache(chart::Cache::graph(
+                row,
+                chart::RowCol::new(col).expect("column"),
+                chart::cache::Ifmt::new(0),
+                chart::Value::Number(value),
+            ))
+            .expect("value cache");
+    }
+    chart
+}
+
+#[test]
+fn authored_graph_package_reopens_as_owned_graph_chart() {
+    let package = Package::from_chart(authored_graph_chart()).expect("Graph package");
+    assert_eq!(package.topology().stream_count(), 1);
+    let bytes = package.finish().into_bytes();
+    let reopened = Package::open(bytes).expect("reopen Graph package");
+    let workbook = reopened.workbook().expect("Workbook");
+    let parsed =
+        chart::Chart::parse(workbook.chart(), chart::Context::graph()).expect("typed Graph chart");
+    assert_eq!(parsed.groups().len(), 1);
+    assert!(parsed.axes().is_empty());
+    assert_eq!(parsed.series().len(), 1);
+    assert_eq!(parsed.caches().len(), 5);
+}
+
 #[test]
 fn accepts_exact_standalone_topology_and_reads_workbook() {
     let workbook = workbook();

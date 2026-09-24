@@ -1,0 +1,1 @@
+Partial capture stopped at refusal-text-asc: timed consumer expected an array for a scalar formula-error result. Preflight correctly validated that result. These samples are diagnostic, not accepted performance evidence. The original harness is retained for reconstruction.

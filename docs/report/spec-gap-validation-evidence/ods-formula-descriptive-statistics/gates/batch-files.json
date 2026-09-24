@@ -1,0 +1,14 @@
+[
+  "crates/litchi-ods/src/codec/formula/evaluation.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/descriptive.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/descriptive/harmonic.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/descriptive/moments.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/descriptive/reciprocal_sum.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/numerics.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value/descriptive.rs",
+  "crates/litchi-ods/tests/ods_formula_descriptive_evaluation.rs",
+  "crates/litchi-ods/tests/ods_formula_descriptive_limits.rs",
+  "crates/litchi-ods/tests/ods_formula_descriptive_native.rs",
+  "crates/litchi-ods/tests/ods_formula_descriptive_oracle.rs"
+]

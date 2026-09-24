@@ -13,11 +13,11 @@ use super::super::{
     LegacyDrawingLineStyle, LegacyDrawingPoint, LegacyDrawingPrimitive, LegacyDrawingProperties,
     LegacyHorizontalAnchor, LegacyTextBox, LegacyTextDirection, LegacyVerticalAnchor,
     MAX_EMBEDDED_OBJECTS, MAX_LEGACY_DRAWINGS, MAX_PICTURE_COMPATIBILITY_RECORDS, MathZone,
-    NavigationEntry, Note, ObjectKind, ObjectResultKind, Picture, PictureCompatibilityKind,
-    PictureCompatibilityRecord, PictureShapeProperties, ProtectionRange, Revision, RevisionType,
-    RtfWriter, Section, Shape, ShapeGroup, ShapeGroupInfo, ShapeType, SoftBreakKind, StoryDrawing,
-    StyleBlock, Write, field, form_field, invalid_story_reference, io, navigation_entry, section,
-    take_story_item,
+    MoveBookmark, NavigationEntry, Note, ObjectKind, ObjectResultKind, Picture,
+    PictureCompatibilityKind, PictureCompatibilityRecord, PictureShapeProperties, ProtectionRange,
+    Revision, RevisionType, RtfWriter, Section, Shape, ShapeGroup, ShapeGroupInfo, ShapeType,
+    SmartTag, SoftBreakKind, StoryDrawing, StyleBlock, Write, field, form_field,
+    invalid_story_reference, io, navigation_entry, section, take_story_item,
 };
 
 impl<W: Write> RtfWriter<W> {
@@ -49,7 +49,9 @@ impl<W: Write> RtfWriter<W> {
         blocks: &[StyleBlock<'_>],
         body_boundaries: &[crate::story::Boundary],
         bookmarks: &BookmarkTable<'_>,
+        move_bookmarks: &[MoveBookmark<'_>],
         custom_xml_tags: &[CustomXmlTag<'_>],
+        smart_tags: &[SmartTag<'_>],
         math_zones: &[MathZone<'_>],
         protection_ranges: &[ProtectionRange<'_>],
         editable_regions: &[EditableRegion<'_>],
@@ -73,7 +75,9 @@ impl<W: Write> RtfWriter<W> {
         opaque_nodes: &[crate::opaque::Node],
     ) -> io::Result<()> {
         if bookmarks.bookmarks().is_empty()
+            && move_bookmarks.is_empty()
             && custom_xml_tags.is_empty()
+            && smart_tags.is_empty()
             && math_zones.is_empty()
             && protection_ranges.is_empty()
             && editable_regions.is_empty()
@@ -127,6 +131,8 @@ impl<W: Write> RtfWriter<W> {
             .saturating_mul(2);
         let event_count = event_count.saturating_add(navigation_entries.len());
         let event_count = event_count.saturating_add(custom_xml_tags.len().saturating_mul(2));
+        let event_count = event_count.saturating_add(move_bookmarks.len().saturating_mul(2));
+        let event_count = event_count.saturating_add(smart_tags.len().saturating_mul(2));
         let event_count = event_count.saturating_add(math_zones.len());
         let event_count = event_count.saturating_add(protection_ranges.len().saturating_mul(2));
         let event_count = event_count.saturating_add(editable_regions.len().saturating_mul(2));
@@ -848,8 +854,12 @@ impl<W: Write> RtfWriter<W> {
         let mut saw_fields = vec![false; fields.len()];
         let mut saw_bookmark_starts = vec![false; bookmark_items.len()];
         let mut saw_bookmark_ends = vec![false; bookmark_items.len()];
+        let mut saw_move_bookmark_starts = vec![false; move_bookmarks.len()];
+        let mut saw_move_bookmark_ends = vec![false; move_bookmarks.len()];
         let mut saw_custom_xml_opens = vec![false; custom_xml_tags.len()];
         let mut saw_custom_xml_closes = vec![false; custom_xml_tags.len()];
+        let mut saw_smart_tag_opens = vec![false; smart_tags.len()];
+        let mut saw_smart_tag_closes = vec![false; smart_tags.len()];
         let mut saw_math_zones = vec![false; math_zones.len()];
         let mut saw_protection_starts = vec![false; protection_ranges.len()];
         let mut saw_protection_ends = vec![false; protection_ranges.len()];
@@ -962,6 +972,30 @@ impl<W: Write> RtfWriter<W> {
                         BodyEventKind::BookmarkEnd(bookmark),
                     )
                 },
+                BodyStoryEvent::MoveBookmarkStart(index) => {
+                    let bookmark =
+                        take_story_item(move_bookmarks, &mut saw_move_bookmark_starts, index)?;
+                    (
+                        bookmark.position,
+                        BodyEventKind::MoveBookmarkStart(bookmark),
+                    )
+                },
+                BodyStoryEvent::MoveBookmarkEnd(index) => {
+                    let bookmark =
+                        take_story_item(move_bookmarks, &mut saw_move_bookmark_ends, index)?;
+                    (
+                        bookmark
+                            .position
+                            .checked_add(bookmark.content.len())
+                            .ok_or_else(|| {
+                                io::Error::new(
+                                    io::ErrorKind::InvalidInput,
+                                    "RTF move-bookmark range overflow",
+                                )
+                            })?,
+                        BodyEventKind::MoveBookmarkEnd(bookmark),
+                    )
+                },
                 BodyStoryEvent::CustomXmlOpen(index) => {
                     let tag = take_story_item(custom_xml_tags, &mut saw_custom_xml_opens, index)?;
                     (tag.position, BodyEventKind::CustomXmlOpen(tag))
@@ -976,6 +1010,22 @@ impl<W: Write> RtfWriter<W> {
                             )
                         })?,
                         BodyEventKind::CustomXmlClose(tag),
+                    )
+                },
+                BodyStoryEvent::SmartTagOpen(index) => {
+                    let tag = take_story_item(smart_tags, &mut saw_smart_tag_opens, index)?;
+                    (tag.position, BodyEventKind::SmartTagOpen(tag))
+                },
+                BodyStoryEvent::SmartTagClose(index) => {
+                    let tag = take_story_item(smart_tags, &mut saw_smart_tag_closes, index)?;
+                    (
+                        tag.position.checked_add(tag.content.len()).ok_or_else(|| {
+                            io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "RTF SmartTag range overflow",
+                            )
+                        })?,
+                        BodyEventKind::SmartTagClose(tag),
                     )
                 },
                 BodyStoryEvent::MathZone(index) => {
@@ -1140,8 +1190,12 @@ impl<W: Write> RtfWriter<W> {
                 .all(|(seen, field)| !matches!(field.owner, FieldOwner::Body) || *seen)
             && saw_bookmark_starts.iter().all(|seen| *seen)
             && saw_bookmark_ends.iter().all(|seen| *seen)
+            && saw_move_bookmark_starts.iter().all(|seen| *seen)
+            && saw_move_bookmark_ends.iter().all(|seen| *seen)
             && saw_custom_xml_opens.iter().all(|seen| *seen)
             && saw_custom_xml_closes.iter().all(|seen| *seen)
+            && saw_smart_tag_opens.iter().all(|seen| *seen)
+            && saw_smart_tag_closes.iter().all(|seen| *seen)
             && saw_math_zones.iter().all(|seen| *seen)
             && saw_protection_starts.iter().all(|seen| *seen)
             && saw_protection_ends.iter().all(|seen| *seen)
@@ -1300,8 +1354,12 @@ impl<W: Write> RtfWriter<W> {
             BodyEventKind::NavigationEntry(entry) => self.write_navigation_entry(entry),
             BodyEventKind::BookmarkStart(bookmark) => self.write_bookmark_start(bookmark),
             BodyEventKind::BookmarkEnd(bookmark) => self.write_bookmark_end(bookmark.name.as_ref()),
+            BodyEventKind::MoveBookmarkStart(bookmark) => self.write_move_bookmark_start(bookmark),
+            BodyEventKind::MoveBookmarkEnd(bookmark) => self.write_move_bookmark_end(bookmark),
             BodyEventKind::CustomXmlOpen(tag) => self.write_custom_xml_open(tag),
             BodyEventKind::CustomXmlClose(tag) => self.write_custom_xml_close(tag),
+            BodyEventKind::SmartTagOpen(tag) => self.write_smart_tag_open(tag),
+            BodyEventKind::SmartTagClose(tag) => self.write_smart_tag_close(tag),
             BodyEventKind::MathZone(zone) => self.write_math_zone(zone),
             BodyEventKind::ProtectionRangeStart(range) => {
                 self.write_protection_range_marker("protstart", range)

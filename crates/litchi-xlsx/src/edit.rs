@@ -4,6 +4,7 @@
 //! snapshot; this module exposes that owner as the standalone edit layer.
 
 pub use crate::workbook::edit::{
-    ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, Edit, JoinError,
-    JoinFailure, NewSheet, PackageChange, Patch, RowEdit, State, TabEdit, WorksheetEdit,
+    ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, Edit,
+    FormControlEdit, JoinError, JoinFailure, NewSheet, PackageChange, Patch, PictureSelector,
+    RowEdit, State, SvgInput, TabEdit, WorksheetEdit,
 };

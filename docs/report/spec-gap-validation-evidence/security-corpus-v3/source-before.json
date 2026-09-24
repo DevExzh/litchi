@@ -1,0 +1,642 @@
+{
+  "schema": "litchi-security-corpus-integration-source-manifest-v1",
+  "artifact": "security-corpus-v3-current-integration",
+  "authoritative_head": "9821676451bf098cd0794fd177702bd82f27d826",
+  "historical_candidate_base": "cab92a6bbc2f2eb09081c69ce90ba7bb29509155",
+  "provenance": {
+    "historical_candidate_manifest": {
+      "path": "docs/performance/results/security-corpus-v3/source-manifest.json",
+      "sha256": "5d123954ea614f9bb9a011628fd8336293764618ab1b45f8d866577812746493",
+      "status": "immutable inherited candidate evidence"
+    },
+    "current_integration_manifest_status": "current 982 HEAD overlay closure; no timing or capture rerun",
+    "current_integration_source_paths_same_as_historical": false,
+    "historical_timing_definitions": 3,
+    "historical_rows_timed": false,
+    "current_integration_rows_timed": false,
+    "current_head_delta_paths": [
+      "tools/perf-baseline/Cargo.lock",
+      "crates/litchi-cfb/src/file.rs",
+      "crates/litchi-doc/src/package/model.rs",
+      "crates/litchi-opc/src/phys_pkg.rs",
+      "crates/litchi-ole-common/src/object/model.rs",
+      "crates/litchi-ole-common/src/object/editor.rs",
+      "crates/soapberry-zip/src/office.rs"
+    ]
+  },
+  "closure": {
+    "path_count": 49,
+    "required_paths": [
+      "crates/litchi-crypto/src/spaces.rs",
+      "crates/litchi-opc/src/limits.rs",
+      "crates/litchi-opc/src/phys_pkg.rs",
+      "crates/litchi-doc/src/package/model.rs",
+      "crates/litchi-doc/src/document/package.rs"
+    ],
+    "strategy": "inherited 49-path implementation/oracle closure, rehashed at current 982 HEAD, with selected crate dep-info cross-check",
+    "dep_info_checked": true,
+    "dep_info_source_path_count": 8280,
+    "selected_required_path_coverage": {
+      "crates/litchi-crypto/src/spaces.rs": true,
+      "crates/litchi-opc/src/limits.rs": true,
+      "crates/litchi-opc/src/phys_pkg.rs": true,
+      "crates/litchi-doc/src/package/model.rs": true,
+      "crates/litchi-doc/src/document/package.rs": true
+    },
+    "dep_info_unique_source_path_count": 1656
+  },
+  "source_paths": [
+    {
+      "path": "tools/perf-baseline/src/bin/security_corpus.rs",
+      "bytes": 77926,
+      "sha256": "124e77b4543e6820417f23e689c8415ed0a6019d187a56453763c2449f0b7348",
+      "historical_candidate_bytes": 77926,
+      "historical_candidate_sha256": "124e77b4543e6820417f23e689c8415ed0a6019d187a56453763c2449f0b7348",
+      "same_as_historical_candidate": true,
+      "role": "feature-source"
+    },
+    {
+      "path": "tools/perf-baseline/Cargo.toml",
+      "bytes": 2101,
+      "sha256": "9692ba054ce1ae07cd0d8d585a2d30e28f8e294175895f3eb7477e5de8180470",
+      "historical_candidate_bytes": 2101,
+      "historical_candidate_sha256": "9692ba054ce1ae07cd0d8d585a2d30e28f8e294175895f3eb7477e5de8180470",
+      "same_as_historical_candidate": true,
+      "role": "feature-source"
+    },
+    {
+      "path": "tools/perf-baseline/Cargo.lock",
+      "bytes": 56394,
+      "sha256": "577ca67feffe8866fb061b82dca0e36203d66f72e913fb7861c2332e38427562",
+      "historical_candidate_bytes": 56378,
+      "historical_candidate_sha256": "2e0ccf57a6b1f69d9fc817bd51e9a6c76f816c936695ff2fe648693c74b7ce04",
+      "same_as_historical_candidate": false,
+      "role": "feature-source"
+    },
+    {
+      "path": "tools/perf-baseline/src/security_corpus.rs",
+      "bytes": 22162,
+      "sha256": "6d7c5d798d7d172e2a87559c880f2abc85a9fb06829425c6561fe94bb05261cb",
+      "historical_candidate_bytes": 22162,
+      "historical_candidate_sha256": "6d7c5d798d7d172e2a87559c880f2abc85a9fb06829425c6561fe94bb05261cb",
+      "same_as_historical_candidate": true,
+      "role": "feature-source"
+    },
+    {
+      "path": "crates/litchi-crypto/tests/ooxml_interoperability.rs",
+      "bytes": 3631,
+      "sha256": "7a07a7445767ce2346fbd415f4a3e91f43efdce319658f563edb87f70b9c03bf",
+      "historical_candidate_bytes": 3631,
+      "historical_candidate_sha256": "7a07a7445767ce2346fbd415f4a3e91f43efdce319658f563edb87f70b9c03bf",
+      "same_as_historical_candidate": true,
+      "role": "oracle-test-source"
+    },
+    {
+      "path": "crates/litchi-crypto/tests/data/ooxml/standard-manifest.json",
+      "bytes": 1169,
+      "sha256": "e7b33ee140c1317549d810a5c14c6556d0b0047fdb232db258bad88430d8a8e5",
+      "historical_candidate_bytes": 1169,
+      "historical_candidate_sha256": "e7b33ee140c1317549d810a5c14c6556d0b0047fdb232db258bad88430d8a8e5",
+      "same_as_historical_candidate": true,
+      "role": "oracle-test-source"
+    },
+    {
+      "path": "crates/litchi-crypto/tests/data/ooxml/agile-mixed-manifest.json",
+      "bytes": 1076,
+      "sha256": "3a6979e404d7eae6830752e5f8960b5e8116a3d5f6330c4ec3efb99996b692a9",
+      "historical_candidate_bytes": 1076,
+      "historical_candidate_sha256": "3a6979e404d7eae6830752e5f8960b5e8116a3d5f6330c4ec3efb99996b692a9",
+      "same_as_historical_candidate": true,
+      "role": "oracle-test-source"
+    },
+    {
+      "path": "crates/litchi-crypto/tests/data/ooxml/native-agile-manifest.json",
+      "bytes": 1053,
+      "sha256": "b48fa91021382b7ce1f91b4a5bf47639675b709fb895c882f8a21e7f66151520",
+      "historical_candidate_bytes": 1053,
+      "historical_candidate_sha256": "b48fa91021382b7ce1f91b4a5bf47639675b709fb895c882f8a21e7f66151520",
+      "same_as_historical_candidate": true,
+      "role": "oracle-test-source"
+    },
+    {
+      "path": "crates/litchi-crypto/tests/data/ooxml/rust-output-manifest.json",
+      "bytes": 1314,
+      "sha256": "7ad2b78c9c79c73da2c2fec36259e472f15461e78c28bcdf2381899da7785d5a",
+      "historical_candidate_bytes": 1314,
+      "historical_candidate_sha256": "7ad2b78c9c79c73da2c2fec36259e472f15461e78c28bcdf2381899da7785d5a",
+      "same_as_historical_candidate": true,
+      "role": "oracle-test-source"
+    },
+    {
+      "path": "crates/litchi-crypto/src/ooxml/mod.rs",
+      "bytes": 34145,
+      "sha256": "976de13d6162a3b9d55d8855129fee94c1be23b4def8b8f7c610135a1eec6ece",
+      "historical_candidate_bytes": 34145,
+      "historical_candidate_sha256": "976de13d6162a3b9d55d8855129fee94c1be23b4def8b8f7c610135a1eec6ece",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-crypto/src/ooxml/container.rs",
+      "bytes": 27612,
+      "sha256": "788b27f67b1056d333f82419a4d784b8e190d1df40aa7fd0fa7251ee380369db",
+      "historical_candidate_bytes": 27612,
+      "historical_candidate_sha256": "788b27f67b1056d333f82419a4d784b8e190d1df40aa7fd0fa7251ee380369db",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-crypto/src/ooxml/standard.rs",
+      "bytes": 23654,
+      "sha256": "5cfaeaa6c4c4edf37c778fb7be604bc974358598835b64d5cc01e64b2ba05964",
+      "historical_candidate_bytes": 23654,
+      "historical_candidate_sha256": "5cfaeaa6c4c4edf37c778fb7be604bc974358598835b64d5cc01e64b2ba05964",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-crypto/src/ooxml/agile.rs",
+      "bytes": 75151,
+      "sha256": "7886eb6def1e9d8e54ca9ed343e17d5978ddbe4f05fff77cffbf14df538e7cd0",
+      "historical_candidate_bytes": 75151,
+      "historical_candidate_sha256": "7886eb6def1e9d8e54ca9ed343e17d5978ddbe4f05fff77cffbf14df538e7cd0",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-crypto/src/spaces.rs",
+      "bytes": 114888,
+      "sha256": "4169d37c3a728576b26416675ede28b68edecc0ba8a9d00019b3a422e3fff835",
+      "historical_candidate_bytes": 114888,
+      "historical_candidate_sha256": "4169d37c3a728576b26416675ede28b68edecc0ba8a9d00019b3a422e3fff835",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-cfb/src/file.rs",
+      "bytes": 181793,
+      "sha256": "6d281b6fb04b4608eca0cdbeaf943a3f866c24a9e490aff51bb8891b0a7d3642",
+      "historical_candidate_bytes": 170707,
+      "historical_candidate_sha256": "334b3f9a0a6a59d1d4f511eaa5ee292eb614b219861e004caf03f5674fab38f9",
+      "same_as_historical_candidate": false,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-cfb/src/allocation_validation_tests.rs",
+      "bytes": 28006,
+      "sha256": "a8b2d291aed754254c08143e763e19d2f4ccbb21d7987f1b4c0ace8c500b0e8f",
+      "historical_candidate_bytes": 28006,
+      "historical_candidate_sha256": "a8b2d291aed754254c08143e763e19d2f4ccbb21d7987f1b4c0ace8c500b0e8f",
+      "same_as_historical_candidate": true,
+      "role": "oracle-source-not-directly-in-security-binary-dep-info"
+    },
+    {
+      "path": "crates/litchi-doc/src/package/codec.rs",
+      "bytes": 17097,
+      "sha256": "b51eaf566273700a4cbfccdfb6d86d075673bddda3d7e5574730c2ad0d3db7f9",
+      "historical_candidate_bytes": 17097,
+      "historical_candidate_sha256": "b51eaf566273700a4cbfccdfb6d86d075673bddda3d7e5574730c2ad0d3db7f9",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-doc/src/package/mod.rs",
+      "bytes": 354,
+      "sha256": "e3b92479c2d107714e0c8db28267c38c9a66c47927e6129bb6b46c12b5a9293a",
+      "historical_candidate_bytes": 354,
+      "historical_candidate_sha256": "e3b92479c2d107714e0c8db28267c38c9a66c47927e6129bb6b46c12b5a9293a",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-doc/src/package/model.rs",
+      "bytes": 18003,
+      "sha256": "7bc48acd1634d338f5799cebc9cf6ad0e314c908413c1f9af9343996996c5926",
+      "historical_candidate_bytes": 17448,
+      "historical_candidate_sha256": "24c8c30d8ad961de84af47f2e5a537f4262a4d9d54062498ff129832ecc4b5d9",
+      "same_as_historical_candidate": false,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-doc/src/document/mod.rs",
+      "bytes": 159,
+      "sha256": "0a43d49daebbb61de9b4315cdad31b2ede6a1da323b22811dcbaff4aefc1031c",
+      "historical_candidate_bytes": 159,
+      "historical_candidate_sha256": "0a43d49daebbb61de9b4315cdad31b2ede6a1da323b22811dcbaff4aefc1031c",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-doc/src/document/package.rs",
+      "bytes": 19113,
+      "sha256": "0b546a79ec0fb6e516dd299edb844bda83660d9737189303604b91c94919da79",
+      "historical_candidate_bytes": 19113,
+      "historical_candidate_sha256": "0b546a79ec0fb6e516dd299edb844bda83660d9737189303604b91c94919da79",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-docx/src/source_backed.rs",
+      "bytes": 110603,
+      "sha256": "8557c29f54d175563e582366edba1c8c202136e4a5da3594ba7ca52cecf2f645",
+      "historical_candidate_bytes": 110603,
+      "historical_candidate_sha256": "8557c29f54d175563e582366edba1c8c202136e4a5da3594ba7ca52cecf2f645",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-opc/src/pkgreader.rs",
+      "bytes": 106539,
+      "sha256": "85bb29e62bdcf58c813a7d44c590c2bbe7ae6e2dbf64393f033dec0b7c049c3c",
+      "historical_candidate_bytes": 106539,
+      "historical_candidate_sha256": "85bb29e62bdcf58c813a7d44c590c2bbe7ae6e2dbf64393f033dec0b7c049c3c",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-opc/src/package.rs",
+      "bytes": 137248,
+      "sha256": "49862f15ea3893ff884e6903753fd0e1de4bd046c0c10a4af10a7e71bcd2ebd1",
+      "historical_candidate_bytes": 137248,
+      "historical_candidate_sha256": "49862f15ea3893ff884e6903753fd0e1de4bd046c0c10a4af10a7e71bcd2ebd1",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-opc/src/limits.rs",
+      "bytes": 22633,
+      "sha256": "2c8ef7a5081ced8a81429ac26cca308d874aa12422745ebfc1c3701589976a32",
+      "historical_candidate_bytes": 22633,
+      "historical_candidate_sha256": "2c8ef7a5081ced8a81429ac26cca308d874aa12422745ebfc1c3701589976a32",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-opc/src/phys_pkg.rs",
+      "bytes": 82719,
+      "sha256": "0ea390fee12dc461401cdc2d887854a32f96bd3d3f526f376b34e9bbebef38a2",
+      "historical_candidate_bytes": 83413,
+      "historical_candidate_sha256": "8050625d6805525733b0a6bd3ab71d065c746b75b0aafdd22673b4aba1057280",
+      "same_as_historical_candidate": false,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-opc/src/source_backed.rs",
+      "bytes": 749864,
+      "sha256": "c56d1d0dd21ca97528982085560d292f6caf6b0594d095f0f4fc65664e8310bd",
+      "historical_candidate_bytes": 749864,
+      "historical_candidate_sha256": "c56d1d0dd21ca97528982085560d292f6caf6b0594d095f0f4fc65664e8310bd",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-ooxml-common/src/properties/read.rs",
+      "bytes": 43581,
+      "sha256": "57b393b460623f89b75c7761ab4f39672fe7ccad221253fb47c7eabc0e46c205",
+      "historical_candidate_bytes": 43581,
+      "historical_candidate_sha256": "57b393b460623f89b75c7761ab4f39672fe7ccad221253fb47c7eabc0e46c205",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-sign/src/xml.rs",
+      "bytes": 80505,
+      "sha256": "187ec1f6a926e87f0e817af4f778861d6eb746053d0ec71b144b672460f1f4a2",
+      "historical_candidate_bytes": 80505,
+      "historical_candidate_sha256": "187ec1f6a926e87f0e817af4f778861d6eb746053d0ec71b144b672460f1f4a2",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-xls/src/workbook/package.rs",
+      "bytes": 17515,
+      "sha256": "3ee906f6e96a1851347408b88205e2f18de6ddd9eb294b672f95390e6dc5e054",
+      "historical_candidate_bytes": 17515,
+      "historical_candidate_sha256": "3ee906f6e96a1851347408b88205e2f18de6ddd9eb294b672f95390e6dc5e054",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-xls/src/vba.rs",
+      "bytes": 23830,
+      "sha256": "a3e4fe975485269a36341d0accc961cda7601f78561599c7dba2cf980a80393e",
+      "historical_candidate_bytes": 23830,
+      "historical_candidate_sha256": "a3e4fe975485269a36341d0accc961cda7601f78561599c7dba2cf980a80393e",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-xls/src/cell_values/mod.rs",
+      "bytes": 272654,
+      "sha256": "b7e9d4fa191c52fa3760020d10e931200fad4e43a0c8b723f900967dfc54746e",
+      "historical_candidate_bytes": 272654,
+      "historical_candidate_sha256": "b7e9d4fa191c52fa3760020d10e931200fad4e43a0c8b723f900967dfc54746e",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-xls/src/cell_values/structural.rs",
+      "bytes": 113040,
+      "sha256": "644e5a7f9a3f45fd337ed066225d6e6e025c3894b842dc77f2a077af58ce1554",
+      "historical_candidate_bytes": 113040,
+      "historical_candidate_sha256": "644e5a7f9a3f45fd337ed066225d6e6e025c3894b842dc77f2a077af58ce1554",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-xls/src/workbook/source.rs",
+      "bytes": 98683,
+      "sha256": "3e7dbde9f197771ee7766a597f3f27f6a0143b79f1cf2575dd52a9f8493f6d92",
+      "historical_candidate_bytes": 98683,
+      "historical_candidate_sha256": "3e7dbde9f197771ee7766a597f3f27f6a0143b79f1cf2575dd52a9f8493f6d92",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-ole-common/src/object/mod.rs",
+      "bytes": 1116,
+      "sha256": "8c183aec5c6818fdc748739a8881aeb0d4585ae9e1f9ba241ce909c5a3c8b87f",
+      "historical_candidate_bytes": 1116,
+      "historical_candidate_sha256": "8c183aec5c6818fdc748739a8881aeb0d4585ae9e1f9ba241ce909c5a3c8b87f",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-ole-common/src/object/model.rs",
+      "bytes": 19315,
+      "sha256": "83389ca205916eb65b36607bb2f15f13541821989f20abfd1e6b3236ef6aa352",
+      "historical_candidate_bytes": 17971,
+      "historical_candidate_sha256": "46b7c03590d68b7812ad279c5c1ae37c9d92a40b24bc0910bfe9631beca31402",
+      "same_as_historical_candidate": false,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-ole-common/src/object/editor.rs",
+      "bytes": 35430,
+      "sha256": "0e3d136ff167f82cb960f37766e996b2aa1f6450008d2b4ba364814e69a42542",
+      "historical_candidate_bytes": 34985,
+      "historical_candidate_sha256": "312108c90d3ffb6e465f71a3e2576d4afc49f6fa26136e333ce7a76e88ec3446",
+      "same_as_historical_candidate": false,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/workbook/model.rs",
+      "bytes": 56918,
+      "sha256": "345c517288661ae41553f72a98594476531e7464d51df692333d2a2bb1d59612",
+      "historical_candidate_bytes": 56918,
+      "historical_candidate_sha256": "345c517288661ae41553f72a98594476531e7464d51df692333d2a2bb1d59612",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/litchi-xlsx/tests/reader_tolerance.rs",
+      "bytes": 1332,
+      "sha256": "71292ec5da0a78e64d55d73c7de251e7c4a0959838ea89ddc21b77ec2967bb8a",
+      "historical_candidate_bytes": 1332,
+      "historical_candidate_sha256": "71292ec5da0a78e64d55d73c7de251e7c4a0959838ea89ddc21b77ec2967bb8a",
+      "same_as_historical_candidate": true,
+      "role": "oracle-test-source"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/xml_maps/tests.rs",
+      "bytes": 19983,
+      "sha256": "cb73a9f5874d367af9fb1c54907e8597affe3ea912da2ee364654a2002a4117f",
+      "historical_candidate_bytes": 19983,
+      "historical_candidate_sha256": "cb73a9f5874d367af9fb1c54907e8597affe3ea912da2ee364654a2002a4117f",
+      "same_as_historical_candidate": true,
+      "role": "oracle-source-not-directly-in-security-binary-dep-info"
+    },
+    {
+      "path": "crates/soapberry-zip/src/archive.rs",
+      "bytes": 168448,
+      "sha256": "7e4243ab183ce7c92b94916835a15cd86adfdcd8149ccdcacc48f5693786a968",
+      "historical_candidate_bytes": 168448,
+      "historical_candidate_sha256": "7e4243ab183ce7c92b94916835a15cd86adfdcd8149ccdcacc48f5693786a968",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/soapberry-zip/src/office.rs",
+      "bytes": 557468,
+      "sha256": "a6f8fd14aed46468063455467e808b40ac1272901548d1bde325b35e4711cb34",
+      "historical_candidate_bytes": 555184,
+      "historical_candidate_sha256": "f5ea04b22ea6655a592b1ed77896091250c3c6505bb911fc30b45268808f635f",
+      "same_as_historical_candidate": false,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "crates/soapberry-zip/src/preserve.rs",
+      "bytes": 226279,
+      "sha256": "48bc63a2197f6c17801acd0f82db8fb8a2062d4c590ab6e62531b7dc7d38321f",
+      "historical_candidate_bytes": 226279,
+      "historical_candidate_sha256": "48bc63a2197f6c17801acd0f82db8fb8a2062d4c590ab6e62531b7dc7d38321f",
+      "same_as_historical_candidate": true,
+      "role": "build-dep-source"
+    },
+    {
+      "path": "docs/adr/0005-io-memory-and-performance.md",
+      "bytes": 139640,
+      "sha256": "34a6148a8fe77b3e90212810996667b654e25209fb49c56aaecd8d8fbe83f770",
+      "historical_candidate_bytes": 139640,
+      "historical_candidate_sha256": "34a6148a8fe77b3e90212810996667b654e25209fb49c56aaecd8d8fbe83f770",
+      "same_as_historical_candidate": true,
+      "role": "historical-artifact-or-policy"
+    },
+    {
+      "path": "docs/adr/0006-validation-security-and-compatibility.md",
+      "bytes": 6694,
+      "sha256": "b686465f342b2e051f856f094e38c2333aa05a2768bb255fc5b223cbba1f3381",
+      "historical_candidate_bytes": 6694,
+      "historical_candidate_sha256": "b686465f342b2e051f856f094e38c2333aa05a2768bb255fc5b223cbba1f3381",
+      "same_as_historical_candidate": true,
+      "role": "historical-artifact-or-policy"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/catalog.json",
+      "bytes": 135550,
+      "sha256": "4b1d7d0d1cf1f345191c698e1d3ecd1b490d4f9cdac24712369567682201d797",
+      "historical_candidate_bytes": 135550,
+      "historical_candidate_sha256": "4b1d7d0d1cf1f345191c698e1d3ecd1b490d4f9cdac24712369567682201d797",
+      "same_as_historical_candidate": true,
+      "role": "historical-artifact-or-policy"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/oracles.json",
+      "bytes": 28050,
+      "sha256": "aa2e636dbd3454a39c41b5e7026ce43970582d3657d537fd285df466894943b6",
+      "historical_candidate_bytes": 28050,
+      "historical_candidate_sha256": "aa2e636dbd3454a39c41b5e7026ce43970582d3657d537fd285df466894943b6",
+      "same_as_historical_candidate": true,
+      "role": "historical-artifact-or-policy"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/profile.json",
+      "bytes": 1728,
+      "sha256": "55724c7634b666136823faa242b100046edbba4954a4af05f8bc229a0a0630d1",
+      "historical_candidate_bytes": 1728,
+      "historical_candidate_sha256": "55724c7634b666136823faa242b100046edbba4954a4af05f8bc229a0a0630d1",
+      "same_as_historical_candidate": true,
+      "role": "historical-artifact-or-policy"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/README.md",
+      "bytes": 3372,
+      "sha256": "9f5f9226750c73b8c2bf15aa54ccf6ccce524e105f0278b20f8c700818267a80",
+      "historical_candidate_bytes": 3372,
+      "historical_candidate_sha256": "9f5f9226750c73b8c2bf15aa54ccf6ccce524e105f0278b20f8c700818267a80",
+      "same_as_historical_candidate": true,
+      "role": "historical-artifact-or-policy"
+    }
+  ],
+  "dep_info": {
+    "target_dir": "/var/tmp/litchi-security-corpus-v3-integration-982-target",
+    "selected_crate_prefixes": [
+      "security_corpus-",
+      "litchi_perf_baseline-",
+      "litchi_opc-",
+      "litchi_crypto-",
+      "litchi_doc-",
+      "litchi_xls-",
+      "litchi_ole_common-",
+      "litchi_cfb-",
+      "soapberry_zip-",
+      "litchi_docx-",
+      "litchi_xlsx-",
+      "litchi_sign-",
+      "litchi_ooxml_common-",
+      "litchi_core-"
+    ],
+    "files": [
+      {
+        "path": "debug/deps/litchi_cfb-6925d16922175399.d",
+        "sha256": "10c21e4107d1328764e12abb821694fe697cb200aa87a75ee8648973acccedd7"
+      },
+      {
+        "path": "debug/deps/litchi_cfb-edb62ea65d7867b5.d",
+        "sha256": "f778231d6c3448aa574cd7a56248646d81d07f3c6508661b6b0694b507744338"
+      },
+      {
+        "path": "debug/deps/litchi_core-2442b671baef8e6a.d",
+        "sha256": "fe880231d622c1a5014f7cd6a7ce8368b9c3adf44ad557250c1c63ed3fa6e446"
+      },
+      {
+        "path": "debug/deps/litchi_core-4d3760af244f026e.d",
+        "sha256": "e2a3c054259e12f23fdb64301b4889bf5f8bfbfcf62214cd6bf6e6e20ff7dbf0"
+      },
+      {
+        "path": "debug/deps/litchi_crypto-d2f6058258f17ef1.d",
+        "sha256": "5bb7b48a1a54c9e468359925c40f70a8852a341cce69e91280d527a00a513739"
+      },
+      {
+        "path": "debug/deps/litchi_crypto-dda1d3207b01b5f6.d",
+        "sha256": "3311648e473082742b040ad96044fb9fdf57011aa13a3be18b91c173940da8de"
+      },
+      {
+        "path": "debug/deps/litchi_doc-40e326b4d9b0cfeb.d",
+        "sha256": "81525c3f28e665f760e62ccf1f7de7186340f03d174ef117b2961e52e450bbab"
+      },
+      {
+        "path": "debug/deps/litchi_doc-e7f54905c9e61b25.d",
+        "sha256": "56b970dc7fcdbe4a26b2f76ff40e6942df9938f52eb9d92000ff238528ac6b29"
+      },
+      {
+        "path": "debug/deps/litchi_docx-2865d3c793c68179.d",
+        "sha256": "933635fb0991b4b2cef2ca6fe88c1c66c273a965995bc209a7becadb98a5e590"
+      },
+      {
+        "path": "debug/deps/litchi_docx-fd80ec24bb533f22.d",
+        "sha256": "4597e66d0379fd6322b7618493a41c1c67ec009caee28dea5372d7acc2bbf0aa"
+      },
+      {
+        "path": "debug/deps/litchi_ole_common-b2bbde079429561f.d",
+        "sha256": "7f61f2493fffa10e869aeabacb77f8b0d049c8066770a08d4616a0e117cd05ba"
+      },
+      {
+        "path": "debug/deps/litchi_ole_common-b5c1295722220dd1.d",
+        "sha256": "815acf7fb8bf65d4e3d2bb165e22ffb6c8e620b363ad085db5e770d4d4dbf2fb"
+      },
+      {
+        "path": "debug/deps/litchi_ooxml_common-da3ab1ae0e77e4e4.d",
+        "sha256": "4fc5b26db8182f9c003953e86340675e5c6ef41753d134403ebae87506bd7caf"
+      },
+      {
+        "path": "debug/deps/litchi_ooxml_common-e25baf118d166549.d",
+        "sha256": "b6331c7b112a198b5620167117bf2fd9203388ef5ef8171db2de75ae1fb90990"
+      },
+      {
+        "path": "debug/deps/litchi_opc-040eea529cacba1a.d",
+        "sha256": "7946deebc9300256a79f71b5951c9a0dd204268afd5fae5b3ed21c733e906661"
+      },
+      {
+        "path": "debug/deps/litchi_opc-3f39ba22a6795434.d",
+        "sha256": "4c76f66cf95c46a2369b98b68684626e6cf21e87ac690c00200fdcc4b716d385"
+      },
+      {
+        "path": "debug/deps/litchi_perf_baseline-5aa8c6907c8bbd5b.d",
+        "sha256": "76faec0f6e1801648a1360412b02d8a387cfc2f5eeaeee13d68f96f9b94ec1ef"
+      },
+      {
+        "path": "debug/deps/litchi_perf_baseline-ab63b7fdb3e18e7b.d",
+        "sha256": "2a1e0caa844f4dddc1d9ee165538d63d431a093db61b3a271e5dfb4ecaafbb02"
+      },
+      {
+        "path": "debug/deps/litchi_perf_baseline-ff1929254d12b8f8.d",
+        "sha256": "16a56a412691f3a7a79c7facfba18be8c338b319a790e2674c37ec3a4c3f1941"
+      },
+      {
+        "path": "debug/deps/litchi_sign-2c74d02105dcdeb4.d",
+        "sha256": "bd23c77f0a2040e14eac83fab5cb5a19b57c15cfaa4600d93849e704aaa3ad8d"
+      },
+      {
+        "path": "debug/deps/litchi_sign-574e5eba57098599.d",
+        "sha256": "dddf3ec17c9e0e4431664edb6236fe6639002731e2bd587a5fd0012f2c049660"
+      },
+      {
+        "path": "debug/deps/litchi_xls-06b815fb261aeb55.d",
+        "sha256": "759a821bc2d5d3e5826b0e90b422ea63b9c13e4aa70f898e8be4b6992fb8c80b"
+      },
+      {
+        "path": "debug/deps/litchi_xls-be98ea3569931001.d",
+        "sha256": "4b15bcaaa217610b7d8499e069e5f94a6227d8157aa6a0a0f477044934102b49"
+      },
+      {
+        "path": "debug/deps/litchi_xlsx-5e4665a6193de156.d",
+        "sha256": "770b43077309e9b04a0176f02627e8b8d7045893bb2277c4f1fb4dac5434f140"
+      },
+      {
+        "path": "debug/deps/litchi_xlsx-62e0bcce75bcd1d2.d",
+        "sha256": "5c1180c0088010f10461316e31bf137acc87e168de18f8a2588fe6cd93a4d505"
+      },
+      {
+        "path": "debug/deps/security_corpus-0c3ccd98346a67f9.d",
+        "sha256": "384876702e394f3aad64f4e85e97025353398788d5120cadaacbd469316f4d71"
+      },
+      {
+        "path": "debug/deps/security_corpus-5f19fa616d31fc3f.d",
+        "sha256": "8b771931d515eda016785a92cd235c164a6e1c1987dd93534d06cd7e5ca9bdf9"
+      },
+      {
+        "path": "debug/deps/security_corpus-bdc6ed37c12832ec.d",
+        "sha256": "bf68579ea1213c1012928f2e32fb0736c1f82af1223eb1bc742687287b001879"
+      },
+      {
+        "path": "debug/deps/soapberry_zip-960735736c568cd1.d",
+        "sha256": "7d55bc76c18dddb1187f07427eba531d54856275598a265e8fcfcc07a742abc3"
+      },
+      {
+        "path": "debug/deps/soapberry_zip-9c1879b4dce87c2f.d",
+        "sha256": "0fe3c2c64b2b9033423cc53a230fbcef6a8561ddc78f3ed5ed08a35910ec3bda"
+      }
+    ]
+  },
+  "oracle_bindings": {
+    "fixtures": 22,
+    "operations_per_fixture": 3,
+    "rows": 66
+  },
+  "policy": {
+    "host_code_execution": false,
+    "external_reference_resolution": false,
+    "timed_captures_recorded": false
+  }
+}

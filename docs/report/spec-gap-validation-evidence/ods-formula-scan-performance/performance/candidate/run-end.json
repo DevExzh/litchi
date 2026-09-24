@@ -1,0 +1,15 @@
+{
+  "label": "candidate-comparable",
+  "group": "comparable",
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/candidate/ods-formula-reference-profile",
+  "binary_sha256": "507c989691190554711c023ebe19796e62388bdc27fe942ab8015e862c49689f",
+  "harness": "/var/tmp/ods-scan-worktree/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/harness/run.py",
+  "output": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/candidate",
+  "warmups": 3,
+  "iterations": 15,
+  "finished_at": "2026-09-13T08:27:42Z",
+  "elapsed_seconds": 0.14844512939453125,
+  "status": 0,
+  "raw_sha256": "ff0ec3dbab8b1a96e0e75fd9a5306b03666f082b7ea0b1318ecf8e6770a0d915",
+  "row_count": 12
+}

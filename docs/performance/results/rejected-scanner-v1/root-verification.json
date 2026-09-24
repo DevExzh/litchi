@@ -1,0 +1,26 @@
+{
+  "allocated_bytes_change_percent": {
+    "xlsx_one_percent_commit": 8.851306783152047,
+    "xlsx_one_percent_commit_save": 8.469847395828566
+  },
+  "allocation_calls_change_percent": {
+    "xlsx_one_percent_commit": 124.55351723086277,
+    "xlsx_one_percent_commit_save": 119.40786119848879
+  },
+  "bundle": "rejected-scanner-v1",
+  "normal_p50_change_percent": {
+    "xlsx_one_percent_commit": 56.251093055851165,
+    "xlsx_one_percent_commit_save": 41.113268624602185
+  },
+  "publication_head": "42be13576f97958c81526d9b239351c72d179fa8",
+  "raw_reports": [
+    "latency-a1.json",
+    "latency-a2.json",
+    "latency-b1.json",
+    "latency-b2.json",
+    "allocator-candidate.json",
+    "allocator-control.json"
+  ],
+  "source_base": "cf4f383c4c203381880d4c2e8445d2616a53d283",
+  "status": "verified"
+}

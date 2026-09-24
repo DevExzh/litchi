@@ -1,0 +1,38 @@
+{
+  "archive": "publication-bundle.tar.zst",
+  "archive_bytes": 1596546,
+  "archive_sha256": "58384afa7434d55cc95c4f99900fd00f8c4f384e969a2b27f6c2555d1fb980e2",
+  "binary_hashes": {
+    "frame_pointer": "d3efaa5c8499454dfb155630d184ae2f87f435423b0504a9991fd8f03939314b",
+    "normal": "8e0024b0b654fbb261eb88a4b93536646a6e8580d5f2b6c4a655cf208721a083"
+  },
+  "bundled_raw_input_manifest_sha256": "2b5d78d25d3233364dccffa09654fa6ff353079b952223f47becf710bf6334ac",
+  "bundled_raw_inputs": true,
+  "corrected_from_archive_sha256": "d1bd39b9cf522f5aa97856712cc0eed67730764f78a4dacc5a7b83a5d0438623",
+  "corrected_from_manifest_sha256": "fdf9de1513f2d0fda6f0b3957c08c5148feaa75314983ff4328e6382c33ad39b",
+  "external_raw_capture_root": "/var/tmp/litchi-profile-exact-cpu2-20260910",
+  "inner_manifest_sha256": "52b43594f0760f645c496ba5922b4903c859b048e0f689f16e706020d5b378e0",
+  "kind": "corrected_filtered_cpu2_profile_v2_archive_receipt",
+  "notes": [
+    "The d1bd corrected archive and the original dc26 archive remain immutable.",
+    "The default verifier derives summaries from raw perf JSON files bundled as gzip inputs.",
+    "An external raw capture root is accepted only as an optional cross-check.",
+    "No benchmark or timing command was run during packaging."
+  ],
+  "original_capture_archive_sha256": "dc26ba06db7264abb72ee8eb87de1969096afad4523d7607b3544fbfe5a841da",
+  "payload_bytes": 6833355,
+  "payload_file_count": 52,
+  "schema_version": 2,
+  "source_base_commit": "cf98bee37455e8e6d0e73002ff2e94299ef546cb",
+  "source_diff_sha256": "487820aba1d94428d8d2fb086d0d2bc889b1b9b9b99bfd65b5f72dc324db5a3b",
+  "source_overlay_sha256": "7dee21be77f466dc62dfbaaaf4353027ac1ca5a10619c0a2a6d1b1414d7ac4a5",
+  "timing_claim": "none; PMU/FIFO-instrumented operation timings are diagnostic only",
+  "verification": {
+    "independent_direct_raw_recompute": "PASS",
+    "manifest_payload_hashes": "PASS",
+    "portable_verifier_bundled_raw": "PASS",
+    "portable_verifier_external_raw": "PASS",
+    "repacked_archive_byte_identical": true,
+    "repacked_archive_sha256": "58384afa7434d55cc95c4f99900fd00f8c4f384e969a2b27f6c2555d1fb980e2"
+  }
+}

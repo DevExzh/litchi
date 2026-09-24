@@ -1,0 +1,11 @@
+binary=/var/tmp/litchi-docx-styles-effects-after-smoke-target-506e6f8e5-20260912-a/debug/docx-styles-effects-smoke
+b1d1a9d1146a2e9b8f68643411b4d8d95888e97f0b6b31e478cc0ac3dd02841c  /var/tmp/litchi-docx-styles-effects-after-smoke-target-506e6f8e5-20260912-a/debug/docx-styles-effects-smoke
+source_commit=506e6f8e5fb94a14c390fc262b152c773e8990b1
+git_head=0aa99593cb609487cf85230c361be23ca34d4367
+git_status=clean
+rustc=rustc 1.95.0 (59807616e 2026-04-14) binary: rustc commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860 commit-date: 2026-04-14 host: x86_64-unknown-linux-gnu release: 1.95.0 LLVM version: 22.1.2 
+cargo=cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+target=/var/tmp/litchi-docx-styles-effects-after-smoke-target-506e6f8e5-20260912-a
+allocator=CountingAllocator (process-local GlobalAlloc observer)
+rss=/usr/bin/time -v Maximum resident set size
+mode=smoke processes=1 warmup=0 samples=1

@@ -1,0 +1,7 @@
+# Run from a repository containing commit 1ae5d7b4504a248ea24ac52cb2bdd1f08859ddd7.
+# The script creates a fresh detached source checkout, installs the retained
+# source lock, uses a private Cargo target, and removes its temporary checkout
+# after the run.
+TMPDIR=/var/tmp \
+docs/report/spec-gap-validation-evidence/xlsx-form-control-owner-read-performance/replay.sh \
+  "$(git rev-parse --show-toplevel)"

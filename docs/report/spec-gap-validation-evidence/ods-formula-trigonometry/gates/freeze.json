@@ -1,0 +1,15 @@
+{
+  "source_root": "/tmp/litchi-ods-trigonometry",
+  "base_commit": "069c658700912994720540cbaaecc4f7d1f41574",
+  "selected_files": {
+    "crates/litchi-ods/src/codec/formula/evaluation.rs": "a20687c9f99820982c1ece5ac0c2e812826c9c5f37235ea42ff5fdc8ce82d71f",
+    "crates/litchi-ods/src/codec/formula/evaluation/trigonometry.rs": "c04bbfd1e128a621f19c760fbb9a4b37602aa11dfccdbe0955d1adf240524f2b",
+    "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "228800a6276c8dd518672f4e1ad5c7bcd141a8fc0d14b8c6532ac93b27313f08",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/scalar.rs": "232311fa431f8ea3711609c2262bdb60048094f90eba389f3cff1f6191aad7ba",
+    "crates/litchi-ods/tests/ods_formula_trigonometry_evaluation.rs": "850a887e6aa6489c4ac386039e0e4aca4c18dc891caeb08bce0381091e100c79",
+    "crates/litchi-ods/tests/ods_formula_trigonometry_arrays.rs": "58346db334aee969e311bbbe692b34a1856d411526da79e11c4a930742316501",
+    "crates/litchi-ods/tests/ods_formula_trigonometry_native.rs": "4a00b5072dfb63cc35111932b7e9c0faec86b93136eadfa5e3642576b7c62457",
+    "docs/report/spec-gap-validation-evidence/ods-formula-trigonometry/native/cached-results.json": "1df0222a151f11180c83c9acd0575d0561bad2a4b66de53bfabcbd9650293d83",
+    "Cargo.lock": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3"
+  }
+}

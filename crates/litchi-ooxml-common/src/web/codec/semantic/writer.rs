@@ -1,12 +1,13 @@
-use super::super::super::model::{AddIn, Conformance, Limits, Panes, Reference};
+use super::super::super::model::{AddIn, Conformance, ExtKind, ExtList, Limits, Panes, Reference};
 use super::super::super::validation::{
     validate_add_in_budget, validate_model_with, validate_panes, validate_panes_budget,
     validate_task_pane_with,
 };
 use super::super::super::{TASK_PANES_NAMESPACE, WEB_EXTENSION_NAMESPACE};
+use super::super::xml::{element_children, parse_mce_xml};
 use super::parser::{parse_add_in_with, parse_panes_with};
 use super::support::{escape_attr, format_f64, invalid, limit};
-use crate::Result;
+use crate::{Error, Result};
 use std::collections::HashSet;
 
 #[cfg(test)]
@@ -103,6 +104,70 @@ pub(in crate::web) fn write_add_in_with(
     if output.len() > limits.xml_bytes {
         return limit("web extension XML bytes", limits.xml_bytes, output.len());
     }
+    parse_add_in_with(&output, limits)?;
+    Ok(output)
+}
+
+/// Replace an existing add-in `we:extLst` using offsets from the retained
+/// source XML. MCE processing is rejected when it changes bytes, because
+/// effective-tree offsets cannot be published as source offsets.
+pub(in crate::web) fn splice_add_in_extension_list_with(
+    source: &[u8],
+    extension_list: &ExtList,
+    limits: &Limits,
+) -> Result<Vec<u8>> {
+    if extension_list.kind() != ExtKind::AddIn {
+        return invalid("add-in source splice requires an add-in extLst".into());
+    }
+    if source.len() > limits.xml_bytes {
+        return limit("web extension XML bytes", limits.xml_bytes, source.len());
+    }
+    let document = parse_mce_xml(source, &[WEB_EXTENSION_NAMESPACE], limits)?;
+    if document.xml.as_slice() != source {
+        return invalid(
+            "cannot source-splice add-in XML containing markup-compatibility alternatives".into(),
+        );
+    }
+    let root = document.root()?;
+    if root.namespace != WEB_EXTENSION_NAMESPACE || root.local_name != "webextension" {
+        return invalid("add-in source splice requires a webextension root".into());
+    }
+    let extensions = element_children(root)
+        .into_iter()
+        .filter(|node| node.namespace == WEB_EXTENSION_NAMESPACE && node.local_name == "extLst")
+        .collect::<Vec<_>>();
+    let [extension] = extensions.as_slice() else {
+        return invalid(
+            "cannot source-splice add-in XML without exactly one retained extLst".into(),
+        );
+    };
+    let fragment = extension
+        .raw_fragment
+        .as_ref()
+        .ok_or_else(|| Error::Invalid("add-in extLst has no retained source span".into()))?;
+    let replacement = extension_list.xml().as_bytes();
+    let output_len = source
+        .len()
+        .checked_sub(fragment.end - fragment.start)
+        .and_then(|length| length.checked_add(replacement.len()))
+        .ok_or(Error::Limit {
+            resource: "web extension XML bytes",
+            max: limits.xml_bytes,
+            actual: usize::MAX,
+        })?;
+    if output_len > limits.xml_bytes {
+        return limit("web extension XML bytes", limits.xml_bytes, output_len);
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "source-spliced web extension XML",
+            source,
+        })?;
+    output.extend_from_slice(&source[..fragment.start]);
+    output.extend_from_slice(replacement);
+    output.extend_from_slice(&source[fragment.end..]);
     parse_add_in_with(&output, limits)?;
     Ok(output)
 }

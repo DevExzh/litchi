@@ -1,0 +1,7 @@
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi-radix-worktree/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-radix-worktree/crates/soapberry-zip)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-radix-worktree/crates/litchi-core)
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi-radix-worktree/crates/litchi-odf-common)
+ Documenting litchi-ods v0.0.1 (/home/zhuhe/code/litchi-radix-worktree/crates/litchi-ods)
+    Finished `dev` profile [unoptimized] target(s) in 4.69s
+   Generated /home/zhuhe/code/litchi-radix-target/doc/litchi_ods/index.html

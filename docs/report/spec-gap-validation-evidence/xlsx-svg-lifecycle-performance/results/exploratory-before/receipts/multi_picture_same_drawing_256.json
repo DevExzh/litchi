@@ -1,0 +1,13 @@
+{
+  "schema":"xlsx-svg-lifecycle-profile-v1",
+  "lane":"multi_picture_same_drawing_256",
+  "input_bytes":7692,
+  "input_hash_fnv1a64":16995913739230470132,
+  "warmup":0,
+  "sample_count":1,
+  "expected_success":true,
+  "samples":[
+    {"elapsed_ns":32882749,"requested_alloc_bytes":28544839,"direct_allocated_bytes":23971630,"realloc_new_bytes":4573209,"realloc_old_bytes":2122141,"deallocated_bytes":26422698,"live_before":8842,"live_after":8842,"peak_live_delta":4054897,"alloc_balance_ok":true,"alloc_invalid":false,"alloc_failed":0,"expected_success":true,"actual_success":true,"semantic_ok":true,"output_exact":true,"error":null,"stage_ns":null,"source_bytes_read":null,"range_read_count":null,"range_request_bytes":null,"bytes_decompressed":null,"bytes_recompressed":null,"bytes_copied":null,"source_copy_bytes":null,"staged_bytes":null,"output_bytes":null,"write_call_count":null,"write_call_bytes":null,"hardware_counters":null}
+  ]
+}
+

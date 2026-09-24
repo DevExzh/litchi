@@ -39,6 +39,8 @@ mod model;
 mod package;
 mod planning;
 mod semantic;
+mod svg;
+mod svg_lifecycle;
 mod transfer;
 mod validation;
 mod wire;
@@ -56,7 +58,10 @@ pub use model::{
     State,
 };
 pub use planning::{MergeChoice, MergeLimits, ThreeWayPlan};
-pub use semantic::{ColumnEdit, DefaultsEdit, Edit, NewSheet, RowEdit, TabEdit, WorksheetEdit};
+pub use semantic::{
+    ColumnEdit, DefaultsEdit, Edit, FormControlEdit, NewSheet, RowEdit, TabEdit, WorksheetEdit,
+};
+pub use svg::{PictureSelector, SvgInput};
 pub use wire::{DurablePatch, SealedPatch};
 
 use model::{

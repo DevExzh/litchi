@@ -1,0 +1,23 @@
+binary=/var/tmp/pptx-ink-actions-profile-260eafd39.wTYD89/target/release/pptx-ink-actions-performance
+12e72a8408e2e9004aadd8d1df5fbb0df862f18852fb347a1a1e18b35a734684  /var/tmp/pptx-ink-actions-profile-260eafd39.wTYD89/target/release/pptx-ink-actions-performance
+source_commit=cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd
+semantic_owner_commit=cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd
+production_source_baseline_commit=2a2ffa1cae4e6b7070082768ce84483e5d411dc8
+semantic_owner_design_path=docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md
+semantic_owner_design_sha256=30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d
+semantic_owner_design_git_blob=597400950b1027c47cd6e4cbbedd23915bc0980e
+capture_head=260eafd391237d49373ad0ea1d73bd9348ab6226
+git_head=260eafd391237d49373ad0ea1d73bd9348ab6226
+rustc -vV:
+rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: x86_64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2
+cargo=cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+target=/var/tmp/pptx-ink-actions-profile-260eafd39.wTYD89/target
+allocator=CountingAllocator (process-local GlobalAlloc observer)
+rss=/usr/bin/time -v Maximum resident set size (kbytes)
+timing_scope=absolute latency, allocation receipts, and process RSS; no speedup claim

@@ -1,0 +1,4 @@
+head=732f3beca1418553c1db8ae4dcb5899e06b7a7db
+target=/var/tmp/pptx-ink-actions-732f3beca-target-parent.rSYID1/target
+results=/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M
+cargo_target_dir=/var/tmp/pptx-ink-actions-732f3beca-target-parent.rSYID1/target

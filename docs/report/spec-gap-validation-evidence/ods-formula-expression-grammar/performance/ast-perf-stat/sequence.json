@@ -1,0 +1,99 @@
+{
+  "binary": "docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/expression/ods-formula-expression-profile",
+  "binary_sha256": "b0e2585b7d6791123a018085283e872c36c513b0cf70957fe7d6919ffd680746",
+  "cpu_pin": "2",
+  "events": [
+    "cycles",
+    "instructions",
+    "branches",
+    "branch-misses",
+    "cache-misses"
+  ],
+  "warmups": 3,
+  "iterations": 15,
+  "jobs": [
+    {
+      "label": "flat-4096",
+      "case": "expr-flat-4096",
+      "repeat": 8,
+      "binary": "docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/expression/ods-formula-expression-profile",
+      "binary_sha256": "b0e2585b7d6791123a018085283e872c36c513b0cf70957fe7d6919ffd680746",
+      "cpu_pin": "2",
+      "events": [
+        "cycles",
+        "instructions",
+        "branches",
+        "branch-misses",
+        "cache-misses"
+      ],
+      "command": "/usr/bin/perf stat --no-big-num -x, -e cycles,instructions,branches,branch-misses,cache-misses -o /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/ast-perf-stat/ast-flat-4096.counters -- taskset -c 2 /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/expression/ods-formula-expression-profile --workload expression --case expr-flat-4096 --warmups 3 --iterations 15 --repeat 8",
+      "status": 0,
+      "started_at": "2026-09-13T10:32:54Z",
+      "finished_at": "2026-09-13T10:32:54Z",
+      "elapsed_seconds": 0.06119060516357422,
+      "stdout": "ast-flat-4096.stdout",
+      "stdout_sha256": "454744aad9b310e66fc3bf77857db45fc9f0290f716da243bfb909cb63974fc7",
+      "stderr": "ast-flat-4096.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "counters": "ast-flat-4096.counters",
+      "counters_sha256": "c2c258786e01c3959dad6f085ebd16842bb8092ec8e4f26260a9a4cfb5dc40fd"
+    },
+    {
+      "label": "name-4096",
+      "case": "expr-name-4096",
+      "repeat": 8,
+      "binary": "docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/expression/ods-formula-expression-profile",
+      "binary_sha256": "b0e2585b7d6791123a018085283e872c36c513b0cf70957fe7d6919ffd680746",
+      "cpu_pin": "2",
+      "events": [
+        "cycles",
+        "instructions",
+        "branches",
+        "branch-misses",
+        "cache-misses"
+      ],
+      "command": "/usr/bin/perf stat --no-big-num -x, -e cycles,instructions,branches,branch-misses,cache-misses -o /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/ast-perf-stat/ast-name-4096.counters -- taskset -c 2 /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/expression/ods-formula-expression-profile --workload expression --case expr-name-4096 --warmups 3 --iterations 15 --repeat 8",
+      "status": 0,
+      "started_at": "2026-09-13T10:32:54Z",
+      "finished_at": "2026-09-13T10:32:54Z",
+      "elapsed_seconds": 0.01750326156616211,
+      "stdout": "ast-name-4096.stdout",
+      "stdout_sha256": "639f4720c31677b2b706f34949267474d20302012a22791a362185d87e3568af",
+      "stderr": "ast-name-4096.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "counters": "ast-name-4096.counters",
+      "counters_sha256": "ac22864b74fa0637664294ff0d2d14b100681bf74179f9b9c6a3abecbd126695"
+    },
+    {
+      "label": "reference-4096",
+      "case": "expr-reference-4096",
+      "repeat": 8,
+      "binary": "docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/expression/ods-formula-expression-profile",
+      "binary_sha256": "b0e2585b7d6791123a018085283e872c36c513b0cf70957fe7d6919ffd680746",
+      "cpu_pin": "2",
+      "events": [
+        "cycles",
+        "instructions",
+        "branches",
+        "branch-misses",
+        "cache-misses"
+      ],
+      "command": "/usr/bin/perf stat --no-big-num -x, -e cycles,instructions,branches,branch-misses,cache-misses -o /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/ast-perf-stat/ast-reference-4096.counters -- taskset -c 2 /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/expression/ods-formula-expression-profile --workload expression --case expr-reference-4096 --warmups 3 --iterations 15 --repeat 8",
+      "status": 0,
+      "started_at": "2026-09-13T10:32:54Z",
+      "finished_at": "2026-09-13T10:32:54Z",
+      "elapsed_seconds": 0.014078855514526367,
+      "stdout": "ast-reference-4096.stdout",
+      "stdout_sha256": "e12203c9e17f4b988724929ddef7efa031aa2df69ac99f9c898b75751aaa6bc7",
+      "stderr": "ast-reference-4096.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "counters": "ast-reference-4096.counters",
+      "counters_sha256": "80d33d5a92e8736db45c538c89379a111065a8f81d2fa122aeb0c66669c8a38b"
+    }
+  ],
+  "order": [
+    "flat-4096",
+    "name-4096",
+    "reference-4096"
+  ]
+}

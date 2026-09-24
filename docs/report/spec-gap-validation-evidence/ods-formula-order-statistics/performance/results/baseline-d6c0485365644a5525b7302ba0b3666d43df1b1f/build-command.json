@@ -1,0 +1,13 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/tmp/litchi-ods-order-statistics-baseline-27hf7v3x/docs/report/spec-gap-validation-evidence/ods-formula-order-statistics/performance/harness/Cargo.toml",
+    "--release"
+  ],
+  "cwd": "/tmp/litchi-ods-order-statistics-baseline-27hf7v3x",
+  "target": "/var/tmp/litchi-ods-order-statistics-baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f-vvnj7lwz"
+}

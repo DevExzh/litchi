@@ -1,0 +1,35 @@
+{
+  "actor": "root",
+  "base_commit": "42cce54f0e04dafd49c996876e1a569594238101",
+  "candidate": "/var/tmp/litchi-docx-ink-trace-v5-git-validation-20260910",
+  "toolchain": "1.95.0",
+  "cpu_set": "8-31",
+  "all_features_tests": {
+    "passed": 1504,
+    "ignored": 1
+  },
+  "doctests": {
+    "passed": 76,
+    "ignored": 31
+  },
+  "gates": {
+    "tests": {
+      "exit_code": 0,
+      "raw_log_sha256": "7c563d1dadd16877253984e4b93e639ff6918565a4eee261be0935dda49ae756"
+    },
+    "clippy": {
+      "exit_code": 0,
+      "raw_log_sha256": "b5ed0b22775acbdcc80a0bfe0315d1c4ddb3e4bae4ebf76fc8b5a2f626091134"
+    },
+    "rustdoc": {
+      "exit_code": 0,
+      "raw_log_sha256": "c334e5994f05eb4fc83a5ae4ec65f513d740522bcd2b10beee1cd9a98b70f20f"
+    },
+    "rustfmt": {
+      "exit_code": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "source_manifest_sha256": "ab93920d342e0ad68018931f27302906cd8429e594eed99677d277bd60075a55",
+  "scope": "Root tests ran in the actual Git worktree. Earlier unversioned V5 test run is not used as this source identity proof."
+}

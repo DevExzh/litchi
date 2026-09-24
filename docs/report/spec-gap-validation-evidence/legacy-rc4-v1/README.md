@@ -1,0 +1,13 @@
+# Shared legacy binary RC4 integration
+
+DOC and XLS already implemented OfficeBinaryRc4 locally. This change consolidates MS-OFFCRYPTO section 2.3.6 into litchi-crypto::legacy_rc4, with exact 52-byte header validation, bounded passwords/block indices, zeroizing key material, constant-time verifier comparison and range preflight before mutation. DOC retains its 512-byte blocks and clear prefixes; XLS retains 1024-byte BIFF blocks and clear-record rules. CryptoAPI remains separate. PPT and OOXML Standard RC4 support are unchanged.
+
+The eight owned paths match the independently reviewed candidate exactly. A clean archive of 6f281e386 excludes all pending DOC/XLS work; root rechecked owned preimages against publication HEAD. Root validation passed 2,735 tests across 124 targets including doctests, with 18 existing ignored tests, strict all-target/all-feature Clippy, warnings-denied rustdoc, and scoped Rust 1.95 formatting. Source and lock hashes remained unchanged during these gates.
+
+The initial locked metadata check refused stale dependency edges. Root explicitly reconciled the integration lock offline: MD5 moved to litchi-crypto, and DOC/XLS removed direct MD5/RC4 edges. Registry records did not change. Before/after locks and exact reconciliation evidence are retained. The root build lock is an explicit validation input, not a staged workspace lockfile.
+
+Independent checks use Apache POI DOC/XLS producer fixtures, known key derivation vectors, wrong-password rejection, direct CFB/header inspection and writer/read round trips. This is not native Office/LibreOffice evidence for every encryption profile. No performance claim is made.
+
+The original integration manifest is retained as history. Revision 1 corrects its statement about the submitted patch: the patch contains only eight owned paths; the incidental perf-baseline lock rewrite existed separately in the candidate worktree and was excluded. Both manifests describe the original root lock before root's recorded offline reconciliation. Root logs, manifests, source overlay and review reports are gzip-compressed with their original bytes preserved.
+
+A later OPC integration mistakenly reused the external RC4 candidate directory. Root preserved the altered tree, reconstructed the original archive plus the eight reviewed RC4 files, verified all 32,517 file hashes and original modes against the saved inventory (using the already-recorded final validation lock), and restored the original path after confirming no live references. Original manifests and gate evidence were retained unchanged. The appended recovery receipts record this incident; they do not revise or rerun the original validation. OPC publication independently used a separate root-built clean candidate.

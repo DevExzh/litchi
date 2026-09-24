@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "source_files_checked": 876,
+  "reviewed_files": 1,
+  "test_totals_including_doctests": {
+    "passed": 1189,
+    "failed": 0,
+    "ignored": 12
+  },
+  "schema_valid_elements": 3,
+  "gates_receipt_sha256": "cfc9882ceea2df8d0500fe1f66cd07db3a2307c109ccd687a05c71a38d4db1ab",
+  "probe_receipt_sha256": "5709f4eaf8ceaa5458503144498f4b3d4a6793e60e8f5648469b9eaacae953a3"
+}

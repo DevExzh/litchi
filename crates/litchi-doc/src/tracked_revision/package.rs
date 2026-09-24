@@ -7,13 +7,19 @@ use super::codec::{
     ParsedMetadata, STTBFRMARK, align2, align512, append_table_block, build_papx_pages, corrupted,
     delete_piece_range, encode_revision, fib_pair, infer_moves, insert_piece, kind_order,
     merge_adjacent, metadata_from_sprms, parse_authors, parse_chpx, parse_clx, parse_cp_table,
-    parse_papx, property_metadata, put_fib_pair, put_u32, read_units, reject_protection,
-    replace_papx_revision_sprms, replace_revision_sprms, restore_before_wall, retain_sprms,
-    revision_opcodes, serialize_authors, serialize_clx, slice, split_transform_chpx,
-    split_transform_papx, strict_sprms, u16_at, u32_at, validate_metadata, validate_range,
+    parse_papx, property_metadata, put_fib_pair, put_u32, read_units, replace_papx_revision_sprms,
+    replace_revision_sprms, restore_before_wall, retain_sprms, revision_opcodes, serialize_authors,
+    serialize_clx, slice, split_transform_chpx, split_transform_papx, strict_sprms, u16_at, u32_at,
+    validate_metadata, validate_range,
 };
 use super::model::{CpTable, FcRun, PapxRun, RawPiece, Revision, RevisionKind, RevisionMetadata};
 use crate::package::{Error as PackageError, Result};
+use crate::parts::dofr::{DofrArray, DofrPatch};
+use crate::parts::fib::FileInformationBlock;
+use crate::parts::protection::{EditProtection, ProtectionPolicy};
+use crate::parts::saved_selection::{
+    SavedSelection, SavedSelectionPatch, SavedSelectionSpliceError, table_range,
+};
 use crate::sprm_operations::{
     SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_BOLD, SPRM_C_F_ITALIC, SPRM_C_F_OBJ,
     SPRM_C_F_OLE2, SPRM_C_F_RMARK, SPRM_C_F_RMARK_DEL, SPRM_C_F_SPEC, SPRM_C_IBST_RMARK,
@@ -24,11 +30,17 @@ use crate::sprm_operations::{
     SPRM_T_WALL,
 };
 use crate::writer::ChpxFkpBuilder;
-use litchi_cfb::OleFile;
+use litchi_cfb::{OleFile, directory_names_equal};
 #[cfg(feature = "performance-diagnostics")]
 use litchi_ole_common::object::CfbParseEvent;
 use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
+use litchi_ole_common::property_set::{
+    DOCUMENT_SUMMARY_INFORMATION_FMTID, Stream as PropertySetStream,
+    document_summary::DIGITAL_SIGNATURE,
+};
+use litchi_ole_common::vba_signature;
 use smallvec::SmallVec;
+use std::collections::HashSet;
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -913,6 +925,13 @@ pub struct RevisionEditor {
     cp_tables: Vec<CpTable>,
     unmodeled_cp_tables: Vec<usize>,
     main_ccp: u32,
+    /// Exact bytes admitted before this editor was exposed. The lower owner
+    /// uses this source for publication-time signature checks, including a
+    /// rendered candidate that happens to clear the sticky changed bit.
+    source: Arc<Vec<u8>>,
+    signed: bool,
+    protection: EditProtection,
+    protection_policy: ProtectionPolicy,
     data_changed: bool,
     changed: bool,
     retained_render_limit: usize,
@@ -924,13 +943,37 @@ impl RevisionEditor {
         Self::open_with_ole_file(bytes, limits).map(|(editor, _ole)| editor)
     }
 
+    /// Opens a tracked-revision editor with an explicit protected-edit policy.
+    ///
+    /// The default [`Self::open`] path enforces document and range-level
+    /// protection. Callers may opt into the explicit caller-granted capability
+    /// carried by [`ProtectionPolicy`]. The capability records caller
+    /// metadata; it does not authenticate a user or provide cryptographic
+    /// audit.
+    pub fn open_with_policy(
+        bytes: Vec<u8>,
+        limits: Limits,
+        policy: ProtectionPolicy,
+    ) -> Result<Self> {
+        Self::open_with_ole_file_with_policy(bytes, limits, policy).map(|(editor, _ole)| editor)
+    }
+
     pub(crate) fn open_with_ole_file(
         bytes: Vec<u8>,
         limits: Limits,
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)> {
-        let (package, ole) = ObjectEditor::open_with_ole_file(bytes, Targets::default(), limits)
-            .map_err(PackageError::from)?;
-        let editor = Self::open_from_package(package)?;
+        Self::open_with_ole_file_with_policy(bytes, limits, ProtectionPolicy::default())
+    }
+
+    pub(crate) fn open_with_ole_file_with_policy(
+        bytes: Vec<u8>,
+        limits: Limits,
+        policy: ProtectionPolicy,
+    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)> {
+        let (package, mut ole) =
+            ObjectEditor::open_with_ole_file(bytes, Targets::default(), limits)
+                .map_err(PackageError::from)?;
+        let editor = Self::open_from_package(package, &mut ole, policy)?;
         Ok((editor, ole))
     }
 
@@ -940,14 +983,18 @@ impl RevisionEditor {
         limits: Limits,
         observer: impl FnMut(CfbParseEvent),
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)> {
-        let (package, ole) =
+        let (package, mut ole) =
             ObjectEditor::open_with_ole_file_profiled(bytes, Targets::default(), limits, observer)
                 .map_err(PackageError::from)?;
-        let editor = Self::open_from_package(package)?;
+        let editor = Self::open_from_package(package, &mut ole, ProtectionPolicy::default())?;
         Ok((editor, ole))
     }
 
-    fn open_from_package(package: ObjectEditor) -> Result<Self> {
+    fn open_from_package(
+        package: ObjectEditor,
+        ole: &mut OleFile<Cursor<Vec<u8>>>,
+        protection_policy: ProtectionPolicy,
+    ) -> Result<Self> {
         let word_path = vec!["WordDocument".to_string()];
         let word = package
             .stream(&word_path)
@@ -978,7 +1025,9 @@ impl RevisionEditor {
         let data = package
             .stream(&data_path)
             .map_or_else(Vec::new, <[u8]>::to_vec);
-        reject_protection(&word, &table)?;
+        let signed = package_has_binary_signature(ole) || word_vba_signature_state(&word, &table);
+        let fib = FileInformationBlock::parse(&word)?;
+        let protection = crate::parts::protection::classify(&fib, &table)?;
         let main_ccp = u32_at(&word, FIB_CCP_TEXT)?;
         let pieces = parse_clx(&word, &table)?;
         if pieces.last().is_none_or(|piece| piece.end < main_ccp) {
@@ -1038,6 +1087,7 @@ impl RevisionEditor {
                     .transpose()
             })
             .collect::<Result<Vec<_>>>()?;
+        let source = package.source_shared();
         let editor = Self {
             package,
             word_path,
@@ -1053,6 +1103,12 @@ impl RevisionEditor {
             cp_tables,
             unmodeled_cp_tables,
             main_ccp,
+            // The common owner already retains the admitted source allocation;
+            // keep a handle to that same immutable bytes without copying it.
+            source,
+            signed,
+            protection,
+            protection_policy,
             data_changed: false,
             changed: false,
             retained_render_limit: 0,
@@ -1096,9 +1152,118 @@ impl RevisionEditor {
         self.retained_render.0 = None;
     }
 
+    /// Moves the retained validated render out of this editor, if any.
+    ///
+    /// The editor's meaning is unchanged; a later finish renders again.
+    pub(crate) fn take_retained_render(&mut self) -> Option<Vec<u8>> {
+        self.retained_render.0.take()
+    }
+
     #[must_use]
     pub fn authors(&self) -> &[String] {
         &self.authors
+    }
+
+    /// Parses the optional saved-selection cache from this exact editor state.
+    ///
+    /// The FIB and table stream remain owned by the DOC editor; callers only
+    /// receive the inert, source-retaining semantic value.
+    pub(crate) fn saved_selection(&self) -> Result<Option<SavedSelection>> {
+        let fib = FileInformationBlock::parse(&self.word)?;
+        let selection = SavedSelection::parse(&fib, &self.table)?;
+        if let Some(selection) = &selection {
+            selection.validate_main_story_bound(self.main_ccp)?;
+        }
+        Ok(selection)
+    }
+
+    /// Parses the optional frame-set/list record array from this exact editor
+    /// state without exposing raw FIB offsets or mutable streams.
+    pub(crate) fn dofr_records(&self) -> Result<Option<DofrArray>> {
+        let fib = FileInformationBlock::parse(&self.word)?;
+        DofrArray::parse(&fib, &self.table)
+    }
+
+    /// Validate a DOFR patch against the current FIB-selected range before a
+    /// candidate table stream is cloned. Exact byte no-ops are accepted even
+    /// when the source carries a VBA signature.
+    pub(crate) fn preflight_dofr_patch(&self, patch: &DofrPatch) -> Result<bool> {
+        let fib = FileInformationBlock::parse(&self.word)?;
+        patch.preflight_table_stream(&fib, &self.table)?;
+        Ok(patch.changed())
+    }
+
+    /// Whether this source carries inert binary VBA signature metadata in
+    /// PIDDSI or `StwUser`. The marker is read once at editor admission and
+    /// is never interpreted as executable or trusted signature content.
+    #[must_use]
+    pub(crate) const fn dofr_source_is_signed(&self) -> bool {
+        self.signed
+    }
+
+    /// Validate a saved-selection patch against this exact editor state before
+    /// cloning the table stream. Exact byte no-ops are accepted even when the
+    /// source carries a binary signature.
+    pub(crate) fn preflight_saved_selection_patch(
+        &self,
+        patch: &SavedSelectionPatch,
+    ) -> Result<bool> {
+        let fib = FileInformationBlock::parse(&self.word)?;
+        patch.preflight_table_stream(&fib, &self.table)?;
+        patch.validate_main_story_bound(self.main_ccp)?;
+        Ok(patch.changed())
+    }
+
+    /// Applies a source-checked, same-length saved-selection patch and
+    /// publishes it through the existing failure-atomic package owner.
+    pub(crate) fn apply_saved_selection_patch(
+        &mut self,
+        patch: &SavedSelectionPatch,
+    ) -> Result<bool> {
+        let fib = FileInformationBlock::parse(&self.word)?;
+        patch.preflight_table_stream(&fib, &self.table)?;
+        patch.validate_main_story_bound(self.main_ccp)?;
+        if !patch.changed() {
+            return Ok(false);
+        }
+        if self.signed {
+            return Err(corrupted("signed DOC cannot accept a changed Selsf patch"));
+        }
+        let mut table = self.table.clone();
+        patch.apply_to_table_stream(&fib, &mut table)?;
+        self.replace_table_stream(table)
+    }
+
+    /// Applies a source-checked, same-length `RgDofr` patch through the DOC
+    /// package owner. The caller never handles a mutable table stream.
+    pub(crate) fn apply_dofr_patch(&mut self, patch: &DofrPatch) -> Result<bool> {
+        let fib = FileInformationBlock::parse(&self.word)?;
+        patch.preflight_table_stream(&fib, &self.table)?;
+        if !patch.changed() {
+            return Ok(false);
+        }
+        if self.signed {
+            return Err(corrupted("signed DOC cannot accept a changed RgDofr patch"));
+        }
+        let mut table = self.table.clone();
+        patch.apply_to_table_stream(&fib, &mut table)?;
+        self.replace_table_stream(table)
+    }
+
+    fn replace_table_stream(&mut self, replacement: Vec<u8>) -> Result<bool> {
+        if replacement == self.table {
+            return Ok(false);
+        }
+        if replacement.len() != self.table.len() {
+            return Err(corrupted(
+                "DOC auxiliary table replacement must preserve stream length",
+            ));
+        }
+        let mut candidate = self.clone();
+        candidate.table = replacement;
+        candidate.commit()?;
+        *self = candidate;
+        Ok(true)
     }
 
     /// Returns the exact main-story text after strict piece-table decoding.
@@ -1323,7 +1488,15 @@ impl RevisionEditor {
         if units.len() > MAX_TEXT_UNITS {
             return Err(corrupted("body replacement exceeds text resource limit"));
         }
-        if units.len() != (end - start) as usize && !self.unmodeled_cp_tables.is_empty() {
+        let length_changed = units.len() != (end - start) as usize;
+        let added = u32::try_from(units.len())
+            .map_err(|_error| corrupted("body replacement length exceeds u32"))?;
+        let saved_selection = if length_changed {
+            self.prepared_saved_selection_splice(start, end, added)?
+        } else {
+            None
+        };
+        if length_changed && !self.unmodeled_cp_tables.is_empty() {
             return Err(corrupted(
                 "length-changing body replacement has unmodeled CP-indexed dependencies",
             ));
@@ -1332,8 +1505,6 @@ impl RevisionEditor {
         let mut candidate = self.clone();
         let removed = end - start;
         delete_piece_range(&mut candidate.pieces, start, end)?;
-        let added = u32::try_from(units.len())
-            .map_err(|_error| corrupted("body replacement length exceeds u32"))?;
         if added != 0 {
             let fc = align2(candidate.word.len())?;
             candidate.word.resize(fc, 0);
@@ -1363,6 +1534,9 @@ impl RevisionEditor {
         candidate.rewrite_chpx()?;
         candidate.append_clx_and_cp_tables()?;
         candidate.patch_sizes()?;
+        if let Some(replacement) = saved_selection {
+            candidate.apply_saved_selection_splice(replacement)?;
+        }
         candidate.commit()?;
         *self = candidate;
         Ok(())
@@ -1863,7 +2037,13 @@ impl RevisionEditor {
             .first()
             .ok_or_else(|| corrupted("picture placeholder has no character formatting"))?
             .to_vec();
-        if !self.unmodeled_cp_tables.is_empty() && end - start != 1 {
+        let length_changed = end - start != 1;
+        let saved_selection = if length_changed {
+            self.prepared_saved_selection_splice(start, end, 1)?
+        } else {
+            None
+        };
+        if !self.unmodeled_cp_tables.is_empty() && length_changed {
             return Err(corrupted(
                 "picture insertion changes length with unmodeled CP dependencies",
             ));
@@ -1934,6 +2114,9 @@ impl RevisionEditor {
             return Ok(None);
         }
         candidate.patch_sizes()?;
+        if let Some(replacement) = saved_selection {
+            candidate.apply_saved_selection_splice(replacement)?;
+        }
         candidate.commit()?;
         *self = candidate;
         Ok(Some(installed))
@@ -1998,7 +2181,15 @@ impl RevisionEditor {
         if units.is_empty() || units.len() > MAX_TEXT_UNITS {
             return Err(corrupted("restored picture text length is invalid"));
         }
-        if units.len() != 1 && !self.unmodeled_cp_tables.is_empty() {
+        let length_changed = units.len() != 1;
+        let added = u32::try_from(units.len())
+            .map_err(|error| corrupted(format!("restored text length exceeds u32: {error}")))?;
+        let saved_selection = if length_changed {
+            self.prepared_saved_selection_splice(start, end, added)?
+        } else {
+            None
+        };
+        if length_changed && !self.unmodeled_cp_tables.is_empty() {
             return Err(corrupted(
                 "picture reversal changes length with unmodeled CP dependencies",
             ));
@@ -2008,8 +2199,6 @@ impl RevisionEditor {
         candidate.data.truncate(data_start);
         candidate.data_changed = true;
         delete_piece_range(&mut candidate.pieces, start, end)?;
-        let added = u32::try_from(units.len())
-            .map_err(|error| corrupted(format!("restored text length exceeds u32: {error}")))?;
         let fc = align2(candidate.word.len())?;
         candidate.word.resize(fc, 0);
         for unit in units {
@@ -2038,6 +2227,9 @@ impl RevisionEditor {
         candidate.rewrite_chpx()?;
         candidate.append_clx_and_cp_tables()?;
         candidate.patch_sizes()?;
+        if let Some(replacement) = saved_selection {
+            candidate.apply_saved_selection_splice(replacement)?;
+        }
         candidate.commit()?;
         *self = candidate;
         Ok(())
@@ -2047,6 +2239,72 @@ impl RevisionEditor {
     #[must_use]
     pub(crate) const fn main_story_cp_len(&self) -> u32 {
         self.main_ccp
+    }
+
+    /// Prepare the passive `Selsf` record for one main-story splice before a
+    /// candidate is cloned. The record is remapped when each CP has a proven
+    /// boundary mapping; interior positions are returned as an ambiguity so
+    /// the body facade can expose its typed dependency refusal.
+    pub(crate) fn saved_selection_splice(
+        &self,
+        start: u32,
+        end: u32,
+        added: u32,
+    ) -> std::result::Result<
+        Option<[u8; crate::parts::saved_selection::SELSF_SIZE]>,
+        SavedSelectionSpliceError,
+    > {
+        let fib =
+            FileInformationBlock::parse(&self.word).map_err(SavedSelectionSpliceError::Invalid)?;
+        let selection =
+            SavedSelection::parse(&fib, &self.table).map_err(SavedSelectionSpliceError::Invalid)?;
+        let Some(selection) = selection else {
+            return Ok(None);
+        };
+        selection
+            .validate_main_story_bound(self.main_ccp)
+            .map_err(SavedSelectionSpliceError::Invalid)?;
+        let removed = end.checked_sub(start).ok_or_else(|| {
+            SavedSelectionSpliceError::Invalid(corrupted("Selsf splice range is reversed"))
+        })?;
+        let new_ccp = self
+            .main_ccp
+            .checked_sub(removed)
+            .and_then(|value| value.checked_add(added))
+            .ok_or_else(|| {
+                SavedSelectionSpliceError::Invalid(corrupted("Selsf splice CP count overflows"))
+            })?;
+        let replacement = selection.remap_for_splice(start, end, added, new_ccp)?;
+        if replacement == selection.bytes() {
+            Ok(None)
+        } else {
+            Ok(Some(replacement))
+        }
+    }
+
+    fn prepared_saved_selection_splice(
+        &self,
+        start: u32,
+        end: u32,
+        added: u32,
+    ) -> Result<Option<[u8; crate::parts::saved_selection::SELSF_SIZE]>> {
+        self.saved_selection_splice(start, end, added)
+            .map_err(|error| match error {
+                SavedSelectionSpliceError::Invalid(error) => error,
+                SavedSelectionSpliceError::Ambiguous => {
+                    corrupted("length-changing edit intersects an ambiguous Selsf CP")
+                },
+            })
+    }
+
+    fn apply_saved_selection_splice(
+        &mut self,
+        replacement: [u8; crate::parts::saved_selection::SELSF_SIZE],
+    ) -> Result<()> {
+        let fib = FileInformationBlock::parse(&self.word)?;
+        let (start, end) = table_range(&fib, self.table.len())?;
+        self.table[start..end].copy_from_slice(&replacement);
+        Ok(())
     }
 
     fn character_groups(&self, start: u32, end: u32) -> Result<Vec<&[u8]>> {
@@ -2206,6 +2464,9 @@ impl RevisionEditor {
             return Err(corrupted("tracked insertion CP exceeds main story"));
         }
         validate_metadata(kind, &metadata)?;
+        let length =
+            u32::try_from(units.len()).map_err(|_| corrupted("tracked text length exceeds u32"))?;
+        let saved_selection = self.prepared_saved_selection_splice(cp, cp, length)?;
         let mut candidate = self.clone();
         let author = candidate.author_index(&metadata.author)?;
         let fc = align2(candidate.word.len())?;
@@ -2213,8 +2474,6 @@ impl RevisionEditor {
         for unit in &units {
             candidate.word.extend_from_slice(&unit.to_le_bytes());
         }
-        let length =
-            u32::try_from(units.len()).map_err(|_| corrupted("tracked text length exceeds u32"))?;
         insert_piece(
             &mut candidate.pieces,
             cp,
@@ -2239,6 +2498,9 @@ impl RevisionEditor {
         candidate.enable_tracking()?;
         candidate.append_clx_and_cp_tables()?;
         candidate.patch_sizes()?;
+        if let Some(replacement) = saved_selection {
+            candidate.apply_saved_selection_splice(replacement)?;
+        }
         candidate.commit()?;
         *self = candidate;
         self.find_exact(cp, cp + length, kind)
@@ -2350,15 +2612,55 @@ impl RevisionEditor {
     /// renders changed saves with its default
     /// [`litchi_cfb::SectorLayoutPolicy::Reuse`] policy. This is the ordinary tracked
     /// revision save route; callers do not need to opt into the CFB policy.
-    pub fn finish(mut self) -> Result<Vec<u8>> {
+    /// A changed edit is authorized under the editor's protection policy, and
+    /// a signed source cannot publish changed bytes.
+    pub fn finish(self) -> Result<Vec<u8>> {
+        if self.changed {
+            self.protection_policy.authorize(self.protection)?;
+        }
+        let source = Arc::clone(&self.source);
+        let signed = self.signed;
+        let bytes = self.finish_unchecked()?;
+        if signed && bytes.as_slice() != source.as_slice() {
+            return Err(corrupted(
+                "signed DOC cannot publish changed bytes through RevisionEditor",
+            ));
+        }
+        Ok(bytes)
+    }
+
+    /// Renders the current package without the public signed-source guard.
+    ///
+    /// The body transaction uses this narrow seam so it can compare the
+    /// rendered bytes with its retained source and preserve its typed
+    /// [`crate::body_text::Refusal::SignedSource`] diagnostic. Callers of the
+    /// public editor use [`Self::finish`], which always applies the guard.
+    /// A validated render retained under the owner's ceiling is moved out
+    /// instead of rendering the package again.
+    pub(crate) fn finish_unchecked(mut self) -> Result<Vec<u8>> {
         if let Some(rendered) = self.retained_render.0.take() {
             return Ok(rendered);
         }
         self.package.finish().map_err(PackageError::from)
     }
 
+    /// Apply this editor's protection policy to a rendered candidate while
+    /// preserving exact final-byte no-ops for higher-level facades.
+    pub(crate) fn authorize_rendered(&self, bytes: &[u8]) -> Result<()> {
+        if bytes != self.source.as_slice() {
+            self.protection_policy.authorize(self.protection)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn protection_state(&self) -> EditProtection {
+        self.protection
+    }
+
     fn delete_revision_text(&mut self, revision: &Revision) -> Result<()> {
         self.reject_destructive_interactions(revision.start_cp, revision.end_cp)?;
+        let saved_selection =
+            self.prepared_saved_selection_splice(revision.start_cp, revision.end_cp, 0)?;
         let mut candidate = self.clone();
         delete_piece_range(&mut candidate.pieces, revision.start_cp, revision.end_cp)?;
         let removed = revision.end_cp - revision.start_cp;
@@ -2369,6 +2671,9 @@ impl RevisionEditor {
             .ok_or_else(|| corrupted("main story CP underflow"))?;
         candidate.append_clx_and_cp_tables()?;
         candidate.patch_sizes()?;
+        if let Some(replacement) = saved_selection {
+            candidate.apply_saved_selection_splice(replacement)?;
+        }
         candidate.commit()?;
         *self = candidate;
         Ok(())
@@ -2699,6 +3004,7 @@ impl RevisionEditor {
     }
 
     fn commit(&mut self) -> Result<()> {
+        self.protection_policy.authorize(self.protection)?;
         // The package mutation below invalidates every render for the prior
         // editor state, including the Data-stream add path. Mutation callers
         // are clone-first, but clearing here keeps the ownership rule local
@@ -2735,6 +3041,151 @@ impl RevisionEditor {
         self.changed = true;
         Ok(())
     }
+}
+
+fn package_has_binary_signature(ole: &mut OleFile<Cursor<Vec<u8>>>) -> bool {
+    let Some(stream_name) = ole.list_directory_entries(&[]).ok().and_then(|entries| {
+        entries
+            .into_iter()
+            .find(|entry| directory_names_equal(&entry.name, "\u{0005}DocumentSummaryInformation"))
+            .map(|entry| entry.name.clone())
+    }) else {
+        return false;
+    };
+    let Ok(bytes) = ole.open_stream(&[stream_name.as_str()]) else {
+        return true;
+    };
+    let Ok(stream) = PropertySetStream::parse(&bytes) else {
+        // Preserve the established permissive reader admission. An opaque or
+        // malformed PIDDSI cannot prove that a changed DOFR edit is safe, so
+        // classify it conservatively as signed for the mutation gate.
+        return true;
+    };
+    stream
+        .section(DOCUMENT_SUMMARY_INFORMATION_FMTID)
+        .is_some_and(|section| section.property(DIGITAL_SIGNATURE).is_some())
+}
+
+const FIB_INDEX_STW_USER: usize = 60;
+const MAX_STW_USER_BYTES: usize = 16 * 1024 * 1024;
+
+/// Detect a valid legacy Word VBA signature variable without making optional
+/// `StwUser` metadata part of ordinary DOC admission. A malformed selected
+/// table is classified conservatively so a changed DOFR edit cannot silently
+/// invalidate an opaque signature value; exact no-op edits still pass the
+/// normal source checks before this marker is consulted.
+fn word_vba_signature_state(word: &[u8], table: &[u8]) -> bool {
+    let Ok(fib) = FileInformationBlock::parse(word) else {
+        return true;
+    };
+    let Some((offset, length)) = fib.get_table_pointer(FIB_INDEX_STW_USER) else {
+        return false;
+    };
+    if length == 0 {
+        return false;
+    }
+    let Ok(offset) = usize::try_from(offset) else {
+        return true;
+    };
+    let Ok(length) = usize::try_from(length) else {
+        return true;
+    };
+    let Some(end) = offset.checked_add(length) else {
+        return true;
+    };
+    let Some(data) = table.get(offset..end) else {
+        return true;
+    };
+    stw_user_contains_signature(data).unwrap_or(true)
+}
+
+fn stw_user_contains_signature(data: &[u8]) -> Result<bool> {
+    if data.len() > MAX_STW_USER_BYTES {
+        return Err(corrupted("StwUser exceeds its bounded table size"));
+    }
+    if u16_at(data, 0)? != 0xFFFF {
+        return Err(corrupted("StwUser fExtend is not 0xFFFF"));
+    }
+    let count = usize::from(u16_at(data, 2)?);
+    if u16_at(data, 4)? != 4 {
+        return Err(corrupted("StwUser cbExtra is not 4"));
+    }
+
+    let mut signature_names = Vec::new();
+    signature_names
+        .try_reserve_exact(count)
+        .map_err(|error| corrupted(format!("StwUser name allocation failed: {error}")))?;
+    let mut seen_names = HashSet::<&[u8]>::new();
+    seen_names
+        .try_reserve(count)
+        .map_err(|error| corrupted(format!("StwUser name allocation failed: {error}")))?;
+    let mut cursor = 6usize;
+    for _ in 0..count {
+        let cch = usize::from(u16_at(data, cursor)?);
+        let chars_start = cursor
+            .checked_add(2)
+            .ok_or_else(|| corrupted("StwUser name offset overflows"))?;
+        let chars_len = cch
+            .checked_mul(2)
+            .ok_or_else(|| corrupted("StwUser name length overflows"))?;
+        let chars_end = chars_start
+            .checked_add(chars_len)
+            .ok_or_else(|| corrupted("StwUser name range overflows"))?;
+        let chars = data
+            .get(chars_start..chars_end)
+            .ok_or_else(|| corrupted("StwUser name is truncated"))?;
+        if !seen_names.insert(chars) {
+            return Err(corrupted("StwUser names are not unique"));
+        }
+        let is_signature = ["Sign", "SigAgile", "SigV3"]
+            .into_iter()
+            .any(|name| utf16_name_equals(chars, name));
+        signature_names.push(is_signature);
+        cursor = chars_end
+            .checked_add(4)
+            .ok_or_else(|| corrupted("StwUser name extra offset overflows"))?;
+        if cursor > data.len() {
+            return Err(corrupted("StwUser name extra is truncated"));
+        }
+    }
+
+    let mut signed = false;
+    for is_signature in signature_names {
+        let cch = usize::from(u16_at(data, cursor)?);
+        let chars_start = cursor
+            .checked_add(2)
+            .ok_or_else(|| corrupted("StwUser value offset overflows"))?;
+        let chars_len = cch
+            .checked_mul(2)
+            .ok_or_else(|| corrupted("StwUser value length overflows"))?;
+        let chars_end = chars_start
+            .checked_add(chars_len)
+            .ok_or_else(|| corrupted("StwUser value range overflows"))?;
+        let value = data
+            .get(cursor..chars_end)
+            .ok_or_else(|| corrupted("StwUser value is truncated"))?;
+        if is_signature {
+            vba_signature::Snapshot::parse_word(value)
+                .map_err(|error| corrupted(format!("invalid StwUser WordSigBlob: {error}")))?;
+            signed = true;
+        }
+        cursor = chars_end;
+    }
+    if cursor != data.len() {
+        return Err(corrupted("StwUser has trailing bytes"));
+    }
+    Ok(signed)
+}
+
+fn utf16_name_equals(bytes: &[u8], expected: &str) -> bool {
+    let mut units = expected.encode_utf16();
+    let mut chunks = bytes.chunks_exact(2);
+    chunks.all(|bytes| {
+        units
+            .next()
+            .is_some_and(|unit| u16::from_le_bytes([bytes[0], bytes[1]]) == unit)
+    }) && chunks.remainder().is_empty()
+        && units.next().is_none()
 }
 
 #[cfg(test)]
@@ -2934,6 +3385,13 @@ mod papx_cache_tests {
     }
 
     #[test]
+    fn editor_source_shares_the_common_admitted_allocation() {
+        let editor = RevisionEditor::open(doc_with_table_state(true), Limits::default())
+            .expect("table-state fixture should open");
+        assert!(Arc::ptr_eq(&editor.source, &editor.package.source_shared()));
+    }
+
+    #[test]
     fn editor_table_queries_preserve_absent_state_and_malformed_open_errors() {
         let mut editor = RevisionEditor::open(doc_with_table_state(false), Limits::default())
             .expect("non-table fixture should open");
@@ -2969,6 +3427,50 @@ mod picture_group_tests {
     use crate::parts::spa::{
         ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, ShapeWrapSide,
     };
+
+    fn normalize_word2002_dop(bytes: Vec<u8>) -> Vec<u8> {
+        let mut package = ObjectEditor::open(bytes, Targets::default(), Limits::default()).unwrap();
+        let word_path = ["WordDocument".to_string()];
+        let word = package.stream(&word_path).unwrap();
+        let fib = FileInformationBlock::parse(word).unwrap();
+        let table_name = if fib.which_table_stream() {
+            "1Table"
+        } else {
+            "0Table"
+        };
+        let table_path = [table_name.to_string()];
+        let mut word = word.to_vec();
+        let mut table = package.stream(&table_path).unwrap().to_vec();
+        let (offset, length) = fib.get_table_pointer(31).unwrap();
+        let offset = usize::try_from(offset).unwrap();
+        let length = usize::try_from(length).unwrap();
+        let dop = crate::parts::document_properties::DocumentProperties::writer_bytes(
+            false, false, false, true,
+        );
+        if length < dop.len() {
+            let insertion = offset + length;
+            let extra = dop.len() - length;
+            table.splice(insertion..insertion, std::iter::repeat_n(0, extra));
+            let count = fib.table_pointer_count().unwrap();
+            for index in 0..count {
+                let pointer = 154 + index * 8;
+                let current = usize::try_from(u32::from_le_bytes(
+                    word[pointer..pointer + 4].try_into().unwrap(),
+                ))
+                .unwrap();
+                if current >= insertion {
+                    let shifted = u32::try_from(current + extra).unwrap();
+                    word[pointer..pointer + 4].copy_from_slice(&shifted.to_le_bytes());
+                }
+            }
+        }
+        table[offset..offset + dop.len()].copy_from_slice(&dop);
+        let pointer = 154 + 31 * 8;
+        word[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
+        package.put_stream(&word_path, word).unwrap();
+        package.put_stream(&table_path, table).unwrap();
+        package.finish().unwrap()
+    }
 
     fn record(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
         let mut output = Vec::new();
@@ -3083,7 +3585,8 @@ mod picture_group_tests {
         let mut donor_bytes = Cursor::new(Vec::new());
         writer.write_to(&mut donor_bytes).unwrap();
 
-        let mut editor = RevisionEditor::open(donor_bytes.into_inner(), Limits::default()).unwrap();
+        let donor_bytes = normalize_word2002_dop(donor_bytes.into_inner());
+        let mut editor = RevisionEditor::open(donor_bytes, Limits::default()).unwrap();
         let (picture, width, height, shape_id) = editor.canonical_picture_at_cp(0).unwrap();
         let (spa_offset, spa_length) = fib_pair(&editor.word, 40).unwrap();
         let anchors = crate::parts::spa::parse_plcf_spa(
@@ -3120,7 +3623,8 @@ mod picture_group_tests {
             .unwrap();
         let mut receiver_bytes = Cursor::new(Vec::new());
         receiver_writer.write_to(&mut receiver_bytes).unwrap();
-        let receiver = BodySnapshot::parse(&receiver_bytes.into_inner()).unwrap();
+        let receiver_bytes = normalize_word2002_dop(receiver_bytes.into_inner());
+        let receiver = BodySnapshot::parse(&receiver_bytes).unwrap();
         let plan = receiver
             .plan_picture_transfer_from(
                 &donor,

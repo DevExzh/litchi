@@ -7,6 +7,7 @@ use crate::error::{Error, Result};
 use crate::font::OpenType;
 use crate::hyperlink::Hyperlink;
 use crate::image::InlineImage;
+use crate::namespace::NamespaceBindings;
 use crate::run_effects::Effects;
 use litchi_core::{VerticalPosition, XmlSlice};
 use litchi_opc::{PartData, SourceXmlPart};
@@ -14,7 +15,7 @@ use quick_xml::name::NamespaceResolver;
 use quick_xml::reader::NsReader;
 use std::borrow::Cow;
 use std::ops::Deref;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 /// Immutable XML storage retained by a semantic view.
 ///
@@ -287,7 +288,11 @@ pub(super) enum XmlData {
     /// Owned data for standalone paragraphs
     Owned(Box<[u8]>),
     /// Shared slice into an arena for zero-copy batch parsing
-    Shared(XmlSlice),
+    Shared {
+        slice: XmlSlice,
+        /// Declarations inherited from ancestors, captured by the arena scan.
+        namespaces: NamespaceBindings,
+    },
     /// A range retained by a managed source-backed PartData handle.
     Managed {
         owner: Arc<PartData>,
@@ -309,7 +314,7 @@ impl XmlData {
     pub(super) fn as_bytes(&self) -> &[u8] {
         match self {
             XmlData::Owned(bytes) => bytes,
-            XmlData::Shared(slice) => slice.as_bytes(),
+            XmlData::Shared { slice, .. } => slice.as_bytes(),
             XmlData::Managed {
                 owner,
                 start,
@@ -334,7 +339,7 @@ impl XmlData {
                 u32::try_from(bytes.len())
                     .map_err(|_| Error::InvalidFormat("Word paragraph XML exceeds u32".into()))?,
             )),
-            XmlData::Shared(slice) => Ok(XmlRef::new(
+            XmlData::Shared { slice, .. } => Ok(XmlRef::new(
                 XmlOwner::Unmanaged(slice.arc()),
                 slice.start(),
                 u32::try_from(slice.len())
@@ -372,9 +377,31 @@ impl XmlData {
     #[inline]
     pub(super) fn parser_admission(&self) -> Result<Option<ManagedParserAdmission>> {
         match self {
-            XmlData::Owned(_) | XmlData::Shared(_) => Ok(None),
+            XmlData::Owned(_) | XmlData::Shared { .. } => Ok(None),
             XmlData::Managed { admission, .. } | XmlData::Source { admission, .. } => {
                 admission.parser_admission(self.as_bytes().len()).map(Some)
+            },
+        }
+    }
+
+    /// Namespace declarations this paragraph inherits from its owning part,
+    /// for parsers that resolve the retained span in context.
+    ///
+    /// An arena slice carries the bindings its scan captured. A source-backed
+    /// range resolves them from its owning part through the bounded,
+    /// admission-charged namespace scan that `self_contained_xml` uses, and
+    /// the result is held to the same binding-count and byte bounds as a
+    /// captured snapshot.
+    pub(super) fn inherited_namespaces(&self) -> Result<NamespaceBindings> {
+        match self {
+            XmlData::Owned(_) => Ok(Arc::clone(&EMPTY_NAMESPACE_BINDINGS)),
+            XmlData::Shared { namespaces, .. } => Ok(Arc::clone(namespaces)),
+            XmlData::Managed { .. } | XmlData::Source { .. } => {
+                let reference = self.xml_ref()?;
+                let lease = reference.namespace_resolver()?;
+                let bindings = crate::namespace::resolver_bindings(&lease)?;
+                lease.check()?;
+                Ok(bindings)
             },
         }
     }
@@ -384,6 +411,8 @@ impl XmlData {
         matches!(self, XmlData::Managed { .. } | XmlData::Source { .. })
     }
 }
+
+static EMPTY_NAMESPACE_BINDINGS: LazyLock<NamespaceBindings> = LazyLock::new(|| Arc::from([]));
 
 /// A paragraph in a Word document.
 ///
@@ -598,7 +627,10 @@ impl Paragraph {
     #[must_use]
     pub fn from_slice(slice: XmlSlice) -> Self {
         Self {
-            xml_data: XmlData::Shared(slice),
+            xml_data: XmlData::Shared {
+                slice,
+                namespaces: Arc::clone(&EMPTY_NAMESPACE_BINDINGS),
+            },
         }
     }
 
@@ -608,7 +640,21 @@ impl Paragraph {
     #[inline]
     #[must_use]
     pub fn from_arc_range(arena: Arc<Vec<u8>>, start: u32, len: u32) -> Self {
-        Self::from_slice(XmlSlice::new(arena, start, len))
+        Self::from_arc_range_with_context(arena, start, len, Arc::clone(&EMPTY_NAMESPACE_BINDINGS))
+    }
+
+    pub(crate) fn from_arc_range_with_context(
+        arena: Arc<Vec<u8>>,
+        start: u32,
+        len: u32,
+        namespaces: NamespaceBindings,
+    ) -> Self {
+        Self {
+            xml_data: XmlData::Shared {
+                slice: XmlSlice::new(arena, start, len),
+                namespaces,
+            },
+        }
     }
 
     pub(crate) fn from_managed_range(

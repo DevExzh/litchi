@@ -3,6 +3,90 @@
 use litchi_opc::{PackURI, TargetMode};
 use std::sync::Arc;
 
+/// DrawingML's `ST_BlackWhiteMode` value used by the PowerPoint 2010
+/// `p14:bwMode` extension on a `p:contentPart` anchor.
+///
+/// The value is inert metadata: it describes a host rendering preference and
+/// never changes or interprets the referenced content-part payload.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlackWhiteMode {
+    /// Preserve the content part's colors.
+    Color,
+    /// Let the host choose the rendering mode.
+    Auto,
+    /// Render in grayscale.
+    Gray,
+    /// Render in light grayscale.
+    LightGray,
+    /// Render in inverted grayscale.
+    InverseGray,
+    /// Render with gray and white tones.
+    GrayWhite,
+    /// Render with black and gray tones.
+    BlackGray,
+    /// Render with black and white tones.
+    BlackWhite,
+    /// Render as black.
+    Black,
+    /// Render as white.
+    White,
+    /// Hide the content part.
+    Hidden,
+}
+
+impl BlackWhiteMode {
+    /// Return the exact OOXML token.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Color => "clr",
+            Self::Auto => "auto",
+            Self::Gray => "gray",
+            Self::LightGray => "ltGray",
+            Self::InverseGray => "invGray",
+            Self::GrayWhite => "grayWhite",
+            Self::BlackGray => "blackGray",
+            Self::BlackWhite => "blackWhite",
+            Self::Black => "black",
+            Self::White => "white",
+            Self::Hidden => "hidden",
+        }
+    }
+
+    pub(crate) fn parse(value: &str) -> crate::Result<Self> {
+        match value {
+            "clr" => Ok(Self::Color),
+            "auto" => Ok(Self::Auto),
+            "gray" => Ok(Self::Gray),
+            "ltGray" => Ok(Self::LightGray),
+            "invGray" => Ok(Self::InverseGray),
+            "grayWhite" => Ok(Self::GrayWhite),
+            "blackGray" => Ok(Self::BlackGray),
+            "blackWhite" => Ok(Self::BlackWhite),
+            "black" => Ok(Self::Black),
+            "white" => Ok(Self::White),
+            "hidden" => Ok(Self::Hidden),
+            _ => Err(crate::Error::Invalid(format!(
+                "invalid p14:bwMode value '{value}'"
+            ))),
+        }
+    }
+}
+
+impl std::fmt::Display for BlackWhiteMode {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl TryFrom<&str> for BlackWhiteMode {
+    type Error = crate::Error;
+
+    fn try_from(value: &str) -> crate::Result<Self> {
+        Self::parse(value)
+    }
+}
+
 /// One content-part anchor and its owning slide relationship.
 ///
 /// The payload is deliberately opaque. The model exposes bytes and OPC
@@ -14,6 +98,7 @@ pub struct ContentPart {
     pub(crate) slide_part_name: PackURI,
     pub(crate) index: usize,
     pub(crate) anchor: Anchor,
+    pub(crate) bw_mode: Option<BlackWhiteMode>,
     pub(crate) relationship: Relationship,
 }
 
@@ -60,6 +145,24 @@ impl ContentPart {
         self.anchor.relationship_id()
     }
 
+    /// The authored `p14:bwMode` rendering preference, when present.
+    ///
+    /// The local [MS-PPTX] schema marks this attribute optional and does not
+    /// declare a default. `None` therefore preserves authored absence instead
+    /// of silently converting it to [`BlackWhiteMode::Auto`].
+    #[inline]
+    #[must_use]
+    pub const fn black_white_mode(&self) -> Option<BlackWhiteMode> {
+        self.bw_mode
+    }
+
+    /// Alias using the schema attribute's compact name.
+    #[inline]
+    #[must_use]
+    pub const fn bw_mode(&self) -> Option<BlackWhiteMode> {
+        self.black_white_mode()
+    }
+
     /// The inert target of this content part.
     #[inline]
     #[must_use]
@@ -80,6 +183,9 @@ impl ContentPart {
 pub struct Anchor {
     pub(crate) relationship_id: String,
     pub(crate) xml: Vec<u8>,
+    pub(crate) bw_mode: Option<BlackWhiteMode>,
+    pub(crate) bw_mode_key: Option<Box<[u8]>>,
+    pub(crate) bw_mode_namespace_added: bool,
 }
 
 impl Anchor {
@@ -93,6 +199,9 @@ impl Anchor {
         Self {
             relationship_id: relationship_id.into(),
             xml: xml.into(),
+            bw_mode: None,
+            bw_mode_key: None,
+            bw_mode_namespace_added: false,
         }
     }
 
@@ -108,6 +217,13 @@ impl Anchor {
     #[must_use]
     pub fn xml(&self) -> &[u8] {
         &self.xml
+    }
+
+    /// The authored `p14:bwMode` value captured for this anchor.
+    #[inline]
+    #[must_use]
+    pub const fn black_white_mode(&self) -> Option<BlackWhiteMode> {
+        self.bw_mode
     }
 }
 

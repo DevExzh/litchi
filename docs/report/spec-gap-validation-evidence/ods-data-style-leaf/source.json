@@ -1,0 +1,11 @@
+{
+  "directory": "/var/tmp/litchi-ods-style-leaf-hki6rrrm",
+  "checkout": "/var/tmp/litchi-ods-style-leaf-hki6rrrm/worktree",
+  "target": "/var/tmp/litchi-xlsx-pivot-final-uwchw4qr/target",
+  "shared_target": true,
+  "base_head": "3abd56b93c212b0d344f109a09a9923b719d7e03",
+  "source_sha256": {
+    "crates/litchi-ods/src/data_style/mod.rs": "6036bb67049db0f281c5d599661d26d816693ed18d2ab8b70a3cde41e5b73216",
+    "crates/litchi-ods/src/lib.rs": "9ae2e12767be1dd9330a5e83a78b8a561d22785aa48a3b056491cc1ea881e2ea"
+  }
+}

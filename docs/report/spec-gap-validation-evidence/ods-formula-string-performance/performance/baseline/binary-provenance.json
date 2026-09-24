@@ -1,0 +1,9 @@
+{
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/baseline/ods-formula-reference-profile",
+  "target_binary": "/var/tmp/ods-string-target/release/ods-formula-reference-profile",
+  "sha256": "52fc5e50b1a8ddebc0dc04fcdde8ef9062728b0bf33e45d39b3a5e2182b550bb",
+  "size_bytes": 1173352,
+  "base_commit": "cbc60f1123d105f67f4abdd0d53034fb3325c25f",
+  "source_manifest": "baseline/source-sha256.json",
+  "build_status": 0
+}

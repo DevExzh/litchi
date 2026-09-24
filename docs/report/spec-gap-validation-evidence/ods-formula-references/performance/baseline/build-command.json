@@ -1,0 +1,13 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--release",
+    "--manifest-path",
+    "/var/tmp/litchi-ods-formula-references-baseline-20260913/docs/report/spec-gap-validation-evidence/ods-formula-references/performance/harness/Cargo.toml"
+  ],
+  "cwd": "/var/tmp/litchi-ods-formula-references-baseline-20260913",
+  "CARGO_TARGET_DIR": "/var/tmp/litchi-ods-formula-references-target-20260913"
+}

@@ -1,0 +1,2 @@
+config workload=Lookup case=lookup-invalid-short input_bytes=16 repeat=10000 warmups=3 iterations=15
+result mean_ns=447374 p50_ns=447342 p95_ns=465802 p99_ns=465802 alloc_calls_p50=10000 alloc_calls_max=10000 dealloc_calls_p50=10000 dealloc_calls_max=10000 requested_bytes_p50=160000 requested_bytes_max=160000 released_bytes_p50=160000 released_bytes_max=160000 live_before_p50=3227 live_after_p50=3227 live_after_max=3227 peak_live_delta_p50=16 peak_live_delta_max=16 successes_p50=0 successes_max=0 checksum_p50=0 checksum_max=0

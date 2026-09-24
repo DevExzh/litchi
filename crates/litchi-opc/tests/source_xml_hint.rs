@@ -799,17 +799,15 @@ fn signed_and_encrypted_packages_refuse_hints_before_payload_transfer() {
         OpcError::SignedSourceRequiresExplicitPolicy
     ));
 
+    // Encrypted members are now refused when the source is admitted (the
+    // spec-gap branch's admission check, merge record 0759), so a hint can
+    // never reach an encrypted package's payload.
     let encrypted_archive =
         mark_entry_encrypted(archive_bytes(FORMATTED_DOCUMENT), DOCUMENT_MEMBER);
-    let encrypted = SourceBackedPackage::from_vec(encrypted_archive)
-        .expect("encrypted metadata fixture must open");
-    let encrypted_error = encrypted
-        .part(&pack(DOCUMENT_URI))
-        .unwrap()
-        .source_xml_with_hint(&hint)
-        .expect_err("encrypted entries must remain transfer-refused");
-    assert!(matches!(
-        encrypted_error,
-        OpcError::SourceBackedOverlayUnavailable { .. }
-    ));
+    let encrypted_error = match SourceBackedPackage::from_vec(encrypted_archive) {
+        Ok(_) => panic!("an encrypted member must be refused during admission"),
+        Err(error) => error,
+    };
+    assert!(matches!(encrypted_error, OpcError::ZipError(_)));
+    drop(hint);
 }

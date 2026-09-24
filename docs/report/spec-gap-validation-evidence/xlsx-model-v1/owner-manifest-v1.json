@@ -1,0 +1,64 @@
+{
+  "candidate_root": "/var/tmp/litchi-xlsx-model-v1-validation-20260910",
+  "candidate_base_commit": "ce0be842b60a28db142b795389e24be5bde8ae07",
+  "current_head": "ce0be842b60a28db142b795389e24be5bde8ae07",
+  "owner_path_count": 10,
+  "owner_paths": [
+    "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+    "crates/litchi-xlsx/src/lib.rs",
+    "crates/litchi-xlsx/src/package.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/codec.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/mod.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/model.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/package.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/removal.rs",
+    "crates/litchi-xlsx/tests/data_model_native.rs",
+    "crates/litchi-xlsx/tests/data_model_opaque_context.rs"
+  ],
+  "files": {
+    "crates/litchi-xlsx/docs/FEATURE_MATRIX.md": {
+      "bytes": 25281,
+      "sha256": "db35a7acbffb7a2cf24cc8356df60d43b85fbfca28c51dae87f2ea3041b441e9"
+    },
+    "crates/litchi-xlsx/src/lib.rs": {
+      "bytes": 14966,
+      "sha256": "fa92b3585a0ad856fc9abe1ac5f8e78cd0eb1b66c9c81295c48d1a3ef03f5986"
+    },
+    "crates/litchi-xlsx/src/package.rs": {
+      "bytes": 34075,
+      "sha256": "0266c10fcfecaf8848d540113d62b3a8863cfd5ab494c28352caca99026dba2a"
+    },
+    "crates/litchi-xlsx/src/workbook/data_model/codec.rs": {
+      "bytes": 76713,
+      "sha256": "aafa52f11fdfed52e81d153900e6284386c0d808a2999658a8b4d45242360f46"
+    },
+    "crates/litchi-xlsx/src/workbook/data_model/mod.rs": {
+      "bytes": 2586,
+      "sha256": "89c4fde8850b2358ca605be244747e8fae691462d3b8e2ba2bb0b9238bf018fa"
+    },
+    "crates/litchi-xlsx/src/workbook/data_model/model.rs": {
+      "bytes": 3507,
+      "sha256": "1c80942bfffe6b49006349410823aea23fa9885d299855a8f5c45d79e06d12af"
+    },
+    "crates/litchi-xlsx/src/workbook/data_model/package.rs": {
+      "bytes": 79527,
+      "sha256": "0441a918cc8a98a76cd52873abe732e4cd84933152ce3c212e2f6eb06ff958d6"
+    },
+    "crates/litchi-xlsx/src/workbook/data_model/removal.rs": {
+      "bytes": 32954,
+      "sha256": "1440675682328b0d2b2ae856f4fa5bb1d6462305abf0aa3dc85438eb7bf72c9b"
+    },
+    "crates/litchi-xlsx/tests/data_model_native.rs": {
+      "bytes": 50948,
+      "sha256": "78d0a392308c7f3b81936a8843b45850f1bd468a9edf1d4ead4c1295fdc062fb"
+    },
+    "crates/litchi-xlsx/tests/data_model_opaque_context.rs": {
+      "bytes": 6627,
+      "sha256": "067714bbddd55d83783b43a98b4383198a5ef91de7081e5bc4605e498a45034d"
+    }
+  },
+  "source_owner_manifest": "/var/tmp/xlsx-model-owner-reconciliation-v7-20260910/owner-final-hashes.json",
+  "source_owner_manifest_sha256": "33b11b4f80bfa5331fb1e157f33e7e8e634998d7c26d861aa4bd93b3568bdb29",
+  "root_gate_source_manifest_sha256": "33b11b4f80bfa5331fb1e157f33e7e8e634998d7c26d861aa4bd93b3568bdb29",
+  "owner_hashes_match_root_gate_manifest": true
+}

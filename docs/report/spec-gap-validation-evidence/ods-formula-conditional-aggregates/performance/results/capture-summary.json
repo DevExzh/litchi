@@ -1,0 +1,116 @@
+{
+  "baseline_commit": "5b125e9ea5870a56b2648ad02917894a5549c571",
+  "captures": [
+    {
+      "binary_sha256": "4cdf5cf925006a7b95a5a586ff6760aeae483492bc43539c2400ae9cecf52543",
+      "case_scope": "matched-controls",
+      "cases": [
+        "scalar-control-arithmetic",
+        "scalar-control-sin",
+        "scalar-control-imsum",
+        "database-control-dsum",
+        "array-control-4x4-arithmetic",
+        "reference-array-16x4-arithmetic",
+        "scalar-aggregate-sum",
+        "literal-aggregate-4x4-sum",
+        "reference-aggregate-64x4-sum"
+      ],
+      "label": "baseline-5b125e9ea5870a56b2648ad02917894a5549c571",
+      "phases": [
+        "evaluate",
+        "parse-evaluate"
+      ],
+      "records": 270,
+      "source_git_head": "5b125e9ea5870a56b2648ad02917894a5549c571"
+    },
+    {
+      "binary_sha256": "ee8b1e64b600030b8a4bb9b25cd045992d434669890a2a1adf72a485b86e0ab1",
+      "case_scope": "all-named-cases",
+      "cases": [
+        "scalar-control-arithmetic",
+        "scalar-control-sin",
+        "scalar-control-imsum",
+        "database-control-dsum",
+        "array-control-4x4-arithmetic",
+        "array-control-4x4-sin",
+        "array-control-16x16-arithmetic",
+        "array-control-16x16-sin",
+        "reference-array-16x4-arithmetic",
+        "scalar-aggregate-sum",
+        "literal-aggregate-4x4-sum",
+        "reference-aggregate-64x4-sum",
+        "reference-conditional-16x4-sumif-implicit",
+        "reference-conditional-64x4-sumif-explicit",
+        "reference-conditional-256x4-sumifs",
+        "reference-conditional-1024x4-countif",
+        "reference-conditional-256x4-countifs",
+        "reference-conditional-64x4-averageif-implicit",
+        "reference-conditional-64x4-averageif-explicit",
+        "reference-conditional-1024x4-averageifs",
+        "reference-conditional-16x1-countif-text",
+        "reference-conditional-6x4-sumif-list",
+        "reference-conditional-3d-sumif",
+        "reference-conditional-2x4-sumif-anchor-clip",
+        "nested-conditional-64-sumifs",
+        "nested-conditional-256-sumifs",
+        "nested-conditional-1024-sumifs",
+        "error-conditional-averageif-empty",
+        "error-conditional-averageifs-empty",
+        "error-conditional-sumifs-mismatch",
+        "error-conditional-countifs-mismatch",
+        "error-conditional-constant-range",
+        "resource-conditional-reference-cells"
+      ],
+      "freeze_base_commit": "5b125e9ea5870a56b2648ad02917894a5549c571",
+      "freeze_path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/gates/freeze.json",
+      "label": "candidate-final",
+      "phases": [
+        "evaluate",
+        "parse-evaluate"
+      ],
+      "records": 990,
+      "source_git_head": "5b125e9ea5870a56b2648ad02917894a5549c571"
+    }
+  ],
+  "cleanup": {
+    "baseline_removed": true,
+    "baseline_worktree": "/tmp/litchi-ods-conditional-baseline-iign1uwv"
+  },
+  "controls": [
+    "scalar-control-arithmetic",
+    "scalar-control-sin",
+    "scalar-control-imsum",
+    "database-control-dsum",
+    "array-control-4x4-arithmetic",
+    "reference-array-16x4-arithmetic",
+    "scalar-aggregate-sum",
+    "literal-aggregate-4x4-sum",
+    "reference-aggregate-64x4-sum"
+  ],
+  "phases": [
+    "evaluate",
+    "parse-evaluate"
+  ],
+  "profile_input_sha256_after": {
+    "PLAN.md": "446301d65bb748730c7afc311d0c8e1fb90a27fd935034e15e279135237ceb24",
+    "README.md": "0873462fc610286a48255e73ee429ebb519275740e5ba4ffd2f3936ddf6f9839",
+    "harness/Cargo.lock": "2a736a18357f7a722578fb8a6c66fb089b59103eb459ad79ed053b8fcaddd3ac",
+    "harness/Cargo.toml": "684854e9ec92e57b3cb2e0c2592967b935d5aedf1ceed97c6e87e51f03fb2f7b",
+    "harness/src/main.rs": "4c6e47af6ffb9a1514a92bebf0c55bab46354a33a1d17626688f9b7ee4f4bb9e",
+    "run_profile.py": "561eab62f326655a4eef9ed6834972f2e66720a19f604a9f942bcd7194adf252",
+    "summarize.py": "7812850d2707cf4aa6bbb395b8c8d035672cd68f3846128324956727c2c0d3de",
+    "verify.py": "f3764eebcdb83fd276ab3cbd545c137c2116e88f6bbcead954bf4e0a7ee181b3"
+  },
+  "profile_input_sha256_before": {
+    "PLAN.md": "446301d65bb748730c7afc311d0c8e1fb90a27fd935034e15e279135237ceb24",
+    "README.md": "0873462fc610286a48255e73ee429ebb519275740e5ba4ffd2f3936ddf6f9839",
+    "harness/Cargo.lock": "2a736a18357f7a722578fb8a6c66fb089b59103eb459ad79ed053b8fcaddd3ac",
+    "harness/Cargo.toml": "684854e9ec92e57b3cb2e0c2592967b935d5aedf1ceed97c6e87e51f03fb2f7b",
+    "harness/src/main.rs": "4c6e47af6ffb9a1514a92bebf0c55bab46354a33a1d17626688f9b7ee4f4bb9e",
+    "run_profile.py": "561eab62f326655a4eef9ed6834972f2e66720a19f604a9f942bcd7194adf252",
+    "summarize.py": "7812850d2707cf4aa6bbb395b8c8d035672cd68f3846128324956727c2c0d3de",
+    "verify.py": "f3764eebcdb83fd276ab3cbd545c137c2116e88f6bbcead954bf4e0a7ee181b3"
+  },
+  "samples_per_group": 15,
+  "warmups_per_child": 3
+}

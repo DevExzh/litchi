@@ -20,4 +20,7 @@ mod validation;
 )]
 mod tests;
 
-pub use model::{Binding, BindingName, GLOBAL_INFO_FMTID, IMAGE_CONTENTS_FMTID, IMAGE_INFO_FMTID};
+pub use model::{
+    Binding, BindingName, GLOBAL_INFO_FMTID, IMAGE_CONTENTS_FMTID, IMAGE_INFO_FMTID,
+    PROPERTY_BAG_FMTID,
+};

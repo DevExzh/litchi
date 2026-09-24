@@ -172,6 +172,14 @@ pub mod vba;
 /// remain outside this crate.
 pub use litchi_crypto::spaces;
 
+/// Inert `[MS-OSHARED]` VBA digital-signature blob storage.
+///
+/// The package facade exposes this owner through [`Package::vba_signature`].
+/// PKCS#7 `SignedData`, `contentInfo` form (`SpcIndirectDataContent` versus
+/// `SpcIndirectDataContentV2`), and certificate-store trust remain opaque:
+/// parsing and editing never establish trust or execute a VBA project.
+pub use litchi_ole_common::vba_signature;
+
 pub mod embedded_object;
 pub mod equation;
 pub use parts::annotation_bookmarks;
@@ -232,6 +240,11 @@ pub use parts::document_properties_2007::{
 };
 pub use parts::document_properties_2010::{DocumentId, Dop2010};
 pub use parts::document_properties_2013::Dop2013;
+pub use parts::dofr::{
+    DofrArray, DofrChildMarker, DofrCommit, DofrDivider, DofrDividerUnits, DofrFrame,
+    DofrFrameKind, DofrListStyle, DofrListStyles, DofrPatch, DofrPayload, DofrRecord,
+    DofrScrollType, DofrSplitter, DofrTransaction, DofrType, DofrXstz,
+};
 pub use parts::embedded_fonts::{DocumentEmbeddedFonts, EmbeddedFont};
 pub use parts::envelope::{
     Attachment, Commit as EnvelopeCommit, Editor as EnvelopeEditor, Envelope,
@@ -317,15 +330,24 @@ pub use parts::mail_merge::{
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat, ParagraphListBinding};
 pub use parts::ole_controls;
 pub use parts::pap::ParagraphConditionalFormatting;
+pub use parts::paragraph_groups::{PgpArray, PgpInfo, PgpOptions, PgpType};
+pub use parts::print_environment::{DocumentPrintEnvironment, PrintDriver, PrintEnvironment};
 pub use parts::proofing::{
     ProofingEntry, ProofingFeature, ProofingRange, ProofingState, ProofingStateTable,
     ProofingStatus, ProofingTables,
 };
-pub use parts::protection::{Mode, Range, Ranges, Reserved, Role, Selector, User};
+pub use parts::protection::{
+    AuthorizationError as ProtectionAuthorizationError, EditProtection, Mode, PackagePatch,
+    ProtectionAuthorization, ProtectionPolicy, Range, Ranges, Reserved, Role, Selector, User,
+};
 pub use parts::repair_bookmarks::{DocumentRepairBookmarks, RepairBookmark};
 pub use parts::rmd_threading::{DocumentRmdThreading, MessageDisplayProperties, ThreadingMessage};
 pub use parts::rsids::DocumentRsids;
 pub use parts::saved_by::{SavedByEntry, SavedByTable};
+pub use parts::saved_selection::{
+    SavedSelection, SavedSelectionCommit, SavedSelectionPatch, SavedSelectionTransaction,
+    SelectionGeometry, SelectionStyle,
+};
 pub use parts::smart_tags::{
     DocumentSmartTag, DocumentSmartTags, SmartTagBookmarkInfo, SmartTagOrigin,
     SmartTagRecognizerRange, SmartTagRecognizerState,
@@ -358,6 +380,7 @@ pub use parts::textbox::TextBox;
 pub use parts::textbox_breaks::{
     TextBoxBreak, TextBoxBreakEntry, TextBoxBreakKind, TextBoxBreakTable, TextBoxBreakTables,
 };
+pub use parts::vba_signature::{DocumentVbaSignatures, SignatureName, WordVbaSignature};
 pub use revision::{
     DisplayFieldRevisionMark, NumberingRevisionMark, RevisionKind, RevisionMark, RevisionReason,
     SectionRevisionMark,

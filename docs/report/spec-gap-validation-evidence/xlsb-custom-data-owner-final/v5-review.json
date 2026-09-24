@@ -1,0 +1,21 @@
+{
+  "verdict": "functionally approved; production release held",
+  "reviewer": "xlsb_custom_data_owner_final_review",
+  "package_sha256": "f52a1b10b38eb6b4e1ae16454c499b628d051ca8b83acf2454165aa1bcea7dd9",
+  "prior_findings_closed": 5,
+  "remaining_release_gate": "Every temporary collection must be fallible and reserved under caller limits.",
+  "sites": [
+    "transition_content_types removed/additions",
+    "connection_values_equal_after reference clone",
+    "validate_connection_ids",
+    "allocate_identity",
+    "relationship-template selector helpers"
+  ],
+  "tests": {
+    "library": 654,
+    "lifecycle": 18,
+    "ignored": 1
+  },
+  "strict_clippy_exit": 0,
+  "rustdoc_exit": 0
+}

@@ -660,6 +660,7 @@ pub struct ArchiveReader<'data> {
     /// Every central entry's wayfinder, sorted by local-header offset. This
     /// is used only to prove non-overlap before publishing a borrowed slice.
     layout: Vec<BorrowedLayoutEntry>,
+    has_encrypted_entries: bool,
     /// A successful strict local-layout proof. The slice source is immutable,
     /// so the proof remains valid for the reader lifetime.
     strict_layout_cache: StrictLayoutCache,
@@ -710,6 +711,73 @@ struct EntryInfo {
 struct BorrowedLayoutEntry {
     wayfinder: crate::ZipArchiveEntryWayfinder,
     central_name: Vec<u8>,
+}
+
+/// ZIP general-purpose bits that indicate an encrypted member.
+///
+/// Bit zero is the traditional PKZIP encryption bit. Bit six selects strong
+/// encryption and is also an encryption declaration even when bit zero is
+/// clear. Physical OPC admission must treat either bit as encrypted.
+const ZIP_ENCRYPTION_FLAGS: u16 = (1 << 0) | (1 << 6);
+const ZIP_LOCAL_FILE_HEADER_SIGNATURE: u32 = 0x0403_4b50;
+
+#[inline]
+fn has_zip_encryption(flags: u16) -> bool {
+    flags & ZIP_ENCRYPTION_FLAGS != 0
+}
+
+fn encrypted_zip_entry_error() -> Error {
+    Error::from(ErrorKind::InvalidInput {
+        msg: "archive contains encrypted ZIP members".to_string(),
+    })
+}
+
+fn reject_encrypted_zip_flags(flags: u16) -> Result<(), Error> {
+    if has_zip_encryption(flags) {
+        Err(encrypted_zip_entry_error())
+    } else {
+        Ok(())
+    }
+}
+
+/// Read the local-header flags from a slice after the archive entry has been
+/// structurally validated. This reads only the fixed eight-byte prefix and
+/// never materializes local names, extras, or payload bytes.
+fn local_header_flags(data: &[u8], offset: u64) -> Result<u16, Error> {
+    let offset = usize::try_from(offset).map_err(|_| Error::from(ErrorKind::Eof))?;
+    let end = offset
+        .checked_add(8)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let header = data
+        .get(offset..end)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let signature = u32::from_le_bytes([header[0], header[1], header[2], header[3]]);
+    if signature != ZIP_LOCAL_FILE_HEADER_SIGNATURE {
+        return Err(Error::from(ErrorKind::InvalidSignature {
+            expected: ZIP_LOCAL_FILE_HEADER_SIGNATURE,
+            actual: signature,
+        }));
+    }
+    Ok(u16::from_le_bytes([header[6], header[7]]))
+}
+
+/// Read the local-header flags from a positional source with one bounded
+/// fixed-prefix request. The indexed archive's source contract guarantees a
+/// stable byte view for its lifetime; callers perform full member framing
+/// validation through the ordinary read paths after this admission check.
+fn reader_local_header_flags<R: ReaderAt>(reader: &R, offset: u64) -> Result<u16, Error> {
+    let mut header = [0u8; 8];
+    reader
+        .read_exact_at(&mut header, offset)
+        .map_err(Error::from)?;
+    let signature = u32::from_le_bytes([header[0], header[1], header[2], header[3]]);
+    if signature != ZIP_LOCAL_FILE_HEADER_SIGNATURE {
+        return Err(Error::from(ErrorKind::InvalidSignature {
+            expected: ZIP_LOCAL_FILE_HEADER_SIGNATURE,
+            actual: signature,
+        }));
+    }
+    Ok(u16::from_le_bytes([header[6], header[7]]))
 }
 
 #[derive(Debug, Clone)]
@@ -1499,6 +1567,10 @@ pub struct IndexedArchive<R> {
     /// A successful strict local-layout proof. The `ReaderAt` source must
     /// remain byte-stable during construction and for this archive's lifetime.
     strict_layout_cache: StrictLayoutCache,
+    /// A successful physical encryption proof. The source is required to stay
+    /// byte-stable for the archive lifetime, so package owners can share one
+    /// bounded local-header scan across ingress phases.
+    unencrypted_entries_validated: std::sync::OnceLock<()>,
 }
 
 /// Zero-allocation iterator over an [`IndexedArchive`] file-name order.
@@ -2677,8 +2749,10 @@ impl<'data> ArchiveReader<'data> {
                 source,
             })
         })?;
+        let mut has_encrypted_entries = false;
         for entry_result in archive.entries() {
             let entry = entry_result?;
+            has_encrypted_entries |= has_zip_encryption(entry.flags());
             let path = entry.file_path();
 
             let member_name_bytes = path.as_ref().len() as u64;
@@ -2865,6 +2939,7 @@ impl<'data> ArchiveReader<'data> {
             ordered_names.push((local_header_offset, name));
         }
 
+        validate_declared_entry_count(layout.len(), declared_entry_count)?;
         ordered_names.sort_by_key(|(offset, _)| *offset);
         let order = collect_order_fallibly(ordered_names, "archive reader file order")?;
         layout.sort_unstable_by_key(|entry| entry.wayfinder.local_header_offset());
@@ -2875,6 +2950,7 @@ impl<'data> ArchiveReader<'data> {
             directories,
             order,
             layout,
+            has_encrypted_entries,
             strict_layout_cache: StrictLayoutCache::new(),
         })
     }
@@ -2889,6 +2965,57 @@ impl<'data> ArchiveReader<'data> {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.index.is_empty()
+    }
+
+    /// Whether any central-directory entry declares ZIP encryption through
+    /// general-purpose flag bit zero or strong-encryption bit six.
+    #[inline]
+    pub fn has_encrypted_entries(&self) -> bool {
+        self.has_encrypted_entries
+    }
+
+    /// Reject an archive when any central or local member header declares ZIP
+    /// encryption.
+    ///
+    /// This is an explicit physical-package admission check. Ordinary ZIP
+    /// reads remain central-directory authoritative and retain their existing
+    /// target-specific behavior; callers that own a package security boundary
+    /// must opt into this method before materializing members.
+    pub fn validate_unencrypted_entries(&self) -> Result<(), Error> {
+        if self.has_encrypted_entries {
+            return Err(encrypted_zip_entry_error());
+        }
+        for layout_entry in &self.layout {
+            // `get_entry` validates the local record and its bounded framing
+            // before the fixed flags are inspected. Directory entries are
+            // retained in `layout`, so their local flags are covered too.
+            let _ = self.archive.get_entry(layout_entry.wayfinder)?;
+            let flags = local_header_flags(
+                self.archive.as_bytes(),
+                layout_entry.wayfinder.local_header_offset(),
+            )?;
+            reject_encrypted_zip_flags(flags)?;
+        }
+        Ok(())
+    }
+
+    /// Reject one member when either its central or local header declares ZIP
+    /// encryption. Unrelated encrypted members are left to the caller's
+    /// package-wide policy.
+    pub fn validate_unencrypted_entry(&self, name: &str) -> Result<(), Error> {
+        let lookup = lookup_member_name(name)?;
+        let info = self
+            .index
+            .get(lookup.key())
+            .filter(|_| !lookup.explicit_directory)
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name.into_owned())))?;
+        reject_encrypted_zip_flags(info.flags)?;
+        let _ = self.archive.get_entry(info.wayfinder)?;
+        let flags = local_header_flags(
+            self.archive.as_bytes(),
+            info.wayfinder.local_header_offset(),
+        )?;
+        reject_encrypted_zip_flags(flags)
     }
 
     /// Check if a file exists in the archive.
@@ -3681,20 +3808,7 @@ where
         limits: ArchiveLimits,
         policy: ArchiveValidationPolicy,
     ) -> Result<Self, Error> {
-        // The common no-comment shape only needs the fixed EOCD probe before
-        // the locator hands its directory prefill to the index.  Keep that
-        // probe in a small stack buffer; the locator allocates its historical
-        // 64 KiB search window only if the probe misses.
-        let mut buffer = [0_u8; crate::ZipFileHeaderFixed::SIZE];
-        // Change 0632: the locator's first-central-record probe and this
-        // index's central-directory scan begin at the same offset, so the
-        // locator reads that span once, into a buffer sized to the declared
-        // directory, and hands it over as the scan buffer.
-        let (archive, prefill) = ZipLocator::new()
-            .directory_prefill(RECOMMENDED_BUFFER_SIZE)
-            .locate_in_reader_prefilling_directory(reader, &mut buffer, end_offset)
-            .map_err(|(_reader, error)| error)?;
-        Self::from_zip_archive_with_limits_policy_and_prefill(archive, limits, policy, prefill)
+        LocatedArchive::locate(reader, end_offset)?.index_with_limits_and_policy(limits, policy)
     }
 
     /// Build an index from an already located ZIP archive using default limits.
@@ -3822,7 +3936,7 @@ where
         {
             let mut central_entries = archive.entries_for_index(buffer, u64::MAX, prefilled);
             while let Some(entry) = central_entries.next_entry()? {
-                has_encrypted_entries |= entry.flags() & 1 != 0;
+                has_encrypted_entries |= has_zip_encryption(entry.flags());
                 has_data_descriptor_entries |= entry.has_data_descriptor();
                 has_zip64_metadata |= entry.is_zip64();
                 let local_span_end = entry
@@ -4037,6 +4151,7 @@ where
             }
         }
 
+        validate_declared_entry_count(layout.len(), declared_entry_count)?;
         if matches!(policy, ArchiveValidationPolicy::StrictPackage) {
             validate_strict_mimetype(&archive, strict_mimetype)?;
         }
@@ -4057,6 +4172,7 @@ where
             has_zip64_metadata,
             all_local_spans_bounded,
             strict_layout_cache: StrictLayoutCache::new(),
+            unencrypted_entries_validated: std::sync::OnceLock::new(),
         })
     }
 
@@ -4145,11 +4261,55 @@ where
         Ok(amount)
     }
 
-    /// Whether any central-directory entry declares traditional ZIP
-    /// encryption through general-purpose bit zero.
+    /// Whether any central-directory entry declares ZIP encryption through
+    /// general-purpose flag bit zero or strong-encryption bit six.
     #[inline]
     pub fn has_encrypted_entries(&self) -> bool {
         self.has_encrypted_entries
+    }
+
+    /// Reject an archive when any central or local member header declares ZIP
+    /// encryption.
+    ///
+    /// The check reads only fixed local-header metadata. It includes
+    /// directory records retained in the physical layout and performs no
+    /// payload decompression or unbounded copy.
+    pub fn validate_unencrypted_entries(&self) -> Result<(), Error> {
+        if self.unencrypted_entries_validated.get().is_some() {
+            return Ok(());
+        }
+        if self.has_encrypted_entries {
+            return Err(encrypted_zip_entry_error());
+        }
+        for layout_entry in &self.layout {
+            let flags = reader_local_header_flags(
+                self.archive.get_ref(),
+                layout_entry.wayfinder.local_header_offset(),
+            )?;
+            reject_encrypted_zip_flags(flags)?;
+        }
+        let _ = self.unencrypted_entries_validated.set(());
+        Ok(())
+    }
+
+    /// Reject one member when either its central or local header declares ZIP
+    /// encryption. Unrelated encrypted members are left to the caller's
+    /// package-wide policy.
+    pub fn validate_unencrypted_entry(&self, name: &str) -> Result<(), Error> {
+        let lookup = lookup_member_name(name)?;
+        let entry_id = self
+            .index
+            .get(lookup.key())
+            .filter(|_| !lookup.explicit_directory)
+            .copied()
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name.into_owned())))?;
+        let entry = self.indexed_entry(entry_id)?;
+        reject_encrypted_zip_flags(entry.info.flags)?;
+        let flags = reader_local_header_flags(
+            self.archive.get_ref(),
+            entry.info.wayfinder.local_header_offset(),
+        )?;
+        reject_encrypted_zip_flags(flags)
     }
 
     /// Whether any indexed central record declares a data descriptor.
@@ -5307,6 +5467,83 @@ where
     }
 }
 
+/// A positional ZIP source whose end of central directory has been located,
+/// before an [`IndexedArchive`] reserves any per-entry storage for it.
+///
+/// [`IndexedArchive::from_reader_with_limits`] locates and indexes in one
+/// call. A caller that must admit the declared central-directory entry count
+/// first (directories included, which [`ArchiveLimits::max_files`] does not
+/// count) locates here, checks [`Self::declared_entries`], and only then
+/// indexes. The locator's bounded central-directory prefill (change 0632) is
+/// carried into the index, so splitting the two steps costs no extra read; at
+/// most [`RECOMMENDED_BUFFER_SIZE`] bytes of the directory are held before the
+/// index is built.
+pub struct LocatedArchive<R> {
+    archive: ZipArchive<R>,
+    prefill: Option<DirectoryPrefill>,
+}
+
+impl<R> std::fmt::Debug for LocatedArchive<R> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("LocatedArchive")
+            .field("declared_entries", &self.archive.entries_hint())
+            .field("prefilled", &self.prefill.is_some())
+            .finish()
+    }
+}
+
+impl<R> LocatedArchive<R>
+where
+    R: ReaderAt,
+{
+    /// Locate the end of central directory of a positional ZIP source.
+    ///
+    /// `end_offset` is the exclusive source length used by the ZIP locator.
+    /// The common no-comment shape needs only a fixed stack probe; the
+    /// historical 64 KiB search window is allocated only when that probe
+    /// misses.
+    pub fn locate(reader: R, end_offset: u64) -> Result<Self, Error> {
+        let mut buffer = [0_u8; crate::ZipFileHeaderFixed::SIZE];
+        // Change 0632: the locator's first-central-record probe and the
+        // index's central-directory scan begin at the same offset, so the
+        // locator reads that span once, into a buffer sized to the declared
+        // directory, and hands it over as the scan buffer.
+        let (archive, prefill) = ZipLocator::new()
+            .directory_prefill(RECOMMENDED_BUFFER_SIZE)
+            .locate_in_reader_prefilling_directory(reader, &mut buffer, end_offset)
+            .map_err(|(_reader, error)| error)?;
+        Ok(Self { archive, prefill })
+    }
+
+    /// The entry count the end of central directory declares, directories
+    /// included. Nothing per entry has been read or reserved yet.
+    #[must_use]
+    pub fn declared_entries(&self) -> u64 {
+        self.archive.entries_hint()
+    }
+
+    /// Index the located archive with explicit resource limits.
+    pub fn index_with_limits(self, limits: ArchiveLimits) -> Result<IndexedArchive<R>, Error> {
+        self.index_with_limits_and_policy(limits, ArchiveValidationPolicy::Normalized)
+    }
+
+    /// Index the located archive with explicit resource limits and
+    /// validation policy.
+    pub fn index_with_limits_and_policy(
+        self,
+        limits: ArchiveLimits,
+        policy: ArchiveValidationPolicy,
+    ) -> Result<IndexedArchive<R>, Error> {
+        IndexedArchive::from_zip_archive_with_limits_policy_and_prefill(
+            self.archive,
+            limits,
+            policy,
+            self.prefill,
+        )
+    }
+}
+
 impl<R> std::fmt::Debug for IndexedArchive<R> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
@@ -5633,6 +5870,17 @@ fn collect_order_fallibly<T>(
 }
 
 const CENTRAL_FIXED_RECORD_BYTES: u64 = 46;
+fn validate_declared_entry_count(actual: usize, declared: usize) -> Result<(), Error> {
+    if actual != declared {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: format!(
+                "central directory contains {actual} records but EOCD declares {declared}"
+            ),
+        }));
+    }
+    Ok(())
+}
+
 fn physical_entry_bound(
     central_directory_size: u64,
     entry_count: u64,
@@ -8350,6 +8598,31 @@ impl<'data> LazyArchiveReader<'data> {
     #[must_use]
     pub const fn cache_limits(&self) -> LazyArchiveCacheLimits {
         self.cache_limits
+    }
+
+    /// Whether any central-directory entry declares ZIP encryption through
+    /// general-purpose flag bit zero or strong-encryption bit six. Lazy reads
+    /// retain the same admission fact as the eager indexed archive so OPC
+    /// callers can refuse encrypted packages before materializing a Part.
+    #[inline]
+    pub fn has_encrypted_entries(&self) -> bool {
+        self.inner.has_encrypted_entries()
+    }
+
+    /// Reject an archive when any central or local member header declares ZIP
+    /// encryption. This is the package-owner admission check; ordinary lazy
+    /// ZIP reads remain target-specific until a caller invokes it.
+    #[inline]
+    pub fn validate_unencrypted_entries(&self) -> Result<(), Error> {
+        self.inner.validate_unencrypted_entries()
+    }
+
+    /// Reject one member when either its central or local header declares ZIP
+    /// encryption. Unrelated encrypted members are left to package-wide
+    /// admission policy.
+    #[inline]
+    pub fn validate_unencrypted_entry(&self, name: &str) -> Result<(), Error> {
+        self.inner.validate_unencrypted_entry(name)
     }
 
     /// Return declared metadata without reading, decompressing, or caching a member.
@@ -13430,6 +13703,84 @@ mod tests {
     }
 
     #[test]
+    fn physical_encryption_admission_checks_both_flags_and_local_headers() {
+        let base = fixture(&[
+            FixtureEntry::stored(b"target.bin", b"target"),
+            FixtureEntry::stored(b"folder/", b""),
+        ]);
+
+        for encrypted_flag in [1u16, 1 << 6] {
+            for local_only in [false, true] {
+                for member in [b"target.bin".as_slice(), b"folder/".as_slice()] {
+                    let mut bytes = base.clone();
+                    let local = local_header_offset_for_name(&bytes, member);
+                    let central = central_header_offset_for_name(&bytes, member);
+                    bytes[local + 6..local + 8].copy_from_slice(&encrypted_flag.to_le_bytes());
+                    if !local_only {
+                        bytes[central + 8..central + 10]
+                            .copy_from_slice(&encrypted_flag.to_le_bytes());
+                    }
+
+                    let reader = ArchiveReader::new(&bytes).unwrap();
+                    assert_eq!(reader.has_encrypted_entries(), !local_only);
+                    assert!(reader.validate_unencrypted_entries().is_err());
+                    if member == b"target.bin" {
+                        assert!(reader.validate_unencrypted_entry("target.bin").is_err());
+                    }
+
+                    let indexed = indexed_archive(bytes.clone());
+                    assert_eq!(indexed.has_encrypted_entries(), !local_only);
+                    assert!(indexed.validate_unencrypted_entries().is_err());
+                    if member == b"target.bin" {
+                        assert!(indexed.validate_unencrypted_entry("target.bin").is_err());
+                    }
+
+                    let lazy = LazyArchiveReader::new(&bytes).unwrap();
+                    assert_eq!(lazy.has_encrypted_entries(), !local_only);
+                    assert!(lazy.validate_unencrypted_entries().is_err());
+                }
+            }
+        }
+
+        let clean = ArchiveReader::new(&base).unwrap();
+        assert!(!clean.has_encrypted_entries());
+        clean.validate_unencrypted_entries().unwrap();
+        let indexed = indexed_archive(base.clone());
+        indexed.validate_unencrypted_entries().unwrap();
+        let lazy = LazyArchiveReader::new(&base).unwrap();
+        lazy.validate_unencrypted_entries().unwrap();
+    }
+
+    #[test]
+    fn indexed_encryption_admission_scans_local_headers_once() {
+        let bytes = fixture(&[
+            FixtureEntry::stored(b"target.bin", b"target"),
+            FixtureEntry::stored(b"folder/", b""),
+        ]);
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let archive = IndexedArchive::from_reader_with_limits(
+            InstrumentedChunkedReaderAt {
+                bytes: bytes.clone(),
+                max_chunk: 8,
+                requests: Arc::clone(&requests),
+            },
+            bytes.len() as u64,
+            ArchiveLimits::default(),
+        )
+        .unwrap();
+        let before = requests.lock().unwrap().len();
+        archive.validate_unencrypted_entries().unwrap();
+        let after = requests.lock().unwrap().len();
+        assert_eq!(
+            after - before,
+            archive.preservation_entry_count(),
+            "one bounded fixed-prefix read per physical member"
+        );
+        archive.validate_unencrypted_entries().unwrap();
+        assert_eq!(requests.lock().unwrap().len(), after);
+    }
+
+    #[test]
     fn deflate_borrowing_returns_none_and_owned_read_remains_available() {
         let payload = b"deflated fallback payload";
         let mut writer = StreamingArchiveWriter::new();
@@ -15005,6 +15356,46 @@ mod tests {
         let error = indexed_archive_result(bytes, ArchiveLimits::UNBOUNDED)
             .expect_err("inflated EOCD count must be rejected");
         assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+    }
+
+    #[test]
+    fn rejects_understated_or_overstated_entry_count_after_bounded_walk() {
+        let mut understated = fixture(&[
+            FixtureEntry::stored(b"first", b"data"),
+            FixtureEntry::stored(b"second", b"data"),
+        ]);
+        let eocd_offset = understated.len() - 22;
+        understated[eocd_offset + 8..eocd_offset + 10].copy_from_slice(&1u16.to_le_bytes());
+        understated[eocd_offset + 10..eocd_offset + 12].copy_from_slice(&1u16.to_le_bytes());
+        assert!(matches!(
+            ArchiveReader::new_with_limits(&understated, ArchiveLimits::UNBOUNDED),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
+        ));
+        assert!(matches!(
+            indexed_archive_result(understated, ArchiveLimits::UNBOUNDED),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
+        ));
+
+        let comment = vec![0xa5; 46];
+        let mut overstated = fixture(&[FixtureEntry {
+            name: b"one",
+            extra: b"",
+            comment: &comment,
+            compressed_size: 0,
+            uncompressed_size: 0,
+            data: b"",
+        }]);
+        let eocd_offset = overstated.len() - 22;
+        overstated[eocd_offset + 8..eocd_offset + 10].copy_from_slice(&2u16.to_le_bytes());
+        overstated[eocd_offset + 10..eocd_offset + 12].copy_from_slice(&2u16.to_le_bytes());
+        assert!(matches!(
+            ArchiveReader::new_with_limits(&overstated, ArchiveLimits::UNBOUNDED),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
+        ));
+        assert!(matches!(
+            indexed_archive_result(overstated, ArchiveLimits::UNBOUNDED),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
+        ));
     }
 
     fn indexed_archive(bytes: Vec<u8>) -> IndexedArchive<std::io::Cursor<Vec<u8>>> {

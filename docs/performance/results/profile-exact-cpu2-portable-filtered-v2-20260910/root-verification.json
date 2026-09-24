@@ -1,0 +1,9 @@
+{
+  "archive_sha256": "58384afa7434d55cc95c4f99900fd00f8c4f384e969a2b27f6c2555d1fb980e2",
+  "exit_code": 0,
+  "mode": "default standalone bundled raw inputs; no external capture root",
+  "stdout": "xlsx-one-percent-save-record samples 6759 operation_denominator 6750 control 9\nopc-open-record samples 4441 operation_denominator 4422 control 14\nopc-source-open-record samples 3454 operation_denominator 3434 control 14\nopc-source-main-read-record samples 3345 operation_denominator 3329 control 11\nPASS: manifest, bundled raw derivation, cf98 source/depfile proof, and corrected profile derivation verified\n",
+  "stderr": "",
+  "temporary_extraction": "removed after verification",
+  "timing_workload_started": false
+}

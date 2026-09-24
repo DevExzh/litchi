@@ -1,0 +1,33 @@
+{
+  "oracle": "Exact Fraction over decoded binary64 operands; Decimal square root at 300 digits",
+  "input": "cached-results.json",
+  "input_sha256": "6907eb0fde9145f256587a2aa4d07018221ffc407fd6192acee452446446876e",
+  "function": "STEYX",
+  "formula": "of:=STEYX([.I2:.I101];[.J2:.J101])",
+  "source": "sc/qa/unit/data/functions/statistical/fods/steyx.fods",
+  "sheet": "Sheet2",
+  "row": 3,
+  "column": 1,
+  "y_column": 9,
+  "x_column": 10,
+  "pair_count": 99,
+  "skipped_rows": [
+    2
+  ],
+  "decimal_precision": 300,
+  "residual_mean_square_fraction": {
+    "numerator": "495419793",
+    "denominator": "193004198"
+  },
+  "reference_decimal_300": "1.60215046095703506873448765149027945769981145319559036588044743267636676645352617788018658891732039745023677408046590427882531860060391745799946654794150160711476123158318542084096867955087563067512399510333057922804241166588602186560884930687234708984523132933351402550775244857973234628177236464386",
+  "reference_float": "1.6021504609570352",
+  "reference_hex": "0x1.9a26885914f04p+0",
+  "reference_bits": "3ff9a26885914f04",
+  "native_cache": "1.60215046095659",
+  "native_hex": "0x1.9a2688591472fp+0",
+  "native_bits": "3ff9a2688591472f",
+  "absolute_difference": "4.4519943287468777e-13",
+  "native_ulp": "2.220446049250313e-16",
+  "ulp_difference": 2005,
+  "comparison": "The Rust native test compares this row to reference_bits and asserts the retained native cache is exactly 2005 binary64 ULP below it; the other 41 rows retain the ordinary 1e-13 relative policy."
+}

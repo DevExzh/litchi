@@ -1,0 +1,103 @@
+[
+  {
+    "name": "ods-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-ods"
+    ],
+    "exit_code": 0,
+    "seconds": 18.28445029258728,
+    "log_sha256": "c8b9f23a12deae0f3e9ea49cf44f5019c158c544e9500a8fecf905242e9e5d88"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi-ods",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 15.170980453491211,
+    "log_sha256": "837e32c4d8e61147ab797e4b1547e0f4ea1e109b2e83622032db42451330cec1"
+  },
+  {
+    "name": "rustdoc",
+    "command": [
+      "cargo",
+      "doc",
+      "--locked",
+      "-p",
+      "litchi-ods",
+      "--no-deps"
+    ],
+    "exit_code": 0,
+    "seconds": 5.770116806030273,
+    "log_sha256": "4098c1c4beca06111ad07f8d5657a5bbbc98e5d56125917a56e18b639d99f1a1"
+  },
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-ods",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 0.9361302852630615,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "batch-format",
+    "command": [
+      "rustfmt",
+      "--edition",
+      "2024",
+      "--check",
+      "--config",
+      "skip_children=true",
+      "crates/litchi-ods/src/codec/formula/evaluation.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/statistical.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/value/statistical.rs",
+      "crates/litchi-ods/tests/ods_formula_statistical_evaluation.rs",
+      "crates/litchi-ods/tests/ods_formula_statistical_limits.rs",
+      "crates/litchi-ods/tests/ods_formula_statistical_native.rs",
+      "crates/litchi-ods/tests/ods_formula_statistical_oracle.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.08044886589050293,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "boundaries",
+    "command": [
+      "python3",
+      "tools/check_crate_boundaries.py"
+    ],
+    "exit_code": 0,
+    "seconds": 228.0520143508911,
+    "log_sha256": "cdea9514ba7c77c1608a6e73b2eeaf093accc70aefd1c3591af13d73e8b871fa"
+  },
+  {
+    "name": "diff-check",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 0.06951618194580078,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

@@ -25,14 +25,14 @@ mod model;
 mod reader;
 mod writer;
 
+pub use crate::time::Offset;
 pub use model::{
-    Axis, Corner, InOut, Kind, MAX_MS, Ms, Origin, Raw, Ripple, Shape, Side, Speed, Spokes,
-    TimeError, Transition,
+    Axis, Corner, FlyThrough, Glitter, GlitterPattern, InOut, Kind, LeftRight, MAX_MS,
+    MAX_PRESET_NAME_BYTES, Morph, Ms, Origin, Preset, Prism, Raw, Reveal, Ripple, Shape, Shred,
+    ShredPattern, Side, Speed, Spokes, TimeError, Transition,
 };
 pub use reader::{Limits, read, read_with};
 pub use writer::{write, write_to};
-
-pub(crate) use model::{preserved_effect_xml, semantic_clone};
 
 #[cfg(test)]
 #[allow(
@@ -112,6 +112,119 @@ mod tests {
     }
 
     #[test]
+    fn morph_uses_powerpoint_2015_choice_and_round_trips() {
+        let value = Transition::new(Kind::Morph(Morph::ByWord))
+            .with_speed(Speed::Fast)
+            .with_duration(Ms::new(750).unwrap())
+            .with_click(false)
+            .with_after(Ms::new(1250).unwrap());
+
+        let xml = write(&value).unwrap();
+        assert!(xml.contains(r#"Requires="p14 p159""#));
+        assert!(xml.contains(r#"<p159:morph option="byWord"/>"#));
+        assert!(xml.contains("<p:fade/>"));
+        assert!(parse_fragment(&xml).same_semantics(&value));
+    }
+
+    #[test]
+    fn preset_uses_powerpoint_2012_choice_and_preserves_inversion() {
+        let preset = Preset::with_options("wind", true, false).unwrap();
+        let value = Transition::new(Kind::Preset(preset.clone())).with_speed(Speed::Slow);
+
+        let xml = write(&value).unwrap();
+        assert!(xml.contains(r#"Requires="p15""#));
+        assert!(xml.contains(r#"<p15:prstTrans prst="wind" invX="1"/>"#));
+        assert!(parse_fragment(&xml).same_semantics(&value));
+        assert_eq!(preset.name(), Some("wind"));
+        assert!(preset.invert_x());
+        assert!(!preset.invert_y());
+    }
+
+    #[test]
+    fn preset_escapes_xml_name_and_round_trips() {
+        let preset = Preset::new("wind&<\"\t\n\r").unwrap();
+        let value = Transition::new(Kind::Preset(preset));
+        let xml = write(&value).unwrap();
+        assert!(xml.contains(r#"prst="wind&amp;&lt;&quot;&#x9;&#xA;&#xD;""#));
+        assert!(parse_fragment(&xml).same_semantics(&value));
+    }
+
+    #[test]
+    fn typed_extension_read_preserves_unknown_attributes_until_semantic_change() {
+        let xml = transition_xml(
+            r#"<p159:morph xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main" option="byChar" future="keep"/>"#,
+        );
+        let value = read(xml.as_bytes()).unwrap().unwrap();
+        assert_eq!(value.kind(), &Kind::Morph(Morph::ByChar));
+        let preserved = write(&value).unwrap();
+        assert!(preserved.contains(r#"future="keep""#));
+        assert!(parse_fragment(&preserved).same_semantics(&value));
+
+        let mut changed = value.clone();
+        changed.set_kind(Kind::Morph(Morph::ByObject));
+        let changed = write(&changed).unwrap();
+        assert!(!changed.contains(r#"future="keep""#));
+        assert!(changed.contains(r#"option="byObject""#));
+    }
+
+    #[test]
+    fn preset_absent_optional_attributes_round_trip_without_normalization() {
+        let xml = transition_xml(
+            r#"<p15:prstTrans xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main" invX="false"/>"#,
+        );
+        let value = read(xml.as_bytes()).unwrap().unwrap();
+        assert_eq!(value.kind(), &Kind::Preset(Preset::without_name()));
+        let output = write(&value).unwrap();
+        assert!(output.contains(r#"invX="false""#));
+        assert!(!output.contains(r#"invY=""#));
+    }
+
+    #[test]
+    fn preset_default_presence_is_semantic_noop_but_wire_distinct() {
+        let absent = read(
+            transition_xml(
+                r#"<p15:prstTrans xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main"/>"#,
+            )
+            .as_bytes(),
+        )
+        .unwrap()
+        .unwrap();
+        let explicit_false = read(
+            transition_xml(
+                r#"<p15:prstTrans xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main" invX="false"/>"#,
+            )
+            .as_bytes(),
+        )
+        .unwrap()
+        .unwrap();
+
+        assert!(absent.same_semantics(&explicit_false));
+        assert_ne!(absent, explicit_false);
+        let absent_xml = write(&absent).unwrap();
+        let explicit_xml = write(&explicit_false).unwrap();
+        assert!(!absent_xml.contains(" invX="));
+        assert!(explicit_xml.contains(r#"invX="false""#));
+    }
+
+    #[test]
+    fn rejects_invalid_morph_option_and_bounded_preset_name() {
+        let invalid = transition_xml(
+            r#"<p159:morph xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main" option="byShape"/>"#,
+        );
+        assert!(matches!(
+            read(invalid.as_bytes()),
+            Err(Error::Invalid(message)) if message.contains("morph transition option")
+        ));
+
+        let oversized = "x".repeat(MAX_PRESET_NAME_BYTES + 1);
+        assert!(matches!(
+            Preset::new(oversized),
+            Err(Error::Limit { resource, limit })
+                if resource == "preset transition name bytes" && limit == MAX_PRESET_NAME_BYTES
+        ));
+    }
+
+    #[test]
     fn reads_local_standard_fixtures() {
         let cover = read(STANDARD_COVER).unwrap().unwrap();
         assert_eq!(cover.speed(), Speed::Fast);
@@ -157,6 +270,151 @@ mod tests {
     }
 
     #[test]
+    fn all_powerpoint_2010_transition_effects_are_typed_and_round_trip() {
+        let cases = [
+            (
+                Kind::Conveyor(LeftRight::Right),
+                r#"<p14:conveyor dir="r"/>"#,
+            ),
+            (Kind::Doors(Axis::Vertical), r#"<p14:doors dir="vert"/>"#),
+            (Kind::Ferris(LeftRight::Left), r#"<p14:ferris dir="l"/>"#),
+            (Kind::Flash, r#"<p14:flash/>"#),
+            (Kind::Flip(LeftRight::Right), r#"<p14:flip dir="r"/>"#),
+            (
+                Kind::FlyThrough(FlyThrough::new(InOut::Out, true)),
+                r#"<p14:flythrough dir="out" hasBounce="1"/>"#,
+            ),
+            (Kind::Gallery(LeftRight::Left), r#"<p14:gallery dir="l"/>"#),
+            (
+                Kind::Glitter(Glitter::new(Side::Down, GlitterPattern::Hexagon)),
+                r#"<p14:glitter dir="d" pattern="hexagon"/>"#,
+            ),
+            (Kind::Honeycomb, r#"<p14:honeycomb/>"#),
+            (Kind::Pan(Side::Up), r#"<p14:pan dir="u"/>"#),
+            (
+                Kind::Prism(Prism::new(Side::Right, true, true)),
+                r#"<p14:prism dir="r" isContent="1" isInverted="1"/>"#,
+            ),
+            (
+                Kind::Reveal(Reveal::new(LeftRight::Right, true)),
+                r#"<p14:reveal dir="r" thruBlk="1"/>"#,
+            ),
+            (
+                Kind::Shred(Shred::new(ShredPattern::Rectangle, InOut::Out)),
+                r#"<p14:shred pattern="rectangle" dir="out"/>"#,
+            ),
+            (Kind::Switch(LeftRight::Right), r#"<p14:switch dir="r"/>"#),
+            (Kind::Vortex(Side::Left), r#"<p14:vortex dir="l"/>"#),
+            (Kind::Warp(InOut::Out), r#"<p14:warp dir="out"/>"#),
+            (
+                Kind::WheelReverse(Spokes::Eight),
+                r#"<p14:wheelReverse spokes="8"/>"#,
+            ),
+            (
+                Kind::Window(Axis::Horizontal),
+                r#"<p14:window dir="horz"/>"#,
+            ),
+        ];
+
+        for (kind, expected) in cases {
+            let value = Transition::new(kind);
+            let xml = write(&value).unwrap();
+            assert!(xml.contains(r#"<mc:Choice Requires="p14">"#));
+            assert!(xml.contains(expected), "expected {expected:?} in {xml:?}");
+            assert!(xml.contains("<p:fade/>"));
+            assert!(parse_fragment(&xml).same_semantics(&value));
+        }
+    }
+
+    #[test]
+    fn p14_effect_defaults_and_boolean_lexical_forms_are_checked() {
+        let cases = [
+            (
+                r#"<p14:conveyor xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"/>"#,
+                Kind::Conveyor(LeftRight::Unspecified),
+            ),
+            (
+                r#"<p14:doors xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"/>"#,
+                Kind::Doors(Axis::Horizontal),
+            ),
+            (
+                r#"<p14:flythrough xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" dir="in" hasBounce="true"/>"#,
+                Kind::FlyThrough(FlyThrough::new(InOut::In, true)),
+            ),
+            (
+                r#"<p14:glitter xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" pattern="diamond"/>"#,
+                Kind::Glitter(Glitter::new(Side::Left, GlitterPattern::Diamond)),
+            ),
+            (
+                r#"<p14:prism xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" isContent="false" isInverted="0"/>"#,
+                Kind::Prism(Prism::new(Side::Left, false, false)),
+            ),
+            (
+                r#"<p14:reveal xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" thruBlk="false"/>"#,
+                Kind::Reveal(Reveal::new(LeftRight::Left, false)),
+            ),
+            (
+                r#"<p14:shred xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"/>"#,
+                Kind::Shred(Shred::new(ShredPattern::Strip, InOut::In)),
+            ),
+            (
+                r#"<p14:wheelReverse xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"/>"#,
+                Kind::WheelReverse(Spokes::Four),
+            ),
+        ];
+
+        for (effect, expected) in cases {
+            let value = read(transition_xml_with_p14(effect).as_bytes())
+                .unwrap()
+                .unwrap();
+            assert_eq!(value.kind(), &expected);
+        }
+    }
+
+    #[test]
+    fn p14_effects_reject_values_outside_their_schema_domains() {
+        for effect in [
+            r#"<p14:conveyor dir="u"/>"#,
+            r#"<p14:doors dir="left"/>"#,
+            r#"<p14:flythrough dir="sideways"/>"#,
+            r#"<p14:glitter pattern="square"/>"#,
+            r#"<p14:prism dir="center"/>"#,
+            r#"<p14:reveal dir="u"/>"#,
+            r#"<p14:shred pattern="circle"/>"#,
+            r#"<p14:wheelReverse spokes="6"/>"#,
+        ] {
+            assert!(
+                matches!(
+                    read(transition_xml_with_p14(effect).as_bytes()),
+                    Err(Error::Invalid(_))
+                ),
+                "unexpectedly accepted {effect:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn p14_source_attributes_are_preserved_until_a_typed_edit() {
+        let value = read(
+            transition_xml_with_p14(
+                r#"<p14:prism xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" dir="r" isContent="true" future="keep"/>"#,
+            )
+            .as_bytes(),
+        )
+        .unwrap()
+        .unwrap();
+        let unchanged = write(&value).unwrap();
+        assert!(unchanged.contains(r#"future="keep""#));
+
+        let mut changed = value.clone();
+        changed.set_kind(Kind::Prism(Prism::new(Side::Up, true, false)));
+        let changed = write(&changed).unwrap();
+        assert!(!changed.contains(r#"future="keep""#));
+        assert!(changed.contains(r#"<p14:prism dir="u" isContent="1"/>"#));
+        assert!(changed.contains("<p:fade/>"));
+    }
+
+    #[test]
     fn rejects_invalid_directions_spokes_and_timing() {
         for effect in [r#"<p:push dir="horz"/>"#, r#"<p:wheel spokes="6"/>"#] {
             let xml = transition_xml(effect);
@@ -197,6 +455,74 @@ mod tests {
                 .get(),
             i32::MAX as u32
         );
+    }
+
+    #[test]
+    fn p14_duration_accepts_exact_units_and_fractional_milliseconds() {
+        for (lexical, canonical, legacy) in [
+            ("500µs", "0.5", None),
+            ("1.25s", "1250", Some(1250)),
+            ("100ns", "0.0001", None),
+            ("1.5", "1.5", None),
+            ("2min", "120000", Some(120_000)),
+        ] {
+            let xml = transition_xml_with_p14(r#"<p:fade/>"#).replacen(
+                "<p:transition>",
+                &format!(r#"<p:transition p14:dur="{lexical}">"#),
+                1,
+            );
+            let value = read(xml.as_bytes()).unwrap().unwrap();
+            assert_eq!(value.duration_offset().unwrap().as_str(), canonical);
+            assert_eq!(value.duration().map(Ms::get), legacy);
+            let output = write(&value).unwrap();
+            assert!(output.contains(&format!(r#"p14:dur="{canonical}""#)));
+            assert!(parse_fragment(&output).same_semantics(&value));
+        }
+
+        let invalid = transition_xml_with_p14(r#"<p:fade/>"#).replacen(
+            "<p:transition>",
+            r#"<p:transition p14:dur="1quarter">"#,
+            1,
+        );
+        assert!(matches!(
+            read(invalid.as_bytes()),
+            Err(Error::Invalid(message)) if message.contains("transition duration")
+        ));
+
+        let invalid = transition_xml_with_p14(r#"<p:fade/>"#).replacen(
+            "<p:transition>",
+            r#"<p:transition p14:dur=" 1s ">"#,
+            1,
+        );
+        assert!(matches!(
+            read(invalid.as_bytes()),
+            Err(Error::Invalid(message)) if message.contains("transition duration")
+        ));
+    }
+
+    #[test]
+    fn token_and_boolean_whitespace_is_schema_collapsed() {
+        let xml = transition_xml_with_p14(
+            r#"<p14:flythrough xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" dir="  out &#x9;" hasBounce=" &#xA; true &#xD; "/>"#,
+        );
+        let value = read(xml.as_bytes()).unwrap().unwrap();
+        assert_eq!(
+            value.kind(),
+            &Kind::FlyThrough(FlyThrough::new(InOut::Out, true))
+        );
+    }
+
+    #[test]
+    fn typed_effects_reject_nested_children_and_character_data() {
+        for effect in [
+            r#"<p14:flash xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"><p14:child/></p14:flash>"#,
+            r#"<p14:honeycomb xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main">unexpected</p14:honeycomb>"#,
+        ] {
+            assert!(matches!(
+                read(transition_xml(effect).as_bytes()),
+                Err(Error::Invalid(message)) if message.contains("typed transition effects")
+            ));
+        }
     }
 
     #[test]
@@ -309,5 +635,11 @@ mod tests {
             r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">{xml}</p:sld>"#
         );
         read(xml.as_bytes()).unwrap().unwrap()
+    }
+
+    fn transition_xml_with_p14(effect: &str) -> String {
+        format!(
+            r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"><p:transition>{effect}</p:transition></p:sld>"#
+        )
     }
 }

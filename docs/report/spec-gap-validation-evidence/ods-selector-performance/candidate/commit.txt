@@ -1,0 +1,5 @@
+base_commit=d5b5afdb4032b718c0f94c113a3b1b09f17ae6ba
+candidate_index_sha256=6f08a6488414c1eb357fa6c877ffe41d3d7c27eed9682ee4f62b3e815b10aa2b
+candidate_patch_sha256=ed29bb9ea6a421387b6e6d4663adc10d9c5f5341344b9416c5bbe2c47401558a
+candidate_patch_path=crates/litchi-ods/src/sheet_metadata/index.rs
+timestamp_utc=2026-09-13T02:27:16Z

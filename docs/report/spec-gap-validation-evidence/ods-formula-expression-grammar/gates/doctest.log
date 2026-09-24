@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+   Doc-tests litchi_ods
+
+running 1 test
+test crates/litchi-ods/src/codec/formula.rs - codec::formula::expression (line 35) ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.28s; merged doctests compilation took 0.27s

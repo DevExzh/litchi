@@ -1,0 +1,7 @@
+# Source-qualified ODF XML publication
+
+The shared helper admits metadata opening-tag changes and empty-container expansion only with a range proof from the exact source part. It preserves QName/shape, original expansion attributes, and every byte outside the proven range. Complete candidate validation checks namespace aliases, expanded attribute uniqueness, declarations, processing instructions, XML characters and depth. Source extraction checks declared member size first; candidate retention bounds both length and Vec capacity. Callers remain responsible for bounding construction of the Vec they supply.
+
+Independent review approved the four common files identified in combined-source.json. Root ran the combined ODS/common suite in a dedicated build directory: 1,113 tests passed across 64 targets, with one existing ignored test. This includes 15 publication regressions and 33 ODS vocabulary tests. Strict all-target Clippy and warning-denied rustdoc passed. A final documentation-only clarification of source-size preflight was followed by another successful rustdoc run; executable code is identical to the tested v5 revision.
+
+Commands, exit codes, resolved lockfile and compressed logs are retained here. TMPDIR=/var/tmp was explicit and inherited Rust warning suppressions were removed. The manifest includes the uncommitted ODS integration snapshot for provenance; this commit approves only the shared helper, not the full ODS feature. Namespace-equivalence work for other ODT readers remains separate.

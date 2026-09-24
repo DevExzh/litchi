@@ -1,0 +1,61 @@
+{
+  "schema": "litchi-security-corpus-receipt-v2",
+  "artifact": "security-corpus-v2",
+  "base_commit": "cab92a6bbc2f2eb09081c69ce90ba7bb29509155",
+  "candidate_worktree": "/var/tmp/litchi-security-corpus-v2-real-20260910",
+  "primary_worktree_modified": false,
+  "owned_scope": [
+    "tools/perf-baseline/Cargo.toml",
+    "tools/perf-baseline/Cargo.lock",
+    "tools/perf-baseline/src/bin/security_corpus.rs",
+    "docs/performance/results/security-corpus-v2/"
+  ],
+  "shared_provider_scope": "provider harness unchanged; no CFB boundary source edits",
+  "catalog": {
+    "catalog_sha256": "cbf3614207f37f7287b6b579155045b1df0dc2a363d84ab2d6335e77f286ebd8",
+    "catalog_file_sha256": "52c9b13976614004d2b80a8a7941763c04ea18528cfb8e63352ce270f0967e76",
+    "oracles_sha256": "57441f97e2a070ff89aad2268cf7f97f18a1989cf11895da7529aa32f44dd36b",
+    "profile_sha256": "ad8b200df07a7161c3b288345e345b3341759350d5ca5d65d26ca58870fdcf12",
+    "source_manifest_sha256": "a30f06adf88b4093630146adae83a2a00fbd35e4d9e3a15b3b640c1decbeff0c",
+    "fixtures": 22,
+    "operation_rows": 66,
+    "default_bindings_unchanged": 201,
+    "timed_operation_definitions": 3,
+    "timed_captures_recorded": false
+  },
+  "commands": {
+    "compile": "TMPDIR=/var/tmp/litchi-security-corpus-v2-tmp-20260910 RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-v2-target-20260910 CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 check --locked --offline --bin security_corpus --manifest-path tools/perf-baseline/Cargo.toml",
+    "unit_tests": "TMPDIR=/var/tmp/litchi-security-corpus-v2-tmp-20260910 RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-v2-target-20260910 CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 test --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin security_corpus",
+    "clippy": "TMPDIR=/var/tmp/litchi-security-corpus-v2-tmp-20260910 RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-v2-target-20260910 CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +stable clippy --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin security_corpus --all-targets -- -D warnings",
+    "correctness_rows": "TMPDIR=/var/tmp/litchi-security-corpus-v2-tmp-20260910 RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-security-corpus-v2-target-20260910 CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 run --locked --offline --quiet --manifest-path tools/perf-baseline/Cargo.toml --bin security_corpus -- --json /var/tmp/security-corpus-v2-all-final.json",
+    "catalog_build": "same security_corpus binary with --locked --offline --operation validate --catalog-dir docs/performance/results/security-corpus-v2"
+  },
+  "results": {
+    "compile": "pass",
+    "unit_tests": "5 passed, 0 failed",
+    "clippy": "pass",
+    "correctness_rows": "66 executable rows passed; 22 fixtures x 3 operations",
+    "catalog_build": "pass: 22 content-addressed corpora and 22 oracle bindings"
+  },
+  "policy": {
+    "timed_runs": false,
+    "capture_gate": "LITCHI_SECURITY_CORPUS_CAPTURE=approved plus --measure",
+    "host_code_execution": false,
+    "external_reference_resolution": false,
+    "native_acceptance_claim": false,
+    "producer_policy": "document_producer is null unless independently recorded; synthetic vectors remain non-native",
+    "macro_policy": "inventory and inert preservation only; never execute"
+  },
+  "preserved_prior_artifacts": [
+    {
+      "artifact": "security-corpus-v1",
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/",
+      "status": "retained verbatim for audit comparison"
+    }
+  ],
+  "not_run": [
+    "timed performance capture",
+    "allocator or latency measurement",
+    "native Office host round-trip"
+  ]
+}

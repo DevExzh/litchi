@@ -14,7 +14,10 @@
 
 use crate::alt::{Chunk, scan};
 use crate::error::Result;
-use crate::namespace::{is_wordprocessing_namespace, scan_word_element_ranges};
+use crate::namespace::{
+    NamespaceBindings, NamespaceCapture, is_wordprocessing_namespace, scan_word_element_ranges,
+    scan_word_element_ranges_with_context,
+};
 use crate::paragraph::{Paragraph, extract_word_text};
 use crate::table::Table;
 use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource, SourceVersion};
@@ -32,17 +35,18 @@ use std::sync::{Arc, Mutex, OnceLock, Weak};
 const MAX_PARAGRAPH_INDEX_RANGES: usize = 1_000_000;
 
 /// One byte range for a visible `w:p` element.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ParagraphRange {
     pub(crate) start: u32,
     pub(crate) length: u32,
+    pub(crate) namespaces: NamespaceBindings,
 }
 
-/// Bounded, source-independent paragraph offsets for one visible XML view.
+/// Bounded paragraph offsets and namespace snapshots for one visible XML view.
 ///
-/// The index retains offsets only.  It never owns or exposes XML bytes, so a
-/// cached lookup cannot extend the lifetime of a payload or bypass the
-/// existing semantic/lossless ownership boundaries.
+/// The index never owns or exposes XML bytes, so a cached lookup cannot extend
+/// the lifetime of a payload or bypass the existing semantic/lossless
+/// ownership boundaries.
 #[derive(Debug, Clone)]
 pub(crate) struct ParagraphIndex {
     ranges: Arc<[ParagraphRange]>,
@@ -53,21 +57,30 @@ impl ParagraphIndex {
     /// paragraph selectors.
     pub(crate) fn from_xml(xml: &[u8]) -> Result<Self> {
         let mut ranges = Vec::new();
-        scan_word_element_ranges(xml, &[b"p".as_slice()], |_, start, length| {
-            if ranges.len() >= MAX_PARAGRAPH_INDEX_RANGES {
-                return Err(crate::Error::InvalidFormat(format!(
-                    "document paragraph index exceeds {MAX_PARAGRAPH_INDEX_RANGES} ranges"
-                )));
-            }
-            ranges
-                .try_reserve(1)
-                .map_err(|source| crate::Error::Allocation {
-                    resource: "document paragraph index",
-                    source,
-                })?;
-            ranges.push(ParagraphRange { start, length });
-            Ok(())
-        })?;
+        scan_word_element_ranges_with_context(
+            xml,
+            &[],
+            &[b"p".as_slice()],
+            |_, start, length, namespaces| {
+                if ranges.len() >= MAX_PARAGRAPH_INDEX_RANGES {
+                    return Err(crate::Error::InvalidFormat(format!(
+                        "document paragraph index exceeds {MAX_PARAGRAPH_INDEX_RANGES} ranges"
+                    )));
+                }
+                ranges
+                    .try_reserve(1)
+                    .map_err(|source| crate::Error::Allocation {
+                        resource: "document paragraph index",
+                        source,
+                    })?;
+                ranges.push(ParagraphRange {
+                    start,
+                    length,
+                    namespaces,
+                });
+                Ok(())
+            },
+        )?;
         Ok(Self {
             ranges: ranges.into(),
         })
@@ -78,11 +91,11 @@ impl ParagraphIndex {
     }
 
     pub(crate) fn get(&self, index: usize) -> Option<ParagraphRange> {
-        self.ranges.get(index).copied()
+        self.ranges.get(index).cloned()
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = ParagraphRange> + '_ {
-        self.ranges.iter().copied()
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &ParagraphRange> + '_ {
+        self.ranges.iter()
     }
 
     fn weight_bytes(&self) -> usize {
@@ -489,6 +502,7 @@ pub(crate) fn visible_document_xml(raw: Arc<Vec<u8>>) -> Result<Arc<Vec<u8>>> {
     // readers.
     let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
     capabilities.understand_namespace(crate::paragraph::extensions::WORD_2010_NAMESPACE);
+    capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
     match litchi_ooxml_common::mce::process_markup_compatibility(
         raw.as_slice(),
         &capabilities,
@@ -505,14 +519,19 @@ pub(crate) fn visible_document_xml(raw: Arc<Vec<u8>>) -> Result<Arc<Vec<u8>>> {
 pub(crate) fn document_paragraphs(xml: Arc<Vec<u8>>) -> Result<SmallVec<[Paragraph; 32]>> {
     let mut inline = SmallVec::new();
     let mut spill = None;
-    scan_word_element_ranges(xml.as_slice(), &[b"p".as_slice()], |_, start, length| {
-        push_document_smallvec(
-            &mut inline,
-            &mut spill,
-            Paragraph::from_arc_range(Arc::clone(&xml), start, length),
-            "document paragraph views",
-        )
-    })?;
+    scan_word_element_ranges_with_context(
+        xml.as_slice(),
+        &[],
+        &[b"p".as_slice()],
+        |_, start, length, namespaces| {
+            push_document_smallvec(
+                &mut inline,
+                &mut spill,
+                Paragraph::from_arc_range_with_context(Arc::clone(&xml), start, length, namespaces),
+                "document paragraph views",
+            )
+        },
+    )?;
     match spill {
         Some(values) => Ok(SmallVec::from_vec(values)),
         None => Ok(inline),
@@ -530,7 +549,12 @@ pub(crate) fn document_paragraphs_from_index(
         push_document_smallvec(
             &mut inline,
             &mut spill,
-            Paragraph::from_arc_range(Arc::clone(&xml), range.start, range.length),
+            Paragraph::from_arc_range_with_context(
+                Arc::clone(&xml),
+                range.start,
+                range.length,
+                Arc::clone(&range.namespaces),
+            ),
             "document paragraph views",
         )?;
     }
@@ -546,9 +570,9 @@ pub(crate) fn document_paragraph_from_index(
     index: &ParagraphIndex,
     position: usize,
 ) -> Option<Paragraph> {
-    index
-        .get(position)
-        .map(|range| Paragraph::from_arc_range(xml, range.start, range.length))
+    index.get(position).map(|range| {
+        Paragraph::from_arc_range_with_context(xml, range.start, range.length, range.namespaces)
+    })
 }
 
 /// Select one visible paragraph without materializing every paragraph view.
@@ -558,15 +582,25 @@ pub(crate) fn document_paragraph_from_index(
 pub(crate) fn document_paragraph(xml: Arc<Vec<u8>>, index: usize) -> Result<Option<Paragraph>> {
     let mut position = 0usize;
     let mut paragraph = None;
-    scan_word_element_ranges(xml.as_slice(), &[b"p".as_slice()], |_, start, length| {
-        if position == index {
-            paragraph = Some(Paragraph::from_arc_range(Arc::clone(&xml), start, length));
-        }
-        position = position.checked_add(1).ok_or_else(|| {
-            crate::Error::InvalidFormat("document paragraph counter overflow".into())
-        })?;
-        Ok(())
-    })?;
+    scan_word_element_ranges_with_context(
+        xml.as_slice(),
+        &[],
+        &[b"p".as_slice()],
+        |_, start, length, namespaces| {
+            if position == index {
+                paragraph = Some(Paragraph::from_arc_range_with_context(
+                    Arc::clone(&xml),
+                    start,
+                    length,
+                    namespaces,
+                ));
+            }
+            position = position.checked_add(1).ok_or_else(|| {
+                crate::Error::InvalidFormat("document paragraph counter overflow".into())
+            })?;
+            Ok(())
+        },
+    )?;
     Ok(paragraph)
 }
 
@@ -587,7 +621,7 @@ pub(crate) fn document_paragraph_count(xml: &[u8]) -> Result<usize> {
 /// `DocumentPart::from_part` has already selected MCE branches for this
 /// source, so every returned range addresses the visible XML and unmodeled
 /// body children can remain lossless instead of being silently discarded.
-pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
+pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32, NamespaceBindings)>> {
     const PARAGRAPH: usize = 0;
     const TABLE: usize = 1;
     const ALT: usize = 2;
@@ -597,8 +631,9 @@ pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
 
     let mut reader = NsReader::from_reader(xml);
     let mut ranges = Vec::new();
+    let mut namespace_capture = NamespaceCapture::default();
     let mut body_depth = None;
-    let mut pending = None::<(usize, usize)>;
+    let mut pending = None::<(usize, usize, NamespaceBindings)>;
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut saw_root = false;
@@ -610,10 +645,8 @@ pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
         })?;
         let event = reader
             .read_event()
-            .map_err(|error| crate::Error::Xml(error.to_string()))?
-            .into_owned();
-        let resolver = reader.resolver().clone();
-        let (namespace, event) = resolver.resolve_event(event);
+            .map_err(|error| crate::Error::Xml(error.to_string()))?;
+        let (namespace, event) = reader.resolver().resolve_event(event);
         let end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
             crate::Error::InvalidFormat("document XML offset does not fit usize".into())
         })?;
@@ -661,7 +694,7 @@ pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
                     } else {
                         UNKNOWN
                     };
-                    pending = Some((kind, start));
+                    pending = Some((kind, start, namespace_capture.capture(reader.resolver())?));
                 }
             },
             Event::Empty(element) => {
@@ -706,12 +739,17 @@ pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
                         crate::Error::InvalidFormat("document XML range does not fit u32".into())
                     })?;
                     reserve_document_value(&mut ranges, "document body block ranges")?;
-                    ranges.push((kind, range_start, length));
+                    ranges.push((
+                        kind,
+                        range_start,
+                        length,
+                        namespace_capture.capture(reader.resolver())?,
+                    ));
                 }
             },
             Event::End(element) => {
-                if pending.is_some_and(|_| body_depth.is_some_and(|body| depth == body + 1)) {
-                    let (kind, range_start) = pending.take().ok_or_else(|| {
+                if body_depth.is_some_and(|body| depth == body + 1) {
+                    let (kind, range_start, namespaces) = pending.take().ok_or_else(|| {
                         crate::Error::InvalidFormat("missing document body block".into())
                     })?;
                     let start = u32::try_from(range_start).map_err(|_source_error| {
@@ -724,7 +762,7 @@ pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
                         crate::Error::InvalidFormat("document XML range does not fit u32".into())
                     })?;
                     reserve_document_value(&mut ranges, "document body block ranges")?;
-                    ranges.push((kind, start, length));
+                    ranges.push((kind, start, length, namespaces));
                 }
                 if body_depth == Some(depth)
                     && is_wordprocessing_namespace(&namespace)
@@ -772,14 +810,19 @@ pub(crate) fn body_block_ranges(xml: &[u8]) -> Result<Vec<(usize, u32, u32)>> {
 pub(crate) fn document_tables(xml: Arc<Vec<u8>>) -> Result<SmallVec<[Table; 8]>> {
     let mut inline = SmallVec::new();
     let mut spill = None;
-    scan_word_element_ranges(xml.as_slice(), &[b"tbl".as_slice()], |_, start, length| {
-        push_document_smallvec(
-            &mut inline,
-            &mut spill,
-            Table::from_arc_range(Arc::clone(&xml), start, length),
-            "document table views",
-        )
-    })?;
+    scan_word_element_ranges_with_context(
+        xml.as_slice(),
+        &[],
+        &[b"tbl".as_slice()],
+        |_, start, length, namespaces| {
+            push_document_smallvec(
+                &mut inline,
+                &mut spill,
+                Table::from_arc_range_with_context(Arc::clone(&xml), start, length, namespaces),
+                "document table views",
+            )
+        },
+    )?;
     match spill {
         Some(values) => Ok(SmallVec::from_vec(values)),
         None => Ok(inline),
@@ -798,17 +841,23 @@ pub(crate) fn document_blocks(xml: Arc<Vec<u8>>) -> Result<Vec<crate::Block>> {
 
     let mut alts = scan(xml.as_slice())?;
     let mut elements = Vec::new();
-    for (target, start, length) in body_block_ranges(xml.as_slice())? {
+    for (target, start, length, namespaces) in body_block_ranges(xml.as_slice())? {
         reserve_document_value(&mut elements, "document block views")?;
         let block_source = Arc::clone(&xml);
         elements.push(if target == 0 {
-            Block::Paragraph(Box::new(Paragraph::from_arc_range(
+            Block::Paragraph(Box::new(Paragraph::from_arc_range_with_context(
                 block_source,
                 start,
                 length,
+                namespaces,
             )))
         } else if target == 1 {
-            Block::Table(Box::new(Table::from_arc_range(block_source, start, length)))
+            Block::Table(Box::new(Table::from_arc_range_with_context(
+                block_source,
+                start,
+                length,
+                namespaces,
+            )))
         } else if target == 2 {
             let chunk = alts.remove(&start).ok_or_else(|| {
                 crate::error::Error::InvalidFormat(
@@ -952,6 +1001,27 @@ impl<'a> DocumentPart<'a> {
     /// Returns an error if the operation cannot be completed.
     pub fn extract_text(&self) -> Result<String> {
         extract_word_text(self.xml_bytes())
+    }
+
+    /// Read recognized tracked revisions throughout the visible main document.
+    /// Includes body-final section properties and table-grid/row metadata that
+    /// paragraph-only traversal cannot visit. Unknown markup remains in source.
+    ///
+    /// # Errors
+    /// Returns malformed metadata, XML, or revision resource-limit errors.
+    pub fn revisions(&self) -> Result<SmallVec<[crate::revision::Revision; 4]>> {
+        self.revisions_with_limits(crate::revision::Limits::default())
+    }
+
+    /// Read tracked revision metadata with explicit parser and retention limits.
+    ///
+    /// # Errors
+    /// Returns malformed metadata, XML, or revision resource-limit errors.
+    pub fn revisions_with_limits(
+        &self,
+        limits: crate::revision::Limits,
+    ) -> Result<SmallVec<[crate::revision::Revision; 4]>> {
+        crate::revision::parse_revisions_with_limits(self.xml_bytes(), &[], limits)
     }
 
     /// Count the number of paragraphs in the document.
@@ -1409,7 +1479,8 @@ mod tests {
         let oversized_ranges = vec![
             ParagraphRange {
                 start: 0,
-                length: 1
+                length: 1,
+                namespaces: Arc::from(Vec::new()),
             };
             1_100_000
         ];

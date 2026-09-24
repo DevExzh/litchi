@@ -3,6 +3,7 @@
 use super::FileInformationBlock;
 use super::transaction::{Commit, Snapshot, Transaction};
 use crate::package::{Error as PackageError, Result};
+use crate::parts::protection::ProtectionPolicy;
 use litchi_codepage::Ansi;
 use litchi_ole_common::smart_tags::Limits;
 
@@ -21,6 +22,17 @@ impl Editor {
     pub fn open(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
         Ok(Self {
             current: Snapshot::parse(fib, table_stream)?,
+        })
+    }
+
+    /// Open with an explicit policy for changed protected metadata.
+    pub fn open_with_policy(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+        protection_policy: ProtectionPolicy,
+    ) -> Result<Self> {
+        Ok(Self {
+            current: Snapshot::parse_with_policy(fib, table_stream, protection_policy)?,
         })
     }
 
@@ -43,6 +55,24 @@ impl Editor {
     ) -> Result<Self> {
         Ok(Self {
             current: Snapshot::parse_with_limits(fib, table_stream, limits)?,
+        })
+    }
+
+    /// Open with bounded parsing and an explicit protected-edit policy.
+    pub fn open_with_limits_and_policy(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+        limits: Limits,
+        protection_policy: ProtectionPolicy,
+    ) -> Result<Self> {
+        Ok(Self {
+            current: Snapshot::parse_with_options_and_policy(
+                fib,
+                table_stream,
+                None,
+                limits,
+                protection_policy,
+            )?,
         })
     }
 

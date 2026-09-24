@@ -439,6 +439,126 @@ impl<R: Read + Seek> Workbook<R> {
             return Ok(None);
         };
         let data = self.ole_file.open_stream(&[name.as_str()])?;
-        crate::revision_log::parse_revision_log_stream(&data).map(Some)
+        crate::revision_log::parse_revision_log_stream_with_sheet_count(&data, self.sheets.len())
+            .map(Some)
+    }
+
+    /// Whether this workbook contains the shared-workbook `User Names` stream.
+    ///
+    /// The stream is intentionally discovered without opening or parsing it;
+    /// [`Self::user_names`] performs the bounded lazy read.
+    #[must_use]
+    pub fn has_user_names(&self) -> bool {
+        self.ole_file.list_streams().iter().any(|path| {
+            path.len() == 1
+                && path[0].eq_ignore_ascii_case(crate::user_names::USER_NAMES_STREAM_NAME)
+        })
+    }
+
+    /// Parse the shared-workbook `User Names` stream on demand.
+    ///
+    /// The required `Revision Log` stream is scanned first for its bounded
+    /// outer grammar and `RRDHead.guid` closure; every `UsrInfo.guid` is
+    /// checked against that set before the snapshot is returned. The snapshot
+    /// also retains the exact Revision Log source identity so a later User
+    /// Names patch cannot apply to a workbook whose revision log changed
+    /// underneath it. The operation is inert: it never acquires the locks
+    /// represented by either stream and never merges or replays revisions.
+    /// # Errors
+    ///
+    /// Returns an error when the stream occurs more than once, the required
+    /// Revision Log is absent or duplicated, its bounded framing/header scan
+    /// is malformed or exceeds the configured limits, or a user GUID has no
+    /// Revision Log owner.
+    pub fn user_names(&mut self) -> Result<Option<crate::user_names::Snapshot>> {
+        self.user_names_with_limits(crate::user_names::Limits::default())
+    }
+
+    /// Parse the shared-workbook `User Names` stream with explicit resource
+    /// bounds. The read remains lazy and inert, and the Revision Log source
+    /// identity is retained for source-checked patch application.
+    /// # Errors
+    ///
+    /// Returns an error when a bound, stream grammar, required Revision Log,
+    /// or GUID dependency closure is invalid.
+    pub fn user_names_with_limits(
+        &mut self,
+        limits: crate::user_names::Limits,
+    ) -> Result<Option<crate::user_names::Snapshot>> {
+        let limits = limits.validate()?;
+        let streams = self.ole_file.list_streams();
+        let names = streams
+            .iter()
+            .filter(|path| {
+                path.len() == 1
+                    && path[0].eq_ignore_ascii_case(crate::user_names::USER_NAMES_STREAM_NAME)
+            })
+            .map(|path| path[0].clone())
+            .collect::<Vec<_>>();
+        if names.len() > 1 {
+            return Err(Error::InvalidData(
+                "CFB contains more than one User Names stream".to_string(),
+            ));
+        }
+        let Some(name) = names.first() else {
+            return Ok(None);
+        };
+        let max_stream_bytes = u64::try_from(limits.max_stream_bytes).unwrap_or(u64::MAX);
+
+        let revision_names = streams
+            .iter()
+            .filter(|path| {
+                path.len() == 1
+                    && path[0].eq_ignore_ascii_case(crate::revision_log::REVISION_LOG_STREAM_NAME)
+            })
+            .map(|path| path[0].clone())
+            .collect::<Vec<_>>();
+        if revision_names.len() > 1 {
+            return Err(Error::InvalidData(
+                "CFB contains more than one Revision Log stream".to_string(),
+            ));
+        }
+        let Some(revision_name) = revision_names.first() else {
+            return Err(Error::InvalidData(
+                "User Names stream requires a Revision Log stream".to_string(),
+            ));
+        };
+        let revision_len = self.ole_file.stream_len(&[revision_name.as_str()])?;
+        if revision_len > max_stream_bytes {
+            return Err(Error::UnsafeEdit(format!(
+                "Revision Log stream has {revision_len} bytes; maximum is {max_stream_bytes}"
+            )));
+        }
+
+        let stream_len = self.ole_file.stream_len(&[name.as_str()])?;
+        if stream_len > max_stream_bytes {
+            return Err(Error::UnsafeEdit(format!(
+                "User Names stream has {stream_len} bytes; maximum is {max_stream_bytes}"
+            )));
+        }
+        let data = Arc::<[u8]>::from(
+            self.ole_file
+                .open_stream(&[name.as_str()])?
+                .into_boxed_slice(),
+        );
+        let revision_data = Arc::<[u8]>::from(
+            self.ole_file
+                .open_stream(&[revision_name.as_str()])?
+                .into_boxed_slice(),
+        );
+        let revision_guids = crate::revision_log::scan_revision_header_guids_with_sheet_count(
+            &revision_data,
+            limits.max_stream_bytes,
+            limits.max_revision_records,
+            limits.max_revision_guids,
+            self.sheets.len(),
+        )?;
+        crate::user_names::Snapshot::parse_shared_with_revision_guids_arc_and_revision_log_with_limits(
+            data,
+            revision_guids,
+            revision_data,
+            limits,
+        )
+        .map(Some)
     }
 }

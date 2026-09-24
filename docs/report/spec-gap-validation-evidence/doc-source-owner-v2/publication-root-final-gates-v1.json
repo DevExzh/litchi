@@ -1,0 +1,35 @@
+{
+  "candidate": "/var/tmp/litchi-doc-source-owner-publication-validation-20260910",
+  "base": "ce0be842b60a28db142b795389e24be5bde8ae07",
+  "source_manifest": "/var/tmp/litchi-doc-source-owner-publication-root-source-v1.json",
+  "source_manifest_sha256": "69081070a2ce237a9be6c04c7942fed3adb34670fd261b5967934fc487926a23",
+  "recorded_at": "2026-09-10T02:36:42.971289+00:00",
+  "tests_passed": 1226,
+  "doctests_passed": 14,
+  "tests_ignored": 2,
+  "doctests_ignored": 12,
+  "logs": {
+    "tests": {
+      "path": "/var/tmp/litchi-doc-source-owner-publication-root-tests-v1.log",
+      "sha256": "db06883f3eab76400909b810702b0fd1c5f0b46f0f84297deff57e49c599fd88",
+      "bytes": 111236,
+      "exit_code": 0
+    },
+    "clippy": {
+      "path": "/var/tmp/litchi-doc-source-owner-publication-root-clippy-v1.log",
+      "sha256": "2461b00c8697c4189b2de92ca6fb05b5d72273c78a0a47b1ce4e83ccca077b70",
+      "bytes": 72,
+      "exit_code": 0
+    },
+    "rustdoc": {
+      "path": "/var/tmp/litchi-doc-source-owner-publication-root-rustdoc-v1.log",
+      "sha256": "5baf00137aedf15bdfa030b3949dd96a00af8998320497ef3c700001e1d34439",
+      "bytes": 172,
+      "exit_code": 0
+    }
+  },
+  "source_hashes_verified": true,
+  "format_passed": true,
+  "diff_check_passed": true,
+  "dedicated_target": "/var/tmp/litchi-doc-source-owner-publication-root-target-195"
+}

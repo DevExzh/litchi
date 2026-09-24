@@ -1889,11 +1889,13 @@ mod streaming_0365_range_tests {
     use std::io::Cursor;
 
     use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
+    use litchi_opc::{OpcPackage, PackURI};
     use litchi_sheet::{Cell as Address, Rect};
 
     use super::super::model::MAX_CELL_STYLE;
     use super::super::selected::{
         NotEligibleReason, RangeScanOutcome, ScanOutcome, SelectedCells, scan, scan_range,
+        scan_targets, scan_targets_bytes, scan_targets_bytes_uses_plain_path,
     };
     use crate::cell::{Cell, Value};
 
@@ -1934,6 +1936,593 @@ mod streaming_0365_range_tests {
             Ok(RangeScanOutcome::Eligible(selected)) => selected,
             other => panic!("expected eligible range, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn sparse_target_scan_retains_only_changed_records() {
+        let xml = worksheet(
+            r#"<sheetData>
+                <row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c></row>
+                <row r="2"><c r="A2"><v>3</v></c><c r="B2"><v>4</v></c></row>
+            </sheetData>"#,
+        );
+        let targets = [address("A1"), address("B2")];
+        let mut input = Cursor::new(xml.as_bytes());
+        let outcome = scan_targets(
+            &mut input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &targets,
+        )
+        .expect("sparse target scan");
+        let RangeScanOutcome::Eligible(selected) = outcome else {
+            panic!("expected eligible sparse target scan");
+        };
+        assert_eq!(
+            selected
+                .cells
+                .iter()
+                .map(|record| record.address)
+                .collect::<Vec<_>>(),
+            targets
+        );
+        assert_eq!(selected.cells.len(), targets.len());
+    }
+
+    #[test]
+    fn sparse_bytes_scan_uses_plain_numeric_path_and_falls_back_for_extended_cells() {
+        let plain = worksheet(
+            r#"<dimension ref="A1:B2"/><sheetData>
+                <row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c></row>
+                <row r="2"><c r="A2"><v>-3.0</v></c><c r="B2"/></row>
+            </sheetData>"#,
+        );
+        let targets = [address("A1"), address("B2")];
+        let selected = scan_targets_bytes(
+            plain.as_bytes(),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &targets,
+        )
+        .expect("plain sparse byte scan");
+        let RangeScanOutcome::Eligible(selected) = selected else {
+            panic!("plain numeric worksheet should be eligible");
+        };
+        assert_eq!(selected.cells.len(), 2);
+        assert_eq!(selected.cells[0].address, address("A1"));
+        assert_number(super::selected_record_cell(&selected.cells[0]), "1");
+        assert_eq!(selected.cells[1].address, address("B2"));
+        assert!(matches!(
+            super::selected_record_cell(&selected.cells[1]),
+            Some(Cell::Empty)
+        ));
+
+        let extended =
+            worksheet(r#"<sheetData><row r="1"><c r="A1" t="b"><v>1</v></c></row></sheetData>"#);
+        let outcome = scan_targets_bytes(
+            extended.as_bytes(),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        )
+        .expect("extended sparse byte scan fallback");
+        let RangeScanOutcome::Eligible(selected) = outcome else {
+            panic!("existing scanner should retain boolean parity");
+        };
+        assert_eq!(selected.cells.len(), 1);
+    }
+
+    #[test]
+    fn sparse_bytes_plain_path_matches_baseline_lexical_and_prolog_edges() {
+        let fragmented = worksheet(
+            r#"<sheetData><row r="1"><c r="A1"><v>1e<!--split-->+2</v></c><c r="B1"><v>  </v></c></row></sheetData>"#,
+        );
+        let targets = [address("A1"), address("B1")];
+        let mut baseline_input = Cursor::new(fragmented.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &targets,
+        )
+        .expect("baseline fragmented numeric stream");
+        let direct = scan_targets_bytes(
+            fragmented.as_bytes(),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &targets,
+        )
+        .expect("direct fragmented numeric stream");
+        let (RangeScanOutcome::Eligible(baseline), RangeScanOutcome::Eligible(direct)) =
+            (baseline, direct)
+        else {
+            panic!("both scanners must remain eligible for plain scalar values")
+        };
+        assert_eq!(baseline.cells.len(), direct.cells.len());
+        assert_eq!(baseline.cells[0].address, direct.cells[0].address);
+        assert_eq!(
+            super::selected_record_cell(&baseline.cells[0]),
+            super::selected_record_cell(&direct.cells[0])
+        );
+        assert_eq!(baseline.cells[1].address, direct.cells[1].address);
+        assert_eq!(
+            super::selected_record_cell(&baseline.cells[1]),
+            super::selected_record_cell(&direct.cells[1])
+        );
+
+        let cdata = worksheet(
+            r#"<sheetData><row r="1"><c r="A1"><v><![CDATA[1.25E+3]]></v></c></row></sheetData>"#,
+        );
+        let mut baseline_input = Cursor::new(cdata.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        )
+        .expect("baseline CDATA numeric stream");
+        let direct = scan_targets_bytes(
+            cdata.as_bytes(),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        )
+        .expect("direct CDATA numeric stream fallback");
+        let (RangeScanOutcome::Eligible(baseline), RangeScanOutcome::Eligible(direct)) =
+            (baseline, direct)
+        else {
+            panic!("both scanners must remain eligible for CDATA numeric values")
+        };
+        assert_eq!(
+            super::selected_record_cell(&baseline.cells[0]),
+            super::selected_record_cell(&direct.cells[0])
+        );
+
+        let entity = worksheet(
+            r#"<sheetData><row r="1"><c r="A1"><v>&#x31;.25E+3</v></c></row></sheetData>"#,
+        );
+        let mut baseline_input = Cursor::new(entity.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        )
+        .expect("baseline entity numeric stream");
+        let direct = scan_targets_bytes(
+            entity.as_bytes(),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        )
+        .expect("direct entity numeric stream fallback");
+        let (RangeScanOutcome::Eligible(baseline), RangeScanOutcome::Eligible(direct)) =
+            (baseline, direct)
+        else {
+            panic!("both scanners must remain eligible for entity numeric values")
+        };
+        assert_eq!(
+            super::selected_record_cell(&baseline.cells[0]),
+            super::selected_record_cell(&direct.cells[0])
+        );
+
+        let malformed_comment = worksheet(
+            r#"<sheetData><row r="1"><c r="A1"><v>1<!-- broken -- comment -->2</v></c></row></sheetData>"#,
+        );
+        let mut baseline_input = Cursor::new(malformed_comment.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        );
+        let direct = scan_targets_bytes(
+            malformed_comment.as_bytes(),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        );
+        assert_eq!(
+            baseline
+                .expect_err("baseline must reject malformed comments")
+                .to_string(),
+            direct
+                .expect_err("direct path must reject malformed comments")
+                .to_string()
+        );
+
+        let invalid_utf8_comment = format!(
+            r#"<worksheet xmlns="{SPREADSHEETML}"><sheetData><row r="1"><c r="A1"><v>1<!--"#
+        )
+        .into_bytes();
+        let mut invalid_utf8_comment = invalid_utf8_comment;
+        invalid_utf8_comment.push(0xff);
+        invalid_utf8_comment.extend_from_slice(b"--></v></c></row></sheetData></worksheet>");
+        let mut baseline_input = Cursor::new(invalid_utf8_comment.as_slice());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        );
+        let direct = scan_targets_bytes(
+            &invalid_utf8_comment,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        );
+        assert_eq!(
+            baseline
+                .expect_err("baseline must reject invalid UTF-8 comments")
+                .to_string(),
+            direct
+                .expect_err("direct path must reject invalid UTF-8 comments")
+                .to_string()
+        );
+
+        let oversized = "7".repeat(40_000);
+        let selected_oversized_xml = worksheet(&format!(
+            r#"<sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>{oversized}</v></c></row></sheetData>"#
+        ));
+        let mut baseline_input = Cursor::new(selected_oversized_xml.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("B1")],
+        );
+        let direct = scan_targets_bytes(
+            selected_oversized_xml.as_bytes(),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("B1")],
+        );
+        assert_eq!(
+            baseline
+                .expect_err("baseline must reject a selected 40k value")
+                .to_string(),
+            direct
+                .expect_err("direct path must reject a selected 40k value")
+                .to_string()
+        );
+
+        let oversized_xml = worksheet(&format!(
+            r#"<sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>{oversized}</v></c></row></sheetData>"#
+        ));
+        let mut baseline_input = Cursor::new(oversized_xml.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        );
+        let direct = scan_targets_bytes(
+            oversized_xml.as_bytes(),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        );
+        assert_eq!(
+            baseline
+                .expect_err("baseline must reject an unselected 40k value")
+                .to_string(),
+            direct
+                .expect_err("direct path must reject an unselected 40k value")
+                .to_string()
+        );
+
+        let late_declaration = format!(
+            r#"<worksheet xmlns="{SPREADSHEETML}"><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet><?xml version="1.0"?>"#
+        );
+        let mut baseline_input = Cursor::new(late_declaration.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        );
+        let direct = scan_targets_bytes(
+            late_declaration.as_bytes(),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        );
+        assert_eq!(
+            baseline
+                .expect_err("baseline must reject a late XML declaration")
+                .to_string(),
+            direct
+                .expect_err("direct path must fall back to late-declaration validation")
+                .to_string()
+        );
+
+        let callback_then_malformed_tail = format!(
+            r#"<worksheet xmlns="{SPREADSHEETML}"><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>not-a-number</v></c></row></sheetData></worksheet><tail>"#
+        );
+        let mut baseline_input = Cursor::new(callback_then_malformed_tail.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        );
+        let direct = scan_targets_bytes(
+            callback_then_malformed_tail.as_bytes(),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        );
+        assert_eq!(
+            baseline
+                .expect_err("baseline must drain after the callback error")
+                .to_string(),
+            direct
+                .expect_err("direct path must preserve MCE tail precedence")
+                .to_string()
+        );
+
+        let descending = worksheet(
+            r#"<sheetData><row r="2"><c r="A2"><v>2</v></c></row><row r="1"><c r="A1"><v>1</v></c></row></sheetData>"#,
+        );
+        let mut baseline_input = Cursor::new(descending.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        )
+        .expect("baseline descending-order stream");
+        let direct = scan_targets_bytes(
+            descending.as_bytes(),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &[address("A1")],
+        )
+        .expect("direct descending-order fallback");
+        assert!(matches!(baseline, RangeScanOutcome::NotEligible(_)));
+        assert!(matches!(direct, RangeScanOutcome::NotEligible(_)));
+    }
+
+    #[test]
+    fn sparse_bytes_custom_event_limits_use_exact_baseline_semantics() {
+        let xml = worksheet(r#"<sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData>"#);
+        let exact_events = StreamLimits {
+            max_events: 11,
+            ..StreamLimits::default()
+        };
+        let mut baseline_input = Cursor::new(xml.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &exact_events,
+            &[address("A1")],
+        )
+        .expect("baseline exact event budget");
+        let direct = scan_targets_bytes(
+            xml.as_bytes(),
+            &Capabilities::default(),
+            &exact_events,
+            &[address("A1")],
+        )
+        .expect("direct exact event budget falls back to baseline");
+        assert!(matches!(baseline, RangeScanOutcome::Eligible(_)));
+        assert!(matches!(direct, RangeScanOutcome::Eligible(_)));
+
+        let under_events = StreamLimits {
+            max_events: 10,
+            ..exact_events
+        };
+        let mut baseline_input = Cursor::new(xml.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &under_events,
+            &[address("A1")],
+        );
+        let direct = scan_targets_bytes(
+            xml.as_bytes(),
+            &Capabilities::default(),
+            &under_events,
+            &[address("A1")],
+        );
+        assert_eq!(
+            baseline
+                .expect_err("baseline must reject the under-event budget")
+                .to_string(),
+            direct
+                .expect_err("direct path must preserve the under-event budget")
+                .to_string()
+        );
+
+        let mut short_input = StreamLimits::default();
+        short_input.processing.max_input_bytes = xml.len() - 1;
+        let mut baseline_input = Cursor::new(xml.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &short_input,
+            &[address("A1")],
+        );
+        let direct = scan_targets_bytes(
+            xml.as_bytes(),
+            &Capabilities::default(),
+            &short_input,
+            &[address("A1")],
+        );
+        assert_eq!(
+            baseline
+                .expect_err("baseline must reject the short input budget")
+                .to_string(),
+            direct
+                .expect_err("direct path must preserve the short input budget")
+                .to_string()
+        );
+
+        let mut exact_depth = StreamLimits::default();
+        exact_depth.processing.max_depth = 5;
+        let mut baseline_input = Cursor::new(xml.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &exact_depth,
+            &[address("A1")],
+        );
+        let direct = scan_targets_bytes(
+            xml.as_bytes(),
+            &Capabilities::default(),
+            &exact_depth,
+            &[address("A1")],
+        );
+        assert_eq!(baseline.is_ok(), direct.is_ok());
+    }
+
+    #[test]
+    fn dense_wide_generated_worksheet_uses_plain_path_and_matches_authoritative_scan() {
+        let workbook = crate::Workbook::new().expect("dense-wide workbook");
+        let mut edit = workbook.edit().expect("dense-wide edit");
+        {
+            let mut sheet = edit
+                .sheet("Sheet1")
+                .expect("initial dense-wide sheet lookup")
+                .expect("initial dense-wide sheet");
+            for row in 0..256u32 {
+                for column in 0..256u32 {
+                    let address = Address::at(row, column).expect("dense-wide address");
+                    let value = i32::try_from(row * 256 + column).expect("dense-wide value");
+                    sheet.set(address, value).expect("dense-wide cell");
+                }
+            }
+        }
+        {
+            let mut second = edit.add("Sheet2").expect("second dense-wide sheet");
+            for row in 0..256u32 {
+                for column in 0..256u32 {
+                    let address = Address::at(row, column).expect("second dense-wide address");
+                    let value = i32::try_from(1_000_000 + row * 256 + column)
+                        .expect("second dense-wide value");
+                    second.set(address, value).expect("second dense-wide cell");
+                }
+            }
+        }
+        let committed = edit.commit().expect("dense-wide commit").workbook().clone();
+        let archive = committed
+            .to_bytes()
+            .expect("dense-wide package serialization");
+        let package = OpcPackage::from_bytes(&archive).expect("dense-wide OPC package");
+        let part = package
+            .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").expect("worksheet URI"))
+            .expect("dense-wide worksheet part");
+        let content = part.blob();
+        let targets = [address("A1"), address("M128"), address("IV256")];
+        let limits = StreamLimits::default();
+
+        assert!(
+            scan_targets_bytes_uses_plain_path(content, &limits, &targets),
+            "the real dense-wide writer shape must not fall back to the MCE scanner"
+        );
+        let mut baseline_input = Cursor::new(content);
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &limits,
+            &targets,
+        )
+        .expect("authoritative dense-wide scan");
+        let direct = scan_targets_bytes(content, &Capabilities::default(), &limits, &targets)
+            .expect("plain dense-wide scan");
+        let (RangeScanOutcome::Eligible(baseline), RangeScanOutcome::Eligible(direct)) =
+            (baseline, direct)
+        else {
+            panic!("dense-wide numeric worksheet must remain eligible")
+        };
+        assert_eq!(baseline.cells.len(), direct.cells.len());
+        for (expected, actual) in baseline.cells.iter().zip(direct.cells.iter()) {
+            assert_eq!(expected.address, actual.address);
+            assert_eq!(
+                super::selected_record_cell(expected),
+                super::selected_record_cell(actual)
+            );
+            assert_eq!(
+                super::selected_record_shared_string_index(expected),
+                super::selected_record_shared_string_index(actual)
+            );
+        }
+        assert_eq!(baseline.dependencies, direct.dependencies);
+    }
+
+    #[test]
+    fn bytes_scan_preserves_authoritative_mce_and_malformed_error_results() {
+        let mce = format!(
+            r#"<worksheet xmlns="{SPREADSHEETML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:f="urn:future" mc:Ignorable="f"><mc:AlternateContent><mc:Choice Requires="f"><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData></mc:Choice><mc:Fallback><sheetData><row r="1"><c r="A1"><v>9</v></c></row></sheetData></mc:Fallback></mc:AlternateContent></worksheet>"#
+        );
+        let targets = [address("A1")];
+        let limits = StreamLimits::default();
+        let mut baseline_input = Cursor::new(mce.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &limits,
+            &targets,
+        );
+        let direct =
+            scan_targets_bytes(mce.as_bytes(), &Capabilities::default(), &limits, &targets);
+        match (baseline, direct) {
+            (Ok(left), Ok(right)) => {
+                assert_eq!(format!("{left:?}"), format!("{right:?}"));
+            },
+            (Err(left), Err(right)) => assert_eq!(left.to_string(), right.to_string()),
+            (left, right) => panic!("MCE fallback changed result shape: {left:?} vs {right:?}"),
+        }
+
+        let malformed = format!(
+            r#"<worksheet xmlns="{SPREADSHEETML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:AlternateContent><mc:Choice Requires="future"><sheetData>"#
+        );
+        let mut baseline_input = Cursor::new(malformed.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &limits,
+            &targets,
+        );
+        let direct = scan_targets_bytes(
+            malformed.as_bytes(),
+            &Capabilities::default(),
+            &limits,
+            &targets,
+        );
+        assert_eq!(
+            baseline
+                .expect_err("authoritative malformed MCE stream must fail")
+                .to_string(),
+            direct
+                .expect_err("plain path must preserve malformed MCE failure")
+                .to_string()
+        );
+
+        let duplicate_declaration = format!(
+            r#"<?xml version="1.0"?><?xml version="1.0"?><worksheet xmlns="{SPREADSHEETML}"><sheetData/></worksheet>"#
+        );
+        let mut baseline_input = Cursor::new(duplicate_declaration.as_bytes());
+        let baseline = scan_targets(
+            &mut baseline_input,
+            &Capabilities::default(),
+            &limits,
+            &targets,
+        );
+        let direct = scan_targets_bytes(
+            duplicate_declaration.as_bytes(),
+            &Capabilities::default(),
+            &limits,
+            &targets,
+        );
+        assert_eq!(
+            baseline
+                .expect_err("authoritative duplicate declaration must fail")
+                .to_string(),
+            direct
+                .expect_err("plain path must preserve duplicate declaration failure")
+                .to_string()
+        );
     }
 
     fn assert_range_not_eligible(xml: &str, expected: NotEligibleReason) {

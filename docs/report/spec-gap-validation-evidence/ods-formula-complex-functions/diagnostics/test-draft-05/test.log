@@ -1,0 +1,17 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+error[E0382]: borrow of partially moved value: `error`
+   --> crates/litchi-ods/tests/ods_formula_complex_evaluation.rs:544:43
+    |
+543 |         matches!(error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Memory),
+    |                                                          ----- value partially moved here
+544 |         "wrong complex text limit error: {error:?}"
+    |                                           ^^^^^ value borrowed here after partial move
+    |
+    = note: partial move occurs because value has type `litchi_core::ResourceLimit`, which does not implement the `Copy` trait
+help: borrow this binding in the pattern to avoid moving the value
+    |
+543 |         matches!(error, EvaluationFailure::ResourceLimit(ref limit) if limit.resource == Resource::Memory),
+    |                                                          +++
+
+For more information about this error, try `rustc --explain E0382`.
+error: could not compile `litchi-ods` (test "ods_formula_complex_evaluation") due to 1 previous error

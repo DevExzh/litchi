@@ -1,0 +1,3664 @@
+diff --git a/crates/litchi-ods/docs/FEATURE_MATRIX.md b/crates/litchi-ods/docs/FEATURE_MATRIX.md
+index ccc5232df..32a1149f0 100644
+--- a/crates/litchi-ods/docs/FEATURE_MATRIX.md
++++ b/crates/litchi-ods/docs/FEATURE_MATRIX.md
+@@ -76,6 +76,7 @@ the existence of an XLSX feature is never treated as ODS support.
+ | Cell scalar types | ✅ | ✅ | ✅ | Typed string, number, boolean, date/time, percentage, currency, and unknown value tokens are validated and serialized without expanding repeats |
+ | Rich cell text, spans, whitespace, fields, and hyperlinks | 🟡 | 🟡 | 🟡 | `document::{RichText, RichRun}` authors bounded paragraphs, text spans, explicit spaces, tabs, line breaks, and inert safe hyperlinks in existing non-repeated cells through provenance splices. The ordinary worksheet projection remains collapsed plain text, and arbitrary fields/foreign inline markup are not structurally editable |
+ | Formula strings and references | ✅ | ✅ | ✅ | Public `codec::formula` recognizes all 393 ODF 1.4 Part 4 chapter-6 function names and tokenizes supported literals, A1 references, ranges, operators, and sheet references. Function calls take precedence over A1-shaped names; UTF-8 strings and doubled quotes retain their values; decoded literal storage is sized to its content and U+0000 is refused under Part 4 §5.4. The bounded `codec::formula::reference` reader represents ODF 1.4 Part 4 §5.8 source IRIs, whole-axis ranges, nested sheet locators, inheritance, absolute markers, and reference errors; external sources remain inert. Worksheet and unified transactions retain, set, or clear inert formula strings. Complete expression grammar, function arity, host-defined identifiers, and evaluation remain outside this tokenizer. [Catalog evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-functions/README.md), [reference evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-references/README.md), [literal validation](../../../docs/report/spec-gap-validation-evidence/ods-formula-string-performance/README.md) |
++| OpenFormula expression syntax | ✅ | ✅ | N/A | `codec::formula::expression::Expression` parses ODF 1.4 Part 4 chapter 5 into a bounded immutable flat tree with source-preserving node views, precedence, arrays, missing parameters, names, labels, errors, and inert external references. Explicit byte/node/depth/array-cell/reference limits and fallible storage apply. It does not perform function arity/type validation, name/reference resolution, evaluation, or recalculation. [Grammar and measurement evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/README.md). |
+ | Formula evaluation and recalculation | ❌ | ❌ | N/A | No ODS evaluation adapter is exported; formulas and cached values remain inert and no recalculation, external I/O, or refresh occurs |
+ | Repeated rows/cells and merged/covered cells | ✅ | ✅ | ✅ | Physical repeated runs are retained, logical lookup/edit splits only the affected run, and merge/covered metadata is typed and validated |
+ | Named ranges and named expressions | ✅ | ✅ | ✅ | Global and sheet-scoped definitions are parsed and validated per ODF 1.4 Part 3 sections 9.4.11-9.4.13; `definitions::{Snapshot, Edit, Commit, Patch}` adds exact key/checked-position CRUD and reorder, compact authored XML, typed readback, exact no-op retention, and reversible exact-source patches alongside the minimal builder |
+@@ -103,7 +104,7 @@ the existence of an XLSX feature is never treated as ODS support.
+ | Feature family | Status | Read | Write | Notes |
+ |----------------|--------|------|-------|-------|
+ | Full public worksheet authoring | 🟡 | ✅ | ✅ | Bounded worksheet and unified transactions cover sheet/cell CRUD, row append/removal, column declaration append/removal, formulas/styles, and checked rich text. Repeated-run structural splitting, arbitrary column/row grouping, calculation, rendering, and the complete extension vocabulary remain outside this slice |
+-| Full OpenFormula semantics | ❌ | 🟡 | ❌ | The public parser is not an evaluator; remaining expression grammar, dynamic arrays, volatile behavior, data tables, and host-service functions remain unsupported; external workbook references are parsed as inert metadata and are never resolved |
++| Full OpenFormula semantics | ❌ | 🟡 | ❌ | Chapter 5 expression syntax is available separately from the compatibility tokenizer; evaluation, array calculation/spilling, volatile behavior, data-table execution, and host-service execution remain unsupported. Standard and host-defined calls, names, labels, and external workbook references are parsed as inert syntax and are never resolved or executed |
+ | XLSX slicers and timelines | ❌ | ❌ | ❌ | `[MS-XLSX]` ToC families for slicer caches, slicers, timelines, and their extension parts are OOXML features, not typed ODS support |
+ | XLSX PivotTable/data-model extensions | ❌ | ❌ | ❌ | OOXML PivotTable caches, OLAP/data-model structures, rich pivot data, pivot UI/version/auto-refresh extensions, and related XML parts are not implemented; ODF DataPilot metadata is not an equivalent claim |
+ | XLSX external data and code services | ❌ | ❌ | ❌ | Query tables, connections, database/model tables, external links, web/rich values, external code services, Python environments/scripts, and refresh behavior are not supported or executed |
+diff --git a/crates/litchi-ods/src/codec/formula.rs b/crates/litchi-ods/src/codec/formula.rs
+index 9f37c08b7..90dd43005 100644
+--- a/crates/litchi-ods/src/codec/formula.rs
++++ b/crates/litchi-ods/src/codec/formula.rs
+@@ -22,6 +22,8 @@ use litchi_core::{Error, Resource, ResourceLimit, Result};
+ use smallvec::SmallVec;
+ use std::{borrow::Cow, convert::TryFrom, sync::Arc};
+ 
++/// Strict, inert OpenFormula 1.4 expression grammar and flat syntax tree.
++pub mod expression;
+ mod functions;
+ pub mod reference;
+ 
+@@ -148,7 +150,7 @@ pub enum Token {
+     RParen,
+     /// Comma (function argument separator)
+     Comma,
+-    /// Semicolon (array row separator)
++    /// Semicolon (function-parameter or inline-array-column separator)
+     Semicolon,
+ }
+ 
+diff --git a/crates/litchi-ods/src/codec/formula/expression.rs b/crates/litchi-ods/src/codec/formula/expression.rs
+new file mode 100644
+index 000000000..0975fb537
+--- /dev/null
++++ b/crates/litchi-ods/src/codec/formula/expression.rs
+@@ -0,0 +1,1876 @@
++//! Bounded, non-evaluating OpenFormula expression syntax.
++//!
++//! This module implements the expression grammar in ODF 1.4 Part 4 §§5.1–5.14
++//! and retains the original source spelling in an immutable flat expression
++//! tree.  It deliberately performs no name lookup, reference resolution,
++//! function evaluation, or recalculation.  The older [`crate::codec::formula::FormulaParser`]
++//! remains the compatibility tokenizer; this parser is an additive strict
++//! grammar surface.
++//!
++//! ```
++//! use litchi_ods::codec::formula::expression::{Expression, Kind, Limits};
++//!
++//! let limits = Limits::default().with_max_bytes(4096).with_max_nodes(512);
++//! let expression = Expression::parse_with_limits("of:==SUM([.A1];;2)", &limits)?;
++//! assert!(expression.is_force_recalculate());
++//! let call = expression.root();
++//! assert!(matches!(call.kind(), Kind::Function { name: "SUM" }));
++//! assert_eq!(call.child_count(), 3);
++//! assert!(call.child(1).unwrap().is_missing());
++//! assert_eq!(call.child(0).unwrap().text(), "[.A1]");
++//! # Ok::<(), litchi_core::Error>(())
++//! ```
++
++use super::reference;
++use litchi_core::{Error, Resource, ResourceLimit, Result};
++use std::{convert::TryFrom, sync::Arc};
++
++mod names;
++
++use names::{is_combining, is_digit, is_letter};
++
++/// Default maximum UTF-8 byte length of one expression source.
++pub const DEFAULT_MAX_EXPRESSION_BYTES: usize = 1024 * 1024;
++/// Default maximum number of flat expression nodes.
++pub const DEFAULT_MAX_EXPRESSION_NODES: usize = 65_536;
++/// Default maximum recursive expression nesting.
++pub const DEFAULT_MAX_EXPRESSION_DEPTH: usize = 256;
++/// Default maximum number of inline-array cells across one expression.
++pub const DEFAULT_MAX_ARRAY_CELLS: usize = 65_536;
++/// Hard ceiling protecting the recursive-descent parser from caller-provided
++/// unbounded depth limits.
++pub const HARD_MAX_EXPRESSION_DEPTH: usize = 256;
++
++/// Finite limits for one strict OpenFormula expression parse.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct Limits {
++    max_bytes: usize,
++    max_nodes: usize,
++    max_depth: usize,
++    max_array_cells: usize,
++    reference: reference::Limits,
++}
++
++impl Default for Limits {
++    fn default() -> Self {
++        Self {
++            max_bytes: DEFAULT_MAX_EXPRESSION_BYTES,
++            max_nodes: DEFAULT_MAX_EXPRESSION_NODES,
++            max_depth: DEFAULT_MAX_EXPRESSION_DEPTH,
++            max_array_cells: DEFAULT_MAX_ARRAY_CELLS,
++            reference: reference::Limits::default(),
++        }
++    }
++}
++
++impl Limits {
++    /// Set the maximum UTF-8 byte length of the source expression.
++    #[must_use]
++    pub const fn with_max_bytes(mut self, value: usize) -> Self {
++        self.max_bytes = value;
++        self
++    }
++
++    /// Set the maximum number of flat expression nodes.
++    #[must_use]
++    pub const fn with_max_nodes(mut self, value: usize) -> Self {
++        self.max_nodes = value;
++        self
++    }
++
++    /// Set the requested recursive expression depth.  The parser also applies
++    /// [`HARD_MAX_EXPRESSION_DEPTH`] even when this value is larger.
++    #[must_use]
++    pub const fn with_max_depth(mut self, value: usize) -> Self {
++        self.max_depth = value;
++        self
++    }
++
++    /// Set the maximum number of inline-array cells across the expression.
++    #[must_use]
++    pub const fn with_max_array_cells(mut self, value: usize) -> Self {
++        self.max_array_cells = value;
++        self
++    }
++
++    /// Set the finite limits passed to each bracketed reference.
++    #[must_use]
++    pub const fn with_reference_limits(mut self, value: reference::Limits) -> Self {
++        self.reference = value;
++        self
++    }
++
++    /// Return the maximum source byte length.
++    #[must_use]
++    pub const fn max_bytes(self) -> usize {
++        self.max_bytes
++    }
++
++    /// Return the maximum node count.
++    #[must_use]
++    pub const fn max_nodes(self) -> usize {
++        self.max_nodes
++    }
++
++    /// Return the caller-requested depth limit.
++    #[must_use]
++    pub const fn max_depth(self) -> usize {
++        self.max_depth
++    }
++
++    /// Return the maximum aggregate inline-array cell count.
++    #[must_use]
++    pub const fn max_array_cells(self) -> usize {
++        self.max_array_cells
++    }
++
++    /// Return the limits used for bracketed references.
++    #[must_use]
++    pub const fn reference_limits(self) -> reference::Limits {
++        self.reference
++    }
++}
++
++/// Prefix operators in the OpenFormula grammar.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum PrefixOperator {
++    /// Unary plus.
++    Plus,
++    /// Unary minus.
++    Minus,
++}
++
++/// Postfix operators in the OpenFormula grammar.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum PostfixOperator {
++    /// Percentage postfix operator.
++    Percent,
++}
++
++/// Infix operators in Table 1 of ODF 1.4 Part 4 §5.5.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum InfixOperator {
++    /// Reference range operator.
++    Range,
++    /// Reference intersection operator.
++    Intersection,
++    /// Reference concatenation/union operator.
++    Union,
++    /// Power operator.
++    Power,
++    /// Multiplication operator.
++    Multiply,
++    /// Division operator.
++    Divide,
++    /// Addition operator.
++    Add,
++    /// Subtraction operator.
++    Subtract,
++    /// String concatenation operator.
++    Concatenate,
++    /// Equality comparison.
++    Equal,
++    /// Inequality comparison.
++    NotEqual,
++    /// Less-than comparison.
++    Less,
++    /// Less-than-or-equal comparison.
++    LessEqual,
++    /// Greater-than comparison.
++    Greater,
++    /// Greater-than-or-equal comparison.
++    GreaterEqual,
++}
++
++/// Scope and lexical qualification of a named expression.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++#[non_exhaustive]
++pub enum NameScope<'a> {
++    /// A current-document name. `forced` records the `$$` spelling that
++    /// forces named-expression interpretation.
++    Simple {
++        /// Whether the source used the `$$` forced-name marker.
++        forced: bool,
++    },
++    /// A name attached to a quoted sheet name.
++    SheetLocal {
++        /// Raw quoted-sheet content, with doubled apostrophes retained.
++        sheet: &'a str,
++        /// Whether the sheet name carried its absolute `$` marker.
++        absolute: bool,
++        /// Whether the source used the `$$` spelling for the name.
++        forced: bool,
++    },
++    /// A name qualified by an inert external source IRI.
++    External {
++        /// Raw source-IRI content, with doubled apostrophes retained.
++        source: &'a str,
++        /// Optional raw quoted-sheet content after the source marker.
++        sheet: Option<&'a str>,
++        /// Whether the optional sheet name carried its absolute `$` marker.
++        sheet_absolute: bool,
++        /// Whether the source used the `$$` spelling for the name.
++        forced: bool,
++    },
++}
++
++/// Dimensions observed for one inline array.
++///
++/// The grammar accepts nonempty ragged rows. `columns` is `Some` only when
++/// every row has the same number of cells; `min_columns` and `max_columns`
++/// retain the shape of a ragged array without imposing the evaluator-only
++/// rectangularity condition from §5.13.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct ArrayDimensions {
++    rows: usize,
++    columns: Option<usize>,
++    min_columns: usize,
++    max_columns: usize,
++}
++
++impl ArrayDimensions {
++    /// Number of nonempty matrix rows.
++    #[must_use]
++    pub const fn rows(self) -> usize {
++        self.rows
++    }
++
++    /// Common column count, or `None` for a ragged matrix.
++    #[must_use]
++    pub const fn columns(self) -> Option<usize> {
++        self.columns
++    }
++
++    /// Smallest row width.
++    #[must_use]
++    pub const fn min_columns(self) -> usize {
++        self.min_columns
++    }
++
++    /// Largest row width.
++    #[must_use]
++    pub const fn max_columns(self) -> usize {
++        self.max_columns
++    }
++
++    /// Whether every row has the same width.
++    #[must_use]
++    pub const fn is_rectangular(self) -> bool {
++        self.columns.is_some()
++    }
++}
++
++/// A borrowed semantic kind for one expression node.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++#[non_exhaustive]
++pub enum Kind<'a> {
++    /// A syntactically valid number; use [`Node::text`] for its exact lexeme.
++    Number,
++    /// A double-quoted string; use [`Node::text`] for its exact escaped lexeme.
++    String,
++    /// A prefix unary operation.
++    Prefix(PrefixOperator),
++    /// A postfix unary operation.
++    Postfix(PostfixOperator),
++    /// A binary operation.
++    Infix(InfixOperator),
++    /// Parentheses retained as a source-level grouping node.
++    Parenthesized,
++    /// A function call with a host-defined or standard name.
++    Function {
++        /// Function name span, excluding the opening parenthesis.
++        name: &'a str,
++    },
++    /// A complete inert bracketed reference.
++    Reference(&'a reference::Reference),
++    /// A single-quoted label.
++    QuotedLabel,
++    /// Two quoted labels joined by automatic intersection (`!!`).
++    AutomaticIntersection,
++    /// A simple, sheet-local, or external named expression.
++    NamedExpression {
++        /// Name content, excluding `$$` and quote delimiters where present.
++        name: &'a str,
++        /// Name qualification and source metadata.
++        scope: NameScope<'a>,
++    },
++    /// A constant formula error such as `#N/A`.
++    Error,
++    /// An inline array. Its direct children are [`ArrayRow`](Self::ArrayRow)
++    /// nodes.
++    Array(ArrayDimensions),
++    /// One matrix row inside an inline array. Its children are cell expressions.
++    ArrayRow,
++    /// An explicitly missing function parameter.
++    Missing,
++}
++
++/// An immutable, owned, flat OpenFormula expression tree.
++#[derive(Debug)]
++pub struct Expression {
++    source: String,
++    nodes: Vec<NodeRecord>,
++    edges: Vec<NodeId>,
++    references: Vec<reference::Reference>,
++    force_recalculate: bool,
++    root: NodeId,
++}
++
++impl Expression {
++    /// Parse an expression using the default finite limits.
++    pub fn parse(source: &str) -> Result<Self> {
++        Self::parse_with_limits(source, &Limits::default())
++    }
++
++    /// Parse an expression using explicit finite limits.
++    pub fn parse_with_limits(source: &str, limits: &Limits) -> Result<Self> {
++        if source.len() > limits.max_bytes {
++            return Err(limit_error(
++                Resource::InputBytes,
++                source.len(),
++                limits.max_bytes,
++            ));
++        }
++
++        // Admit the immutable source before any parser-owned storage is
++        // created. Every node and edge allocation below is separately
++        // fallible; the source remains authoritative for every Node::text view.
++        let mut owned_source = String::new();
++        owned_source
++            .try_reserve_exact(source.len())
++            .map_err(|error| Error::Allocation {
++                resource: "formula expression source",
++                source: error,
++            })?;
++        owned_source.push_str(source);
++
++        let parser = Parser::new(&owned_source, *limits);
++        let (root, nodes, edges, references, force_recalculate) = parser.parse()?;
++        Ok(Self {
++            source: owned_source,
++            nodes,
++            edges,
++            references,
++            force_recalculate,
++            root,
++        })
++    }
++
++    /// Return the exact source spelling supplied to the parser.
++    #[must_use]
++    pub fn source(&self) -> &str {
++        &self.source
++    }
++
++    /// Return whether the formula used the optional forced-recalculation
++    /// marker (`==` or `of:==`).
++    #[must_use]
++    pub fn is_force_recalculate(&self) -> bool {
++        self.force_recalculate
++    }
++
++    /// Return the root node of the expression tree.
++    #[must_use]
++    pub fn root(&self) -> Node<'_> {
++        Node {
++            expression: self,
++            id: self.root,
++        }
++    }
++
++    /// Number of nodes in the flat arena.
++    #[must_use]
++    pub fn node_count(&self) -> usize {
++        self.nodes.len()
++    }
++
++    /// Number of parent-to-child edges in the flat arena.
++    #[must_use]
++    pub fn edge_count(&self) -> usize {
++        self.edges.len()
++    }
++}
++
++/// A borrowed node view into an [`Expression`].
++#[derive(Clone, Copy)]
++pub struct Node<'a> {
++    expression: &'a Expression,
++    id: NodeId,
++}
++
++impl<'a> Node<'a> {
++    /// Return the source span covered by this node, including its delimiters.
++    #[must_use]
++    pub fn text(&self) -> &'a str {
++        slice(&self.expression.source, self.record().span).unwrap_or_default()
++    }
++
++    /// Return the typed node kind and borrowed names/references.
++    #[must_use]
++    pub fn kind(&self) -> Kind<'a> {
++        let record = self.record();
++        match &record.kind {
++            RecordKind::Number => Kind::Number,
++            RecordKind::String => Kind::String,
++            RecordKind::Prefix(operator) => Kind::Prefix(*operator),
++            RecordKind::Postfix(operator) => Kind::Postfix(*operator),
++            RecordKind::Infix(operator) => Kind::Infix(*operator),
++            RecordKind::Parenthesized => Kind::Parenthesized,
++            RecordKind::Function { name } => Kind::Function {
++                name: slice(&self.expression.source, *name).unwrap_or_default(),
++            },
++            RecordKind::Reference(reference) => {
++                Kind::Reference(&self.expression.references[reference.0])
++            },
++            RecordKind::QuotedLabel { .. } => Kind::QuotedLabel,
++            RecordKind::AutomaticIntersection => Kind::AutomaticIntersection,
++            RecordKind::Named { name, scope } => Kind::NamedExpression {
++                name: slice(&self.expression.source, *name).unwrap_or_default(),
++                scope: scope.as_public(&self.expression.source),
++            },
++            RecordKind::Error => Kind::Error,
++            RecordKind::Array { dimensions } => Kind::Array(*dimensions),
++            RecordKind::ArrayRow => Kind::ArrayRow,
++            RecordKind::Missing => Kind::Missing,
++        }
++    }
++
++    /// Return the direct children in source/grammar order.
++    #[must_use]
++    pub fn children(&self) -> Children<'a> {
++        let record = self.record();
++        let end = record
++            .children_start
++            .checked_add(record.children_len)
++            .expect("validated expression child span overflow");
++        let ids = self
++            .expression
++            .edges
++            .get(record.children_start..end)
++            .expect("validated expression child span out of bounds");
++        Children {
++            expression: self.expression,
++            ids,
++            position: 0,
++        }
++    }
++
++    /// Return one direct child by zero-based index.
++    #[must_use]
++    pub fn child(&self, index: usize) -> Option<Node<'a>> {
++        let record = self.record();
++        if index >= record.children_len {
++            return None;
++        }
++        let edge = record.children_start.checked_add(index)?;
++        let id = *self.expression.edges.get(edge)?;
++        Some(Node {
++            expression: self.expression,
++            id,
++        })
++    }
++
++    /// Return the number of direct children.
++    #[must_use]
++    pub fn child_count(&self) -> usize {
++        self.record().children_len
++    }
++
++    /// Return a function or named-expression name span, if this node has one.
++    #[must_use]
++    pub fn name(&self) -> Option<&'a str> {
++        match &self.record().kind {
++            RecordKind::Function { name } | RecordKind::Named { name, .. } => {
++                slice(&self.expression.source, *name)
++            },
++            _ => None,
++        }
++    }
++
++    /// Return a function name span, if this node is a function call.
++    #[must_use]
++    pub fn function_name(&self) -> Option<&'a str> {
++        match &self.record().kind {
++            RecordKind::Function { name } => slice(&self.expression.source, *name),
++            _ => None,
++        }
++    }
++
++    /// Return the raw content of a quoted label, excluding quote delimiters.
++    #[must_use]
++    pub fn label(&self) -> Option<&'a str> {
++        match &self.record().kind {
++            RecordKind::QuotedLabel { value } => slice(&self.expression.source, *value),
++            _ => None,
++        }
++    }
++
++    /// Return a borrowed parsed reference, if this node is a reference.
++    #[must_use]
++    pub fn reference(&self) -> Option<&'a reference::Reference> {
++        match &self.record().kind {
++            RecordKind::Reference(reference) => Some(&self.expression.references[reference.0]),
++            _ => None,
++        }
++    }
++
++    /// Return inline-array dimensions, if this node is an array.
++    #[must_use]
++    pub fn array_dimensions(&self) -> Option<ArrayDimensions> {
++        match &self.record().kind {
++            RecordKind::Array { dimensions } => Some(*dimensions),
++            _ => None,
++        }
++    }
++
++    /// Return whether this node represents a missing function parameter.
++    #[must_use]
++    pub fn is_missing(&self) -> bool {
++        matches!(self.record().kind, RecordKind::Missing)
++    }
++
++    fn record(&self) -> &NodeRecord {
++        // Node values are created only from parser-validated IDs. Returning a
++        // static empty record would conceal an internal invariant violation;
++        // this branch is unreachable for safe public callers.
++        &self.expression.nodes[self.id.0]
++    }
++}
++
++impl std::fmt::Debug for Node<'_> {
++    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        formatter
++            .debug_struct("Node")
++            .field("kind", &self.kind())
++            .field("text", &self.text())
++            .finish()
++    }
++}
++
++/// An allocation-free iterator over borrowed node children.
++pub struct Children<'a> {
++    expression: &'a Expression,
++    ids: &'a [NodeId],
++    position: usize,
++}
++
++impl<'a> Iterator for Children<'a> {
++    type Item = Node<'a>;
++
++    fn next(&mut self) -> Option<Self::Item> {
++        let id = *self.ids.get(self.position)?;
++        self.position += 1;
++        Some(Node {
++            expression: self.expression,
++            id,
++        })
++    }
++
++    fn size_hint(&self) -> (usize, Option<usize>) {
++        let remaining = self.ids.len().saturating_sub(self.position);
++        (remaining, Some(remaining))
++    }
++}
++
++impl ExactSizeIterator for Children<'_> {}
++impl std::iter::FusedIterator for Children<'_> {}
++
++#[derive(Clone, Copy, Debug)]
++struct Span {
++    start: usize,
++    end: usize,
++}
++
++#[derive(Clone, Copy, Debug)]
++struct NodeId(usize);
++
++#[derive(Clone, Copy, Debug)]
++struct ReferenceId(usize);
++
++#[derive(Debug)]
++struct NodeRecord {
++    span: Span,
++    children_start: usize,
++    children_len: usize,
++    kind: RecordKind,
++}
++
++#[derive(Debug)]
++enum RecordKind {
++    Number,
++    String,
++    Prefix(PrefixOperator),
++    Postfix(PostfixOperator),
++    Infix(InfixOperator),
++    Parenthesized,
++    Function { name: Span },
++    Reference(ReferenceId),
++    QuotedLabel { value: Span },
++    AutomaticIntersection,
++    Named { name: Span, scope: RecordScope },
++    Error,
++    Array { dimensions: ArrayDimensions },
++    ArrayRow,
++    Missing,
++}
++
++#[derive(Clone, Copy, Debug)]
++enum RecordScope {
++    Simple {
++        forced: bool,
++    },
++    SheetLocal {
++        sheet: Span,
++        absolute: bool,
++        forced: bool,
++    },
++    External {
++        source: Span,
++        sheet: Option<Span>,
++        sheet_absolute: bool,
++        forced: bool,
++    },
++}
++
++impl RecordScope {
++    fn as_public<'a>(self, source: &'a str) -> NameScope<'a> {
++        match self {
++            Self::Simple { forced } => NameScope::Simple { forced },
++            Self::SheetLocal {
++                sheet,
++                absolute,
++                forced,
++            } => NameScope::SheetLocal {
++                sheet: slice(source, sheet).unwrap_or_default(),
++                absolute,
++                forced,
++            },
++            Self::External {
++                source: source_span,
++                sheet,
++                sheet_absolute,
++                forced,
++            } => NameScope::External {
++                source: slice(source, source_span).unwrap_or_default(),
++                sheet: sheet.and_then(|span| slice(source, span)),
++                sheet_absolute,
++                forced,
++            },
++        }
++    }
++}
++
++fn slice(source: &str, span: Span) -> Option<&str> {
++    source.get(span.start..span.end)
++}
++
++struct Parser<'a> {
++    source: &'a str,
++    bytes: &'a [u8],
++    position: usize,
++    limits: Limits,
++    effective_depth: usize,
++    nodes: Vec<NodeRecord>,
++    edges: Vec<NodeId>,
++    references: Vec<reference::Reference>,
++    array_cells: usize,
++}
++
++impl<'a> Parser<'a> {
++    fn new(source: &'a str, limits: Limits) -> Self {
++        Self {
++            source,
++            bytes: source.as_bytes(),
++            position: 0,
++            limits,
++            effective_depth: limits.max_depth.min(HARD_MAX_EXPRESSION_DEPTH),
++            nodes: Vec::new(),
++            edges: Vec::new(),
++            references: Vec::new(),
++            array_cells: 0,
++        }
++    }
++
++    fn parse(
++        mut self,
++    ) -> Result<(
++        NodeId,
++        Vec<NodeRecord>,
++        Vec<NodeId>,
++        Vec<reference::Reference>,
++        bool,
++    )> {
++        self.skip_whitespace();
++        let force_recalculate = self.parse_intro()?;
++        self.skip_whitespace();
++        let root = self.parse_expression(0, 0)?;
++        self.skip_whitespace();
++        if !self.at_end() {
++            return Err(invalid("trailing bytes after OpenFormula expression"));
++        }
++        Ok((
++            root,
++            self.nodes,
++            self.edges,
++            self.references,
++            force_recalculate,
++        ))
++    }
++
++    fn parse_intro(&mut self) -> Result<bool> {
++        if self.starts_with_ascii_case_insensitive(b"of:") {
++            self.position += 3;
++            self.skip_whitespace();
++            if !self.consume_byte(b'=') {
++                return Err(invalid(
++                    "OpenFormula namespace wrapper must be followed by '='",
++                ));
++            }
++            return Ok(self.consume_force_recalculate());
++        }
++
++        if self.consume_byte(b'=') {
++            return Ok(self.consume_force_recalculate());
++        }
++        Ok(false)
++    }
++
++    fn consume_force_recalculate(&mut self) -> bool {
++        let checkpoint = self.position;
++        self.skip_whitespace();
++        if self.consume_byte(b'=') {
++            self.skip_whitespace();
++            true
++        } else {
++            self.position = checkpoint;
++            self.skip_whitespace();
++            false
++        }
++    }
++
++    fn parse_expression(&mut self, minimum_precedence: u8, depth: usize) -> Result<NodeId> {
++        self.check_depth(depth)?;
++        self.skip_whitespace();
++        let mut left = self.parse_prefix(depth)?;
++
++        loop {
++            self.skip_whitespace();
++            if let Some(operator) = self.peek_postfix() {
++                if POSTFIX_PRECEDENCE < minimum_precedence {
++                    break;
++                }
++                self.position += 1;
++                let span = Span {
++                    start: self.node(left).span.start,
++                    end: self.position,
++                };
++                left = self.push_node(span, RecordKind::Postfix(operator), &[left])?;
++                continue;
++            }
++            if let Some((operator, precedence, width)) = self.peek_infix() {
++                if precedence < minimum_precedence {
++                    break;
++                }
++                self.position += width;
++                let right =
++                    self.parse_expression(precedence.saturating_add(1), depth.saturating_add(1))?;
++                let span = Span {
++                    start: self.node(left).span.start,
++                    end: self.node(right).span.end,
++                };
++                left = self.push_node(span, RecordKind::Infix(operator), &[left, right])?;
++                continue;
++            }
++            break;
++        }
++        Ok(left)
++    }
++
++    fn parse_prefix(&mut self, depth: usize) -> Result<NodeId> {
++        self.skip_whitespace();
++        let start = self.position;
++        let operator = match self.peek() {
++            Some(b'+') => Some(PrefixOperator::Plus),
++            Some(b'-') => Some(PrefixOperator::Minus),
++            _ => None,
++        };
++        let Some(operator) = operator else {
++            return self.parse_primary(depth);
++        };
++        self.position += 1;
++        let operand = self.parse_expression(PREFIX_PRECEDENCE, depth.saturating_add(1))?;
++        let span = Span {
++            start,
++            end: self.node(operand).span.end,
++        };
++        self.push_node(span, RecordKind::Prefix(operator), &[operand])
++    }
++
++    fn parse_primary(&mut self, depth: usize) -> Result<NodeId> {
++        self.skip_whitespace();
++        let start = self.position;
++        match self.peek() {
++            Some(b'(') => self.parse_parenthesized(start, depth),
++            Some(b'[') => self.parse_reference(start),
++            Some(b'{') => self.parse_array(start, depth),
++            Some(b'"') => self.parse_string(start),
++            Some(b'\'') => self.parse_quoted_primary(start, depth),
++            Some(b'#') => self.parse_error(start),
++            Some(byte) if byte.is_ascii_digit() => self.parse_number(start),
++            Some(b'.') if self.bytes.get(start + 1).is_some_and(u8::is_ascii_digit) => {
++                self.parse_number(start)
++            },
++            Some(b'$') => self.parse_dollar_name(start, depth),
++            Some(_) if self.is_letter_at(start) => self.parse_identifier_primary(start, depth),
++            Some(_) => Err(invalid("expected an OpenFormula expression")),
++            None => Err(invalid("expected an OpenFormula expression")),
++        }
++    }
++
++    fn parse_parenthesized(&mut self, start: usize, depth: usize) -> Result<NodeId> {
++        self.position += 1;
++        let child = self.parse_expression(0, depth.saturating_add(1))?;
++        self.skip_whitespace();
++        if !self.consume_byte(b')') {
++            return Err(invalid("parenthesized expression is missing ')'"));
++        }
++        self.push_node(
++            Span {
++                start,
++                end: self.position,
++            },
++            RecordKind::Parenthesized,
++            &[child],
++        )
++    }
++
++    fn parse_string(&mut self, start: usize) -> Result<NodeId> {
++        self.position += 1;
++        let content_start = self.position;
++        let closing = loop {
++            let Some(byte) = self.peek() else {
++                return Err(invalid("unterminated OpenFormula string literal"));
++            };
++            if byte != b'"' {
++                self.position += 1;
++                continue;
++            }
++            if self.bytes.get(self.position + 1) == Some(&b'"') {
++                self.position += 2;
++                continue;
++            }
++            break self.position;
++        };
++        let content = &self.bytes[content_start..closing];
++        if content.contains(&0) {
++            return Err(invalid("NUL is not allowed in OpenFormula string literal"));
++        }
++        self.position = closing + 1;
++        self.push_node(
++            Span {
++                start,
++                end: self.position,
++            },
++            RecordKind::String,
++            &[],
++        )
++    }
++
++    fn parse_number(&mut self, start: usize) -> Result<NodeId> {
++        if self.consume_byte(b'.') {
++            if !self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
++                return Err(invalid("fractional number requires digits after '.'"));
++            }
++            self.consume_ascii_digits();
++        } else {
++            if !self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
++                return Err(invalid("number requires a digit"));
++            }
++            self.consume_ascii_digits();
++            if self.consume_byte(b'.') {
++                if !self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
++                    return Err(invalid("number requires digits after its decimal point"));
++                }
++                self.consume_ascii_digits();
++            }
++        }
++
++        if matches!(self.peek(), Some(b'e' | b'E')) {
++            self.position += 1;
++            if matches!(self.peek(), Some(b'+' | b'-')) {
++                self.position += 1;
++            }
++            if !self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
++                return Err(invalid("scientific number requires an exponent"));
++            }
++            self.consume_ascii_digits();
++        }
++
++        self.push_node(
++            Span {
++                start,
++                end: self.position,
++            },
++            RecordKind::Number,
++            &[],
++        )
++    }
++
++    fn parse_error(&mut self, start: usize) -> Result<NodeId> {
++        self.position += 1;
++        let body_start = self.position;
++        while self
++            .peek()
++            .is_some_and(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())
++        {
++            self.position += 1;
++        }
++        if self.position == body_start {
++            return Err(invalid(
++                "formula error name requires uppercase letters or digits",
++            ));
++        }
++
++        match self.peek() {
++            Some(b'!' | b'?') => self.position += 1,
++            Some(b'/') => {
++                self.position += 1;
++                if self.peek().is_some_and(|byte| byte.is_ascii_uppercase()) {
++                    self.position += 1;
++                } else if self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
++                    self.position += 1;
++                    if !matches!(self.peek(), Some(b'!' | b'?')) {
++                        return Err(invalid("numeric formula error suffix needs ! or ?"));
++                    }
++                    self.position += 1;
++                } else {
++                    return Err(invalid("formula error slash suffix is malformed"));
++                }
++            },
++            _ => return Err(invalid("formula error name is missing its suffix")),
++        }
++
++        self.push_node(
++            Span {
++                start,
++                end: self.position,
++            },
++            RecordKind::Error,
++            &[],
++        )
++    }
++
++    fn parse_reference(&mut self, start: usize) -> Result<NodeId> {
++        // A parsed reference owns its complete endpoint/source metadata. Do
++        // the node admission before invoking the bounded reference parser so
++        // a zero-node expression limit cannot trigger component allocations.
++        self.reserve_node_slot()?;
++        let closing = self.scan_reference_close(start)?;
++        let body = self
++            .source
++            .get(start + 1..closing)
++            .ok_or_else(|| invalid("reference span is not valid UTF-8"))?;
++        let reference = reference::parse_body(body, &self.limits.reference)?;
++        let reference_id = self.push_reference(reference)?;
++        self.position = closing + 1;
++        self.push_node(
++            Span {
++                start,
++                end: self.position,
++            },
++            RecordKind::Reference(reference_id),
++            &[],
++        )
++    }
++
++    fn parse_array(&mut self, start: usize, depth: usize) -> Result<NodeId> {
++        self.position += 1;
++        let mut rows = Vec::new();
++        let mut row_count = 0usize;
++        let mut min_columns = usize::MAX;
++        let mut max_columns = 0usize;
++
++        loop {
++            self.skip_whitespace();
++            if matches!(self.peek(), Some(b'}' | b'|' | b';') | None) {
++                return Err(invalid("inline array rows and cells cannot be empty"));
++            }
++
++            let row_start = self.position;
++            let mut cells = Vec::new();
++            loop {
++                self.bump_array_cell()?;
++                let cell = self.parse_expression(0, depth.saturating_add(1))?;
++                push_child(&mut cells, cell)?;
++                self.skip_whitespace();
++                if !self.consume_byte(b';') {
++                    break;
++                }
++                self.skip_whitespace();
++                if matches!(self.peek(), Some(b'}' | b'|' | b';') | None) {
++                    return Err(invalid("inline array cells cannot be empty"));
++                }
++            }
++
++            let row_end = cells
++                .last()
++                .map(|id| self.node(*id).span.end)
++                .unwrap_or(row_start);
++            let row = self.push_node(
++                Span {
++                    start: row_start,
++                    end: row_end,
++                },
++                RecordKind::ArrayRow,
++                &cells,
++            )?;
++            push_child(&mut rows, row)?;
++            row_count = row_count
++                .checked_add(1)
++                .ok_or_else(|| invalid("inline array row count overflow"))?;
++            min_columns = min_columns.min(cells.len());
++            max_columns = max_columns.max(cells.len());
++
++            self.skip_whitespace();
++            if self.consume_byte(b'|') {
++                continue;
++            }
++            if !self.consume_byte(b'}') {
++                return Err(invalid("inline array requires '|' or '}' after each row"));
++            }
++            break;
++        }
++
++        let dimensions = ArrayDimensions {
++            rows: row_count,
++            columns: (min_columns == max_columns).then_some(min_columns),
++            min_columns,
++            max_columns,
++        };
++        self.push_node(
++            Span {
++                start,
++                end: self.position,
++            },
++            RecordKind::Array { dimensions },
++            &rows,
++        )
++    }
++
++    fn parse_identifier_primary(&mut self, start: usize, depth: usize) -> Result<NodeId> {
++        let name = self.scan_identifier()?;
++        if self.peek() == Some(b'(') {
++            return self.parse_function(start, name, depth);
++        }
++        validate_named_identifier(self.slice(name))?;
++        self.push_node(
++            Span {
++                start,
++                end: name.end,
++            },
++            RecordKind::Named {
++                name,
++                scope: RecordScope::Simple { forced: false },
++            },
++            &[],
++        )
++    }
++
++    fn parse_dollar_name(&mut self, start: usize, depth: usize) -> Result<NodeId> {
++        if self
++            .bytes
++            .get(self.position..self.position + 2)
++            .is_some_and(|bytes| bytes == b"$$")
++        {
++            let (name, forced) = self.scan_simple_name(true)?;
++            self.push_node(
++                Span {
++                    start,
++                    end: self.position,
++                },
++                RecordKind::Named {
++                    name,
++                    scope: RecordScope::Simple { forced },
++                },
++                &[],
++            )
++        } else if self.bytes.get(self.skip_whitespace_from(self.position + 1)) == Some(&b'\'') {
++            self.position = self.skip_whitespace_from(self.position + 1);
++            self.parse_sheet_local_name(start, true, depth)
++        } else {
++            Err(invalid("'$' must begin a $$ name or quoted sheet name"))
++        }
++    }
++
++    fn parse_quoted_primary(&mut self, start: usize, depth: usize) -> Result<NodeId> {
++        let (close, value) = self.scan_single_quoted(true)?;
++        self.position = close + 1;
++        let probe = self.skip_whitespace_from(self.position);
++        match self.bytes.get(probe).copied() {
++            Some(b'#') => {
++                self.position = probe + 1;
++                self.parse_external_name(start, value, depth)
++            },
++            Some(b'.') => {
++                self.position = probe + 1;
++                self.parse_sheet_local_suffix(start, value, depth)
++            },
++            _ => {
++                if value.start == value.end {
++                    return Err(invalid("quoted labels cannot be empty"));
++                }
++                let label = self.push_node(
++                    Span {
++                        start,
++                        end: close + 1,
++                    },
++                    RecordKind::QuotedLabel { value },
++                    &[],
++                )?;
++                let intersection_probe = self.skip_whitespace_from(close + 1);
++                if self
++                    .bytes
++                    .get(intersection_probe..intersection_probe + 2)
++                    .is_some_and(|bytes| bytes == b"!!")
++                {
++                    self.position = intersection_probe + 2;
++                    self.skip_whitespace();
++                    let second_start = self.position;
++                    let (second_close, second_value) = self.scan_single_quoted(false)?;
++                    self.position = second_close + 1;
++                    let second = self.push_node(
++                        Span {
++                            start: second_start,
++                            end: second_close + 1,
++                        },
++                        RecordKind::QuotedLabel {
++                            value: second_value,
++                        },
++                        &[],
++                    )?;
++                    return self.push_node(
++                        Span {
++                            start,
++                            end: self.position,
++                        },
++                        RecordKind::AutomaticIntersection,
++                        &[label, second],
++                    );
++                }
++                self.position = close + 1;
++                Ok(label)
++            },
++        }
++    }
++
++    fn parse_sheet_local_name(
++        &mut self,
++        start: usize,
++        absolute_marker: bool,
++        depth: usize,
++    ) -> Result<NodeId> {
++        let (close, sheet) = self.scan_single_quoted(true)?;
++        self.position = close + 1;
++        let separator = self.skip_whitespace_from(self.position);
++        if self.bytes.get(separator) != Some(&b'.') {
++            return Err(invalid("quoted sheet name must be followed by '.'"));
++        }
++        self.position = separator + 1;
++        self.parse_sheet_local_suffix_with_marker(start, sheet, absolute_marker, depth)
++    }
++
++    fn parse_sheet_local_suffix(
++        &mut self,
++        start: usize,
++        sheet: Span,
++        depth: usize,
++    ) -> Result<NodeId> {
++        self.parse_sheet_local_suffix_with_marker(start, sheet, false, depth)
++    }
++
++    fn parse_sheet_local_suffix_with_marker(
++        &mut self,
++        start: usize,
++        sheet: Span,
++        absolute_marker: bool,
++        _depth: usize,
++    ) -> Result<NodeId> {
++        let (name, forced) = self.scan_simple_name(true)?;
++        self.push_node(
++            Span {
++                start,
++                end: self.position,
++            },
++            RecordKind::Named {
++                name,
++                scope: RecordScope::SheetLocal {
++                    sheet,
++                    absolute: absolute_marker,
++                    forced,
++                },
++            },
++            &[],
++        )
++    }
++
++    fn parse_external_name(&mut self, start: usize, source: Span, _depth: usize) -> Result<NodeId> {
++        self.reserve_node_slot()?;
++        self.validate_source_iri(source)?;
++        self.skip_whitespace();
++        let absolute_sheet = self.peek() == Some(b'$')
++            && self.bytes.get(self.skip_whitespace_from(self.position + 1)) == Some(&b'\'');
++        if absolute_sheet || self.peek() == Some(b'\'') {
++            if absolute_sheet {
++                self.position += 1;
++                self.skip_whitespace();
++            }
++            let (close, sheet) = self.scan_single_quoted(true)?;
++            self.position = close + 1;
++            let separator = self.skip_whitespace_from(self.position);
++            if self.bytes.get(separator) != Some(&b'.') {
++                return Err(invalid(
++                    "external quoted sheet name must be followed by '.'",
++                ));
++            }
++            self.position = separator + 1;
++            let (name, forced) = self.scan_simple_name(true)?;
++            return self.push_node(
++                Span {
++                    start,
++                    end: self.position,
++                },
++                RecordKind::Named {
++                    name,
++                    scope: RecordScope::External {
++                        source,
++                        sheet: Some(sheet),
++                        sheet_absolute: absolute_sheet,
++                        forced,
++                    },
++                },
++                &[],
++            );
++        }
++        if self
++            .bytes
++            .get(self.position..self.position + 2)
++            .is_some_and(|bytes| bytes == b"$$")
++        {
++            let (name, forced) = self.scan_simple_name(true)?;
++            return self.push_node(
++                Span {
++                    start,
++                    end: self.position,
++                },
++                RecordKind::Named {
++                    name,
++                    scope: RecordScope::External {
++                        source,
++                        sheet: None,
++                        sheet_absolute: false,
++                        forced,
++                    },
++                },
++                &[],
++            );
++        }
++
++        let (name, forced) = self.scan_simple_name(true)?;
++        self.push_node(
++            Span {
++                start,
++                end: self.position,
++            },
++            RecordKind::Named {
++                name,
++                scope: RecordScope::External {
++                    source,
++                    sheet: None,
++                    sheet_absolute: false,
++                    forced,
++                },
++            },
++            &[],
++        )
++    }
++
++    fn parse_function(&mut self, start: usize, name: Span, depth: usize) -> Result<NodeId> {
++        self.position += 1;
++        let mut parameters = Vec::new();
++        self.skip_whitespace();
++        if !self.consume_byte(b')') {
++            loop {
++                self.skip_whitespace();
++                let parameter = if matches!(self.peek(), Some(b';' | b')') | None) {
++                    self.push_node(
++                        Span {
++                            start: self.position,
++                            end: self.position,
++                        },
++                        RecordKind::Missing,
++                        &[],
++                    )?
++                } else {
++                    self.parse_expression(0, depth.saturating_add(1))?
++                };
++                push_child(&mut parameters, parameter)?;
++                self.skip_whitespace();
++                if self.consume_byte(b')') {
++                    break;
++                }
++                if !self.consume_byte(b';') {
++                    return Err(invalid("function parameters require ';' or ')'"));
++                }
++            }
++        }
++
++        self.push_node(
++            Span {
++                start,
++                end: self.position,
++            },
++            RecordKind::Function { name },
++            &parameters,
++        )
++    }
++
++    fn scan_identifier(&mut self) -> Result<Span> {
++        let start = self.position;
++        let Some((character, width)) = self.character_at(self.position) else {
++            return Err(invalid("expected an identifier"));
++        };
++        if !is_letter(character) {
++            return Err(invalid("identifier must begin with an XML Letter"));
++        }
++        self.position += width;
++        while let Some((character, width)) = self.character_at(self.position) {
++            if !(is_letter(character)
++                || is_digit(character)
++                || is_combining(character)
++                || matches!(character, '_' | '.'))
++            {
++                break;
++            }
++            self.position += width;
++        }
++        Ok(Span {
++            start,
++            end: self.position,
++        })
++    }
++
++    fn peek_postfix(&self) -> Option<PostfixOperator> {
++        (self.peek() == Some(b'%')).then_some(PostfixOperator::Percent)
++    }
++
++    fn scan_simple_name(&mut self, allow_forced_marker: bool) -> Result<(Span, bool)> {
++        // §5.14 permits whitespace between grammar components, while the
++        // $$ marker and Identifier/SingleQuoted terminals remain contiguous.
++        self.skip_whitespace();
++        let forced = allow_forced_marker
++            && self
++                .bytes
++                .get(self.position..self.position + 2)
++                .is_some_and(|bytes| bytes == b"$$");
++        if forced {
++            self.position += 2;
++            self.skip_whitespace();
++        }
++        if self.peek() == Some(b'\'') {
++            if !forced {
++                return Err(invalid("quoted named expressions require the $$ marker"));
++            }
++            let (close, value) = self.scan_single_quoted(false)?;
++            self.position = close + 1;
++            return Ok((value, true));
++        }
++        let name = self.scan_identifier()?;
++        validate_named_identifier(self.slice(name))?;
++        Ok((name, forced))
++    }
++
++    fn scan_single_quoted(&self, allow_empty: bool) -> Result<(usize, Span)> {
++        if self.peek() != Some(b'\'') {
++            return Err(invalid("expected a single-quoted component"));
++        }
++        let opening = self.position;
++        let mut cursor = opening + 1;
++        while cursor < self.bytes.len() {
++            if self.bytes[cursor] != b'\'' {
++                cursor += 1;
++                continue;
++            }
++            if self.bytes.get(cursor + 1) == Some(&b'\'') {
++                cursor += 2;
++                continue;
++            }
++            if !allow_empty && cursor == opening + 1 {
++                return Err(invalid("single-quoted component cannot be empty"));
++            }
++            return Ok((
++                cursor,
++                Span {
++                    start: opening + 1,
++                    end: cursor,
++                },
++            ));
++        }
++        Err(invalid("unterminated single-quoted component"))
++    }
++
++    fn validate_source_iri(&self, source: Span) -> Result<()> {
++        let raw = self.slice(source);
++        let mut pairs = 0usize;
++        let mut cursor = 0usize;
++        while cursor < raw.len() {
++            if raw.as_bytes()[cursor] == b'\'' {
++                if raw.as_bytes().get(cursor + 1) != Some(&b'\'') {
++                    return Err(invalid("source IRI contains an invalid apostrophe escape"));
++                }
++                pairs = pairs
++                    .checked_add(1)
++                    .ok_or_else(|| invalid("source IRI escape count overflow"))?;
++                cursor += 2;
++            } else {
++                cursor += 1;
++            }
++        }
++        let decoded_len = raw
++            .len()
++            .checked_sub(pairs)
++            .ok_or_else(|| invalid("source IRI length overflow"))?;
++        let maximum = self.limits.reference.max_name_bytes();
++        if decoded_len > maximum {
++            return Err(limit_error(Resource::InputBytes, decoded_len, maximum));
++        }
++        if pairs == 0 {
++            if reference::is_valid_iri_reference(raw) {
++                return Ok(());
++            }
++            return Err(invalid("invalid OpenFormula source IRI"));
++        }
++
++        let mut decoded = String::new();
++        decoded
++            .try_reserve_exact(decoded_len)
++            .map_err(|error| Error::Allocation {
++                resource: "formula expression source IRI",
++                source: error,
++            })?;
++        let mut segment_start = 0usize;
++        cursor = 0;
++        while cursor < raw.len() {
++            if raw.as_bytes()[cursor] == b'\'' {
++                if segment_start < cursor {
++                    decoded.push_str(&raw[segment_start..cursor]);
++                }
++                decoded.push('\'');
++                cursor += 2;
++                segment_start = cursor;
++            } else {
++                cursor += 1;
++            }
++        }
++        if segment_start < raw.len() {
++            decoded.push_str(&raw[segment_start..]);
++        }
++        if reference::is_valid_iri_reference(&decoded) {
++            Ok(())
++        } else {
++            Err(invalid("invalid OpenFormula source IRI"))
++        }
++    }
++
++    fn scan_reference_close(&self, start: usize) -> Result<usize> {
++        let mut cursor = start + 1;
++        let mut quoted = false;
++        while cursor < self.bytes.len() {
++            match self.bytes[cursor] {
++                b'\'' => {
++                    if quoted && self.bytes.get(cursor + 1) == Some(&b'\'') {
++                        cursor += 2;
++                    } else {
++                        quoted = !quoted;
++                        cursor += 1;
++                    }
++                },
++                b']' if !quoted => return Ok(cursor),
++                _ => cursor += 1,
++            }
++        }
++        Err(invalid("unterminated bracketed reference"))
++    }
++
++    fn check_depth(&self, depth: usize) -> Result<()> {
++        if depth > self.effective_depth {
++            return Err(limit_error(Resource::Depth, depth, self.effective_depth));
++        }
++        Ok(())
++    }
++
++    fn bump_array_cell(&mut self) -> Result<()> {
++        self.array_cells = self
++            .array_cells
++            .checked_add(1)
++            .ok_or_else(|| invalid("inline array cell count overflow"))?;
++        if self.array_cells > self.limits.max_array_cells {
++            return Err(limit_error(
++                Resource::Objects,
++                self.array_cells,
++                self.limits.max_array_cells,
++            ));
++        }
++        Ok(())
++    }
++
++    fn push_node(&mut self, span: Span, kind: RecordKind, children: &[NodeId]) -> Result<NodeId> {
++        self.reserve_node_slot()?;
++        self.reserve_edges(children.len())?;
++        let children_start = self.edges.len();
++        self.edges.extend_from_slice(children);
++        let id = NodeId(self.nodes.len());
++        self.nodes.push(NodeRecord {
++            span,
++            children_start,
++            children_len: children.len(),
++            kind,
++        });
++        Ok(id)
++    }
++
++    fn reserve_node_slot(&mut self) -> Result<()> {
++        let observed = self
++            .nodes
++            .len()
++            .checked_add(1)
++            .ok_or_else(|| invalid("expression node count overflow"))?;
++        if observed > self.limits.max_nodes {
++            return Err(limit_error(
++                Resource::Objects,
++                observed,
++                self.limits.max_nodes,
++            ));
++        }
++        if self.nodes.len() == self.nodes.capacity() {
++            self.nodes
++                .try_reserve(1)
++                .map_err(|error| Error::Allocation {
++                    resource: "formula expression nodes",
++                    source: error,
++                })?;
++        }
++        Ok(())
++    }
++
++    fn push_reference(&mut self, reference: reference::Reference) -> Result<ReferenceId> {
++        let observed = self
++            .references
++            .len()
++            .checked_add(1)
++            .ok_or_else(|| invalid("expression reference count overflow"))?;
++        if observed > self.limits.max_nodes {
++            return Err(limit_error(
++                Resource::Objects,
++                observed,
++                self.limits.max_nodes,
++            ));
++        }
++        if self.references.len() == self.references.capacity() {
++            self.references
++                .try_reserve(1)
++                .map_err(|error| Error::Allocation {
++                    resource: "formula expression references",
++                    source: error,
++                })?;
++        }
++        let id = ReferenceId(self.references.len());
++        self.references.push(reference);
++        Ok(id)
++    }
++
++    fn reserve_edges(&mut self, additional: usize) -> Result<()> {
++        let observed = self
++            .edges
++            .len()
++            .checked_add(additional)
++            .ok_or_else(|| invalid("expression edge count overflow"))?;
++        if observed > self.limits.max_nodes {
++            return Err(limit_error(
++                Resource::Objects,
++                observed,
++                self.limits.max_nodes,
++            ));
++        }
++        self.edges
++            .try_reserve(additional)
++            .map_err(|error| Error::Allocation {
++                resource: "formula expression edges",
++                source: error,
++            })?;
++        Ok(())
++    }
++
++    fn consume_ascii_digits(&mut self) {
++        while self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
++            self.position += 1;
++        }
++    }
++
++    fn is_letter_at(&self, position: usize) -> bool {
++        self.character_at(position)
++            .is_some_and(|(character, _)| is_letter(character))
++    }
++
++    fn character_at(&self, position: usize) -> Option<(char, usize)> {
++        let character = self.source.get(position..)?.chars().next()?;
++        Some((character, character.len_utf8()))
++    }
++
++    fn skip_whitespace_from(&self, mut position: usize) -> usize {
++        while matches!(self.bytes.get(position), Some(b' ' | b'\t' | b'\n' | b'\r')) {
++            position += 1;
++        }
++        position
++    }
++
++    fn skip_whitespace(&mut self) {
++        self.position = self.skip_whitespace_from(self.position);
++    }
++
++    fn peek_infix(&self) -> Option<(InfixOperator, u8, usize)> {
++        let first = *self.bytes.get(self.position)?;
++        let second = self.bytes.get(self.position + 1).copied();
++        let (operator, width) = match (first, second) {
++            (b'<', Some(b'>')) => (InfixOperator::NotEqual, 2),
++            (b'<', Some(b'=')) => (InfixOperator::LessEqual, 2),
++            (b'>', Some(b'=')) => (InfixOperator::GreaterEqual, 2),
++            (b':', _) => (InfixOperator::Range, 1),
++            (b'!', _) => (InfixOperator::Intersection, 1),
++            (b'~', _) => (InfixOperator::Union, 1),
++            (b'^', _) => (InfixOperator::Power, 1),
++            (b'*', _) => (InfixOperator::Multiply, 1),
++            (b'/', _) => (InfixOperator::Divide, 1),
++            (b'+', _) => (InfixOperator::Add, 1),
++            (b'-', _) => (InfixOperator::Subtract, 1),
++            (b'&', _) => (InfixOperator::Concatenate, 1),
++            (b'=', _) => (InfixOperator::Equal, 1),
++            (b'<', _) => (InfixOperator::Less, 1),
++            (b'>', _) => (InfixOperator::Greater, 1),
++            _ => return None,
++        };
++        Some((operator, precedence(operator), width))
++    }
++
++    fn consume_byte(&mut self, expected: u8) -> bool {
++        if self.peek() == Some(expected) {
++            self.position += 1;
++            true
++        } else {
++            false
++        }
++    }
++
++    fn starts_with_ascii_case_insensitive(&self, expected: &[u8]) -> bool {
++        self.bytes
++            .get(self.position..self.position.saturating_add(expected.len()))
++            .is_some_and(|value| value.eq_ignore_ascii_case(expected))
++    }
++
++    fn slice(&self, span: Span) -> &str {
++        slice(self.source, span).unwrap_or_default()
++    }
++
++    fn node(&self, id: NodeId) -> &NodeRecord {
++        &self.nodes[id.0]
++    }
++
++    fn peek(&self) -> Option<u8> {
++        self.bytes.get(self.position).copied()
++    }
++
++    fn at_end(&self) -> bool {
++        self.position == self.bytes.len()
++    }
++}
++
++fn push_child(children: &mut Vec<NodeId>, child: NodeId) -> Result<()> {
++    children.try_reserve(1).map_err(|error| Error::Allocation {
++        resource: "formula expression child list",
++        source: error,
++    })?;
++    children.push(child);
++    Ok(())
++}
++
++fn validate_named_identifier(value: &str) -> Result<()> {
++    if value.as_bytes().contains(&b'.') {
++        return Err(invalid("periods are only allowed in function names"));
++    }
++    if value.eq_ignore_ascii_case("true") || value.eq_ignore_ascii_case("false") {
++        return Err(invalid("True and False are not named expressions"));
++    }
++    let bytes = value.as_bytes();
++    let mut position = 0;
++    while bytes.get(position).is_some_and(u8::is_ascii_alphabetic) {
++        position += 1;
++    }
++    if position != 0 && position < bytes.len() && bytes[position..].iter().all(u8::is_ascii_digit) {
++        return Err(invalid("cell-shaped identifiers are not named expressions"));
++    }
++    Ok(())
++}
++
++fn precedence(operator: InfixOperator) -> u8 {
++    match operator {
++        InfixOperator::Range => 100,
++        InfixOperator::Intersection => 95,
++        InfixOperator::Union => 90,
++        InfixOperator::Power => 70,
++        InfixOperator::Multiply | InfixOperator::Divide => 60,
++        InfixOperator::Add | InfixOperator::Subtract => 50,
++        InfixOperator::Concatenate => 40,
++        InfixOperator::Equal
++        | InfixOperator::NotEqual
++        | InfixOperator::Less
++        | InfixOperator::LessEqual
++        | InfixOperator::Greater
++        | InfixOperator::GreaterEqual => 30,
++    }
++}
++
++const PREFIX_PRECEDENCE: u8 = 80;
++const POSTFIX_PRECEDENCE: u8 = 75;
++
++fn invalid(message: impl Into<String>) -> Error {
++    Error::InvalidFormat(message.into())
++}
++
++#[cold]
++fn limit_error(resource: Resource, actual: usize, maximum: usize) -> Error {
++    let Some(observed) = u64::try_from(actual).ok() else {
++        return invalid("OpenFormula expression limit exceeds u64");
++    };
++    let Some(limit) = u64::try_from(maximum).ok() else {
++        return invalid("OpenFormula expression limit exceeds u64");
++    };
++    Error::ResourceLimit(ResourceLimit {
++        resource,
++        observed,
++        limit,
++        scope: Arc::from("ods-formula-expression"),
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn child_kinds(node: Node<'_>) -> Vec<Kind<'_>> {
++        node.children().map(|child| child.kind()).collect()
++    }
++
++    #[test]
++    fn parses_intro_numbers_strings_and_operator_precedence() {
++        let expression = Expression::parse("of:== -2^2+ .5e999 & \"a\"\"b\"")
++            .expect("strict expression grammar");
++        assert_eq!(expression.source(), "of:== -2^2+ .5e999 & \"a\"\"b\"");
++        assert!(expression.is_force_recalculate());
++        assert!(matches!(
++            expression.root().kind(),
++            Kind::Infix(InfixOperator::Concatenate)
++        ));
++        assert!(expression.node_count() >= 8);
++    }
++
++    #[test]
++    fn parses_functions_with_missing_arguments_and_nested_children() {
++        let expression = Expression::parse("F(;1;;\"x\")")
++            .expect("missing function parameters are syntactically valid");
++        let root = expression.root();
++        assert!(matches!(root.kind(), Kind::Function { name: "F" }));
++        assert_eq!(root.child_count(), 4);
++        assert!(root.child(0).is_some_and(|node| node.is_missing()));
++        assert!(root.child(2).is_some_and(|node| node.is_missing()));
++    }
++
++    #[test]
++    fn parses_ragged_arrays_without_imposing_evaluator_rectangularity() {
++        let expression = Expression::parse("{1;2|3}").expect("ragged grammar");
++        let root = expression.root();
++        let dimensions = root.array_dimensions().expect("array dimensions");
++        assert_eq!(dimensions.rows(), 2);
++        assert_eq!(dimensions.columns(), None);
++        assert_eq!(dimensions.min_columns(), 1);
++        assert_eq!(dimensions.max_columns(), 2);
++        assert_eq!(root.children().count(), 2);
++        assert!(matches!(child_kinds(root)[0], Kind::ArrayRow));
++    }
++
++    #[test]
++    fn parses_reference_names_labels_and_errors_inertly() {
++        let reference = Expression::parse("[.A1]").expect("reference");
++        assert!(matches!(reference.root().kind(), Kind::Reference(_)));
++
++        let name = Expression::parse("'Sheet'.Rate").expect("sheet-local name");
++        assert!(matches!(
++            name.root().kind(),
++            Kind::NamedExpression {
++                scope: NameScope::SheetLocal { sheet: "Sheet", .. },
++                ..
++            }
++        ));
++
++        let forced = Expression::parse("$$'Name'").expect("forced quoted name");
++        assert!(matches!(
++            forced.root().kind(),
++            Kind::NamedExpression {
++                scope: NameScope::Simple { forced: true },
++                ..
++            }
++        ));
++        assert!(Expression::parse("'Sheet'.'Name'").is_err());
++
++        let absolute = Expression::parse("$'Sheet'.$$Name").expect("absolute sheet name");
++        assert!(matches!(
++            absolute.root().kind(),
++            Kind::NamedExpression {
++                scope: NameScope::SheetLocal {
++                    sheet: "Sheet",
++                    absolute: true,
++                    forced: true,
++                },
++                ..
++            }
++        ));
++
++        let label = Expression::parse("'row'!!'column'").expect("automatic intersection");
++        assert!(matches!(label.root().kind(), Kind::AutomaticIntersection));
++
++        let error = Expression::parse("#N/A").expect("constant error");
++        assert!(matches!(error.root().kind(), Kind::Error));
++    }
++
++    #[test]
++    fn depth_and_array_limits_are_typed() {
++        let error =
++            Expression::parse_with_limits("((((1))))", &Limits::default().with_max_depth(1))
++                .expect_err("depth limit");
++        assert!(matches!(error, Error::ResourceLimit(limit) if limit.resource == Resource::Depth));
++        let error =
++            Expression::parse_with_limits("{1;2}", &Limits::default().with_max_array_cells(1))
++                .expect_err("array cell limit");
++        assert!(
++            matches!(error, Error::ResourceLimit(limit) if limit.resource == Resource::Objects)
++        );
++
++        let hostile = format!(
++            "{}1{}",
++            "(".repeat(HARD_MAX_EXPRESSION_DEPTH + 1),
++            ")".repeat(HARD_MAX_EXPRESSION_DEPTH + 1)
++        );
++        let unbounded = Limits::default().with_max_depth(usize::MAX);
++        let error = Expression::parse_with_limits(&hostile, &unbounded)
++            .expect_err("the parser's hard depth ceiling must remain effective");
++        assert!(matches!(error, Error::ResourceLimit(limit) if limit.resource == Resource::Depth));
++    }
++}
+diff --git a/crates/litchi-ods/src/codec/formula/expression/names.rs b/crates/litchi-ods/src/codec/formula/expression/names.rs
+new file mode 100644
+index 000000000..4d4131198
+--- /dev/null
++++ b/crates/litchi-ods/src/codec/formula/expression/names.rs
+@@ -0,0 +1,479 @@
++//! XML 1.0 character classes used by the OpenFormula name grammar.
++//!
++//! OpenFormula 1.4 §5.6 and §5.11 call these classes `LetterXML`, `DigitXML`,
++//! and `CombiningCharXML`, and explicitly define them through XML 1.0.  These
++//! tables intentionally retain XML 1.0's finite historical character classes;
++//! Rust's Unicode predicates and XML `NameStartChar` are broader grammars.
++
++// ODF 1.4 Part 4's [XML1.0] bibliography names XML 1.0 Fourth Edition:
++// <https://www.w3.org/TR/2006/REC-xml-20060816/>.
++// The exact source productions are XML 1.0 Appendix B, [84] Letter,
++// [85] BaseChar, [86] Ideographic, [87] CombiningChar, and [88] Digit.
++// LetterXML is the Part 4 spelling of XML's Letter production.  The fifth
++// edition keeps these Appendix-B tables; its broader NameStartChar production
++// is deliberately not used here.
++
++/// XML 1.0 `Letter` = `BaseChar | Ideographic`, productions [84]-[86].
++pub(super) fn is_letter(character: char) -> bool {
++    contains(LETTER_RANGES, character as u32)
++}
++
++/// XML 1.0 `Digit`, production [88].
++pub(super) fn is_digit(character: char) -> bool {
++    contains(DIGIT_RANGES, character as u32)
++}
++
++/// XML 1.0 `CombiningChar`, production [87].
++pub(super) fn is_combining(character: char) -> bool {
++    contains(COMBINING_RANGES, character as u32)
++}
++
++fn contains(ranges: &[(u32, u32)], value: u32) -> bool {
++    let mut low = 0;
++    let mut high = ranges.len();
++    while low < high {
++        let middle = low + (high - low) / 2;
++        let (start, end) = ranges[middle];
++        if value < start {
++            high = middle;
++        } else if value > end {
++            low = middle + 1;
++        } else {
++            return true;
++        }
++    }
++    false
++}
++
++// XML 1.0 Appendix B [85] BaseChar plus [86] Ideographic.  Adjacent source
++// ranges are kept as one inclusive range where doing so does not change the
++// production's set; the table remains sorted for `contains` above.
++const LETTER_RANGES: &[(u32, u32)] = &[
++    (0x0041, 0x005A),
++    (0x0061, 0x007A),
++    (0x00C0, 0x00D6),
++    (0x00D8, 0x00F6),
++    (0x00F8, 0x00FF),
++    (0x0100, 0x0131),
++    (0x0134, 0x013E),
++    (0x0141, 0x0148),
++    (0x014A, 0x017E),
++    (0x0180, 0x01C3),
++    (0x01CD, 0x01F0),
++    (0x01F4, 0x01F5),
++    (0x01FA, 0x0217),
++    (0x0250, 0x02A8),
++    (0x02BB, 0x02C1),
++    (0x0386, 0x0386),
++    (0x0388, 0x038A),
++    (0x038C, 0x038C),
++    (0x038E, 0x03A1),
++    (0x03A3, 0x03CE),
++    (0x03D0, 0x03D6),
++    (0x03DA, 0x03DA),
++    (0x03DC, 0x03DC),
++    (0x03DE, 0x03DE),
++    (0x03E0, 0x03E0),
++    (0x03E2, 0x03F3),
++    (0x0401, 0x040C),
++    (0x040E, 0x044F),
++    (0x0451, 0x045C),
++    (0x045E, 0x0481),
++    (0x0490, 0x04C4),
++    (0x04C7, 0x04C8),
++    (0x04CB, 0x04CC),
++    (0x04D0, 0x04EB),
++    (0x04EE, 0x04F5),
++    (0x04F8, 0x04F9),
++    (0x0531, 0x0556),
++    (0x0559, 0x0559),
++    (0x0561, 0x0586),
++    (0x05D0, 0x05EA),
++    (0x05F0, 0x05F2),
++    (0x0621, 0x063A),
++    (0x0641, 0x064A),
++    (0x0671, 0x06B7),
++    (0x06BA, 0x06BE),
++    (0x06C0, 0x06CE),
++    (0x06D0, 0x06D3),
++    (0x06D5, 0x06D5),
++    (0x06E5, 0x06E6),
++    (0x0905, 0x0939),
++    (0x093D, 0x093D),
++    (0x0958, 0x0961),
++    (0x0985, 0x098C),
++    (0x098F, 0x0990),
++    (0x0993, 0x09A8),
++    (0x09AA, 0x09B0),
++    (0x09B2, 0x09B2),
++    (0x09B6, 0x09B9),
++    (0x09DC, 0x09DD),
++    (0x09DF, 0x09E1),
++    (0x09F0, 0x09F1),
++    (0x0A05, 0x0A0A),
++    (0x0A0F, 0x0A10),
++    (0x0A13, 0x0A28),
++    (0x0A2A, 0x0A30),
++    (0x0A32, 0x0A33),
++    (0x0A35, 0x0A36),
++    (0x0A38, 0x0A39),
++    (0x0A59, 0x0A5C),
++    (0x0A5E, 0x0A5E),
++    (0x0A72, 0x0A74),
++    (0x0A85, 0x0A8B),
++    (0x0A8D, 0x0A8D),
++    (0x0A8F, 0x0A91),
++    (0x0A93, 0x0AA8),
++    (0x0AAA, 0x0AB0),
++    (0x0AB2, 0x0AB3),
++    (0x0AB5, 0x0AB9),
++    (0x0ABD, 0x0ABD),
++    (0x0AE0, 0x0AE0),
++    (0x0B05, 0x0B0C),
++    (0x0B0F, 0x0B10),
++    (0x0B13, 0x0B28),
++    (0x0B2A, 0x0B30),
++    (0x0B32, 0x0B33),
++    (0x0B36, 0x0B39),
++    (0x0B3D, 0x0B3D),
++    (0x0B5C, 0x0B5D),
++    (0x0B5F, 0x0B61),
++    (0x0B85, 0x0B8A),
++    (0x0B8E, 0x0B90),
++    (0x0B92, 0x0B95),
++    (0x0B99, 0x0B9A),
++    (0x0B9C, 0x0B9C),
++    (0x0B9E, 0x0B9F),
++    (0x0BA3, 0x0BA4),
++    (0x0BA8, 0x0BAA),
++    (0x0BAE, 0x0BB5),
++    (0x0BB7, 0x0BB9),
++    (0x0C05, 0x0C0C),
++    (0x0C0E, 0x0C10),
++    (0x0C12, 0x0C28),
++    (0x0C2A, 0x0C33),
++    (0x0C35, 0x0C39),
++    (0x0C60, 0x0C61),
++    (0x0C85, 0x0C8C),
++    (0x0C8E, 0x0C90),
++    (0x0C92, 0x0CA8),
++    (0x0CAA, 0x0CB3),
++    (0x0CB5, 0x0CB9),
++    (0x0CDE, 0x0CDE),
++    (0x0CE0, 0x0CE1),
++    (0x0D05, 0x0D0C),
++    (0x0D0E, 0x0D10),
++    (0x0D12, 0x0D28),
++    (0x0D2A, 0x0D39),
++    (0x0D60, 0x0D61),
++    (0x0E01, 0x0E2E),
++    (0x0E30, 0x0E30),
++    (0x0E32, 0x0E33),
++    (0x0E40, 0x0E45),
++    (0x0E81, 0x0E82),
++    (0x0E84, 0x0E84),
++    (0x0E87, 0x0E88),
++    (0x0E8A, 0x0E8A),
++    (0x0E8D, 0x0E8D),
++    (0x0E94, 0x0E97),
++    (0x0E99, 0x0E9F),
++    (0x0EA1, 0x0EA3),
++    (0x0EA5, 0x0EA5),
++    (0x0EA7, 0x0EA7),
++    (0x0EAA, 0x0EAB),
++    (0x0EAD, 0x0EAE),
++    (0x0EB0, 0x0EB0),
++    (0x0EB2, 0x0EB3),
++    (0x0EBD, 0x0EBD),
++    (0x0EC0, 0x0EC4),
++    (0x0F40, 0x0F47),
++    (0x0F49, 0x0F69),
++    (0x10A0, 0x10C5),
++    (0x10D0, 0x10F6),
++    (0x1100, 0x1100),
++    (0x1102, 0x1103),
++    (0x1105, 0x1107),
++    (0x1109, 0x1109),
++    (0x110B, 0x110C),
++    (0x110E, 0x1112),
++    (0x113C, 0x113C),
++    (0x113E, 0x113E),
++    (0x1140, 0x1140),
++    (0x114C, 0x114C),
++    (0x114E, 0x114E),
++    (0x1150, 0x1150),
++    (0x1154, 0x1155),
++    (0x1159, 0x1159),
++    (0x115F, 0x1161),
++    (0x1163, 0x1163),
++    (0x1165, 0x1165),
++    (0x1167, 0x1167),
++    (0x1169, 0x1169),
++    (0x116D, 0x116E),
++    (0x1172, 0x1173),
++    (0x1175, 0x1175),
++    (0x119E, 0x119E),
++    (0x11A8, 0x11A8),
++    (0x11AB, 0x11AB),
++    (0x11AE, 0x11AF),
++    (0x11B7, 0x11B8),
++    (0x11BA, 0x11BA),
++    (0x11BC, 0x11C2),
++    (0x11EB, 0x11EB),
++    (0x11F0, 0x11F0),
++    (0x11F9, 0x11F9),
++    (0x1E00, 0x1E9B),
++    (0x1EA0, 0x1EF9),
++    (0x1F00, 0x1F15),
++    (0x1F18, 0x1F1D),
++    (0x1F20, 0x1F45),
++    (0x1F48, 0x1F4D),
++    (0x1F50, 0x1F57),
++    (0x1F59, 0x1F59),
++    (0x1F5B, 0x1F5B),
++    (0x1F5D, 0x1F5D),
++    (0x1F5F, 0x1F7D),
++    (0x1F80, 0x1FB4),
++    (0x1FB6, 0x1FBC),
++    (0x1FBE, 0x1FBE),
++    (0x1FC2, 0x1FC4),
++    (0x1FC6, 0x1FCC),
++    (0x1FD0, 0x1FD3),
++    (0x1FD6, 0x1FDB),
++    (0x1FE0, 0x1FEC),
++    (0x1FF2, 0x1FF4),
++    (0x1FF6, 0x1FFC),
++    (0x2126, 0x2126),
++    (0x212A, 0x212B),
++    (0x212E, 0x212E),
++    (0x2180, 0x2182),
++    (0x3007, 0x3007),
++    (0x3021, 0x3029),
++    (0x3041, 0x3094),
++    (0x30A1, 0x30FA),
++    (0x3105, 0x312C),
++    (0x4E00, 0x9FA5),
++    (0xAC00, 0xD7A3),
++];
++
++// XML 1.0 Appendix B [88] Digit.
++const DIGIT_RANGES: &[(u32, u32)] = &[
++    (0x0030, 0x0039),
++    (0x0660, 0x0669),
++    (0x06F0, 0x06F9),
++    (0x0966, 0x096F),
++    (0x09E6, 0x09EF),
++    (0x0A66, 0x0A6F),
++    (0x0AE6, 0x0AEF),
++    (0x0B66, 0x0B6F),
++    (0x0BE7, 0x0BEF),
++    (0x0C66, 0x0C6F),
++    (0x0CE6, 0x0CEF),
++    (0x0D66, 0x0D6F),
++    (0x0E50, 0x0E59),
++    (0x0ED0, 0x0ED9),
++    (0x0F20, 0x0F29),
++];
++
++// XML 1.0 Appendix B [87] CombiningChar.  Contiguous singleton entries are
++// combined into inclusive ranges to keep the lookup table compact.
++const COMBINING_RANGES: &[(u32, u32)] = &[
++    (0x0300, 0x0345),
++    (0x0360, 0x0361),
++    (0x0483, 0x0486),
++    (0x0591, 0x05A1),
++    (0x05A3, 0x05B9),
++    (0x05BB, 0x05BD),
++    (0x05BF, 0x05BF),
++    (0x05C1, 0x05C2),
++    (0x05C4, 0x05C4),
++    (0x064B, 0x0652),
++    (0x0670, 0x0670),
++    (0x06D6, 0x06DC),
++    (0x06DD, 0x06DF),
++    (0x06E0, 0x06E4),
++    (0x06E7, 0x06E8),
++    (0x06EA, 0x06ED),
++    (0x0901, 0x0903),
++    (0x093C, 0x093C),
++    (0x093E, 0x094C),
++    (0x094D, 0x094D),
++    (0x0951, 0x0954),
++    (0x0962, 0x0963),
++    (0x0981, 0x0983),
++    (0x09BC, 0x09BC),
++    (0x09BE, 0x09BF),
++    (0x09C0, 0x09C4),
++    (0x09C7, 0x09C8),
++    (0x09CB, 0x09CD),
++    (0x09D7, 0x09D7),
++    (0x09E2, 0x09E3),
++    (0x0A02, 0x0A02),
++    (0x0A3C, 0x0A3C),
++    (0x0A3E, 0x0A3F),
++    (0x0A40, 0x0A42),
++    (0x0A47, 0x0A48),
++    (0x0A4B, 0x0A4D),
++    (0x0A70, 0x0A71),
++    (0x0A81, 0x0A83),
++    (0x0ABC, 0x0ABC),
++    (0x0ABE, 0x0AC5),
++    (0x0AC7, 0x0AC9),
++    (0x0ACB, 0x0ACD),
++    (0x0B01, 0x0B03),
++    (0x0B3C, 0x0B3C),
++    (0x0B3E, 0x0B43),
++    (0x0B47, 0x0B48),
++    (0x0B4B, 0x0B4D),
++    (0x0B56, 0x0B57),
++    (0x0B82, 0x0B83),
++    (0x0BBE, 0x0BC2),
++    (0x0BC6, 0x0BC8),
++    (0x0BCA, 0x0BCD),
++    (0x0BD7, 0x0BD7),
++    (0x0C01, 0x0C03),
++    (0x0C3E, 0x0C44),
++    (0x0C46, 0x0C48),
++    (0x0C4A, 0x0C4D),
++    (0x0C55, 0x0C56),
++    (0x0C82, 0x0C83),
++    (0x0CBE, 0x0CC4),
++    (0x0CC6, 0x0CC8),
++    (0x0CCA, 0x0CCD),
++    (0x0CD5, 0x0CD6),
++    (0x0D02, 0x0D03),
++    (0x0D3E, 0x0D43),
++    (0x0D46, 0x0D48),
++    (0x0D4A, 0x0D4D),
++    (0x0D57, 0x0D57),
++    (0x0E31, 0x0E31),
++    (0x0E34, 0x0E3A),
++    (0x0E47, 0x0E4E),
++    (0x0EB1, 0x0EB1),
++    (0x0EB4, 0x0EB9),
++    (0x0EBB, 0x0EBC),
++    (0x0EC8, 0x0ECD),
++    (0x0F18, 0x0F19),
++    (0x0F35, 0x0F35),
++    (0x0F37, 0x0F37),
++    (0x0F39, 0x0F39),
++    (0x0F3E, 0x0F3F),
++    (0x0F71, 0x0F84),
++    (0x0F86, 0x0F8B),
++    (0x0F90, 0x0F95),
++    (0x0F97, 0x0F97),
++    (0x0F99, 0x0FAD),
++    (0x0FB1, 0x0FB7),
++    (0x0FB9, 0x0FB9),
++    (0x20D0, 0x20DC),
++    (0x20E1, 0x20E1),
++    (0x302A, 0x302F),
++    (0x3099, 0x309A),
++];
++
++#[cfg(test)]
++mod tests {
++    use super::{is_combining, is_digit, is_letter};
++
++    #[test]
++    fn letter_uses_xml_base_and_ideographic_boundaries() {
++        for character in [
++            'A', 'Z', 'a', 'z', '\u{00C0}', '\u{00D6}', '\u{0386}', '\u{0559}', '\u{1FF4}',
++            '\u{1FF6}', '\u{3007}', '\u{3021}', '\u{3029}', '\u{4E00}', '\u{9FA5}', '\u{AC00}',
++            '\u{D7A3}',
++        ] {
++            assert!(
++                is_letter(character),
++                "XML Letter should contain U+{:04X}",
++                character as u32
++            );
++        }
++
++        for character in [
++            '@',
++            '[',
++            '\u{00D7}',
++            '\u{00F7}',
++            '\u{0387}',
++            '\u{0557}',
++            '\u{1FF5}',
++            '\u{3006}',
++            '\u{302A}',
++            '\u{3095}',
++            '\u{9FA6}',
++            '\u{D7A4}',
++            '\u{10000}',
++            '\u{1D400}',
++        ] {
++            assert!(
++                !is_letter(character),
++                "XML Letter should exclude U+{:04X}",
++                character as u32
++            );
++        }
++    }
++
++    #[test]
++    fn digit_is_the_xml_digit_table_not_unicode_numeric() {
++        for character in [
++            '0', '9', '\u{0660}', '\u{0669}', '\u{06F0}', '\u{06F9}', '\u{0966}', '\u{096F}',
++            '\u{0F20}', '\u{0F29}',
++        ] {
++            assert!(
++                is_digit(character),
++                "XML Digit should contain U+{:04X}",
++                character as u32
++            );
++        }
++
++        for character in [
++            '/',
++            ':',
++            '\u{065F}',
++            '\u{066A}',
++            '\u{0BE6}',
++            '\u{0BF0}',
++            '\u{1D7CE}',
++            '\u{10000}',
++        ] {
++            assert!(
++                !is_digit(character),
++                "XML Digit should exclude U+{:04X}",
++                character as u32
++            );
++        }
++    }
++
++    #[test]
++    fn combining_character_boundaries_and_excluded_marks_are_exact() {
++        for character in [
++            '\u{0300}', '\u{0345}', '\u{0360}', '\u{05BF}', '\u{0901}', '\u{0A3E}', '\u{0FAD}',
++            '\u{20D0}', '\u{20E1}', '\u{302A}', '\u{3099}', '\u{309A}',
++        ] {
++            assert!(
++                is_combining(character),
++                "XML CombiningChar should contain U+{:04X}",
++                character as u32
++            );
++        }
++
++        for character in [
++            '\u{02FF}', '\u{0346}', '\u{0482}', '\u{05A2}', '\u{05BE}', '\u{05C3}', '\u{093D}',
++            '\u{0A3D}', '\u{20DD}', '\u{3029}', '\u{309B}', '\u{1AB0}',
++        ] {
++            assert!(
++                !is_combining(character),
++                "XML CombiningChar should exclude U+{:04X}",
++                character as u32
++            );
++        }
++    }
++
++    #[test]
++    fn ranges_are_character_based_and_do_not_accept_broad_unicode_classes() {
++        assert!(is_letter('\u{4E00}'));
++        assert!(!is_letter('\u{20000}'));
++        assert!(!is_digit('\u{1D7D8}'));
++        assert!(!is_combining('\u{1D165}'));
++    }
++}
+diff --git a/crates/litchi-ods/src/codec/formula/reference.rs b/crates/litchi-ods/src/codec/formula/reference.rs
+index ad4d691ad..dc6f409b0 100644
+--- a/crates/litchi-ods/src/codec/formula/reference.rs
++++ b/crates/litchi-ods/src/codec/formula/reference.rs
+@@ -12,7 +12,7 @@ use std::{convert::TryFrom, sync::Arc};
+ 
+ mod iri;
+ 
+-use self::iri::is_valid_iri_reference;
++pub(crate) use self::iri::is_valid_iri_reference;
+ 
+ /// Default maximum number of bytes in one bracketed reference body.
+ pub const DEFAULT_MAX_REFERENCE_BYTES: usize = 64 * 1024;
+@@ -454,7 +454,7 @@ pub fn parse(value: &str) -> Result<Reference> {
+ 
+ /// Parse one OpenFormula reference with explicit finite limits.
+ pub fn parse_with_limits(value: &str, limits: &Limits) -> Result<Reference> {
+-    let value = value.trim();
++    let value = trim_reference_whitespace(value);
+     if !value.starts_with('[') || !value.ends_with(']') || value.len() < 2 {
+         return Err(invalid("a reference must be enclosed in brackets"));
+     }
+@@ -469,9 +469,9 @@ pub(crate) fn parse_body(value: &str, limits: &Limits) -> Result<Reference> {
+             limits.max_bytes,
+         ));
+     }
+-    // The public wrapper may be surrounded by formula whitespace, but bytes
+-    // inside the brackets belong to the reference grammar.  Keep them intact
+-    // so whitespace cannot be silently accepted inside a sheet or coordinate.
++    // The body is kept byte-for-byte for limits and lexical components. The
++    // parser skips only the four OpenFormula whitespace characters at grammar
++    // boundaries; whitespace inside a terminating component remains visible.
+     let mut parser = Parser::new(value, *limits);
+     parser.parse()
+ }
+@@ -496,16 +496,23 @@ impl<'a> Parser<'a> {
+     }
+ 
+     fn parse(&mut self) -> Result<Reference> {
+-        if self.input.is_empty() {
++        self.skip_whitespace();
++        if self.at_end() {
+             return Err(invalid("empty OpenFormula reference"));
+         }
+ 
+-        if self.input == "#REF!" {
+-            return Ok(Reference::Error);
++        if self.starts_with(b"#REF!") {
++            self.position += 5;
++            self.skip_whitespace();
++            if self.at_end() {
++                return Ok(Reference::Error);
++            }
++            return Err(invalid("trailing bytes in OpenFormula reference error"));
+         }
+ 
+         let source = self.parse_source_prefix()?;
+         let first = self.parse_first_endpoint()?;
++        self.skip_whitespace();
+         let address = if self.at_end() {
+             match first.value {
+                 EndpointValue::Cell(_) => Address::Cell(first),
+@@ -515,7 +522,9 @@ impl<'a> Parser<'a> {
+             }
+         } else {
+             self.expect_byte(b':', "reference range separator")?;
++            self.skip_whitespace();
+             let second = if self.consume_byte(b'.') {
++                self.skip_whitespace();
+                 Endpoint {
+                     sheet: SheetSelector::Inherited,
+                     value: self.parse_coordinate()?,
+@@ -529,12 +538,14 @@ impl<'a> Parser<'a> {
+                 self.parse_explicit_endpoint()?
+             };
+ 
++            self.skip_whitespace();
+             if !self.at_end() {
+                 return Err(invalid("trailing bytes in OpenFormula reference"));
+             }
+             self.combine_range(first, second)?
+         };
+ 
++        self.skip_whitespace();
+         if !self.at_end() {
+             return Err(invalid("trailing bytes in OpenFormula reference"));
+         }
+@@ -553,7 +564,8 @@ impl<'a> Parser<'a> {
+ 
+         let checkpoint = self.position;
+         let close = self.scan_quoted(checkpoint)?;
+-        if self.bytes.get(close + 1) != Some(&b'#') {
++        let marker = self.skip_whitespace_from(close + 1);
++        if self.bytes.get(marker) != Some(&b'#') {
+             return Ok(None);
+         }
+ 
+@@ -562,7 +574,9 @@ impl<'a> Parser<'a> {
+         let (iri, close) = self.parse_quoted_text(true)?;
+         debug_assert_eq!(self.bytes.get(close), Some(&b'\''));
+         self.position = close + 1;
++        self.skip_whitespace();
+         self.expect_byte(b'#', "source IRI terminator")?;
++        self.skip_whitespace();
+         if iri.len() > self.limits.max_name_bytes {
+             return Err(limit_error(
+                 "source IRI bytes",
+@@ -577,7 +591,9 @@ impl<'a> Parser<'a> {
+     }
+ 
+     fn parse_first_endpoint(&mut self) -> Result<Endpoint> {
++        self.skip_whitespace();
+         if self.consume_byte(b'.') {
++            self.skip_whitespace();
+             return Ok(Endpoint {
+                 sheet: SheetSelector::Current,
+                 value: self.parse_coordinate()?,
+@@ -591,7 +607,9 @@ impl<'a> Parser<'a> {
+         let mut subtables = Vec::new();
+ 
+         loop {
++            self.skip_whitespace();
+             self.expect_byte(b'.', "sheet and coordinate separator")?;
++            self.skip_whitespace();
+             if self.peek() == Some(b'\'') || self.peek_dollar_quote() {
+                 let name = self.parse_sheet_name()?;
+                 self.push_subtable_into(&mut subtables, Subtable::Name(name))?;
+@@ -599,6 +617,7 @@ impl<'a> Parser<'a> {
+             }
+ 
+             let coordinate = self.parse_coordinate()?;
++            self.skip_whitespace();
+             if matches!(coordinate, EndpointValue::Cell(_)) && self.peek() == Some(b'.') {
+                 let EndpointValue::Cell(cell) = coordinate else {
+                     unreachable!("coordinate was checked as a cell")
+@@ -649,6 +668,7 @@ impl<'a> Parser<'a> {
+                 ));
+             }
+ 
++            self.skip_whitespace();
+             let row_absolute = self.consume_byte(b'$');
+             let row_start = self.position;
+             if self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
+@@ -686,6 +706,7 @@ impl<'a> Parser<'a> {
+             if row_absolute {
+                 return Err(invalid("absolute column must be followed by a row"));
+             }
++            self.skip_whitespace();
+             if self.peek() == Some(b':') || self.at_end() || self.peek() == Some(b'.') {
+                 self.bump_component()?;
+                 return Ok(EndpointValue::Column(Column {
+@@ -716,6 +737,7 @@ impl<'a> Parser<'a> {
+                 self.limits.max_name_bytes,
+             ));
+         }
++        self.skip_whitespace();
+         if !self.at_end() && self.peek() != Some(b':') && self.peek() != Some(b'.') {
+             return Err(invalid("invalid OpenFormula row endpoint"));
+         }
+@@ -731,6 +753,15 @@ impl<'a> Parser<'a> {
+ 
+     fn parse_sheet_name(&mut self) -> Result<SheetName> {
+         let absolute = self.consume_byte(b'$');
++        if absolute {
++            let marker_end = self.position;
++            self.skip_whitespace();
++            if self.position != marker_end && self.peek() != Some(b'\'') {
++                return Err(invalid(
++                    "whitespace after '$' is allowed only before a quoted sheet name",
++                ));
++            }
++        }
+         if self.peek() == Some(b'\'') {
+             self.bump_component()?;
+             let (name, close) = self.parse_quoted_text(false)?;
+@@ -912,7 +943,29 @@ impl<'a> Parser<'a> {
+     }
+ 
+     fn peek_dollar_quote(&self) -> bool {
+-        self.peek() == Some(b'$') && self.bytes.get(self.position + 1) == Some(&b'\'')
++        self.peek() == Some(b'$')
++            && self.bytes.get(self.skip_whitespace_from(self.position + 1)) == Some(&b'\'')
++    }
++
++    fn skip_whitespace(&mut self) {
++        self.position = self.skip_whitespace_from(self.position);
++    }
++
++    fn skip_whitespace_from(&self, mut position: usize) -> usize {
++        while self
++            .bytes
++            .get(position)
++            .is_some_and(|byte| is_reference_whitespace(*byte))
++        {
++            position += 1;
++        }
++        position
++    }
++
++    fn starts_with(&self, expected: &[u8]) -> bool {
++        self.bytes
++            .get(self.position..self.position.saturating_add(expected.len()))
++            .is_some_and(|value| value == expected)
+     }
+ 
+     fn expect_byte(&mut self, expected: u8, label: &str) -> Result<()> {
+@@ -945,6 +998,30 @@ impl<'a> Parser<'a> {
+     }
+ }
+ 
++fn is_reference_whitespace(byte: u8) -> bool {
++    matches!(byte, b' ' | b'\t' | b'\n' | b'\r')
++}
++
++fn trim_reference_whitespace(value: &str) -> &str {
++    let bytes = value.as_bytes();
++    let mut start = 0usize;
++    while bytes
++        .get(start)
++        .is_some_and(|byte| is_reference_whitespace(*byte))
++    {
++        start += 1;
++    }
++    let mut end = bytes.len();
++    while end > start
++        && bytes
++            .get(end - 1)
++            .is_some_and(|byte| is_reference_whitespace(*byte))
++    {
++        end -= 1;
++    }
++    &value[start..end]
++}
++
+ fn invalid(message: impl Into<String>) -> Error {
+     Error::InvalidFormat(message.into())
+ }
+@@ -993,10 +1070,10 @@ mod tests {
+ 
+     #[test]
+     fn parses_local_cell_and_preserves_absolute_metadata() {
+-        let reference = parse("[. $A$1]");
+-        assert!(reference.is_err(), "interior whitespace is not grammar");
++        let spaced = parse("[. $A$1]").expect("whitespace after the current-sheet dot");
+ 
+         let reference = parse("[.$A$1]").expect("relative cell reference");
++        assert_eq!(spaced, reference);
+         let endpoint = cell_endpoint(&reference);
+         assert!(matches!(endpoint.sheet, SheetSelector::Current));
+         assert!(matches!(
+@@ -1110,12 +1187,30 @@ mod tests {
+     #[test]
+     fn rejects_non_normative_columns_and_second_endpoint_without_dot() {
+         assert!(parse("[.a1]").is_err());
+-        assert!(parse("[ .A1 ]").is_err());
+         assert!(parse("[Sheet.A1:B2]").is_err());
+         assert!(parse("[.A1:Sheet.B2]").is_err());
+         assert!(parse("[Sheet.A1:.B]").is_err());
+     }
+ 
++    #[test]
++    fn accepts_whitespace_only_at_reference_grammar_boundaries() {
++        for value in [
++            "[ . A1 ]",
++            "[.A 1]",
++            "[.$A $1]",
++            "[.A $1]",
++            "[Sheet . A1 : . B2]",
++            "[ $ 'Sheet' . A1 ]",
++            "['file:///tmp/a.ods' # . A1 ]",
++        ] {
++            parse(value).unwrap_or_else(|error| panic!("{value:?} should parse: {error}"));
++        }
++
++        for value in ["[.$ A1]", "[.A$ 1]", "[$ Sheet.A1]"] {
++            assert!(parse(value).is_err(), "{value:?} splits a lexical terminal");
++        }
++    }
++
+     #[test]
+     fn applies_byte_and_component_limits_before_component_allocation() {
+         let limits = Limits::default().with_max_bytes(4);
+diff --git a/crates/litchi-ods/src/codec/formula/reference/iri.rs b/crates/litchi-ods/src/codec/formula/reference/iri.rs
+index f7e65f4f1..a68a09894 100644
+--- a/crates/litchi-ods/src/codec/formula/reference/iri.rs
++++ b/crates/litchi-ods/src/codec/formula/reference/iri.rs
+@@ -14,7 +14,7 @@ use std::net::Ipv6Addr;
+ /// input, a fixed-size scalar state, or the standard library's lexical IPv6
+ /// parser. In particular, it never allocates while checking a caller-owned
+ /// reference.
+-pub(super) fn is_valid_iri_reference(value: &str) -> bool {
++pub(crate) fn is_valid_iri_reference(value: &str) -> bool {
+     let (without_fragment, fragment) = split_first(value, b'#');
+     if let Some(fragment) = fragment {
+         if !validate_component(fragment, Component::Fragment) {
+diff --git a/crates/litchi-ods/tests/ods_formula_expressions.rs b/crates/litchi-ods/tests/ods_formula_expressions.rs
+new file mode 100644
+index 000000000..6ef7eb5ff
+--- /dev/null
++++ b/crates/litchi-ods/tests/ods_formula_expressions.rs
+@@ -0,0 +1,953 @@
++//! Integration coverage for the strict OpenFormula 1.4 expression grammar.
++//!
++//! These tests inspect the parser's immutable syntax tree and source spans. They
++//! do not evaluate formulas, resolve names, open external IRIs, or make claims
++//! about function arity beyond the syntax rules in Part 4 sections 5.1--5.14.
++
++#![allow(
++    unsafe_code,
++    reason = "The integration-only allocator injects fallible failures."
++)]
++
++use litchi_core::Error;
++use litchi_ods::codec::formula::expression::{
++    Expression, HARD_MAX_EXPRESSION_DEPTH, InfixOperator, Kind, Limits, NameScope, Node,
++    PostfixOperator, PrefixOperator,
++};
++use litchi_ods::codec::formula::reference::{
++    Address, Endpoint, EndpointValue, Reference, SheetSelector, Subtable,
++};
++use std::alloc::{GlobalAlloc, Layout, System};
++use std::cell::Cell;
++use std::process::Command;
++
++thread_local! {
++    static COUNT_ALLOCATIONS: Cell<bool> = const { Cell::new(false) };
++    static ALLOCATION_COUNT: Cell<usize> = const { Cell::new(0) };
++    static FAIL_AT: Cell<Option<usize>> = const { Cell::new(None) };
++    static INJECTION_FIRED: Cell<bool> = const { Cell::new(false) };
++}
++
++struct OneShotFailureAllocator;
++
++#[global_allocator]
++static GLOBAL: OneShotFailureAllocator = OneShotFailureAllocator;
++
++// SAFETY: All non-injected calls delegate unchanged to the system allocator.
++// The injected null result is scoped to this test thread and consumed once.
++unsafe impl GlobalAlloc for OneShotFailureAllocator {
++    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
++        if should_fail() {
++            std::ptr::null_mut()
++        } else {
++            // SAFETY: The caller supplies a valid allocation layout.
++            unsafe { System.alloc(layout) }
++        }
++    }
++
++    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
++        if should_fail() {
++            std::ptr::null_mut()
++        } else {
++            // SAFETY: The caller supplies a valid allocation layout.
++            unsafe { System.alloc_zeroed(layout) }
++        }
++    }
++
++    unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
++        // SAFETY: The pointer/layout pair comes from a prior allocator call.
++        unsafe { System.dealloc(pointer, layout) }
++    }
++
++    unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, size: usize) -> *mut u8 {
++        if should_fail() {
++            std::ptr::null_mut()
++        } else {
++            // SAFETY: The pointer/layout pair and new size are supplied by the
++            // allocator caller.
++            unsafe { System.realloc(pointer, layout, size) }
++        }
++    }
++}
++
++fn should_fail() -> bool {
++    COUNT_ALLOCATIONS.with(|counting| {
++        if !counting.get() {
++            return false;
++        }
++        let index = ALLOCATION_COUNT.with(|count| {
++            let index = count.get();
++            count.set(index.saturating_add(1));
++            index
++        });
++        FAIL_AT.with(|target| {
++            if target.get() == Some(index) {
++                target.set(None);
++                INJECTION_FIRED.with(|fired| fired.set(true));
++                true
++            } else {
++                false
++            }
++        })
++    })
++}
++
++fn begin_allocation_count() {
++    ALLOCATION_COUNT.with(|count| count.set(0));
++    FAIL_AT.with(|target| target.set(None));
++    INJECTION_FIRED.with(|fired| fired.set(false));
++    COUNT_ALLOCATIONS.with(|counting| counting.set(true));
++}
++
++fn end_allocation_count() -> usize {
++    COUNT_ALLOCATIONS.with(|counting| counting.set(false));
++    ALLOCATION_COUNT.with(Cell::get)
++}
++
++fn arm_allocation_failure(index: usize) {
++    ALLOCATION_COUNT.with(|count| count.set(0));
++    FAIL_AT.with(|target| target.set(Some(index)));
++    INJECTION_FIRED.with(|fired| fired.set(false));
++    COUNT_ALLOCATIONS.with(|counting| counting.set(true));
++}
++
++fn injection_fired() -> bool {
++    INJECTION_FIRED.with(Cell::get)
++}
++
++fn assert_number(node: &Node<'_>) {
++    assert!(
++        matches!(node.kind(), Kind::Number),
++        "expected number: {node:?}"
++    );
++}
++
++fn assert_string(node: &Node<'_>) {
++    assert!(
++        matches!(node.kind(), Kind::String),
++        "expected string: {node:?}"
++    );
++}
++
++fn assert_reference(node: &Node<'_>) {
++    assert!(
++        matches!(node.kind(), Kind::Reference(_)),
++        "expected reference: {node:?}"
++    );
++}
++
++fn assert_array_row(node: &Node<'_>) {
++    assert!(
++        matches!(node.kind(), Kind::ArrayRow),
++        "expected array row: {node:?}"
++    );
++}
++
++fn assert_cell_endpoint(
++    endpoint: &Endpoint,
++    column: &str,
++    row: u32,
++    column_absolute: bool,
++    row_absolute: bool,
++) {
++    let EndpointValue::Cell(cell) = &endpoint.value else {
++        panic!("expected a cell endpoint, got {:?}", endpoint.value);
++    };
++    assert_eq!(cell.column.label, column);
++    assert_eq!(cell.column.absolute, column_absolute);
++    assert_eq!(cell.row.number, row);
++    assert_eq!(cell.row.absolute, row_absolute);
++}
++
++fn assert_current_cell_reference(
++    node: &Node<'_>,
++    expected_text: &str,
++    column: &str,
++    row: u32,
++    column_absolute: bool,
++    row_absolute: bool,
++) {
++    assert_reference(node);
++    assert_eq!(node.text(), expected_text);
++    let reference = node
++        .reference()
++        .expect("reference node should expose its parsed value");
++    match reference {
++        Reference::Local(Address::Cell(endpoint)) => {
++            assert!(matches!(&endpoint.sheet, SheetSelector::Current));
++            assert_cell_endpoint(endpoint, column, row, column_absolute, row_absolute);
++        },
++        other => panic!("expected a current-sheet cell reference, got {other:?}"),
++    }
++}
++
++fn parse(source: &str) -> Expression {
++    match Expression::parse(source) {
++        Ok(expression) => expression,
++        Err(error) => panic!("{source:?} should parse: {error}"),
++    }
++}
++
++fn assert_invalid(source: &str) {
++    let error = Expression::parse(source)
++        .err()
++        .unwrap_or_else(|| panic!("{source:?} should be rejected"));
++    assert!(
++        matches!(error, Error::InvalidFormat(_)),
++        "{source:?} returned an unexpected syntax error: {error}"
++    );
++}
++
++fn assert_resource_limit(source: &str, limits: &Limits) {
++    let error = Expression::parse_with_limits(source, limits)
++        .err()
++        .unwrap_or_else(|| panic!("{source:?} should exceed its explicit limit"));
++    assert!(
++        matches!(error, Error::ResourceLimit(_)),
++        "{source:?} returned a non-resource error: {error}"
++    );
++}
++
++#[test]
++fn precedence_and_associativity_are_retained_in_the_tree() {
++    let expression = parse("=1+2*3");
++    assert_eq!(expression.source(), "=1+2*3");
++    let root = expression.root();
++    assert_eq!(root.kind(), Kind::Infix(InfixOperator::Add));
++    let children: Vec<_> = root.children().collect();
++    assert_eq!(children.len(), 2);
++    assert_number(&children[0]);
++    assert_eq!(children[0].text(), "1");
++    assert_eq!(children[1].kind(), Kind::Infix(InfixOperator::Multiply));
++    assert_eq!(children[1].text(), "2*3");
++
++    // §5.5 makes power left associative and puts prefix unary operators above
++    // power. Parentheses must still create an observable tree node.
++    let power = parse("=2^3^2");
++    let power_root = power.root();
++    assert_eq!(power_root.kind(), Kind::Infix(InfixOperator::Power));
++    let power_children: Vec<_> = power_root.children().collect();
++    assert_eq!(power_children.len(), 2);
++    assert_eq!(power_children[0].kind(), Kind::Infix(InfixOperator::Power));
++    assert_eq!(power_children[0].text(), "2^3");
++    assert_number(&power_children[1]);
++
++    let unary = parse("=-2^2");
++    let unary_root = unary.root();
++    assert_eq!(unary_root.kind(), Kind::Infix(InfixOperator::Power));
++    let unary_children: Vec<_> = unary_root.children().collect();
++    assert_eq!(
++        unary_children[0].kind(),
++        Kind::Prefix(PrefixOperator::Minus)
++    );
++    assert_number(&unary_children[1]);
++
++    let parenthesized = parse("=-(2^2)");
++    let parenthesized_root = parenthesized.root();
++    assert_eq!(
++        parenthesized_root.kind(),
++        Kind::Prefix(PrefixOperator::Minus)
++    );
++    let prefix_child = parenthesized_root
++        .child(0)
++        .expect("prefix must have one operand");
++    assert!(matches!(prefix_child.kind(), Kind::Parenthesized));
++    assert_eq!(prefix_child.text(), "(2^2)");
++
++    let postfix = parse("=50%+1");
++    let postfix_root = postfix.root();
++    assert_eq!(postfix_root.kind(), Kind::Infix(InfixOperator::Add));
++    let postfix_children: Vec<_> = postfix_root.children().collect();
++    assert_eq!(
++        postfix_children[0].kind(),
++        Kind::Postfix(PostfixOperator::Percent)
++    );
++    assert_number(&postfix_children[1]);
++}
++
++#[test]
++fn reference_operators_follow_their_distinct_precedence() {
++    let expression = parse("=[.A1:.B2]![.A1]~[.B2]");
++    let root = expression.root();
++    assert_eq!(root.kind(), Kind::Infix(InfixOperator::Union));
++    let union_children: Vec<_> = root.children().collect();
++    assert_eq!(union_children.len(), 2);
++    assert_eq!(
++        union_children[0].kind(),
++        Kind::Infix(InfixOperator::Intersection)
++    );
++    assert_eq!(union_children[0].text(), "[.A1:.B2]![.A1]");
++    assert_reference(&union_children[1]);
++    let intersection_children: Vec<_> = union_children[0].children().collect();
++    assert_eq!(intersection_children.len(), 2);
++    assert_reference(&intersection_children[0]);
++    assert_reference(&intersection_children[1]);
++}
++
++#[test]
++fn function_calls_have_strict_parenthesis_and_separator_grammar() {
++    let zero = parse("=SUM()");
++    let zero_root = zero.root();
++    assert!(matches!(zero_root.kind(), Kind::Function { name: "SUM" }));
++    assert_eq!(zero_root.function_name(), Some("SUM"));
++    assert_eq!(zero_root.children().count(), 0);
++
++    let slots = parse("=SUM(;1;)");
++    let slot_root = slots.root();
++    assert!(matches!(slot_root.kind(), Kind::Function { name: "SUM" }));
++    let arguments: Vec<_> = slot_root.children().collect();
++    assert_eq!(arguments.len(), 3);
++    assert!(matches!(arguments[0].kind(), Kind::Missing));
++    assert_number(&arguments[1]);
++    assert!(matches!(arguments[2].kind(), Kind::Missing));
++
++    let separated = parse("=SUM(1;2)");
++    assert_eq!(separated.root().children().count(), 2);
++
++    let all_missing = parse("=SUM(;)");
++    let all_missing_arguments: Vec<_> = all_missing.root().children().collect();
++    assert_eq!(all_missing_arguments.len(), 2);
++    for argument in &all_missing_arguments {
++        assert!(matches!(argument.kind(), Kind::Missing));
++    }
++
++    for source in ["=SUM (1)", "=SUM(1,2)", "=SUM(,1)", "=SUM(1,)", "=SUM(1 2)"] {
++        assert_invalid(source);
++    }
++
++    // A name may be a function name lexically; the call remains syntactically
++    // valid even when the evaluator has no implementation for it.
++    let cell_shaped_call = parse("=A1()");
++    assert!(matches!(
++        cell_shaped_call.root().kind(),
++        Kind::Function { name: "A1" }
++    ));
++}
++
++#[test]
++fn inline_arrays_preserve_rows_columns_and_nested_expression_nodes() {
++    let rectangular = parse("={1;2|3;4}");
++    let root = rectangular.root();
++    let dimensions = match root.kind() {
++        Kind::Array(dimensions) => dimensions,
++        kind => panic!("expected array, got {kind:?}"),
++    };
++    assert_eq!(dimensions.rows(), 2);
++    assert_eq!(dimensions.columns(), Some(2));
++    assert!(dimensions.is_rectangular());
++    let rows: Vec<_> = root.children().collect();
++    assert_eq!(rows.len(), 2);
++    for row in &rows {
++        assert_array_row(row);
++        assert_eq!(row.children().count(), 2);
++    }
++
++    let nested = parse("={SUM(1;2);\"α🌟\"|3}");
++    let nested_rows: Vec<_> = nested.root().children().collect();
++    assert_eq!(nested_rows.len(), 2);
++    assert_eq!(nested_rows[0].children().count(), 2);
++    let first_row: Vec<_> = nested_rows[0].children().collect();
++    assert!(matches!(
++        first_row[0].kind(),
++        Kind::Function { name: "SUM" }
++    ));
++    assert_string(&first_row[1]);
++
++    // §5.13 describes syntax for nonempty rows; the rectangular restriction is
++    // an evaluator acceptance rule. The syntax tree must retain a ragged array
++    // instead of silently padding or discarding its last cell.
++    let ragged = parse("={1;2|3}");
++    let ragged_dimensions = ragged
++        .root()
++        .array_dimensions()
++        .expect("ragged array dimensions");
++    assert_eq!(ragged_dimensions.rows(), 2);
++    assert_eq!(ragged_dimensions.columns(), None);
++    assert_eq!(ragged_dimensions.min_columns(), 1);
++    assert_eq!(ragged_dimensions.max_columns(), 2);
++    let ragged_rows: Vec<_> = ragged.root().children().collect();
++    assert_eq!(ragged_rows.len(), 2);
++    assert_eq!(ragged_rows[0].children().count(), 2);
++    assert_eq!(ragged_rows[1].children().count(), 1);
++
++    for source in ["={}", "={|1}", "={1;}", "={1||2}"] {
++        assert_invalid(source);
++    }
++}
++
++#[test]
++fn names_sheets_sources_and_labels_are_inert_typed_nodes() {
++    let name = parse("='Sheet One'.Total");
++    let name_root = name.root();
++    assert!(matches!(
++        name_root.kind(),
++        Kind::NamedExpression {
++            name: "Total",
++            scope: NameScope::SheetLocal {
++                sheet: "Sheet One",
++                ..
++            }
++        }
++    ));
++    assert_eq!(name_root.name(), Some("Total"));
++
++    let forced_name = parse("=$$Global");
++    assert!(matches!(
++        forced_name.root().kind(),
++        Kind::NamedExpression {
++            name: "Global",
++            scope: NameScope::Simple { forced: true }
++        }
++    ));
++
++    let external = parse("='file:///tmp/foreign.ods'#'Sheet One'.Total");
++    let external_root = external.root();
++    assert!(matches!(
++        external_root.kind(),
++        Kind::NamedExpression {
++            name: "Total",
++            scope: NameScope::External {
++                source: "file:///tmp/foreign.ods",
++                sheet: Some("Sheet One"),
++                ..
++            }
++        }
++    ));
++    assert_eq!(external_root.name(), Some("Total"));
++
++    // A quoted named-expression component is legal only with the forced-name
++    // marker. Without `$$`, the same spelling is a malformed sheet/name
++    // qualification and must not be reclassified as a label.
++    assert_invalid("='Sheet'.'Name'");
++    assert_invalid("='file:///tmp/foreign.ods'#'Sheet'.'Name'");
++
++    let quoted_name = parse("='Sheet'.$$'Name'");
++    assert!(matches!(
++        quoted_name.root().kind(),
++        Kind::NamedExpression {
++            name: "Name",
++            scope: NameScope::SheetLocal {
++                sheet: "Sheet",
++                forced: true,
++                ..
++            }
++        }
++    ));
++    let quoted_external_name = parse("='file:///tmp/foreign.ods'#'Sheet'.$$'Name'");
++    assert!(matches!(
++        quoted_external_name.root().kind(),
++        Kind::NamedExpression {
++            name: "Name",
++            scope: NameScope::External {
++                source: "file:///tmp/foreign.ods",
++                sheet: Some("Sheet"),
++                forced: true,
++                ..
++            }
++        }
++    ));
++
++    let local_reference = parse("=[Sheet:Two.A1]");
++    let local_root = local_reference.root();
++    assert_reference(&local_root);
++    assert!(local_root.reference().is_some());
++
++    let external_reference = parse("=['file:///tmp/foreign.ods'#'Sheet One'.A1]");
++    let external_reference_root = external_reference.root();
++    let reference = external_reference_root
++        .reference()
++        .expect("external reference node should expose its parsed reference");
++    assert_eq!(
++        reference.source().map(|source| source.as_str()),
++        Some("file:///tmp/foreign.ods")
++    );
++
++    let label = parse("='Column Label'");
++    let label_root = label.root();
++    assert!(matches!(label_root.kind(), Kind::QuotedLabel));
++    assert_eq!(label_root.label(), Some("Column Label"));
++
++    let intersection = parse("='Row'!!'Column'");
++    assert!(matches!(
++        intersection.root().kind(),
++        Kind::AutomaticIntersection
++    ));
++    assert_eq!(intersection.root().children().count(), 2);
++}
++
++#[test]
++fn whitespace_between_nonterminating_components_is_preserved_and_typed() {
++    let forced_name = parse("=$$ Name");
++    assert_eq!(forced_name.source(), "=$$ Name");
++    assert_eq!(forced_name.root().text(), "$$ Name");
++    assert!(matches!(
++        forced_name.root().kind(),
++        Kind::NamedExpression {
++            name: "Name",
++            scope: NameScope::Simple { forced: true }
++        }
++    ));
++
++    let forced_quoted_name = parse("=$$ 'Name'");
++    assert_eq!(forced_quoted_name.source(), "=$$ 'Name'");
++    assert_eq!(forced_quoted_name.root().text(), "$$ 'Name'");
++    assert!(matches!(
++        forced_quoted_name.root().kind(),
++        Kind::NamedExpression {
++            name: "Name",
++            scope: NameScope::Simple { forced: true }
++        }
++    ));
++
++    let sheet_name = parse("='Sheet' . Name");
++    assert_eq!(sheet_name.source(), "='Sheet' . Name");
++    assert_eq!(sheet_name.root().text(), "'Sheet' . Name");
++    assert!(matches!(
++        sheet_name.root().kind(),
++        Kind::NamedExpression {
++            name: "Name",
++            scope: NameScope::SheetLocal {
++                sheet: "Sheet",
++                forced: false,
++                ..
++            }
++        }
++    ));
++
++    let absolute_sheet_name = parse("=$ 'Sheet' . Name");
++    assert_eq!(absolute_sheet_name.source(), "=$ 'Sheet' . Name");
++    assert_eq!(absolute_sheet_name.root().text(), "$ 'Sheet' . Name");
++    assert!(matches!(
++        absolute_sheet_name.root().kind(),
++        Kind::NamedExpression {
++            name: "Name",
++            scope: NameScope::SheetLocal {
++                sheet: "Sheet",
++                absolute: true,
++                forced: false,
++            }
++        }
++    ));
++
++    let external_name = parse("='file:///book.ods' # Name");
++    assert_eq!(external_name.source(), "='file:///book.ods' # Name");
++    assert_eq!(external_name.root().text(), "'file:///book.ods' # Name");
++    assert!(matches!(
++        external_name.root().kind(),
++        Kind::NamedExpression {
++            name: "Name",
++            scope: NameScope::External {
++                source: "file:///book.ods",
++                sheet: None,
++                forced: false,
++                ..
++            }
++        }
++    ));
++
++    let external_absolute_sheet = parse("='file:///book.ods' # $ 'Sheet' . Name");
++    assert_eq!(
++        external_absolute_sheet.source(),
++        "='file:///book.ods' # $ 'Sheet' . Name"
++    );
++    assert_eq!(
++        external_absolute_sheet.root().text(),
++        "'file:///book.ods' # $ 'Sheet' . Name"
++    );
++    assert!(matches!(
++        external_absolute_sheet.root().kind(),
++        Kind::NamedExpression {
++            name: "Name",
++            scope: NameScope::External {
++                source: "file:///book.ods",
++                sheet: Some("Sheet"),
++                sheet_absolute: true,
++                forced: false,
++            }
++        }
++    ));
++
++    let spaced_cell = parse("=[ . $A$1 ]");
++    assert_current_cell_reference(&spaced_cell.root(), "[ . $A$1 ]", "A", 1, true, true);
++
++    let spaced_range = parse("=[ . $A$1 : . $B$2 ]");
++    assert_eq!(spaced_range.source(), "=[ . $A$1 : . $B$2 ]");
++    assert_eq!(spaced_range.root().text(), "[ . $A$1 : . $B$2 ]");
++    match spaced_range.root().reference() {
++        Some(Reference::Local(Address::Cells(start, end))) => {
++            assert!(matches!(&start.sheet, SheetSelector::Current));
++            assert!(matches!(&end.sheet, SheetSelector::Inherited));
++            assert_cell_endpoint(start, "A", 1, true, true);
++            assert_cell_endpoint(end, "B", 2, true, true);
++        },
++        other => panic!("expected a spaced current-sheet cell range, got {other:?}"),
++    }
++
++    let spaced_external_range = parse("=['file:///book.ods' # . $A$1 : . $B$2 ]");
++    assert_eq!(
++        spaced_external_range.source(),
++        "=['file:///book.ods' # . $A$1 : . $B$2 ]"
++    );
++    assert_eq!(
++        spaced_external_range.root().text(),
++        "['file:///book.ods' # . $A$1 : . $B$2 ]"
++    );
++    match spaced_external_range.root().reference() {
++        Some(Reference::Source {
++            source,
++            address: Address::Cells(start, end),
++        }) => {
++            assert_eq!(source.as_str(), "file:///book.ods");
++            assert!(matches!(&start.sheet, SheetSelector::Current));
++            assert!(matches!(&end.sheet, SheetSelector::Inherited));
++            assert_cell_endpoint(start, "A", 1, true, true);
++            assert_cell_endpoint(end, "B", 2, true, true);
++        },
++        other => panic!("expected a spaced external cell range, got {other:?}"),
++    }
++
++    let spaced_subtables = parse("=[ Sheet . A1 . 'Sub.Table' . B2 ]");
++    assert_eq!(
++        spaced_subtables.source(),
++        "=[ Sheet . A1 . 'Sub.Table' . B2 ]"
++    );
++    assert_eq!(
++        spaced_subtables.root().text(),
++        "[ Sheet . A1 . 'Sub.Table' . B2 ]"
++    );
++    match spaced_subtables.root().reference() {
++        Some(Reference::Local(Address::Cell(endpoint))) => {
++            let SheetSelector::Explicit(locator) = &endpoint.sheet else {
++                panic!("expected an explicit sheet locator: {:?}", endpoint.sheet);
++            };
++            assert_eq!(locator.sheet.name, "Sheet");
++            assert_eq!(locator.subtables.len(), 2);
++            assert!(matches!(
++                &locator.subtables[0],
++                Subtable::Cell(cell) if cell.column.label == "A" && cell.row.number == 1
++            ));
++            assert!(matches!(
++                &locator.subtables[1],
++                Subtable::Name(name) if name.name == "Sub.Table" && name.quoted
++            ));
++            assert_cell_endpoint(endpoint, "B", 2, false, false);
++        },
++        other => panic!("expected a spaced subtable reference, got {other:?}"),
++    }
++
++    let spaced_external_absolute = parse("=['file:///book.ods' # $ 'Sheet' . $A$1 ]");
++    assert_eq!(
++        spaced_external_absolute.source(),
++        "=['file:///book.ods' # $ 'Sheet' . $A$1 ]"
++    );
++    assert_eq!(
++        spaced_external_absolute.root().text(),
++        "['file:///book.ods' # $ 'Sheet' . $A$1 ]"
++    );
++    match spaced_external_absolute.root().reference() {
++        Some(Reference::Source {
++            source,
++            address: Address::Cell(endpoint),
++        }) => {
++            assert_eq!(source.as_str(), "file:///book.ods");
++            let SheetSelector::Explicit(locator) = &endpoint.sheet else {
++                panic!(
++                    "expected an explicit quoted sheet locator: {:?}",
++                    endpoint.sheet
++                );
++            };
++            assert_eq!(locator.sheet.name, "Sheet");
++            assert!(locator.sheet.absolute);
++            assert!(locator.sheet.quoted);
++            assert_cell_endpoint(endpoint, "A", 1, true, true);
++        },
++        other => panic!("expected a spaced external absolute cell, got {other:?}"),
++    }
++
++    for source in [
++        "=$ $Name",
++        "=Na me",
++        "=SUM (1)",
++        "=$ Sheet.Name",
++        "=[.$ A1]",
++        "=[.A$ 1]",
++        "=\u{000b}1",
++        "=1\u{000c}+2",
++        "=[.\u{000b}A1]",
++        "=[.A1\u{000c}]",
++    ] {
++        assert_invalid(source);
++    }
++
++    for (source, column, row, column_absolute, row_absolute) in [
++        ("=[.A 1]", "A", 1, false, false),
++        ("=[.$A $1]", "A", 1, true, true),
++        ("=[.A $1]", "A", 1, false, true),
++    ] {
++        let expression = parse(source);
++        assert_current_cell_reference(
++            &expression.root(),
++            &source[1..],
++            column,
++            row,
++            column_absolute,
++            row_absolute,
++        );
++    }
++}
++
++#[test]
++fn numbers_strings_and_errors_keep_lexical_boundaries() {
++    for source in ["=.5", "=1.25e+3", "=1e-9", "=0"] {
++        let expression = parse(source);
++        assert_number(&expression.root());
++        assert_eq!(expression.root().text(), &source[1..]);
++    }
++
++    assert_invalid("=1.");
++    assert_invalid("=1e+");
++
++    let huge_lexeme = "9".repeat(4096);
++    let huge_source = format!("={huge_lexeme}");
++    let huge = parse(&huge_source);
++    assert_number(&huge.root());
++    assert_eq!(huge.root().text(), huge_lexeme);
++
++    let string_source = "=\"α🌟\"\"quote\"";
++    let string = parse(string_source);
++    assert_string(&string.root());
++    assert_eq!(string.root().text(), "\"α🌟\"\"quote\"");
++
++    for source in ["=\"a\0b\"", "=\"unterminated", "=\"a\"b\""] {
++        assert_invalid(source);
++    }
++
++    for source in ["=#N/A", "=#DIV/0!", "=#FOO?"] {
++        let error = parse(source);
++        assert!(matches!(error.root().kind(), Kind::Error));
++        assert_eq!(error.root().text(), &source[1..]);
++    }
++    for source in ["=#BAD", "=#N/AA", "=#DIV/01!"] {
++        assert_invalid(source);
++    }
++}
++
++#[test]
++fn exact_formula_source_and_forced_recalculation_spelling_are_retained() {
++    let source = "of:== SUM(1; 2) ";
++    let expression = parse(source);
++    assert_eq!(expression.source(), source);
++    assert!(expression.is_force_recalculate());
++    assert_eq!(expression.root().text(), "SUM(1; 2)");
++
++    let ordinary = parse("of:=SUM(1; 2)");
++    assert!(!ordinary.is_force_recalculate());
++
++    let whitespace = parse("=  1 +\t2\n");
++    assert_eq!(whitespace.source(), "=  1 +\t2\n");
++    assert_eq!(whitespace.root().text(), "1 +\t2");
++}
++
++#[test]
++fn strict_expression_consumes_the_entire_input() {
++    for source in [
++        "=1 2", "=1+2 3", "=1)", "=(1", "=1@2", "=1,2", "=TRUE", "=FALSE", "=A1",
++    ] {
++        assert_invalid(source);
++    }
++}
++
++#[test]
++fn explicit_resource_limits_fail_atomically_at_the_boundary() {
++    let source = "=1+2";
++    let exact_bytes = Limits::default().with_max_bytes(source.len());
++    assert_eq!(parse_with_limits(source, &exact_bytes).source(), source);
++
++    let short_bytes = Limits::default().with_max_bytes(source.len() - 1);
++    assert_resource_limit(source, &short_bytes);
++
++    let exact_nodes = Limits::default().with_max_nodes(3);
++    assert_eq!(parse_with_limits(source, &exact_nodes).source(), source);
++    let short_nodes = Limits::default().with_max_nodes(2);
++    assert_resource_limit(source, &short_nodes);
++
++    let array_source = "={1;2|3;4}";
++    let exact_cells = Limits::default().with_max_array_cells(4);
++    assert_eq!(
++        parse_with_limits(array_source, &exact_cells).source(),
++        array_source
++    );
++    let short_cells = Limits::default().with_max_array_cells(3);
++    assert_resource_limit(array_source, &short_cells);
++
++    let shallow = Limits::default().with_max_depth(1);
++    assert_eq!(parse_with_limits("=1", &shallow).source(), "=1");
++    assert_resource_limit("=((1))", &shallow);
++}
++
++fn parse_with_limits(source: &str, limits: &Limits) -> Expression {
++    match Expression::parse_with_limits(source, limits) {
++        Ok(expression) => expression,
++        Err(error) => panic!("{source:?} should parse: {error}"),
++    }
++}
++
++#[test]
++fn deep_parentheses_and_long_left_chains_are_bounded_without_recursive_drop() {
++    let mut long = String::from("=");
++    for index in 0..1024 {
++        if index != 0 {
++            long.push('+');
++        }
++        long.push('1');
++    }
++    let expression = parse(&long);
++    let mut current = expression.root();
++    let mut infix_count = 0;
++    loop {
++        let children: Vec<_> = current.children().collect();
++        if children.len() != 2 || !matches!(current.kind(), Kind::Infix(InfixOperator::Add)) {
++            break;
++        }
++        infix_count += 1;
++        current = children.into_iter().next().expect("left child");
++    }
++    assert_eq!(infix_count, 1023);
++
++    let hostile = format!("={}", "(".repeat(256) + "1" + &")".repeat(256));
++    let limits = Limits::default().with_max_depth(64);
++    assert_resource_limit(&hostile, &limits);
++}
++
++#[test]
++fn hard_depth_cap_is_checked_in_a_subprocess_before_stack_overflow() {
++    const CHILD_MARKER: &str = "LITCHI_ODS_EXPRESSION_DEPTH_CHILD";
++
++    if std::env::var_os(CHILD_MARKER).is_some() {
++        let depth = HARD_MAX_EXPRESSION_DEPTH + 32;
++        let limits = Limits::default().with_max_depth(usize::MAX);
++        let sources = [
++            format!("={}1{}", "(".repeat(depth), ")".repeat(depth)),
++            format!("={}1{}", "F(".repeat(depth), ")".repeat(depth)),
++            format!("={}1{}", "{".repeat(depth), "}".repeat(depth)),
++            format!("={}1", "-".repeat(depth)),
++        ];
++
++        for source in &sources {
++            let error = Expression::parse_with_limits(source, &limits)
++                .err()
++                .unwrap_or_else(|| panic!("depth-hostile source unexpectedly parsed"));
++            assert!(
++                matches!(&error, Error::ResourceLimit(limit) if limit.resource == litchi_core::Resource::Depth),
++                "depth-hostile source returned the wrong error: {error}"
++            );
++        }
++        return;
++    }
++
++    let executable = std::env::current_exe().expect("test executable path");
++    let status = Command::new(executable)
++        .arg("--exact")
++        .arg("hard_depth_cap_is_checked_in_a_subprocess_before_stack_overflow")
++        .arg("--nocapture")
++        .env(CHILD_MARKER, "1")
++        .status()
++        .expect("spawn depth-cap child test");
++    assert!(
++        status.success(),
++        "depth-cap child test failed with status {status}"
++    );
++}
++
++#[test]
++fn malformed_short_inputs_are_bounded_and_panic_free() {
++    const FRAGMENTS: &[&str] = &[
++        "",
++        "=",
++        "of:",
++        "of:=",
++        "(",
++        ")",
++        "[",
++        "]",
++        "{",
++        "}",
++        "{}",
++        "{|",
++        ";",
++        "|",
++        ":",
++        "!",
++        "~",
++        "+",
++        "-",
++        "^",
++        "%",
++        "&",
++        "<",
++        ">",
++        "<=",
++        "<>",
++        "#",
++        "#N/",
++        "'",
++        "\"",
++        "\"\"",
++        "A",
++        "A1",
++        ".5",
++        "1.",
++        "1e+",
++        "SUM",
++        "SUM(",
++        "SUM (",
++        "SUM;",
++        "α",
++        "🌟",
++        "\0",
++        "'a''b'",
++        "[.A1]",
++        "['x'#.A1]",
++    ];
++    let limits = Limits::default()
++        .with_max_bytes(128)
++        .with_max_nodes(32)
++        .with_max_depth(8)
++        .with_max_array_cells(16);
++
++    for (index, left) in FRAGMENTS.iter().enumerate() {
++        for right in FRAGMENTS.iter().skip(index % 7) {
++            let source = format!("{left}{right}");
++            let _ = Expression::parse_with_limits(&source, &limits);
++        }
++    }
++}
++
++#[test]
++fn every_parser_reservation_propagates_a_single_injected_allocation_failure() {
++    let source = "of:==SUM(1;[.A1];{2;3|4})";
++
++    begin_allocation_count();
++    let baseline = Expression::parse(source);
++    let allocation_count = end_allocation_count();
++    assert!(baseline.is_ok(), "valid mixed expression should parse");
++    assert!(
++        allocation_count > 0,
++        "parser should make bounded reservations"
++    );
++
++    for index in 0..allocation_count {
++        arm_allocation_failure(index);
++        let result = Expression::parse(source);
++        let _ = end_allocation_count();
++        FAIL_AT.with(|target| target.set(None));
++        assert!(
++            injection_fired(),
++            "allocation-failure injection did not fire at attempt {index} of {allocation_count}"
++        );
++        assert!(
++            matches!(&result, Err(Error::Allocation { .. })),
++            "attempt {index} was swallowed or changed into another error: {result:?}"
++        );
++    }
++}

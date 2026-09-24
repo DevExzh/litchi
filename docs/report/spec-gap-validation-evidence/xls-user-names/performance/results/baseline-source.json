@@ -1,0 +1,24 @@
+{
+  "source": "v5 measured candidate",
+  "source_sha256": {
+    "crates/litchi-xls/docs/FEATURE_MATRIX.md": "2a3a9de268e58ca5c92280ebb3290801820c74d4a28c73c006a15ab18ae0f26a",
+    "crates/litchi-xls/src/lib.rs": "6fb0f1ac31b0c91c9cf63c5dad9d7dbcfdb40005114d6fa6f40b325dbb1a2d39",
+    "crates/litchi-xls/src/revision_log.rs": "e551f280a9124e0fefb91cb54506e9b1dd8b574e7ee37561b4343faa4e84779b",
+    "crates/litchi-xls/src/revision_records/codec.rs": "214252bb40ad0dfb0db097e08ade1697ae9c60f41cbf4beeec74f58335d11d16",
+    "crates/litchi-xls/src/revision_records/transaction_tests.rs": "3ca28624dd34e095c6e9d5149f30dbb0cdad3ddd8c676d464d28f6219be2fffe",
+    "crates/litchi-xls/src/user_names/codec.rs": "78b9667cf12d7419e47910e572460d60433061ed33f8192eafa7abfa525febe0",
+    "crates/litchi-xls/src/user_names/edit.rs": "506199529183f6bc696edd29c9d99a4b9541645bf5912e4cb967b71b39223add",
+    "crates/litchi-xls/src/user_names/mod.rs": "02a581ab7d6c358f51966392e75b9fde64ad0e049227beba1285a1f7f4074268",
+    "crates/litchi-xls/src/user_names/model.rs": "68883833fbec133d3bd64b1620cc7375a7df631b04e6076ec38931dd23973ca4",
+    "crates/litchi-xls/src/user_names/package.rs": "9a36a65e1414ed7224ab5db46dd964c0190db6030905d2c9a8311227dbeb9bbf",
+    "crates/litchi-xls/src/user_names/publication.rs": "f9c404d1d235b6b393af04f7bec4d9fb48c876b90c445383fbfb2f576fb12827",
+    "crates/litchi-xls/src/user_names/tests.rs": "346c01ef66c7e174afb456d96cdb4c945ec0fb78b6e8d875e8a32a4ec3ae5171",
+    "crates/litchi-xls/src/user_routing.rs": "cf6e26b86f81321d39a0c11d5441cf27aea0b759c0df0808618cc90ec58fbdf4",
+    "crates/litchi-xls/src/workbook/package.rs": "8058700956351c188f98f06262316d77f50b0ec36238c14a886f24e7932fafe6",
+    "crates/litchi-xls/tests/xls_revision_log.rs": "8bdfa078101726f899eb4a1f258752eaa2f83c5b20eadfcafcf3356b9c68a4d0",
+    "crates/litchi-xls/tests/xls_user_names.rs": "486a6742c08e79235ad8f48f86156dd4884133fb616abf20559dc8b4b8109bbe"
+  },
+  "patch_sha256": "fd4a5c1b9608b73dab1c1f0db9590db2e59104c7e87030dcf2bf7a786c588bd6",
+  "reverse_reconstruction_verified": true,
+  "scope": "All 16 feature source/test/matrix paths; apply in a detached checkout of the feature commit before running the retained harness."
+}

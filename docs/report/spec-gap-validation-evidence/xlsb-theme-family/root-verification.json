@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "gate_input_files": 866,
+  "reviewed_files": 5,
+  "tests_including_doctests": {
+    "passed": 1127,
+    "failed": 0,
+    "ignored": 12
+  },
+  "schema_reports": 8,
+  "performance": {
+    "passed": true,
+    "source_manifest_sha256": "5afedc6a14bc1f363526640a242f33c453103412bc968437b55868e18a03ddd7",
+    "manifest_paths_checked": 4619,
+    "lanes": 18,
+    "samples": 1620,
+    "independently_checked_raw_processes": 54,
+    "verification_receipt_sha256": "da82119fd10869cb3d30fb03045dce5e99ecbbad3922b7346273a5467bbf9bc8"
+  }
+}

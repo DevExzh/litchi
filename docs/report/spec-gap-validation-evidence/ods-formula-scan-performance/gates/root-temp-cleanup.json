@@ -1,0 +1,14 @@
+{
+  "utc": "2026-09-13T08:38:24.325445+00:00",
+  "removed": [
+    {
+      "path": "/var/tmp/ods-scan-tmp",
+      "bytes": 0
+    },
+    {
+      "path": "/var/tmp/ods-scan-cleanup-pre.json",
+      "bytes": 5073
+    }
+  ],
+  "owned_tmp_paths_absent": true
+}

@@ -1,0 +1,27 @@
+{
+  "actor": "root",
+  "archive_sha256": "a3599c7eec70c97dba9a7455fc524509c7ebb45925a930473f4bd3f39865d4d3",
+  "safe_extraction": {
+    "root": "/var/tmp/litchi-normal-201-root-portable-v2-20260910",
+    "members": 79,
+    "links_or_traversal": false
+  },
+  "checks": [
+    {
+      "mode": "no-binary",
+      "exit_code": 0,
+      "raw_log_sha256": "8e10f49c9c7f29aab82a86e4b4db32f438f85849356623f17d801b46531cf0b2",
+      "binary_check": "skipped",
+      "fresh_analyzer_output_sha256": "f47efcf91a7191814ee4a035692641a43814d23c529c8dfc94749bcab7eb7542"
+    },
+    {
+      "mode": "with-binary",
+      "exit_code": 0,
+      "raw_log_sha256": "3f958fcf290bf98447db453f8bc99892d69be7d94fe86d00af7c87e158c3e5f9",
+      "binary_check": "verified",
+      "fresh_analyzer_output_sha256": "f47efcf91a7191814ee4a035692641a43814d23c529c8dfc94749bcab7eb7542"
+    }
+  ],
+  "timed_workload_executed": false,
+  "scope": "Root independently extracted and ran the sealed verifier twice. It recomputes 603 raw row percentiles and runs the corrected analyzer in a temporary directory. The optional binary check hashes the historical 995bdaf executable only."
+}

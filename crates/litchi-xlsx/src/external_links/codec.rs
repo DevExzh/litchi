@@ -1,19 +1,24 @@
 //! Bounded `SpreadsheetML` external-link XML codec.
 
+use std::collections::HashMap;
+
 use crate::error::{Error, Result};
 use crate::raw::namespace::{is_spreadsheetml_name, relationship_attribute_value};
 use litchi_ooxml_common::external_link::EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES;
-use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
+use litchi_ooxml_common::relationships::{STRICT_NAMESPACE, TRANSITIONAL_NAMESPACE};
+use litchi_ooxml_common::xml::{decode_xml_reference, is_ncname, unqualified_attribute_value};
 use litchi_opc::constants::relationship_type as rt;
+use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{NamespaceResolver, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::model::{
-    Cell, CellType, Conformance, Dde, DdeItem, DdeValue, DdeValueType, DdeValues, DefinedName,
-    ItemSource, Link, MAX_CACHE_TEXT_BYTES, MAX_CACHED_CELLS, MAX_CACHED_ROWS, MAX_CACHED_SHEETS,
-    MAX_CELL_COLUMN, MAX_CELL_ROW, MAX_COLUMN_LETTERS, MAX_DEFINED_NAMES,
+    ALTERNATE_URLS_NAMESPACE, AlternateUrl, AlternateUrls, Cell, CellType, Conformance, Dde,
+    DdeItem, DdeValue, DdeValueType, DdeValues, DefinedName, ItemSource, Link,
+    MAX_ALTERNATE_URL_METADATA_BYTES, MAX_CACHE_TEXT_BYTES, MAX_CACHED_CELLS, MAX_CACHED_ROWS,
+    MAX_CACHED_SHEETS, MAX_CELL_COLUMN, MAX_CELL_ROW, MAX_COLUMN_LETTERS, MAX_DEFINED_NAMES,
     MAX_EXTERNAL_TARGET_BYTES, MAX_LINK_ITEMS, MAX_SHEET_NAMES, Ole, OleItem, Row, SheetData,
     Target, Workbook, X14,
 };
@@ -214,8 +219,165 @@ fn write_external_workbook(xml: &mut String, link: &Workbook) -> Result<()> {
         }
         xml.push_str("</sheetDataSet>");
     }
+    if let Some(alternate_urls) = &link.alternate_urls {
+        write_alternate_urls(xml, alternate_urls, &link.target)?;
+    }
     xml.push_str("</externalBook>");
     Ok(())
+}
+
+fn write_alternate_urls(xml: &mut String, value: &AlternateUrls, primary: &Target) -> Result<()> {
+    validate_alternate_urls(value, Some(primary))?;
+    xml.push_str("<alternateUrls xmlns=\"");
+    xml.push_str(
+        std::str::from_utf8(ALTERNATE_URLS_NAMESPACE)
+            .map_err(|error| invalid(format!("alternate URL namespace is not UTF-8: {error}")))?,
+    );
+    xml.push('"');
+    if let Some(drive_id) = &value.drive_id {
+        push_xml_attr(xml, "driveId", drive_id)?;
+    }
+    if let Some(item_id) = &value.item_id {
+        push_xml_attr(xml, "itemId", item_id)?;
+    }
+    match (&value.absolute_url, &value.relative_url) {
+        (None, None) => xml.push_str("/>"),
+        _ => {
+            xml.push('>');
+            if let Some(url) = &value.absolute_url {
+                write_alternate_url(xml, "absoluteUrl", url)?;
+            }
+            if let Some(url) = &value.relative_url {
+                write_alternate_url(xml, "relativeUrl", url)?;
+            }
+            xml.push_str("</alternateUrls>");
+        },
+    }
+    Ok(())
+}
+
+fn write_alternate_url(xml: &mut String, element: &str, value: &AlternateUrl) -> Result<()> {
+    xml.push('<');
+    xml.push_str(element);
+    push_xml_attr(xml, "r:id", &value.relationship_id)?;
+    xml.push_str("/>");
+    Ok(())
+}
+
+fn validate_alternate_urls(value: &AlternateUrls, primary: Option<&Target>) -> Result<()> {
+    for (name, value) in [
+        ("driveId", value.drive_id.as_deref()),
+        ("itemId", value.item_id.as_deref()),
+    ] {
+        if let Some(value) = value {
+            if value.len() > MAX_ALTERNATE_URL_METADATA_BYTES {
+                return Err(limit(&format!("alternate URL {name}")));
+            }
+            if value.chars().any(|character| {
+                character.is_control() || character == '\u{fffe}' || character == '\u{ffff}'
+            }) {
+                return Err(invalid(format!(
+                    "alternate URL {name} contains an invalid character"
+                )));
+            }
+        }
+    }
+    let mut seen = HashMap::<&str, (&str, &str)>::with_capacity(3);
+    if let Some(primary) = primary {
+        validate_alternate_url_target(primary, "external workbook")?;
+        seen.insert(
+            primary.relationship_id.as_str(),
+            (primary.target.as_str(), primary.relationship_type.as_str()),
+        );
+    }
+    for (name, url) in [
+        ("absoluteUrl", value.absolute_url.as_ref()),
+        ("relativeUrl", value.relative_url.as_ref()),
+    ] {
+        if let Some(url) = url {
+            validate_alternate_url_target(url, name)?;
+            if let Some((target, relationship_type)) = seen.insert(
+                url.relationship_id.as_str(),
+                (url.target.as_str(), url.relationship_type.as_str()),
+            ) {
+                if target != url.target || relationship_type != url.relationship_type {
+                    return Err(invalid(format!(
+                        "alternate URL relationship ID '{}' has conflicting targets",
+                        url.relationship_id
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_alternate_url_target(value: &impl AlternateUrlTarget, description: &str) -> Result<()> {
+    if value.relationship_id().is_empty() {
+        return Err(invalid(format!(
+            "{description} relationship ID must not be empty"
+        )));
+    }
+    if !is_ncname(value.relationship_id())
+        || value.relationship_id().len() > 1024
+        || value.relationship_id().chars().any(char::is_control)
+    {
+        return Err(invalid(format!("{description} relationship ID is invalid")));
+    }
+    if value.target().is_empty() {
+        return Err(invalid(format!("{description} target must not be empty")));
+    }
+    if value.target().len() > MAX_EXTERNAL_TARGET_BYTES {
+        return Err(limit(&format!("{description} target URI")));
+    }
+    if value.target().chars().any(|character| {
+        character.is_control() || character == '\u{fffe}' || character == '\u{ffff}'
+    }) {
+        return Err(invalid(format!(
+            "{description} target URI contains an invalid character"
+        )));
+    }
+    if !EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES.contains(&value.relationship_type()) {
+        return Err(invalid(format!(
+            "{description} has invalid relationship type '{}'",
+            value.relationship_type()
+        )));
+    }
+    Ok(())
+}
+
+trait AlternateUrlTarget {
+    fn relationship_id(&self) -> &str;
+    fn target(&self) -> &str;
+    fn relationship_type(&self) -> &str;
+}
+
+impl AlternateUrlTarget for Target {
+    fn relationship_id(&self) -> &str {
+        &self.relationship_id
+    }
+
+    fn target(&self) -> &str {
+        &self.target
+    }
+
+    fn relationship_type(&self) -> &str {
+        &self.relationship_type
+    }
+}
+
+impl AlternateUrlTarget for AlternateUrl {
+    fn relationship_id(&self) -> &str {
+        &self.relationship_id
+    }
+
+    fn target(&self) -> &str {
+        &self.target
+    }
+
+    fn relationship_type(&self) -> &str {
+        &self.relationship_type
+    }
 }
 
 fn write_dde_link(xml: &mut String, link: &Dde) -> Result<()> {
@@ -427,9 +589,13 @@ enum Context {
     Row(usize, usize),
     Cell(usize, usize, usize),
     Value(usize, usize, usize),
+    AlternateUrls,
+    AlternateAbsoluteUrl,
+    AlternateRelativeUrl,
     Other,
 }
 
+#[allow(clippy::large_enum_variant)] // parse projection mirrors the public link variants
 enum ParsedLink {
     Workbook(ParsedExternalBook),
     Dde(ParsedDdeLink),
@@ -483,9 +649,17 @@ struct ParsedExternalBook {
     sheet_names: Vec<String>,
     defined_names: Vec<DefinedName>,
     cached_sheets: Vec<SheetData>,
+    alternate_urls: Option<ParsedAlternateUrls>,
     saw_sheet_names: bool,
     saw_defined_names: bool,
     saw_sheet_data_set: bool,
+}
+
+struct ParsedAlternateUrls {
+    drive_id: Option<String>,
+    item_id: Option<String>,
+    absolute_url: Option<AlternateUrl>,
+    relative_url: Option<AlternateUrl>,
 }
 
 struct Parser {
@@ -548,6 +722,7 @@ impl Parser {
                 sheet_names: Vec::new(),
                 defined_names: Vec::new(),
                 cached_sheets: Vec::new(),
+                alternate_urls: None,
                 saw_sheet_names: false,
                 saw_defined_names: false,
                 saw_sheet_data_set: false,
@@ -799,6 +974,88 @@ impl Parser {
             let book = self.book_mut()?;
             mark_once(&mut book.saw_sheet_names, "external sheetNames")?;
             return Ok(Context::SheetNames);
+        }
+        if parent == Context::ExternalBook
+            && is_exact_name(
+                namespace,
+                element.name(),
+                ALTERNATE_URLS_NAMESPACE,
+                b"alternateUrls",
+            )
+        {
+            let drive_id =
+                bounded_unqualified_attribute_value(element, b"driveId", decoder, "driveId")?;
+            let item_id =
+                bounded_unqualified_attribute_value(element, b"itemId", decoder, "itemId")?;
+            self.add_text(
+                drive_id.as_ref().map_or(0, String::len) + item_id.as_ref().map_or(0, String::len),
+            )?;
+            let book = self.book_mut()?;
+            if book.alternate_urls.is_some() {
+                return Err(invalid("externalBook has duplicate alternateUrls"));
+            }
+            book.alternate_urls = Some(ParsedAlternateUrls {
+                drive_id,
+                item_id,
+                absolute_url: None,
+                relative_url: None,
+            });
+            return Ok(Context::AlternateUrls);
+        }
+        if parent == Context::AlternateUrls
+            && is_exact_name(
+                namespace,
+                element.name(),
+                ALTERNATE_URLS_NAMESPACE,
+                b"absoluteUrl",
+            )
+        {
+            let relationship_id =
+                parse_alternate_relationship_id(element, decoder, resolver, "absoluteUrl")?;
+            self.add_text(relationship_id.len())?;
+            let book = self.book_mut()?;
+            let alternate_urls = book
+                .alternate_urls
+                .as_mut()
+                .ok_or_else(|| invalid("alternateUrl is outside alternateUrls"))?;
+            if alternate_urls.relative_url.is_some() {
+                return Err(invalid("alternateUrls children are out of schema order"));
+            }
+            if alternate_urls.absolute_url.is_some() {
+                return Err(invalid("alternateUrls has duplicate absoluteUrl"));
+            }
+            alternate_urls.absolute_url = Some(AlternateUrl {
+                relationship_id,
+                target: String::new(),
+                relationship_type: String::new(),
+            });
+            return Ok(Context::AlternateAbsoluteUrl);
+        }
+        if parent == Context::AlternateUrls
+            && is_exact_name(
+                namespace,
+                element.name(),
+                ALTERNATE_URLS_NAMESPACE,
+                b"relativeUrl",
+            )
+        {
+            let relationship_id =
+                parse_alternate_relationship_id(element, decoder, resolver, "relativeUrl")?;
+            self.add_text(relationship_id.len())?;
+            let book = self.book_mut()?;
+            let alternate_urls = book
+                .alternate_urls
+                .as_mut()
+                .ok_or_else(|| invalid("alternateUrl is outside alternateUrls"))?;
+            if alternate_urls.relative_url.is_some() {
+                return Err(invalid("alternateUrls has duplicate relativeUrl"));
+            }
+            alternate_urls.relative_url = Some(AlternateUrl {
+                relationship_id,
+                target: String::new(),
+                relationship_type: String::new(),
+            });
+            return Ok(Context::AlternateRelativeUrl);
         }
         if parent == Context::ExternalBook
             && is_spreadsheetml_name(namespace, element.name(), b"definedNames")
@@ -1111,6 +1368,12 @@ pub fn parse_external_link(xml: &[u8]) -> Result<Link> {
             sheet_names: book.sheet_names,
             defined_names: book.defined_names,
             cached_sheets: book.cached_sheets,
+            alternate_urls: book.alternate_urls.map(|value| AlternateUrls {
+                drive_id: value.drive_id,
+                item_id: value.item_id,
+                absolute_url: value.absolute_url,
+                relative_url: value.relative_url,
+            }),
         })),
         ParsedLink::Dde(link) => {
             if link.saw_items && link.items.is_empty() {
@@ -1152,9 +1415,11 @@ pub fn parse_external_link(xml: &[u8]) -> Result<Link> {
 /// The typed parser deliberately ignores future and producer-specific
 /// children. When the edit keeps the known tree topology, this routine only
 /// replaces the affected attribute/text spans, so those opaque children and
-/// the source's formatting remain byte-identical. Structural CRUD falls back
-/// to the bounded canonical writer for the changed part; package callers keep
-/// every unaffected part and relationship untouched.
+/// the source's formatting remain byte-identical. The bounded `alternateUrls`
+/// child edits also splice their own extension tree, including prefixed
+/// wrappers and empty-child expansion; other unsupported topology changes
+/// fall back to the canonical writer. Package callers keep every unaffected
+/// part and relationship untouched.
 pub(super) fn patch_source(
     source: &[u8],
     before: &Link,
@@ -1172,7 +1437,7 @@ pub(super) fn patch_source(
     let kind = tree.kind_node()?;
     match (before, after) {
         (Link::Workbook(before), Link::Workbook(after)) => {
-            patch_workbook(&tree, kind, before, after, &mut edits)?;
+            patch_workbook(&tree, source, kind, before, after, &mut edits)?;
         },
         (Link::Dde(before), Link::Dde(after)) => {
             patch_dde(&tree, kind, before, after, &mut edits)?;
@@ -1194,6 +1459,9 @@ struct XmlTree {
 #[derive(Debug)]
 struct XmlNode {
     local: String,
+    qualified: String,
+    namespace_uri: Option<String>,
+    start: usize,
     start_end: usize,
     end_start: usize,
     end: usize,
@@ -1205,15 +1473,44 @@ struct XmlNode {
 #[derive(Debug)]
 struct XmlAttr {
     name: String,
+    namespace_uri: Option<String>,
     start: usize,
     value_start: usize,
     value_end: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum XmlNamespace {
+    SpreadsheetMl,
+    AlternateUrls,
+    X14,
+    SpreadsheetMlOrX14,
+}
+
+impl XmlNamespace {
+    fn matches(self, uri: Option<&str>) -> bool {
+        let Some(uri) = uri else {
+            return false;
+        };
+        match self {
+            Self::SpreadsheetMl => {
+                uri.as_bytes() == super::model::TRANSITIONAL_SML.as_bytes()
+                    || uri.as_bytes() == super::model::STRICT_SML.as_bytes()
+            },
+            Self::AlternateUrls => uri.as_bytes() == ALTERNATE_URLS_NAMESPACE,
+            Self::X14 => uri.as_bytes() == X14,
+            Self::SpreadsheetMlOrX14 => {
+                Self::SpreadsheetMl.matches(Some(uri)) || Self::X14.matches(Some(uri))
+            },
+        }
+    }
 }
 
 impl XmlTree {
     fn parse(source: &[u8]) -> Result<Self> {
         let mut nodes: Vec<XmlNode> = Vec::new();
         let mut stack: Vec<usize> = Vec::new();
+        let mut namespace_stack: Vec<HashMap<String, String>> = Vec::new();
         let mut root: Option<usize> = None;
         let mut position = 0usize;
         while position < source.len() {
@@ -1241,25 +1538,41 @@ impl XmlTree {
                 let end = find_tag_end(source, position)?;
                 let name_start = position + 2;
                 let name_end = skip_name(source, name_start);
+                let qualified =
+                    std::str::from_utf8(&source[name_start..name_end]).map_err(|error| {
+                        invalid(format!("external-link XML name is not UTF-8: {error}"))
+                    })?;
                 let local = local_name(&source[name_start..name_end])?;
                 let node_index = stack
                     .pop()
                     .ok_or_else(|| invalid("external-link XML has an unmatched closing tag"))?;
-                if nodes[node_index].local != local {
+                if nodes[node_index].local != local || nodes[node_index].qualified != qualified {
                     return Err(invalid("external-link XML has mismatched tags"));
                 }
                 nodes[node_index].end_start = position;
                 nodes[node_index].end = end + 1;
+                namespace_stack
+                    .pop()
+                    .ok_or_else(|| invalid("external-link XML namespace stack is unbalanced"))?;
                 position = end + 1;
                 continue;
             }
 
             let end = find_tag_end(source, position)?;
-            let (local, _name_end, attrs, close_pos, self_closing) =
+            let (local, qualified, mut attrs, close_pos, self_closing) =
                 parse_start_tag(source, position, end)?;
+            let mut namespaces = namespace_stack.last().cloned().unwrap_or_default();
+            apply_namespace_declarations(source, &attrs, &mut namespaces)?;
+            let element_namespace = namespace_uri(&namespaces, &qualified, false);
+            for attr in &mut attrs {
+                attr.namespace_uri = namespace_uri(&namespaces, &attr.name, true);
+            }
             let node_index = nodes.len();
             nodes.push(XmlNode {
                 local,
+                qualified,
+                namespace_uri: element_namespace,
+                start: position,
                 start_end: end + 1,
                 end_start: end + 1,
                 end: end + 1,
@@ -1274,6 +1587,7 @@ impl XmlTree {
             }
             if !self_closing {
                 stack.push(node_index);
+                namespace_stack.push(namespaces);
             }
             position = end + 1;
         }
@@ -1292,18 +1606,21 @@ impl XmlTree {
             .iter()
             .copied()
             .find(|index| {
-                matches!(
-                    self.nodes[*index].local.as_str(),
-                    "externalBook" | "ddeLink" | "oleLink"
-                )
+                XmlNamespace::SpreadsheetMl.matches(self.nodes[*index].namespace_uri.as_deref())
+                    && matches!(
+                        self.nodes[*index].local.as_str(),
+                        "externalBook" | "ddeLink" | "oleLink"
+                    )
             })
             .ok_or_else(|| invalid("external-link source has no known link kind"))
     }
 
-    fn child(&self, parent: usize, name: &str) -> Result<Option<usize>> {
+    fn child(&self, parent: usize, name: &str, namespace: XmlNamespace) -> Result<Option<usize>> {
         let mut found = None;
         for child in &self.nodes[parent].children {
-            if self.nodes[*child].local != name {
+            if self.nodes[*child].local != name
+                || !namespace.matches(self.nodes[*child].namespace_uri.as_deref())
+            {
                 continue;
             }
             if found.replace(*child).is_some() {
@@ -1315,23 +1632,27 @@ impl XmlTree {
         Ok(found)
     }
 
-    fn required_child(&self, parent: usize, name: &str) -> Result<usize> {
-        self.child(parent, name)?
+    fn required_child(&self, parent: usize, name: &str, namespace: XmlNamespace) -> Result<usize> {
+        self.child(parent, name, namespace)?
             .ok_or_else(|| invalid(format!("external-link source is missing '{name}'")))
     }
 
-    fn children(&self, parent: usize, name: &str) -> Vec<usize> {
+    fn children(&self, parent: usize, name: &str, namespace: XmlNamespace) -> Vec<usize> {
         self.nodes[parent]
             .children
             .iter()
             .copied()
-            .filter(|child| self.nodes[*child].local == name)
+            .filter(|child| {
+                self.nodes[*child].local == name
+                    && namespace.matches(self.nodes[*child].namespace_uri.as_deref())
+            })
             .collect()
     }
 }
 
 fn patch_workbook(
     tree: &XmlTree,
+    source: &[u8],
     book: usize,
     before: &Workbook,
     after: &Workbook,
@@ -1346,9 +1667,9 @@ fn patch_workbook(
         edits,
     )?;
     if !before.sheet_names.is_empty() {
-        let wrapper = tree.required_child(book, "sheetNames")?;
+        let wrapper = tree.required_child(book, "sheetNames", XmlNamespace::SpreadsheetMl)?;
         for (node, (before, after)) in tree
-            .children(wrapper, "sheetName")
+            .children(wrapper, "sheetName", XmlNamespace::SpreadsheetMl)
             .into_iter()
             .zip(before.sheet_names.iter().zip(&after.sheet_names))
         {
@@ -1356,9 +1677,9 @@ fn patch_workbook(
         }
     }
     if !before.defined_names.is_empty() {
-        let wrapper = tree.required_child(book, "definedNames")?;
+        let wrapper = tree.required_child(book, "definedNames", XmlNamespace::SpreadsheetMl)?;
         for (node, (before, after)) in tree
-            .children(wrapper, "definedName")
+            .children(wrapper, "definedName", XmlNamespace::SpreadsheetMl)
             .into_iter()
             .zip(before.defined_names.iter().zip(&after.defined_names))
         {
@@ -1382,9 +1703,9 @@ fn patch_workbook(
         }
     }
     if !before.cached_sheets.is_empty() {
-        let wrapper = tree.required_child(book, "sheetDataSet")?;
+        let wrapper = tree.required_child(book, "sheetDataSet", XmlNamespace::SpreadsheetMl)?;
         for (sheet_node, (before, after)) in tree
-            .children(wrapper, "sheetData")
+            .children(wrapper, "sheetData", XmlNamespace::SpreadsheetMl)
             .into_iter()
             .zip(before.cached_sheets.iter().zip(&after.cached_sheets))
         {
@@ -1397,12 +1718,12 @@ fn patch_workbook(
                 edits,
             )?;
             for (row_node, (before, after)) in tree
-                .children(sheet_node, "row")
+                .children(sheet_node, "row", XmlNamespace::SpreadsheetMl)
                 .into_iter()
                 .zip(before.rows.iter().zip(&after.rows))
             {
                 for (cell_node, (before, after)) in tree
-                    .children(row_node, "cell")
+                    .children(row_node, "cell", XmlNamespace::SpreadsheetMl)
                     .into_iter()
                     .zip(before.cells.iter().zip(&after.cells))
                 {
@@ -1431,7 +1752,8 @@ fn patch_workbook(
                         edits,
                     )?;
                     if before.raw_value != after.raw_value {
-                        let value_node = tree.required_child(cell_node, "v")?;
+                        let value_node =
+                            tree.required_child(cell_node, "v", XmlNamespace::SpreadsheetMl)?;
                         patch_text(
                             tree,
                             value_node,
@@ -1443,6 +1765,373 @@ fn patch_workbook(
                 }
             }
         }
+    }
+    patch_alternate_urls(
+        tree,
+        source,
+        book,
+        &after.target,
+        before.alternate_urls.as_ref(),
+        after.alternate_urls.as_ref(),
+        edits,
+    )?;
+    Ok(())
+}
+
+fn patch_alternate_urls(
+    tree: &XmlTree,
+    source: &[u8],
+    book: usize,
+    primary: &Target,
+    before: Option<&AlternateUrls>,
+    after: Option<&AlternateUrls>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    match (before, after) {
+        (None, None) => Ok(()),
+        (None, Some(after)) => {
+            let fragment = alternate_urls_fragment(after, primary)?;
+            insert_child(tree, source, book, fragment, edits)
+        },
+        (Some(_), None) => {
+            let node = tree.required_child(book, "alternateUrls", XmlNamespace::AlternateUrls)?;
+            if !can_remove_alternate_urls(tree, source, node) {
+                return Err(invalid(
+                    "removing alternateUrls would discard opaque source markup",
+                ));
+            }
+            edits.push(SourceEdit {
+                range: tree.nodes[node].start..tree.nodes[node].end,
+                replacement: Vec::new(),
+            });
+            Ok(())
+        },
+        (Some(before), Some(after)) => {
+            let node = tree.required_child(book, "alternateUrls", XmlNamespace::AlternateUrls)?;
+            patch_optional_attr(
+                tree,
+                node,
+                "driveId",
+                before.drive_id.as_deref(),
+                after.drive_id.as_deref(),
+                edits,
+            )?;
+            patch_optional_attr(
+                tree,
+                node,
+                "itemId",
+                before.item_id.as_deref(),
+                after.item_id.as_deref(),
+                edits,
+            )?;
+            let contract_empty = after.absolute_url.is_none()
+                && after.relative_url.is_none()
+                && (before.absolute_url.is_some() || before.relative_url.is_some())
+                && can_contract_empty_alternate_urls(tree, source, node);
+            if !contract_empty {
+                patch_alternate_url(
+                    tree,
+                    source,
+                    node,
+                    "absoluteUrl",
+                    before.absolute_url.as_ref(),
+                    after.absolute_url.as_ref(),
+                    edits,
+                )?;
+                patch_alternate_url(
+                    tree,
+                    source,
+                    node,
+                    "relativeUrl",
+                    before.relative_url.as_ref(),
+                    after.relative_url.as_ref(),
+                    edits,
+                )?;
+            }
+            let mut append = Vec::new();
+            if before.absolute_url.is_none() {
+                if let Some(after_url) = after.absolute_url.as_ref() {
+                    let mut fragment = Vec::new();
+                    let qualified =
+                        qualified_child_name(&tree.nodes[node].qualified, "absoluteUrl");
+                    write_alternate_url_bytes(&mut fragment, &qualified, after_url)?;
+                    if before.relative_url.is_some() && after.relative_url.is_some() {
+                        let relative =
+                            tree.required_child(node, "relativeUrl", XmlNamespace::AlternateUrls)?;
+                        insert_children_before(tree, relative, fragment, edits);
+                    } else {
+                        append.push(fragment);
+                    }
+                }
+            }
+            if before.relative_url.is_none() {
+                if let Some(after_url) = after.relative_url.as_ref() {
+                    let mut fragment = Vec::new();
+                    let qualified =
+                        qualified_child_name(&tree.nodes[node].qualified, "relativeUrl");
+                    write_alternate_url_bytes(&mut fragment, &qualified, after_url)?;
+                    append.push(fragment);
+                }
+            }
+            if !append.is_empty() {
+                insert_children(tree, source, node, append, edits)?;
+            }
+            if contract_empty {
+                contract_empty_alternate_urls(tree, source, node, edits)?;
+            }
+            Ok(())
+        },
+    }
+}
+
+fn patch_alternate_url(
+    tree: &XmlTree,
+    source: &[u8],
+    parent: usize,
+    name: &str,
+    before: Option<&AlternateUrl>,
+    after: Option<&AlternateUrl>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    match (before, after) {
+        (Some(before), Some(after)) => patch_attr(
+            tree,
+            tree.required_child(parent, name, XmlNamespace::AlternateUrls)?,
+            "r:id",
+            &before.relationship_id,
+            &after.relationship_id,
+            edits,
+        ),
+        (Some(_), None) => {
+            let node = tree.required_child(parent, name, XmlNamespace::AlternateUrls)?;
+            if !can_remove_alternate_url(tree, source, node) {
+                return Err(invalid(
+                    "removing alternate URL would discard opaque source markup",
+                ));
+            }
+            edits.push(SourceEdit {
+                range: tree.nodes[node].start..tree.nodes[node].end,
+                replacement: Vec::new(),
+            });
+            Ok(())
+        },
+        (None, Some(_)) => Ok(()),
+        (None, None) => Ok(()),
+    }
+}
+
+fn can_remove_alternate_url(tree: &XmlTree, source: &[u8], node: usize) -> bool {
+    let node_info = &tree.nodes[node];
+    node_info.children.is_empty()
+        && node_info
+            .attrs
+            .iter()
+            .all(|attr| is_namespace_declaration(attr) || attr_matches(attr, "r:id"))
+        && is_xml_whitespace(source.get(node_info.start_end..node_info.end_start))
+}
+
+fn can_contract_empty_alternate_urls(tree: &XmlTree, source: &[u8], node: usize) -> bool {
+    let node = &tree.nodes[node];
+    if node.children.is_empty()
+        || node.children.iter().any(|child| {
+            !matches!(
+                tree.nodes[*child].local.as_str(),
+                "absoluteUrl" | "relativeUrl"
+            ) || !XmlNamespace::AlternateUrls.matches(tree.nodes[*child].namespace_uri.as_deref())
+        })
+    {
+        return false;
+    }
+    let mut cursor = node.start_end;
+    for child in &node.children {
+        if !source
+            .get(cursor..tree.nodes[*child].start)
+            .is_some_and(<[u8]>::is_empty)
+        {
+            return false;
+        }
+        cursor = tree.nodes[*child].end;
+    }
+    source
+        .get(cursor..node.end_start)
+        .is_some_and(<[u8]>::is_empty)
+}
+
+fn can_remove_alternate_urls(tree: &XmlTree, source: &[u8], node: usize) -> bool {
+    let node_info = &tree.nodes[node];
+    if node_info.attrs.iter().any(|attr| {
+        !is_namespace_declaration(attr)
+            && !is_unqualified_attribute(attr, "driveId")
+            && !is_unqualified_attribute(attr, "itemId")
+    }) {
+        return false;
+    }
+    let mut cursor = node_info.start_end;
+    for child in &node_info.children {
+        if !is_xml_whitespace(source.get(cursor..tree.nodes[*child].start)) {
+            return false;
+        }
+        let child_info = &tree.nodes[*child];
+        if !matches!(child_info.local.as_str(), "absoluteUrl" | "relativeUrl")
+            || !XmlNamespace::AlternateUrls.matches(child_info.namespace_uri.as_deref())
+            || !child_info.children.is_empty()
+            || child_info
+                .attrs
+                .iter()
+                .any(|attr| !is_namespace_declaration(attr) && !attr_matches(attr, "r:id"))
+        {
+            return false;
+        }
+        if !is_xml_whitespace(source.get(child_info.start_end..child_info.end_start)) {
+            return false;
+        }
+        cursor = child_info.end;
+    }
+    is_xml_whitespace(source.get(cursor..node_info.end_start))
+}
+
+fn is_namespace_declaration(attr: &XmlAttr) -> bool {
+    attr.name == "xmlns" || attr.name.starts_with("xmlns:")
+}
+
+fn is_unqualified_attribute(attr: &XmlAttr, expected: &str) -> bool {
+    attr.name == expected && attr.namespace_uri.is_none()
+}
+
+fn is_xml_whitespace(value: Option<&[u8]>) -> bool {
+    value.is_some_and(|value| value.iter().all(u8::is_ascii_whitespace))
+}
+
+fn contract_empty_alternate_urls(
+    tree: &XmlTree,
+    source: &[u8],
+    node: usize,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    let node_info = &tree.nodes[node];
+    let mut opening_edits = Vec::new();
+    let mut retained = Vec::new();
+    for edit in edits.drain(..) {
+        if edit.range.start >= node_info.start && edit.range.end <= node_info.close_pos {
+            opening_edits.push(SourceEdit {
+                range: (edit.range.start - node_info.start)..(edit.range.end - node_info.start),
+                replacement: edit.replacement,
+            });
+        } else {
+            retained.push(edit);
+        }
+    }
+    let mut replacement = apply_source_edits(
+        source
+            .get(node_info.start..node_info.close_pos)
+            .ok_or_else(|| invalid("alternateUrls opening span is invalid"))?,
+        opening_edits,
+    )?;
+    replacement.extend_from_slice(b"/>");
+    retained.push(SourceEdit {
+        range: node_info.start..node_info.end,
+        replacement,
+    });
+    *edits = retained;
+    Ok(())
+}
+
+fn alternate_urls_fragment(value: &AlternateUrls, primary: &Target) -> Result<Vec<u8>> {
+    let mut fragment = String::new();
+    write_alternate_urls(&mut fragment, value, primary)?;
+    Ok(fragment.into_bytes())
+}
+
+fn write_alternate_url_bytes(output: &mut Vec<u8>, name: &str, value: &AlternateUrl) -> Result<()> {
+    let mut fragment = String::new();
+    write_alternate_url(&mut fragment, name, value)?;
+    output.extend_from_slice(fragment.as_bytes());
+    Ok(())
+}
+
+fn qualified_child_name(parent: &str, local: &str) -> String {
+    parent.split_once(':').map_or_else(
+        || local.to_owned(),
+        |(prefix, _)| format!("{prefix}:{local}"),
+    )
+}
+
+fn insert_child(
+    tree: &XmlTree,
+    source: &[u8],
+    parent: usize,
+    child: Vec<u8>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    insert_children(tree, source, parent, vec![child], edits)
+}
+
+fn insert_children_before(
+    tree: &XmlTree,
+    anchor: usize,
+    children: Vec<u8>,
+    edits: &mut Vec<SourceEdit>,
+) {
+    let _ = tree;
+    edits.push(SourceEdit {
+        range: tree.nodes[anchor].start..tree.nodes[anchor].start,
+        replacement: children,
+    });
+}
+
+fn insert_children(
+    tree: &XmlTree,
+    source: &[u8],
+    parent: usize,
+    children: Vec<Vec<u8>>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    if children.is_empty() {
+        return Ok(());
+    }
+    let node = &tree.nodes[parent];
+    if node.start_end == node.end_start {
+        let opening_start = node.start;
+        let opening_end = node.close_pos;
+        let mut opening_edits = Vec::new();
+        let mut retained = Vec::new();
+        for edit in edits.drain(..) {
+            if edit.range.start >= opening_start && edit.range.end <= opening_end {
+                opening_edits.push(SourceEdit {
+                    range: (edit.range.start - opening_start)..(edit.range.end - opening_start),
+                    replacement: edit.replacement,
+                });
+            } else {
+                retained.push(edit);
+            }
+        }
+        *edits = retained;
+        let mut expanded = apply_source_edits(
+            source
+                .get(opening_start..opening_end)
+                .ok_or_else(|| invalid("external-link self-closing opening span is invalid"))?,
+            opening_edits,
+        )?;
+        expanded.push(b'>');
+        for child in children {
+            expanded.extend_from_slice(&child);
+        }
+        expanded.extend_from_slice(b"</");
+        expanded.extend_from_slice(node.qualified.as_bytes());
+        expanded.push(b'>');
+        edits.push(SourceEdit {
+            range: node.start..node.end,
+            replacement: expanded,
+        });
+    } else {
+        let mut replacement = Vec::new();
+        for child in children {
+            replacement.extend_from_slice(&child);
+        }
+        edits.push(SourceEdit {
+            range: node.end_start..node.end_start,
+            replacement,
+        });
     }
     Ok(())
 }
@@ -1464,9 +2153,9 @@ fn patch_dde(
     )?;
     patch_attr(tree, link, "ddeTopic", &before.topic, &after.topic, edits)?;
     if !before.items.is_empty() {
-        let wrapper = tree.required_child(link, "ddeItems")?;
+        let wrapper = tree.required_child(link, "ddeItems", XmlNamespace::SpreadsheetMl)?;
         for (node, (before, after)) in tree
-            .children(wrapper, "ddeItem")
+            .children(wrapper, "ddeItem", XmlNamespace::SpreadsheetMl)
             .into_iter()
             .zip(before.items.iter().zip(&after.items))
         {
@@ -1489,7 +2178,14 @@ fn patch_dde(
                 edits,
             )?;
             if let (Some(before), Some(after)) = (&before.values, &after.values) {
-                patch_values(tree, node, before, after, "values", edits)?;
+                patch_values(
+                    tree,
+                    node,
+                    before,
+                    after,
+                    XmlNamespace::SpreadsheetMl,
+                    edits,
+                )?;
             }
         }
     }
@@ -1520,12 +2216,16 @@ fn patch_ole(
         edits,
     )?;
     if !before.items.is_empty() {
-        let wrapper = tree.required_child(link, "oleItems")?;
+        let wrapper = tree.required_child(link, "oleItems", XmlNamespace::SpreadsheetMl)?;
         let nodes = tree.nodes[wrapper]
             .children
             .iter()
             .copied()
-            .filter(|node| tree.nodes[*node].local == "oleItem")
+            .filter(|node| {
+                tree.nodes[*node].local == "oleItem"
+                    && XmlNamespace::SpreadsheetMlOrX14
+                        .matches(tree.nodes[*node].namespace_uri.as_deref())
+            })
             .collect::<Vec<_>>();
         for (node, (before, after)) in nodes.into_iter().zip(before.items.iter().zip(&after.items))
         {
@@ -1540,8 +2240,12 @@ fn patch_ole(
                 after.prefer_picture,
                 edits,
             )?;
-            if let (Some(before), Some(after)) = (&before.values, &after.values) {
-                patch_values(tree, node, before, after, "values", edits)?;
+            if let (Some(values_before), Some(values_after)) = (&before.values, &after.values) {
+                let namespace = match before.source {
+                    ItemSource::SpreadsheetMl => XmlNamespace::SpreadsheetMl,
+                    ItemSource::Office2010 => XmlNamespace::X14,
+                };
+                patch_values(tree, node, values_before, values_after, namespace, edits)?;
             }
         }
     }
@@ -1553,26 +2257,12 @@ fn patch_values(
     parent: usize,
     before: &DdeValues,
     after: &DdeValues,
-    name: &str,
+    namespace: XmlNamespace,
     edits: &mut Vec<SourceEdit>,
 ) -> Result<()> {
-    let node = if name == "values" {
-        tree.nodes[parent]
-            .children
-            .iter()
-            .copied()
-            .find(|node| tree.nodes[*node].local == "values")
-            .or_else(|| {
-                tree.nodes[parent]
-                    .children
-                    .iter()
-                    .copied()
-                    .find(|node| tree.nodes[*node].local == "values")
-            })
-    } else {
-        None
-    }
-    .ok_or_else(|| invalid("external-link source is missing cached values"))?;
+    let node = tree
+        .child(parent, "values", namespace)?
+        .ok_or_else(|| invalid("external-link source is missing cached values"))?;
     patch_attr(
         tree,
         node,
@@ -1590,7 +2280,7 @@ fn patch_values(
         edits,
     )?;
     for (value_node, (before, after)) in tree
-        .children(node, "value")
+        .children(node, "value", XmlNamespace::SpreadsheetMl)
         .into_iter()
         .zip(before.values.iter().zip(&after.values))
     {
@@ -1602,7 +2292,7 @@ fn patch_values(
             dde_value_type_attr(after.value_type),
             edits,
         )?;
-        let text_node = tree.required_child(value_node, "val")?;
+        let text_node = tree.required_child(value_node, "val", XmlNamespace::SpreadsheetMl)?;
         patch_text(
             tree,
             text_node,
@@ -1703,7 +2393,7 @@ fn patch_optional_attr(
     let attr = tree.nodes[node]
         .attrs
         .iter()
-        .find(|attr| attr_matches(&attr.name, name));
+        .find(|attr| attr_matches(attr, name));
     match (attr, after) {
         (Some(attr), Some(after)) => {
             let replacement = escaped(after)?;
@@ -1808,12 +2498,15 @@ fn parse_start_tag(
     source: &[u8],
     start: usize,
     end: usize,
-) -> Result<(String, usize, Vec<XmlAttr>, usize, bool)> {
+) -> Result<(String, String, Vec<XmlAttr>, usize, bool)> {
     let name_start = start + 1;
     let name_end = skip_name(source, name_start);
     if name_end == name_start {
         return Err(invalid("external-link source has an empty element name"));
     }
+    let qualified = std::str::from_utf8(&source[name_start..name_end])
+        .map_err(|error| invalid(format!("external-link XML name is not UTF-8: {error}")))?
+        .to_owned();
     let local = local_name(&source[name_start..name_end])?;
     let mut attrs = Vec::new();
     let mut position = name_end;
@@ -1864,13 +2557,55 @@ fn parse_start_tag(
         }
         attrs.push(XmlAttr {
             name,
+            namespace_uri: None,
             start: attr_start,
             value_start,
             value_end: position,
         });
         position += 1;
     }
-    Ok((local, name_end, attrs, close_pos, self_closing))
+    Ok((local, qualified, attrs, close_pos, self_closing))
+}
+
+fn apply_namespace_declarations(
+    source: &[u8],
+    attrs: &[XmlAttr],
+    namespaces: &mut HashMap<String, String>,
+) -> Result<()> {
+    for attr in attrs {
+        let Some(prefix) = attr
+            .name
+            .strip_prefix("xmlns:")
+            .or_else(|| (attr.name == "xmlns").then_some(""))
+        else {
+            continue;
+        };
+        let raw = std::str::from_utf8(
+            source
+                .get(attr.value_start..attr.value_end)
+                .ok_or_else(|| invalid("external-link namespace declaration span is invalid"))?,
+        )
+        .map_err(|error| invalid(format!("external-link namespace is not UTF-8: {error}")))?;
+        let value = quick_xml::escape::unescape(raw)
+            .map_err(|error| Error::Invalid(error.to_string()))?
+            .into_owned();
+        namespaces.insert(prefix.to_owned(), value);
+    }
+    Ok(())
+}
+
+fn namespace_uri(
+    namespaces: &HashMap<String, String>,
+    qualified_name: &str,
+    is_attribute: bool,
+) -> Option<String> {
+    if let Some((prefix, _)) = qualified_name.split_once(':') {
+        namespaces.get(prefix).cloned()
+    } else if is_attribute {
+        None
+    } else {
+        namespaces.get("").cloned()
+    }
 }
 
 fn find_tag_end(source: &[u8], start: usize) -> Result<usize> {
@@ -1911,12 +2646,21 @@ fn local_name(name: &[u8]) -> Result<String> {
     Ok(name.rsplit(':').next().unwrap_or(name).to_owned())
 }
 
-fn attr_matches(actual: &str, expected: &str) -> bool {
-    if expected == "r:id" {
-        actual == expected || actual.rsplit(':').next() == Some("id")
-    } else {
-        actual == expected
+fn attr_matches(actual: &XmlAttr, expected: &str) -> bool {
+    if expected != "r:id" {
+        return actual.name == expected;
     }
+    actual.name.rsplit(':').next() == Some("id")
+        && match actual.namespace_uri.as_deref() {
+            Some(namespace) => {
+                namespace.as_bytes() == TRANSITIONAL_NAMESPACE
+                    || namespace.as_bytes() == STRICT_NAMESPACE
+            },
+            // Preserve compatibility with standalone XML slices that omit
+            // the inherited declaration, while never treating an unqualified
+            // `id` as the relationship attribute.
+            None => actual.name == "r:id",
+        }
 }
 
 fn escaped(value: &str) -> Result<Vec<u8>> {
@@ -1954,6 +2698,9 @@ fn push_context_text(parser: &mut Parser, context: Option<Context>, text: &str) 
             | Context::OleValues(_)
             | Context::OleValue(_, _),
         ) if !text.trim().is_empty() => Err(invalid("unexpected text in DDE/OLE external link")),
+        Some(
+            Context::AlternateUrls | Context::AlternateAbsoluteUrl | Context::AlternateRelativeUrl,
+        ) if !text.trim().is_empty() => Err(invalid("unexpected text in alternateUrls")),
         _ => Ok(()),
     }
 }
@@ -2024,6 +2771,115 @@ fn parse_dde_value_type(value: Option<&str>) -> Result<DdeValueType> {
         "str" => Ok(DdeValueType::String),
         value => Err(invalid(format!("invalid DDE value type '{value}'"))),
     }
+}
+
+fn parse_alternate_relationship_id(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    name: &str,
+) -> Result<String> {
+    let value = bounded_relationship_attribute_value(element, b"id", decoder, resolver, name)?
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| invalid(format!("{name} is missing relationship ID")))?;
+    if !is_ncname(&value) || value.len() > 1024 || value.chars().any(char::is_control) {
+        return Err(invalid(format!("{name} relationship ID is invalid")));
+    }
+    Ok(value)
+}
+
+fn bounded_relationship_attribute_value(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    description: &str,
+) -> Result<Option<String>> {
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Invalid(error.to_string()))?;
+        if attribute.key.local_name().as_ref() != name {
+            continue;
+        }
+        let (namespace, _) = resolver.resolve_attribute(attribute.key);
+        let is_relationship = matches!(
+            namespace,
+            ResolveResult::Bound(Namespace(value))
+                if value == TRANSITIONAL_NAMESPACE || value == STRICT_NAMESPACE
+        ) || matches!(namespace, ResolveResult::Unknown(prefix) if prefix.as_slice() == b"r");
+        if !is_relationship {
+            continue;
+        }
+        if value.is_some() {
+            return Err(invalid(format!(
+                "duplicate relationship attribute '{}'",
+                String::from_utf8_lossy(name)
+            )));
+        }
+        if attribute.value.len() > 1024 {
+            return Err(limit(&format!("{description} relationship ID")));
+        }
+        let decoded = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Invalid(error.to_string()))?;
+        if decoded.len() > 1024 {
+            return Err(limit(&format!("{description} relationship ID")));
+        }
+        value = Some(decoded.into_owned());
+    }
+    Ok(value)
+}
+
+fn validate_alternate_metadata(name: &str, value: Option<&str>) -> Result<()> {
+    if let Some(value) = value {
+        if value.len() > MAX_ALTERNATE_URL_METADATA_BYTES {
+            return Err(limit(&format!("alternate URL {name}")));
+        }
+        if value.chars().any(|character| {
+            character.is_control() || character == '\u{fffe}' || character == '\u{ffff}'
+        }) {
+            return Err(invalid(format!(
+                "alternate URL {name} contains an invalid character"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn bounded_unqualified_attribute_value(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<Option<String>> {
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Invalid(error.to_string()))?;
+        if attribute.key.prefix().is_some() || attribute.key.local_name().as_ref() != name {
+            continue;
+        }
+        if value.is_some() {
+            return Err(invalid(format!(
+                "duplicate XML attribute '{}'",
+                String::from_utf8_lossy(name)
+            )));
+        }
+        // Check the encoded value before quick-xml decodes entities into a
+        // newly allocated String.  Check again after decoding because one
+        // entity can expand beyond the source byte count.
+        if attribute.value.len() > MAX_ALTERNATE_URL_METADATA_BYTES {
+            return Err(limit(&format!("alternate URL {description}")));
+        }
+        let decoded = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Invalid(error.to_string()))?;
+        if decoded.len() > MAX_ALTERNATE_URL_METADATA_BYTES {
+            return Err(limit(&format!("alternate URL {description}")));
+        }
+        value = Some(decoded.into_owned());
+    }
+    validate_alternate_metadata(description, value.as_deref())?;
+    Ok(value)
 }
 
 fn is_exact_name(

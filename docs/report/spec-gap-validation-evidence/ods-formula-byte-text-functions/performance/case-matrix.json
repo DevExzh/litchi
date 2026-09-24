@@ -1,0 +1,30 @@
+{
+  "baseline_commit": "3844f235bac545ff0ae1580b97612883c1fd9f89",
+  "candidate_case_count": 84,
+  "matched_control_count": 28,
+  "byte_case_count": 53,
+  "projected_reducer_count": 3,
+  "phases": ["evaluate", "parse-evaluate"],
+  "read_bounds": {
+    "tiny-byte-*": 0,
+    "large-unicode-byte-*": 0,
+    "large-ascii-byte-*": 0,
+    "refusal-byte-*": 0,
+    "reference-64-byte-*": 64,
+    "matrix-broadcast-byte-lenb": 64,
+    "matrix-broadcast-byte-findb": 64,
+    "matrix-broadcast-byte-searchb": 64,
+    "matrix-broadcast-byte-leftb": 128,
+    "matrix-broadcast-byte-midb": 128,
+    "matrix-broadcast-byte-replaceb": 128,
+    "matrix-broadcast-byte-rightb": 128,
+    "cancellation-byte-{lenb,midb,replaceb,searchb}": 1,
+    "resource-byte-{lenb,midb,replaceb,searchb}": 0,
+    "search-worstcase-byte-{findb,searchb}": 0,
+    "replaceb-growth": 0,
+    "projected-statistical-average-lenb": 2,
+    "projected-statistical-sum-lenb": 4,
+    "projected-statistical-average-len": 2
+  },
+  "functions": ["FINDB", "LEFTB", "LENB", "MIDB", "REPLACEB", "RIGHTB", "SEARCHB"]
+}

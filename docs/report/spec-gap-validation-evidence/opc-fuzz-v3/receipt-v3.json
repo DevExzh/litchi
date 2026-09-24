@@ -1,0 +1,286 @@
+{
+  "kind": "instrumented-bounded-opc-fuzz-validation",
+  "revision": "v3",
+  "status": "pass",
+  "date_utc": "2026-09-10",
+  "base_head": "5953a2ed1a036179042b55f96a4ee333e554b659",
+  "primary_root": "/home/zhuhe/code/litchi-spec-gaps",
+  "overlay_root": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3",
+  "primary_head_observed": "52519031b4c877032553bf5d4ea4393f3e0e60d1",
+  "primary_worktree_touched_by_this_task": false,
+  "source_manifest": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/source-manifest-v3.json",
+  "source_manifest_sha256": "0e79b495e581e65a4de234313a1da6af2b56d4f78c814f50509b7089d56b5504",
+  "source_delta_patch": {
+    "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/source-delta-v3.patch",
+    "bytes": 45294,
+    "sha256": "a60be8e2838960bcf9bcfa352c051351cbc10b86f0ddf182c25b6c6f96eebc4f",
+    "relative_path": "source-delta-v3.patch"
+  },
+  "corpus_manifest": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-manifest-v3.json",
+  "corpus_manifest_sha256": "5e3ff96285a0f7f79820878ecd827c854c374f48d0de33fb4cd8030ea5f57861",
+  "primary_v1_preservation_proof": {
+    "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/primary-v1-preservation-v3.json",
+    "sha256": "da6152f4f69b9c4522a82b2c4d91c9f88421a1500fa274d371aeeb5cb22c0663",
+    "comparison_reference": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/source-manifest-v2.json"
+  },
+  "preserved_v2_evidence": [
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/README-v2.md",
+      "bytes": 1821,
+      "sha256": "00788cb7cd5edbf4f7318d8f86e4018e280ad7d668ec2db00ed5b5454e318ead",
+      "relative_path": "README-v2.md"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/receipt-v2.json",
+      "bytes": 14456,
+      "sha256": "55623944af3a8c4753a9682587bc82de374a5b3dda1bb6c537cc9c220ae68990",
+      "relative_path": "receipt-v2.json"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/source-manifest-v2.json",
+      "bytes": 7252,
+      "sha256": "1f6fa02220f2a730399d53d5c84b456adbfc622dca018c525ffbc0d605120563",
+      "relative_path": "source-manifest-v2.json"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/corpus-manifest-v2.json",
+      "bytes": 57929,
+      "sha256": "38f427922cf90da019a979f786cacac14cbe2f02d6ab277c87cad50011db2162",
+      "relative_path": "corpus-manifest-v2.json"
+    }
+  ],
+  "fuzz_workspace_lock": {
+    "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3/crates/litchi-opc/fuzz/Cargo.lock",
+    "bytes": 22400,
+    "sha256": "c94123f2c10e92123034bb2b916b986ba989c0f51d4c202b5916d4a321f7b70d",
+    "relative_path": "crates/litchi-opc/fuzz/Cargo.lock",
+    "package_count": 99,
+    "used_by_validation": true,
+    "replay_mode": "--locked"
+  },
+  "harness_limits": {
+    "max_input_bytes": 1048576,
+    "max_archive_members": 64,
+    "max_parts": 64,
+    "max_relationship_parts": 32,
+    "max_archive_member_name_bytes": 4096,
+    "max_archive_metadata_bytes": 65536,
+    "max_archive_compressed_bytes": 262144,
+    "max_archive_entry_bytes": 262144,
+    "max_archive_total_bytes": 1048576,
+    "max_part_bytes": 262144,
+    "max_total_part_bytes": 1048576,
+    "max_content_types_bytes": 65536,
+    "max_content_type_mappings": 64,
+    "max_relationship_xml_bytes": 65536,
+    "max_total_relationship_xml_bytes": 262144,
+    "max_relationships_per_part": 64,
+    "max_total_relationships": 256,
+    "max_relationship_graph_nodes": 256,
+    "max_xml_events": 512,
+    "max_total_relationship_xml_events": 2048,
+    "max_xml_depth": 32,
+    "max_xml_attribute_bytes": 16384,
+    "max_relationship_target_bytes": 4096
+  },
+  "smoke": {
+    "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_HOME=/tmp/litchi-spec-gap-cargo-home CARGO_NET_OFFLINE=true TMPDIR=/var/tmp/litchi-spec-gap-gate-tmp CARGO_TARGET_DIR=/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-target-smoke rustup run 1.95.0 cargo run --locked --offline --manifest-path /var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3/crates/litchi-opc/fuzz/Cargo.toml --release --bin smoke_opc -- --write-seeds=/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/smoke-seeds-v3-rerun",
+    "result": "pass",
+    "log": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/smoke-v3-rerun.log",
+    "log_sha256": "aca5c14c273f9a7261ca74e3268ae1955545bafa40ba1635acd553b4141e343e",
+    "output": "bounded OPC smoke passed: valid=1 malformed=6 boundaries=22 bytes=1724",
+    "valid_seed_assertions": [
+      "source-backed admission",
+      "source XML replacement publication",
+      "source XML addition publication",
+      "source topology write to an in-memory output buffer",
+      "source-backed internal relationship targets resolve to existing in-memory parts",
+      "source-backed main_document_part resolves exactly to /word/document.xml",
+      "reopen of the written topology through source-backed and eager readers preserves main-document resolution and the appended inert external relationship",
+      "eager admission",
+      "eager internal relationship targets resolve to existing in-memory parts",
+      "eager main_document_part resolves exactly to /word/document.xml",
+      "metadata-only probe admission"
+    ],
+    "malformed_seed_assertions": "All six deterministic malformed seeds return ExerciseStats::default(); source-backed, eager, and metadata-only probe paths reject them without a panic.",
+    "boundary_assertions": {
+      "checked_applicable_boundaries": 22,
+      "semantics": "For every listed boundary, exact and one-over values admit all three ingress paths; one-under returns the named ReadResource through source-backed, eager, and metadata-only probe paths.",
+      "fixture": {
+        "InputBytes": 1724,
+        "ArchiveMembers": 5,
+        "Parts": 2,
+        "RelationshipParts": 2,
+        "ContentTypesBytes": 452,
+        "ContentTypeMappings": 4,
+        "RelationshipXmlBytes": 361,
+        "TotalRelationshipXmlBytes": 603,
+        "RelationshipsPerPart": 2,
+        "TotalRelationships": 3,
+        "ArchiveMemberNameBytes": 28,
+        "ArchiveMetadataBytes": 320,
+        "ArchiveCompressedBytes": 452,
+        "ArchiveEntryBytes": 452,
+        "ArchiveTotalBytes": 1151,
+        "PartBytes": 59,
+        "TotalPartBytes": 96,
+        "RelationshipGraphNodes": 2,
+        "XmlEvents": 7,
+        "TotalRelationshipXmlEvents": 9,
+        "XmlAttributeBytes": 82,
+        "RelationshipTargetBytes": 28
+      },
+      "resources": [
+        "InputBytes",
+        "ArchiveMembers",
+        "Parts",
+        "RelationshipParts",
+        "ContentTypesBytes",
+        "ContentTypeMappings",
+        "RelationshipXmlBytes",
+        "TotalRelationshipXmlBytes",
+        "RelationshipsPerPart",
+        "TotalRelationships",
+        "ArchiveMemberNameBytes",
+        "ArchiveMetadataBytes",
+        "ArchiveCompressedBytes",
+        "ArchiveEntryBytes",
+        "ArchiveTotalBytes",
+        "PartBytes",
+        "TotalPartBytes",
+        "RelationshipGraphNodes",
+        "XmlEvents",
+        "TotalRelationshipXmlEvents",
+        "XmlAttributeBytes",
+        "RelationshipTargetBytes"
+      ]
+    },
+    "omitted_boundaries": [
+      {
+        "resource": "ArchiveTotalEntries",
+        "reason": "The deterministic archive has no separate directory-entry population; its entry count is coupled to the five physical archive members, so an under-limit cannot isolate this resource from ArchiveMembers."
+      },
+      {
+        "resource": "XmlDepth",
+        "reason": "The fixture reaches depth 1 and the ReadLimits builder requires a positive depth; there is no constructible zero under-limit for this fixture."
+      }
+    ],
+    "fixture_archive_sha256": "fbb8cf01b98323d5403b2ab817632f996f0e5d3158e0a3ad41de371fd9c6758b",
+    "fixture_archive_bytes": 1724
+  },
+  "static_checks": {
+    "rustfmt": {
+      "result": "pass",
+      "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup rustup run 1.95.0 rustfmt --edition 2024 --check crates/litchi-opc/fuzz/fuzz_targets/opc_harness.rs crates/litchi-opc/fuzz/fuzz_targets/smoke_opc.rs crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+      "log": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/rustfmt-v3-final.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "diff_check": {
+      "result": "pass",
+      "command": "git diff --check",
+      "log": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/diff-check-v3-final.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "clippy": {
+      "result": "pass",
+      "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_HOME=/tmp/litchi-spec-gap-cargo-home CARGO_NET_OFFLINE=true TMPDIR=/var/tmp/litchi-spec-gap-gate-tmp CARGO_TARGET_DIR=/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-target-clippy-rerun rustup run 1.95.0 cargo clippy --locked --offline --manifest-path /var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3/crates/litchi-opc/fuzz/Cargo.toml --bins -- -D warnings",
+      "log": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/clippy-v3-rerun.log",
+      "log_sha256": "45d5f17d5deedd6f0ba014a3f36b9b8f94d0196db5b6b2ca1900fdf803672359"
+    }
+  },
+  "instrumented_build": {
+    "result": "pass",
+    "sanitizer": "address",
+    "coverage_instrumentation": true,
+    "command": "PATH=/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/locked-cargo/bin:$PATH RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_HOME=/tmp/litchi-spec-gap-cargo-home CARGO_NET_OFFLINE=true TMPDIR=/var/tmp/litchi-spec-gap-tmp RUSTUP_TOOLCHAIN=nightly /var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/tooling/bin/cargo-fuzz build -O -s address --target-dir /var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-target-fuzz-final parse_opc",
+    "working_directory": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3/crates/litchi-opc/fuzz",
+    "locked_cargo_wrapper": {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/locked-cargo/bin/cargo",
+      "bytes": 362,
+      "sha256": "3307eec7fbd232fb48d6e63aa8a63f8f2c1ed57ed5ec9329efee87b447af1e5c"
+    },
+    "log": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/fuzz-build-v3-final.log",
+    "log_sha256": "9ef777a7151a789bd1800e12301f904971d4a46da63c5ce126ad93c278fa8cec"
+  },
+  "instrumented_campaign": {
+    "result": "exit_0_no_crash_no_timeout",
+    "command": "taskset -c 8-31 env PATH=/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/locked-cargo/bin:$PATH RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_HOME=/tmp/litchi-spec-gap-cargo-home CARGO_NET_OFFLINE=true TMPDIR=/var/tmp/litchi-spec-gap-tmp RUSTUP_TOOLCHAIN=nightly CARGO_TARGET_DIR=/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-target-fuzz-final /var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/tooling/bin/cargo-fuzz run -O -s address --target-dir /var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-target-fuzz-final parse_opc /var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final -- -runs=10000 -max_len=1048576 -timeout=3 -rss_limit_mb=512 -artifact_prefix=/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/artifacts-v3-final/ -print_final_stats=1 -seed=20260913",
+    "working_directory": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3/crates/litchi-opc/fuzz",
+    "cpu_affinity": "8-31",
+    "seed": 20260913,
+    "runs_requested": 10000,
+    "max_len": 1048576,
+    "timeout_seconds": 3,
+    "rss_limit_mb": 512,
+    "initial_nonempty_corpus_files": 236,
+    "initial_corpus_bytes": 349428,
+    "executed_units": 10000,
+    "loaded_modules": 1,
+    "inline_8bit_counters": 88253,
+    "final_coverage_counters": 10364,
+    "final_feature_count": 23234,
+    "new_units_added": 127,
+    "libfuzzer_reported_final_in_memory_corpus_files": 255,
+    "reported_peak_rss_mb": 392,
+    "final_on_disk_corpus_files": 352,
+    "final_on_disk_corpus_nonempty_files": 351,
+    "final_on_disk_corpus_bytes": 511731,
+    "artifact_files": [],
+    "log": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/fuzz-run-v3-final.log",
+    "log_sha256": "b896675fd2ef2cb24bf276ef30b7bfa81e18ae97d925a9e4df4d6ca6b581f92a",
+    "note": "LibFuzzer diagnostic counters and raw elapsed/execution-rate text are retained for reproducibility only; this receipt makes no performance or timing claim."
+  },
+  "campaign_binary": {
+    "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-target-fuzz-final/x86_64-unknown-linux-gnu/release/parse_opc",
+    "bytes": 39085640,
+    "sha256": "593c412c1186d37205c30a58c9b9da150e47565797f654bf002e6d45ff96bc97",
+    "retained_after_evidence_freeze": true
+  },
+  "tooling": {
+    "cargo_fuzz": "cargo-fuzz 0.13.2",
+    "cargo_fuzz_binary": {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/tooling/bin/cargo-fuzz",
+      "bytes": 2583800,
+      "sha256": "311966e03b177d403d6b472991d8dcda43e8ccc9fde6f5fcbd65144e5cad3e35"
+    },
+    "nightly_rustc": "rustc 1.100.0-nightly (a36d05efa 2026-09-09)",
+    "nightly_cargo": "cargo 1.100.0-nightly (3c0b53475 2026-09-04)",
+    "rust_1_95": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo_1_95": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "rustup_home": "/tmp/litchi-spec-gap-rustup",
+    "cargo_home": "/tmp/litchi-spec-gap-cargo-home",
+    "network": "offline",
+    "tooling_setup_history": {
+      "included_in_validation_claims": false,
+      "note": "Tool installation history and any tooling.log/seed setup history are excluded from validation evidence and claims; only the bound final tool binary, lock wrapper, source, corpus, and final validation logs are used."
+    }
+  },
+  "safety": {
+    "relationship_targets": "Internal targets are resolved only against admitted in-memory parts; external targets are inspected as inert strings and never fetched.",
+    "embedded_content": "Inert; no macro/VBA/ActiveX/OLE execution.",
+    "ambient_execution": false,
+    "network_fetch": false,
+    "timing_claims": false,
+    "arbitrary_input": "Malformed and non-OPC input is a typed refusal case; successful authoring/topology assertions are required only for the deterministic valid fixture."
+  },
+  "limitations": [
+    "The harness configures 24 ReadLimits ceilings, but this deterministic fixture supports 22 isolated exact/over/under boundary checks. The receipt makes no claim to have checked all configured limits; ArchiveTotalEntries and XmlDepth are omitted for the stated fixture reasons.",
+    "The campaign is a bounded 10,000-execution AddressSanitizer/libFuzzer run and is not a completeness or performance claim."
+  ],
+  "cleanup": {
+    "retained_for_review": [
+      "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence",
+      "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3",
+      "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-target-fuzz-final/x86_64-unknown-linux-gnu/release/parse_opc"
+    ],
+    "excluded_setup_history": [
+      "tooling.log, if present in any surrounding setup directory, is not part of this V3 validation bundle or claim."
+    ],
+    "note": "No primary or V2 path was removed or mutated."
+  },
+  "readme": {
+    "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/README-v3.md",
+    "bytes": 2513,
+    "sha256": "a951d90a7c94fccdff2e74e925dfd93eddde73f28d856151e973a5cd6b7841d0"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "base_commit": "2aeeb8d2f25c16045388b16608b4d857723e3e28",
+  "selected_files": {
+    "crates/litchi-ods/src/codec/formula/evaluation.rs": "d644ea1ad3b424472154dd1ec7faacd52001da77b2b550d6a12b4f35d67d62c5",
+    "crates/litchi-ods/src/codec/formula/evaluation/aggregate.rs": "a2152fc3f6c1cfbd93cf7d71c3e8ca0b3a602629498617c1a3fc98f2ca4c6011",
+    "crates/litchi-ods/src/codec/formula/evaluation/numerics.rs": "ccc41f18a9aa05855bf21a6139d730bf25fed76cc90d78f39be4d2e335538504",
+    "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "17cb7901287a28ee1d2cc7f816ef68a86e19e831d00ae86a33f1e1ef0467257f",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/aggregate.rs": "1184c1c4e6273a4b01eca308c0e0ca637fc71d6c2e4a5428f66354f46fbdbb55",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/database.rs": "cb7117dd82fc5939cfa195f31a88e958991e9b2cf68d20a0e59dea1c571e077c",
+    "crates/litchi-ods/tests/ods_formula_aggregate_evaluation.rs": "57a576ebf3708a616dc6b8f31758d47f016c6e56eacaf28900c8f4e4cfdc6ce0",
+    "crates/litchi-ods/tests/ods_formula_aggregate_arrays.rs": "e5c1898ba3e35cfc98125c23f7bb268a5e315342e92fe48d1887e6fb21407d34",
+    "crates/litchi-ods/tests/ods_formula_aggregate_native.rs": "f297ac6d476bb2c2572446ca6e4c8c0ac358da76492887244ba7a6cab642edee",
+    "crates/litchi-ods/tests/ods_formula_aggregate_oracle.rs": "30569c29a8a16b4a38a1ec73647c7e22626893a53ebd71c9635b9b5e907238a6",
+    "docs/report/spec-gap-validation-evidence/ods-formula-aggregates/numeric-goldens.json": "0947ce78f36e53e6a2867164a73264a28842cf6139d65b574521a182dccb5a6e",
+    "docs/report/spec-gap-validation-evidence/ods-formula-aggregates/differential-goldens.json": "26899b07ab7660778583423121791a01fa6b049e1fb76e1c7c99ea712b396d09",
+    "docs/report/spec-gap-validation-evidence/ods-formula-aggregates/native/cached-results.json": "2d632454dcf73d80caa2c0498e32ec658842e4ddf6fa8b71efd169e90e24d59f",
+    "docs/report/spec-gap-validation-evidence/ods-formula-aggregates/native/provenance.json": "e5f513a026095cc9f15e7aa3c489e720f90e04ae95cac033b14230dcceb2d2ac",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/database/numerics.rs": null,
+    "Cargo.lock": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3",
+    "crates/litchi-ods/tests/ods_formula_evaluation.rs": "e62d44996da22ed8ed9f0d065c6d993d9965ef1a51ce0c5326040352e5612056"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "crates/litchi-xlsx/src/edit.rs": "e6b864d39e90e3372a26b9dd761595412347026a478eadee49b411e5ff28e3e2",
+  "crates/litchi-xlsx/src/workbook/edit/codec.rs": "2f64977e1a0f6f39a7e2bb17ad61c27dee87251443c9b4104f91620a477e4899",
+  "crates/litchi-xlsx/src/workbook/edit/mod.rs": "6bc728f73027053ba8c31b735f4f9050afb711cd2eecdd9b8509c3eeafba8353",
+  "crates/litchi-xlsx/src/workbook/edit/model.rs": "f612dbfb63000e5f1e6a6fe9e7b085afa594d11f7c8d2d5b6e980a965b53a67d",
+  "crates/litchi-xlsx/src/workbook/edit/package.rs": "c720924177e133a0916707237697b27dcae5cbef5e5e7d7055516842daa162dd",
+  "crates/litchi-xlsx/src/workbook/edit/semantic/mod.rs": "810a2e5f08518507aef8cc70a94a3397f603c9a89e6ca6906271f11559785968",
+  "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs": "8454d930c8e49f9fab4e97e41b3e4da991c9d6a65fa34aa18168494ef5d19e19",
+  "crates/litchi-xlsx/src/workbook/edit/semantic/worksheet.rs": "6a5b4d8ae0dfadb3e3fe770091908ec32df308d874bfc2cb0d6f2422ec55c9e5",
+  "crates/litchi-xlsx/src/workbook/edit/svg.rs": "caa5a7c0cc97a4a10ea2e1975553e19367d88ca1d42af8f9cfdd8cb492ed330c",
+  "crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs": "54b0bda62c4d35fef4dda8dfdfc64bf16079e1a6f027ac4aa7e8f2eb3218f647",
+  "crates/litchi-xlsx/tests/drawing_svg_lifecycle.rs": "2667188c93fb46c7c7f800b5b5606a9af01f8191daf478120ad7b3965cd999f6",
+  "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx": "0b647da300a085f39914fdfae961463ae9e54ffe772b2e0eb9860a841ab93f72",
+  "Cargo.lock": "ff45c428d2047106e3cc586e879cea7bd5d7556eaebcf6634e00659406d49a9b"
+}

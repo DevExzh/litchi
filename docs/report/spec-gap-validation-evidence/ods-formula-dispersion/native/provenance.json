@@ -1,0 +1,205 @@
+{
+  "upstream": "https://github.com/LibreOffice/core",
+  "raw_url": "https://raw.githubusercontent.com/LibreOffice/core/d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "commit": "d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "inputs": {
+    "sc/qa/unit/data/functions/statistical/fods/stdev.fods": "639d4e57f95fb747e901e0e0257716d30be7c9b459159dc0749cdd8336c43db8",
+    "sc/qa/unit/data/functions/statistical/fods/stdeva.fods": "12e3f7c281ef444dc4e09eb2dd5c559856b1707eccc719541defe4a463941c89",
+    "sc/qa/unit/data/functions/statistical/fods/stdevp.fods": "4c5d8babcf7b2a8527c0e29b2c3a047bff548b58e56f60044572912ef8ee521b",
+    "sc/qa/unit/data/functions/statistical/fods/stdevpa.fods": "e2f477a97ace5ec2ed28d744101306a4dde0bd39f6773dc10ca8de72bac98128",
+    "sc/qa/unit/data/functions/statistical/fods/var.fods": "ceb4f7f1707000bd5d9b600daa31d65641e9da6fbc1198db2852b98d0ce263b9",
+    "sc/qa/unit/data/functions/statistical/fods/vara.fods": "f80e138cb1d4f3e45808a02ba096808b583c59160a9111aa76a3958d96657b76",
+    "sc/qa/unit/data/functions/statistical/fods/varp.fods": "355d8e3e4f5fc1d28b79d742f20d98fee72b495bf8714ea6efa474778272600d",
+    "sc/qa/unit/data/functions/statistical/fods/varpa.fods": "17c93215bd7f6aef117b9726753da3530fde4cbdf9c97bcf8755475b4a7e2605"
+  },
+  "source_staging": "Receipt inputs were assembled in a temporary tree from exact raw GitHub files at the pinned commit; the repository auxiliary checkout was not assumed to be pinned.",
+  "byte_comparison": "Each staged input was SHA-256 checked against the exact raw GitHub file at commit before extraction.",
+  "selected_observations": 48,
+  "selected_functions": [
+    "STDEV",
+    "STDEVA",
+    "STDEVP",
+    "STDEVPA",
+    "VAR",
+    "VARA",
+    "VARP",
+    "VARPA"
+  ],
+  "selected_modes": [
+    "scalar",
+    "matrix"
+  ],
+  "excluded_profile_variances": [
+    {
+      "function": "VAR",
+      "source": "sc/qa/unit/data/functions/statistical/fods/var.fods",
+      "sheet": "Sheet2",
+      "row": 15,
+      "column": 1,
+      "formula": "of:=VAR(5)",
+      "cached": null,
+      "kind": "insufficient_sample",
+      "reason": "LibreOffice reports #DIV/0! for one admitted value; the native receipt retains only finite numeric caches."
+    },
+    {
+      "function": "VAR",
+      "source": "sc/qa/unit/data/functions/statistical/fods/var.fods",
+      "sheet": "Sheet2",
+      "row": 16,
+      "column": 1,
+      "formula": "of:=VAR()",
+      "cached": null,
+      "kind": "empty_argument_list",
+      "reason": "The zero-argument sample is an error result and is outside the finite numeric cache receipt."
+    },
+    {
+      "function": "VARA",
+      "source": "sc/qa/unit/data/functions/statistical/fods/vara.fods",
+      "sheet": "Sheet2",
+      "row": 15,
+      "column": 1,
+      "formula": "of:=VARA(5)",
+      "cached": null,
+      "kind": "insufficient_sample",
+      "reason": "LibreOffice reports #DIV/0! for one admitted value; the native receipt retains only finite numeric caches."
+    },
+    {
+      "function": "VARA",
+      "source": "sc/qa/unit/data/functions/statistical/fods/vara.fods",
+      "sheet": "Sheet2",
+      "row": 16,
+      "column": 1,
+      "formula": "of:=VARA()",
+      "cached": null,
+      "kind": "empty_argument_list",
+      "reason": "The zero-argument sample is an error result and is outside the finite numeric cache receipt."
+    },
+    {
+      "function": "VARP",
+      "source": "sc/qa/unit/data/functions/statistical/fods/varp.fods",
+      "sheet": "Sheet2",
+      "row": 16,
+      "column": 1,
+      "formula": "of:=VARP()",
+      "cached": null,
+      "kind": "empty_argument_list",
+      "reason": "The zero-argument sample is an error result and is outside the finite numeric cache receipt."
+    },
+    {
+      "function": "VARP",
+      "source": "sc/qa/unit/data/functions/statistical/fods/varp.fods",
+      "sheet": "Sheet2",
+      "row": 20,
+      "column": 1,
+      "formula": "of:=VARP(\"red\";1;2)",
+      "cached": null,
+      "kind": "direct_text_error",
+      "reason": "The direct text argument produces a host error for the non-A population reducer; no finite cache is promoted."
+    },
+    {
+      "function": "VARPA",
+      "source": "sc/qa/unit/data/functions/statistical/fods/varpa.fods",
+      "sheet": "Sheet2",
+      "row": 16,
+      "column": 1,
+      "formula": "of:=VARPA()",
+      "cached": null,
+      "kind": "empty_argument_list",
+      "reason": "The zero-argument sample is an error result and is outside the finite numeric cache receipt."
+    },
+    {
+      "function": "STDEV",
+      "source": "sc/qa/unit/data/functions/statistical/fods/stdev.fods",
+      "sheet": "Sheet2",
+      "row": 7,
+      "column": 1,
+      "formula": "of:=STDEV([.F1])",
+      "cached": null,
+      "kind": "insufficient_sample",
+      "reason": "A single admitted number produces #DIV/0! for the sample standard deviation."
+    },
+    {
+      "function": "STDEV",
+      "source": "sc/qa/unit/data/functions/statistical/fods/stdev.fods",
+      "sheet": "Sheet2",
+      "row": 9,
+      "column": 1,
+      "formula": "of:=STDEV(\"red\";1;2)",
+      "cached": null,
+      "kind": "direct_text_error",
+      "reason": "The direct text argument is rejected by the non-A sample reducer and has no finite cache."
+    },
+    {
+      "function": "STDEVA",
+      "source": "sc/qa/unit/data/functions/statistical/fods/stdeva.fods",
+      "sheet": "Sheet2",
+      "row": 7,
+      "column": 1,
+      "formula": "of:=STDEVA([.F1])",
+      "cached": null,
+      "kind": "insufficient_sample",
+      "reason": "A single admitted number produces #DIV/0! for the sample standard deviation."
+    },
+    {
+      "function": "STDEVA",
+      "source": "sc/qa/unit/data/functions/statistical/fods/stdeva.fods",
+      "sheet": "Sheet2",
+      "row": 13,
+      "column": 1,
+      "formula": "of:=STDEVA(\"red\";1;2;[.F18])",
+      "cached": "0.816496580927726",
+      "kind": "formula_closure",
+      "reason": "The reference closure includes F18:=TRUE(); the receipt excludes the cached result rather than importing a formula dependency."
+    },
+    {
+      "function": "STDEVP",
+      "source": "sc/qa/unit/data/functions/statistical/fods/stdevp.fods",
+      "sheet": "Sheet2",
+      "row": 9,
+      "column": 1,
+      "formula": "of:=STDEVP(\"red\";1;2)",
+      "cached": null,
+      "kind": "direct_text_error",
+      "reason": "The direct text argument is rejected by the non-A population reducer and has no finite cache."
+    },
+    {
+      "function": "STDEVP",
+      "source": "sc/qa/unit/data/functions/statistical/fods/stdevp.fods",
+      "sheet": "Sheet2",
+      "row": 13,
+      "column": 1,
+      "formula": "of:=STDEVP(\"red\";1;2;[.F18])",
+      "cached": null,
+      "kind": "formula_closure",
+      "reason": "The reference closure includes F18:=TRUE(); the cached host error is not imported into the literal resolver."
+    },
+    {
+      "function": "STDEVPA",
+      "source": "sc/qa/unit/data/functions/statistical/fods/stdevpa.fods",
+      "sheet": "Sheet2",
+      "row": 13,
+      "column": 1,
+      "formula": "of:=STDEVPA(\"red\";1;2;[.F18])",
+      "cached": "0.707106781186548",
+      "kind": "formula_closure",
+      "reason": "The reference closure includes F18:=TRUE(); the receipt excludes the cached result rather than importing a formula dependency."
+    },
+    {
+      "function": "STDEVPA",
+      "source": "sc/qa/unit/data/functions/statistical/fods/stdevpa.fods",
+      "sheet": "Sheet2",
+      "row": 14,
+      "column": 1,
+      "formula": "of:=STDEVPA(range)",
+      "cached": "2.63899331455874",
+      "kind": "named_range_unmaterialized",
+      "reason": "The named range has no bounded literal closure in the FODS table; no inferred source cells are promoted."
+    }
+  ],
+  "coverage_notes": {
+    "source_format": "All selected sources are upstream FODS fixtures; no conversion tool or recalculation step is used.",
+    "closure": "Each selected reference closure contains only literal number, logical, text, or empty cells. Formula cells, dates, named ranges, and nested formula dependencies remain explicit exclusions.",
+    "cache": "The retained cached value is used only as an upstream observation. The Rust test reconstructs the literal closure and evaluates the formula in both scalar and matrix modes.",
+    "profile": "Host-specific date/error coercions and unsupported named-range or nested-expression behavior are not silently promoted to the evaluator contract."
+  }
+}

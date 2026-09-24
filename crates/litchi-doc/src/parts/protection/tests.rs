@@ -4,21 +4,34 @@ use super::codec::{
     parse_starts, parse_users,
 };
 use super::model::{Mode, Ranges, Role, Selector, User};
+use super::policy::{EditProtection, ProtectionAuthorization, ProtectionPolicy, classify};
+use crate::package::Error as PackageError;
 use crate::package::Result;
 use crate::parts::fib::FileInformationBlock;
+use litchi_cfb::OleFile;
+use std::io::Cursor;
 
 const BKC_F_PUB: u16 = 0x0080;
 
 /// Build a minimal FIB whose table-pointer array covers indexes 0..144,
 /// with a main-document length of `document_end` characters.
 fn fib_bytes(document_end: u32) -> Vec<u8> {
-    let pointer_count = 145usize;
-    let mut bytes = vec![0u8; 154 + pointer_count * 8];
+    // Use the Word 2010 counted layout so the range-protection pointers at
+    // indexes 141..144 are inside the specification-defined array.  The base
+    // nFib remains Word 97; cswNew/nFibNew selects the effective Word 2010
+    // layout as real modern DOC files do.
+    let pointer_count = 183usize;
+    let pointer_end = 154 + pointer_count * 8;
+    let mut bytes = vec![0u8; pointer_end + 12];
     bytes[..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
     bytes[2..4].copy_from_slice(&0x0101u16.to_le_bytes());
+    bytes[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    bytes[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
     bytes[6..8].copy_from_slice(&0x0409u16.to_le_bytes());
     bytes[76..80].copy_from_slice(&document_end.to_le_bytes());
     bytes[152..154].copy_from_slice(&(pointer_count as u16).to_le_bytes());
+    bytes[pointer_end..pointer_end + 2].copy_from_slice(&5u16.to_le_bytes());
+    bytes[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0112u16.to_le_bytes());
     bytes
 }
 
@@ -30,6 +43,34 @@ fn set_pointer(fib: &mut [u8], index: usize, offset: u32, length: u32) {
 
 fn utf16(text: &str) -> Vec<u8> {
     text.encode_utf16().flat_map(u16::to_le_bytes).collect()
+}
+
+fn valid_modern_dop() -> Vec<u8> {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/ole/doc/NoHeadFoot.doc");
+    let bytes = std::fs::read(path).expect("modern DOC fixture");
+    let mut ole = OleFile::open(Cursor::new(bytes)).expect("modern DOC CFB");
+    let word = ole.open_stream(&["WordDocument"]).expect("WordDocument");
+    let count = usize::from(u16::from_le_bytes([word[152], word[153]]));
+    let pointer = 154 + 31 * 8;
+    assert!(count > 31);
+    let offset = usize::try_from(u32::from_le_bytes(
+        word[pointer..pointer + 4].try_into().expect("DOP offset"),
+    ))
+    .expect("DOP offset");
+    let length = usize::try_from(u32::from_le_bytes(
+        word[pointer + 4..pointer + 8]
+            .try_into()
+            .expect("DOP length"),
+    ))
+    .expect("DOP length");
+    let table_name = if u16::from_le_bytes([word[10], word[11]]) & 0x0200 != 0 {
+        "1Table"
+    } else {
+        "0Table"
+    };
+    let table = ole.open_stream(&[table_name]).expect("table stream");
+    table[offset..offset + length].to_vec()
 }
 
 fn sttb_users(users: &[(&str, u16)]) -> Vec<u8> {
@@ -106,7 +147,11 @@ impl Tables {
 
     fn assemble(&self) -> (Vec<u8>, Vec<u8>) {
         let mut fib = fib_bytes(10);
-        let mut table = Vec::new();
+        // A nonzero lcbDop is mandatory in MS-DOC.  Keep a valid base DOP in
+        // every protection fixture so range-only classification exercises the
+        // range state rather than the malformed-host state.
+        let mut table = valid_modern_dop();
+        set_pointer(&mut fib, 31, 0, table.len() as u32);
         for (index, data) in [
             (STTBF_BKMK_PROT, &self.assignments),
             (PLCF_BKF_PROT, &self.starts),
@@ -337,4 +382,277 @@ fn bounds_large_encoded_counts_before_allocating() {
     users.extend_from_slice(&u16::MAX.to_le_bytes());
     users.extend_from_slice(&USER_ROLE_SIZE.to_le_bytes());
     assert!(parse_users(&users).is_err());
+}
+
+#[test]
+fn classifies_document_and_range_protection_independently() {
+    let mut fib = fib_bytes(10);
+    let mut table = valid_modern_dop();
+    table[6] = 0x10;
+    set_pointer(&mut fib, 31, 0, table.len() as u32);
+    let fib = FileInformationBlock::parse(&fib).unwrap();
+    assert_eq!(classify(&fib, &table).unwrap(), EditProtection::Document);
+
+    let range_tables = Tables::typical();
+    let (range_fib, range_table) = range_tables.assemble();
+    let range_fib = FileInformationBlock::parse(&range_fib).unwrap();
+    assert_eq!(
+        classify(&range_fib, &range_table).unwrap(),
+        EditProtection::Ranges
+    );
+
+    table.extend_from_slice(&range_table);
+    let mut combined_fib = range_tables.assemble().0;
+    let combined_offset = table.len() - range_table.len();
+    set_pointer(&mut combined_fib, 31, 0, 674);
+    for index in [
+        STTBF_BKMK_PROT,
+        PLCF_BKF_PROT,
+        PLCF_BKL_PROT,
+        STTB_PROT_USER,
+    ] {
+        let base = 154 + index * 8;
+        let offset = u32::from_le_bytes(combined_fib[base..base + 4].try_into().unwrap());
+        let relocated = u32::try_from(combined_offset)
+            .unwrap()
+            .checked_add(offset)
+            .unwrap();
+        combined_fib[base..base + 4].copy_from_slice(&relocated.to_le_bytes());
+    }
+    let combined_fib = FileInformationBlock::parse(&combined_fib).unwrap();
+    assert_eq!(
+        classify(&combined_fib, &table).unwrap(),
+        EditProtection::DocumentAndRanges
+    );
+
+    let authorization = ProtectionAuthorization::audited("alice", "approved").unwrap();
+    assert!(
+        ProtectionPolicy::default()
+            .authorize(EditProtection::Document)
+            .is_err_and(|error| matches!(error, PackageError::ProtectionDenied(_)))
+    );
+    assert!(
+        ProtectionPolicy::allow_protected(authorization)
+            .authorize(EditProtection::DocumentAndRanges)
+            .is_ok()
+    );
+    assert!(
+        ProtectionPolicy::default()
+            .authorize(EditProtection::Unrecognized)
+            .is_err()
+    );
+    let authorization = ProtectionAuthorization::audited("alice", "repair legacy DOP").unwrap();
+    assert!(
+        ProtectionPolicy::allow_protected(authorization)
+            .authorize(EditProtection::Unrecognized)
+            .is_err()
+    );
+    let authorization = ProtectionAuthorization::audited("alice", "repair malformed host").unwrap();
+    assert!(
+        ProtectionPolicy::allow_protected(authorization)
+            .authorize(EditProtection::Unknown)
+            .is_err()
+    );
+}
+
+#[test]
+fn word_2002_requires_its_counted_fib_and_dop_shapes() {
+    const POINTER_COUNT: usize = 136;
+    let pointer_end = 154 + POINTER_COUNT * 8;
+    let mut fib = vec![0u8; pointer_end + 4];
+    fib[..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
+    fib[2..4].copy_from_slice(&0x0101u16.to_le_bytes());
+    fib[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    fib[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
+    fib[152..154].copy_from_slice(&(POINTER_COUNT as u16).to_le_bytes());
+    fib[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+    fib[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
+    let mut dop = crate::parts::document_properties::DocumentProperties::word97_writer_bytes(
+        false, false, false,
+    );
+    dop.resize(594, 0);
+    set_pointer(&mut fib, 31, 0, dop.len() as u32);
+    let parsed = FileInformationBlock::parse(&fib).unwrap();
+    assert_eq!(classify(&parsed, &dop).unwrap(), EditProtection::None);
+
+    let authorization =
+        ProtectionAuthorization::audited("test-suite", "reject malformed Word 2002 shape").unwrap();
+    let allow = ProtectionPolicy::allow_protected(authorization);
+
+    let mut wrong_csw_new = fib.clone();
+    wrong_csw_new[pointer_end..pointer_end + 2].copy_from_slice(&0u16.to_le_bytes());
+    let word97_dop = &dop[..500];
+    set_pointer(&mut wrong_csw_new, 31, 0, word97_dop.len() as u32);
+    let wrong_csw_new = FileInformationBlock::parse(&wrong_csw_new).unwrap();
+    assert_eq!(
+        classify(&wrong_csw_new, word97_dop).unwrap(),
+        EditProtection::Unknown
+    );
+    assert!(
+        ProtectionPolicy::default()
+            .authorize(EditProtection::Unknown)
+            .is_err()
+    );
+    assert!(allow.authorize(EditProtection::Unknown).is_err());
+
+    let mut wrong_dop_length = fib;
+    let word97_dop = &dop[..500];
+    set_pointer(&mut wrong_dop_length, 31, 0, word97_dop.len() as u32);
+    let wrong_dop_length = FileInformationBlock::parse(&wrong_dop_length).unwrap();
+    assert_eq!(
+        classify(&wrong_dop_length, word97_dop).unwrap(),
+        EditProtection::Unrecognized
+    );
+    assert!(
+        ProtectionPolicy::default()
+            .authorize(EditProtection::Unrecognized)
+            .is_err()
+    );
+    assert!(allow.authorize(EditProtection::Unrecognized).is_err());
+}
+
+#[test]
+fn rejects_wrong_fixed_fib_counts_and_generation_csw_new() {
+    let dop = valid_modern_dop();
+    let mut wrong_csw = fib_bytes(10);
+    wrong_csw[32..34].copy_from_slice(&0x000du16.to_le_bytes());
+    set_pointer(&mut wrong_csw, 31, 0, dop.len() as u32);
+    let wrong_csw = FileInformationBlock::parse(&wrong_csw).unwrap();
+    assert_eq!(classify(&wrong_csw, &dop).unwrap(), EditProtection::Unknown);
+
+    let mut wrong_cslw = fib_bytes(10);
+    wrong_cslw[62..64].copy_from_slice(&0x0015u16.to_le_bytes());
+    set_pointer(&mut wrong_cslw, 31, 0, dop.len() as u32);
+    let wrong_cslw = FileInformationBlock::parse(&wrong_cslw).unwrap();
+    assert_eq!(
+        classify(&wrong_cslw, &dop).unwrap(),
+        EditProtection::Unknown
+    );
+
+    let mut wrong_csw_new = fib_bytes(10);
+    let pointer_end = 154 + 183 * 8;
+    wrong_csw_new[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+    set_pointer(&mut wrong_csw_new, 31, 0, dop.len() as u32);
+    let wrong_csw_new = FileInformationBlock::parse(&wrong_csw_new).unwrap();
+    assert_eq!(
+        classify(&wrong_csw_new, &dop).unwrap(),
+        EditProtection::Unknown
+    );
+}
+
+#[test]
+fn malformed_range_tables_remain_unrecognized_under_an_explicit_capability() {
+    let (mut fib, table) = Tables::typical().assemble();
+    let pointer = 154 + PLCF_BKL_PROT * 8;
+    fib[pointer + 4..pointer + 8].copy_from_slice(&1u32.to_le_bytes());
+    let parsed = FileInformationBlock::parse(&fib).unwrap();
+    assert_eq!(
+        classify(&parsed, &table).unwrap(),
+        EditProtection::Unrecognized
+    );
+    let authorization = ProtectionAuthorization::audited("test-suite", "inspect ranges").unwrap();
+    assert!(
+        ProtectionPolicy::allow_protected(authorization)
+            .authorize(EditProtection::Unrecognized)
+            .is_err()
+    );
+}
+
+#[test]
+fn preserves_nonstandard_and_truncated_dops_as_unrecognized() {
+    for length in 595..=615 {
+        let mut fib = fib_bytes(10);
+        let table = vec![0u8; length];
+        set_pointer(&mut fib, 31, 0, u32::try_from(length).unwrap());
+        let fib = FileInformationBlock::parse(&fib).unwrap();
+        assert_eq!(
+            classify(&fib, &table).unwrap(),
+            EditProtection::Unrecognized
+        );
+    }
+
+    let mut fib = fib_bytes(10);
+    let mut table = valid_modern_dop();
+    table[0x190..0x19a].copy_from_slice(&[0xa5, 0x06, 0xc0, 0x07, 0xb4, 0, 0xb4, 0, 1, 0x81]);
+    // Dop2003 iDocProtCur values 4..6 are reserved by MS-DOC and must not
+    // become an unprotected state merely because fEnforceDocProt is set.
+    table[598..600].copy_from_slice(&(0x0008u16 | (4 << 4)).to_le_bytes());
+    set_pointer(&mut fib, 31, 0, 674);
+    let fib = FileInformationBlock::parse(&fib).unwrap();
+    assert_eq!(
+        classify(&fib, &table).unwrap(),
+        EditProtection::Unrecognized
+    );
+
+    table[598..600].copy_from_slice(&(0x0008u16 | (7 << 4)).to_le_bytes());
+    assert_eq!(classify(&fib, &table).unwrap(), EditProtection::None);
+}
+
+#[test]
+fn malformed_dops_and_incomplete_fibs_fail_closed_for_both_policies() {
+    let authorization = ProtectionAuthorization::audited("test-suite", "inspect malformed DOC")
+        .expect("test authorization");
+    let allow = ProtectionPolicy::allow_protected(authorization);
+
+    for length in 595..=615 {
+        let mut fib = fib_bytes(10);
+        let table = vec![0u8; length];
+        set_pointer(&mut fib, 31, 0, u32::try_from(length).unwrap());
+        let fib = FileInformationBlock::parse(&fib).unwrap();
+        assert_eq!(
+            classify(&fib, &table).unwrap(),
+            EditProtection::Unrecognized
+        );
+        assert!(
+            ProtectionPolicy::default()
+                .authorize(EditProtection::Unrecognized)
+                .is_err()
+        );
+        assert!(allow.authorize(EditProtection::Unrecognized).is_err());
+    }
+
+    // A zero or absent lcbDop is host ambiguity, not an unprotected document;
+    // even the explicit protected-edit capability cannot make the host shape
+    // safe to interpret.
+    let fib = FileInformationBlock::parse(&fib_bytes(10)).unwrap();
+    assert_eq!(classify(&fib, &[]).unwrap(), EditProtection::Unknown);
+    assert!(
+        ProtectionPolicy::default()
+            .authorize(EditProtection::Unknown)
+            .is_err()
+    );
+    assert!(allow.authorize(EditProtection::Unknown).is_err());
+
+    let mut zero_dop = fib_bytes(10);
+    set_pointer(&mut zero_dop, 31, 12, 0);
+    let zero_dop = FileInformationBlock::parse(&zero_dop).unwrap();
+    assert_eq!(
+        classify(&zero_dop, &[0u8; 12]).unwrap(),
+        EditProtection::Unknown
+    );
+    assert!(allow.authorize(EditProtection::Unknown).is_err());
+
+    let mut truncated_fib = fib_bytes(10);
+    truncated_fib.truncate(154 + 136 * 8);
+    let truncated_fib = FileInformationBlock::parse(&truncated_fib).unwrap();
+    assert_eq!(
+        classify(&truncated_fib, &[]).unwrap(),
+        EditProtection::Unknown
+    );
+    assert!(allow.authorize(EditProtection::Unknown).is_err());
+
+    let mut wrong_count = fib_bytes(10);
+    wrong_count[152..154].copy_from_slice(&117u16.to_le_bytes());
+    let wrong_count = FileInformationBlock::parse(&wrong_count).unwrap();
+    assert_eq!(
+        classify(&wrong_count, &[]).unwrap(),
+        EditProtection::Unknown
+    );
+    assert!(allow.authorize(EditProtection::Unknown).is_err());
+}
+
+#[test]
+fn authorization_requires_actor_and_reason() {
+    assert!(ProtectionAuthorization::audited("", "reason").is_err());
+    assert!(ProtectionAuthorization::audited("actor", " ").is_err());
 }

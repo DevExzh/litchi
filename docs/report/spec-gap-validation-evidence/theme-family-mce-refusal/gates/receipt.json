@@ -1,0 +1,112 @@
+{
+  "base": "230b15b3f3eaacf71e961b890ab5b62e85b6ac9b",
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "commands": [
+    {
+      "name": "compile",
+      "argv": [
+        "cargo",
+        "check",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": ""
+    },
+    {
+      "name": "tests",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--no-fail-fast"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": ""
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": ""
+    },
+    {
+      "name": "rustdoc",
+      "argv": [
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--no-deps"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": "-D warnings"
+    },
+    {
+      "name": "format",
+      "argv": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-xlsb",
+        "--check"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": ""
+    },
+    {
+      "name": "diff",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": ""
+    }
+  ],
+  "source_unchanged": true,
+  "test_totals_including_doctests": {
+    "passed": 1141,
+    "failed": 0,
+    "ignored": 12
+  },
+  "logs": {
+    "clippy.log": "a58153a7d7e76a647650e4bc8e022a7632a00e8eaf705807a37d1ba699dcb1fe",
+    "compile.log": "2a65191fdadd51c3ac7d8e4d89f1771c02e407c5bb6ea63f9fc5a586e1e29996",
+    "diff.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rustdoc.log": "58678b1643589067666b84779eed87ff43fbf537369bb6cf5026c39582dd767e",
+    "tests.log": "33e0545313f7c88a76f43eeda12e34a30d12c7f3a549a8412eb65fcbec358917"
+  },
+  "passed": true
+}

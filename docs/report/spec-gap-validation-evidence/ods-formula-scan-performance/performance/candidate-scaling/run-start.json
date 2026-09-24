@@ -1,0 +1,11 @@
+{
+  "label": "candidate-scaling",
+  "group": "scaling",
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/candidate/ods-formula-reference-profile",
+  "binary_sha256": "507c989691190554711c023ebe19796e62388bdc27fe942ab8015e862c49689f",
+  "harness": "/var/tmp/ods-scan-worktree/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/harness/run.py",
+  "output": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/candidate-scaling",
+  "warmups": 3,
+  "iterations": 15,
+  "started_at": "2026-09-13T08:27:53Z"
+}

@@ -1,0 +1,19 @@
+{
+  "utc": "2026-09-13T07:24:42.498336+00:00",
+  "commit": "b7a66574a541ac0efc443056c4d11f6b829fffa9",
+  "base_commit": "b7a66574a541ac0efc443056c4d11f6b829fffa9",
+  "worktree": "/var/tmp/litchi-ods-formula-references-candidate-20260913",
+  "target": "/var/tmp/litchi-ods-formula-references-candidate-target-20260913",
+  "source_hashes_match_gates": false,
+  "source_hashes": {
+    "crates/litchi-ods/src/codec/formula.rs": "6ac4f24329723fa4027512480ebc4b3b7eb46c7baea80dfb7e01063be42e253f",
+    "crates/litchi-ods/src/codec/formula/functions.rs": "1d736271e9f9cf3743295f8895f184e32842640eaba48084dfafc9ca7333e2a1",
+    "crates/litchi-ods/src/codec/formula/reference.rs": "f72ffeb06d5ab2354c747a96e6e13961d4325da81c5004529bf6df02bb4430d6",
+    "crates/litchi-ods/src/codec/formula/reference/iri.rs": "a09fa610c25de63e5665f9de88698d7578f8b80c70ca027382ddb4d13ae05961",
+    "crates/litchi-ods/src/model/cell.rs": "85d71d6e4c7986cc9450ded6d26eb41656adcaa1104ac4284b5338b2cf8cdc15",
+    "crates/litchi-ods/tests/ods_formula_references.rs": "b9d9fbd654e00e0dc4919451fc9b46aeedad8669dca0be541f757c1e779680db",
+    "crates/litchi-ods/tests/ods_formula_functions.rs": "0699ad88e3eb17f07c98f57178b4eea68d6cc39ec88d026fc80222efe63a1947"
+  },
+  "scoped_source_status": " M crates/litchi-ods/src/codec/formula.rs\n M crates/litchi-ods/src/model/cell.rs\n?? crates/litchi-ods/src/codec/formula/reference.rs\n?? crates/litchi-ods/src/codec/formula/reference/iri.rs\n?? crates/litchi-ods/tests/ods_formula_references.rs\n",
+  "capture_source_revision": "pre-reserve-token-slot guard candidate"
+}

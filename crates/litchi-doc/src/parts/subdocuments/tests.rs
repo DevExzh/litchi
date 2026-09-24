@@ -10,16 +10,23 @@ use crate::parts::mail_merge::Fnpi;
 use litchi_cfb::{OleFile, OleWriter};
 use std::io::Cursor;
 
-/// Build a minimal FIB whose table-pointer array covers indexes 0..73,
+/// Build a minimal FIB whose table-pointer array covers the modern Word 2002
+/// indexes used by this fixture,
 /// with a main-document length of `document_end` characters.
 fn fib_bytes(document_end: u32) -> Vec<u8> {
-    let pointer_count = 73usize;
-    let mut bytes = vec![0u8; 154 + pointer_count * 8];
+    let pointer_count = 136usize;
+    let pointer_end = 154 + pointer_count * 8;
+    let mut bytes = vec![0u8; pointer_end + 4];
     bytes[..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
-    bytes[2..4].copy_from_slice(&0x0101u16.to_le_bytes());
+    // FibBase.csw and cslw are fixed MS-DOC counts.
+    bytes[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    bytes[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
+    bytes[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
     bytes[6..8].copy_from_slice(&0x0409u16.to_le_bytes());
     bytes[76..80].copy_from_slice(&document_end.to_le_bytes());
     bytes[152..154].copy_from_slice(&(pointer_count as u16).to_le_bytes());
+    bytes[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+    bytes[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
     bytes
 }
 
@@ -103,6 +110,11 @@ impl Tables {
                 table.extend_from_slice(data);
             }
         }
+        let dop = crate::parts::document_properties::DocumentProperties::writer_bytes(
+            false, false, false, true,
+        );
+        set_pointer(&mut fib, 31, table.len() as u32, dop.len() as u32);
+        table.extend_from_slice(&dop);
         (fib, table)
     }
 

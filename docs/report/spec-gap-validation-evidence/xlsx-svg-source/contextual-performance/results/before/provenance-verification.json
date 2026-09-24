@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "snapshot_label": "before-8b5838c59",
+  "expected_commit": "8b5838c591775990747b2cbce82fb2eea372b58b",
+  "binary_sha256": "1c0df3243a09ec02fc7699d99eccedd7413d4a62ab2eda5fc1392ba20b5aea0d",
+  "source_sha256": {
+    "source.rs": "1d8e6adf127a00dc25cd801bd90835f41442220ce944ba005cfdfa28e6dd62c2",
+    "source_tests.rs": "03c67af436e218156cd48df52de1963bff97006025bc9f2d1848122f910bcc89",
+    "svg_blip.rs": "e8a1e480d249b834f286e0deec083f8044257faf3b95905fb5b771e83f71605a"
+  },
+  "fresh_binary_validated_before_target_cleanup": true
+}

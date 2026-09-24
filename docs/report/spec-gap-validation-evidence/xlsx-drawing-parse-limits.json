@@ -1,0 +1,42 @@
+{
+  "scope": "typed worksheet drawing parser caller-limit prerequisite",
+  "isolated_base": "930305a93",
+  "changed_xlsx_files": [
+    "crates/litchi-xlsx/src/drawing/codec.rs"
+  ],
+  "source_sha256": "c957b218b59cda78f0fc1c4615d68a33e084d410d889289f86cd2a60b9eef679",
+  "cargo_lock_sha256": "ff45c428d2047106e3cc586e879cea7bd5d7556eaebcf6634e00659406d49a9b",
+  "checks": [
+    {
+      "command": "cargo test --locked -p litchi-xlsx --lib --offline --quiet",
+      "passed": 1103
+    },
+    {
+      "command": "cargo clippy --locked -p litchi-xlsx --lib --offline --quiet -- -D warnings",
+      "result": "pass"
+    },
+    {
+      "command": "rustfmt --edition 2024 --check crates/litchi-xlsx/src/drawing/codec.rs",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --check -- crates/litchi-xlsx/src/drawing/codec.rs",
+      "result": "pass"
+    }
+  ],
+  "regressions": [
+    "MCE namespace-closure output exceeds caller cap while input fits",
+    "ordinary no-MCE XML succeeds at exact per-part boundary",
+    "empty root and empty child obey caller depth before semantic parsing"
+  ],
+  "limits": [
+    "part bytes and MCE output",
+    "XML nesting for Start and Empty",
+    "XML events clamped to 1000000"
+  ],
+  "exclusions": [
+    "No worksheet SVG lifecycle acceptance",
+    "No shared contextual SVG codec or paired-read facade changes in tested XLSX sources",
+    "No timing or allocation performance claim"
+  ]
+}

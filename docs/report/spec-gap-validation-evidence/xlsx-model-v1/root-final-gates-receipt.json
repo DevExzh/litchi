@@ -1,0 +1,34 @@
+{
+  "candidate": "/var/tmp/litchi-xlsx-model-final-validation-v7-20260910-a",
+  "source_manifest": "/var/tmp/xlsx-model-owner-reconciliation-v7-20260910/owner-final-hashes.json",
+  "source_manifest_sha256": "33b11b4f80bfa5331fb1e157f33e7e8e634998d7c26d861aa4bd93b3568bdb29",
+  "recorded_at": "2026-09-10T02:27:56.687610+00:00",
+  "tests_passed": 1437,
+  "doctests_passed": 2,
+  "ignored": 0,
+  "logs": {
+    "tests": {
+      "path": "/var/tmp/litchi-xlsx-model-v7-root-tests.log",
+      "sha256": "87daf42f5eef1ae71b8418544c4ac51b6eb1e2ee4da7ad2a6f2042fe6caf7c35",
+      "bytes": 148366,
+      "exit_code": 0
+    },
+    "clippy": {
+      "path": "/var/tmp/litchi-xlsx-model-v7-root-clippy.log",
+      "sha256": "fdae0ae59319d50a7454d4d68fbe886dcfd5ab4d1049c94aa8b749c33a959b49",
+      "bytes": 4814,
+      "exit_code": 0
+    },
+    "rustdoc": {
+      "path": "/var/tmp/litchi-xlsx-model-v7-root-rustdoc.log",
+      "sha256": "37e0f7877044f699c90de54d86e25384aae65f2bf9cfbf1bd8b0ed59d495b6ba",
+      "bytes": 1922,
+      "exit_code": 0
+    }
+  },
+  "source_hashes_verified": true,
+  "format_passed": true,
+  "diff_check_passed": true,
+  "dedicated_target": "/var/tmp/litchi-xlsx-model-v7-root-target-195",
+  "independent_integration_review": "clear"
+}

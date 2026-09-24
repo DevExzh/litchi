@@ -1,0 +1,11 @@
+[package]
+name = "ods-meta-profile"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+litchi-core = { path = "../../../../../crates/litchi-core" }
+litchi-ods = { path = "../../../../../crates/litchi-ods" }

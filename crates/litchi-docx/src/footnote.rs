@@ -12,39 +12,49 @@ use crate::error::{Error, Result};
 /// This module provides types and methods for accessing footnotes and endnotes
 /// in Word documents. Footnotes appear at the bottom of pages, while endnotes
 /// appear at the end of the document or section.
-use crate::namespace::scan_word_element_ranges;
+use crate::namespace::{NamespaceBindings, scan_word_element_ranges_with_context};
 use crate::paragraph::{Paragraph, extract_word_text};
 use litchi_core::XmlSlice;
 use litchi_opc::part::Part;
 use quick_xml::Reader;
 use quick_xml::events::Event;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 #[derive(Debug, Clone)]
 enum NoteXmlData {
     Owned(Box<[u8]>),
-    Shared(XmlSlice),
+    Shared {
+        slice: XmlSlice,
+        namespaces: NamespaceBindings,
+    },
 }
 
 impl NoteXmlData {
     fn as_bytes(&self) -> &[u8] {
         match self {
             Self::Owned(bytes) => bytes,
-            Self::Shared(slice) => slice.as_bytes(),
+            Self::Shared { slice, .. } => slice.as_bytes(),
         }
     }
 
     fn get_or_create_arc(&self) -> (Arc<Vec<u8>>, u32) {
         match self {
             Self::Owned(bytes) => (Arc::new(bytes.to_vec()), 0),
-            Self::Shared(slice) => (slice.arc(), slice.start()),
+            Self::Shared { slice, .. } => (slice.arc(), slice.start()),
+        }
+    }
+
+    fn namespace_bindings(&self) -> &NamespaceBindings {
+        match self {
+            Self::Owned(_) => &EMPTY_NAMESPACE_BINDINGS,
+            Self::Shared { namespaces, .. } => namespaces,
         }
     }
 
     fn self_contained_xml(&self) -> Result<Vec<u8>> {
         match self {
             Self::Owned(bytes) => Ok(bytes.to_vec()),
-            Self::Shared(slice) => crate::namespace::self_contained_element_xml(
+            Self::Shared { slice, .. } => crate::namespace::self_contained_element_xml(
                 slice.arc().as_slice(),
                 slice.start(),
                 u32::try_from(slice.len()).map_err(|_source_error| {
@@ -54,6 +64,8 @@ impl NoteXmlData {
         }
     }
 }
+
+static EMPTY_NAMESPACE_BINDINGS: LazyLock<NamespaceBindings> = LazyLock::new(|| Arc::from([]));
 
 /// A footnote or endnote in a Word document.
 ///
@@ -146,10 +158,14 @@ impl Note {
         start: u32,
         length: u32,
         note_type: NoteType,
+        namespaces: NamespaceBindings,
     ) -> Self {
         Self {
             id,
-            xml_data: NoteXmlData::Shared(XmlSlice::new(source, start, length)),
+            xml_data: NoteXmlData::Shared {
+                slice: XmlSlice::new(source, start, length),
+                namespaces,
+            },
             note_type,
         }
     }
@@ -245,16 +261,22 @@ impl Note {
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         let (source, base_offset) = self.xml_data.get_or_create_arc();
         let mut paragraphs = Vec::new();
-        scan_word_element_ranges(self.xml_bytes(), &[b"p".as_slice()], |_, start, length| {
-            paragraphs.push(Paragraph::from_arc_range(
-                Arc::clone(&source),
-                base_offset.checked_add(start).ok_or_else(|| {
-                    Error::InvalidFormat("Word note offset exceeds u32".to_string())
-                })?,
-                length,
-            ));
-            Ok(())
-        })?;
+        scan_word_element_ranges_with_context(
+            self.xml_bytes(),
+            self.xml_data.namespace_bindings(),
+            &[b"p".as_slice()],
+            |_, start, length, namespaces| {
+                paragraphs.push(Paragraph::from_arc_range_with_context(
+                    Arc::clone(&source),
+                    base_offset.checked_add(start).ok_or_else(|| {
+                        Error::InvalidFormat("Word note offset exceeds u32".to_string())
+                    })?,
+                    length,
+                    namespaces,
+                ));
+                Ok(())
+            },
+        )?;
         Ok(paragraphs)
     }
 
@@ -286,28 +308,49 @@ impl Note {
 
     /// Extract notes from a part (generic for footnotes and endnotes).
     fn extract_notes_from_part(part: &dyn Part, note_tag: &[u8]) -> Result<Vec<Note>> {
-        let source = litchi_ooxml_common::mce::process_part_arc(part)?;
+        // `w16du:dateUtc` is a Word 2023 tracked-change attribute and is
+        // commonly protected by `mc:Ignorable` in a notes part.  Use the
+        // DOCX profile here rather than the format-generic baseline, which
+        // would discard the attribute before note ranges are projected.
+        let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
+        capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
+        let source = match litchi_ooxml_common::mce::process_markup_compatibility(
+            part.blob(),
+            &capabilities,
+            &litchi_ooxml_common::mce::Limits::default(),
+        )?
+        .xml
+        {
+            std::borrow::Cow::Borrowed(_) => part.blob_arc(),
+            std::borrow::Cow::Owned(value) => Arc::new(value),
+        };
         let mut notes = Vec::new();
-        scan_word_element_ranges(source.as_slice(), &[note_tag], |_, start, length| {
-            let start_index = start as usize;
-            let end_index = start_index
-                .checked_add(length as usize)
-                .ok_or_else(|| Error::InvalidFormat("Word note range overflow".to_string()))?;
-            let (id, note_type) = parse_note_metadata(&source[start_index..end_index])?;
-            if let Some(id) = id
-                && id > 0
-                && note_type.is_normal()
-            {
-                notes.push(Note::from_arc_range(
-                    id,
-                    Arc::clone(&source),
-                    start,
-                    length,
-                    note_type,
-                ));
-            }
-            Ok(())
-        })?;
+        scan_word_element_ranges_with_context(
+            source.as_slice(),
+            &[],
+            &[note_tag],
+            |_, start, length, namespaces| {
+                let start_index = start as usize;
+                let end_index = start_index
+                    .checked_add(length as usize)
+                    .ok_or_else(|| Error::InvalidFormat("Word note range overflow".to_string()))?;
+                let (id, note_type) = parse_note_metadata(&source[start_index..end_index])?;
+                if let Some(id) = id
+                    && id > 0
+                    && note_type.is_normal()
+                {
+                    notes.push(Note::from_arc_range(
+                        id,
+                        Arc::clone(&source),
+                        start,
+                        length,
+                        note_type,
+                        namespaces,
+                    ));
+                }
+                Ok(())
+            },
+        )?;
         Ok(notes)
     }
 }
@@ -661,6 +704,27 @@ mod tests {
         assert_eq!(paragraphs[0].runs().unwrap()[0].text().unwrap(), "A < B");
         assert_eq!(notes[1].id(), 3);
         assert_eq!(notes[1].text().unwrap(), "");
+    }
+
+    #[test]
+    fn word_2023_revision_utc_is_retained_in_footnote_mce_projection() {
+        let word = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+        let mce = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+        let date_utc = crate::revision::WORD_2023_DATE_UTC_NAMESPACE;
+        let xml = format!(
+            r#"<w:footnotes xmlns:w="{word}" xmlns:mc="{mce}" xmlns:du="{date_utc}" mc:Ignorable="du"><w:footnote w:id="1"><w:p><w:ins w:id="7" w:author="Alice" du:dateUtc="2026-07-17T00:00:00Z"><w:r><w:t>added</w:t></w:r></w:ins></w:p></w:footnote></w:footnotes>"#
+        );
+        let notes = Note::extract_footnotes_from_part(&MockPart::new(xml.into_bytes())).unwrap();
+        assert_eq!(notes.len(), 1);
+        assert!(
+            notes[0]
+                .xml_bytes()
+                .windows(b"du:dateUtc".len())
+                .any(|window| window == b"du:dateUtc")
+        );
+        let revisions = notes[0].paragraphs().unwrap()[0].revisions().unwrap();
+        assert_eq!(revisions.len(), 1);
+        assert_eq!(revisions[0].date_utc(), Some("2026-07-17T00:00:00Z"));
     }
 
     #[test]

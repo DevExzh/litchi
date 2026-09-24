@@ -9,8 +9,9 @@ use super::transaction::{
 use super::validation;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
+use crate::parts::protection::{EditProtection, PackagePatch, ProtectionPolicy, classify};
 use crate::writer::fib::FibBuilder;
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Patch as ObjectPatch, Targets};
+use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Targets};
 
 /// `FibRgFcLcb97` index of fcCmds/lcbCmds (MS-DOC 2.5).
 pub const FIB_INDEX_CMDS: usize = 24;
@@ -92,7 +93,7 @@ impl Snapshot {
 pub struct Commit {
     snapshot: Snapshot,
     patch: TransactionCommit,
-    package_patch: ObjectPatch,
+    package_patch: PackagePatch,
 }
 
 impl Commit {
@@ -110,13 +111,13 @@ impl Commit {
 
     /// The reversible whole-CFB byte patch.
     #[must_use]
-    pub fn package_patch(&self) -> &ObjectPatch {
+    pub fn package_patch(&self) -> &PackagePatch {
         &self.package_patch
     }
 
     /// Splits the package snapshot, semantic patch, and CFB byte patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, TransactionCommit, ObjectPatch) {
+    pub fn into_parts(self) -> (Snapshot, TransactionCommit, PackagePatch) {
         (self.snapshot, self.patch, self.package_patch)
     }
 }
@@ -128,6 +129,8 @@ pub struct Editor {
     table_name: String,
     original: TransactionSnapshot,
     command_bars: TransactionSnapshot,
+    protection: EditProtection,
+    protection_policy: ProtectionPolicy,
     changed: bool,
 }
 
@@ -137,8 +140,22 @@ impl Editor {
         Self::open_with_limits(bytes, Limits::default())
     }
 
+    /// Opens a package with an explicit policy for changed protected content.
+    pub fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
+        Self::open_with_limits_and_policy(bytes, Limits::default(), policy)
+    }
+
     /// Opens a package with an explicit bounded OLE resource profile.
     pub fn open_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+        Self::open_with_limits_and_policy(bytes, limits, ProtectionPolicy::default())
+    }
+
+    /// Opens a package with both bounded resources and an explicit protection policy.
+    pub fn open_with_limits_and_policy(
+        bytes: Vec<u8>,
+        limits: Limits,
+        protection_policy: ProtectionPolicy,
+    ) -> Result<Self> {
         let package =
             ObjectEditor::open(bytes, Targets::new([]).map_err(PackageError::from)?, limits)
                 .map_err(PackageError::from)?;
@@ -155,12 +172,15 @@ impl Editor {
         let table = package
             .stream(&[table_name.to_owned()])
             .ok_or_else(|| PackageError::StreamNotFound(table_name.to_owned()))?;
+        let protection = classify(&fib, table)?;
         let command_bars = TransactionSnapshot::new(parse(&fib, table)?)?;
         Ok(Self {
             package,
             table_name: table_name.to_owned(),
             original: command_bars.clone(),
             command_bars,
+            protection,
+            protection_policy,
             changed: false,
         })
     }
@@ -224,15 +244,21 @@ impl Editor {
 
     /// Finishes the edit and returns rendered DOC bytes.
     pub fn finish(self) -> Result<Vec<u8>> {
+        if self.changed {
+            self.protection_policy.authorize(self.protection)?;
+        }
         self.package.finish().map_err(PackageError::from)
     }
 
     /// Commits the package as an immutable snapshot with reversible patches.
     pub fn commit(self) -> Result<Commit> {
+        if self.changed {
+            self.protection_policy.authorize(self.protection)?;
+        }
         let patch = TransactionCommit::new(self.original, self.command_bars.clone());
         let object_commit = self.package.commit().map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
-        let package_patch = object_commit.into_patch();
+        let package_patch = PackagePatch::new(object_commit.into_patch(), self.protection);
         Ok(Commit {
             snapshot: Snapshot::new(bytes, self.command_bars),
             patch,
@@ -249,12 +275,15 @@ impl Editor {
                 .commit()
                 .map_err(PackageError::from)?
                 .into_patch();
+            let package_patch = PackagePatch::new(package_patch, self.protection);
             return Ok(Commit {
                 snapshot: self.snapshot()?,
                 patch,
                 package_patch,
             });
         }
+
+        self.protection_policy.authorize(self.protection)?;
 
         let mut candidate = self.clone();
         candidate.write_snapshot(&snapshot)?;
@@ -266,7 +295,7 @@ impl Editor {
             .commit()
             .map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
-        let package_patch = object_commit.into_patch();
+        let package_patch = PackagePatch::new(object_commit.into_patch(), candidate.protection);
         let package_snapshot = Snapshot::new(bytes, candidate.command_bars.clone());
         *self = candidate;
         Ok(Commit {

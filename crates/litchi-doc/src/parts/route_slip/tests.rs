@@ -206,15 +206,33 @@ fn editable_sample() -> Metadata {
 }
 
 fn write_base_doc(table: &[u8]) -> Vec<u8> {
-    let pointer = 154 + 70 * 8;
-    let mut word = vec![0; pointer + 8];
+    const DOP_INDEX: usize = 31;
+    const POINTER_COUNT: usize = 136;
+    let pointer_end = 154 + POINTER_COUNT * 8;
+    let mut word = vec![0; pointer_end + 4];
     word[0..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
+    // FibBase.csw and cslw are fixed MS-DOC counts.
+    word[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    word[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
     word[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
-    word[152..154].copy_from_slice(&71u16.to_le_bytes());
+    word[152..154].copy_from_slice(&(POINTER_COUNT as u16).to_le_bytes());
+    word[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+    word[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
+
+    let mut table = table.to_vec();
+    let dop_offset = table.len();
+    table.extend_from_slice(
+        &crate::parts::document_properties::DocumentProperties::writer_bytes(
+            false, false, false, true,
+        ),
+    );
+    let dop_pointer = 154 + DOP_INDEX * 8;
+    word[dop_pointer..dop_pointer + 4].copy_from_slice(&(dop_offset as u32).to_le_bytes());
+    word[dop_pointer + 4..dop_pointer + 8].copy_from_slice(&594u32.to_le_bytes());
 
     let mut writer = OleWriter::new();
     writer.create_stream(&["WordDocument"], &word).unwrap();
-    writer.create_stream(&["0Table"], table).unwrap();
+    writer.create_stream(&["0Table"], &table).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     output.into_inner()
@@ -230,11 +248,18 @@ fn first_recipient_name_length_offset(bytes: &[u8]) -> usize {
 }
 
 fn fib_with_route_slip_pointer(offset: usize, length: usize) -> FileInformationBlock {
+    const POINTER_COUNT: usize = 136;
     let pointer_offset = 154 + 70 * 8;
-    let mut data = vec![0; pointer_offset + 8];
+    let pointer_end = 154 + POINTER_COUNT * 8;
+    let mut data = vec![0; pointer_end + 4];
     data[0..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
+    // FibBase.csw and cslw are fixed MS-DOC counts.
+    data[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    data[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
     data[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
-    data[152..154].copy_from_slice(&71u16.to_le_bytes());
+    data[152..154].copy_from_slice(&(POINTER_COUNT as u16).to_le_bytes());
+    data[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+    data[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
     data[pointer_offset..pointer_offset + 4].copy_from_slice(
         &u32::try_from(offset)
             .expect("test offset fits")

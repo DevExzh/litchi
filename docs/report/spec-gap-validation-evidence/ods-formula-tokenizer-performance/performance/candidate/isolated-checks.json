@@ -1,0 +1,34 @@
+{
+  "worktree": "/var/tmp/ods-tokenizer-baseline-20260913",
+  "target": "/var/tmp/ods-tokenizer-baseline-target-20260913",
+  "checks": [
+    {
+      "name": "formula-unit",
+      "command": "cargo test --locked --offline -p litchi-ods --lib codec::formula",
+      "status": 0,
+      "elapsed_seconds": 0.105,
+      "log": "candidate/isolated-formula-unit.log"
+    },
+    {
+      "name": "tokenizer-integration",
+      "command": "cargo test --locked --offline -p litchi-ods --test ods_formula_tokenizer_regression -- --nocapture",
+      "status": 0,
+      "elapsed_seconds": 0.104,
+      "log": "candidate/isolated-tokenizer-integration.log"
+    },
+    {
+      "name": "reference-integration",
+      "command": "cargo test --locked --offline -p litchi-ods --test ods_formula_references",
+      "status": 0,
+      "elapsed_seconds": 0.11,
+      "log": "candidate/isolated-reference-integration.log"
+    },
+    {
+      "name": "function-catalog-integration",
+      "command": "cargo test --locked --offline -p litchi-ods --test ods_formula_functions",
+      "status": 0,
+      "elapsed_seconds": 0.408,
+      "log": "candidate/isolated-function-catalog.log"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+Snapshot: /home/zhuhe/xlsx-content-part-final-gate-20260912
+Target: /home/zhuhe/xlsx-content-part-final-target-20260912
+Evidence: /home/zhuhe/xlsx-content-part-final-evidence-20260912
+
+The snapshot is a regular copied workspace from git archive plus final production files.
+The only symlink under the snapshot is:
+  crates/litchi-xlsx/tests/drawing_content_part.rs -> /home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsx/tests/drawing_content_part.rs
+All other crate files are regular copied files. The snapshot omits only the form_control module export in litchi-xlsx/src/lib.rs to isolate the WIP form-control work.
+The lockfile is retained at evidence/Cargo.lock for replay.

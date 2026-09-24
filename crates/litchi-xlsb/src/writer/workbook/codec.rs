@@ -125,6 +125,11 @@ impl WorkbookWriter {
         // values, so we emit it unconditionally.
         self.write_calc(writer)?;
 
+        if let Some(model) = &self.data_model {
+            let bytes = crate::data_model::serialize_workbook_records(&model.definition)?;
+            writer.get_mut().write_all(&bytes).map_err(Error::Io)?;
+        }
+
         // BrtEndBook
         writer.write_record(kind::END_BOOK, &[])?;
 

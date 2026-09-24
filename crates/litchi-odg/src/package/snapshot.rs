@@ -837,6 +837,7 @@ impl Snapshot {
     /// resources, or unresolved source dependencies.
     pub fn prepare_shape_transfer(&self, page: usize, shape: usize) -> Result<ShapeTransfer> {
         let source_namespaces = transfer_source_namespaces(self)?;
+        let mut transfer_budget = TransferBudget::default();
         let parsed = parse_content(self.content_xml())?;
         let selected_page = parsed.pages.get(page).ok_or_else(|| {
             Error::InvalidFormat("ODG transfer page selector is out of bounds".into())
@@ -850,11 +851,8 @@ impl Snapshot {
         let raw_xml = self
             .content_xml()
             .get(span.clone())
-            .ok_or_else(|| Error::InvalidFormat("ODG transfer shape span is invalid".into()))?
-            .to_owned();
-        let xml = close_transfer_fragment_namespaces(&raw_xml, &source_namespaces)?;
-        validate_transfer_fragment_namespaces(&xml)?;
-        compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
+            .ok_or_else(|| Error::InvalidFormat("ODG transfer shape span is invalid".into()))?;
+        transfer_budget.charge(raw_xml.len(), "ODG transfer XML")?;
         let dependency_shapes = selected_page
             .shapes()
             .iter()
@@ -890,10 +888,10 @@ impl Snapshot {
             .collect::<Vec<_>>();
         controls.sort_unstable();
         controls.dedup();
-        let mut style_definitions = BTreeMap::new();
+        let mut style_sources = BTreeMap::new();
         let mut required_style_resources = BTreeSet::new();
         while let Some(style_name) = required_styles.pop() {
-            if style_definitions.contains_key(&style_name) {
+            if style_sources.contains_key(&style_name) {
                 continue;
             }
             let definition = find_style_definition(self, &style_name)?.ok_or_else(|| {
@@ -901,10 +899,7 @@ impl Snapshot {
                     "ODG transfer source has unresolved style '{style_name}'"
                 ))
             })?;
-            let definition_xml =
-                close_transfer_fragment_namespaces(&definition.xml, &source_namespaces)?;
-            validate_transfer_fragment_namespaces(&definition_xml)?;
-            compact_xml::validate(definition_xml.as_bytes()).map_err(Error::from)?;
+            transfer_budget.charge(definition.xml.len(), "ODG transfer XML")?;
             if let Some(parent) = style_parent_name(&definition.xml)? {
                 required_styles.push(parent);
             }
@@ -916,35 +911,17 @@ impl Snapshot {
                     required_style_resources.insert((kind, value.clone()));
                 }
             }
-            style_definitions.insert(
-                style_name.clone(),
-                TransferStyle {
-                    name: style_name,
-                    family: definition.style.family().to_owned(),
-                    parent: definition.style.parent().map(str::to_owned),
-                    xml: definition_xml,
-                },
-            );
+            style_sources.insert(style_name, definition);
         }
-        let styles = style_definitions.keys().cloned().collect::<Vec<_>>();
-        let mut style_resources = BTreeMap::new();
+        let mut style_resource_sources = BTreeMap::new();
         for (kind, value) in required_style_resources {
             let definition = find_style_resource(self, kind, &value)?.ok_or_else(|| {
                 Error::Unsupported(format!(
                     "ODG transfer source has unresolved named style resource '{value}'"
                 ))
             })?;
-            let resource_xml =
-                close_transfer_fragment_namespaces(&definition.xml, &source_namespaces)?;
-            validate_transfer_fragment_namespaces(&resource_xml)?;
-            compact_xml::validate(resource_xml.as_bytes()).map_err(Error::from)?;
-            style_resources.insert(
-                (kind, value),
-                TransferStyleResource {
-                    resource: definition.resource,
-                    xml: resource_xml,
-                },
-            );
+            transfer_budget.charge(definition.xml.len(), "ODG transfer XML")?;
+            style_resource_sources.insert((kind, value), definition);
         }
         for control in &controls {
             if !self
@@ -957,41 +934,147 @@ impl Snapshot {
                 )));
             }
         }
-        let dependency_xml = std::iter::once(xml.as_str())
+        let mut control_sources = Vec::new();
+        for identifier in &controls {
+            let position = parsed
+                .form_controls
+                .iter()
+                .position(|control| control.id() == identifier)
+                .ok_or_else(|| {
+                    Error::InvalidFormat("ODG transfer form control is missing".into())
+                })?;
+            let control_span = parsed.form_control_spans[position]
+                .as_ref()
+                .ok_or_else(|| {
+                    Error::InvalidFormat("ODG transfer form-control span is missing".into())
+                })?;
+            let raw_control_xml =
+                self.content_xml()
+                    .get(control_span.clone())
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("ODG transfer form-control span is invalid".into())
+                    })?;
+            transfer_budget.charge(raw_control_xml.len(), "ODG transfer XML")?;
+            control_sources.push((parsed.form_controls[position].clone(), control_span.clone()));
+        }
+
+        // Namespace closure can add producer declarations to each detached
+        // fragment.  Charge those bytes for the complete set before any
+        // closure string is allocated, so a rejected aggregate cannot leave
+        // several large detached strings behind.
+        let mut charge_namespace_closure = |fragment: &str| -> Result<()> {
+            let added = transfer_namespace_closure_bytes(fragment, &source_namespaces)?;
+            transfer_budget.charge(added, "ODG transfer namespace closure")?;
+            Ok(())
+        };
+        charge_namespace_closure(raw_xml)?;
+        for definition in style_sources.values() {
+            charge_namespace_closure(&definition.xml)?;
+        }
+        for definition in style_resource_sources.values() {
+            charge_namespace_closure(&definition.xml)?;
+        }
+        for (_control, span) in &control_sources {
+            let fragment = self.content_xml().get(span.clone()).ok_or_else(|| {
+                Error::InvalidFormat("ODG transfer form-control span is invalid".into())
+            })?;
+            charge_namespace_closure(fragment)?;
+        }
+
+        // Every source XML span is charged before any detached transfer string
+        // is cloned or namespace-closed.  This keeps a rejected aggregate from
+        // allocating one large fragment at a time before discovering the cap.
+        let xml = close_transfer_fragment_namespaces(raw_xml, &source_namespaces)?;
+        validate_transfer_fragment_namespaces(&xml)?;
+        compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
+        let styles = style_sources.keys().cloned().collect::<Vec<_>>();
+        let mut style_definitions = BTreeMap::new();
+        for (style_name, definition) in style_sources {
+            let definition_xml =
+                close_transfer_fragment_namespaces(&definition.xml, &source_namespaces)?;
+            validate_transfer_fragment_namespaces(&definition_xml)?;
+            compact_xml::validate(definition_xml.as_bytes()).map_err(Error::from)?;
+            style_definitions.insert(
+                style_name.clone(),
+                TransferStyle {
+                    name: style_name,
+                    family: definition.style.family().to_owned(),
+                    parent: definition.style.parent().map(str::to_owned),
+                    xml: definition_xml,
+                },
+            );
+        }
+        let mut style_resources = BTreeMap::new();
+        for (key, definition) in style_resource_sources {
+            let resource_xml =
+                close_transfer_fragment_namespaces(&definition.xml, &source_namespaces)?;
+            validate_transfer_fragment_namespaces(&resource_xml)?;
+            compact_xml::validate(resource_xml.as_bytes()).map_err(Error::from)?;
+            style_resources.insert(
+                key,
+                TransferStyleResource {
+                    resource: definition.resource,
+                    xml: resource_xml,
+                },
+            );
+        }
+        let transfer_fragments = std::iter::once(xml.as_str())
             .chain(style_definitions.values().map(|style| style.xml.as_str()))
             .chain(
                 style_resources
                     .values()
                     .map(|resource| resource.xml.as_str()),
             )
-            .collect::<String>();
-        let mut resources = Vec::new();
-        let mut resource_bytes = 0usize;
-        for (resource_index, resource) in self
-            .resources()
-            .iter()
-            .enumerate()
-            .filter(|(_index, resource)| transfer_xml_references(&dependency_xml, resource.href()))
-        {
-            if resources
+            .collect::<Vec<_>>();
+        let mut resource_indices = Vec::new();
+        for (resource_index, resource) in self.resources().iter().enumerate() {
+            if !transfer_fragments
                 .iter()
-                .any(|existing: &TransferResource| existing.path == resource.path())
+                .any(|fragment| transfer_xml_references(fragment, resource.href()))
             {
                 continue;
             }
-            if resources.len() >= MAX_TRANSFER_RESOURCES {
+            if resource_indices
+                .iter()
+                .any(|index: &usize| self.resources()[*index].path() == resource.path())
+            {
+                continue;
+            }
+            if resource_indices.len() >= MAX_TRANSFER_RESOURCES {
                 return invalid("ODG transfer resource count exceeds the limit");
             }
+            resource_indices.push(resource_index);
+        }
+        let archive = self.0.package.package();
+        let archive_view = archive.package()?;
+        for resource_index in &resource_indices {
+            let resource = &self.resources()[*resource_index];
+            let size = archive_view
+                .member_materialized_size(resource.path())?
+                .ok_or_else(|| {
+                    Error::Unsupported(format!(
+                        "ODG transfer resource '{}' is missing",
+                        resource.path()
+                    ))
+                })?;
+            if size > MAX_OUTPUT_BYTES as u64 {
+                return invalid("ODG transfer resources exceed the byte limit");
+            }
+            let size = usize::try_from(size).map_err(|_| {
+                Error::InvalidFormat("ODG transfer resource size overflows usize".into())
+            })?;
+            transfer_budget.charge(size, "ODG transfer closure")?;
+        }
+        let mut resources = Vec::new();
+        for resource_index in resource_indices {
+            let resource = &self.resources()[resource_index];
             let bytes = self.resource_bytes(resource_index)?.ok_or_else(|| {
                 Error::Unsupported(format!(
                     "ODG transfer resource '{}' is missing",
                     resource.path()
                 ))
             })?;
-            resource_bytes = resource_bytes.checked_add(bytes.len()).ok_or_else(|| {
-                Error::InvalidFormat("ODG transfer resource size overflow".to_string())
-            })?;
-            if resource_bytes > MAX_OUTPUT_BYTES {
+            if bytes.len() > MAX_OUTPUT_BYTES {
                 return invalid("ODG transfer resources exceed the byte limit");
             }
             resources.push(TransferResource {
@@ -1001,29 +1084,18 @@ impl Snapshot {
                 bytes: Some(bytes),
             });
         }
-        let control_definitions = controls
-            .iter()
-            .map(|identifier| {
-                let position = parsed
-                    .form_controls
-                    .iter()
-                    .position(|control| control.id() == identifier)
-                    .ok_or_else(|| {
-                        Error::InvalidFormat("ODG transfer form control is missing".into())
-                    })?;
-                let control_span =
-                    parsed.form_control_spans[position]
-                        .as_ref()
-                        .ok_or_else(|| {
-                            Error::InvalidFormat("ODG transfer form-control span is missing".into())
-                        })?;
-                let raw_control_xml = self.content_xml()[control_span.clone()].to_owned();
+        let control_definitions = control_sources
+            .into_iter()
+            .map(|(control, control_span)| {
+                let raw_control_xml = self.content_xml().get(control_span).ok_or_else(|| {
+                    Error::InvalidFormat("ODG transfer form-control span is invalid".into())
+                })?;
                 let control_xml =
-                    close_transfer_fragment_namespaces(&raw_control_xml, &source_namespaces)?;
+                    close_transfer_fragment_namespaces(raw_control_xml, &source_namespaces)?;
                 validate_transfer_fragment_namespaces(&control_xml)?;
                 compact_xml::validate(control_xml.as_bytes()).map_err(Error::from)?;
                 Ok(TransferControl {
-                    control: parsed.form_controls[position].clone(),
+                    control,
                     xml: control_xml,
                 })
             })
@@ -1106,7 +1178,7 @@ impl Transaction {
     }
 
     fn replace_content_value(&mut self, span: &Range<usize>, replacement: &str) -> Result<()> {
-        let escaped = quick_xml::escape::escape(replacement).into_owned();
+        let escaped = escaped_xml_string(replacement, MAX_OUTPUT_BYTES, "ODG edited content")?;
         let next = replace_xml_value(&self.content, span, replacement)?;
         if let Some(splices) = &mut self.content_splices {
             stage_content_splice(
@@ -1448,10 +1520,12 @@ impl Transaction {
             }
         }
         if in_content == 1 {
-            let before_xml = self.content.clone();
-            let after_xml = edit_transition_style_xml(&before_xml, style_name, desired.as_ref())?;
+            // Borrow the current owner instead of cloning it: the edited copy
+            // is the only new allocation, and the reversibility probe reads
+            // both strings in place.
+            let after_xml = edit_transition_style_xml(&self.content, style_name, desired.as_ref())?;
             if !transition_edit_is_lexically_reversible(
-                &before_xml,
+                &self.content,
                 &after_xml,
                 style_name,
                 current.as_ref(),
@@ -1479,10 +1553,9 @@ impl Transaction {
                     "ODG page transition style is not uniquely owned".into(),
                 ));
             }
-            let before_xml = styles.clone();
-            let after_xml = edit_transition_style_xml(&before_xml, style_name, desired.as_ref())?;
+            let after_xml = edit_transition_style_xml(styles, style_name, desired.as_ref())?;
             let requires_projection = !transition_edit_is_lexically_reversible(
-                &before_xml,
+                styles,
                 &after_xml,
                 style_name,
                 current.as_ref(),
@@ -2570,6 +2643,7 @@ impl Transaction {
         transfer: &ShapeTransfer,
     ) -> Result<()> {
         ShapeTransfer::validate_destination(&self.content, page)?;
+        transfer.validate_aggregate()?;
         let mut transfer_xml = transfer.xml.clone();
         let mut resource_remaps = BTreeMap::new();
         for resource in &transfer.resources {
@@ -3262,18 +3336,43 @@ impl Transaction {
         {
             return invalid("ODG transferred form-control identifier is already present");
         }
+        if xml.len() > MAX_OUTPUT_BYTES {
+            return invalid("ODG transferred form-control exceeds the output limit");
+        }
         let content = if let Some(at) = parsed.forms_insert_position {
-            let form_xml = format!(
-                "<form:form xmlns:form=\"{}\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" form:name=\"Litchi\">{xml}</form:form>",
+            let prefix = format!(
+                "<form:form xmlns:form=\"{}\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" form:name=\"Litchi\">",
                 std::str::from_utf8(FORM).unwrap_or_default()
             );
+            let suffix = "</form:form>";
+            let capacity = prefix
+                .len()
+                .checked_add(xml.len())
+                .and_then(|size| size.checked_add(suffix.len()))
+                .ok_or_else(|| Error::InvalidFormat("ODG transferred form size overflow".into()))?;
+            let mut form_xml =
+                precharge_xml_capacity(prefix, capacity, "ODG transferred form-control")?;
+            form_xml.push_str(xml);
+            form_xml.push_str(suffix);
             insert_child_xml(&self.content, at, &form_xml)?
         } else {
-            let forms_xml = format!(
-                "<office:forms xmlns:office=\"{}\" xmlns:form=\"{}\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><form:form form:name=\"Litchi\">{xml}</form:form></office:forms>",
+            let prefix = format!(
+                "<office:forms xmlns:office=\"{}\" xmlns:form=\"{}\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><form:form form:name=\"Litchi\">",
                 std::str::from_utf8(OFFICE).unwrap_or_default(),
                 std::str::from_utf8(FORM).unwrap_or_default()
             );
+            let suffix = "</form:form></office:forms>";
+            let capacity = prefix
+                .len()
+                .checked_add(xml.len())
+                .and_then(|size| size.checked_add(suffix.len()))
+                .ok_or_else(|| {
+                    Error::InvalidFormat("ODG transferred forms size overflow".into())
+                })?;
+            let mut forms_xml =
+                precharge_xml_capacity(prefix, capacity, "ODG transferred form-controls")?;
+            forms_xml.push_str(xml);
+            forms_xml.push_str(suffix);
             insert_xml(&self.content, parsed.drawing_start_position, &forms_xml)?
         };
         self.invalidate_content_splices();
@@ -4171,7 +4270,45 @@ pub struct ShapeTransfer {
     resources: Vec<TransferResource>,
 }
 
+#[derive(Default)]
+struct TransferBudget {
+    bytes: usize,
+}
+
+impl TransferBudget {
+    fn charge(&mut self, bytes: usize, owner: &str) -> Result<()> {
+        self.bytes = self
+            .bytes
+            .checked_add(bytes)
+            .ok_or_else(|| Error::InvalidFormat(format!("{owner} size overflow")))?;
+        if self.bytes > MAX_OUTPUT_BYTES {
+            return invalid(format!("{owner} aggregate exceeds the output limit"));
+        }
+        Ok(())
+    }
+}
+
 impl ShapeTransfer {
+    fn validate_aggregate(&self) -> Result<()> {
+        let mut budget = TransferBudget::default();
+        budget.charge(self.xml.len(), "ODG transfer XML")?;
+        for style in &self.style_definitions {
+            budget.charge(style.xml.len(), "ODG transfer XML")?;
+        }
+        for resource in &self.style_resources {
+            budget.charge(resource.xml.len(), "ODG transfer XML")?;
+        }
+        for control in &self.control_definitions {
+            budget.charge(control.xml.len(), "ODG transfer XML")?;
+        }
+        for resource in &self.resources {
+            if let Some(bytes) = &resource.bytes {
+                budget.charge(bytes.len(), "ODG transfer resources")?;
+            }
+        }
+        Ok(())
+    }
+
     /// Root shape semantics retained by the transfer.
     #[must_use]
     pub const fn shape(&self) -> &Shape {
@@ -5247,10 +5384,18 @@ impl Scanner {
                 return invalid("ODG form-control identifier is duplicated");
             }
             let control = self.form_controls.len();
+            let element_name = std::str::from_utf8(local).map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODG form-control element name: {error}"))
+            })?;
+            let element_name = clone_bounded_string(
+                element_name,
+                MAX_TEXT_BYTES,
+                "ODG form-control element name",
+            )?;
             self.form_controls.push(FormControl::parsed(
                 identifier,
                 attribute(reader, element, FORM, b"name")?,
-                String::from_utf8_lossy(local).into_owned(),
+                element_name,
                 arbitrary_attributes(
                     reader,
                     element,
@@ -5761,6 +5906,7 @@ impl Scanner {
 }
 
 fn parse_content(xml: &str) -> Result<Parsed> {
+    validate_raw_xml_events(xml, "ODG content.xml event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut scanner = Scanner::new();
@@ -5772,11 +5918,14 @@ fn parse_content(xml: &str) -> Result<Parsed> {
             .read_resolved_event()
             .map_err(|error| Error::InvalidFormat(format!("invalid ODG content.xml: {error}")))?;
         let namespace = classify(&resolved_namespace);
+        validate_borrowed_xml_event(&borrowed_event, "ODG content.xml event")?;
         if let Event::Start(element) | Event::Empty(element) = &borrowed_event {
             let local = element.local_name();
             // Discover optional inventories during the mandatory namespace-aware
             // scan. Misplaced owners still select their validating pass, and
-            // producer aliases or namespace rebinding cannot hide them.
+            // producer aliases or namespace rebinding cannot hide them. A pass
+            // that is skipped here has nothing to validate beyond the raw
+            // admission that already covered this whole part above.
             has_enhanced_geometry |= namespace == NamespaceKind::Draw
                 && matches!(
                     local.as_ref(),
@@ -5797,9 +5946,8 @@ fn parse_content(xml: &str) -> Result<Parsed> {
                             | b"glue-point"
                     );
         }
-        let event = borrowed_event.into_owned();
         let end = position(&reader)?;
-        match event {
+        match borrowed_event {
             Event::Start(element) => scanner.start(
                 &reader,
                 namespace,
@@ -5853,6 +6001,92 @@ fn parse_content(xml: &str) -> Result<Parsed> {
     }
 }
 
+/// Admit one borrowed quick-xml event before any parser path can call
+/// `into_owned` or retain one of its fields. The reader normally exposes
+/// borrowed slices, but `Event::into_owned` clones every variant, including
+/// comments, processing instructions, and oversized start-tag attributes that
+/// this family ignores. Checking the raw event and each raw attribute here
+/// keeps those ignored inputs bounded just like semantic fields.
+fn validate_borrowed_xml_event(event: &Event<'_>, owner: &str) -> Result<()> {
+    match event {
+        Event::Start(element) | Event::Empty(element) => {
+            validate_raw_xml_value(element.as_ref(), owner)?;
+            for raw_attribute in element.attributes() {
+                let attribute = raw_attribute.map_err(|error| {
+                    Error::InvalidFormat(format!("invalid {owner} attribute: {error}"))
+                })?;
+                validate_raw_xml_value(attribute.key.as_ref(), owner)?;
+                validate_raw_xml_value(attribute.value.as_ref(), owner)?;
+            }
+        },
+        Event::End(element) => validate_raw_xml_value(element.as_ref(), owner)?,
+        Event::Text(text) | Event::Comment(text) | Event::DocType(text) => {
+            validate_raw_xml_value(text.as_ref(), owner)?;
+        },
+        Event::CData(text) => validate_raw_xml_value(text.as_ref(), owner)?,
+        Event::Decl(declaration) => validate_raw_xml_value(declaration.as_ref(), owner)?,
+        Event::PI(instruction) => validate_raw_xml_value(instruction.as_ref(), owner)?,
+        Event::GeneralRef(reference) => validate_raw_xml_value(reference.as_ref(), owner)?,
+        Event::Eof => {},
+    }
+    Ok(())
+}
+
+/// Admit every raw event before handing the same XML to `NsReader`.
+///
+/// `NsReader::read_event` updates its namespace stack while reading a start
+/// tag, and `read_resolved_event` can clone an unknown prefix while resolving
+/// the element name. The raw reader has neither behaviour: it only borrows
+/// the event from the source. Running this admission pass first therefore
+/// makes the per-event byte limit apply before namespace bookkeeping can own a
+/// prefix or declaration value.
+fn validate_raw_xml_events(xml: &str, owner: &str) -> Result<()> {
+    validate_xml_source_size(xml, owner)?;
+    let mut reader = quick_xml::Reader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut depth = 0usize;
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::InvalidFormat(format!("invalid {owner}: {error}")))?;
+        validate_borrowed_xml_event(&event, owner)?;
+        match event {
+            Event::Start(_) => {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidFormat(format!("{owner} depth overflow")))?;
+                if depth > MAX_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "{owner} nesting exceeds the limit"
+                    )));
+                }
+            },
+            Event::Empty(_) => {
+                let virtual_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidFormat(format!("{owner} depth overflow")))?;
+                if virtual_depth > MAX_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "{owner} nesting exceeds the limit"
+                    )));
+                }
+            },
+            Event::End(_) => {
+                depth = depth.saturating_sub(1);
+            },
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_)
+            | Event::PI(_)
+            | Event::Text(_) => {},
+            Event::Eof => break,
+        }
+    }
+    Ok(())
+}
+
 struct ActiveEnhancedGeometry {
     page: usize,
     shape: usize,
@@ -5876,6 +6110,7 @@ struct ActiveAuxiliaryShape {
 }
 
 fn parse_enhanced_geometry(xml: &str, parsed: &mut Parsed) -> Result<()> {
+    validate_raw_xml_events(xml, "ODG enhanced-geometry event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -5893,8 +6128,8 @@ fn parse_enhanced_geometry(xml: &str, parsed: &mut Parsed) -> Result<()> {
                 Error::InvalidFormat(format!("invalid ODG enhanced-geometry XML: {error}"))
             })?;
         let namespace = classify(&resolved_namespace);
-        let event = borrowed_event.into_owned();
-        match event {
+        validate_borrowed_xml_event(&borrowed_event, "ODG enhanced-geometry event")?;
+        match borrowed_event {
             Event::Start(element) => {
                 depth = checked_xml_depth(depth)?;
                 if active_empty_child_depth.is_some() {
@@ -6146,6 +6381,7 @@ struct ActiveAuxiliaryArea {
 }
 
 fn parse_shape_auxiliary_children(xml: &str, parsed: &mut Parsed) -> Result<()> {
+    validate_raw_xml_events(xml, "ODG drawing-child event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -6164,9 +6400,9 @@ fn parse_shape_auxiliary_children(xml: &str, parsed: &mut Parsed) -> Result<()> 
                 Error::InvalidFormat(format!("invalid ODG drawing-child XML: {error}"))
             })?;
         let namespace = classify(&resolved_namespace);
-        let event = borrowed_event.into_owned();
+        validate_borrowed_xml_event(&borrowed_event, "ODG drawing-child event")?;
         let end = position(&reader)?;
-        match event {
+        match borrowed_event {
             Event::Start(element) => {
                 depth = checked_xml_depth(depth)?;
                 let local = element.local_name();
@@ -6758,9 +6994,11 @@ fn next_auxiliary_shape(
 
 fn empty_auxiliary_end(reader: &mut NsReader<&[u8]>) -> Result<usize> {
     loop {
-        match reader.read_event().map_err(|error| {
+        let event = reader.read_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG empty drawing child: {error}"))
-        })? {
+        })?;
+        validate_borrowed_xml_event(&event, "ODG empty drawing child event")?;
+        match event {
             Event::End(_) => return position(reader),
             Event::Comment(_) | Event::PI(_) => {},
             Event::Text(text)
@@ -6821,6 +7059,8 @@ fn update_auxiliary_shape_parent_order(
     if parent.kind != ShapeKind::ThreeDimensionalScene {
         return Ok(());
     }
+    // ODF 1.4 `shapes3d` includes `dr3d-scene`, so a nested scene is an
+    // ordinary 3D child of its parent scene.
     if !kind.is_three_dimensional() {
         return invalid("ODG dr3d:scene contains a non-3D drawing object");
     }
@@ -7091,7 +7331,22 @@ fn source_fragment(xml: &str, span: Range<usize>, owner: &str) -> Result<String>
             "{owner} source exceeds the byte limit"
         )));
     }
-    Ok(source.to_owned())
+    let mut fragment = String::new();
+    fragment
+        .try_reserve_exact(source.len())
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "ODG source fragment",
+            source: allocation_error,
+        })?;
+    fragment.push_str(source);
+    Ok(fragment)
+}
+
+fn clone_xml_span(xml: &str, span: Range<usize>, resource: &'static str) -> Result<String> {
+    let source = xml
+        .get(span)
+        .ok_or_else(|| Error::InvalidFormat(format!("{resource} source span is invalid")))?;
+    clone_bounded_string(source, MAX_OUTPUT_BYTES, resource)
 }
 
 fn enhanced_child_kind(
@@ -7131,13 +7386,18 @@ fn drawing_attributes(
             | NamespaceKind::Style
             | NamespaceKind::Presentation => continue,
         };
-        let local = std::str::from_utf8(local.as_ref())
-            .map_err(|error| Error::InvalidFormat(format!("invalid ODG attribute name: {error}")))?
-            .to_owned();
+        let local = std::str::from_utf8(local.as_ref()).map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG attribute name: {error}"))
+        })?;
+        let local = clone_bounded_string(local, MAX_TEXT_BYTES, "ODG attribute name")?;
+        validate_raw_xml_value(attribute.value.as_ref(), "ODG enhanced-geometry attribute")?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|error| Error::InvalidFormat(format!("invalid ODG attribute value: {error}")))?
-            .into_owned();
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODG attribute value: {error}"))
+            })?;
+        validate_decoded_xml_value(value.as_ref(), "ODG enhanced-geometry attribute")?;
+        let value = own_bounded_cow(value, MAX_TEXT_BYTES, "ODG enhanced-geometry attribute")?;
         let attribute = DrawingAttribute::parsed(namespace, local, value)?;
         if attributes.iter().any(|existing: &DrawingAttribute| {
             existing.namespace() == attribute.namespace()
@@ -7400,6 +7660,7 @@ fn is_point3d(value: &str) -> bool {
 }
 
 fn parse_declared_layers(xml: &str) -> Result<Vec<Layer>> {
+    validate_raw_xml_events(xml, "ODG styles.xml event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -7409,6 +7670,7 @@ fn parse_declared_layers(xml: &str) -> Result<Vec<Layer>> {
         let (resolved_namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::InvalidFormat(format!("invalid ODG styles.xml: {error}")))?;
+        validate_borrowed_xml_event(&event, "ODG styles.xml event")?;
         let namespace = classify(&resolved_namespace);
         match event {
             Event::Start(element) => {
@@ -7502,12 +7764,14 @@ fn scan_active_content(content: &str, styles: Option<&str>) -> Result<ActiveCont
 }
 
 fn scan_active_xml(xml: &str, status: &mut ActiveContentStatus) -> Result<()> {
+    validate_raw_xml_events(xml, "ODG active-content event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     loop {
         let (resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG active-content inventory XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG active-content event")?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 let local_name = element.local_name();
@@ -7597,6 +7861,7 @@ struct ActiveStyleResource {
 }
 
 fn parse_style_resources(xml: &str) -> Result<Vec<ParsedStyleResource>> {
+    validate_raw_xml_events(xml, "ODG style-resource event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -7607,6 +7872,7 @@ fn parse_style_resources(xml: &str) -> Result<Vec<ParsedStyleResource>> {
         let (resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG named style-resource XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG style-resource event")?;
         let namespace = classify(&resolved_namespace);
         let end = position(&reader)?;
         match event {
@@ -7654,7 +7920,7 @@ fn parse_style_resources(xml: &str) -> Result<Vec<ParsedStyleResource>> {
                             name,
                             arbitrary_attributes(&reader, &element, &[(DRAW, b"name".as_slice())])?,
                         ),
-                        xml: xml[start..end].to_owned(),
+                        xml: clone_xml_span(xml, start..end, "ODG style-resource XML")?,
                         span: start..end,
                     });
                 }
@@ -7671,7 +7937,11 @@ fn parse_style_resources(xml: &str) -> Result<Vec<ParsedStyleResource>> {
                     })?;
                     definitions.push(ParsedStyleResource {
                         resource: completed_resource.resource,
-                        xml: xml[completed_resource.start..end].to_owned(),
+                        xml: clone_xml_span(
+                            xml,
+                            completed_resource.start..end,
+                            "ODG style-resource XML",
+                        )?,
                         span: completed_resource.start..end,
                     });
                 }
@@ -7805,6 +8075,7 @@ struct ActiveStyleDefinition {
 }
 
 fn parse_style_definitions(xml: &str) -> Result<Vec<ParsedStyleDefinition>> {
+    validate_raw_xml_events(xml, "ODG style-definition event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -7815,6 +8086,7 @@ fn parse_style_definitions(xml: &str) -> Result<Vec<ParsedStyleDefinition>> {
         let (resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG style catalog XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG style event")?;
         let namespace = classify(&resolved_namespace);
         let active_namespace = resolved_bound(&resolved_namespace, SCRIPT)
             || resolved_bound(&resolved_namespace, XML_EVENTS);
@@ -7846,7 +8118,9 @@ fn parse_style_definitions(xml: &str) -> Result<Vec<ParsedStyleDefinition>> {
                     && let Some(value) = &mut active
                     && value.depth.checked_add(1) == Some(depth)
                 {
-                    let owner = String::from_utf8_lossy(local.as_ref());
+                    let owner = std::str::from_utf8(local.as_ref()).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid ODG style property name: {error}"))
+                    })?;
                     for (name, property) in arbitrary_attributes(&reader, &element, &[])? {
                         if value
                             .properties
@@ -7872,7 +8146,7 @@ fn parse_style_definitions(xml: &str) -> Result<Vec<ParsedStyleDefinition>> {
                     let parent = attribute(&reader, &element, STYLE, b"parent-style-name")?;
                     definitions.push(ParsedStyleDefinition {
                         style: Style::parsed(name, family, parent, BTreeMap::new()),
-                        xml: xml[start..end].to_owned(),
+                        xml: clone_xml_span(xml, start..end, "ODG style XML")?,
                         span: start..end,
                     });
                 } else if namespace == NamespaceKind::Style
@@ -7880,7 +8154,9 @@ fn parse_style_definitions(xml: &str) -> Result<Vec<ParsedStyleDefinition>> {
                     && let Some(value) = &mut active
                     && value.depth == depth
                 {
-                    let owner = String::from_utf8_lossy(local.as_ref());
+                    let owner = std::str::from_utf8(local.as_ref()).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid ODG style property name: {error}"))
+                    })?;
                     for (name, property) in arbitrary_attributes(&reader, &element, &[])? {
                         if value
                             .properties
@@ -7908,7 +8184,7 @@ fn parse_style_definitions(xml: &str) -> Result<Vec<ParsedStyleDefinition>> {
                             value.parent,
                             value.properties,
                         ),
-                        xml: xml[value.start..end].to_owned(),
+                        xml: clone_xml_span(xml, value.start..end, "ODG style XML")?,
                         span: value.start..end,
                     });
                 }
@@ -8186,6 +8462,7 @@ fn edit_transition_style_xml(
     style_name: &str,
     transition: Option<&Transition>,
 ) -> Result<String> {
+    validate_xml_source_size(source, "ODG transition XML")?;
     let owner = find_transition_style_owner(source, style_name)?;
     let Some(owner) = owner else {
         return Err(Error::Unsupported(
@@ -8195,7 +8472,7 @@ fn edit_transition_style_xml(
     let fields = transition_fields(transition);
     if owner.property_open_span.is_none() {
         let Some(transition) = transition else {
-            return Ok(source.to_owned());
+            return clone_bounded_string(source, MAX_OUTPUT_BYTES, "ODG transition XML");
         };
         let property = serialize_transition_properties(transition)?;
         let at = if let Some(close) = owner.style_close_start {
@@ -8213,7 +8490,7 @@ fn edit_transition_style_xml(
             insert_child_xml(source, at, &property)
         };
     }
-    let mut current = source.to_owned();
+    let mut current = clone_bounded_string(source, MAX_OUTPUT_BYTES, "ODG transition XML")?;
     for (qualified, value) in fields {
         current = rewrite_transition_attribute(&current, style_name, qualified, value)?;
     }
@@ -8401,6 +8678,7 @@ fn validate_transition_xml_ids(
 }
 
 fn collect_xml_ids(xml: &str) -> Result<BTreeMap<String, usize>> {
+    validate_raw_xml_events(xml, "ODG XML-id event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut identifiers = BTreeMap::new();
@@ -8410,6 +8688,7 @@ fn collect_xml_ids(xml: &str) -> Result<BTreeMap<String, usize>> {
                 "invalid ODG XML while checking xml:id values: {error}"
             ))
         })?;
+        validate_borrowed_xml_event(&event, "ODG xml:id event")?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 if let Some(identifier) = attribute(&reader, &element, XML, b"id")? {
@@ -8548,7 +8827,7 @@ fn push_attribute_allow_empty(output: &mut String, name: &str, value: Option<&st
     output.push(' ');
     output.push_str(name);
     output.push_str("=\"");
-    output.push_str(&quick_xml::escape::escape(attribute_value));
+    push_escaped_xml(output, attribute_value, "ODG transition attribute")?;
     output.push('"');
     Ok(())
 }
@@ -8573,7 +8852,7 @@ fn rewrite_transition_attribute(
         };
     }
     let Some(value) = value else {
-        return Ok(source.to_owned());
+        return clone_bounded_string(source, MAX_OUTPUT_BYTES, "ODG transition XML");
     };
     let mut insertion = String::new();
     let prefix = qualified
@@ -8637,6 +8916,9 @@ fn source_transition_namespace_binding_for(
     prefix: &str,
     expected: &[u8],
 ) -> Result<TransitionNamespaceBinding> {
+    // Every caller passes the exact source that `find_transition_style_owner`
+    // has just admitted with `validate_raw_xml_events`, so the raw per-event
+    // and depth bounds already hold before this namespace-aware reader runs.
     let probe = format!("{prefix}:__litchi_namespace_probe");
     let mut reader = NsReader::from_str(source);
     reader.config_mut().check_end_names = true;
@@ -8648,6 +8930,7 @@ fn source_transition_namespace_binding_for(
         let (_resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG transition namespace source: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG transition namespace event")?;
         let end = position(&reader)?;
         if start != open.start {
             if matches!(event, Event::Eof) {
@@ -8716,7 +8999,7 @@ fn write_attribute(target: &mut String, name: &str, value: &str) -> Result<()> {
     target.push(' ');
     target.push_str(name);
     target.push_str("=\"");
-    target.push_str(&quick_xml::escape::escape(value));
+    push_escaped_xml(target, value, "ODG transition attribute")?;
     target.push('"');
     Ok(())
 }
@@ -8725,6 +9008,7 @@ fn find_transition_style_owner(
     xml: &str,
     style_name: &str,
 ) -> Result<Option<TransitionStyleOwner>> {
+    validate_raw_xml_events(xml, "ODG transition-style event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -8737,6 +9021,7 @@ fn find_transition_style_owner(
         let (resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG transition XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG transition event")?;
         let namespace = classify(&resolved_namespace);
         let end = position(&reader)?;
         match event {
@@ -8995,14 +9280,17 @@ fn transition_attribute_spans(
             _ => continue,
         };
         let raw_name = attribute.key.as_ref();
+        validate_raw_xml_value(raw_name, "ODG transition attribute name")?;
+        validate_raw_xml_value(attribute.value.as_ref(), "ODG transition attribute value")?;
         let (value_start, value_end) = attribute_value_span(tag, raw_name)?;
         let token = attribute_token_span(tag, raw_name)?;
         let decoded = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| {
                 Error::InvalidFormat(format!("invalid ODG transition attribute value: {error}"))
-            })?
-            .into_owned();
+            })?;
+        validate_decoded_xml_value(decoded.as_ref(), "ODG transition attribute value")?;
+        let decoded = own_bounded_cow(decoded, MAX_TEXT_BYTES, "ODG transition attribute value")?;
         if result
             .insert(
                 qualified.to_owned(),
@@ -9047,15 +9335,22 @@ fn push_declared_layer(
 }
 
 fn text_value(text: &quick_xml::events::BytesText<'_>) -> Result<String> {
+    // The raw escaped form bounds every decoder/unescape allocation below.
+    validate_raw_xml_value(text.as_ref(), "ODG text")?;
     let decoded = text
         .decode()
         .map_err(|error| Error::InvalidFormat(format!("invalid ODG text: {error}")))?;
-    quick_xml::escape::unescape(&decoded)
-        .map(std::borrow::Cow::into_owned)
-        .map_err(|error| Error::InvalidFormat(format!("invalid ODG text escape: {error}")))
+    // Check the borrowed Cow before converting it into an owned String.
+    validate_decoded_xml_value(decoded.as_ref(), "ODG text")?;
+    let unescaped = quick_xml::escape::unescape(decoded.as_ref())
+        .map_err(|error| Error::InvalidFormat(format!("invalid ODG text escape: {error}")))?;
+    let unescaped = own_bounded_cow(unescaped, MAX_TEXT_BYTES, "ODG text")?;
+    validate_decoded_xml_value(&unescaped, "ODG text")?;
+    Ok(unescaped)
 }
 
 fn reference_value(reference: &quick_xml::events::BytesRef<'_>) -> Result<String> {
+    validate_raw_xml_value(reference.as_ref(), "ODG character reference")?;
     if let Some(value) = reference.resolve_char_ref().map_err(|error| {
         Error::InvalidFormat(format!("invalid ODG character reference: {error}"))
     })? {
@@ -9216,11 +9511,11 @@ fn replace_xml_value(source: &str, span: &Range<usize>, replacement: &str) -> Re
     if span.start > span.end || span.end > source.len() {
         return invalid("ODG text source span is invalid");
     }
-    let escaped_replacement = quick_xml::escape::escape(replacement);
+    let escaped_replacement_len = escaped_xml_len(replacement)?;
     let capacity = source
         .len()
         .checked_sub(span.end - span.start)
-        .and_then(|size| size.checked_add(escaped_replacement.len()))
+        .and_then(|size| size.checked_add(escaped_replacement_len))
         .ok_or_else(|| Error::InvalidFormat("ODG edited content size overflow".to_string()))?;
     if capacity > MAX_OUTPUT_BYTES {
         return invalid("ODG edited content exceeds the output limit");
@@ -9233,7 +9528,7 @@ fn replace_xml_value(source: &str, span: &Range<usize>, replacement: &str) -> Re
             source: allocation_error,
         })?;
     output.push_str(&source[..span.start]);
-    output.push_str(&escaped_replacement);
+    push_escaped_xml(&mut output, replacement, "ODG edited content")?;
     output.push_str(&source[span.end..]);
     Ok(output)
 }
@@ -9370,6 +9665,7 @@ fn insert_xml(source: &str, at: usize, xml: &str) -> Result<String> {
 }
 
 fn insert_automatic_style(source: &str, style: &str) -> Result<String> {
+    validate_raw_xml_events(source, "ODG automatic-style event")?;
     let mut reader = NsReader::from_str(source);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -9381,6 +9677,7 @@ fn insert_automatic_style(source: &str, style: &str) -> Result<String> {
         let (resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG automatic-style owner XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG automatic-style event")?;
         let namespace = classify(&resolved_namespace);
         let end = position(&reader)?;
         match event {
@@ -9515,7 +9812,17 @@ fn remove_xml(source: &str, span: &Range<usize>) -> Result<String> {
     {
         return invalid("ODG XML removal span is invalid");
     }
-    let mut output = String::with_capacity(source.len() - (span.end - span.start));
+    let capacity = source.len() - (span.end - span.start);
+    if capacity > MAX_OUTPUT_BYTES {
+        return invalid("ODG edited content exceeds the output limit");
+    }
+    let mut output = String::new();
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "ODG edited content",
+            source: allocation_error,
+        })?;
     output.push_str(&source[..span.start]);
     output.push_str(&source[span.end..]);
     Ok(output)
@@ -9860,6 +10167,54 @@ fn escaped_xml_len(value: &str) -> Result<usize> {
     })
 }
 
+fn push_escaped_xml(output: &mut String, value: &str, resource: &'static str) -> Result<()> {
+    let escaped_len = escaped_xml_len(value)?;
+    let required = output
+        .len()
+        .checked_add(escaped_len)
+        .ok_or_else(|| Error::InvalidFormat("ODG escaped XML size overflow".into()))?;
+    if required > output.capacity() {
+        output
+            .try_reserve_exact(required - output.len())
+            .map_err(|allocation_error| Error::Allocation {
+                resource,
+                source: allocation_error,
+            })?;
+    }
+    let mut start = 0usize;
+    for (index, character) in value.char_indices() {
+        let replacement = match character {
+            '&' => "&amp;",
+            '<' => "&lt;",
+            '>' => "&gt;",
+            '\'' => "&apos;",
+            '"' => "&quot;",
+            _ => continue,
+        };
+        output.push_str(&value[start..index]);
+        output.push_str(replacement);
+        start = index + character.len_utf8();
+    }
+    output.push_str(&value[start..]);
+    Ok(())
+}
+
+fn escaped_xml_string(value: &str, maximum: usize, resource: &'static str) -> Result<String> {
+    let escaped_len = escaped_xml_len(value)?;
+    if escaped_len > maximum {
+        return invalid(format!("{resource} exceeds the output limit"));
+    }
+    let mut output = String::new();
+    output
+        .try_reserve_exact(escaped_len)
+        .map_err(|allocation_error| Error::Allocation {
+            resource,
+            source: allocation_error,
+        })?;
+    push_escaped_xml(&mut output, value, resource)?;
+    Ok(output)
+}
+
 fn serialized_attribute_len(name: &str, value: Option<&str>) -> Result<usize> {
     let Some(value) = value else {
         return Ok(0);
@@ -9882,6 +10237,50 @@ fn serialized_attribute_len_allow_empty(name: &str, value: Option<&str>) -> Resu
         .and_then(|size| size.checked_add(escaped))
         .and_then(|size| size.checked_add(1))
         .ok_or_else(|| Error::InvalidFormat("ODG XML attribute size overflow".into()))
+}
+
+fn validate_xml_source_size(source: &str, owner: &str) -> Result<()> {
+    if source.len() > MAX_OUTPUT_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "{owner} exceeds the output limit"
+        )));
+    }
+    Ok(())
+}
+
+fn clone_bounded_string(source: &str, maximum: usize, resource: &'static str) -> Result<String> {
+    if source.len() > maximum {
+        return Err(Error::InvalidFormat(format!(
+            "{resource} exceeds the byte limit"
+        )));
+    }
+    let mut output = String::new();
+    output
+        .try_reserve_exact(source.len())
+        .map_err(|allocation_error| Error::Allocation {
+            resource,
+            source: allocation_error,
+        })?;
+    output.push_str(source);
+    Ok(output)
+}
+
+fn own_bounded_cow<'a>(
+    value: std::borrow::Cow<'a, str>,
+    maximum: usize,
+    resource: &'static str,
+) -> Result<String> {
+    match value {
+        std::borrow::Cow::Borrowed(value) => clone_bounded_string(value, maximum, resource),
+        std::borrow::Cow::Owned(value) => {
+            if value.len() > maximum {
+                return Err(Error::InvalidFormat(format!(
+                    "{resource} exceeds the byte limit"
+                )));
+            }
+            Ok(value)
+        },
+    }
 }
 
 fn precharge_xml_capacity(
@@ -10144,17 +10543,17 @@ fn serialize_shape(shape: &Shape) -> Result<String> {
     xml.push('>');
     if let Some(title) = shape.title() {
         xml.push_str("<svg:title>");
-        xml.push_str(&quick_xml::escape::escape(title));
+        push_escaped_xml(&mut xml, title, "ODG serialized shape")?;
         xml.push_str("</svg:title>");
     }
     if let Some(description) = shape.description() {
         xml.push_str("<svg:desc>");
-        xml.push_str(&quick_xml::escape::escape(description));
+        push_escaped_xml(&mut xml, description, "ODG serialized shape")?;
         xml.push_str("</svg:desc>");
     }
     if !shape.text().is_empty() {
         xml.push_str("<text:p>");
-        xml.push_str(&quick_xml::escape::escape(shape.text()));
+        push_escaped_xml(&mut xml, shape.text(), "ODG serialized shape")?;
         xml.push_str("</text:p>");
     }
     xml.push_str("</");
@@ -10173,7 +10572,7 @@ fn push_attribute(output: &mut String, name: &str, value: Option<&str>) -> Resul
     output.push(' ');
     output.push_str(name);
     output.push_str("=\"");
-    output.push_str(&quick_xml::escape::escape(attribute_value));
+    push_escaped_xml(output, attribute_value, "ODG XML attribute")?;
     output.push('"');
     Ok(())
 }
@@ -10181,6 +10580,20 @@ fn push_attribute(output: &mut String, name: &str, value: Option<&str>) -> Resul
 fn validate_bounded_value(value: &str, owner: &str) -> Result<()> {
     if value.is_empty() || value.len() > MAX_TEXT_BYTES || value.contains('\0') {
         return Err(Error::InvalidFormat(format!("{owner} is invalid")));
+    }
+    Ok(())
+}
+
+fn validate_raw_xml_value(value: &[u8], owner: &str) -> Result<()> {
+    if value.len() > MAX_TEXT_BYTES {
+        return Err(Error::InvalidFormat(format!("{owner} exceeds the limit")));
+    }
+    Ok(())
+}
+
+fn validate_decoded_xml_value(value: &str, owner: &str) -> Result<()> {
+    if value.len() > MAX_TEXT_BYTES || value.contains('\0') {
+        return Err(Error::InvalidFormat(format!("{owner} exceeds the limit")));
     }
     Ok(())
 }
@@ -10288,6 +10701,7 @@ fn transfer_source_namespaces(snapshot: &Snapshot) -> Result<BTreeMap<String, St
 fn transfer_fragment_namespaces(
     xml: &str,
 ) -> Result<(BTreeSet<String>, BTreeMap<String, String>, BTreeSet<String>)> {
+    validate_xml_source_size(xml, "ODG transfer fragment")?;
     let mut reader = quick_xml::Reader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut declarations = BTreeMap::<String, String>::new();
@@ -10298,6 +10712,7 @@ fn transfer_fragment_namespaces(
         let event = reader.read_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG transfer fragment XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG transfer fragment event")?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 record_transfer_qname(
@@ -10311,24 +10726,37 @@ fn transfer_fragment_namespaces(
                         Error::InvalidFormat(format!("invalid ODG transfer namespace: {error}"))
                     })?;
                     let name = attribute.key.as_ref();
+                    validate_raw_xml_value(name, "ODG transfer namespace name")?;
                     if name == b"xmlns" {
                         continue;
                     }
                     if let Some(prefix) = name.strip_prefix(b"xmlns:") {
+                        validate_raw_xml_value(prefix, "ODG transfer namespace prefix")?;
                         let prefix = std::str::from_utf8(prefix).map_err(|error| {
                             Error::InvalidFormat(format!(
                                 "invalid ODG transfer namespace prefix: {error}"
                             ))
                         })?;
+                        validate_raw_xml_value(
+                            attribute.value.as_ref(),
+                            "ODG transfer namespace URI",
+                        )?;
                         let value = attribute
                             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                             .map_err(|error| {
                                 Error::InvalidFormat(format!(
                                     "invalid ODG transfer namespace URI: {error}"
                                 ))
-                            })?
-                            .into_owned();
-                        declarations.insert(prefix.to_owned(), value);
+                            })?;
+                        validate_decoded_xml_value(value.as_ref(), "ODG transfer namespace URI")?;
+                        let value =
+                            own_bounded_cow(value, MAX_TEXT_BYTES, "ODG transfer namespace URI")?;
+                        let prefix = clone_bounded_string(
+                            prefix,
+                            MAX_TEXT_BYTES,
+                            "ODG transfer namespace prefix",
+                        )?;
+                        declarations.insert(prefix, value);
                     } else {
                         record_transfer_qname(name, &mut used, &mut sensitive_aliases, false)?;
                     }
@@ -10421,13 +10849,48 @@ fn close_transfer_fragment_namespaces(
     ensure_transfer_namespace_values(xml, &missing)
 }
 
+fn transfer_namespace_closure_bytes(
+    xml: &str,
+    available: &BTreeMap<String, String>,
+) -> Result<usize> {
+    let (used, declarations, _sensitive_aliases) = transfer_fragment_namespaces(xml)?;
+    used.into_iter().try_fold(0usize, |total, prefix| {
+        if prefix == "xml"
+            || transfer_namespace_uri(&prefix).is_some()
+            || declarations.contains_key(&prefix)
+        {
+            return Ok(total);
+        }
+        let uri = available.get(&prefix).ok_or_else(|| {
+            Error::Unsupported(format!(
+                "ODG transfer fragment cannot prove namespace closure for prefix '{prefix}'"
+            ))
+        })?;
+        // `ensure_transfer_namespace_values` writes exactly:
+        // ` xmlns:{prefix}="{uri}"`.
+        let escaped_uri_len = escaped_xml_len(uri)?;
+        let declaration_bytes = 1usize
+            .checked_add("xmlns:".len())
+            .and_then(|size| size.checked_add(prefix.len()))
+            .and_then(|size| size.checked_add(2))
+            .and_then(|size| size.checked_add(escaped_uri_len))
+            .and_then(|size| size.checked_add(1))
+            .ok_or_else(|| Error::InvalidFormat("ODG namespace closure size overflow".into()))?;
+        total
+            .checked_add(declaration_bytes)
+            .ok_or_else(|| Error::InvalidFormat("ODG namespace closure size overflow".into()))
+    })
+}
+
 fn transfer_root_namespaces(xml: &str) -> Result<BTreeMap<String, String>> {
+    validate_xml_source_size(xml, "ODG transfer root XML")?;
     let mut reader = quick_xml::Reader::from_str(xml);
     reader.config_mut().check_end_names = true;
     loop {
         let event = reader.read_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG transfer root XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG transfer root event")?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 let mut declarations = BTreeMap::new();
@@ -10438,9 +10901,11 @@ fn transfer_root_namespaces(xml: &str) -> Result<BTreeMap<String, String>> {
                         ))
                     })?;
                     let key = attribute.key.as_ref();
+                    validate_raw_xml_value(key, "ODG transfer root namespace name")?;
                     let prefix = if key == b"xmlns" {
                         ""
                     } else if let Some(prefix) = key.strip_prefix(b"xmlns:") {
+                        validate_raw_xml_value(prefix, "ODG transfer root namespace prefix")?;
                         std::str::from_utf8(prefix).map_err(|error| {
                             Error::InvalidFormat(format!(
                                 "invalid ODG transfer root namespace prefix: {error}"
@@ -10449,15 +10914,26 @@ fn transfer_root_namespaces(xml: &str) -> Result<BTreeMap<String, String>> {
                     } else {
                         continue;
                     };
+                    validate_raw_xml_value(
+                        attribute.value.as_ref(),
+                        "ODG transfer root namespace URI",
+                    )?;
                     let value = attribute
                         .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                         .map_err(|error| {
                             Error::InvalidFormat(format!(
                                 "invalid ODG transfer root namespace URI: {error}"
                             ))
-                        })?
-                        .into_owned();
-                    if declarations.insert(prefix.to_owned(), value).is_some() {
+                        })?;
+                    validate_decoded_xml_value(value.as_ref(), "ODG transfer root namespace URI")?;
+                    let value =
+                        own_bounded_cow(value, MAX_TEXT_BYTES, "ODG transfer root namespace URI")?;
+                    let prefix = clone_bounded_string(
+                        prefix,
+                        MAX_TEXT_BYTES,
+                        "ODG transfer root namespace prefix",
+                    )?;
+                    if declarations.insert(prefix, value).is_some() {
                         return invalid("ODG transfer root namespace declaration is duplicated");
                     }
                 }
@@ -10482,18 +10958,28 @@ fn record_transfer_qname(
     sensitive_aliases: &mut BTreeSet<String>,
     root: bool,
 ) -> Result<()> {
+    validate_raw_xml_value(name, "ODG transfer qualified name")?;
     let Some(separator) = name.iter().position(|byte| *byte == b':') else {
         return Ok(());
     };
+    validate_raw_xml_value(&name[..separator], "ODG transfer qualified-name prefix")?;
     let prefix = std::str::from_utf8(&name[..separator]).map_err(|error| {
         Error::InvalidFormat(format!("invalid ODG transfer qualified name: {error}"))
     })?;
     if prefix.is_empty() {
         return invalid("ODG transfer qualified name has an empty prefix");
     }
-    used.insert(prefix.to_owned());
+    used.insert(clone_bounded_string(
+        prefix,
+        MAX_TEXT_BYTES,
+        "ODG transfer qualified-name prefix",
+    )?);
     if root || transfer_sensitive_local_name(&name[separator + 1..]) {
-        sensitive_aliases.insert(prefix.to_owned());
+        sensitive_aliases.insert(clone_bounded_string(
+            prefix,
+            MAX_TEXT_BYTES,
+            "ODG transfer qualified-name prefix",
+        )?);
     }
     Ok(())
 }
@@ -10601,12 +11087,14 @@ fn find_style_definition(snapshot: &Snapshot, name: &str) -> Result<Option<Parse
 }
 
 fn style_parent_name(xml: &str) -> Result<Option<String>> {
+    validate_raw_xml_events(xml, "ODG transferred style event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     loop {
         let (namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG transferred style XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG transferred style event")?;
         match event {
             Event::Start(element) | Event::Empty(element)
                 if classify(&namespace) == NamespaceKind::Style
@@ -10630,12 +11118,14 @@ fn style_parent_name(xml: &str) -> Result<Option<String>> {
 }
 
 fn xml_has_attribute(xml: &str, namespace: &[u8], local: &[u8], value: &str) -> Result<bool> {
+    validate_raw_xml_events(xml, "ODG dependency event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     loop {
         let (_resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG dependency XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG dependency event")?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 if attribute(&reader, &element, namespace, local)?.as_deref() == Some(value) {
@@ -10758,8 +11248,9 @@ fn rewrite_qualified_attribute_values(
     after: &str,
 ) -> Result<String> {
     if before == after {
-        return Ok(xml.to_owned());
+        return clone_bounded_string(xml, MAX_OUTPUT_BYTES, "ODG transfer fragment");
     }
+    validate_xml_source_size(xml, "ODG transfer fragment")?;
     let mut reader = quick_xml::Reader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut spans = Vec::new();
@@ -10768,6 +11259,7 @@ fn rewrite_qualified_attribute_values(
         let event = reader.read_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG transfer fragment XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG transfer fragment rewrite event")?;
         let end = position_reader(&reader)?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
@@ -10784,6 +11276,7 @@ fn rewrite_qualified_attribute_values(
                     {
                         continue;
                     }
+                    validate_raw_xml_value(parsed.value.as_ref(), "ODG transfer attribute value")?;
                     let value = parsed
                         .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                         .map_err(|error| {
@@ -10791,6 +11284,7 @@ fn rewrite_qualified_attribute_values(
                                 "invalid ODG transfer attribute value: {error}"
                             ))
                         })?;
+                    validate_decoded_xml_value(value.as_ref(), "ODG transfer attribute value")?;
                     if value == before {
                         let (value_start, value_end) =
                             attribute_value_span(tag, parsed.key.as_ref())?;
@@ -10809,7 +11303,7 @@ fn rewrite_qualified_attribute_values(
             | Event::Text(_) => {},
         }
     }
-    let mut output = xml.to_owned();
+    let mut output = clone_bounded_string(xml, MAX_OUTPUT_BYTES, "ODG transfer fragment")?;
     spans.sort_unstable_by_key(|span| std::cmp::Reverse(span.start));
     for span in spans {
         output = replace_xml_value(&output, &span, after)?;
@@ -10821,16 +11315,16 @@ fn ensure_transfer_namespaces(xml: &str, namespaces: &[(&str, &[u8])]) -> Result
     let namespaces = namespaces
         .iter()
         .map(|(prefix, uri)| {
-            (
-                (*prefix).to_owned(),
-                std::str::from_utf8(uri)
-                    .map(str::to_owned)
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!("ODG transfer namespace is invalid: {error}"))
-                    }),
-            )
+            validate_raw_xml_value(prefix.as_bytes(), "ODG transfer namespace prefix")?;
+            validate_raw_xml_value(uri, "ODG transfer namespace URI")?;
+            let uri = std::str::from_utf8(uri).map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODG transfer namespace: {error}"))
+            })?;
+            let uri = clone_bounded_string(uri, MAX_TEXT_BYTES, "ODG transfer namespace URI")?;
+            let prefix =
+                clone_bounded_string(prefix, MAX_TEXT_BYTES, "ODG transfer namespace prefix")?;
+            Ok((prefix, uri))
         })
-        .map(|(prefix, uri)| uri.map(|uri| (prefix, uri)))
         .collect::<Result<BTreeMap<_, _>>>()?;
     ensure_transfer_namespace_values(xml, &namespaces)
 }
@@ -10839,6 +11333,7 @@ fn ensure_transfer_namespace_values(
     xml: &str,
     namespaces: &BTreeMap<String, String>,
 ) -> Result<String> {
+    validate_xml_source_size(xml, "ODG transfer fragment")?;
     let mut reader = quick_xml::Reader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let (root_start, root_end) = loop {
@@ -10846,6 +11341,7 @@ fn ensure_transfer_namespace_values(
         let event = reader.read_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG transfer fragment XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG transfer namespace event")?;
         let end = position_reader(&reader)?;
         match event {
             Event::Start(_) | Event::Empty(_) => break (start, end),
@@ -10868,12 +11364,44 @@ fn ensure_transfer_namespace_values(
         .find(|(_index, byte)| byte.is_ascii_whitespace() || matches!(byte, b'/' | b'>'))
         .map(|(index, _byte)| root_start + index)
         .ok_or_else(|| Error::InvalidFormat("ODG transfer fragment name is invalid".into()))?;
-    let mut declarations = String::new();
+    let mut declaration_capacity = 0usize;
+    for (prefix, namespace_uri) in namespaces {
+        validate_decoded_xml_value(prefix, "ODG transfer namespace prefix")?;
+        validate_decoded_xml_value(namespace_uri, "ODG transfer namespace URI")?;
+        if !transfer_root_declares_namespace(xml, prefix)? {
+            let escaped_uri_len = escaped_xml_len(namespace_uri)?;
+            let declaration_bytes = 1usize
+                .checked_add("xmlns:".len())
+                .and_then(|size| size.checked_add(prefix.len()))
+                .and_then(|size| size.checked_add(2))
+                .and_then(|size| size.checked_add(escaped_uri_len))
+                .and_then(|size| size.checked_add(1))
+                .ok_or_else(|| {
+                    Error::InvalidFormat("ODG transfer namespace declaration size overflow".into())
+                })?;
+            declaration_capacity = declaration_capacity
+                .checked_add(declaration_bytes)
+                .ok_or_else(|| {
+                    Error::InvalidFormat("ODG transfer namespace declaration size overflow".into())
+                })?;
+        }
+    }
+    let mut declarations = precharge_xml_capacity(
+        String::new(),
+        declaration_capacity,
+        "ODG transfer namespace declarations",
+    )?;
     for (prefix, namespace_uri) in namespaces {
         if !transfer_root_declares_namespace(xml, prefix)? {
-            write!(declarations, " xmlns:{prefix}=\"{namespace_uri}\"").map_err(|error| {
+            write!(declarations, " xmlns:{prefix}=\"").map_err(|error| {
                 Error::InvalidFormat(format!("ODG transfer namespace write failed: {error}"))
             })?;
+            push_escaped_xml(
+                &mut declarations,
+                namespace_uri,
+                "ODG transfer namespace declarations",
+            )?;
+            declarations.push('"');
         }
     }
     insert_xml(xml, name_end, &declarations)
@@ -10887,6 +11415,7 @@ fn transfer_root_declares_namespace(xml: &str, prefix: &str) -> Result<bool> {
         let event = reader.read_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG transfer fragment XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG transfer namespace declaration event")?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 return element.attributes().try_fold(false, |found, raw| {
@@ -11098,12 +11627,16 @@ fn attribute(
         }
         let (namespace, name) = reader.resolver().resolve_attribute(parsed_attribute.key);
         if resolved_bound(&namespace, expected) && name.as_ref() == local {
+            // Check the encoded attribute before quick-xml can materialize its Cow.
+            validate_raw_xml_value(parsed_attribute.value.as_ref(), "ODG attribute value")?;
             let decoded = parsed_attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                 .map_err(|error| {
                     Error::InvalidFormat(format!("invalid ODG attribute value: {error}"))
-                })?
-                .into_owned();
+                })?;
+            // Keep the decoded Cow borrowed/temporary until its size is admitted.
+            validate_decoded_xml_value(decoded.as_ref(), "ODG attribute value")?;
+            let decoded = own_bounded_cow(decoded, MAX_TEXT_BYTES, "ODG attribute value")?;
             if value.replace(decoded).is_some() {
                 return invalid("ODG element has a duplicate namespaced attribute");
             }
@@ -11147,14 +11680,32 @@ fn attribute_values<const N: usize>(
                 batch_error = true;
                 break;
             }
+            // Apply the same bounded admission as `attribute` before a value
+            // is decoded or retained. Any refusal replays the ordered helper
+            // below, which reports the established first error.
+            if validate_raw_xml_value(parsed_attribute.value.as_ref(), "ODG attribute value")
+                .is_err()
+            {
+                batch_error = true;
+                break;
+            }
             let decoded = match parsed_attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             {
-                Ok(decoded) => decoded.into_owned(),
+                Ok(decoded) => decoded,
                 Err(_) => {
                     batch_error = true;
                     break;
                 },
+            };
+            if validate_decoded_xml_value(decoded.as_ref(), "ODG attribute value").is_err() {
+                batch_error = true;
+                break;
+            }
+            let Ok(decoded) = own_bounded_cow(decoded, MAX_TEXT_BYTES, "ODG attribute value")
+            else {
+                batch_error = true;
+                break;
             };
             values[slot] = Some(decoded);
         }
@@ -11198,13 +11749,21 @@ fn arbitrary_attributes(
         }) {
             continue;
         }
-        let name = std::str::from_utf8(raw_name)
-            .map_err(|error| Error::InvalidFormat(format!("invalid ODG attribute name: {error}")))?
-            .to_owned();
+        validate_raw_xml_value(raw_name, "ODG arbitrary attribute name")?;
+        let name = std::str::from_utf8(raw_name).map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG attribute name: {error}"))
+        })?;
+        let name = clone_bounded_string(name, MAX_TEXT_BYTES, "ODG arbitrary attribute name")?;
+        // The raw escaped bytes bound normalization before it can allocate.
+        validate_raw_xml_value(parsed.value.as_ref(), "ODG arbitrary attribute value")?;
         let value = parsed
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|error| Error::InvalidFormat(format!("invalid ODG attribute value: {error}")))?
-            .into_owned();
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODG attribute value: {error}"))
+            })?;
+        // Admit the decoded Cow before retaining an owned attribute value.
+        validate_decoded_xml_value(value.as_ref(), "ODG arbitrary attribute value")?;
+        let value = own_bounded_cow(value, MAX_TEXT_BYTES, "ODG arbitrary attribute value")?;
         if values.insert(name, value).is_some() {
             return invalid("ODG element has a duplicate arbitrary attribute");
         }
@@ -11776,4 +12335,75 @@ fn resolved_bound(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidFormat(message.into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quick_xml::events::{BytesCData, BytesPI, BytesText};
+
+    #[test]
+    fn borrowed_event_admission_rejects_oversized_ignored_inputs() {
+        let oversized = "x".repeat(MAX_TEXT_BYTES + 1);
+        assert!(
+            validate_borrowed_xml_event(&Event::Text(BytesText::new(&oversized)), "text probe")
+                .is_err()
+        );
+        assert!(
+            validate_borrowed_xml_event(&Event::CData(BytesCData::new(&oversized)), "cdata probe")
+                .is_err()
+        );
+        assert!(
+            validate_borrowed_xml_event(
+                &Event::Comment(BytesText::new(&oversized)),
+                "comment probe"
+            )
+            .is_err()
+        );
+        assert!(
+            validate_borrowed_xml_event(
+                &Event::PI(BytesPI::new(&oversized)),
+                "processing-instruction probe"
+            )
+            .is_err()
+        );
+
+        let start = format!("draw:rect value=\"{oversized}\"");
+        assert!(
+            validate_borrowed_xml_event(
+                &Event::Start(BytesStart::from_content(&start, "draw:rect".len())),
+                "start-tag probe"
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn bounded_clone_admission_refuses_before_reservation() {
+        let source = "0123456789";
+        let error = clone_bounded_string(source, 9, "allocation probe").unwrap_err();
+        assert!(
+            matches!(error, Error::InvalidFormat(reason) if reason.contains("allocation probe"))
+        );
+    }
+
+    #[test]
+    fn attribute_value_batch_applies_the_ordered_value_admission() {
+        let oversized = "x".repeat(MAX_TEXT_BYTES + 1);
+        let xml = format!(
+            r#"<d:rect xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" d:name="kept" d:layer="{oversized}"/>"#
+        );
+        let mut reader = NsReader::from_str(&xml);
+        let element = match reader.read_resolved_event().unwrap().1 {
+            Event::Empty(element) => element.into_owned(),
+            other => panic!("expected an empty element, got {other:?}"),
+        };
+        let requests = [(DRAW, b"name".as_slice()), (DRAW, b"layer".as_slice())];
+        let batch = attribute_values(&reader, &element, requests).unwrap_err();
+        let ordered = attribute(&reader, &element, DRAW, b"layer").unwrap_err();
+        assert_eq!(batch.to_string(), ordered.to_string());
+        assert!(
+            matches!(batch, Error::InvalidFormat(reason) if reason.contains("ODG attribute value"))
+        );
+    }
 }

@@ -74,6 +74,7 @@ fn plan(layout: &SourceLayout, streams: &[StreamInput<'_>]) -> ReusePlan {
         storages: &storages,
         storage_class_ids: &class_ids,
         root_class_id: None,
+        directory_metadata: None,
     };
     match plan_reuse(layout, &model).unwrap() {
         Outcome::Planned(plan) => *plan,

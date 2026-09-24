@@ -170,6 +170,24 @@ impl Paragraph {
     pub fn set_style_name(&mut self, name: &str) {
         self.element.set_attribute("text:style-name", name);
     }
+
+    /// Return soft page-break children in source order.
+    pub fn soft_page_breaks(&self) -> Result<Vec<SoftPageBreak>> {
+        direct_soft_page_breaks(&self.element)
+    }
+
+    /// Append one inert soft page-break marker.
+    pub fn add_soft_page_break(&mut self) -> Result<()> {
+        self.element.try_add_child(
+            Element::try_new("text:soft-page-break")?,
+            "ODT soft page-break",
+        )
+    }
+
+    /// Remove all direct soft page-break markers and return their count.
+    pub fn remove_soft_page_breaks(&mut self) -> usize {
+        remove_direct_soft_page_breaks(&mut self.element)
+    }
 }
 
 /// A `text:numbered-paragraph`: a paragraph with explicit list numbering.
@@ -179,6 +197,62 @@ impl Paragraph {
 #[derive(Clone, Debug)]
 pub struct NumberedParagraph {
     element: Element,
+}
+
+/// The inert fallback label carried by text:number.
+///
+/// Consumers that generate list labels should ignore this value. It is
+/// retained for consumers which do not implement automatic numbering, and
+/// authoring APIs treat it as ordinary source text rather than recalculating
+/// a list style.
+#[derive(Debug, Clone)]
+pub struct NumberLabel {
+    element: Element,
+}
+
+impl NumberLabel {
+    /// Create a fallback number label with string content.
+    pub fn new(text: impl AsRef<str>) -> Result<Self> {
+        let mut element = Element::try_new("text:number")?;
+        element.try_set_text(text.as_ref(), "ODT text:number content")?;
+        Ok(Self { element })
+    }
+
+    /// Wrap a parsed text:number, rejecting attributes or child elements.
+    pub fn from_element(element: Element) -> Result<Self> {
+        if element.tag_name() != "text:number" {
+            return Err(Error::InvalidFormat(
+                "Element is not a text:number label".to_string(),
+            ));
+        }
+        if !element.attributes().is_empty() || !element.get_children().is_empty() {
+            return Err(Error::InvalidFormat(
+                "text:number has no attributes or child elements".to_string(),
+            ));
+        }
+        Ok(Self { element })
+    }
+
+    /// Return the fallback label text.
+    pub fn text(&self) -> Result<String> {
+        self.element.try_get_text_recursive()
+    }
+
+    /// Replace the fallback label text.
+    pub fn set_text(&mut self, text: &str) -> Result<()> {
+        self.element.try_set_text(text, "ODT text:number content")
+    }
+
+    /// Return the underlying element for advanced source-preserving callers.
+    pub fn element(&self) -> &Element {
+        &self.element
+    }
+}
+
+impl From<NumberLabel> for Element {
+    fn from(label: NumberLabel) -> Element {
+        label.element
+    }
 }
 
 impl Default for NumberedParagraph {
@@ -210,9 +284,107 @@ impl NumberedParagraph {
         self.element.try_get_text_recursive()
     }
 
-    /// Set the text content of the paragraph.
-    pub fn set_text(&mut self, text: &str) {
-        self.element.set_text(text);
+    /// Set the text content of the owned paragraph or heading.
+    ///
+    /// Numbered paragraphs carry their content in exactly one nested
+    /// `text:p` or `text:h`; direct text would be serialized before
+    /// `text:number` and would violate the ODF content model.  Unknown or
+    /// ambiguous source children are rejected instead of being rearranged.
+    pub fn set_text(&mut self, text: &str) -> Result<()> {
+        validate_numbered_paragraph_attributes(&self.element)?;
+        validate_xml_text(text)?;
+        let children = self.element.get_children();
+        let mut block_index = None;
+        let mut block_count = 0usize;
+        let mut number_count = 0usize;
+        let mut unsupported_child = false;
+        let mut malformed_number = false;
+        for (index, child) in children.iter().enumerate() {
+            match child.tag_name() {
+                "text:p" | "text:h" => {
+                    block_index = Some(index);
+                    block_count += 1;
+                },
+                "text:number" => {
+                    number_count += 1;
+                    malformed_number |=
+                        !child.attributes().is_empty() || !child.get_children().is_empty();
+                },
+                _ => unsupported_child = true,
+            }
+        }
+        let Some(block_index) = block_index else {
+            return Err(Error::InvalidFormat(
+                "text:numbered-paragraph text requires exactly one text:p or text:h child"
+                    .to_string(),
+            ));
+        };
+        let schema_order = match (number_count, children.len(), block_index) {
+            (0, 1, 0) => true,
+            (1, 2, 1) => children[0].tag_name() == "text:number",
+            _ => false,
+        };
+        if self.element.get_attribute("text:list-id").is_none()
+            || !self.element.text().is_empty()
+            || block_count != 1
+            || number_count > 1
+            || malformed_number
+            || unsupported_child
+            || !schema_order
+            || !children[block_index].get_children().is_empty()
+        {
+            return Err(Error::InvalidFormat(
+                "text:numbered-paragraph text source has ambiguous or unsupported children"
+                    .to_string(),
+            ));
+        }
+        let mut replacement = String::new();
+        replacement
+            .try_reserve(text.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODT numbered paragraph text",
+                source,
+            })?;
+        replacement.push_str(text);
+        self.element
+            .get_children_mut()
+            .get_mut(block_index)
+            .ok_or_else(|| Error::InvalidFormat("missing numbered paragraph block".to_string()))?
+            .set_text_owned(replacement);
+        Ok(())
+    }
+
+    /// Return the optional source fallback label.
+    pub fn number_label(&self) -> Result<Option<NumberLabel>> {
+        direct_number_label(&self.element)
+    }
+
+    /// Set or clear the source fallback label without recalculating numbering.
+    pub fn set_number_label(&mut self, label: Option<NumberLabel>) -> Result<()> {
+        let children = self.element.get_children();
+        let block_count = children
+            .iter()
+            .filter(|child| matches!(child.tag_name(), "text:p" | "text:h"))
+            .count();
+        let number_count = children
+            .iter()
+            .filter(|child| child.tag_name() == "text:number")
+            .count();
+        let children_are_schema_shape = children
+            .iter()
+            .all(|child| matches!(child.tag_name(), "text:number" | "text:p" | "text:h"));
+        if self.element.get_attribute("text:list-id").is_none()
+            || !self.element.text().is_empty()
+            || block_count != 1
+            || number_count > 1
+            || !children_are_schema_shape
+        {
+            return Err(Error::InvalidFormat(
+                "text:numbered-paragraph labels require text:list-id, one text:p or text:h child, and no direct text"
+                    .to_string(),
+            ));
+        }
+        set_direct_number_label(&mut self.element, label, NumberLabelHost::Block)
     }
 
     /// Get the underlying element.
@@ -252,6 +424,251 @@ impl NumberedParagraph {
     pub fn into_paragraph(self) -> Paragraph {
         Paragraph::from_element_unchecked(self.element)
     }
+}
+
+fn validate_numbered_paragraph_attributes(element: &Element) -> Result<()> {
+    let list_id = element.get_attribute("text:list-id").ok_or_else(|| {
+        Error::InvalidFormat("text:numbered-paragraph requires text:list-id".to_string())
+    })?;
+    let list_id_is_parsed = element.parsed_attribute_lexical("text:list-id").is_some();
+    validate_ncname(
+        element
+            .parsed_attribute_lexical("text:list-id")
+            .unwrap_or(list_id),
+        "text:list-id",
+        list_id_is_parsed,
+    )?;
+
+    if let Some(level) = element.get_attribute("text:level") {
+        let level_is_parsed = element.parsed_attribute_lexical("text:level").is_some();
+        validate_integer_attribute(
+            element
+                .parsed_attribute_lexical("text:level")
+                .unwrap_or(level),
+            true,
+            "text:level",
+            level_is_parsed,
+        )?;
+    }
+    if let Some(start_value) = element.get_attribute("text:start-value") {
+        let start_value_is_parsed = element
+            .parsed_attribute_lexical("text:start-value")
+            .is_some();
+        validate_integer_attribute(
+            element
+                .parsed_attribute_lexical("text:start-value")
+                .unwrap_or(start_value),
+            false,
+            "text:start-value",
+            start_value_is_parsed,
+        )?;
+    }
+    if let Some(continue_numbering) = element.get_attribute("text:continue-numbering")
+        && !matches!(continue_numbering, "true" | "false")
+    {
+        return Err(Error::InvalidFormat(
+            "text:continue-numbering must be true or false".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_ncname(value: &str, attribute: &str, decode_references: bool) -> Result<()> {
+    let value = decode_and_collapse_xml_schema_whitespace(value, decode_references)?;
+    let mut characters = value.chars();
+    let Some(first) = characters.next() else {
+        return Err(Error::InvalidFormat(format!(
+            "{attribute} must be an XML NCName"
+        )));
+    };
+    if !is_ncname_start(first) || !characters.all(is_ncname_continue) {
+        return Err(Error::InvalidFormat(format!(
+            "{attribute} must be an XML NCName"
+        )));
+    }
+    Ok(())
+}
+
+fn is_ncname_start(character: char) -> bool {
+    let codepoint = character as u32;
+    character == '_'
+        || matches!(
+            codepoint,
+            0x41..=0x5A
+                | 0x61..=0x7A
+                | 0xC0..=0xD6
+                | 0xD8..=0xF6
+                | 0xF8..=0x2FF
+                | 0x370..=0x37D
+                | 0x37F..=0x1FFF
+                | 0x200C..=0x200D
+                | 0x2070..=0x218F
+                | 0x2C00..=0x2FEF
+                | 0x3001..=0xD7FF
+                | 0xF900..=0xFDCF
+                | 0xFDF0..=0xFFFD
+                | 0x10000..=0xEFFFF
+        )
+}
+
+fn is_ncname_continue(character: char) -> bool {
+    is_ncname_start(character)
+        || matches!(
+            character,
+            '0'..='9'
+                | '-'
+                | '.'
+                | '\u{b7}'
+                | '\u{300}'..='\u{36f}'
+                | '\u{203f}'..='\u{2040}'
+        )
+}
+
+fn validate_integer_attribute(
+    value: &str,
+    positive: bool,
+    attribute: &str,
+    decode_references: bool,
+) -> Result<()> {
+    let value = decode_and_collapse_xml_schema_whitespace(value, decode_references)?;
+    let (negative, digits) = match value.strip_prefix('+') {
+        Some(digits) => (false, digits),
+        None => match value.strip_prefix('-') {
+            Some(digits) => (true, digits),
+            None => (false, value.as_str()),
+        },
+    };
+    let valid_digits = !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit());
+    let nonzero = digits.bytes().any(|byte| byte != b'0');
+    let valid = valid_digits
+        && if positive {
+            !negative && nonzero
+        } else {
+            !negative || !nonzero
+        };
+    if !valid {
+        let kind = if positive {
+            "positiveInteger"
+        } else {
+            "nonNegativeInteger"
+        };
+        return Err(Error::InvalidFormat(format!(
+            "{attribute} must be an XML Schema {kind}"
+        )));
+    }
+    Ok(())
+}
+
+fn decode_and_collapse_xml_schema_whitespace(
+    value: &str,
+    decode_references: bool,
+) -> Result<String> {
+    let mut collapsed = String::new();
+    collapsed
+        .try_reserve(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODT numbered paragraph attribute validation",
+            source,
+        })?;
+    let mut pending_space = false;
+    let mut offset = 0;
+    while offset < value.len() {
+        let character = value[offset..].chars().next().ok_or_else(|| {
+            Error::InvalidFormat("invalid numbered paragraph attribute lexical value".to_string())
+        })?;
+        let (character, next_offset) = if character == '&' && decode_references {
+            let entity_start = offset + character.len_utf8();
+            let entity_end = value[entity_start..]
+                .find(';')
+                .map(|end| entity_start + end)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "invalid numbered paragraph attribute character reference".to_string(),
+                    )
+                })?;
+            (
+                decode_numbered_paragraph_character_reference(&value[entity_start..entity_end])?,
+                entity_end + 1,
+            )
+        } else {
+            (character, offset + character.len_utf8())
+        };
+        if matches!(character, ' ' | '\t' | '\n' | '\r') {
+            pending_space = true;
+        } else {
+            if pending_space && !collapsed.is_empty() {
+                collapsed.push(' ');
+            }
+            collapsed.push(character);
+            pending_space = false;
+        }
+        offset = next_offset;
+    }
+    Ok(collapsed)
+}
+
+fn decode_numbered_paragraph_character_reference(reference: &str) -> Result<char> {
+    let character = match reference {
+        "amp" => '&',
+        "lt" => '<',
+        "gt" => '>',
+        "quot" => '"',
+        "apos" => '\'',
+        _ => {
+            let (digits, radix) = if let Some(hex) = reference.strip_prefix("#x") {
+                (hex, 16)
+            } else if let Some(decimal) = reference.strip_prefix('#') {
+                (decimal, 10)
+            } else {
+                return Err(Error::InvalidFormat(
+                    "invalid numbered paragraph attribute character reference".to_string(),
+                ));
+            };
+            let codepoint = digits
+                .bytes()
+                .try_fold(0_u32, |value, byte| {
+                    let digit = match byte {
+                        b'0'..=b'9' => byte - b'0',
+                        b'a'..=b'f' if radix == 16 => byte - b'a' + 10,
+                        b'A'..=b'F' if radix == 16 => byte - b'A' + 10,
+                        _ => return None,
+                    };
+                    value.checked_mul(radix)?.checked_add(u32::from(digit))
+                })
+                .ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "invalid numbered paragraph attribute character reference".to_string(),
+                    )
+                })?;
+            char::from_u32(codepoint).ok_or_else(|| {
+                Error::InvalidFormat(
+                    "invalid numbered paragraph attribute character reference".to_string(),
+                )
+            })?
+        },
+    };
+    if !is_xml_1_0_char(character) {
+        return Err(Error::InvalidFormat(
+            "invalid XML character in numbered paragraph attribute".to_string(),
+        ));
+    }
+    Ok(character)
+}
+
+fn validate_xml_text(value: &str) -> Result<()> {
+    if value.chars().all(is_xml_1_0_char) {
+        return Ok(());
+    }
+    Err(Error::InvalidFormat(
+        "text:numbered-paragraph text contains an invalid XML 1.0 character".to_string(),
+    ))
+}
+
+fn is_xml_1_0_char(character: char) -> bool {
+    matches!(character, '\u{9}' | '\u{A}' | '\u{D}')
+        || ('\u{20}'..='\u{D7FF}').contains(&character)
+        || ('\u{E000}'..='\u{FFFD}').contains(&character)
+        || ('\u{10000}'..='\u{10FFFF}').contains(&character)
 }
 
 impl From<NumberedParagraph> for Element {
@@ -635,6 +1052,34 @@ impl Heading {
         self.element.set_text(text);
     }
 
+    /// Return the optional source fallback label.
+    pub fn number_label(&self) -> Result<Option<NumberLabel>> {
+        direct_number_label(&self.element)
+    }
+
+    /// Set or clear the source fallback label without recalculating numbering.
+    pub fn set_number_label(&mut self, label: Option<NumberLabel>) -> Result<()> {
+        set_direct_number_label(&mut self.element, label, NumberLabelHost::Inline)
+    }
+
+    /// Return soft page-break children in source order.
+    pub fn soft_page_breaks(&self) -> Result<Vec<SoftPageBreak>> {
+        direct_soft_page_breaks(&self.element)
+    }
+
+    /// Append one inert soft page-break marker.
+    pub fn add_soft_page_break(&mut self) -> Result<()> {
+        self.element.try_add_child(
+            Element::try_new("text:soft-page-break")?,
+            "ODT soft page-break",
+        )
+    }
+
+    /// Remove all direct soft page-break markers and return their count.
+    pub fn remove_soft_page_breaks(&mut self) -> usize {
+        remove_direct_soft_page_breaks(&mut self.element)
+    }
+
     /// Get the outline level
     pub fn level(&self) -> Option<u8> {
         self.element
@@ -799,6 +1244,34 @@ impl ListHeader {
         self.element.set_text(text);
     }
 
+    /// Return the optional source fallback label.
+    pub fn number_label(&self) -> Result<Option<NumberLabel>> {
+        direct_number_label(&self.element)
+    }
+
+    /// Set or clear the source fallback label without recalculating numbering.
+    pub fn set_number_label(&mut self, label: Option<NumberLabel>) -> Result<()> {
+        set_direct_number_label(&mut self.element, label, NumberLabelHost::Block)
+    }
+
+    /// Return soft page-break children in source order.
+    pub fn soft_page_breaks(&self) -> Result<Vec<SoftPageBreak>> {
+        direct_soft_page_breaks(&self.element)
+    }
+
+    /// Append one inert soft page-break marker.
+    pub fn add_soft_page_break(&mut self) -> Result<()> {
+        self.element.try_add_child(
+            Element::try_new("text:soft-page-break")?,
+            "ODT soft page-break",
+        )
+    }
+
+    /// Remove all direct soft page-break markers and return their count.
+    pub fn remove_soft_page_breaks(&mut self) -> usize {
+        remove_direct_soft_page_breaks(&mut self.element)
+    }
+
     /// Get the paragraphs the header contains.
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         let mut paragraphs = Vec::new();
@@ -863,6 +1336,34 @@ impl ListItem {
         self.element.set_text(text);
     }
 
+    /// Return the optional source fallback label.
+    pub fn number_label(&self) -> Result<Option<NumberLabel>> {
+        direct_number_label(&self.element)
+    }
+
+    /// Set or clear the source fallback label without recalculating numbering.
+    pub fn set_number_label(&mut self, label: Option<NumberLabel>) -> Result<()> {
+        set_direct_number_label(&mut self.element, label, NumberLabelHost::Block)
+    }
+
+    /// Return soft page-break children in source order.
+    pub fn soft_page_breaks(&self) -> Result<Vec<SoftPageBreak>> {
+        direct_soft_page_breaks(&self.element)
+    }
+
+    /// Append one inert soft page-break marker.
+    pub fn add_soft_page_break(&mut self) -> Result<()> {
+        self.element.try_add_child(
+            Element::try_new("text:soft-page-break")?,
+            "ODT soft page-break",
+        )
+    }
+
+    /// Remove all direct soft page-break markers and return their count.
+    pub fn remove_soft_page_breaks(&mut self) -> usize {
+        remove_direct_soft_page_breaks(&mut self.element)
+    }
+
     /// Get nested paragraphs
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         let mut paragraphs = Vec::new();
@@ -885,6 +1386,140 @@ impl From<ListItem> for Element {
     fn from(item: ListItem) -> Element {
         item.element
     }
+}
+
+/// An inert text:soft-page-break marker.
+#[derive(Debug, Clone)]
+pub struct SoftPageBreak {
+    element: Element,
+}
+
+impl Default for SoftPageBreak {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SoftPageBreak {
+    /// Create an empty soft page-break marker.
+    pub fn new() -> Self {
+        Self {
+            element: Element::new("text:soft-page-break"),
+        }
+    }
+
+    /// Wrap a parsed soft page-break marker, rejecting attributes or children.
+    pub fn from_element(element: Element) -> Result<Self> {
+        if element.tag_name() != "text:soft-page-break" {
+            return Err(Error::InvalidFormat(
+                "Element is not a text:soft-page-break".to_string(),
+            ));
+        }
+        if !element.attributes().is_empty()
+            || !element.get_children().is_empty()
+            || !element.text().is_empty()
+        {
+            return Err(Error::InvalidFormat(
+                "text:soft-page-break has no attributes, text, or child elements".to_string(),
+            ));
+        }
+        Ok(Self { element })
+    }
+
+    /// Return the underlying element for advanced callers.
+    pub fn element(&self) -> &Element {
+        &self.element
+    }
+}
+
+impl From<SoftPageBreak> for Element {
+    fn from(value: SoftPageBreak) -> Element {
+        value.element
+    }
+}
+
+fn direct_number_label(element: &Element) -> Result<Option<NumberLabel>> {
+    let mut found = None;
+    for child in element.get_children() {
+        if child.tag_name() == "text:number" {
+            if found.is_some() {
+                return Err(Error::InvalidFormat(
+                    "text container has more than one text:number".to_string(),
+                ));
+            }
+            found = Some(NumberLabel::from_element(child.try_clone()?)?);
+        }
+    }
+    Ok(found)
+}
+
+#[derive(Clone, Copy)]
+enum NumberLabelHost {
+    Inline,
+    Block,
+}
+
+fn set_direct_number_label(
+    element: &mut Element,
+    label: Option<NumberLabel>,
+    host: NumberLabelHost,
+) -> Result<()> {
+    let text_child = if label.is_some() && !element.text().is_empty() {
+        let mut child = Element::try_new(match host {
+            NumberLabelHost::Inline => "text:span",
+            NumberLabelHost::Block => "text:p",
+        })?;
+        child.try_set_text(element.text(), "ODT text:number host content")?;
+        Some(child)
+    } else {
+        None
+    };
+    let additional = usize::from(label.is_some()) + usize::from(text_child.is_some());
+    if additional != 0 {
+        element
+            .get_children_mut()
+            .try_reserve(additional)
+            .map_err(|source| Error::Allocation {
+                resource: "ODT text:number label",
+                source,
+            })?;
+    }
+    if label.is_some() {
+        element.set_text("");
+    }
+    element
+        .get_children_mut()
+        .retain(|child| child.tag_name() != "text:number");
+    if let Some(label) = label {
+        let label = NumberLabel::from_element(label.element)?;
+        element.get_children_mut().insert(0, label.element);
+        if let Some(text_child) = text_child {
+            element.get_children_mut().insert(1, text_child);
+        }
+    }
+    Ok(())
+}
+
+fn direct_soft_page_breaks(element: &Element) -> Result<Vec<SoftPageBreak>> {
+    let mut output = Vec::new();
+    for child in element.get_children() {
+        if child.tag_name() == "text:soft-page-break" {
+            output.try_reserve(1).map_err(|source| Error::Allocation {
+                resource: "ODT soft page-break projection",
+                source,
+            })?;
+            output.push(SoftPageBreak::from_element(child.try_clone()?)?);
+        }
+    }
+    Ok(output)
+}
+
+fn remove_direct_soft_page_breaks(element: &mut Element) -> usize {
+    let before = element.get_children().len();
+    element
+        .get_children_mut()
+        .retain(|child| child.tag_name() != "text:soft-page-break");
+    before - element.get_children().len()
 }
 
 /// A page break element
@@ -1628,7 +2263,7 @@ impl TextNamespaceMemo {
 
 /// Parse every `text:p` and `text:h`, retaining only the collected text.
 ///
-/// Behaves exactly like [`parse_text_blocks_owned`] followed by
+/// Behaves exactly like the test oracle `parse_text_blocks_owned` followed by
 /// `Block::into_text` on every block — same event handling, suppression
 /// rules, limits, and start-ordered output — but validates each block's
 /// attributes without building the retained `Element`, using the established
@@ -3360,6 +3995,16 @@ mod tests {
         assert_eq!(spans.len(), 2);
     }
 
+    #[test]
+    fn paragraph_soft_page_breaks_round_trip() {
+        let mut paragraph = Paragraph::new();
+        paragraph.set_text("before");
+        paragraph.add_soft_page_break().unwrap();
+        assert_eq!(paragraph.soft_page_breaks().unwrap().len(), 1);
+        assert_eq!(paragraph.remove_soft_page_breaks(), 1);
+        assert!(paragraph.soft_page_breaks().unwrap().is_empty());
+    }
+
     // ========== Span Tests ==========
     #[test]
     fn test_span_new() {
@@ -3530,6 +4175,306 @@ mod tests {
         let mut heading = Heading::new(1);
         heading.set_text("Title");
         assert_eq!(heading.text().unwrap(), "Title");
+    }
+
+    #[test]
+    fn numbered_paragraph_number_label_requires_schema_shape() {
+        let mut element = Element::new("text:numbered-paragraph");
+        element.set_attribute("text:list-id", "list1");
+        let mut content = Element::new("text:p");
+        content.set_text("Item");
+        element.add_child(content);
+        let mut paragraph = NumberedParagraph::from_element(element).unwrap();
+        paragraph
+            .set_number_label(Some(NumberLabel::new("4.").unwrap()))
+            .unwrap();
+
+        assert_eq!(
+            paragraph.number_label().unwrap().unwrap().text().unwrap(),
+            "4."
+        );
+
+        let xml = paragraph.element.to_xml_string();
+        assert!(xml.contains("<text:number>4.</text:number><text:p>Item</text:p>"));
+        assert!(
+            NumberedParagraph::new()
+                .set_number_label(Some(NumberLabel::new("1.").unwrap()))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn numbered_paragraph_set_text_updates_owned_block_and_reopens_in_schema_order() {
+        let element = Element::from_bytes(
+            br#"<text:numbered-paragraph text:list-id="list1"><text:number>1.</text:number><text:p>before</text:p></text:numbered-paragraph>"#,
+        )
+        .unwrap();
+        let mut paragraph = NumberedParagraph::from_element(element).unwrap();
+
+        paragraph.set_text("fresh").unwrap();
+        let fresh_xml = paragraph.element().to_xml_string();
+        assert_eq!(
+            fresh_xml,
+            r#"<text:numbered-paragraph text:list-id="list1"><text:number>1.</text:number><text:p>fresh</text:p></text:numbered-paragraph>"#
+        );
+        let mut reopened =
+            NumberedParagraph::from_element(Element::from_bytes(fresh_xml.as_bytes()).unwrap())
+                .unwrap();
+        assert_eq!(
+            reopened.element().get_children()[1].get_text_recursive(),
+            "fresh"
+        );
+
+        reopened.set_text("updated").unwrap();
+        let updated_xml = reopened.element().to_xml_string();
+        assert_eq!(
+            updated_xml,
+            r#"<text:numbered-paragraph text:list-id="list1"><text:number>1.</text:number><text:p>updated</text:p></text:numbered-paragraph>"#
+        );
+        assert!(updated_xml.find("<text:number>").unwrap() < updated_xml.find("<text:p>").unwrap());
+
+        let ambiguous = Element::from_bytes(
+            br#"<text:numbered-paragraph text:list-id="list1"><text:number>1.</text:number><text:p><text:span>unknown</text:span></text:p></text:numbered-paragraph>"#,
+        )
+        .unwrap();
+        assert!(
+            NumberedParagraph::from_element(ambiguous)
+                .unwrap()
+                .set_text("refuse")
+                .is_err()
+        );
+
+        let out_of_order = Element::from_bytes(
+            br#"<text:numbered-paragraph text:list-id="list1"><text:p>before</text:p><text:number>1.</text:number></text:numbered-paragraph>"#,
+        )
+        .unwrap();
+        assert!(
+            NumberedParagraph::from_element(out_of_order)
+                .unwrap()
+                .set_text("refuse")
+                .is_err()
+        );
+
+        let malformed_number = Element::from_bytes(
+            br#"<text:numbered-paragraph text:list-id="list1"><text:number text:style-name="bad">1.</text:number><text:p>before</text:p></text:numbered-paragraph>"#,
+        )
+        .unwrap();
+        assert!(
+            NumberedParagraph::from_element(malformed_number)
+                .unwrap()
+                .set_text("refuse")
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn numbered_paragraph_set_text_validates_attributes_and_xml_text_atomically() {
+        let valid = Element::from_bytes(
+            br#"<text:numbered-paragraph text:list-id="list_1" text:level="1" text:start-value="0" text:continue-numbering="false"><text:p>before</text:p></text:numbered-paragraph>"#,
+        )
+        .unwrap();
+        let mut paragraph = NumberedParagraph::from_element(valid).unwrap();
+        paragraph.set_text("fresh").unwrap();
+        assert_eq!(paragraph.text().unwrap(), "fresh");
+
+        fn assert_refused_without_mutation(xml: &str, replacement: &str) {
+            let mut paragraph =
+                NumberedParagraph::from_element(Element::from_bytes(xml.as_bytes()).unwrap())
+                    .unwrap();
+            let before = paragraph.element().to_xml_string();
+            assert!(paragraph.set_text(replacement).is_err());
+            assert_eq!(paragraph.element().to_xml_string(), before);
+        }
+
+        assert_refused_without_mutation(
+            r#"<text:numbered-paragraph text:list-id="bad id"><text:p>before</text:p></text:numbered-paragraph>"#,
+            "after",
+        );
+        assert_refused_without_mutation(
+            r#"<text:numbered-paragraph text:list-id="list1" text:level="0"><text:p>before</text:p></text:numbered-paragraph>"#,
+            "after",
+        );
+        assert_refused_without_mutation(
+            r#"<text:numbered-paragraph text:list-id="list1" text:start-value="-1"><text:p>before</text:p></text:numbered-paragraph>"#,
+            "after",
+        );
+        assert_refused_without_mutation(
+            r#"<text:numbered-paragraph text:list-id="list1" text:continue-numbering="1"><text:p>before</text:p></text:numbered-paragraph>"#,
+            "after",
+        );
+        assert_refused_without_mutation(
+            r#"<text:numbered-paragraph text:list-id="list1"><text:p>before</text:p></text:numbered-paragraph>"#,
+            "bad\u{1}text",
+        );
+    }
+
+    #[test]
+    fn numbered_paragraph_set_text_collapses_schema_whitespace_without_rewriting_attributes() {
+        fn assert_collapsed_validation_preserves_attributes(
+            list_id: &str,
+            level: &str,
+            start_value: &str,
+        ) {
+            let mut element = Element::new("text:numbered-paragraph");
+            element.set_attribute("text:list-id", list_id);
+            element.set_attribute("text:level", level);
+            element.set_attribute("text:start-value", start_value);
+            element.set_attribute("text:continue-numbering", "false");
+            let mut content = Element::new("text:p");
+            content.set_text("before");
+            element.add_child(content);
+
+            let mut paragraph = NumberedParagraph::from_element(element).unwrap();
+            let list_id_before = paragraph
+                .element()
+                .get_attribute("text:list-id")
+                .map(str::to_owned);
+            let level_before = paragraph
+                .element()
+                .get_attribute("text:level")
+                .map(str::to_owned);
+            let start_value_before = paragraph
+                .element()
+                .get_attribute("text:start-value")
+                .map(str::to_owned);
+            paragraph.set_text("after").unwrap();
+            assert_eq!(
+                paragraph.element().get_attribute("text:list-id"),
+                list_id_before.as_deref()
+            );
+            assert_eq!(
+                paragraph.element().get_attribute("text:level"),
+                level_before.as_deref()
+            );
+            assert_eq!(
+                paragraph.element().get_attribute("text:start-value"),
+                start_value_before.as_deref()
+            );
+        }
+
+        assert_collapsed_validation_preserves_attributes(" list1 ", " 1 ", " 0 ");
+        assert_collapsed_validation_preserves_attributes("\tα-list\n", "\t+01\n", "\r-00\r");
+
+        let entity_encoded = Element::from_bytes(
+            br#"<text:numbered-paragraph text:list-id="&#x9;list1&#x9;" text:level="&#x31;" text:start-value="&#x30;"><text:p>before</text:p></text:numbered-paragraph>"#,
+        )
+        .unwrap();
+        let mut entity_encoded = NumberedParagraph::from_element(entity_encoded).unwrap();
+        entity_encoded.set_text("after").unwrap();
+        assert_eq!(
+            entity_encoded.element().get_attribute("text:list-id"),
+            Some("&#x9;list1&#x9;")
+        );
+        assert_eq!(
+            entity_encoded.element().get_attribute("text:level"),
+            Some("&#x31;")
+        );
+        assert_eq!(
+            entity_encoded.element().get_attribute("text:start-value"),
+            Some("&#x30;")
+        );
+
+        fn assert_internal_whitespace_refused(xml: &str) {
+            let mut paragraph =
+                NumberedParagraph::from_element(Element::from_bytes(xml.as_bytes()).unwrap())
+                    .unwrap();
+            let before = paragraph.element().to_xml_string();
+            assert!(paragraph.set_text("after").is_err());
+            assert_eq!(paragraph.element().to_xml_string(), before);
+        }
+
+        assert_internal_whitespace_refused(
+            r#"<text:numbered-paragraph text:list-id="list 1"><text:p>before</text:p></text:numbered-paragraph>"#,
+        );
+        assert_internal_whitespace_refused(
+            r#"<text:numbered-paragraph text:list-id="list1" text:level="1 2"><text:p>before</text:p></text:numbered-paragraph>"#,
+        );
+        assert_internal_whitespace_refused(
+            r#"<text:numbered-paragraph text:list-id="list1" text:start-value="0 1"><text:p>before</text:p></text:numbered-paragraph>"#,
+        );
+    }
+
+    #[test]
+    fn numbered_paragraph_set_text_distinguishes_parsed_lexicals_from_literal_attributes() {
+        let parsed = Element::from_bytes(
+            br#"<text:numbered-paragraph text:list-id="&#x9;list1&#x9;" text:level="&#x31;" text:start-value="&#x30;"><text:p>before</text:p></text:numbered-paragraph>"#,
+        )
+        .unwrap();
+        let parsed = NumberedParagraph::from_element(parsed).unwrap();
+        let serialized = parsed.element().to_xml_string();
+        assert!(serialized.contains(r#"text:level="&#x31;""#));
+        assert!(serialized.contains(r#"text:list-id="&#x9;list1&#x9;""#));
+        assert!(serialized.contains(r#"text:start-value="&#x30;""#));
+        assert!(!serialized.contains("&amp;#x"));
+
+        let mut reopened =
+            NumberedParagraph::from_element(Element::from_bytes(serialized.as_bytes()).unwrap())
+                .unwrap();
+        reopened.set_text("reopened").unwrap();
+        assert_eq!(
+            reopened.element().get_attribute("text:level"),
+            Some("&#x31;")
+        );
+        assert_eq!(
+            reopened.element().get_attribute("text:list-id"),
+            Some("&#x9;list1&#x9;")
+        );
+        assert_eq!(
+            reopened.element().get_attribute("text:start-value"),
+            Some("&#x30;")
+        );
+
+        let mut caller = Element::new("text:numbered-paragraph");
+        caller.set_attribute("text:list-id", "list1");
+        caller.set_attribute("text:level", "&#x31;");
+        caller.set_attribute("text:start-value", "&#x30;");
+        let mut content = Element::new("text:p");
+        content.set_text("before");
+        caller.add_child(content);
+        let mut caller = NumberedParagraph::from_element(caller).unwrap();
+        let before = caller.element().to_xml_string();
+        assert!(caller.set_text("after").is_err());
+        assert_eq!(caller.element().to_xml_string(), before);
+        assert!(before.contains("&amp;#x31;"));
+    }
+
+    #[test]
+    fn heading_number_label_precedes_text_and_list_labels_use_blocks() {
+        let mut heading = Heading::new(1);
+        heading.set_text("Heading");
+        heading
+            .set_number_label(Some(NumberLabel::new("1.").unwrap()))
+            .unwrap();
+        let heading_xml = heading.element.to_xml_string();
+        assert!(
+            heading_xml.contains("<text:number>1.</text:number><text:span>Heading</text:span>")
+        );
+
+        let mut header = ListHeader::new();
+        header.set_text("Header");
+        header
+            .set_number_label(Some(NumberLabel::new("1.").unwrap()))
+            .unwrap();
+        let header_xml = header.element.to_xml_string();
+        assert!(header_xml.contains("<text:number>1.</text:number><text:p>Header</text:p>"));
+
+        let mut item = ListItem::new();
+        item.set_text("Item");
+        item.set_number_label(Some(NumberLabel::new("2.").unwrap()))
+            .unwrap();
+        let item_xml = item.element.to_xml_string();
+        assert!(item_xml.contains("<text:number>2.</text:number><text:p>Item</text:p>"));
+    }
+
+    #[test]
+    fn marker_wrappers_reject_non_empty_soft_breaks_and_number_children() {
+        let mut soft_break = Element::new("text:soft-page-break");
+        soft_break.set_text("unexpected");
+        assert!(SoftPageBreak::from_element(soft_break).is_err());
+
+        let mut number = Element::new("text:number");
+        number.add_child(Element::new("text:span"));
+        assert!(NumberLabel::from_element(number).is_err());
     }
 
     #[test]

@@ -1,0 +1,17 @@
+binary=/home/zhuhe/code/litchi-ink-action-profile-candidate-control-target/release/ink-action-edit-profile
+692599ed0184650ccab25b1ef2283d2763a2fcf839023126bda61bcc060c1f29  /home/zhuhe/code/litchi-ink-action-profile-candidate-control-target/release/ink-action-edit-profile
+profile_arm=candidate
+source_pin=ab94a4d7a02053765bf4c70b4af5022273b821e5
+rustc -vV:
+rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: x86_64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2
+cargo=cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+target=/home/zhuhe/code/litchi-ink-action-profile-candidate-control-target
+cargo_incremental=0
+flags=none
+allocator=CountingAllocator (process-local GlobalAlloc observer)

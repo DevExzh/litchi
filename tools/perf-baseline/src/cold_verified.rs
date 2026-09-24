@@ -1,8 +1,8 @@
 //! Strict Linux page-cache verification for the filesystem evidence harness.
 //!
 //! This module is deliberately harness-only.  It does not claim that a block
-//! filesystem read reached physical media: the proof is limited to an
-//! external `fincore` observation immediately before the operation and a
+//! filesystem read reached physical media: the proof is limited to external
+//! `fincore` observations immediately before and after the operation plus a
 //! positive process `read_bytes` delta during the operation.
 
 use std::path::{Path, PathBuf};
@@ -49,6 +49,7 @@ pub(crate) enum Status {
     IneligibleProcIoUnavailable,
     IneligibleReadBytesBackwards,
     IneligibleReadBytesZero,
+    IneligiblePostFincore,
     IneligiblePreparedQueryControl,
     IneligibleSourceAlignmentUnavailable,
     IneligibleSourceWriteFailed,
@@ -110,12 +111,53 @@ pub(crate) struct Sample {
     pub fincore_method: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fincore_fallback: Option<String>,
+    /// The post-operation per-file cache observation.  The existing flat
+    /// fincore fields above are retained as the pre-operation observation for
+    /// schema compatibility; this nested field makes the before/after
+    /// boundary explicit without changing their meaning.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_post: Option<PostFincoreEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub read_bytes_before: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub read_bytes_after: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub read_bytes_delta: Option<u64>,
+}
+
+/// Content-free provenance and counters for the fincore observation taken
+/// immediately after the timed operation.  A failed post probe is retained as
+/// an ineligible nested status rather than being silently treated as a warm or
+/// cold fallback.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct PostFincoreEvidence {
+    pub status: Status,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resident_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dirty_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub writeback_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_tool: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_stderr_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_stderr_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_version_stderr_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_version_stderr_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_method: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_fallback: Option<String>,
 }
 
 impl Sample {
@@ -143,6 +185,7 @@ impl Sample {
             fincore_version_stderr_bytes: None,
             fincore_method: None,
             fincore_fallback: None,
+            fincore_post: None,
             read_bytes_before: None,
             read_bytes_after: None,
             read_bytes_delta: None,
@@ -178,6 +221,7 @@ impl Sample {
             fincore_version_stderr_bytes: None,
             fincore_method: None,
             fincore_fallback: None,
+            fincore_post: None,
             read_bytes_before: None,
             read_bytes_after: None,
             read_bytes_delta: None,
@@ -397,6 +441,14 @@ fn observation_status(observation: FincoreObservation, source_bytes: u64) -> Sta
     }
 }
 
+fn post_observation_status(observation: FincoreObservation, source_bytes: u64) -> Status {
+    if observation.size_bytes == source_bytes {
+        Status::Eligible
+    } else {
+        Status::IneligibleFincoreSizeMismatch
+    }
+}
+
 struct FincoreProbe {
     observation: Result<FincoreObservation, Status>,
     executable: Option<PathBuf>,
@@ -425,6 +477,31 @@ impl FincoreProbe {
             version_stderr_bytes: None,
             method: None,
             fallback: None,
+        }
+    }
+}
+
+impl PostFincoreEvidence {
+    fn from_probe(probe: &FincoreProbe) -> Self {
+        let (status, observation) = match probe.observation {
+            Ok(observation) => (Status::Eligible, Some(observation)),
+            Err(status) => (status, None),
+        };
+        Self {
+            status,
+            size_bytes: observation.map(|value| value.size_bytes),
+            resident_bytes: observation.map(|value| value.resident_bytes),
+            dirty_bytes: observation.map(|value| value.dirty_bytes),
+            writeback_bytes: observation.map(|value| value.writeback_bytes),
+            fincore_tool: probe.tool.clone(),
+            fincore_sha256: probe.sha256.clone(),
+            fincore_version: probe.version.clone(),
+            fincore_stderr_sha256: probe.stderr_sha256.clone(),
+            fincore_stderr_bytes: probe.stderr_bytes,
+            fincore_version_stderr_sha256: probe.version_stderr_sha256.clone(),
+            fincore_version_stderr_bytes: probe.version_stderr_bytes,
+            fincore_method: probe.method.map(str::to_owned),
+            fincore_fallback: probe.fallback.map(str::to_owned),
         }
     }
 }
@@ -555,6 +632,56 @@ pub(crate) fn prepare(path: &Path) -> Sample {
             sample
         }
     }
+}
+
+fn fincore_provenance_matches(sample: &Sample, probe: &FincoreProbe) -> bool {
+    sample.fincore_tool == probe.tool
+        && sample.fincore_sha256 == probe.sha256
+        && sample.fincore_version == probe.version
+        && sample.fincore_stderr_sha256 == probe.stderr_sha256
+        && sample.fincore_stderr_bytes == probe.stderr_bytes
+        && sample.fincore_version_stderr_sha256 == probe.version_stderr_sha256
+        && sample.fincore_version_stderr_bytes == probe.version_stderr_bytes
+        && sample.fincore_method.as_deref() == probe.method
+        && sample.fincore_fallback.as_deref() == probe.fallback
+}
+
+fn apply_post_probe(mut sample: Sample, source_bytes: u64, probe: &FincoreProbe) -> Sample {
+    let mut evidence = PostFincoreEvidence::from_probe(probe);
+    let status = match probe.observation {
+        Ok(observation) => post_observation_status(observation, source_bytes),
+        Err(status) => status,
+    };
+    if status.is_eligible() && !fincore_provenance_matches(&sample, probe) {
+        evidence.status = Status::IneligiblePostFincore;
+        evidence.fincore_fallback = Some("provenance_changed".to_owned());
+        sample.status = Status::IneligiblePostFincore;
+    } else if !status.is_eligible() {
+        evidence.status = status;
+        sample.status = Status::IneligiblePostFincore;
+    }
+    sample.fincore_post = Some(evidence);
+    sample
+}
+
+/// Records the post-operation per-file cache observation.  This runs after
+/// the timed interval, in the same fresh child, and never evicts or mutates
+/// the global page cache.  An unavailable or malformed post observation is an
+/// explicit ineligible result; the caller does not silently fall back to
+/// `cold-requested` or `warm` semantics.
+pub(crate) fn observe_post(mut sample: Sample, path: &Path) -> Sample {
+    if !sample.status.is_eligible() {
+        return sample;
+    }
+    let source_bytes = match sample.source_bytes {
+        Some(source_bytes) => source_bytes,
+        None => {
+            sample.status = Status::IneligiblePostFincore;
+            return sample;
+        },
+    };
+    let probe = run_fincore(path);
+    apply_post_probe(sample, source_bytes, &probe)
 }
 
 /// Completes the proof after the timed operation.  `read_bytes` is the
@@ -899,9 +1026,9 @@ fn command_output(program: &str, arguments: &[&str]) -> Option<String> {
 mod tests {
     use super::{
         BTRFS_SUPER_MAGIC, EXT_SUPER_MAGIC, F2FS_SUPER_MAGIC, FINCORE_FALLBACK, FINCORE_METHOD,
-        FincoreObservation, SUPPORTED_BLOCK_FILESYSTEM_MAGICS, Sample, Status, XFS_SUPER_MAGIC,
-        ZFS_SUPER_MAGIC, complete, observation_status, page_aligned_archive, parse_fincore_json,
-        supported_block_filesystem,
+        FincoreObservation, FincoreProbe, SUPPORTED_BLOCK_FILESYSTEM_MAGICS, Sample, Status,
+        XFS_SUPER_MAGIC, ZFS_SUPER_MAGIC, apply_post_probe, complete, observation_status,
+        page_aligned_archive, parse_fincore_json, supported_block_filesystem,
     };
 
     fn valid_json() -> &'static [u8] {
@@ -1001,6 +1128,107 @@ mod tests {
         ] {
             assert_eq!(observation_status(observation, source_bytes), status);
         }
+    }
+
+    fn eligible_probe(observation: FincoreObservation) -> FincoreProbe {
+        FincoreProbe {
+            observation: Ok(observation),
+            executable: Some("/usr/bin/fincore".into()),
+            tool: Some("fincore".to_owned()),
+            sha256: Some("a".repeat(64)),
+            version: Some("fincore from util-linux 2.41.3".to_owned()),
+            stderr_sha256: Some("b".repeat(64)),
+            stderr_bytes: Some(0),
+            version_stderr_sha256: Some("c".repeat(64)),
+            version_stderr_bytes: Some(0),
+            method: Some(FINCORE_METHOD),
+            fallback: Some(FINCORE_FALLBACK),
+        }
+    }
+
+    fn eligible_sample() -> Sample {
+        let mut sample = Sample::with_source(Status::Eligible, EXT_SUPER_MAGIC, 4096, 8192);
+        sample.fincore_tool = Some("fincore".to_owned());
+        sample.fincore_sha256 = Some("a".repeat(64));
+        sample.fincore_version = Some("fincore from util-linux 2.41.3".to_owned());
+        sample.fincore_stderr_sha256 = Some("b".repeat(64));
+        sample.fincore_stderr_bytes = Some(0);
+        sample.fincore_version_stderr_sha256 = Some("c".repeat(64));
+        sample.fincore_version_stderr_bytes = Some(0);
+        sample.fincore_method = Some(FINCORE_METHOD.to_owned());
+        sample.fincore_fallback = Some(FINCORE_FALLBACK.to_owned());
+        sample
+    }
+
+    #[test]
+    fn post_cache_observation_records_residency_without_claiming_cold_after_state() {
+        let result = apply_post_probe(
+            eligible_sample(),
+            8192,
+            &eligible_probe(FincoreObservation {
+                size_bytes: 8192,
+                resident_bytes: 4096,
+                dirty_bytes: 0,
+                writeback_bytes: 0,
+            }),
+        );
+        assert_eq!(result.status, Status::Eligible);
+        let post = result.fincore_post.expect("post fincore evidence");
+        assert_eq!(post.status, Status::Eligible);
+        assert_eq!(post.size_bytes, Some(8192));
+        assert_eq!(post.resident_bytes, Some(4096));
+        assert_eq!(post.dirty_bytes, Some(0));
+        assert_eq!(post.writeback_bytes, Some(0));
+        assert_eq!(post.fincore_fallback.as_deref(), Some(FINCORE_FALLBACK));
+    }
+
+    #[test]
+    fn post_cache_observation_size_mismatch_is_ineligible() {
+        let result = apply_post_probe(
+            eligible_sample(),
+            8192,
+            &eligible_probe(FincoreObservation {
+                size_bytes: 4096,
+                resident_bytes: 0,
+                dirty_bytes: 0,
+                writeback_bytes: 0,
+            }),
+        );
+        assert_eq!(result.status, Status::IneligiblePostFincore);
+        assert_eq!(
+            result.fincore_post.expect("post fincore evidence").status,
+            Status::IneligibleFincoreSizeMismatch
+        );
+    }
+
+    #[test]
+    fn post_cache_observation_provenance_change_is_ineligible() {
+        let mut probe = eligible_probe(FincoreObservation {
+            size_bytes: 8192,
+            resident_bytes: 0,
+            dirty_bytes: 0,
+            writeback_bytes: 0,
+        });
+        probe.version = Some("fincore from util-linux changed".to_owned());
+        let result = apply_post_probe(eligible_sample(), 8192, &probe);
+        assert_eq!(result.status, Status::IneligiblePostFincore);
+        let post = result.fincore_post.expect("post fincore evidence");
+        assert_eq!(post.status, Status::IneligiblePostFincore);
+        assert_eq!(post.fincore_fallback.as_deref(), Some("provenance_changed"));
+    }
+
+    #[test]
+    fn post_cache_observation_failure_is_retained_without_fallback() {
+        let result = apply_post_probe(
+            eligible_sample(),
+            8192,
+            &FincoreProbe::unavailable(Status::IneligibleFincoreUnavailable),
+        );
+        assert_eq!(result.status, Status::IneligiblePostFincore);
+        let post = result.fincore_post.expect("post fincore evidence");
+        assert_eq!(post.status, Status::IneligibleFincoreUnavailable);
+        assert!(post.fincore_tool.is_none());
+        assert!(post.fincore_fallback.is_none());
     }
 
     #[test]

@@ -1,0 +1,35 @@
+{
+  "reviewer": "normal_baseline_review",
+  "verdict": "pass",
+  "standalone_raw_recomputation": true,
+  "source_base": "cf98bee37455e8e6d0e73002ff2e94299ef546cb",
+  "source_prerequisites": 3581,
+  "lanes": {
+    "xlsx": {
+      "all_samples": 6759,
+      "binary_samples": 6759,
+      "control_samples": 9,
+      "operation_samples": 6750
+    },
+    "opc_open": {
+      "all_samples": 4441,
+      "binary_samples": 4436,
+      "control_samples": 14,
+      "operation_samples": 4422
+    },
+    "source_open": {
+      "all_samples": 3454,
+      "binary_samples": 3448,
+      "control_samples": 14,
+      "operation_samples": 3434
+    },
+    "source_main_read": {
+      "all_samples": 3345,
+      "binary_samples": 3340,
+      "control_samples": 11,
+      "operation_samples": 3329
+    }
+  },
+  "folded_stacks": "Exact independent recomputation; no control markers",
+  "timing_boundary": "Diagnostic PMU totals retain handshake boundary; operation stacks exclude it; no speedup claim"
+}

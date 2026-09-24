@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "lanes": 69,
+  "processes_per_lane": 3,
+  "warmup_per_process": 2,
+  "samples_per_process": 20,
+  "source_manifest_sha256": "c347f6640a6c2bda22ed51e3b202f53eaf857f30eb915631c31836e0ad790d52",
+  "manifest_inputs_checked": 4870,
+  "binary_sha256": "0036e449333d1690260eb60a8c2447fef58476d6ea63187d377923862caf82fc",
+  "binary_identity_stable_during_measurement": true,
+  "expected_refusals": [
+    "limit_large",
+    "limit_small",
+    "malformed_duplicate_owner",
+    "malformed_linked_owner",
+    "malformed_mce_owner",
+    "mixed_caps_rejection",
+    "namespace_limit_refusal"
+  ],
+  "report_recomputed_from_samples": true
+}

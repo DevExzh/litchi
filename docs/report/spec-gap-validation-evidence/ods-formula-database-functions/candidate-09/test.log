@@ -1,0 +1,53 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+    Finished `test` profile [unoptimized] target(s) in 0.44s
+     Running tests/ods_formula_database_evaluation.rs (/home/zhuhe/code/litchi-array-target/debug/deps/ods_formula_database_evaluation-803b39d1abe9e97a)
+
+running 20 tests
+test a_unique_empty_text_header_is_selectable_without_treating_an_empty_cell_header_as_text ... ok
+test dcount_and_dcounta_support_omitted_fields ... ok
+test database_formula_errors_propagate_and_selected_error_is_not_a_number ... ok
+test computed_database_and_criteria_missing_broadcast_cells_preserve_not_available ... ok
+test criteria_text_preserves_leading_and_trailing_whitespace ... ok
+test dget_converts_empty_logical_numeric_text_and_rejects_bad_text ... ok
+test criteria_rows_are_or_and_fields_in_each_row_are_and ... ok
+test dcount_and_dcounta_accept_the_two_argument_omitted_field_form ... ok
+test dget_requires_one_match_and_empty_criterion_is_distinct_from_equals_zero ... ok
+test nonempty_expression_under_a_blank_criteria_header_is_value_error ... ok
+test iferror_can_return_a_reference_union_when_dget_fails ... ok
+test numeric_criteria_headers_and_duplicate_criteria_columns_form_an_and_bound ... ok
+test numeric_field_selector_ignores_an_error_header_when_selecting_by_ordinal ... ok
+test empty_criterion_reference_converts_to_zero_without_matching_empty_records ... ok
+test empty_database_selection_uses_profiled_zero_sum_extrema_and_unit_product ... ok
+test successful_dget_number_cannot_be_used_as_a_reference_operand ... ok
+test field_selection_is_case_insensitive_one_based_and_type_aware ... ok
+test numeric_field_selectors_use_position_even_with_duplicate_non_text_and_empty_headers ... ok
+test reference_database_runs_all_twelve_functions ... ok
+test rectangular_inline_database_and_criteria_cover_the_same_numeric_family ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_database_limits.rs (/home/zhuhe/code/litchi-array-target/debug/deps/ods_formula_database_limits-cbdd995ed03bad94)
+
+running 10 tests
+test database_zero_work_and_storage_limits_are_typed_and_atomic ... ok
+test database_provider_cancellation_stops_mid_scan_and_releases_memory ... ok
+test duplicate_criteria_fields_share_one_provider_read_per_database_row ... ok
+test false_criteria_clause_short_circuits_later_unsupported_field_reads ... ok
+test unselected_database_branch_is_lazy_and_does_not_read_the_provider ... ok
+test dget_avoids_unrelated_record_fields_when_the_projection_does_not_need_them ... ok
+test owned_dget_number_survives_source_and_resolver_drop ... ok
+test database_reference_read_admission_is_cumulative_and_atomic ... ok
+test oversized_provider_text_is_refused_before_database_comparison ... ok
+test projected_scalar_database_result_is_cached_and_broadcast_with_shape ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_database_numerics.rs (/home/zhuhe/code/litchi-array-target/debug/deps/ods_formula_database_numerics-ce416b78f71b0a1a)
+
+running 3 tests
+test database_product_retains_exponent_until_final_result ... ok
+test database_sum_and_mean_preserve_finite_cancellation_and_extreme_scale ... ok
+test database_statistics_keep_finite_standard_deviation_when_variance_overflows ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

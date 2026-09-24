@@ -1,0 +1,215 @@
+{
+  "receipt": "odg-v8-independent-clear",
+  "date_utc": "2026-09-10",
+  "reviewer": "/root/performance_authority_docs",
+  "candidate": {
+    "path": "/var/tmp/litchi-odg-v8-clean-20260910",
+    "base_head": "9d3da11b61f05707a5320e1c8145f07930f0bc8c",
+    "manifest": "/var/tmp/litchi-odg-v8-clean-evidence-20260910/manifest-v8.json",
+    "manifest_sha256": "958c5fea4a4e40d6fbf43bd68b0aa464b23f331f5fea0ac58e8367b08569615c",
+    "manifest_schema": "litchi.odg.v8.validation-manifest.v1",
+    "source_hashes_sha256": {
+      "crates/litchi-odf-common/src/core/family.rs": "b39b0b375579fa5610ce21cd53fbe6eee937dbbab88e7117893ff7d1ff7b21d1",
+      "crates/litchi-odf-common/src/core/package.rs": "d78a3eeff08ae95a70f039b427ce1e44e9c28084bf6df68383c93861df637df7",
+      "crates/litchi-odg/docs/FEATURE_MATRIX.md": "45b46b9be99d3912f63fac07a23a633953e766af44c9c78a2e185ea7e1032838",
+      "crates/litchi-odg/src/facade/mod.rs": "607bd92870078f1420f7d74e14e6c3a4170d63dcf1e0e9949cbe1b1eac65631d",
+      "crates/litchi-odg/src/flat.rs": "2a07b8c5a7165e3dace8d57b1956421399eff6e42fa0258828273d38c4ca786f",
+      "crates/litchi-odg/src/lib.rs": "d907c7b0578bb76321cbaa9863fd77ae8bef82b37c11005fdfc6031b209b0c52",
+      "crates/litchi-odg/src/model/auxiliary.rs": "5f170ff65d36c900f47b837b9f6928a067b3d2e11e0a38b801003ea80e101d3a",
+      "crates/litchi-odg/src/model/enhanced.rs": "5c75f1139ec78254e7ad900723cda2727263de954971088cb30fbcd1266ca989",
+      "crates/litchi-odg/src/model/mod.rs": "4a712ad5620f025d77063ad9b9b9a44a870a3b8c51457cc7a4d109b1a860a532",
+      "crates/litchi-odg/src/model/page.rs": "6a968f5e860522066f5f82996ba9d0925581e3bc6763f54c986d488097846e44",
+      "crates/litchi-odg/src/model/shape.rs": "da080b99ea07fda89f2da8dd9fa42ff3007e231ea1b3e388ae45f73b4e12dbb9",
+      "crates/litchi-odg/src/model/transition.rs": "31e707ad0464f8e3293ae662751ac7e9c994d12cc6b13598ed54a837a9548f8b",
+      "crates/litchi-odg/src/package/mod.rs": "379154a3b53d0e0edca2afa777b49f7cc8bc65efff83ea58869ffa753f12567c",
+      "crates/litchi-odg/src/package/snapshot.rs": "d9962781fae823b8eb7213f4a4ced4efb2b47b500cf193b15d1005659c71eed1",
+      "crates/litchi-odg/tests/allocation_admission.rs": "667187f49c8e4f225e3da05986cf4d7d19f04cfdfc8b474ed56d7d4f5d8248f7",
+      "crates/litchi-odg/tests/package_snapshot.rs": "e1deee17ccfc42d55e5aed1b16cfa22bffbe71a8b17b8ff35d8f96845a7946c5",
+      "crates/litchi-odg/tests/page_transitions.rs": "8ad5e34e4524bedcad494c31d5493fcdb60366189431699291f6e192fcb239e7"
+    },
+    "candidate_artifacts_sha256": {
+      "odg-test.log": "c2dc9ee21386952cc4810faa03540bc4a3340632764312867d900bcb68374449",
+      "common-test.log": "3d01c4cc073a5275b66629706252b90e20670ed65620c5961093bb877a86369a",
+      "clippy.log": "2433c8f4aa68c0c73774f19bca416e5d72b9c000ba50db26c773d4f1f0dd4006",
+      "docs.log": "a31b3e273733c002aae45f698ba7b2ab5477ea1c10b6ce49542ff3bf166c18e2",
+      "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "v5-freeze-verification.txt": "0743023ac4268b7a35e1011a2e582dd97b0b3f4e8d530286f2a430d75a0bfe7d",
+      "v6-freeze-verification.txt": "94b07b25d2b618bfb41b8391255b57ba38d10a1981acb18f5a0b6e1d6287c0ff",
+      "v7-freeze-verification.txt": "05977c93fc0b5e4c8ebfabbe8b97a9ef2e93a068b0f0f717efa7eda3c08a275f",
+      "manifest-v7-reference.json": "d51c234b80b0983e5f791e7e5ca039dfe3aa970c4b16097934f18c6cf537801f"
+    },
+    "candidate_artifact_bytes": {
+      "odg-test.log": 8046,
+      "common-test.log": 43639,
+      "clippy.log": 215,
+      "docs.log": 269,
+      "fmt.log": 0,
+      "v5-freeze-verification.txt": 1843,
+      "v6-freeze-verification.txt": 1938,
+      "v7-freeze-verification.txt": 1938,
+      "manifest-v7-reference.json": 16721
+    },
+    "working_tree_expected_status": [
+      " M crates/litchi-odf-common/src/core/family.rs",
+      " M crates/litchi-odf-common/src/core/package.rs",
+      " M crates/litchi-odg/docs/FEATURE_MATRIX.md",
+      " M crates/litchi-odg/src/facade/mod.rs",
+      " M crates/litchi-odg/src/flat.rs",
+      " M crates/litchi-odg/src/lib.rs",
+      " M crates/litchi-odg/src/model/mod.rs",
+      " M crates/litchi-odg/src/model/page.rs",
+      " M crates/litchi-odg/src/model/shape.rs",
+      " M crates/litchi-odg/src/package/mod.rs",
+      " M crates/litchi-odg/src/package/snapshot.rs",
+      " M crates/litchi-odg/tests/package_snapshot.rs",
+      "?? crates/litchi-odg/src/model/auxiliary.rs",
+      "?? crates/litchi-odg/src/model/enhanced.rs",
+      "?? crates/litchi-odg/src/model/transition.rs",
+      "?? crates/litchi-odg/tests/allocation_admission.rs",
+      "?? crates/litchi-odg/tests/page_transitions.rs"
+    ],
+    "source_edits_by_reviewer": false
+  },
+  "runtime": {
+    "cpuset": "8-31",
+    "rustup_home": "/tmp/litchi-spec-gap-rustup",
+    "toolchain": "1.95.0",
+    "offline": true,
+    "target_dir": "/var/tmp/litchi-odg-v8-clean-target-20260910",
+    "tmpdir": "/var/tmp/litchi-odg-v8-clean-tmp-20260910"
+  },
+  "scope": {
+    "status": "CLEAR",
+    "baseline": {
+      "repository": "/home/zhuhe/code/litchi-spec-gaps",
+      "commit": "9d3da11b61f05707a5320e1c8145f07930f0bc8c",
+      "v7_clean_root": "/var/tmp/litchi-odg-v7-clean-20260910",
+      "v7_manifest": "/var/tmp/litchi-odg-v8-clean-evidence-20260910/manifest-v7-reference.json",
+      "v7_manifest_sha256": "d51c234b80b0983e5f791e7e5ca039dfe3aa970c4b16097934f18c6cf537801f",
+      "v7_freeze_verification": "/var/tmp/litchi-odg-v8-clean-evidence-20260910/v7-freeze-verification.txt"
+    },
+    "changes": [
+      "Both raw XML admission passes now track open-element depth against the existing 256-level ODG limit immediately after each borrowed Start or virtual Empty event; only the bounded max-plus-one quick-xml open-name state can exist before refusal, rather than an unbounded stack.",
+      "The package and Flat depth guards preserve quick-xml check_end_names and leave ordinary malformed/end-name diagnostics to the existing resolver/parser after bounded admission.",
+      "Added a public FlatDrawing allocation probe with eight million nested elements; it refuses at the depth limit before the reader can grow a large open-name stack and keeps observed post-input allocations below 32 MiB.",
+      "Documented the intentional Flat UTF-8-before-detector ordering: invalid UTF-8 retains a direct typed source error, while raw admission still precedes the detector because detector namespace resolution can own oversized root declarations."
+    ],
+    "normative": {
+      "depth_admission": "Raw admission enforces MAX_DEPTH=256 before requesting another event beyond the one current start state quick-xml has already opened; valid inputs at or below the limit retain existing check_end_names behavior. Empty events are checked at their virtual depth without growing the open-name stack.",
+      "allocation_probe": "The public deep-nesting probe constructs 8,000,000 nested <x> elements and asserts typed nesting refusal plus a bounded allocation envelope.",
+      "utf8_order": "Flat invalid UTF-8 is rejected directly before format classification by design; this gives a stable typed source error while protecting the detector NsReader with prior raw admission.",
+      "prior_v7_status": "V7 escaped namespace closure accounting and unknown-prefix/namespace declaration probes remain frozen and verified."
+    },
+    "review_boundary": "ODG V8 admission-depth and allocation safety only; no suite-wide performance or current-latency claim."
+  },
+  "independent_verification": {
+    "summary_log": {
+      "path": "/var/tmp/litchi-odg-v8-independent-clear-20260910/independent-verification-summary.log",
+      "sha256": "71efa2b2688adf5ea7ac79b51a776869f460fa8c2e25d643092fe7359de9fe0d",
+      "bytes": 3030
+    },
+    "depth_boundary_log": {
+      "path": "/var/tmp/litchi-odg-v8-independent-clear-20260910/depth-boundary-probe.log",
+      "sha256": "115916ecadfa8c9e7208da58ee2325386cc69fdeb3bae6f0f5a906c49de33efd",
+      "bytes": 2330
+    },
+    "utf8_order_log": {
+      "path": "/var/tmp/litchi-odg-v8-independent-clear-20260910/utf8-order-probe.log",
+      "sha256": "81276f1342223358a2ec740bb5eeb0b856f8d0f8fdd34bfcc4dd8efa00f9b1bc",
+      "bytes": 747
+    },
+    "commands_and_results": [
+      {
+        "command": "cargo +1.95.0 test -p litchi-odg --offline --test allocation_admission -- --nocapture",
+        "target_dir": "/var/tmp/litchi-odg-v8-independent-alloc",
+        "exit": 0,
+        "result": "8 tests passed; public 8,000,000-level Flat probe passed with typed nesting refusal and allocation assertion below 32 MiB."
+      },
+      {
+        "command": "cargo +1.95.0 test -p litchi-odg --offline --test flat_deferred -- --nocapture",
+        "target_dir": "/var/tmp/litchi-odg-v8-independent-flat",
+        "exit": 0,
+        "result": "4 tests passed."
+      },
+      {
+        "command": "cargo +1.95.0 test -p litchi-odg --offline --test page_transitions -- --nocapture",
+        "target_dir": "/var/tmp/litchi-odg-v8-independent-page",
+        "exit": 0,
+        "result": "23 tests passed."
+      },
+      {
+        "command": "cargo +1.95.0 test -p litchi-odg --offline --all-targets",
+        "target_dir": "/var/tmp/litchi-odg-v8-independent-full",
+        "exit": 0,
+        "result": "All litchi-odg unit and integration suites passed."
+      },
+      {
+        "command": "cargo +1.95.0 test -p litchi-odf-common --offline --all-targets",
+        "target_dir": "/var/tmp/litchi-odg-v8-independent-common",
+        "exit": 0,
+        "result": "324 unit tests and all integration suites passed."
+      },
+      {
+        "command": "cargo +1.95.0 clippy -p litchi-odg -p litchi-odf-common --offline --all-targets -- -D warnings",
+        "target_dir": "/var/tmp/litchi-odg-v8-independent-clippy",
+        "exit": 0,
+        "result": "Clippy passed with warnings denied."
+      },
+      {
+        "command": "RUSTDOCFLAGS=-Dwarnings cargo +1.95.0 doc -p litchi-odg -p litchi-odf-common --offline --no-deps",
+        "target_dir": "/var/tmp/litchi-odg-v8-independent-doc",
+        "exit": 0,
+        "result": "Documentation passed with rustdoc warnings denied."
+      },
+      {
+        "command": "cargo +1.95.0 fmt -p litchi-odg -- --check",
+        "exit": 0,
+        "result": "Format check passed."
+      },
+      {
+        "command": "git -C /var/tmp/litchi-odg-v8-clean-20260910 diff --check",
+        "exit": 0,
+        "result": "No whitespace errors."
+      }
+    ]
+  },
+  "independent_boundary_probes": {
+    "max_depth": 256,
+    "flat_total_depth_256": "Ok(1)",
+    "flat_total_depth_257": "Err(InvalidFormat(\"flat ODG XML nesting exceeds the limit\"))",
+    "packaged_total_depth_256": "Ok(1)",
+    "packaged_total_depth_257": "Err(InvalidFormat(\"ODG content.xml event nesting exceeds the limit\"))",
+    "public_deep_levels": 8000000,
+    "public_deep_result": "typed nesting-limit refusal; observed allocation assertion < 32 MiB",
+    "harnesses": [
+      {
+        "path": "/var/tmp/odg-v8-utf8-order",
+        "Cargo.toml_sha256": "a7a412711069a09a814a6c8ea1b090531ceb38487e80f634f57b214cba50eca1",
+        "Cargo.lock_sha256": "51eb2593e42f7da8a8fcdfb6689e6bcf17d120dc6f786817ff255d86be5f6105",
+        "src/main.rs_sha256": "169b06634beeba9375993a5e5d259b438972d6942cea40f272dcdebd60901974"
+      },
+      {
+        "path": "/var/tmp/odg-v8-package-depth",
+        "Cargo.toml_sha256": "81cbd8b6790da062921cfced0b878155b0d6b5b07850609f53e49193627f26c8",
+        "Cargo.lock_sha256": "a2cf55a70968fa23c6d2e908b7d3bb3fb81a1a3479483c6051168995447ced2f",
+        "src/main.rs_sha256": "18ec84467d5d1737b7d85c431509fd4140b3c0fb86b58797082b3de11c5815aa"
+      }
+    ]
+  },
+  "candidate_gates_from_frozen_manifest": {
+    "odg_tests": "pass: cargo test -p litchi-odg --offline --all-targets (includes eight allocation probes, including the 8,000,000-level public deep-nesting probe)",
+    "common_tests": "pass: cargo test -p litchi-odf-common --offline --all-targets",
+    "clippy": "pass: cargo clippy -p litchi-odg -p litchi-odf-common --offline --all-targets -- -D warnings",
+    "docs": "pass: RUSTDOCFLAGS=-Dwarnings cargo doc -p litchi-odg -p litchi-odf-common --offline --no-deps",
+    "fmt": "pass: cargo fmt -p litchi-odg -- --check under Rust 1.95"
+  },
+  "review_result": {
+    "status": "CLEAR",
+    "blockers": [],
+    "qualification": "Both raw XML passes bound open-element depth at MAX_DEPTH=256 before another event can grow quick-xml state; valid depth 256 remains accepted and depth 257 is rejected. The Flat UTF-8-before-detector typed error is intentional and documented. This receipt does not claim whole-goal completion, current latency, or a suite-wide performance result.",
+    "no_primary_edits": true,
+    "no_candidate_edits": true,
+    "no_staging_or_commit": true,
+    "no_timing_workload": true
+  }
+}

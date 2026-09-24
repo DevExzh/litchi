@@ -1,0 +1,15 @@
+{
+  "scope": "Production4fe743db1/c76e3d with added regressions. 57-case run55pass2fail: evaluatedreference shape1x1vs1x4, geometryreconstruction Work1000001>1M. Separate finitecondition cache case fails Objects33>32. Exacttestvariants retained. No final acceptanceclaim.",
+  "production_commit": "4fe743db1",
+  "source_receipt": "../../gates/planner-integration-20.json",
+  "workspace": "/home/zhuhe/code/litchi-array-worktree",
+  "command": "cargo test --locked --offline -p litchi-ods --all-features --test ods_formula_array_reference_evaluation [finite_inner_condition_does_not_cache_out_of_shape_broadcast_positions for second run]",
+  "archive": "planner-remaining-boundaries-baseline.tar.gz",
+  "sha256": "deb013c27399252d18470bd29c16796bcced109be3bbacb11fcc532a793cc2ff",
+  "members": {
+    "planner-crp1-baseline-tests.log": "8be64d49d0bfd307c14b4b5063370827e25fbde24d167cf4add9761701a0f568",
+    "planner-outside-shape-baseline-test.log": "17a2415dfeeed48cc078361452a23447c549535f9d4b755633fd1551ab845597",
+    "tests-58.rs": "9e037f026946b540bb994b16d40ccc57290866293df9ca351c55d4eb89d13ed0",
+    "tests-57.rs": "af48d8e0fc959d95acafdce4d23c3bc57307ba28ecd995e15064ed333220538a"
+  }
+}

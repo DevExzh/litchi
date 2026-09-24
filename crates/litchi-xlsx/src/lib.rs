@@ -79,12 +79,14 @@ pub mod connections;
 pub mod custom;
 pub mod custom_data;
 pub mod data_consolidation;
+pub mod data_type_icons;
 pub mod data_validation;
 pub mod defined_names;
 pub mod drawing;
 pub mod edit;
 mod error;
 pub mod external_links;
+pub mod form_control;
 pub mod formula;
 pub mod header_footer;
 pub mod hyperlinks;
@@ -124,6 +126,7 @@ pub mod slicer;
 mod slicer_cache;
 pub mod smart_tags;
 pub mod sort;
+mod source_attributes;
 mod source_payload;
 /// Bounded, sequential creation of one-sheet XLSX workbooks.
 pub mod streaming;
@@ -143,6 +146,8 @@ pub mod timeline;
 mod timelines;
 pub mod volatile_dependencies;
 pub mod web;
+
+pub use drawing::ContentPartSelector;
 pub mod workbook;
 pub mod workbook_metadata;
 pub mod writer;
@@ -184,11 +189,20 @@ pub use conditional_formatting::{
     parse_conditional_formattings, parse_differential_formats,
 };
 pub use custom_data::{
-    ExtensionList, Properties, parse_properties, validate_workbook_root, write_properties,
+    Commit as CustomDataCommit, CustomData, ExtensionList, Limits as CustomDataLimits,
+    Part as CustomDataPart, Patch as CustomDataPatch, Properties, Snapshot as CustomDataSnapshot,
+    Store, Transaction as CustomDataTransaction, parse_properties, validate_workbook_root,
+    write_properties,
 };
 pub use data_consolidation::{
     DataConsolidation, Function, RangeReference, Reference, ReferenceSource, References,
     parse_worksheet_data_consolidation, write_worksheet_data_consolidation,
+};
+pub use data_type_icons::{
+    Commit as DataTypeIconsCommit, Patch as DataTypeIconsPatch, SHOW_DATA_TYPE_ICONS_NAMESPACE,
+    ShowDataTypeIcons, Snapshot as DataTypeIconsSnapshot, Transaction as DataTypeIconsTransaction,
+    apply_patch as apply_data_type_icons_patch, edit as edit_data_type_icons,
+    load as load_data_type_icons,
 };
 pub use data_validation::{
     Collection, Conformance, ListSource, Range, Source, Sqref, Validation, ValidationErrorStyle,
@@ -202,9 +216,9 @@ pub use error::{
     Result, RowEditBlock, TabEditBlock,
 };
 pub use external_links::{
-    CellType, Dde, DdeItem, DdeValue, DdeValueType, DdeValues, DefinedName, Entry, ItemSource,
-    Link, Ole, OleItem, SheetData, Target, build_external_link_part,
-    build_external_link_part_with_conformance, load_external_link,
+    AlternateUrl, AlternateUrls, CellType, Dde, DdeItem, DdeValue, DdeValueType, DdeValues,
+    DefinedName, Entry, ItemSource, Link, Ole, OleItem, SheetData, Target,
+    build_external_link_part, build_external_link_part_with_conformance, load_external_link,
 };
 pub use formula::Formula;
 pub use header_footer::{SectionKind, Settings, parse_worksheet_header_footer};
@@ -245,6 +259,20 @@ pub use page_setup::{
 pub use phonetic_properties::{
     PhoneticAlignment, PhoneticProperties, PhoneticType, parse_phonetic_properties,
 };
+pub use pivot::{
+    PivotCellAddress, PivotCellType, PivotCellValueEdit, PivotRowView,
+    PivotServerFormatAttributeEdit, PivotServerFormatsCommit, PivotServerFormatsPatch,
+    PivotServerFormatsSnapshot, PivotServerFormatsTransaction, PivotTableDataCommit,
+    PivotTableDataDiagnostic, PivotTableDataEdit, PivotTableDataLimits, PivotTableDataPatch,
+    PivotTableDataSnapshot, PivotTableDataTransaction, PivotTableDataView,
+    PivotTableDataWorkbookCommit, PivotTableDataWorkbookPatch, PivotTableSelector,
+    PivotTableServerFormats, PivotTableServerFormatsEdit, PivotTableServerFormatsWorkbookCommit,
+    PivotTableServerFormatsWorkbookPatch, PivotTableView, PivotValueAttributeEdit,
+    PivotValueCellExtraEdit, PivotValueCellExtraView, PivotValueCellView, ServerFormat,
+    ServerFormatEdit, apply_pivot_server_formats_patch, edit_pivot_server_formats,
+    edit_pivot_table_data, edit_pivot_table_data_with_limits, load_pivot_server_formats,
+    load_pivot_table_data, load_pivot_table_data_with_limits,
+};
 pub use print_options::{PrintOptions, parse_print_options};
 pub use streaming::{
     StreamingCell, StreamingCellValue, StreamingValue, StreamingWorkbookLimits,
@@ -276,6 +304,13 @@ pub use revisions::{
 };
 pub use rich_values::codec::{parse_feature_property_bags, write_feature_property_bags};
 pub use rich_values::package::load as load_rich_values;
+pub use rich_values::refresh_intervals::{
+    Commit as RichValueRefreshCommit, Patch as RichValueRefreshPatch, REFRESH_INTERVALS_NAMESPACE,
+    RefreshInterval, RefreshIntervals, Snapshot as RichValueRefreshSnapshot,
+    Transaction as RichValueRefreshTransaction, TypeRefreshIntervals,
+    apply_patch as apply_rich_value_refresh_patch, edit as edit_rich_value_refresh,
+    load as load_rich_value_refresh, parse_refresh_intervals, write_refresh_intervals,
+};
 pub use row::{Height, HeightAt, Row, Rows};
 pub use scenarios::{
     CellReference, InputCell, Scenario, UnknownAttribute, UnknownElement,
@@ -296,10 +331,16 @@ pub use sheet_view::parse_worksheet_views;
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use survey::{
-    Binding as SurveyBinding, ElementProperties as SurveyElementProperties, Guid as SurveyGuid,
-    Id as SurveyId, Part as SurveyPart, Position as SurveyPosition, Question as SurveyQuestion,
+    Binding as SurveyBinding, Commit as SurveyCommit, ElementProperties as SurveyElementProperties,
+    Guid as SurveyGuid, Id as SurveyId, Limits as SurveyLimits, Part as SurveyPart,
+    Patch as SurveyPatch, Position as SurveyPosition, Question as SurveyQuestion,
     QuestionFormat as SurveyQuestionFormat, QuestionType as SurveyQuestionType,
-    Questions as SurveyQuestions, Survey, load as load_surveys, parse as parse_survey,
+    Questions as SurveyQuestions, Snapshot as SurveySnapshot, Survey,
+    Transaction as SurveyTransaction, load as load_surveys,
+    load_with_limits as load_surveys_with_limits, parse as parse_survey,
+    parse_with_limits as parse_survey_with_limits, validate as validate_survey,
+    validate_with_limits as validate_surveys_with_limits, write as write_survey,
+    write_with_limits as write_survey_with_limits,
 };
 pub use table::{
     Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction,
@@ -310,14 +351,23 @@ pub use threaded_comments::{
     parse_persons, validate_comments, validate_graph, validate_guid, validate_people,
     validate_timestamp, write_comments, write_persons,
 };
+pub use workbook::data_model::{
+    Commit as DataModelCommit, Definition as DataModelDefinition, Model as DataModel,
+    OpaqueXml as DataModelOpaqueXml, Patch as DataModelPatch, Payload as DataModelPayload,
+    Relationship as DataModelRelationship, Snapshot as DataModelSnapshot, Table as DataModelTable,
+    Transaction as DataModelTransaction, load_data_model, parse_data_model, store_data_model,
+    write_data_model,
+};
 pub use workbook::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit,
-    DurablePatch, Edit, Flavor, History, HistoryLimits, JoinError, JoinFailure, MergeChoice,
-    MergeLimits, NewSheet, PackageChange, Patch, RowEdit, SealedPatch, Selector,
+    DurablePatch, Edit, Flavor, FormControlEdit, History, HistoryLimits, JoinError, JoinFailure,
+    MergeChoice, MergeLimits, NewSheet, PackageChange, Patch, RowEdit, SealedPatch, Selector,
     SourceBackedMergeCommit, SourceBackedMergeDiagnostics, SourceBackedMergeEdit,
     SourceBackedMergeEditor, SourceBackedMergePatch, SourceBackedMergeSnapshot,
     SourceBackedWorkbook, SourceCell, SourceCellView, SourceWorksheet, State, TabEdit,
-    ThreeWayPlan, Visibility, Workbook, Worksheet, WorksheetEdit, WorksheetKind,
+    ThreeWayPlan, Visibility, Workbook, Worksheet, WorksheetContentPart,
+    WorksheetContentPartOutboundRelationship, WorksheetContentPartPayload,
+    WorksheetContentPartRelationship, WorksheetEdit, WorksheetKind,
 };
 pub use workbook_metadata::{
     FutureMetadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,

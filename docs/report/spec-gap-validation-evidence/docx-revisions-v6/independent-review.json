@@ -1,0 +1,98 @@
+{
+  "receipt": "docx-revision-v6-independent-review",
+  "date_utc": "2026-09-10",
+  "candidate": {
+    "path": "/var/tmp/litchi-docx-revision-v6-validation-20260910",
+    "head": "0201c716e6005ad26712895db409b807cdbca5b0",
+    "source_hashes_sha256": {
+      "crates/litchi-docx/src/revision/authoring.rs": "b31449c98a0522c004e4c0c52bc9a97ee083599412672ccb3db2440beb19f3a3",
+      "crates/litchi-docx/src/revision.rs": "20cd62514a79a1371c291999dda54ef35e5e18df0393c1f067a3ace1b4c5dac7",
+      "crates/litchi-docx/docs/FEATURE_MATRIX.md": "1e1f57717555adadacdfa88ddafb0f49fdb291d7331bb7648f46f9382c42baff"
+    },
+    "working_tree_expected_status": [
+      "M crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "M crates/litchi-docx/src/revision.rs",
+      "?? crates/litchi-docx/src/revision/authoring.rs"
+    ],
+    "source_edits_by_reviewer": false
+  },
+  "schema_authority": {
+    "local_source_archive": "/home/zhuhe/code/litchi/3rdparty/specs/ECMA-376/ECMA-376-1_5th_edition_december_2016.zip",
+    "local_source_archive_sha256": "9d0bcad9cf06054785b03762fcfadbf6bab7e54a5f9d69434e34b7fd464d4129",
+    "extracted_local_schema": "/var/tmp/ecma376-part1-docx-review/part1.txt",
+    "extracted_schema_sha256": "af3bc1470c89cef4690c22b8837048baed9281abcc5cddb00f30653c778c0dfc",
+    "references": {
+      "CT_R": "part1.txt lines 1670-1706 / 1706-1714: EG_RPr then EG_RunInnerContent;",
+      "CT_RPr": "part1.txt lines 1745-1799: EG_RPrBase choice and EG_RPrContent base* then one rPrChange"
+    },
+    "comparison": {
+      "command": "python3 /var/tmp/docx-v6-independent-schema-check-20260910.py",
+      "script_sha256": "00e479f7b75c7f47afdc60b3ed3bcd072cc261c153d5dca39444e3056d2122d5",
+      "log": "/var/tmp/docx-v6-independent-schema-check-20260910.log",
+      "log_sha256": "f4d30bbe6abfaadba79ed3287a28a179bbea24aae39c5a59a1a598d721c08215",
+      "exit": 0,
+      "result": "exact 32 CT_R EG_RunInnerContent names and exact 39 CT_RPr EG_RPrBase names"
+    }
+  },
+  "independent_probes": [
+    {
+      "name": "V6 delta and schema-edge probe",
+      "project": "/var/tmp/docx-v6-revision-probe3",
+      "dependency": "/var/tmp/litchi-docx-revision-v6-validation-20260910/crates/litchi-docx",
+      "project_hashes_sha256": {
+        "src/main.rs": "2eb8b980226024b4638fd46786d1e268c86794d949639d060bb519184f57a38e",
+        "Cargo.toml": "e4155156531ecdeaf442350f7bca4f45f2e4cdeac513ac92045dfc6d9213008c"
+      },
+      "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=/var/tmp/docx-v6-probe3-target taskset -c 8-31 cargo +1.95.0 run --manifest-path /var/tmp/docx-v6-revision-probe3/Cargo.toml --quiet",
+      "log": "/var/tmp/docx-v6-independent-probe3-20260910.log",
+      "log_sha256": "7faecf1c95e7bf89ed2d5be2559e98193da3dfa38949384ce3f925285d416377",
+      "exit": 0,
+      "cases": [
+        "raw Text and CDATA directly under w:r and w:rPr reject",
+        "whitespace-only character data survives exact accept/reopen",
+        "duplicate rPr and rPr after run content reject",
+        "duplicate CT_RPr base property rejects; unordered distinct properties pass",
+        "bound foreign child after rPr and inside rPr remains accepted",
+        "bound foreign child before rPr rejects later rPr as conservative CT_R ordering",
+        "rPrChange remains refused by the existing unsupported-property owner boundary"
+      ],
+      "mismatch_scan": "none"
+    }
+  ],
+  "verification_commands": [
+    {
+      "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=/var/tmp/docx-v6-review-target taskset -c 8-31 cargo +1.95.0 test -p litchi-docx --no-default-features revision::authoring",
+      "exit": 0,
+      "result": "19 focused authoring tests passed"
+    },
+    {
+      "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=/var/tmp/docx-v6-full-test-target taskset -c 8-31 cargo +1.95.0 test -p litchi-docx --no-default-features",
+      "exit": 0,
+      "result": "full package suite passed; 1086 unit tests and 76 doctests passed, 31 doctests ignored"
+    },
+    {
+      "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=/var/tmp/docx-v6-allfeatures-target taskset -c 8-31 cargo +1.95.0 test -p litchi-docx --all-features",
+      "exit": 0,
+      "result": "all-features package suite and doctests passed"
+    },
+    {
+      "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup taskset -c 8-31 cargo +1.95.0 fmt --manifest-path crates/litchi-docx/Cargo.toml -- --check",
+      "exit": 0,
+      "result": "litchi-docx format check passed"
+    },
+    {
+      "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=/var/tmp/docx-v6-clippy-target taskset -c 8-31 cargo +1.95.0 clippy -p litchi-docx --no-default-features --all-targets -- -D warnings",
+      "exit": 101,
+      "result": "six pre-existing unfulfilled lint expectations in package/codec.rs, package/model.rs, settings/document/codec.rs, writer/hyperlink.rs, writer/run.rs; no V6 authoring.rs diagnostic"
+    }
+  ],
+  "review_result": {
+    "status": "CLEAR",
+    "scope": "V6 direct character-data rejection, XML whitespace preservation, CT_R rPr cardinality/order, CT_RPr base uniqueness/order, local schema correspondence, and retained V5 behavior",
+    "blockers": [],
+    "qualification": "Foreign content before rPr is counted as run content; this is conservative and consistent with the CT_R sequence when admitted foreign payloads are treated as opaque content. rPrChange remains intentionally outside this owner.",
+    "no_primary_edits": true,
+    "no_staging_or_commit": true,
+    "no_timing_workload": true
+  }
+}

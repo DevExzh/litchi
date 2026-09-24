@@ -1,6 +1,7 @@
 use super::codec::*;
 use crate::package::Error as PackageError;
 use crate::parts::fib::FileInformationBlock;
+use litchi_crypto::legacy_rc4;
 use litchi_crypto::rc4 as office_rc4;
 use zeroize::Zeroizing;
 
@@ -106,25 +107,14 @@ fn xor_accepts_lcid_ansi_password_conversion_and_truncates_to_fifteen_bytes() {
 }
 
 #[test]
-fn binary_rc4_secret_matches_apache_poi_vector() {
-    let salt = [
-        0x17, 0xf6, 0xd1, 0x6b, 0x09, 0xb1, 0x5f, 0x7b, 0x4c, 0x9d, 0x03, 0xb4, 0x81, 0xb5, 0xb4,
-        0x4a,
-    ];
-    assert_eq!(
-        derive_secret("MoneyForNothing", &salt).as_ref(),
-        &[0xc2, 0xd9, 0x56, 0xb2, 0x6b]
-    );
-}
-
-#[test]
 fn stream_cipher_preserves_absolute_block_position() {
-    let secret = [1, 2, 3, 4, 5];
+    let (_, context) =
+        legacy_rc4::build_header("absolute-offset", &[0x31; 16], &[0x72; 16]).unwrap();
     let mut data = vec![0x5a; 80];
     let expected = data.clone();
-    apply_stream_cipher(&mut data, 500, &secret).unwrap();
+    legacy_rc4::apply_at(&context, 512, 500, &mut data).unwrap();
     assert_ne!(data, expected);
-    apply_stream_cipher(&mut data, 500, &secret).unwrap();
+    legacy_rc4::apply_at(&context, 512, 500, &mut data).unwrap();
     assert_eq!(data, expected);
 }
 

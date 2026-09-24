@@ -752,6 +752,7 @@ mod tests {
     fn error_family(error: &Error) -> &'static str {
         match error {
             Error::Opc(_) => "opc",
+            Error::Patch(_) => "patch",
             Error::Xml(_) => "xml",
             Error::Missing(_) => "missing",
             Error::ContentType { .. } => "content-type",

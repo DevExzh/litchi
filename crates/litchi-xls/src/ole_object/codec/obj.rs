@@ -1,8 +1,8 @@
 //! Lossless BIFF8 Obj and `XLUnicodeString` codecs.
 
 use super::super::semantic::{
-    CheckState, EditBoxValidation, FormControl, FtCblsData, FtCmo, FtEdoData, FtGboData, FtLbsData,
-    FtPictFmla, FtPioGrbit, FtRboData, FtSbs, LbsDropData, LbsItem, ListSelectionType,
+    CheckState, EditBoxValidation, FormControl, FtCblsData, FtCf, FtCmo, FtEdoData, FtGboData,
+    FtLbsData, FtPictFmla, FtPioGrbit, FtRboData, FtSbs, LbsDropData, LbsItem, ListSelectionType,
     ObjSubrecord, ObjectType, OleObjectRecord,
 };
 use super::super::{
@@ -27,6 +27,10 @@ fn parse_formula(body: &[u8]) -> Result<FtPictFmla> {
     let tail = &body[end..];
     let (storage_position, control_buffer_size) = match tail.len() {
         0 => (None, None),
+        4 => (
+            Some(u32_at(tail, 0).ok_or_else(|| invalid(OBJ, "storage position is truncated"))?),
+            None,
+        ),
         8 => (
             Some(u32_at(tail, 0).ok_or_else(|| invalid(OBJ, "storage position is truncated"))?),
             Some(u32_at(tail, 4).ok_or_else(|| invalid(OBJ, "control buffer size is truncated"))?),
@@ -40,7 +44,7 @@ fn parse_formula(body: &[u8]) -> Result<FtPictFmla> {
     })
 }
 
-pub(super) fn parse_subrecords(data: &[u8]) -> Result<Vec<ObjSubrecord>> {
+pub(crate) fn parse_subrecords(data: &[u8]) -> Result<Vec<ObjSubrecord>> {
     let mut offset = 0usize;
     let mut control_type = None;
     let mut subrecords = Vec::new();
@@ -67,6 +71,14 @@ pub(super) fn parse_subrecords(data: &[u8]) -> Result<Vec<ObjSubrecord>> {
                         .ok_or_else(|| invalid(OBJ, "FtCmo reserved bytes are truncated"))?,
                 }),
                 (FT_CMO, _) => return Err(invalid(OBJ, "FtCmo must contain 18 bytes")),
+                (FT_CF, 2) => {
+                    let format =
+                        u16_at(body, 0).ok_or_else(|| invalid(OBJ, "FtCf format is truncated"))?;
+                    let value = FtCf::new(format).ok_or_else(|| {
+                        invalid(OBJ, format!("unsupported FtCf format 0x{format:04X}"))
+                    })?;
+                    ObjSubrecord::PictureFormat(value)
+                },
                 (FT_CF, _) => ObjSubrecord::ClipboardFormat(body.to_vec()),
                 (FT_PIO, 2) => ObjSubrecord::PictureFlags(FtPioGrbit {
                     raw: u16::from_le_bytes([body[0], body[1]]),
@@ -385,6 +397,12 @@ fn serialize_subrecord(value: &ObjSubrecord) -> Result<(u16, Vec<u8>)> {
             body.extend_from_slice(&value.reserved);
             (FT_CMO, body)
         },
+        ObjSubrecord::PictureFormat(value) => {
+            let mut body = Vec::with_capacity(2);
+            body.extend_from_slice(&value.format.to_le_bytes());
+            value.validate()?;
+            (FT_CF, body)
+        },
         ObjSubrecord::ClipboardFormat(data) => (FT_CF, data.clone()),
         ObjSubrecord::PictureFlags(value) => (FT_PIO, value.raw.to_le_bytes().to_vec()),
         ObjSubrecord::PictureFormula(value) => {
@@ -393,6 +411,9 @@ fn serialize_subrecord(value: &ObjSubrecord) -> Result<(u16, Vec<u8>)> {
             let mut body = len.to_le_bytes().to_vec();
             body.extend_from_slice(&value.formula);
             match (value.storage_position, value.control_buffer_size) {
+                (Some(position), None) => {
+                    body.extend_from_slice(&position.to_le_bytes());
+                },
                 (Some(position), Some(size)) => {
                     body.extend_from_slice(&position.to_le_bytes());
                     body.extend_from_slice(&size.to_le_bytes());

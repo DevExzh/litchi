@@ -14,15 +14,17 @@ use super::super::types::{
     Color, ColorRef, ColorTable, EmbeddedFont, EmbeddedFontFormat, EmphasisMark, FitText, Font,
     FontCharset, FontFamily, FontPage, FontPitch, FontRef, FontTable, FontTheme, Formatting,
     MAX_PARAGRAPH_DROP_CAP_LINES, Paragraph, ParagraphDropCap, ParagraphDropCapKind,
-    ParagraphFontAlignment, ParagraphWrapping, RevisionMetadata, StyleBlock, TextDirection,
-    UnderlineStyle,
+    ParagraphFontAlignment, ParagraphFrame, ParagraphFrameHorizontalPosition,
+    ParagraphFrameHorizontalReference, ParagraphFrameTextFlow, ParagraphFrameVerticalPosition,
+    ParagraphFrameVerticalReference, ParagraphFrameWrap, ParagraphWrapping, RevisionMetadata,
+    StyleBlock, TextDirection, UnderlineStyle,
 };
 use bumpalo::Bump;
 use litchi_codepage::Mbcs;
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::mem::size_of;
 use std::num::NonZeroU16;
 use std::ops::Range;
@@ -461,6 +463,33 @@ struct OpenBookmark {
 
 struct BookmarkSpan {
     bookmark: OpenBookmark,
+    end: usize,
+}
+
+struct OpenSmartTag {
+    name: String,
+    namespace: Option<u32>,
+    attributes: Vec<crate::SmartTagAttribute<'static>>,
+    position: usize,
+    order: usize,
+}
+
+struct SmartTagSpan {
+    tag: OpenSmartTag,
+    end: usize,
+}
+
+struct OpenMoveBookmark {
+    kind: crate::MoveBookmarkKind,
+    tag: String,
+    author: u16,
+    date: u32,
+    position: usize,
+    order: usize,
+}
+
+struct MoveBookmarkSpan {
+    bookmark: OpenMoveBookmark,
     end: usize,
 }
 
@@ -1026,6 +1055,9 @@ struct NestedTableBuilder<'a> {
     table: super::super::table::Table<'a>,
     row: super::super::table::Row<'a>,
     cell_text: SmallVec<[u8; 128]>,
+    cell_paragraphs: Vec<crate::CellParagraph>,
+    cell_paragraph_start: usize,
+    cell_paragraph_frame: Option<ParagraphFrame>,
     cell_nested: Vec<crate::CellNestedTable<'a>>,
     cell_drawings: DrawingStoryCapture<'a>,
     cell_story_events: Vec<crate::CellStoryEvent>,
@@ -1037,6 +1069,9 @@ impl NestedTableBuilder<'_> {
             table: super::super::table::Table::new(),
             row: super::super::table::Row::new(),
             cell_text: SmallVec::new(),
+            cell_paragraphs: Vec::new(),
+            cell_paragraph_start: 0,
+            cell_paragraph_frame: None,
             cell_nested: Vec::new(),
             cell_drawings: DrawingStoryCapture::default(),
             cell_story_events: Vec::new(),
@@ -1476,6 +1511,10 @@ pub(crate) struct Parser<'a> {
     current_row: Option<super::super::table::Row<'a>>,
     /// Current cell text buffer
     current_cell_text: SmallVec<[u8; 128]>,
+    /// Paragraph frame spans within the current flattened cell text.
+    current_cell_paragraphs: Vec<crate::CellParagraph>,
+    current_cell_paragraph_start: usize,
+    current_cell_paragraph_frame: Option<ParagraphFrame>,
     current_cell_nested: Vec<crate::CellNestedTable<'a>>,
     current_cell_drawings: DrawingStoryCapture<'a>,
     current_cell_story_events: Vec<crate::CellStoryEvent>,
@@ -1642,6 +1681,31 @@ pub(crate) struct Parser<'a> {
     open_bookmarks: HashMap<String, Vec<OpenBookmark>>,
     /// Completed bookmark ranges awaiting content reconstruction.
     bookmark_spans: Vec<BookmarkSpan>,
+    /// Completed SmartTag ranges with body content attached.
+    smart_tags: Vec<crate::SmartTag<'a>>,
+    /// Open SmartTag ranges, nested in source order.
+    open_smart_tags: Vec<OpenSmartTag>,
+    /// Completed SmartTag ranges awaiting content reconstruction.
+    smart_tag_spans: Vec<SmartTagSpan>,
+    /// Open move-bookmark ranges, keyed by kind and tag.
+    open_move_bookmarks: HashMap<(crate::MoveBookmarkKind, String), Vec<OpenMoveBookmark>>,
+    /// Completed move-bookmark ranges awaiting content reconstruction.
+    move_bookmark_spans: Vec<MoveBookmarkSpan>,
+    /// Completed move-bookmark keys, indexed for bounded duplicate detection.
+    ///
+    /// Keeping this set separate from `move_bookmark_spans` avoids rescanning
+    /// every completed range when a later start marker is parsed.
+    completed_move_bookmarks: HashSet<(crate::MoveBookmarkKind, String)>,
+    /// Completed move-bookmark ranges with body content attached.
+    move_bookmarks: Vec<crate::MoveBookmark<'a>>,
+    /// Whether a recognized move-bookmark marker lacks a same-kind start/end
+    /// match and therefore is not represented by a complete range.
+    ///
+    /// Such markers are not modeled as a range and therefore cannot be
+    /// re-emitted by a typed changed publication.  The edit layer refuses
+    /// changed publication for this source while immutable no-op writes keep
+    /// the original transport intact.
+    unmatched_move_bookmarks: bool,
     /// UTF-8 byte length of body text emitted into style blocks.
     body_text_len: usize,
     /// Accepted visible root-body paragraph breaks.
@@ -1652,6 +1716,11 @@ pub(crate) struct Parser<'a> {
     body_boundaries: Vec<crate::story::Boundary>,
     /// Stable source order for bookmark ranges.
     next_bookmark_order: usize,
+    /// Stable source order for SmartTag ranges.
+    next_smart_tag_order: usize,
+    /// Stable source order for tracked-move ranges.  This is separate from
+    /// SmartTag order because unmatched move starts are discarded.
+    next_move_bookmark_order: usize,
     /// Shapes
     shapes: Vec<super::super::shape::Shape<'a>>,
     /// Exact source order of non-background root drawings in the body story.
@@ -2090,6 +2159,11 @@ pub(crate) struct ParsedDocument<'a> {
     pub saw_xml_namespace_table: bool,
     /// Ordered inert custom XML markup tags spanning body text.
     pub custom_xml_tags: Vec<crate::CustomXmlTag<'a>>,
+    /// Ordered inert SmartTag/factoid ranges spanning body text.
+    pub smart_tags: Vec<crate::SmartTag<'a>>,
+    /// Whether a recognized move-bookmark marker lacks a same-kind start/end
+    /// match and therefore is not represented by a complete range.
+    pub unmatched_move_bookmarks: bool,
     /// Ordered inert math zones anchored in the body story.
     pub math_zones: Vec<crate::MathZone<'a>>,
     /// Ordered inert protection-exception ranges spanning body text.
@@ -2164,6 +2238,10 @@ pub(crate) struct ParsedDocument<'a> {
     pub sections: Vec<super::super::section::Section<'a>>,
     /// Bookmarks
     pub bookmarks: super::super::bookmark::BookmarkTable<'a>,
+    /// Complete inert tracked-move start/end ranges.  Equal tags with
+    /// opposite kinds identify the two move locations, but no cross-location
+    /// pair index or move fallback semantics is materialized.
+    pub move_bookmarks: Vec<crate::MoveBookmark<'a>>,
     /// Shapes
     pub shapes: Vec<super::super::shape::Shape<'a>>,
     /// Exact source order of non-background root drawings in the body story.

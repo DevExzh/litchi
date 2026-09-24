@@ -1,0 +1,18 @@
+{
+  "label": "candidate-comparable",
+  "group": "comparable",
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/candidate/ods-formula-reference-profile",
+  "binary_sha256": "30a7da005fdb3c18ac06f1c8a7328a6755cadd64abee02b97a4b869612c6effd",
+  "harness": "/var/tmp/ods-tokenizer-baseline-20260913/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/harness/run.py",
+  "output": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/candidate",
+  "warmups": 3,
+  "iterations": 15,
+  "finished_at": "2026-09-13T08:03:37Z",
+  "elapsed_seconds": 0.2810029983520508,
+  "status": 0,
+  "raw_sha256": "32d8fb582d3b4dea2a6d07832424b443a0d3ba5f9399068ef1d0bf18a6270e23",
+  "row_count": 12,
+  "expected_statuses": [
+    "0"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-bitwise-evaluation/performance/bitwise-harness/run.py",
+    "--binary",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-bitwise-evaluation/performance/candidate/ods-formula-bitwise-evaluation-profile",
+    "--output",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-bitwise-evaluation/performance/candidate/bitwise",
+    "--revision",
+    "candidate",
+    "--group",
+    "bitwise",
+    "--phase",
+    "all",
+    "--warmups",
+    "3",
+    "--iterations",
+    "15"
+  ],
+  "started_at": "2026-09-13T13:09:47.107860+00:00",
+  "finished_at": "2026-09-13T13:09:49.009942+00:00",
+  "status": 0,
+  "binary_sha256": "6b6a83496f40b173802f3f615880e8d755338fa34c5266345bcb12defffc89cb",
+  "raw_sha256": "2f438478545fd05293537b6d7b83ef0ed968a42336e9801b4d20ac0b55c44e99"
+}

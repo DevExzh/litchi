@@ -1,0 +1,2536 @@
+{
+  "kind": "instrumented-libfuzzer-corpus",
+  "revision": "v3",
+  "date_utc": "2026-09-10",
+  "root": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence",
+  "campaign_seed": 20260913,
+  "corpus_directory": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final",
+  "initial_source": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/corpus-v2",
+  "initial_file_count": 237,
+  "initial_nonempty_files": 236,
+  "initial_total_bytes": 349428,
+  "initial_source_manifest": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/corpus-manifest-v2.json",
+  "initial_source_manifest_sha256": "38f427922cf90da019a979f786cacac14cbe2f02d6ab277c87cad50011db2162",
+  "final_on_disk_file_count": 352,
+  "final_on_disk_nonempty_files": 351,
+  "final_on_disk_total_bytes": 511731,
+  "new_on_disk_file_count": 115,
+  "new_on_disk_bytes": 162303,
+  "libfuzzer_reported_final_in_memory_corpus_files": 255,
+  "libfuzzer_reported_final_in_memory_corpus_bytes_text": "378Kb",
+  "smoke_seed_directory": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/smoke-seeds-v3-rerun",
+  "smoke_seed_files": [
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/smoke-seeds-v3-rerun/malformed-00.bin",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "relative_path": "smoke-seeds-v3-rerun/malformed-00.bin"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/smoke-seeds-v3-rerun/malformed-01.bin",
+      "bytes": 18,
+      "sha256": "235e41813f620455e9332c7d63fcb01c27f83f4015bcb80313f6e9f1d4ca5a8b",
+      "relative_path": "smoke-seeds-v3-rerun/malformed-01.bin"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/smoke-seeds-v3-rerun/malformed-02.bin",
+      "bytes": 8,
+      "sha256": "4bc961e8ca5ed1566ca76e0986ba99290b4fe8fbc177eaa9c99761dc2bb74cc1",
+      "relative_path": "smoke-seeds-v3-rerun/malformed-02.bin"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/smoke-seeds-v3-rerun/malformed-03.bin",
+      "bytes": 862,
+      "sha256": "82dd65ea8b0258ac3d1e29e61c19ab815c416234e2d32b8bab44b3c387915723",
+      "relative_path": "smoke-seeds-v3-rerun/malformed-03.bin"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/smoke-seeds-v3-rerun/malformed-04.bin",
+      "bytes": 1723,
+      "sha256": "343100c07f1a1d8399f58294dbef77f3bf2524bce4e3dfc6d15af4f5fc8b76b3",
+      "relative_path": "smoke-seeds-v3-rerun/malformed-04.bin"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/smoke-seeds-v3-rerun/malformed-05.bin",
+      "bytes": 842,
+      "sha256": "f8be444c1ef2dc3cc8903c09ff2710d838cd1279de7c8354437895c58d5d532a",
+      "relative_path": "smoke-seeds-v3-rerun/malformed-05.bin"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/smoke-seeds-v3-rerun/valid-opc.zip",
+      "bytes": 1724,
+      "sha256": "fbb8cf01b98323d5403b2ab817632f996f0e5d3158e0a3ad41de371fd9c6758b",
+      "relative_path": "smoke-seeds-v3-rerun/valid-opc.zip"
+    }
+  ],
+  "files": [
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/0000a07a723d044eb60ad2a0a83e3b29ca230675",
+      "bytes": 1724,
+      "sha256": "99498b8b2bd3755cda43ced9d4eb23c6196f185b17ef169d8546a47b7328d5bd",
+      "relative_path": "corpus-v3-final/0000a07a723d044eb60ad2a0a83e3b29ca230675",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/00aa89b436787ec33838771d40be79a1e3a00464",
+      "bytes": 289,
+      "sha256": "7f3082c1ffe91fee5c5a84fa012ef27c699962b4f2d317375110affd6ca571c6",
+      "relative_path": "corpus-v3-final/00aa89b436787ec33838771d40be79a1e3a00464",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/012be34e9ec101aab196efcc7e96e2a648e3cf66",
+      "bytes": 1724,
+      "sha256": "e8aa1d8f0f51690627045c8ccc2865d49237bbd21713d9bd11c8511b5fe02cd0",
+      "relative_path": "corpus-v3-final/012be34e9ec101aab196efcc7e96e2a648e3cf66",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/01734285f0250974c7e88bf387974fdfac916d8b",
+      "bytes": 1724,
+      "sha256": "8b7284082334d36e59f22744cd4f9c7827d80dc518842ff166094922719e1a84",
+      "relative_path": "corpus-v3-final/01734285f0250974c7e88bf387974fdfac916d8b",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/02e0ebd1234c044f169b04495b6707749c0ab2bb",
+      "bytes": 1724,
+      "sha256": "bd235dba5e7914e313a337549ba25170ab3c128aa5e1a18af8048c7df699e2f8",
+      "relative_path": "corpus-v3-final/02e0ebd1234c044f169b04495b6707749c0ab2bb",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/0359d20596923e897e82d94bf5f5113bf3be5b16",
+      "bytes": 1724,
+      "sha256": "2463af118f602525437e85b7de2bc41b426c8c2324128afce240273dee462e88",
+      "relative_path": "corpus-v3-final/0359d20596923e897e82d94bf5f5113bf3be5b16",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/03a2e28ecc217497e8dc336c617f78576077ee5f",
+      "bytes": 1724,
+      "sha256": "918ea911515227e61b2fb5ac6f1992129410997e8252453e7bfcedc114ac28c4",
+      "relative_path": "corpus-v3-final/03a2e28ecc217497e8dc336c617f78576077ee5f",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/03cba31f0ffdcfadc993fe6bbd826ac8dff2542e",
+      "bytes": 1724,
+      "sha256": "a68e219c3c03493463631c5bb074f73a1d264e94595c453ef895760d22f5a473",
+      "relative_path": "corpus-v3-final/03cba31f0ffdcfadc993fe6bbd826ac8dff2542e",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/05275a04b02465e05f7b869c5269cd373f4ec110",
+      "bytes": 349,
+      "sha256": "a36053f585f71ae91ccd064cccc169d8098830adf2dba599912ac8c676f7661f",
+      "relative_path": "corpus-v3-final/05275a04b02465e05f7b869c5269cd373f4ec110",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/06fbafe9436458be52d99ab03e1dcfaaf99203ff",
+      "bytes": 1724,
+      "sha256": "88f5d18c60ba48b51931e14b3d02ec7756fd7b4be5b47d2aab430380a54c775d",
+      "relative_path": "corpus-v3-final/06fbafe9436458be52d99ab03e1dcfaaf99203ff",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/079024ebde06115f5e6f615560d0d170928a43b4",
+      "bytes": 1724,
+      "sha256": "62c085b07b210a0526fc1fc7839fa6cdee025925ecd39c041ae00c44f972a12f",
+      "relative_path": "corpus-v3-final/079024ebde06115f5e6f615560d0d170928a43b4",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/0831c4558e6a1ddd9bba1037d04b82c3a368da24",
+      "bytes": 899,
+      "sha256": "ac714f3bddd6bd0b4de6b21b9ccf4b4f7d356f872121773fd9393aedaba89ba3",
+      "relative_path": "corpus-v3-final/0831c4558e6a1ddd9bba1037d04b82c3a368da24",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/08a6b454432ee8a697ee8f284ae3a1836f357270",
+      "bytes": 347,
+      "sha256": "18c77f77c938d2b8ea4b61f6c4c5f44053c689dc1f1cb6b22e30d21df4e06271",
+      "relative_path": "corpus-v3-final/08a6b454432ee8a697ee8f284ae3a1836f357270",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/0acf1bbf031b58db83addc2b92d26c9a258ca3d8",
+      "bytes": 1724,
+      "sha256": "49d6ac66552a8bed228d1bb740633af97134ccd28c0fe945d7220d6fa8854ee3",
+      "relative_path": "corpus-v3-final/0acf1bbf031b58db83addc2b92d26c9a258ca3d8",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/0b4ba3fa7503cf4608c72f1894ec98fcf26f72f9",
+      "bytes": 1724,
+      "sha256": "07b0dfbcf646b4099114146936018a83911695c3e5251ad37ded8a5d78a033aa",
+      "relative_path": "corpus-v3-final/0b4ba3fa7503cf4608c72f1894ec98fcf26f72f9",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/0ba6abac26e2395395f6756ad18b1abea2d0a2e3",
+      "bytes": 1724,
+      "sha256": "b58dd8f759653a4e0d53738944c5f7785aca1f318189ce31113b5f4079eed285",
+      "relative_path": "corpus-v3-final/0ba6abac26e2395395f6756ad18b1abea2d0a2e3",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/0c37083971da7084f9e2961723adba3608517fd3",
+      "bytes": 1724,
+      "sha256": "ee7e379721db20a47c1a2bb9b33e01dcdd436c981de94bafb53c0dacdea51780",
+      "relative_path": "corpus-v3-final/0c37083971da7084f9e2961723adba3608517fd3",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/0c97c4ee4b89ea67494363c23c42d02c3a656c24",
+      "bytes": 1724,
+      "sha256": "aa07125134cc6bb47080c1f4ff0d667e87ade01b09f95ef09981f44f80bca553",
+      "relative_path": "corpus-v3-final/0c97c4ee4b89ea67494363c23c42d02c3a656c24",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/0e1a7bacd1116ea7bae27c46b0bf5a63f365ba6c",
+      "bytes": 1724,
+      "sha256": "a7c26aee7c45bb3f8ed05c1b99f4a3238566c257156cc8c7003792820b6162b7",
+      "relative_path": "corpus-v3-final/0e1a7bacd1116ea7bae27c46b0bf5a63f365ba6c",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/0ee5a74d6fa8a35e1dcbdd962828b5de6779ec82",
+      "bytes": 1724,
+      "sha256": "d1286fbcfc1d26a59cc7d216ac78fc3d61787d7f2a56bdc770c952b1cc4d73bc",
+      "relative_path": "corpus-v3-final/0ee5a74d6fa8a35e1dcbdd962828b5de6779ec82",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/0ef021f1e0fb6579c6e6024aeac4c7422573c9ff",
+      "bytes": 1724,
+      "sha256": "f57f875bc3a2d56aa07e2bec95a81b78744da1a9e7b10de6f04d7f0a7c2b5501",
+      "relative_path": "corpus-v3-final/0ef021f1e0fb6579c6e6024aeac4c7422573c9ff",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/0f292ea8225db4ed9eb241e5b265182ca524ba27",
+      "bytes": 1724,
+      "sha256": "5e1653c97394897e2f361e0b916f54598672da3b605e96dbe56b994c09d99487",
+      "relative_path": "corpus-v3-final/0f292ea8225db4ed9eb241e5b265182ca524ba27",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/0f45b4a04fd7e840221d62d1ca978989dddb38fd",
+      "bytes": 894,
+      "sha256": "0755cdfe8e44d1f27855165c812d2eb0135b346db6f68bc9978e2d2a3b6768dd",
+      "relative_path": "corpus-v3-final/0f45b4a04fd7e840221d62d1ca978989dddb38fd",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/109fe56937ee008b3be3474a366b9319c16c25fb",
+      "bytes": 1724,
+      "sha256": "a3b2b9001643f230f789dce7852e4b1db14f8109a66bf26fe495cba76f0e4146",
+      "relative_path": "corpus-v3-final/109fe56937ee008b3be3474a366b9319c16c25fb",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/10b6177e6b447ee805d05652b021bacee90bc28a",
+      "bytes": 1724,
+      "sha256": "9bbdae83e4d44835a563bb1fb4ffb3dc29c4771b6f5a63640333445dc5c5e117",
+      "relative_path": "corpus-v3-final/10b6177e6b447ee805d05652b021bacee90bc28a",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/131900d8092f9aa623acd70c7ade3ed40674cb6b",
+      "bytes": 1724,
+      "sha256": "7638c0037272d6b58620d1b1b52990f7eb3b44fe25cfc296f8050381ded42d13",
+      "relative_path": "corpus-v3-final/131900d8092f9aa623acd70c7ade3ed40674cb6b",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/13d75410fb7d48aad65529d740340f9ed4e38c37",
+      "bytes": 1724,
+      "sha256": "d277d2a60ffae64d2c20af55154fe9b540effee7cca6bfc7918bf8c8f87e4a84",
+      "relative_path": "corpus-v3-final/13d75410fb7d48aad65529d740340f9ed4e38c37",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/14cf615b54e2ee41c740df103e39d4464223dacb",
+      "bytes": 1724,
+      "sha256": "34bdb55ccfc4c088f2efa58302b7e1d3df14910a3bb841ba7f7f47cbf4959ca7",
+      "relative_path": "corpus-v3-final/14cf615b54e2ee41c740df103e39d4464223dacb",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/1549ef8544216babbf5334df5daa6f79b62504c3",
+      "bytes": 1724,
+      "sha256": "2e2b620d77a84335a1c7ff16734b7c79ecd9c7f3aee58688a7c94aa07ae7edbd",
+      "relative_path": "corpus-v3-final/1549ef8544216babbf5334df5daa6f79b62504c3",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/164cf955da6287982aeae9db6c8021b09242505f",
+      "bytes": 862,
+      "sha256": "75f725f58f20b9e528c1bb6e1c3aaa5a9223196e5ef3e9a721a674cb5fdcc251",
+      "relative_path": "corpus-v3-final/164cf955da6287982aeae9db6c8021b09242505f",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/187bf141cc525bc61450b8d41f598071f8b72b50",
+      "bytes": 1724,
+      "sha256": "7889d35ba4ff74d2836524add1f7be37253933b79253fefe4c432c7960b6ac55",
+      "relative_path": "corpus-v3-final/187bf141cc525bc61450b8d41f598071f8b72b50",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/1913cf1e77b34bcb113f43d9d33d04f56bb0b0d0",
+      "bytes": 249,
+      "sha256": "93a7b9c7757d3c9cda06fc24e923ab75735270f9dfb9be71cbf24587cbabca09",
+      "relative_path": "corpus-v3-final/1913cf1e77b34bcb113f43d9d33d04f56bb0b0d0",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/19ada717e98b0b7220790d9cbaea50a7d43ad002",
+      "bytes": 1724,
+      "sha256": "37076feb47aa45c807186015dd57e085fab4def697b9cf0038c1a9ef3bba7cb7",
+      "relative_path": "corpus-v3-final/19ada717e98b0b7220790d9cbaea50a7d43ad002",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/19c97a96e3caaca7be3bc21d0dfcb0d0b3fdff25",
+      "bytes": 1724,
+      "sha256": "aeb5e2b8f330f273493e5c7016aaeeaeaa4af815d7d9f816f69543f6fe3a9fa4",
+      "relative_path": "corpus-v3-final/19c97a96e3caaca7be3bc21d0dfcb0d0b3fdff25",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/19d9ef24ee94ac50700e45f4b612c7bef4c829f8",
+      "bytes": 1724,
+      "sha256": "83fc3c089a0149d04390f26e58b86e30b337f35a24c822e0ad23cead43176fe1",
+      "relative_path": "corpus-v3-final/19d9ef24ee94ac50700e45f4b612c7bef4c829f8",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/1a2124eb6557324703b5fec0c1bc7a4af813b4a3",
+      "bytes": 1724,
+      "sha256": "b8a6752965c82d86a311e0616a31f70d04692aee217f717b9613c5d2ebcd00b3",
+      "relative_path": "corpus-v3-final/1a2124eb6557324703b5fec0c1bc7a4af813b4a3",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/1b48c9ba2a6521bdb73de01e71388df5870238b0",
+      "bytes": 1724,
+      "sha256": "b523b3c27c9bb622f98d06390c0f69667fb53fe963acdd8bd783d5f3cfc50e5d",
+      "relative_path": "corpus-v3-final/1b48c9ba2a6521bdb73de01e71388df5870238b0",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/1cc92bf376a19899031693075236b51d8e53b8e4",
+      "bytes": 1724,
+      "sha256": "1f61b34cceadad1708d82f5087e62a16c4e8414fba4832fd5c8e12685cdf05de",
+      "relative_path": "corpus-v3-final/1cc92bf376a19899031693075236b51d8e53b8e4",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/1e8e4435e73848a7d8be49c1f40c3cf345490647",
+      "bytes": 280,
+      "sha256": "650a260a1e15497bce5f1516a09febf4dd5f636be0d5e926cd17ef2fa7e1e03a",
+      "relative_path": "corpus-v3-final/1e8e4435e73848a7d8be49c1f40c3cf345490647",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/1fa1267304dde0ee55f83c4b627d0e6c2d51ed40",
+      "bytes": 1724,
+      "sha256": "58db899533451b4a6faa8014065b0bf82c8e727b616e1f50d4f89720ec4e1142",
+      "relative_path": "corpus-v3-final/1fa1267304dde0ee55f83c4b627d0e6c2d51ed40",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/20638aba52996b680643c6e3c4116738e9456086",
+      "bytes": 1724,
+      "sha256": "db0a0aabe3940677dfbf19cfb5dd1170b07197921ede441a472590e44bf6d5d2",
+      "relative_path": "corpus-v3-final/20638aba52996b680643c6e3c4116738e9456086",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/20e9ce8265a35968fa64926a7f5ed147693a0199",
+      "bytes": 1724,
+      "sha256": "3deb120c4348135bc2481827d2204510fccd8e7e1f81260c00464b778290c3d3",
+      "relative_path": "corpus-v3-final/20e9ce8265a35968fa64926a7f5ed147693a0199",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/20eb873f357723048001a85275d2cbfa7e5657de",
+      "bytes": 1067,
+      "sha256": "152ab509d27e0a402a0773a1a453348b6388a6a54fafc05ae800597e0d03180b",
+      "relative_path": "corpus-v3-final/20eb873f357723048001a85275d2cbfa7e5657de",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/211aa46f30783a42ce1807a1b570b7e7fdbd4c46",
+      "bytes": 272,
+      "sha256": "40d14279602141e5c678d3b2864867ff20ffc813e00e67df28c3482c0214342f",
+      "relative_path": "corpus-v3-final/211aa46f30783a42ce1807a1b570b7e7fdbd4c46",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/2161c5834397d113cebabf2247de922881eefbac",
+      "bytes": 1724,
+      "sha256": "bff44d3cf04e8c658b4c235fccfcf7b1009924555364bccb2fb07165590d18ec",
+      "relative_path": "corpus-v3-final/2161c5834397d113cebabf2247de922881eefbac",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/219968493e2b95df065f7fe8baa87ff6d38ccf83",
+      "bytes": 1724,
+      "sha256": "d49621054a2ccd9278a0ab786e8f5b2d7399a3bebda6e90889190025c7fab5a7",
+      "relative_path": "corpus-v3-final/219968493e2b95df065f7fe8baa87ff6d38ccf83",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/21be8edf165fd479f2ab41d56421b6add47fa9ce",
+      "bytes": 459,
+      "sha256": "151dbebff4e277c1eacda24f8f4902ec8031947c3a9ea0355bc15421e4e44acf",
+      "relative_path": "corpus-v3-final/21be8edf165fd479f2ab41d56421b6add47fa9ce",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/21feb1111259b82bfc3d822081fb9c5408f58074",
+      "bytes": 1724,
+      "sha256": "25eefc95fdbcfd1b27ee7312895517063f5f7737c8cd0afd872d924b578ae10c",
+      "relative_path": "corpus-v3-final/21feb1111259b82bfc3d822081fb9c5408f58074",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/22339cd3b4bd0a3a1ab540139d3e8b8c18d08786",
+      "bytes": 1724,
+      "sha256": "ec9f38371c1baee5377afbd914837dfa8395b636c35f79f1ac54b566203e934a",
+      "relative_path": "corpus-v3-final/22339cd3b4bd0a3a1ab540139d3e8b8c18d08786",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/227bd0aee4caf5daecbb2cde25dbdb8b885ba532",
+      "bytes": 1724,
+      "sha256": "bcb1d02accc8cbae44cee66d428e99489eca6e21c648f4bb1e0e31ba09243e6f",
+      "relative_path": "corpus-v3-final/227bd0aee4caf5daecbb2cde25dbdb8b885ba532",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/23279123aaf5f54c744c04468ee30b605c46ebc0",
+      "bytes": 278,
+      "sha256": "84faaea9d5d77f0f3c4db83e59b6a3309fea5f8360b8ca42c7d5d69329c79d87",
+      "relative_path": "corpus-v3-final/23279123aaf5f54c744c04468ee30b605c46ebc0",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/23b152a1c2b8b0cd49224a384eac973a20a7834c",
+      "bytes": 1724,
+      "sha256": "dc189b22c259334b86d54e4be170e6b0b189ddadcf52703141a23d38c7182d3e",
+      "relative_path": "corpus-v3-final/23b152a1c2b8b0cd49224a384eac973a20a7834c",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/24d1e8c0bce6c0a8c085884218a16c889a139bdd",
+      "bytes": 13,
+      "sha256": "76d8c997dc62908c5ca4b8d62884616b066e31e99e96f71daa0833da549ba7c4",
+      "relative_path": "corpus-v3-final/24d1e8c0bce6c0a8c085884218a16c889a139bdd",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/24f629f9acddbdd6d69536cb3191dd20e8983975",
+      "bytes": 1724,
+      "sha256": "ee853b5ff2017627a90ef78db2cd371d923a2a564e4df07f7d27206746ddce38",
+      "relative_path": "corpus-v3-final/24f629f9acddbdd6d69536cb3191dd20e8983975",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/2558024d77863760e924ad862e92b8e00c7f2e1d",
+      "bytes": 1724,
+      "sha256": "ff927b333806d84f12efebb21b9faa1b4017256a5bdf993a4a61f639b4a1280a",
+      "relative_path": "corpus-v3-final/2558024d77863760e924ad862e92b8e00c7f2e1d",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/260530f231643c08be8408efdeab12e80c4903fb",
+      "bytes": 1724,
+      "sha256": "858a4f4bc6a931aa9f6f4f85b4a93bb5e0e4c819bbaf8960494b9f4782881bd8",
+      "relative_path": "corpus-v3-final/260530f231643c08be8408efdeab12e80c4903fb",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/262197d604f16f703f3868672fd3d3fdfe725896",
+      "bytes": 1724,
+      "sha256": "945b75a2b24f407b0ce83e8d1013cfcd542f50774a67617e0bece719e4682a5d",
+      "relative_path": "corpus-v3-final/262197d604f16f703f3868672fd3d3fdfe725896",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/2696825d7afb2ea6d8e0f53add62a051f95ab886",
+      "bytes": 1724,
+      "sha256": "fb624aee8cdd82c5c6f6d7208a0230d7cffc71007376531a0c79756875a6da5b",
+      "relative_path": "corpus-v3-final/2696825d7afb2ea6d8e0f53add62a051f95ab886",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/26d62ec1980d3b14a2696b7ad24c67b606774c56",
+      "bytes": 1724,
+      "sha256": "e9b3e3ff333918329aae3d8eaa00014ea06dbe20bb4c8518171be44418ca05d6",
+      "relative_path": "corpus-v3-final/26d62ec1980d3b14a2696b7ad24c67b606774c56",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/2789e5324102e7fc4951842cdef2e9768a915020",
+      "bytes": 1724,
+      "sha256": "d993eda8d1eabf33836c4fb2c05b9f50c8728892f1e983594ea37aed2bf97df4",
+      "relative_path": "corpus-v3-final/2789e5324102e7fc4951842cdef2e9768a915020",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/2794a9b7ea1fbe8b4967f9be9c53cd1c7dee2a12",
+      "bytes": 968,
+      "sha256": "01c5340c5c1e9037b31a1cfdfabf4fcdbc47f11155ebe58091fd054a5dcdc477",
+      "relative_path": "corpus-v3-final/2794a9b7ea1fbe8b4967f9be9c53cd1c7dee2a12",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/27a7866ed834ec16b262d040db9d3c681f4a4085",
+      "bytes": 1724,
+      "sha256": "a4ff29f1b9d45d85a88617fa8894de06784cdf2533edee2f0790cdbb94844fe6",
+      "relative_path": "corpus-v3-final/27a7866ed834ec16b262d040db9d3c681f4a4085",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/29473a603093b03bf0bc30e91493a8242ca258bd",
+      "bytes": 1724,
+      "sha256": "f141a2721fad1c1eac7ed98b2cf758f028eb2e4d1799629e87e306bcd5c9a0c8",
+      "relative_path": "corpus-v3-final/29473a603093b03bf0bc30e91493a8242ca258bd",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/2b0f14a145e072bf9bc6daf0ab30dbb1bb4ebf15",
+      "bytes": 1724,
+      "sha256": "9b6496068962928da6927897a8076c75543a3f1fd3d2e700752f9f4915b2ff4d",
+      "relative_path": "corpus-v3-final/2b0f14a145e072bf9bc6daf0ab30dbb1bb4ebf15",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/2b64c15e5e76b01950700d5bf1960f30a669d17b",
+      "bytes": 1724,
+      "sha256": "fd8c397b59dd07a9e606f5c709c8205fa6414bcebf16cdc1f59c4164adb0f12e",
+      "relative_path": "corpus-v3-final/2b64c15e5e76b01950700d5bf1960f30a669d17b",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/2b8f624c9af0ffd5664e5b65d54cec6dffdd19d7",
+      "bytes": 1724,
+      "sha256": "faab27c5d2a6824a69fec9c889994810eb37c981abe872fb81861da836ddf166",
+      "relative_path": "corpus-v3-final/2b8f624c9af0ffd5664e5b65d54cec6dffdd19d7",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/2bb1e60c5f4a515051110f8816a1baf30d8ed829",
+      "bytes": 1566,
+      "sha256": "bd2d4e47b1ffa5ab05b5d9a763e9cf9af8b47e6285a62a0b12a9781230efc5ae",
+      "relative_path": "corpus-v3-final/2bb1e60c5f4a515051110f8816a1baf30d8ed829",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/2d0134ed3b9de132c720fe697b532b4c232ff9fe",
+      "bytes": 1,
+      "sha256": "67586e98fad27da0b9968bc039a1ef34c939b9b8e523a8bef89d478608c5ecf6",
+      "relative_path": "corpus-v3-final/2d0134ed3b9de132c720fe697b532b4c232ff9fe",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/2d8b4ce8efd5e300f470acdf1b21190a24254930",
+      "bytes": 1724,
+      "sha256": "d6030bb6ea00ba29ff4de90a2687ea6fd2f38c0c4112f8d71b04524fab259639",
+      "relative_path": "corpus-v3-final/2d8b4ce8efd5e300f470acdf1b21190a24254930",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/2dcbd2b70755e2d1ba78ef002b3a388c54ac4053",
+      "bytes": 1724,
+      "sha256": "58b415e9cf420da0a58a704e6548116fc6dbc1ee1efef7867bf1ff7f193d971d",
+      "relative_path": "corpus-v3-final/2dcbd2b70755e2d1ba78ef002b3a388c54ac4053",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/2efd0e5b915b00bcf600898fca461f1a8d1f6a57",
+      "bytes": 1724,
+      "sha256": "39d197a06b3c43ca7fabbb7045d8da4f1f9e3fb25a29689671535053bbcf88fd",
+      "relative_path": "corpus-v3-final/2efd0e5b915b00bcf600898fca461f1a8d1f6a57",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/2f30ddb24002117bcaa3c5387d04675379c16e41",
+      "bytes": 1724,
+      "sha256": "2ee0c5814b90085de1dd81b639fda8e84f5c2a5a983fbbece4f4160884e06452",
+      "relative_path": "corpus-v3-final/2f30ddb24002117bcaa3c5387d04675379c16e41",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/3056d43e8f46fe74b2bdb2cc5188a4c8d4e486a7",
+      "bytes": 1724,
+      "sha256": "869b1840edb311437960aa45b52e85ead065aaef0f68cfaedb4046c41f8fb383",
+      "relative_path": "corpus-v3-final/3056d43e8f46fe74b2bdb2cc5188a4c8d4e486a7",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/3073bfb4a020e4f8fac9d8cd7a7a0d6b7d939ffb",
+      "bytes": 1724,
+      "sha256": "d19ac17dc3e04b41a41f694c4af97f411b3feff19eb157d96d8ad2bc8b79912c",
+      "relative_path": "corpus-v3-final/3073bfb4a020e4f8fac9d8cd7a7a0d6b7d939ffb",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/31a870c3539450e3f625f465c12eb6ffb084062a",
+      "bytes": 1724,
+      "sha256": "ba3d506a10aa47538a7b34e4326efeb6e076faaea3a9cbf111fc2c6466617035",
+      "relative_path": "corpus-v3-final/31a870c3539450e3f625f465c12eb6ffb084062a",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/32067ea0e8c9ff75531e411535fa9c943eb3e72b",
+      "bytes": 1724,
+      "sha256": "0580d1c19fce60888f06e2cb7a88cfc27a8cc8965894624e9ce1a9116480b70b",
+      "relative_path": "corpus-v3-final/32067ea0e8c9ff75531e411535fa9c943eb3e72b",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/323ecd8e34ae3d327e7f81c9c8fac7090f718c5a",
+      "bytes": 1724,
+      "sha256": "989c5977b40e1b57ed0148636aeac0139640f496f8af82df6dc787c788e614e7",
+      "relative_path": "corpus-v3-final/323ecd8e34ae3d327e7f81c9c8fac7090f718c5a",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/32554da66d8a04813875b31e8802d2c365ec06b8",
+      "bytes": 1724,
+      "sha256": "3a64679520a43d1f620285d77251afea2ad7934eea141e32015370d2aee92d8f",
+      "relative_path": "corpus-v3-final/32554da66d8a04813875b31e8802d2c365ec06b8",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/32777018022ff8847b11970351872ad9b8398feb",
+      "bytes": 1724,
+      "sha256": "9caa4dc7458f23f7db07450b863a418ac8adc704548a7f47ee91093c1f427f1e",
+      "relative_path": "corpus-v3-final/32777018022ff8847b11970351872ad9b8398feb",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/33151829930931699eba67f8a0317074b849fe77",
+      "bytes": 1724,
+      "sha256": "7e07ac5275b3fa87ccacb70c49d1f52c3d802f6cae8bf97aa6b31ba78807e404",
+      "relative_path": "corpus-v3-final/33151829930931699eba67f8a0317074b849fe77",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/34f935e5bf1bab8e1fe21b7d5e551bdc6d9de9e3",
+      "bytes": 1724,
+      "sha256": "59fa605371c57af9361e075f369c4b7e3acc18c5255e1077be946cd9cf9188a4",
+      "relative_path": "corpus-v3-final/34f935e5bf1bab8e1fe21b7d5e551bdc6d9de9e3",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/3507f25cd72ce917b39a4967f6975e9340c587cf",
+      "bytes": 63,
+      "sha256": "8bf2665fb245eab7a438e18d12efd92c85a50ff2e6284049facece2ba54db426",
+      "relative_path": "corpus-v3-final/3507f25cd72ce917b39a4967f6975e9340c587cf",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/37ef92d04cad2b986a08565e6146ae8da0e4995d",
+      "bytes": 856,
+      "sha256": "442a3ff1bb3a0461beccddbdb97415a43e77a0aa3d3b0894a5be724e908c8176",
+      "relative_path": "corpus-v3-final/37ef92d04cad2b986a08565e6146ae8da0e4995d",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/398fdf425eb9854a39e2a75d00614d967e03924d",
+      "bytes": 1724,
+      "sha256": "23d0c296cc82215c5fc5601242d8823bf4603f65c1df6a4868a5dcf3baba4a05",
+      "relative_path": "corpus-v3-final/398fdf425eb9854a39e2a75d00614d967e03924d",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/39b9538cfbaf752f6a6213b4143393b89ced99ba",
+      "bytes": 225,
+      "sha256": "b94714517c7a8b93b33a8b6569623784208d087c33aa7a56babb9c2311090be4",
+      "relative_path": "corpus-v3-final/39b9538cfbaf752f6a6213b4143393b89ced99ba",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/3b53a0d792909383fb7612e90d27b461722ed645",
+      "bytes": 1724,
+      "sha256": "5519162995345c6049f5989b0f8be224e67921f2a4adb16af130556c5f4a5855",
+      "relative_path": "corpus-v3-final/3b53a0d792909383fb7612e90d27b461722ed645",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/3b9328d4873a48ce3512295ee2f509ad8c37beee",
+      "bytes": 1724,
+      "sha256": "016ac1c63ac5db616b483cfbce59ee733793d11e459f987a9f3050913e403909",
+      "relative_path": "corpus-v3-final/3b9328d4873a48ce3512295ee2f509ad8c37beee",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/3bf9eb35040032ce70cd17e68ecd28317bf91df2",
+      "bytes": 1724,
+      "sha256": "ca7d9efcf162274b15dfbabc4fb9666c8b277aafaf3d99278fe8269e3db48354",
+      "relative_path": "corpus-v3-final/3bf9eb35040032ce70cd17e68ecd28317bf91df2",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/3c42fc52571a441b9ff674ee6835c67f64966c39",
+      "bytes": 642,
+      "sha256": "6101ceed25d39bc9b29ccf2f0f988719419115727f73a21d2d5021923f88dd5e",
+      "relative_path": "corpus-v3-final/3c42fc52571a441b9ff674ee6835c67f64966c39",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/3cc663625fdfe2857029f57c09ff1ac90599d5e3",
+      "bytes": 1724,
+      "sha256": "53eceaca5c2046734bd75836c60de0a23da1d9605f754800fdfad095b6cd12fb",
+      "relative_path": "corpus-v3-final/3cc663625fdfe2857029f57c09ff1ac90599d5e3",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/40ee3de7a015b607a534bc7c74dbec0876a7f25e",
+      "bytes": 1724,
+      "sha256": "fb2338b03be25a135041cfa2b85a46c595ea4b53b608a76f2dad6add0a446ee8",
+      "relative_path": "corpus-v3-final/40ee3de7a015b607a534bc7c74dbec0876a7f25e",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/42620205feea869d96cca4e80ca6b2fb71890bc7",
+      "bytes": 842,
+      "sha256": "6138aa9a8be868826433257cf5604cadcb9663344e44466c64cfd13fe1c5b60f",
+      "relative_path": "corpus-v3-final/42620205feea869d96cca4e80ca6b2fb71890bc7",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/430c5adba25d494dc6c6dece99b7b9a50eb5b290",
+      "bytes": 1724,
+      "sha256": "c9027238e44709449ffc79e52f22926661de799aa15ccbbb4dc7570bc9874ebd",
+      "relative_path": "corpus-v3-final/430c5adba25d494dc6c6dece99b7b9a50eb5b290",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/431db3331763109d0e8b76fe7b29a8aeed6550a5",
+      "bytes": 580,
+      "sha256": "5118c04076576a1b062667986d2b89a2aedcf4dca096b5a5a369c71b500eb4ca",
+      "relative_path": "corpus-v3-final/431db3331763109d0e8b76fe7b29a8aeed6550a5",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/44330c5f063a33df1881a35d826fe382174be156",
+      "bytes": 1724,
+      "sha256": "81888fdd712b68acd2c66b89a677a75e69439541c7aa27fa52d6ddf59860da8e",
+      "relative_path": "corpus-v3-final/44330c5f063a33df1881a35d826fe382174be156",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/454cd962e1b26f967dbc2f31e8d641c963c97bbb",
+      "bytes": 1724,
+      "sha256": "5a505b5f343430e7653b3f78de3d8a40276fbe0effd565aa822c5c8f1d2c50aa",
+      "relative_path": "corpus-v3-final/454cd962e1b26f967dbc2f31e8d641c963c97bbb",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/45545461fe0277402bd6d5dab03f6793459e0cc1",
+      "bytes": 1724,
+      "sha256": "b2cb14ce9c79c85b76bb4933ace8dd987fd8fc249f96b7ea0d07742dc1ebd367",
+      "relative_path": "corpus-v3-final/45545461fe0277402bd6d5dab03f6793459e0cc1",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/46735dbf0e30765188724b11f0a56672be7e633f",
+      "bytes": 1724,
+      "sha256": "4c7288c987cd5935edb849fe6753e4817cfef31d79d3ec5fc5251a134d1ce28f",
+      "relative_path": "corpus-v3-final/46735dbf0e30765188724b11f0a56672be7e633f",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/467bb266c8a4daccf861d72bf4746c539d64dfb7",
+      "bytes": 843,
+      "sha256": "79f80b5573142079d7f0ae6601485afc8af93b098e2e326ae06f31f344011111",
+      "relative_path": "corpus-v3-final/467bb266c8a4daccf861d72bf4746c539d64dfb7",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/472ea6b57e9f78661d5ae73c7d5cff497460b707",
+      "bytes": 1724,
+      "sha256": "2ec8d1fa6eaee15264f4cd635656b401a50aa9ef9370fee094e088ffdc4f46f7",
+      "relative_path": "corpus-v3-final/472ea6b57e9f78661d5ae73c7d5cff497460b707",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/47369df7f83e991aca8bd03769796970d5f88103",
+      "bytes": 1724,
+      "sha256": "9d0d3bc5b98984b479968161f058d9ec68e189777b628c45ab91a4c5279668e5",
+      "relative_path": "corpus-v3-final/47369df7f83e991aca8bd03769796970d5f88103",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/49123867dfdcba810d99e01792850360965b5e37",
+      "bytes": 1724,
+      "sha256": "ecde351de61927586cd07dce2445e412c05388acbf330170e91869def4405c88",
+      "relative_path": "corpus-v3-final/49123867dfdcba810d99e01792850360965b5e37",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/495105690f286bcfafe3517fc1ca8030d3c97831",
+      "bytes": 1724,
+      "sha256": "7f1371dad90299d3f8d00dc8f8848f0d63167716479049c8edde421a0d225c85",
+      "relative_path": "corpus-v3-final/495105690f286bcfafe3517fc1ca8030d3c97831",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/4a81190fee751fb88c394865b617525147dd8b02",
+      "bytes": 1724,
+      "sha256": "1ad164629d1529f7080bcce880665c3ee6581f97b374457e4e710657e8dcd842",
+      "relative_path": "corpus-v3-final/4a81190fee751fb88c394865b617525147dd8b02",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/4af4213f60b467ab036bf83e03830f8f1fda8f01",
+      "bytes": 1724,
+      "sha256": "8bf185f441abe303287bec39edad41fc8c0a5bdfc1ffee7c1af703a66631feba",
+      "relative_path": "corpus-v3-final/4af4213f60b467ab036bf83e03830f8f1fda8f01",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/4b35389b894874a3952cebed373963b9714b8324",
+      "bytes": 412,
+      "sha256": "f152bceed6aae494f8954abfdd7f429e884f8a6844eea22f35039dfa3f9f8b1f",
+      "relative_path": "corpus-v3-final/4b35389b894874a3952cebed373963b9714b8324",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/4b64f28e4880463510e24fbf8850dba4fb2d18cb",
+      "bytes": 1724,
+      "sha256": "2386a5efdf81c3ac9b97ad7a137e4c21016da43cffec0e135f1fc4ec02954d8e",
+      "relative_path": "corpus-v3-final/4b64f28e4880463510e24fbf8850dba4fb2d18cb",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/4b9f1b840712b6a7de7691ed6150a9ac61b16efa",
+      "bytes": 1724,
+      "sha256": "b98aae4043824bfed5646213468117597b7f7c1a649f20fd2eee36cac1b76831",
+      "relative_path": "corpus-v3-final/4b9f1b840712b6a7de7691ed6150a9ac61b16efa",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/4c351c8daf9f4ca145daf1017c6aedf969bf3fc9",
+      "bytes": 1724,
+      "sha256": "a986909eb3acb87227d84ac31f06e4954961955ce654697ce6fe5b85e3260557",
+      "relative_path": "corpus-v3-final/4c351c8daf9f4ca145daf1017c6aedf969bf3fc9",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/4cc239de955f8fae3e87f563be423da6d2a35187",
+      "bytes": 1724,
+      "sha256": "387dcd41ffb27f83f57acc3d805d32e38eac699f6bbe2c9350c0416c53263855",
+      "relative_path": "corpus-v3-final/4cc239de955f8fae3e87f563be423da6d2a35187",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/4d285656cb83e50b28494c269a0c17264952c8ff",
+      "bytes": 842,
+      "sha256": "47e2539de394acc9ad1fa1e50e00c95ebd67311a8a4d9646300e353ff58b4d16",
+      "relative_path": "corpus-v3-final/4d285656cb83e50b28494c269a0c17264952c8ff",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/4d4964c6f1891491045d1781a7d56170795689f9",
+      "bytes": 1724,
+      "sha256": "ae47e9360ba890513f5be549d17e5426c4cfc67640a7420af16e774d7e0ab0c8",
+      "relative_path": "corpus-v3-final/4d4964c6f1891491045d1781a7d56170795689f9",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/4d4c9de779bf9b5de4520f4a314b0263b64a95e2",
+      "bytes": 1724,
+      "sha256": "6bdacdc27cc8b120c91f825200456c3cf310b55fd5c324eb4139be0d825b3d38",
+      "relative_path": "corpus-v3-final/4d4c9de779bf9b5de4520f4a314b0263b64a95e2",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/4d4fd5c3684a6919f06cf66d995014e2559482a1",
+      "bytes": 1724,
+      "sha256": "72fdb84d3dbd9d814db040012b4f170fc817c0a1a2b442c65bdfa328c4157dd1",
+      "relative_path": "corpus-v3-final/4d4fd5c3684a6919f06cf66d995014e2559482a1",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/4d86ff395ae652c6f9abbd95fe202f0b3f702329",
+      "bytes": 1724,
+      "sha256": "a5e348591cbf66ece6237c0b987ece0e840901fe8b461a1b0b9e3e5528825f70",
+      "relative_path": "corpus-v3-final/4d86ff395ae652c6f9abbd95fe202f0b3f702329",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/4dcc962f5a3aa1d743fc158583941134e44717ce",
+      "bytes": 1724,
+      "sha256": "6fefd30887abe854e723b7c777c98d1e04b2a883e60d925542a5ff3ee748523e",
+      "relative_path": "corpus-v3-final/4dcc962f5a3aa1d743fc158583941134e44717ce",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/4e52179835e4e028bf70d3d8ec5fbf6815e07934",
+      "bytes": 1498,
+      "sha256": "2f85eac8a600acc1347b96d20868e65f3669e782c4bb88c977dd34a0771e741e",
+      "relative_path": "corpus-v3-final/4e52179835e4e028bf70d3d8ec5fbf6815e07934",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/50096281bc508cbc73571326fed23de1a654752b",
+      "bytes": 1724,
+      "sha256": "f12d02b42e71630d43505322d1e162685e0e729160dc0f3903c1b58534bff2f7",
+      "relative_path": "corpus-v3-final/50096281bc508cbc73571326fed23de1a654752b",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/500b19b4a3c7d6da7a7c39bf4140af5d3e03131d",
+      "bytes": 1724,
+      "sha256": "3aefbe73cc68890ceb4234519369cb29095d55dd78c45b9677c6d37193e20b80",
+      "relative_path": "corpus-v3-final/500b19b4a3c7d6da7a7c39bf4140af5d3e03131d",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/50e3d2f3e5e8d300535c23e1f63b97fe994b20ab",
+      "bytes": 1724,
+      "sha256": "2f14a20e7f8b9ac70cce6f1262f2958a0d197967e264feeeaf0e02c65abacf86",
+      "relative_path": "corpus-v3-final/50e3d2f3e5e8d300535c23e1f63b97fe994b20ab",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/51e09709d6f8ccf4b947dc8377c89297f867eb38",
+      "bytes": 1724,
+      "sha256": "b1712bf8f9c393243f01d53b7ecac5033f8ee61523f435c9c3c671c5fc2b148f",
+      "relative_path": "corpus-v3-final/51e09709d6f8ccf4b947dc8377c89297f867eb38",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/5251e046710d759a000a6d709ef5d6389b045a2f",
+      "bytes": 1228,
+      "sha256": "4322832d1b563f762e3f4244f8f55936405a1731bdc285004b4bb1cab603e280",
+      "relative_path": "corpus-v3-final/5251e046710d759a000a6d709ef5d6389b045a2f",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/54b70df0eca25c994d5bcc6d657cf7d857bfe923",
+      "bytes": 1455,
+      "sha256": "a7f4e00b85a0125ec373800947d494a5d2f92daac3fc8c95d9b83aec8f082e57",
+      "relative_path": "corpus-v3-final/54b70df0eca25c994d5bcc6d657cf7d857bfe923",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/570a435779b2dd1081bd30fcda82ab81fa9bc5a4",
+      "bytes": 1724,
+      "sha256": "7381a29ac315497777202eee85a2754d9cdce81883775ece8895cf4746243fd8",
+      "relative_path": "corpus-v3-final/570a435779b2dd1081bd30fcda82ab81fa9bc5a4",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/57347632c312ab4db3599ac8f76cfc12b0630192",
+      "bytes": 1724,
+      "sha256": "9ee56c4a6d7e87d2f8354965367ecf1a38214e44582355a890ee939e0f9f5f0d",
+      "relative_path": "corpus-v3-final/57347632c312ab4db3599ac8f76cfc12b0630192",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/5892be4bdaaa82806dd1b144f6fd2295c54a9c30",
+      "bytes": 1724,
+      "sha256": "ca5d19ba8e02b9641aa9b2c5e009304745bca0cf40500cfe756713edd562b1f0",
+      "relative_path": "corpus-v3-final/5892be4bdaaa82806dd1b144f6fd2295c54a9c30",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/58d0a5cb812ea814000682db9c381aa5be83bf1b",
+      "bytes": 1724,
+      "sha256": "359fc33de0f857f0175527ffad3ab55d1183fa6cb1cd67fdc186eacfecb360ca",
+      "relative_path": "corpus-v3-final/58d0a5cb812ea814000682db9c381aa5be83bf1b",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/58f7bcf74407803845bf06eb6077389e472e33b0",
+      "bytes": 1724,
+      "sha256": "afd401e7e9bd238a1ec2bf99bc5e4f4b707ca9b0a30550680baf24b50aef1e5c",
+      "relative_path": "corpus-v3-final/58f7bcf74407803845bf06eb6077389e472e33b0",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/5b2d6f97c8e6eaa4859d82d4aaacdbe55e5d3a11",
+      "bytes": 922,
+      "sha256": "392df79d8f7eb1e9858a40700b06728006d27759a3cde40da1dbb8f3d2790b7b",
+      "relative_path": "corpus-v3-final/5b2d6f97c8e6eaa4859d82d4aaacdbe55e5d3a11",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/5b68d0a6b2f9e0f942cbc986f75c687bef11c63b",
+      "bytes": 1724,
+      "sha256": "c46052edced5b209a50af49a0350e60e155a3767e6a51702756af90e6ca0dd05",
+      "relative_path": "corpus-v3-final/5b68d0a6b2f9e0f942cbc986f75c687bef11c63b",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/5ccba4784ef3c2bec69608944fbe8a4a338a668a",
+      "bytes": 1724,
+      "sha256": "600e774c848647f0d5a1d3890e7ca15f0e90b862d03c48a495523607fc3db0da",
+      "relative_path": "corpus-v3-final/5ccba4784ef3c2bec69608944fbe8a4a338a668a",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/5d292c5932b75b7401b1a37a4d7322bd9595f155",
+      "bytes": 1724,
+      "sha256": "82463b6c0b62e698d2fd47f127f340353edd1633130bc5df498fa5c244873a10",
+      "relative_path": "corpus-v3-final/5d292c5932b75b7401b1a37a4d7322bd9595f155",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/5dc34c5c8340b8ae7f878fc346ff1f5033300b70",
+      "bytes": 1724,
+      "sha256": "a4aeed157d4bf7960acd3b3abf7d757dbe0a699472a6b0361594bcd73660788f",
+      "relative_path": "corpus-v3-final/5dc34c5c8340b8ae7f878fc346ff1f5033300b70",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/5ddc2d8644bf4329d1007db292fe420f061734df",
+      "bytes": 1724,
+      "sha256": "fea25e8bff6fb7fd3c361450c5e93198f317d48648705c652c107121ef5c936b",
+      "relative_path": "corpus-v3-final/5ddc2d8644bf4329d1007db292fe420f061734df",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/5e5c0b439a29678100aa1e11975861327d0771de",
+      "bytes": 1724,
+      "sha256": "54acd59dd255fd347f58e77a838a893c1aa157a014b522b718b207f8d68724ec",
+      "relative_path": "corpus-v3-final/5e5c0b439a29678100aa1e11975861327d0771de",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/5f0507b5c7a397ffdb913a875206f2eb4de88241",
+      "bytes": 1724,
+      "sha256": "37cf9071f2f94cc1aa325803bae5a7948ca3a2b5b03991f24e54fbadcb3ef3ba",
+      "relative_path": "corpus-v3-final/5f0507b5c7a397ffdb913a875206f2eb4de88241",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/5fe43c2dc49ee8242c2d2f411a8bdce660e9b8a3",
+      "bytes": 1724,
+      "sha256": "2c2c16bffd331784af170cc4388f1312fa4257de86ac01f36475972ee46a5382",
+      "relative_path": "corpus-v3-final/5fe43c2dc49ee8242c2d2f411a8bdce660e9b8a3",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/613d39df079434a23b0e8ef747fc7c3291356128",
+      "bytes": 1724,
+      "sha256": "18d3faa2199a8fad365290bfa17256640d0d9d58083f71a64ecadf5a7d5ea036",
+      "relative_path": "corpus-v3-final/613d39df079434a23b0e8ef747fc7c3291356128",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/6176ef5e988d79d0dae052d11255115983fcb44a",
+      "bytes": 359,
+      "sha256": "5e8ef06b664a626c0428db93a8013999e79c2d649d011543ef97752c8cb34232",
+      "relative_path": "corpus-v3-final/6176ef5e988d79d0dae052d11255115983fcb44a",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/619a4ec81ccb1fc621dac8b2094eaa5036f0b91b",
+      "bytes": 851,
+      "sha256": "6316823454d3acbab19b8ee1a6caa0197d6adb8f25db2556919c7794cb7067b8",
+      "relative_path": "corpus-v3-final/619a4ec81ccb1fc621dac8b2094eaa5036f0b91b",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/62ad6b61c1572ed2673ddc1613b3cdbb05e2892a",
+      "bytes": 113,
+      "sha256": "278e719033f60f9cca73ccbe2385bfbaeb42926e0847ca4dfa0c45a5ac1ff17e",
+      "relative_path": "corpus-v3-final/62ad6b61c1572ed2673ddc1613b3cdbb05e2892a",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/63ff5d1e0d964306ae8e22dbb756b1ecfadcd9aa",
+      "bytes": 1724,
+      "sha256": "d7206f6fd9f12aefab702dcc3c148a3822a95b7081c2492db173219939328906",
+      "relative_path": "corpus-v3-final/63ff5d1e0d964306ae8e22dbb756b1ecfadcd9aa",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/6664617fa6990a05d9fbda47a92cc65d4d5132d1",
+      "bytes": 1724,
+      "sha256": "72f3f8a48a646ef9a79228038d6c342ad8b4438ba4a8b174ae66dc54e89bd69a",
+      "relative_path": "corpus-v3-final/6664617fa6990a05d9fbda47a92cc65d4d5132d1",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/678fb0e4237b0a56f57e5e2e8b990839a431c486",
+      "bytes": 1724,
+      "sha256": "6ae59eb64dcb14b09a2adab714964a9cf7fa192d00429f91ed95fbcac3173d8d",
+      "relative_path": "corpus-v3-final/678fb0e4237b0a56f57e5e2e8b990839a431c486",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/67fe356c8dff06988ac92664a67d25954babac89",
+      "bytes": 1724,
+      "sha256": "9a78afc96f18d28728d765aabb9030be69cb277ce631c0ea3123dcba221de04a",
+      "relative_path": "corpus-v3-final/67fe356c8dff06988ac92664a67d25954babac89",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/68017f45117562170b619b6e3d50cad46195ea12",
+      "bytes": 1724,
+      "sha256": "c2019e7868710498c130312bf47ea8a6e59d8712b2aae9cde3aaa84b0c705abc",
+      "relative_path": "corpus-v3-final/68017f45117562170b619b6e3d50cad46195ea12",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/69d3491902a9c7242e515a5690cc51830e896f50",
+      "bytes": 277,
+      "sha256": "bb53ae91b5e76a221e91372896098c43b502a7dd83f0a6128c715faeafae1b9d",
+      "relative_path": "corpus-v3-final/69d3491902a9c7242e515a5690cc51830e896f50",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/6aa3c1e5486a1c792c84bf498330f069c8b0fc5b",
+      "bytes": 1724,
+      "sha256": "7f11daedae3b2511fc80cceccbf46747071265a345cf53db30fa27f9c1cac508",
+      "relative_path": "corpus-v3-final/6aa3c1e5486a1c792c84bf498330f069c8b0fc5b",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/6c1315f72cf5286c1bba15aa8d30edd99c8ff851",
+      "bytes": 195,
+      "sha256": "9dcad5c890de1fb813b27e59c929f1928b8f42b10e31b019a33991e50614210f",
+      "relative_path": "corpus-v3-final/6c1315f72cf5286c1bba15aa8d30edd99c8ff851",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/6c2779119f02084dea0df4e8649fa055e6aa917a",
+      "bytes": 1724,
+      "sha256": "945f02b38ee9606b89665b665b828e2a9b36928407ab78c3627175d8f4437ba6",
+      "relative_path": "corpus-v3-final/6c2779119f02084dea0df4e8649fa055e6aa917a",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/6ca24fdedbf8899c63b5a6292e8e670ec850976c",
+      "bytes": 1724,
+      "sha256": "4fbaf1dca20ff08644f7de72501127d637adab565f6f6679875edf69961426ea",
+      "relative_path": "corpus-v3-final/6ca24fdedbf8899c63b5a6292e8e670ec850976c",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/6ca402175a19dd9cd00a50668ce1e8eeb2e1b6d0",
+      "bytes": 50,
+      "sha256": "c147512e1e507e8e5e1757c7031abf13d03fc463051101eb10264148c0b4060c",
+      "relative_path": "corpus-v3-final/6ca402175a19dd9cd00a50668ce1e8eeb2e1b6d0",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/6eef5491cb30ec6dfb196c7bb28398651e4a49ff",
+      "bytes": 1724,
+      "sha256": "fbb8cf01b98323d5403b2ab817632f996f0e5d3158e0a3ad41de371fd9c6758b",
+      "relative_path": "corpus-v3-final/6eef5491cb30ec6dfb196c7bb28398651e4a49ff",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/6fb1251c4d4b8c30bb9ef486f7313e7920960658",
+      "bytes": 105,
+      "sha256": "3d41621365db9d9c4cbc0306f09a029b3890c7ee7286dd0dd24bfae3b304ebe7",
+      "relative_path": "corpus-v3-final/6fb1251c4d4b8c30bb9ef486f7313e7920960658",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/7035bda898221c9759ae73b95a7cdd284754bd2d",
+      "bytes": 1502,
+      "sha256": "6b464ae92c6fa110252506a29f894bfd87d1d44d38818c476588db6cbe0e0e31",
+      "relative_path": "corpus-v3-final/7035bda898221c9759ae73b95a7cdd284754bd2d",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/706652985f018de55b3024a66b07e0bd3b14916f",
+      "bytes": 1724,
+      "sha256": "5af1c519479e81f90b994b680431173cc9f4fb74b91b03189954046a27850c44",
+      "relative_path": "corpus-v3-final/706652985f018de55b3024a66b07e0bd3b14916f",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/70da47704d75bd697553268a22c0255771447118",
+      "bytes": 1724,
+      "sha256": "afbffd68ec1baa5087a3dbacf63a8a01bcb57de052421b089d8ecff6991a5464",
+      "relative_path": "corpus-v3-final/70da47704d75bd697553268a22c0255771447118",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/70f1596c8ae1d7871821fb514eb76795c9bdf485",
+      "bytes": 1724,
+      "sha256": "fa37ad2c1ae4015a4224806d28676c631abc9b608ef848ff7cce6c68e1fc6207",
+      "relative_path": "corpus-v3-final/70f1596c8ae1d7871821fb514eb76795c9bdf485",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/714211d1c3efdb5d80e9ec1b5fabc7db5be16432",
+      "bytes": 1724,
+      "sha256": "fe0257574830bb324ed1dcf17e45f6b65a7d3e4088f44b17f5ce3e96a5c401f4",
+      "relative_path": "corpus-v3-final/714211d1c3efdb5d80e9ec1b5fabc7db5be16432",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/72940aa724d3ad13c261d894b1af9ad94d27b381",
+      "bytes": 1724,
+      "sha256": "e7ff79691aa2bb683f7667f589512a6c2af00bf61b9bd8c3b46d6a40dd79d675",
+      "relative_path": "corpus-v3-final/72940aa724d3ad13c261d894b1af9ad94d27b381",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/730aca930478a2e1d17dae0bb00188d50f76e74f",
+      "bytes": 1724,
+      "sha256": "076203c663c3dc228eaba7619928bfb641d27a9688f6154fe9fd0f275ffe0f26",
+      "relative_path": "corpus-v3-final/730aca930478a2e1d17dae0bb00188d50f76e74f",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/739f29bd1fd5de81e08e6412cd7684394c83c43b",
+      "bytes": 6,
+      "sha256": "dbce761e77413a39ce96be1bdf471657ddb561eacf7ea6dbcbfdc67e4b25b8ec",
+      "relative_path": "corpus-v3-final/739f29bd1fd5de81e08e6412cd7684394c83c43b",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/7407765aa2035ba7f270fa5f998f94c2021d97ce",
+      "bytes": 1724,
+      "sha256": "93b592a955de3713a1d6e7f3ec3ba14cebf8085577fd6a361f43052602b48666",
+      "relative_path": "corpus-v3-final/7407765aa2035ba7f270fa5f998f94c2021d97ce",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/7519fbdb9ebe709f5d2b0fae50d8207dc1dca840",
+      "bytes": 1724,
+      "sha256": "23eb1d13efe80d4bc09a233cb69551da9cbcd706a4ae1ebe095887e9c1630e8e",
+      "relative_path": "corpus-v3-final/7519fbdb9ebe709f5d2b0fae50d8207dc1dca840",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/758a7ee0eddf3d61b2fd6129b4045b6d5ec3c824",
+      "bytes": 1724,
+      "sha256": "dfd7bea5b7e1d73951b219c861d48aa6eb232a323423d3707810ac16cc46ea4f",
+      "relative_path": "corpus-v3-final/758a7ee0eddf3d61b2fd6129b4045b6d5ec3c824",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/76b57906ed34091809a98a1e18a2aaf30771e2e4",
+      "bytes": 1724,
+      "sha256": "b0de48fce918a097309c27b3dd40e4d75983069bbe49546179fd49557b6024aa",
+      "relative_path": "corpus-v3-final/76b57906ed34091809a98a1e18a2aaf30771e2e4",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/76cf51cb4085b7415c11f226b2264e2e72e6e599",
+      "bytes": 79,
+      "sha256": "c53b012d5a7cca8f93e6a021c94a822476132695073fe738abb0a086d00b8263",
+      "relative_path": "corpus-v3-final/76cf51cb4085b7415c11f226b2264e2e72e6e599",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/77700ed41779705a5b67eed625036227f4e81125",
+      "bytes": 1724,
+      "sha256": "2824394f5cca5c1077c38505152a130a44ecec97781e144b82fe34a53c03647f",
+      "relative_path": "corpus-v3-final/77700ed41779705a5b67eed625036227f4e81125",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/78234ec3f87508f022ff705d264a2c0cf63532e7",
+      "bytes": 1724,
+      "sha256": "00eb7edec75bf310ea280ccf88d20cb3f2624c3c62c45a187d4ecb76f3ac7161",
+      "relative_path": "corpus-v3-final/78234ec3f87508f022ff705d264a2c0cf63532e7",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/7922a154220dcf9f8968ae3e6266f13176c28e2a",
+      "bytes": 1724,
+      "sha256": "eacf10dcb7bae2ff9224b7ecfacf33ef5d8ec0e7150ef0002babeeadb003d533",
+      "relative_path": "corpus-v3-final/7922a154220dcf9f8968ae3e6266f13176c28e2a",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/793efdf177487045e78fc787cf1e085c5095f04d",
+      "bytes": 1194,
+      "sha256": "7cbd6aa160833f333b3ca9ff8efa7e1bcc24ac65192de4535167994cae46b2a4",
+      "relative_path": "corpus-v3-final/793efdf177487045e78fc787cf1e085c5095f04d",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/798988f7bad723de850b9c4c3a2e124a4654bc9a",
+      "bytes": 1724,
+      "sha256": "95244fd3d9d47c5ce802f7a7299109e941e9835ff7787f1e0196b9b660bf161d",
+      "relative_path": "corpus-v3-final/798988f7bad723de850b9c4c3a2e124a4654bc9a",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/79a5907c08246254a9c65a9f9e04d6dfd5748fe4",
+      "bytes": 295,
+      "sha256": "5e037c52df9406a2537b30e2eb3d39639981f539ac2bda9abccfd2fdf837fafc",
+      "relative_path": "corpus-v3-final/79a5907c08246254a9c65a9f9e04d6dfd5748fe4",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/79b99ef07f7b499da5e0359c1b1ac1501c8d3b0a",
+      "bytes": 1724,
+      "sha256": "43fd4d4610abcdce7dc3517e991f8b9f7ddbf7d73fa926976c0ff26c44253525",
+      "relative_path": "corpus-v3-final/79b99ef07f7b499da5e0359c1b1ac1501c8d3b0a",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/7afdf7a3e357e143ff5b3bc979e37be4d5db4b10",
+      "bytes": 1724,
+      "sha256": "c7e5b7e231dfd29658d32c7c4d799a457034d9bded2bba8138f65e28ca83a215",
+      "relative_path": "corpus-v3-final/7afdf7a3e357e143ff5b3bc979e37be4d5db4b10",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/7b545d48bbabd75d936193e83ccf518289cb8348",
+      "bytes": 1724,
+      "sha256": "c6941c372ec91eeb1856519939a652f0278e73a7dbc5a0a2500c73e1dcb1a9a7",
+      "relative_path": "corpus-v3-final/7b545d48bbabd75d936193e83ccf518289cb8348",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/7cdbe08d736aedee1b35cffafcb5d8bae0f35e0e",
+      "bytes": 248,
+      "sha256": "91aa9257c095de7c67d0f6c05d717807bde182715b06aa8c46fdf08110dadf41",
+      "relative_path": "corpus-v3-final/7cdbe08d736aedee1b35cffafcb5d8bae0f35e0e",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/7ef65c5acff3b048e16da75354bf2444ae312243",
+      "bytes": 1724,
+      "sha256": "cadb8addc5b07b1c70ed4eb309a8248cbe93f6aef7f8ccbb7d1c9bcb9a88d77b",
+      "relative_path": "corpus-v3-final/7ef65c5acff3b048e16da75354bf2444ae312243",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/7fa196999887469e34c1b9717e6aabf589cac4d2",
+      "bytes": 1724,
+      "sha256": "7421856d9b800aa52a7e1569c83ce9a7ef6531bcabb7b080d28217a64a516dc5",
+      "relative_path": "corpus-v3-final/7fa196999887469e34c1b9717e6aabf589cac4d2",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/81a475071ca4ba342bdf82b9234687b5b97d8ae2",
+      "bytes": 1724,
+      "sha256": "a5b7a94c3074d49a027806548e5c43c2168e2b5e578c9d6ee91b266924853917",
+      "relative_path": "corpus-v3-final/81a475071ca4ba342bdf82b9234687b5b97d8ae2",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/8264527b01203a065162bfecfbc59eeb49f991fd",
+      "bytes": 1097,
+      "sha256": "8a44401661e276151253a0972e46c530077b330200905eb3eaf6d10c94210575",
+      "relative_path": "corpus-v3-final/8264527b01203a065162bfecfbc59eeb49f991fd",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/83974b1f92581e2188b34d3089a67413949ddc8c",
+      "bytes": 1724,
+      "sha256": "ff4ffffaf746539efe9346de3ba5973d4add1c983b4dea886d2ef00948803fc7",
+      "relative_path": "corpus-v3-final/83974b1f92581e2188b34d3089a67413949ddc8c",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/845b690fc4b639981e30a350ff6f2f41f82aee3b",
+      "bytes": 5,
+      "sha256": "d3f569f6b2752c909030bd2f6d264f2b7dc461e3687b6d751ba090d3bd2c005e",
+      "relative_path": "corpus-v3-final/845b690fc4b639981e30a350ff6f2f41f82aee3b",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/84915ca7cfaa6348829025be5fb93e1ee0cbbfca",
+      "bytes": 1724,
+      "sha256": "2304deae7eb8eacdbf9fed9e3bb90ca6d568cc8d29f5b1f8305f6425ef2e0a9d",
+      "relative_path": "corpus-v3-final/84915ca7cfaa6348829025be5fb93e1ee0cbbfca",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/84cef2dd3fd25f47c5956279bef4755ab690d5af",
+      "bytes": 976,
+      "sha256": "5a92b4460a1c59908b6e48d522a4906894e5d3823f094dcf63ff41bb9d2f165d",
+      "relative_path": "corpus-v3-final/84cef2dd3fd25f47c5956279bef4755ab690d5af",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/84e0914439a729af938c57b1b518f78bcdd5b9bf",
+      "bytes": 1724,
+      "sha256": "cbbacda59a4aac8964b615d11eb8d4161e0df72ed177811e74580dbed758fc37",
+      "relative_path": "corpus-v3-final/84e0914439a729af938c57b1b518f78bcdd5b9bf",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/8684e355339992c277078292e961dc937345c819",
+      "bytes": 1724,
+      "sha256": "3637418614bda4244fc96fc8bfce5e5c5d452e51b31f8ddbd12920f92dbbedbb",
+      "relative_path": "corpus-v3-final/8684e355339992c277078292e961dc937345c819",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/88048ce145c19a800494965e6371e68f47bf253e",
+      "bytes": 1724,
+      "sha256": "e34d795e621116f911b20069c1f54219232e97df8d2ca9cf51ebd8e84dd7bb12",
+      "relative_path": "corpus-v3-final/88048ce145c19a800494965e6371e68f47bf253e",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/8863052fa659d51e0546c3727d07ddaeeb4e93cf",
+      "bytes": 1724,
+      "sha256": "2a3dffc50e7f5a03a1cbcea5e2552466aafdf3b4172a3b1b5829492d3eed6681",
+      "relative_path": "corpus-v3-final/8863052fa659d51e0546c3727d07ddaeeb4e93cf",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/88a83b6d33a26004dfed5f17f24a6df83142c558",
+      "bytes": 1724,
+      "sha256": "191969fc8c1c2a4f3f24e2d57ac9939592a8a936941e553a56e64fa725bea03f",
+      "relative_path": "corpus-v3-final/88a83b6d33a26004dfed5f17f24a6df83142c558",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/893e62b6f7f82e96d682a00efb101aadb0198a5c",
+      "bytes": 1724,
+      "sha256": "ff752423075671cbb1fdb8f1d00008590c328330227f10a916ab7ff521aaf2c1",
+      "relative_path": "corpus-v3-final/893e62b6f7f82e96d682a00efb101aadb0198a5c",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/8977b98ceafb79581b90bc94c38e1c85a3d7a498",
+      "bytes": 1724,
+      "sha256": "89b40707c62755f48e684565fe3a04a856cd828a18da2198b7bbb3ef5dd9d482",
+      "relative_path": "corpus-v3-final/8977b98ceafb79581b90bc94c38e1c85a3d7a498",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/8dd65296966b99c161b2983754614f4afe980536",
+      "bytes": 1724,
+      "sha256": "d4a462f771e58672f3213adfc7a691742f315cdb98c91aa8e02dd23f8230e5a8",
+      "relative_path": "corpus-v3-final/8dd65296966b99c161b2983754614f4afe980536",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/8e0039f836792a434f3283ac6fc4163f95616387",
+      "bytes": 842,
+      "sha256": "91188c3af0d604e83f58de37d7831363ac917a792b2491d555739d88ef125643",
+      "relative_path": "corpus-v3-final/8e0039f836792a434f3283ac6fc4163f95616387",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/8e2e6f5fc481419167be5b75b317a12f98c5ff9a",
+      "bytes": 1724,
+      "sha256": "690c08417d26d542deb81d6e54905effea8346e78bbd93dc53e21cded443cdf3",
+      "relative_path": "corpus-v3-final/8e2e6f5fc481419167be5b75b317a12f98c5ff9a",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/8ebb01ab060f102d8d0aa958062d86fa8ce723c0",
+      "bytes": 1724,
+      "sha256": "ba2a11c9bef8d81b23bb641264cba94b06b11ad1167275b9e0bdb1f8e351a4bb",
+      "relative_path": "corpus-v3-final/8ebb01ab060f102d8d0aa958062d86fa8ce723c0",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/8ec0fa1967f0e3c5fe1955669a7fac9ea4111737",
+      "bytes": 1724,
+      "sha256": "c54207e84ba3df66e6eb8b9d547f7aa48666831648a6497f8fe0eb5938660cfb",
+      "relative_path": "corpus-v3-final/8ec0fa1967f0e3c5fe1955669a7fac9ea4111737",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/8ec372eab9a74aec85df0b164936409cd28accc9",
+      "bytes": 1724,
+      "sha256": "e5aa794f1b62a1199d4ef1b8a39014fe51daffdf50c8af3acb5a4f7fc8f34bc8",
+      "relative_path": "corpus-v3-final/8ec372eab9a74aec85df0b164936409cd28accc9",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/8f08dcc135fe3c7e5e252208ce91d27e3831747c",
+      "bytes": 1724,
+      "sha256": "c97fb603a86b0cd4e2848edc65fb55f7aaed184b51f747d567d3369b403824d9",
+      "relative_path": "corpus-v3-final/8f08dcc135fe3c7e5e252208ce91d27e3831747c",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/8f32ce89e4a54d430e43372e2aed2e96a56be991",
+      "bytes": 1462,
+      "sha256": "eb42e3191db5fbcaae604f7cc09986bf16c9f1abde6d8c226e547405205526eb",
+      "relative_path": "corpus-v3-final/8f32ce89e4a54d430e43372e2aed2e96a56be991",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/8fc5f2568ae8ecd15de4c39d556e759d0d3564d7",
+      "bytes": 1724,
+      "sha256": "43af93aa47a6911c4085c98a743b7d9c18ef1ec9aafadfc5c4ff3dea568700cf",
+      "relative_path": "corpus-v3-final/8fc5f2568ae8ecd15de4c39d556e759d0d3564d7",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/8ffa7fc46cdccae3ffc0b1ab9d9ee3ec53a94a39",
+      "bytes": 1724,
+      "sha256": "52c20dfc98f806e10db09141a7b47df3837357726f270a2c832262e461523fc0",
+      "relative_path": "corpus-v3-final/8ffa7fc46cdccae3ffc0b1ab9d9ee3ec53a94a39",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/91705ea8f885d11d236859946e2df742e5407e8a",
+      "bytes": 1724,
+      "sha256": "948a6a856da43a72c693fbd3f9c9261efd26ff3232edc91df3517757c2b5f9d7",
+      "relative_path": "corpus-v3-final/91705ea8f885d11d236859946e2df742e5407e8a",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/93d30641c4507bef587a30ddd925c228c6ce82b7",
+      "bytes": 1724,
+      "sha256": "ead888405c9fb482fad61ead4725ca66b067f3c20e01b8bbd59b979f266c658c",
+      "relative_path": "corpus-v3-final/93d30641c4507bef587a30ddd925c228c6ce82b7",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/947d053142ba42c80e7717b66729cb00c582d2da",
+      "bytes": 1724,
+      "sha256": "48bbd675b21ececa849a1eecd00959c13784442723e9cee79a83823e5b66b0d1",
+      "relative_path": "corpus-v3-final/947d053142ba42c80e7717b66729cb00c582d2da",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/953e85de9be06f94bcc74f96685c50819339de22",
+      "bytes": 1724,
+      "sha256": "485be172ec64c758d652d18563c49af7ad0cfa20da691a33c3392949409dc92a",
+      "relative_path": "corpus-v3-final/953e85de9be06f94bcc74f96685c50819339de22",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/9581ab06f8dee4537f57171ab644b5b182e2679f",
+      "bytes": 1724,
+      "sha256": "d39f570b95efc8c7fa17e82ed257bc4d92eff0cc7e4fd7b8f99e922ae784c654",
+      "relative_path": "corpus-v3-final/9581ab06f8dee4537f57171ab644b5b182e2679f",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/95c7f602d5824ca1f0201a9dbf4f0bab6d191ade",
+      "bytes": 1724,
+      "sha256": "b8d463a146b375742c96c211209a6265fb2081e59bf7051e45a17372a99f568e",
+      "relative_path": "corpus-v3-final/95c7f602d5824ca1f0201a9dbf4f0bab6d191ade",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/95ecdcbc6afc07b7d0b19fc859513d3a293f03a7",
+      "bytes": 1724,
+      "sha256": "7eb1b84a62691763f6891d4d748b7c32fd4181966493c3675db76c3e7ccd1881",
+      "relative_path": "corpus-v3-final/95ecdcbc6afc07b7d0b19fc859513d3a293f03a7",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/9662f85e5fe011d4244b93c978d870d03269543c",
+      "bytes": 1724,
+      "sha256": "60d8843c754404d0315f418d56d59a2ca57b9743a419fb254535046abe7f1d49",
+      "relative_path": "corpus-v3-final/9662f85e5fe011d4244b93c978d870d03269543c",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/979c563f4bc6790775214dc317a347176f58edd4",
+      "bytes": 1724,
+      "sha256": "411fc0bbdec877e0943e6c61e52e8c3c19080f4d304de965366392ea9560f75f",
+      "relative_path": "corpus-v3-final/979c563f4bc6790775214dc317a347176f58edd4",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/9a9d4de0c106466c6b49459e0887d20ca5685ec8",
+      "bytes": 1724,
+      "sha256": "46a8eeff6f2baba728adc75556901b4944f505bffa07686f61730b18e7ded812",
+      "relative_path": "corpus-v3-final/9a9d4de0c106466c6b49459e0887d20ca5685ec8",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/9c3cea2ab155f9d7ad4254747451b9a528319140",
+      "bytes": 1724,
+      "sha256": "5f2545ca7f5f2545b9480b9beb30c30037c9a18abd43f260d9b8454a90f61f6c",
+      "relative_path": "corpus-v3-final/9c3cea2ab155f9d7ad4254747451b9a528319140",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/9cf793f54740b07e43e3e584de4f68a278bc713f",
+      "bytes": 1724,
+      "sha256": "dec319b8a8c5660bf6151be54385c725c6acaf94005299c70dc6212e19a2acba",
+      "relative_path": "corpus-v3-final/9cf793f54740b07e43e3e584de4f68a278bc713f",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/9d0b35f4cad1a806ec09b463b36bdabb9d2df136",
+      "bytes": 184,
+      "sha256": "22ae7a7c68bceb43b912a6d54d5c4dad2eab1ec384c0a7624159c2b58365340d",
+      "relative_path": "corpus-v3-final/9d0b35f4cad1a806ec09b463b36bdabb9d2df136",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/9daba378e5ce74c1a6c4e053db5b1fd9692ca79d",
+      "bytes": 842,
+      "sha256": "dcd516d80505fce792cbab3c2dce3fd5cd0c15770eb26ff7da647092ae9b865a",
+      "relative_path": "corpus-v3-final/9daba378e5ce74c1a6c4e053db5b1fd9692ca79d",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/9fa1aa0d5440ff758b8e4e1804f617633e8ec64f",
+      "bytes": 392,
+      "sha256": "93836d7bb0fa8d6ae2de072395171611f920425c774a3e47f5f0ccd3c2d8e68c",
+      "relative_path": "corpus-v3-final/9fa1aa0d5440ff758b8e4e1804f617633e8ec64f",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/a01980b5c665896c68c399c312def3d4184e8771",
+      "bytes": 1724,
+      "sha256": "989d3cee6f3c50cccf134a4a932572e7ab5dc222ee772d9a955cffac6f421d3c",
+      "relative_path": "corpus-v3-final/a01980b5c665896c68c399c312def3d4184e8771",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/a06cc514631993405225e0881776a4224bef4d18",
+      "bytes": 1724,
+      "sha256": "9baf2d8869f67ab9a09dfc7881c2dc335a681f65387c20d35793fd690314143b",
+      "relative_path": "corpus-v3-final/a06cc514631993405225e0881776a4224bef4d18",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/a0849cfe8208cc85af3110945c178885dfa9554d",
+      "bytes": 1724,
+      "sha256": "09c4ffdf1a20fc70e108e8edb53233677e834fc05ec67b0e1148170ee17977bb",
+      "relative_path": "corpus-v3-final/a0849cfe8208cc85af3110945c178885dfa9554d",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/a128350cab14389eb91b611b33491c99016511eb",
+      "bytes": 1724,
+      "sha256": "07adc5687fa6d2db588e476805ea2dd875738031f5313a9ed42e39193f09b71c",
+      "relative_path": "corpus-v3-final/a128350cab14389eb91b611b33491c99016511eb",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/a13b1f1cce26e4de358636f8d809dd5deee98d71",
+      "bytes": 1724,
+      "sha256": "4f40cffb1d090f596e7a2ba7cd17dedd823dbb2909fdd415c4e6af4c06bca692",
+      "relative_path": "corpus-v3-final/a13b1f1cce26e4de358636f8d809dd5deee98d71",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/a1611f11a9db30ac34176f9f394e063dc24382d4",
+      "bytes": 1724,
+      "sha256": "64af7e5d57fb8c9d6c0905ade8f2a000b126c4791d8fcdd543acf56d3ea2fc83",
+      "relative_path": "corpus-v3-final/a1611f11a9db30ac34176f9f394e063dc24382d4",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/a1c3642a42101727e3f0e77ce941e565eb689f75",
+      "bytes": 1724,
+      "sha256": "0600b9c94a01c0744c292e47f9ad5787b393ddcdf0464729bdcfef6deea71722",
+      "relative_path": "corpus-v3-final/a1c3642a42101727e3f0e77ce941e565eb689f75",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/a90bfedc901bd06bca9bddf283b16eac8d78a417",
+      "bytes": 1724,
+      "sha256": "03b0691c7ea551a22315e27cd6236972503e23ae8e414b184c9b85204812064c",
+      "relative_path": "corpus-v3-final/a90bfedc901bd06bca9bddf283b16eac8d78a417",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/a980bd17fdfc95b80494a059c8537f186535fb3b",
+      "bytes": 1724,
+      "sha256": "aa4c75c148659c770f0c142782f7835e347a2ea70a7146e33201655c8742deef",
+      "relative_path": "corpus-v3-final/a980bd17fdfc95b80494a059c8537f186535fb3b",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/aa4beac24a3420a493022cb51826d82791e165d2",
+      "bytes": 1040,
+      "sha256": "55c69b34c8cfbf6938fb1b085bd5a2988f2c94ff1b652075480ebe2a9c7fb9c0",
+      "relative_path": "corpus-v3-final/aa4beac24a3420a493022cb51826d82791e165d2",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/aa740759e5c10f9f4d5ccb1e6ccb2b64381f59ee",
+      "bytes": 1724,
+      "sha256": "e6f772b293121530b1ae32d417c67beeabf96aa07f45efae2456e4912496acd1",
+      "relative_path": "corpus-v3-final/aa740759e5c10f9f4d5ccb1e6ccb2b64381f59ee",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/aabba92ba28f20cd4cec6c5f5f19bab25fa7e0e3",
+      "bytes": 1724,
+      "sha256": "2390fc22cfe0e7ce5bca05ba2d5f7494727c58f61c896a43e7e2782e25561807",
+      "relative_path": "corpus-v3-final/aabba92ba28f20cd4cec6c5f5f19bab25fa7e0e3",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/aaff81f136bed784250a443b8ef1728fa24ce1d1",
+      "bytes": 1173,
+      "sha256": "23ecb83579915a4f4eb580ecc2a139e37c6e87da474295e439303c5ca63546a3",
+      "relative_path": "corpus-v3-final/aaff81f136bed784250a443b8ef1728fa24ce1d1",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/ac72e8594678924657f93b0cbdd633cd6c781218",
+      "bytes": 1383,
+      "sha256": "35c9e342a1a8506eacd9625cea8262a121f50c908c44188d293c3e84c9f5f4f1",
+      "relative_path": "corpus-v3-final/ac72e8594678924657f93b0cbdd633cd6c781218",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/ae313ccac6676c966a32e2ceaa159b7aa360ea1b",
+      "bytes": 1724,
+      "sha256": "5878c5c8e1a5d34c5c9fd5ccca6f78b9aae801213b0e0894a4836f56f0a6d6fb",
+      "relative_path": "corpus-v3-final/ae313ccac6676c966a32e2ceaa159b7aa360ea1b",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/aefe4b46d96eb9782433461ab4fc76cc615ce6eb",
+      "bytes": 1005,
+      "sha256": "ee6ccdaa6131c95411232163c4e3d00e722931327de6d363417bba925d2a557c",
+      "relative_path": "corpus-v3-final/aefe4b46d96eb9782433461ab4fc76cc615ce6eb",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/b17dbc503cc9528db6b5551ddcf78a68667b7378",
+      "bytes": 1724,
+      "sha256": "51b391ed19ee621ac9059ef034b97a02af064716d006347ff93fd2b6599a5b93",
+      "relative_path": "corpus-v3-final/b17dbc503cc9528db6b5551ddcf78a68667b7378",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/b2433d60243b11e6dde1213419ff7edfecd9bd04",
+      "bytes": 183,
+      "sha256": "23bbfbbf0f80f8bc76fd2a060f2e9926a00fed57627e00b3cc2dac7a9b95d523",
+      "relative_path": "corpus-v3-final/b2433d60243b11e6dde1213419ff7edfecd9bd04",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/b3c14d77043a443eacc888d86e86af3d26011a1e",
+      "bytes": 1724,
+      "sha256": "02e6124b81877c991de43631cdb30496275c15c81aa89936fd288fe6942a7749",
+      "relative_path": "corpus-v3-final/b3c14d77043a443eacc888d86e86af3d26011a1e",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/b3f6db42ff3cd308de60bba6cf7b57e0d08adf78",
+      "bytes": 1724,
+      "sha256": "9d893230dc85a03821837b2b63321a6f76bd4735b7ce10943cdf99b92b19d7eb",
+      "relative_path": "corpus-v3-final/b3f6db42ff3cd308de60bba6cf7b57e0d08adf78",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/b5370dd01a82fc658794c4a05f8914139612de8b",
+      "bytes": 1724,
+      "sha256": "d0a0e3a626688b7400826ee26ab6f01b01bdcbe2f40c000d3d80d23bb5c6509d",
+      "relative_path": "corpus-v3-final/b5370dd01a82fc658794c4a05f8914139612de8b",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/b54e9640092a3da057279faddd7f443494d6c342",
+      "bytes": 1724,
+      "sha256": "bf12169416aada28eab500443ca5dd8d5df92c6269514d46549a1f163aac8e61",
+      "relative_path": "corpus-v3-final/b54e9640092a3da057279faddd7f443494d6c342",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/b5694037b14a923c3546a13973b22e68c4196634",
+      "bytes": 1724,
+      "sha256": "2457c30535e74b6c5548f7c24a524415c0bdf75f95e0732d02054c0277826a7c",
+      "relative_path": "corpus-v3-final/b5694037b14a923c3546a13973b22e68c4196634",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/b6814af342b5a362d93375f5a3017f9455c6b617",
+      "bytes": 1724,
+      "sha256": "87ea5e49cdf7d7634ec2b3bc3022276f16af8b953b7e3c916575de7d34465d30",
+      "relative_path": "corpus-v3-final/b6814af342b5a362d93375f5a3017f9455c6b617",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/b6a08c8651464c9ed18e428ccb7ec5572541efcf",
+      "bytes": 1724,
+      "sha256": "5a36944a03fec8f5b83d04fc35a774b2b79edaad5ea23190ff3af3bd6b33260c",
+      "relative_path": "corpus-v3-final/b6a08c8651464c9ed18e428ccb7ec5572541efcf",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/b7fca075e6ae57ab4661ee54235cbf45317504aa",
+      "bytes": 1724,
+      "sha256": "6b053f417ad3ae26246400fe3ae37f49afc8c708c8f6611c2a82b215a5fc131b",
+      "relative_path": "corpus-v3-final/b7fca075e6ae57ab4661ee54235cbf45317504aa",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/b8749a6f761c31127c47f9e5dfe0a843954195e4",
+      "bytes": 1724,
+      "sha256": "28e75a8685edf1bd08fa09737b9492250ae9e7d59cf7ab7597f3ffe1310c4bf5",
+      "relative_path": "corpus-v3-final/b8749a6f761c31127c47f9e5dfe0a843954195e4",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/b8a78050743d24269cb77ccc5a36ee03af9748a5",
+      "bytes": 561,
+      "sha256": "06599b633b70da94b559d1466c0ed2851ba05274d8b992ffef0b6c8c6586b445",
+      "relative_path": "corpus-v3-final/b8a78050743d24269cb77ccc5a36ee03af9748a5",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/baa378cf0b7b51dc4347c123c5819eb1dd067095",
+      "bytes": 1724,
+      "sha256": "49ba57cd27c70fc929f8eaed837cf02052dc218e8d187d40dc2bfbc6c6ccd30c",
+      "relative_path": "corpus-v3-final/baa378cf0b7b51dc4347c123c5819eb1dd067095",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/baf7d399402233c6c582882cbe49ab1058efb004",
+      "bytes": 1724,
+      "sha256": "f3fcc158a333d308e27be8d3f15512a9bfc5d95251250d9931c04cc11f0fe73e",
+      "relative_path": "corpus-v3-final/baf7d399402233c6c582882cbe49ab1058efb004",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/bb91a0ede76932329ca1f9bbdb91c23d3ef2be5a",
+      "bytes": 1724,
+      "sha256": "3d72ecb7854f5657e6d0fe1f63f7dc070736249b96df125a27ff9158550f5ba7",
+      "relative_path": "corpus-v3-final/bb91a0ede76932329ca1f9bbdb91c23d3ef2be5a",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/bcb1a357707a6d35f5eb4ca06c278156409d7409",
+      "bytes": 1209,
+      "sha256": "b8b890469075124414fbb13ffb8a1c7247eec3369c39368b6c292dd7c78e0c64",
+      "relative_path": "corpus-v3-final/bcb1a357707a6d35f5eb4ca06c278156409d7409",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/bd7fcfd1e415d8bc4262588eb8d8181d75eff75b",
+      "bytes": 243,
+      "sha256": "ab32fd1210840994f902c1c2c8bf5f7d942f3128359a3b5ab5eaec06ecd6fbf4",
+      "relative_path": "corpus-v3-final/bd7fcfd1e415d8bc4262588eb8d8181d75eff75b",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/be40cd16022b626d4fcd0f077edfc5c10f531906",
+      "bytes": 1724,
+      "sha256": "6d90ea26bd5d5a142ce70b360b056896efa4c36b2e8fde8d9c697ca1d4dc0b2d",
+      "relative_path": "corpus-v3-final/be40cd16022b626d4fcd0f077edfc5c10f531906",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/bf1dc80e686c01c79b4e917a21ceea1a2bc7d3e4",
+      "bytes": 1724,
+      "sha256": "9b253f20356c7ce94eff127dcb7a31ca0f334b56cc86757f6b483c5903ec2fb3",
+      "relative_path": "corpus-v3-final/bf1dc80e686c01c79b4e917a21ceea1a2bc7d3e4",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/bf1e699ebdd666f5259772a7c8742ecd48932d42",
+      "bytes": 1724,
+      "sha256": "68e92e9f547e2838f902abef49531ec57b43b3131d6d65b03744eb44ccd72899",
+      "relative_path": "corpus-v3-final/bf1e699ebdd666f5259772a7c8742ecd48932d42",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/c04ef3b731fce76f018ebad839301124fda42a8b",
+      "bytes": 1724,
+      "sha256": "fc3cbf49d44471750e9dcffe1069f80e48d3c5c926760c2d9e590e427bf68910",
+      "relative_path": "corpus-v3-final/c04ef3b731fce76f018ebad839301124fda42a8b",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/c08ef00211251d1d64931ff44e7129c12b40125a",
+      "bytes": 1724,
+      "sha256": "2d6ff26ed218f17c23721e74df941c2d54cb55dc431fcd0ef5d5976f5870feec",
+      "relative_path": "corpus-v3-final/c08ef00211251d1d64931ff44e7129c12b40125a",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/c15e3027baba3e10d59317b8f5a89971a4940667",
+      "bytes": 1724,
+      "sha256": "3ed9608d5fed4dedcda72abff71b533e2910bb6a273992258a86ae5a74eefed5",
+      "relative_path": "corpus-v3-final/c15e3027baba3e10d59317b8f5a89971a4940667",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/c1cedd48163cbd7e9b617930e281af0d2c36577e",
+      "bytes": 1724,
+      "sha256": "c4382f19194af7955913544d893fe4b7086cb2310394793f4e647751705e1938",
+      "relative_path": "corpus-v3-final/c1cedd48163cbd7e9b617930e281af0d2c36577e",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/c2cb3afbfb50006971af3c7894dd4526a46838ae",
+      "bytes": 896,
+      "sha256": "528dd243f4ec5480090f56b01ef1af8b512cc4c242c6de0f85fadc07b6a13405",
+      "relative_path": "corpus-v3-final/c2cb3afbfb50006971af3c7894dd4526a46838ae",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/c333ab92f5b950bec0cbc04b307c6fa86e12f9ae",
+      "bytes": 1724,
+      "sha256": "4acb665c5680c771e4acd493fbe8e90bf8a9c490d9f30bddbc1612a4f12d1d8f",
+      "relative_path": "corpus-v3-final/c333ab92f5b950bec0cbc04b307c6fa86e12f9ae",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/c43fbee6ab4b22c664b3c77f3bef6e4d717a995d",
+      "bytes": 1724,
+      "sha256": "580b63c1f1e511886bf06cf0d081a60649952d14f40184ac401ce42d8bf2e37b",
+      "relative_path": "corpus-v3-final/c43fbee6ab4b22c664b3c77f3bef6e4d717a995d",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/c476d706559d49299fbf7ef4a6902dda3dbeb8b6",
+      "bytes": 1724,
+      "sha256": "625ac6ca775c38b0da1ac05cbab8cdd2e0feb8322cada062291c81dbbb9bd18d",
+      "relative_path": "corpus-v3-final/c476d706559d49299fbf7ef4a6902dda3dbeb8b6",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/c489a71c3e286f1c68d74d3f578107564b192562",
+      "bytes": 1724,
+      "sha256": "af492a3ff15bb3d8ffef1541e5c74ed453ba5f606c4f322d0c5274bc4d9e6b85",
+      "relative_path": "corpus-v3-final/c489a71c3e286f1c68d74d3f578107564b192562",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/c50350210f3f44676747ee659cac63138203530a",
+      "bytes": 1724,
+      "sha256": "16f6d8152ebf231fa939d71229ce907d88d272e9ff5dc7402d448f8cefca2395",
+      "relative_path": "corpus-v3-final/c50350210f3f44676747ee659cac63138203530a",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/c5b1cd3c375ac9497a9e2a06fd84564b82ca0e30",
+      "bytes": 842,
+      "sha256": "a37823b856fa73ed82b03040741117dc891e53d62a22a00ab27f0146f75dbfcb",
+      "relative_path": "corpus-v3-final/c5b1cd3c375ac9497a9e2a06fd84564b82ca0e30",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/c6ab036d86d7c23511fd10fb33436f701749cb92",
+      "bytes": 1724,
+      "sha256": "f35edbc149d1e4c3e260b865b253137b329d569c8035a6facbbf7de38f770a11",
+      "relative_path": "corpus-v3-final/c6ab036d86d7c23511fd10fb33436f701749cb92",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/c86aa4ddecaf53651c7d3fbb170e307629eb2ac2",
+      "bytes": 1724,
+      "sha256": "d504a45725ab3c86976b705e3dd53b4bb13e8c8c6cfcab6a1c71b53e39086bcf",
+      "relative_path": "corpus-v3-final/c86aa4ddecaf53651c7d3fbb170e307629eb2ac2",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/c96bd65998c99d86326a7263989aa9a5b6823662",
+      "bytes": 1724,
+      "sha256": "76ae8b4318c7a2d7772015d99849c5521fc70ae9ec8c6ef5997e686767958e87",
+      "relative_path": "corpus-v3-final/c96bd65998c99d86326a7263989aa9a5b6823662",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/ca07687bd05fef606f58510bc482aa2a36831fd1",
+      "bytes": 1724,
+      "sha256": "f4ad9489484fbb6b968d1d80cc52ed38abfd726e87e1887d01c459a6b6dee167",
+      "relative_path": "corpus-v3-final/ca07687bd05fef606f58510bc482aa2a36831fd1",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/ca1635b9d62e312f1971932f6cf75ca3fac11986",
+      "bytes": 1724,
+      "sha256": "343278549fd85c312af788524cc818e4d416aceca4888d3e6508be579a02a79d",
+      "relative_path": "corpus-v3-final/ca1635b9d62e312f1971932f6cf75ca3fac11986",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/ca3589685751b3bd1458379dbc3ffc2bd7b0f2bd",
+      "bytes": 1724,
+      "sha256": "d3b7b861213ea45c26e2e90e6a5df9123d4e23bc28172d33eb21e64f09548e2d",
+      "relative_path": "corpus-v3-final/ca3589685751b3bd1458379dbc3ffc2bd7b0f2bd",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/ca3fb942d6a42579d6f0d4fda14b6c373a500ff7",
+      "bytes": 1110,
+      "sha256": "ecbe1d2414b37905c35f81620fe18fdbd7fa3e38367240c8178537fa28a4d617",
+      "relative_path": "corpus-v3-final/ca3fb942d6a42579d6f0d4fda14b6c373a500ff7",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/cad6873c5da1084cd38ff3c316295b3eeb7b68c3",
+      "bytes": 1724,
+      "sha256": "8951a7c5f831b867624c6bbccbb8b7a26b97ec3856bff40b63b9edfb634e2c14",
+      "relative_path": "corpus-v3-final/cad6873c5da1084cd38ff3c316295b3eeb7b68c3",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/ccb2837f75f37c6a005cdce12d01b8e88807b8ed",
+      "bytes": 1724,
+      "sha256": "3aec95b06daf1bf4ea5583d259c03ff53ce9f491285e550da3ee85e8764b34e1",
+      "relative_path": "corpus-v3-final/ccb2837f75f37c6a005cdce12d01b8e88807b8ed",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/cd6868f5e3743a241d3136c351aa3000000fbef7",
+      "bytes": 1724,
+      "sha256": "8c4312306d1eb175d210a1da4b2f116c38d72563d85337b4f7c31fa394359ed1",
+      "relative_path": "corpus-v3-final/cd6868f5e3743a241d3136c351aa3000000fbef7",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/cdcfcf8c288fc14ec2f190124f102a8e8b863767",
+      "bytes": 1724,
+      "sha256": "f3e7e67580a31d730508dba54e8da133b8f760595071c9bc23fa23eb08480cb0",
+      "relative_path": "corpus-v3-final/cdcfcf8c288fc14ec2f190124f102a8e8b863767",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/ce84ea440f3b6f878fb8103ae612fb121ca9c821",
+      "bytes": 1724,
+      "sha256": "93af724bffbdf0cca2931f3e391121dc61cc499d7b53379c8190748b85f0cf76",
+      "relative_path": "corpus-v3-final/ce84ea440f3b6f878fb8103ae612fb121ca9c821",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/cfd4ec9a2cc8ca6c20b0de3187badfd86a5e90b4",
+      "bytes": 1724,
+      "sha256": "d4c3b535d02f52f9e3b10dc2b6c9020896b672d39b6798435751fd3e9b951650",
+      "relative_path": "corpus-v3-final/cfd4ec9a2cc8ca6c20b0de3187badfd86a5e90b4",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d05fc14b1bda49b01bafa59aa4f35b8c2b1f5e40",
+      "bytes": 1724,
+      "sha256": "89091496dbf26cd8611338d54f5b91bcbc74f9a76fba54ba378bd73eac70f1cf",
+      "relative_path": "corpus-v3-final/d05fc14b1bda49b01bafa59aa4f35b8c2b1f5e40",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d068a3c7332857181d1168926a4e3cc0dd9dfbf1",
+      "bytes": 1724,
+      "sha256": "e54cca418d4318527e0b1c7dbc9759c36aad4ba1f862addc2bf9d3908cc7b96c",
+      "relative_path": "corpus-v3-final/d068a3c7332857181d1168926a4e3cc0dd9dfbf1",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d121fce5d70ee2328d7feceebad4d60358d3e795",
+      "bytes": 5,
+      "sha256": "24c3c4997fd4e15ba894909b0d71f825767b4087f7efdd39c1b134264585cac9",
+      "relative_path": "corpus-v3-final/d121fce5d70ee2328d7feceebad4d60358d3e795",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d189aa3f7bb3ead26552c18f129deb3eddb712e2",
+      "bytes": 1724,
+      "sha256": "3c76ea352d57b72d897c3b38f1bdfc7b06f2561477f8c7a4c7af043da5d1fa27",
+      "relative_path": "corpus-v3-final/d189aa3f7bb3ead26552c18f129deb3eddb712e2",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d252a3a0bbac19681b1e7612e23600dab25ab8c9",
+      "bytes": 968,
+      "sha256": "6e0c996c6b1758028b8af7b64769929fc1a6a9d5ebc1a81c8bad7dd962f232db",
+      "relative_path": "corpus-v3-final/d252a3a0bbac19681b1e7612e23600dab25ab8c9",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d29015ff6f98c4999d2cc9b6b75f956a336ccd7e",
+      "bytes": 1724,
+      "sha256": "6b676b8bcf58d71947ca13eb13cff1bda1b6d8154c6dada04b5ae9ebf902576c",
+      "relative_path": "corpus-v3-final/d29015ff6f98c4999d2cc9b6b75f956a336ccd7e",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d35c142dc99ba8eb6c1dbd6f969a5a3ae24e9b46",
+      "bytes": 1724,
+      "sha256": "827d55c00f239a616768b0769ab3ed096d82dc6a3e2ea586b3fe7616b0da0fe9",
+      "relative_path": "corpus-v3-final/d35c142dc99ba8eb6c1dbd6f969a5a3ae24e9b46",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d37956e641e6cea39ad6909b319b2bb4d7b5945c",
+      "bytes": 1724,
+      "sha256": "095af9e8a18739c00eb5124d011ed1794ca5925aa38806cfe8da71a2f5b360a5",
+      "relative_path": "corpus-v3-final/d37956e641e6cea39ad6909b319b2bb4d7b5945c",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d55f5399e45f5b99e2dfea6a4e91467f67d1efac",
+      "bytes": 1724,
+      "sha256": "11526b938b33511ff13fcf9413470e1bad1fc43226fb84c2e3b247cc212611be",
+      "relative_path": "corpus-v3-final/d55f5399e45f5b99e2dfea6a4e91467f67d1efac",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d57c86c6983219183578bdbc088e97cd895770b7",
+      "bytes": 1724,
+      "sha256": "dd73b9a29cbe240ad83f8a67ba40305ef1365eb6fcde8b33c55baa207c0381f1",
+      "relative_path": "corpus-v3-final/d57c86c6983219183578bdbc088e97cd895770b7",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d5f111f465519fee1fa9a946255316f10e6f5739",
+      "bytes": 1724,
+      "sha256": "42d4a1a8609231a7e48ad72211a78ddab184fd9fbc0873409ec25b8abaa204d3",
+      "relative_path": "corpus-v3-final/d5f111f465519fee1fa9a946255316f10e6f5739",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d6693f43ab4b631ed3dd0d62245b1796750d64e8",
+      "bytes": 1724,
+      "sha256": "f077421b9c596ace50f72296d047b647052768e782c31efe3cb1767c23c9925d",
+      "relative_path": "corpus-v3-final/d6693f43ab4b631ed3dd0d62245b1796750d64e8",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d6898d45d526bb014f83c6d1ca1ed93e802f327c",
+      "bytes": 842,
+      "sha256": "f1682c907f2f4944dfa16eb8191938941cb445ac0de60ded639d26448b9322be",
+      "relative_path": "corpus-v3-final/d6898d45d526bb014f83c6d1ca1ed93e802f327c",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d6ac08e9a7d0ce15911f18bbe9eff2f3ecd0bcc0",
+      "bytes": 1724,
+      "sha256": "40677faa556c2b745c27b99e22fb323432971e7dba3da7b2f66c1266a37980ff",
+      "relative_path": "corpus-v3-final/d6ac08e9a7d0ce15911f18bbe9eff2f3ecd0bcc0",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d7f255135d0bc80aac58dead8aff5af90976c022",
+      "bytes": 1724,
+      "sha256": "5e1fb397daa9cfc670f441ae5cfc5bcab1d2bcbf1081a9dae2464b196c6311fc",
+      "relative_path": "corpus-v3-final/d7f255135d0bc80aac58dead8aff5af90976c022",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/d93179af7aef7985a9ec72c26e5bdf06d63f9ef7",
+      "bytes": 1724,
+      "sha256": "e8a125b12e2d300d701d253bf5c4c905830823c9bae63911858573402fe8a87c",
+      "relative_path": "corpus-v3-final/d93179af7aef7985a9ec72c26e5bdf06d63f9ef7",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/db40aef11c7de34fe8cdcfb64f2cf17f0d37c74e",
+      "bytes": 1724,
+      "sha256": "15542d6f5279457818f3e123e2e9ef8999085a1acd8d409fa45b52f5b0b4977d",
+      "relative_path": "corpus-v3-final/db40aef11c7de34fe8cdcfb64f2cf17f0d37c74e",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/db7e638014c9238be122ce508ef7ceb2b0366b7e",
+      "bytes": 1724,
+      "sha256": "de8d6a027959163a9b4e0a1a312cb85e121d8eff897ff948ece6865249b03b97",
+      "relative_path": "corpus-v3-final/db7e638014c9238be122ce508ef7ceb2b0366b7e",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/dc78f98be191967089d21b286c0324ae945cc0ec",
+      "bytes": 273,
+      "sha256": "b18e24661f82ec7bdf98f06f24bff89976319a7d6264ae39b7c09170681f2617",
+      "relative_path": "corpus-v3-final/dc78f98be191967089d21b286c0324ae945cc0ec",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/dca919bf1b3d963939c8cc40b09d962f2e3e4ad0",
+      "bytes": 1724,
+      "sha256": "922cf30801a252e7cab283148abfbdc84cd70bccd1ee6f010c3eab3fdbcbd2ef",
+      "relative_path": "corpus-v3-final/dca919bf1b3d963939c8cc40b09d962f2e3e4ad0",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/dd7dbb6a66fa3b5d16171586e3c46b0ab83b7a25",
+      "bytes": 1724,
+      "sha256": "01385325aca3598ff05c18dfc148247f4328e82d891752b59ef65aaa77f5a2d1",
+      "relative_path": "corpus-v3-final/dd7dbb6a66fa3b5d16171586e3c46b0ab83b7a25",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/ddb9bba1f6fad706690da32c1c89f21a142832e3",
+      "bytes": 362,
+      "sha256": "a431687ae95e0964165cd140c34f3936724526511e7a33dd12835500d0c3e708",
+      "relative_path": "corpus-v3-final/ddb9bba1f6fad706690da32c1c89f21a142832e3",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/de88bbd70ddff2a30a290b23f514c5df6e37fa5e",
+      "bytes": 560,
+      "sha256": "604b531d638876ac70cef0fd0153c9e0351d5da0097de0077c9620745a71d0f0",
+      "relative_path": "corpus-v3-final/de88bbd70ddff2a30a290b23f514c5df6e37fa5e",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/dedca52795f4a5c11705e64c9e09d87e29e59b39",
+      "bytes": 1724,
+      "sha256": "43ccd85e265dfceca8cebb9f14d9e825a7df76ffef1cd1058bebe675b98a5202",
+      "relative_path": "corpus-v3-final/dedca52795f4a5c11705e64c9e09d87e29e59b39",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/df50cf0d54c38b8ace74becdfeba5f5bf75ffbc6",
+      "bytes": 1724,
+      "sha256": "6f9ad763c7706b4dbc5889079a68dbc32c60c28227bb69d51fbfae89b570a0df",
+      "relative_path": "corpus-v3-final/df50cf0d54c38b8ace74becdfeba5f5bf75ffbc6",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/df867f6c45fac26fb1ad632293ecb0cd4b68fdce",
+      "bytes": 1724,
+      "sha256": "a3c4f414ca0e30d0914035da44eba15e863b6814fd2c18557a6f00b20c1dc756",
+      "relative_path": "corpus-v3-final/df867f6c45fac26fb1ad632293ecb0cd4b68fdce",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/e0432f344b4fd8ab707d80d4c6405d09bf364410",
+      "bytes": 1724,
+      "sha256": "781310c5958c503c3b2d791f8eb0ba457280b3ea318b3785c78d57f332159a10",
+      "relative_path": "corpus-v3-final/e0432f344b4fd8ab707d80d4c6405d09bf364410",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/e13794572af60486f13d449a90890ebe3a862434",
+      "bytes": 12,
+      "sha256": "059b0bd115f5749030b3453e240bee0629cad965562fc7532355e5827d50a272",
+      "relative_path": "corpus-v3-final/e13794572af60486f13d449a90890ebe3a862434",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/e359b14bc9cb5c960aeb98762ebabf35df9f6b79",
+      "bytes": 207,
+      "sha256": "c915b0c9abcb4b168b9b52055193377f58bd809e6985cdb164a9def6ad9e01b8",
+      "relative_path": "corpus-v3-final/e359b14bc9cb5c960aeb98762ebabf35df9f6b79",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/e390606c0b26b21fadac8db3afbe7edfc71dbc12",
+      "bytes": 1724,
+      "sha256": "9b1c1f5a8903143585e2437758bb3fdaf1016f27b0c216f70e26ed705100b407",
+      "relative_path": "corpus-v3-final/e390606c0b26b21fadac8db3afbe7edfc71dbc12",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/e64ea4912a1a8a6c46586dd2fa533c3c1db6133d",
+      "bytes": 1462,
+      "sha256": "4bdcb7c93c2e8bfd408688e670a7644a9cc526c84e332f784311012bef646877",
+      "relative_path": "corpus-v3-final/e64ea4912a1a8a6c46586dd2fa533c3c1db6133d",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/e6bf8fcec9046f020bf43928ba9d9844be7d7bfb",
+      "bytes": 1724,
+      "sha256": "b36b831b732648957b3e9822b6c5f207be3853de48ed198ee411ab3227851041",
+      "relative_path": "corpus-v3-final/e6bf8fcec9046f020bf43928ba9d9844be7d7bfb",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/e7064f0b80f61dbc65915311032d27baa569ae2a",
+      "bytes": 1,
+      "sha256": "ba5ec51d07a4ac0e951608704431d59a02b21a4e951acc10505a8dc407c501ee",
+      "relative_path": "corpus-v3-final/e7064f0b80f61dbc65915311032d27baa569ae2a",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/e7ff4bbc91f33605afa7acf82e3c4697f09b80a5",
+      "bytes": 701,
+      "sha256": "1af6a3b15129381d3c8be2c299e45132c320ffd38bce1c5a800d5bb2f1cd1ac0",
+      "relative_path": "corpus-v3-final/e7ff4bbc91f33605afa7acf82e3c4697f09b80a5",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/e8c2e13a0202af1a118245a43fb47276d253fcea",
+      "bytes": 233,
+      "sha256": "0df2d05e8ae5cf85fc5f4e87312795492eb59058938e27df2adc1592aa775463",
+      "relative_path": "corpus-v3-final/e8c2e13a0202af1a118245a43fb47276d253fcea",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/e8ecd74375005849b3baaefeb7b7cba0002980cd",
+      "bytes": 1724,
+      "sha256": "e872ff1e258adc3bd35a87069f297ac85c7b4dc6b1b6adde5463e895e7bb2c75",
+      "relative_path": "corpus-v3-final/e8ecd74375005849b3baaefeb7b7cba0002980cd",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/e9fc664af367e3cb5fa7797455eb572db31f8324",
+      "bytes": 1724,
+      "sha256": "ebcf29421da1351a09f83ba806a751c520a5a136c6d6c3fc7c2b88f7c79f26d3",
+      "relative_path": "corpus-v3-final/e9fc664af367e3cb5fa7797455eb572db31f8324",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/ea7e757d5a3dc3f409bbd18a721e180f71e7b711",
+      "bytes": 1724,
+      "sha256": "db9a2347c313d3e6c49abf7fc1b0f2903a67038f12f2c211383760c2316db8a5",
+      "relative_path": "corpus-v3-final/ea7e757d5a3dc3f409bbd18a721e180f71e7b711",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/eac6960e0ef19de8e761a260b7123719e76d4ddd",
+      "bytes": 1466,
+      "sha256": "86884b9929b84b071cfdc7e1b88142244d8c2d8d79e7051be9f0c9a1ecfb61e2",
+      "relative_path": "corpus-v3-final/eac6960e0ef19de8e761a260b7123719e76d4ddd",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/ec00c3ec05c49fc76127c892b51949300dfa8646",
+      "bytes": 1724,
+      "sha256": "030430dac55ea338d884e5a450a55dfb3f5e3cbd9f4203042b1dc6384090655a",
+      "relative_path": "corpus-v3-final/ec00c3ec05c49fc76127c892b51949300dfa8646",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/ed1d835c40850bbe9b1c46a8569738289d34c521",
+      "bytes": 1156,
+      "sha256": "462d1d35743a2be0d6d265e3d1ce46b35a92d4063e7f52db750c34eb2b17a01c",
+      "relative_path": "corpus-v3-final/ed1d835c40850bbe9b1c46a8569738289d34c521",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/ede4479b8f1ce50d9f0568ad0e9bf4156121d61c",
+      "bytes": 1724,
+      "sha256": "91daf0dfeecedfe90bfffd38d4a72836a533e97bfbfafe23fdcdd87bb7199e92",
+      "relative_path": "corpus-v3-final/ede4479b8f1ce50d9f0568ad0e9bf4156121d61c",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/efb32d90aeb9af88f6cb17e29b34744637d37631",
+      "bytes": 1724,
+      "sha256": "ac241f612d3468fa5e90a0c8504bd4ed0f05a05fe92d9155aaaf743d49133735",
+      "relative_path": "corpus-v3-final/efb32d90aeb9af88f6cb17e29b34744637d37631",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/f04f88c8b4610345e41ffc533d3e1cb69c286feb",
+      "bytes": 644,
+      "sha256": "e08068a892c5c81b7a48f00c4db8ace42b3671cb887900cd60c6b4cb2dc29e7d",
+      "relative_path": "corpus-v3-final/f04f88c8b4610345e41ffc533d3e1cb69c286feb",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/f09fc903a0b99797c5694b45180cfc65e34c781a",
+      "bytes": 1724,
+      "sha256": "87ed31a9edd8562a8532a87bf679e3a9effe4e86d405e07e3cf0e9e249dd3e6f",
+      "relative_path": "corpus-v3-final/f09fc903a0b99797c5694b45180cfc65e34c781a",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/f1a50318694490a493be03f0e53c8a08685bfb5b",
+      "bytes": 1724,
+      "sha256": "5a23e542144e9d66926427b2f099bc5a1ce49d9bcca6f4a4e2ae35bbf74d721c",
+      "relative_path": "corpus-v3-final/f1a50318694490a493be03f0e53c8a08685bfb5b",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/f4a6b667cf1770de43cebfeba2ef75c7bb3efe1a",
+      "bytes": 1724,
+      "sha256": "b6fd53f4b7bfb62f5fd4c2c217f6722d59cb43c6b7c1f52a1ce604dfe17d1ee8",
+      "relative_path": "corpus-v3-final/f4a6b667cf1770de43cebfeba2ef75c7bb3efe1a",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/f4d12878a66fa40067274deff0cdee5a6f0fc1d9",
+      "bytes": 1724,
+      "sha256": "e23537dccee9d8ecdd784caffc978585c4f0e5f6b9a71ee559c3dc9afafd3f59",
+      "relative_path": "corpus-v3-final/f4d12878a66fa40067274deff0cdee5a6f0fc1d9",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/f509ff3df8194b6d2771a6e6065a155a5da680cd",
+      "bytes": 695,
+      "sha256": "fa357b3cee8b57ad448633b69ad2f0a46e8e34fbbb6832dcb0b74e2d49d05cdc",
+      "relative_path": "corpus-v3-final/f509ff3df8194b6d2771a6e6065a155a5da680cd",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/f517f493c4ae0619dc0619b605505b66dce3f1fd",
+      "bytes": 842,
+      "sha256": "ffb1811435bcc7df0cd2cc43ca8686ef0f5d36b90d641c7fe45c40f449cf2f05",
+      "relative_path": "corpus-v3-final/f517f493c4ae0619dc0619b605505b66dce3f1fd",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/f5213ae6be5948bb4d8b0305659955d5f978ffd0",
+      "bytes": 1724,
+      "sha256": "8da08c880341a4491aae7caef945efc682cfe26d76f9f2601cbfaaf8c6f27cda",
+      "relative_path": "corpus-v3-final/f5213ae6be5948bb4d8b0305659955d5f978ffd0",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/f5eeea78008f9c50a26a187d9905e545a568ddbb",
+      "bytes": 1724,
+      "sha256": "edc9fabfa15832f6b7d3af87bf64084653383c0014514fcb9da64d8d718d9a0f",
+      "relative_path": "corpus-v3-final/f5eeea78008f9c50a26a187d9905e545a568ddbb",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/f6a7d79dca3837e3e2d936b7bfaf950016c78ce7",
+      "bytes": 1724,
+      "sha256": "61d0245f997ceaed57c4774a265eca5d44256e406cbd195f78575cc99cff85eb",
+      "relative_path": "corpus-v3-final/f6a7d79dca3837e3e2d936b7bfaf950016c78ce7",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/f6d6d408b16edc4075316b3a7decf6cdca07a4f3",
+      "bytes": 968,
+      "sha256": "096c707b079abcec377997bbb18b0d18c42b726d396b3eb3b879e398fe77c475",
+      "relative_path": "corpus-v3-final/f6d6d408b16edc4075316b3a7decf6cdca07a4f3",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/f73fc895954bb4dddc999e6d4d7fba94e64137de",
+      "bytes": 1724,
+      "sha256": "7e900fac42c086992f08b8220a1630464ac3e40a627369787e44e60a36e4ddf0",
+      "relative_path": "corpus-v3-final/f73fc895954bb4dddc999e6d4d7fba94e64137de",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/f77886a5703495b26bbc0992f4b1626e571723eb",
+      "bytes": 1724,
+      "sha256": "1d3369644025d327ede08786f601067ac332d29902acfaad111dc826e9dc7010",
+      "relative_path": "corpus-v3-final/f77886a5703495b26bbc0992f4b1626e571723eb",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/f799a6de140065445477a1240d900feedeae2cb5",
+      "bytes": 1724,
+      "sha256": "d9e2faacb0ba70e51167d6d0fb4145bdd43bf463e0dcdba0f5756854b51fb8de",
+      "relative_path": "corpus-v3-final/f799a6de140065445477a1240d900feedeae2cb5",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/f9cc5749765640e2d3510a6ae016c4875036a721",
+      "bytes": 1724,
+      "sha256": "5e9411c94e15d83276db4af19bb175eacbd20eacffb6a41fd8541c6c1d0c8c33",
+      "relative_path": "corpus-v3-final/f9cc5749765640e2d3510a6ae016c4875036a721",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/fae270fc3d258f1bce51ce106ce7a92212485b48",
+      "bytes": 1724,
+      "sha256": "94520f813ef80fa2d95d835dccc3a9f8f120108398b8920d990d7ccf6c6d749d",
+      "relative_path": "corpus-v3-final/fae270fc3d258f1bce51ce106ce7a92212485b48",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/fbc53a713f739369651c498b457c192a2c186e75",
+      "bytes": 1724,
+      "sha256": "69df563634eab93d5dbbb8eb4a1f8c2590efae6bc2a1649b9dafe7a898983e41",
+      "relative_path": "corpus-v3-final/fbc53a713f739369651c498b457c192a2c186e75",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/fc352f83a55bed608af89fd9bcb7a9acac90469e",
+      "bytes": 7,
+      "sha256": "4309323b3868aaf91b856ebd24fe1737a9f4da45744c43983f0cde1357b4ab48",
+      "relative_path": "corpus-v3-final/fc352f83a55bed608af89fd9bcb7a9acac90469e",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/fc35982597360b41a52f1125812ff763535dcb35",
+      "bytes": 1724,
+      "sha256": "3a1709ec491f7ca3b771ab7007407eb798164de2bd5e5da82d3ca0870a077c1f",
+      "relative_path": "corpus-v3-final/fc35982597360b41a52f1125812ff763535dcb35",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/fd02ea01f0373f5e30b89606b0ea359fe6b7ddc2",
+      "bytes": 1724,
+      "sha256": "f0880ac049d026297622edb456eb7375d5249070e5a34ef57039891bf33a181f",
+      "relative_path": "corpus-v3-final/fd02ea01f0373f5e30b89606b0ea359fe6b7ddc2",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/fd3726d92e1e4156d0a9b4b546c287a18662a5a6",
+      "bytes": 1724,
+      "sha256": "3084c29572b1ec12d4e63753e78eeb671b9870fd16b53bd6988463f10299968f",
+      "relative_path": "corpus-v3-final/fd3726d92e1e4156d0a9b4b546c287a18662a5a6",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/fdb6ff331a533ecd12306e4ea295b41e4265d393",
+      "bytes": 1724,
+      "sha256": "5111658ee1ba7fc693784381ea01deeb060c9aee1f876283e8f9508203d07908",
+      "relative_path": "corpus-v3-final/fdb6ff331a533ecd12306e4ea295b41e4265d393",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/fe049cc1e8967536f08e62eb966e5cecc1dc4f61",
+      "bytes": 94,
+      "sha256": "30abd2234675439046330b96d5ff2e378ec34870206b44118fcc45f9b7b76b9e",
+      "relative_path": "corpus-v3-final/fe049cc1e8967536f08e62eb966e5cecc1dc4f61",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/fee628d45655ea0044c38ea748e847dd010b12b4",
+      "bytes": 1724,
+      "sha256": "2c9e54c61c378a781983116548a18b48982271d34b433ce35cadc3c51cc3b7a7",
+      "relative_path": "corpus-v3-final/fee628d45655ea0044c38ea748e847dd010b12b4",
+      "role": "libfuzzer-discovered-v3"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/feedc60467eced24e1cab998067042d5fdb800ac",
+      "bytes": 1724,
+      "sha256": "fef99bf800d04486437108aa1475900fee1139f04dd008753f0c26e1598a1464",
+      "relative_path": "corpus-v3-final/feedc60467eced24e1cab998067042d5fdb800ac",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/malformed-00.bin",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "relative_path": "corpus-v3-final/malformed-00.bin",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/malformed-01.bin",
+      "bytes": 18,
+      "sha256": "235e41813f620455e9332c7d63fcb01c27f83f4015bcb80313f6e9f1d4ca5a8b",
+      "relative_path": "corpus-v3-final/malformed-01.bin",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/malformed-02.bin",
+      "bytes": 8,
+      "sha256": "4bc961e8ca5ed1566ca76e0986ba99290b4fe8fbc177eaa9c99761dc2bb74cc1",
+      "relative_path": "corpus-v3-final/malformed-02.bin",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/malformed-03.bin",
+      "bytes": 862,
+      "sha256": "82dd65ea8b0258ac3d1e29e61c19ab815c416234e2d32b8bab44b3c387915723",
+      "relative_path": "corpus-v3-final/malformed-03.bin",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/malformed-04.bin",
+      "bytes": 1723,
+      "sha256": "343100c07f1a1d8399f58294dbef77f3bf2524bce4e3dfc6d15af4f5fc8b76b3",
+      "relative_path": "corpus-v3-final/malformed-04.bin",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/malformed-05.bin",
+      "bytes": 842,
+      "sha256": "f8be444c1ef2dc3cc8903c09ff2710d838cd1279de7c8354437895c58d5d532a",
+      "relative_path": "corpus-v3-final/malformed-05.bin",
+      "role": "inherited-v2-final-corpus"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-v3-final/valid-opc.zip",
+      "bytes": 1724,
+      "sha256": "fbb8cf01b98323d5403b2ab817632f996f0e5d3158e0a3ad41de371fd9c6758b",
+      "relative_path": "corpus-v3-final/valid-opc.zip",
+      "role": "inherited-v2-final-corpus"
+    }
+  ],
+  "notes": [
+    "The final on-disk directory contains the copied v2 final corpus plus files discovered during the v3 run. LibFuzzer reports its reduced in-memory corpus separately; the manifest binds every retained on-disk file.",
+    "The copied v2 corpus and v2 manifest remain byte-for-byte untouched."
+  ]
+}

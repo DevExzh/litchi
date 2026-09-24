@@ -1,12 +1,13 @@
+use crate::model::database_range::Range as DatabaseRange;
 use crate::model::names::{Definition, Expression, Range};
 use crate::worksheet::{Cell, Sheet};
 use litchi_core::{Error, Result};
+use litchi_odf_common::ResolvedReader;
 use litchi_odf_common::calculation::Settings;
 use litchi_odf_common::core::PackageWriter;
 use quick_xml::{
     events::Event,
     name::{Namespace, ResolveResult},
-    reader::NsReader,
 };
 
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
@@ -21,6 +22,7 @@ pub struct Builder {
     definitions: Vec<Definition>,
     metadata: litchi_core::Metadata,
     settings: Option<Settings>,
+    table_templates: Vec<crate::styles::table_template::Template>,
 }
 
 impl Default for Builder {
@@ -37,6 +39,7 @@ impl Builder {
             definitions: Vec::new(),
             metadata: litchi_core::Metadata::default(),
             settings: None,
+            table_templates: Vec::new(),
         }
     }
 
@@ -78,6 +81,112 @@ impl Builder {
             settings.validate()?;
         }
         self.settings = settings;
+        Ok(self)
+    }
+
+    /// Borrow standalone table templates authored into the next package.
+    #[must_use]
+    pub fn table_templates(&self) -> &[crate::styles::table_template::Template] {
+        &self.table_templates
+    }
+
+    /// Replace the complete standalone table-template catalog.
+    pub fn set_table_templates(
+        &mut self,
+        templates: Vec<crate::styles::table_template::Template>,
+    ) -> Result<&mut Self> {
+        let snapshot = crate::styles::table_template::Snapshot::from_source(None)?;
+        let mut edit = snapshot.edit();
+        edit.replace(templates)?;
+        self.table_templates = edit.templates().to_vec();
+        Ok(self)
+    }
+
+    /// Stage a bounded table-template update in the builder.
+    pub fn edit_table_templates<F>(&mut self, update: F) -> Result<&mut Self>
+    where
+        F: FnOnce(&mut crate::styles::table_template::Edit) -> Result<()>,
+    {
+        let snapshot = crate::styles::table_template::Snapshot::from_source(None)?;
+        let mut edit = snapshot.edit();
+        edit.replace(self.table_templates.clone())?;
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        self.table_templates = commit.snapshot().templates().to_vec();
+        Ok(self)
+    }
+
+    /// Borrow the inert scenario declarations currently staged in
+    /// `content.xml`.
+    pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
+        crate::scenario::Snapshot::parse(&self.content_xml).map_err(|error| {
+            Error::InvalidFormat(format!("ODS scenario metadata inspection failed: {error}"))
+        })
+    }
+
+    /// Stage a source-bound, inert scenario metadata update in the builder.
+    ///
+    /// The update records declarations only.  It never applies a what-if
+    /// scenario, evaluates formulas, or refreshes external data.
+    pub fn edit_scenarios<F>(&mut self, update: F) -> Result<&mut Self>
+    where
+        F: FnOnce(&mut crate::scenario::Edit) -> Result<()>,
+    {
+        let snapshot = self.scenarios()?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        if commit.changed() {
+            self.content_xml = commit.snapshot().source_xml().to_owned();
+        }
+        Ok(self)
+    }
+
+    /// Borrow the inert database-range declarations currently staged in the
+    /// builder's content XML.
+    pub fn database_ranges(&self) -> Result<Vec<DatabaseRange>> {
+        crate::database_range::parse_content(&self.content_xml).map(|(ranges, _)| ranges)
+    }
+
+    /// Replace the complete database-range catalog while preserving whether
+    /// an existing empty owner is physical.
+    pub fn set_database_ranges(&mut self, ranges: Vec<DatabaseRange>) -> Result<&mut Self> {
+        let (_, present) = crate::database_range::parse_content(&self.content_xml)?;
+        let candidate = if present || !ranges.is_empty() {
+            Some(ranges.as_slice())
+        } else {
+            None
+        };
+        let updated = crate::database_range::replace_content(&self.content_xml, candidate)?;
+        self.content_xml = updated;
+        Ok(self)
+    }
+
+    /// Append one inert database-range declaration atomically.
+    pub fn add_database_range(&mut self, range: DatabaseRange) -> Result<&mut Self> {
+        let mut ranges = self.database_ranges()?;
+        ranges.push(range);
+        self.set_database_ranges(ranges)
+    }
+
+    /// Remove the physical database-range owner from the next package.
+    pub fn clear_database_ranges(&mut self) -> Result<&mut Self> {
+        let updated = crate::database_range::replace_content(&self.content_xml, None)?;
+        self.content_xml = updated;
+        Ok(self)
+    }
+
+    /// Stage source-checked inert database-range CRUD in the builder.
+    pub fn edit_database_ranges<F>(&mut self, update: F) -> Result<&mut Self>
+    where
+        F: FnOnce(&mut crate::database_range::ContentEdit) -> Result<()>,
+    {
+        let mut edit = crate::database_range::ContentEdit::from_source(&self.content_xml)?;
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        if commit.changed() {
+            self.content_xml = commit.into_source_xml();
+        }
         Ok(self)
     }
 
@@ -180,6 +289,24 @@ impl Builder {
         })
     }
 
+    /// Set or clear one worksheet's direct table title.
+    pub fn set_sheet_title(
+        &mut self,
+        sheet_name: &str,
+        title: Option<String>,
+    ) -> Result<&mut Self> {
+        self.edit_sheet(sheet_name, |sheet| sheet.set_title(title))
+    }
+
+    /// Set or clear one worksheet's direct table description.
+    pub fn set_sheet_description(
+        &mut self,
+        sheet_name: &str,
+        description: Option<String>,
+    ) -> Result<&mut Self> {
+        self.edit_sheet(sheet_name, |sheet| sheet.set_description(description))
+    }
+
     fn edit_sheet<F>(&mut self, sheet_name: &str, operation: F) -> Result<&mut Self>
     where
         F: FnOnce(&mut Sheet) -> Result<()>,
@@ -259,6 +386,11 @@ impl Builder {
                 writer.add_file("meta.xml", metadata_xml.as_bytes())?;
             }
         }
+        if !self.table_templates.is_empty() {
+            let styles_xml =
+                crate::styles::table_template::styles_xml_for_templates(&self.table_templates)?;
+            writer.add_file("styles.xml", styles_xml.as_bytes())?;
+        }
         writer.finish_to_bytes()
     }
 }
@@ -273,7 +405,7 @@ impl Builder {
 pub(crate) fn validate_content_xml(xml: &str) -> Result<()> {
     validate_size(xml)?;
 
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut depth = 0usize;

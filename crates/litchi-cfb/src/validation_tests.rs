@@ -323,6 +323,24 @@ fn directory_byte_limit_is_a_blocked_cfb_validation_ingress() {
 }
 
 #[test]
+fn allocation_table_byte_limit_is_a_blocked_cfb_validation_ingress() {
+    let source = Arc::new(MutableSource::new(sample_file()));
+    let limits = SharedOleFileLimits::new(SharedOleFileLimits::MAX_INPUT_BYTES)
+        .unwrap()
+        .with_max_allocation_table_bytes(1)
+        .unwrap();
+
+    let report = validate_source_with_limits(source, limits, ValidationLimits::default())
+        .expect("allocation-table ceiling should be represented in the report");
+    assert!(!report.is_complete());
+    assert!(!report.has_errors());
+    assert!(matches!(
+        report.checks()[0].status(),
+        CheckStatus::Blocked { .. }
+    ));
+}
+
+#[test]
 fn version_change_between_preflight_and_canonical_ingress_is_an_error() {
     let unstable = Arc::new(ChangingVersionSource {
         bytes: sample_file(),
@@ -345,5 +363,22 @@ fn shared_view_revalidation_refuses_a_changed_source_version() {
     assert!(matches!(
         shared.validate(ValidationLimits::default()),
         Err(CfbValidationError::Ingress(OleError::SourceChanged { .. }))
+    ));
+}
+
+#[test]
+fn shared_view_revalidation_reuses_selected_allocation_table_limit() {
+    let source = Arc::new(MutableSource::new(sample_file()));
+    let mut shared = SharedOleFile::open(source).unwrap();
+    shared.limits = shared.limits.with_max_allocation_table_bytes(1).unwrap();
+
+    let report = shared
+        .validate(ValidationLimits::default())
+        .expect("selected allocation-table ceiling should be retained");
+    assert!(!report.is_complete());
+    assert!(!report.has_errors());
+    assert!(matches!(
+        report.checks()[0].status(),
+        CheckStatus::Blocked { .. }
     ));
 }

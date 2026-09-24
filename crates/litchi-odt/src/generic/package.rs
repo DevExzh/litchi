@@ -31,6 +31,9 @@ impl Package {
     /// Replace `content.xml` while preserving optional core parts and every
     /// auxiliary package entry that can be rewritten safely.
     pub(crate) fn replace_content_xml(&mut self, content: String) -> Result<()> {
+        if self.content_xml()? == content {
+            return Ok(());
+        }
         *self = self.with_replaced_content_xml(content)?;
         Ok(())
     }
@@ -276,6 +279,102 @@ impl Package {
             parts.push((styles, crate::form::Part::Styles));
         }
         crate::form::parse_form_parts(&parts)
+    }
+
+    /// Inspect in-content RDFa and inline `text:meta` values in content and
+    /// styles without materializing unrelated package members.
+    pub fn in_content_metadata(&self) -> Result<crate::ContentMetadata> {
+        let content = self.content_xml()?;
+        let styles = self.styles_xml()?;
+        let mut parts = vec![(content.as_str(), crate::MetadataPart::Content)];
+        if let Some(styles) = styles.as_deref() {
+            parts.push((styles, crate::MetadataPart::Styles));
+        }
+        crate::content_metadata::parse_parts(&parts)
+    }
+
+    /// Inspect inert XForms model declarations in `office:forms`.
+    pub fn xforms_models(&self) -> Result<Vec<crate::xforms::Model>> {
+        crate::xforms::parse_models(&self.content_xml()?)
+    }
+
+    /// Set or clear paragraph RDFa and atomically publish `content.xml`.
+    pub fn set_paragraph_rdfa(
+        &mut self,
+        position: litchi_core::Position,
+        value: &crate::RdfaAttributes,
+    ) -> Result<()> {
+        let content =
+            crate::content_metadata::set_paragraph_rdfa(&self.content_xml()?, position, value)?;
+        self.replace_content_xml(content)
+    }
+
+    /// Set or clear RDFa on a uniquely named bookmark start and publish it.
+    pub fn set_bookmark_rdfa(&mut self, name: &str, value: &crate::RdfaAttributes) -> Result<()> {
+        let content =
+            crate::content_metadata::set_bookmark_rdfa(&self.content_xml()?, name, value)?;
+        self.replace_content_xml(content)
+    }
+
+    /// Set or clear RDFa on one inline `text:meta` occurrence and publish it.
+    pub fn set_text_meta_rdfa(
+        &mut self,
+        position: litchi_core::Position,
+        value: &crate::RdfaAttributes,
+    ) -> Result<()> {
+        let content =
+            crate::content_metadata::set_text_meta_rdfa(&self.content_xml()?, position, value)?;
+        self.replace_content_xml(content)
+    }
+
+    /// Insert an inline `text:meta` and atomically publish `content.xml`.
+    pub fn insert_text_meta(
+        &mut self,
+        paragraph: litchi_core::Position,
+        value: &crate::TextMeta,
+    ) -> Result<()> {
+        let content =
+            crate::content_metadata::insert_text_meta(&self.content_xml()?, paragraph, value)?;
+        self.replace_content_xml(content)
+    }
+
+    /// Replace one inline `text:meta` and atomically publish `content.xml`.
+    pub fn replace_text_meta(
+        &mut self,
+        position: litchi_core::Position,
+        value: &crate::TextMeta,
+    ) -> Result<()> {
+        let content =
+            crate::content_metadata::replace_text_meta(&self.content_xml()?, position, value)?;
+        self.replace_content_xml(content)
+    }
+
+    /// Remove one inline `text:meta` and atomically publish `content.xml`.
+    pub fn remove_text_meta(&mut self, position: litchi_core::Position) -> Result<()> {
+        let content = crate::content_metadata::remove_text_meta(&self.content_xml()?, position)?;
+        self.replace_content_xml(content)
+    }
+
+    /// Replace one inert XForms model and atomically publish `content.xml`.
+    pub fn replace_xforms_model(
+        &mut self,
+        position: litchi_core::Position,
+        model: &crate::xforms::Model,
+    ) -> Result<()> {
+        let content = crate::xforms::replace_model(&self.content_xml()?, position.get(), model)?;
+        self.replace_content_xml(content)
+    }
+
+    /// Insert an inert XForms model into the existing `office:forms` container.
+    pub fn insert_xforms_model(&mut self, model: &crate::xforms::Model) -> Result<()> {
+        let content = crate::xforms::insert_model(&self.content_xml()?, model)?;
+        self.replace_content_xml(content)
+    }
+
+    /// Remove one inert XForms model from `office:forms` and publish it.
+    pub fn remove_xforms_model(&mut self, position: litchi_core::Position) -> Result<()> {
+        let content = crate::xforms::remove_model(&self.content_xml()?, position.get())?;
+        self.replace_content_xml(content)
     }
 
     /// Inspect ordered ODF variable declarations in content and styles.

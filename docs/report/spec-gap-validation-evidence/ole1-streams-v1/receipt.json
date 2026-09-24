@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "9aa761f071b37edfbb898664338e2819c81e728d",
+  "toolchain": "1.95.0",
+  "source_files": {
+    "crates/litchi-ole-common/src/ole1.rs": "b4d2912b5f45b21c1c3b83fd94e54f2a135f07b3a92cc8586726cb3669ab18cd",
+    "crates/litchi-ole-common/tests/ole1.rs": "2ef811dfccf958d2f066b54de1c941a9d6fca99bacf03da3fd2e6d5e94554fe5",
+    "crates/litchi-ole-common/src/lib.rs": "3b049cd35ed805ddc84e03238562dc899b829ab058e5a7d8ade4e67bf937ecde"
+  },
+  "scope": "Bounded inert OLE1 borrowed parser, shared snapshots, five typed presentation forms, canonical authoring, exact reversible source-checked edits, explicit read/preserve-only producer compatibility.",
+  "commands": [
+    {
+      "command": "cargo +1.95.0 test --offline --locked -p litchi-ole-common -p litchi-cfb --all-features",
+      "exit_code": 0,
+      "log": "tests.log.gz",
+      "tests_passed": 522,
+      "tests_ignored": 1,
+      "doctests_passed": 14,
+      "doctests_ignored": 1
+    },
+    {
+      "command": "cargo +1.95.0 clippy --offline --locked -p litchi-ole-common -p litchi-cfb --all-targets --all-features -- -D warnings",
+      "exit_code": 0,
+      "log": "clippy.log.gz"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 --config skip_children=true (changed Rust files)",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "3ae2ed0fc4b148617ed846bb3730efa46a00fe00ad2631d6b5cabf6d921cf586",
+      "uncompressed_sha256": "2a44c054324df39c75b826c122c1409d99edcd93ad2533e29928a1c3758c6aa3"
+    },
+    "clippy.log.gz": {
+      "sha256": "a97f458a7d320e417e945b435b28dfa1f3332dd0ec9d40b5a8d76dcb0cc655de",
+      "uncompressed_sha256": "3a20cbf49e28c78b3ba1095ceb401114e46e0789136f49efddd487a2b476289d"
+    }
+  },
+  "native": {
+    "archive": "native-harness-v3.tar.gz",
+    "sha256": "093d4e68893846092e35e03ef5c19178291f7b2897affb6503b04688f1b7d250",
+    "files": {
+      ".cargo/config.toml": "ba4c7dc6f4264c182273a7491b574bb2bb1da40f738cc27b8036f0de30518644",
+      "Cargo.lock": "73602d5a6a167a87cf7fa495b7948de36ce478c917cfb7cd27eeb80dae6f009d",
+      "Cargo.toml": "1a2655cf0835db15bfb99c9787807c9520343d727040191df8cd04dcf1bfde05",
+      "RECEIPT.md": "d31d7d5fd10c6a5f33b80c14f32adcd66e3d387027367a6c7d2f91f5b0f0d1fd",
+      "RECEIPT.md.sha256": "19a65f7884922510288da7d7d1f70b43c1805f698bdf114014ebe8f719f8b54b",
+      "candidate-ole1-tests.notiming.log": "0273cba841f377edb9dab28c056a7354c4159134c05b862f903908266ccfeb8f",
+      "candidate-source.sha256": "572408178c01c672aa32afe4d35e97b9f67c725c081f3d168053963e8cd14b47",
+      "commands.txt": "406a931b0239b4d1c29016cb91760fd03951a8e93c875e54b0c853751dc73b38",
+      "evidence-manifests.sha256": "2d7c452b04bac13ddfa3e9f104598e6db3fc30d51fb6e30d0f59169d4586a359",
+      "fixture-sources.sha256": "5f444d54ff92c358a0c5f738eeb6fc65a99e6e2bf9fdd2614246e3cb51493770",
+      "harness-inputs.sha256": "48b1c6e28e62562ceb9cfaeba1aeae17c0694478716e8012b0585352fb4cd66d",
+      "outputs.sha256": "e315aba0e46778fddc30e7354262857324dbb8c7cc55ca843946d039317e9b78",
+      "run-v3.notiming.log": "6ce3e21acc1563eb460e86b842818731c056d4a3ff738e58f80ddee6bf14d55e",
+      "src/main.rs": "f1903e49c9893543aca02822432fc5456bf25c8fd75c9f33a59225648db10491"
+    },
+    "root_verified_manifest_counts": {
+      "candidate-source.sha256": 3,
+      "harness-inputs.sha256": 4,
+      "fixture-sources.sha256": 4,
+      "outputs.sha256": 16,
+      "evidence-manifests.sha256": 8,
+      "RECEIPT.md.sha256": 1
+    },
+    "external_root": "/var/tmp/ole1-native-validation-v3-20260909",
+    "fixture_count": 4,
+    "scope": "Four pinned native sources plus one synthetic compatibility control. Exact source/noop/inverse/limits/truncation behavior. Original/decoded binary inputs remain external and their hashes are archived. No rendering, activation, timing, throughput or total-memory claim."
+  },
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  }
+}

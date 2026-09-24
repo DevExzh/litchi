@@ -1,0 +1,11 @@
+[package]
+name = "form-owner-perf-harness"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+litchi-core = { path = "../source/crates/litchi-core" }
+litchi-xlsx = { path = "../source/crates/litchi-xlsx" }

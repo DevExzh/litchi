@@ -1,0 +1,133 @@
+{
+  "format": "litchi-doc-source-owner-portable-allocation-publication-proposal/1",
+  "status": "proposal only; no publication files or source trees changed by this proposal",
+  "fresh_reproduction": {
+    "directory": "/var/tmp/litchi-doc-source-owner-portable-allocation-reproduction-20260910",
+    "selected_member_count": 13,
+    "selected_bytes": 532496,
+    "members": [
+      {
+        "path": "allocation-control.jsonl",
+        "bytes": 168995,
+        "sha256": "b476839769aa473d15306afcee672fd4a8142584e50f12e92688cdd779092d58"
+      },
+      {
+        "path": "allocation-candidate.jsonl",
+        "bytes": 168995,
+        "sha256": "a88ee39aac4186272128eaaf0dffe406da14e7b6e803c964408c2f9b3fbc7a99"
+      },
+      {
+        "path": "allocation-receipt.json",
+        "bytes": 18844,
+        "sha256": "852bff2dbd7ea61155b935f66e3b3fd9aa09a6a3b7ca383fd59776857b408ab3"
+      },
+      {
+        "path": "commands.json",
+        "bytes": 13424,
+        "sha256": "1ec0e8e85347a2e4c8762d8e33d1cef4a17a15bd9e2ed908907f6a3e9a15a588"
+      },
+      {
+        "path": "cargo-shim-invocations.jsonl",
+        "bytes": 560,
+        "sha256": "e00be3b3c282997ea58818a81816d4d55c62cffb1934716387eae4448071bb0c"
+      },
+      {
+        "path": "toolchain-version.json",
+        "bytes": 664,
+        "sha256": "ad25e8b6c280df9b150d59c0dc947d4de319b5e2f4c57339f7dbd57a5891c6fe"
+      },
+      {
+        "path": "correctness-control.json",
+        "bytes": 2224,
+        "sha256": "5fa425bb43e7a5cff9be84409540b51cdbb562c820eb25940bc1aae52ebd802b"
+      },
+      {
+        "path": "correctness-candidate.json",
+        "bytes": 2224,
+        "sha256": "5fa425bb43e7a5cff9be84409540b51cdbb562c820eb25940bc1aae52ebd802b"
+      },
+      {
+        "path": "preflight-source-fixture-verification.json",
+        "bytes": 487,
+        "sha256": "a9d85a3bad53fd0b526507bfdfa995173464f775f490649127d8debaed05adb4"
+      },
+      {
+        "path": "preflight-copied-source-verification.json",
+        "bytes": 487,
+        "sha256": "a9d85a3bad53fd0b526507bfdfa995173464f775f490649127d8debaed05adb4"
+      },
+      {
+        "path": "comparison-vs-retained-evidence-v1.json",
+        "bytes": 151520,
+        "sha256": "1f0cb0218d098cee1ed0d12e9d10c994ab7a3cd2918f0a99c32a7b40b6369f7e"
+      },
+      {
+        "path": "publication-manifest-before-provenance-refresh.json",
+        "bytes": 1778,
+        "sha256": "454f4d2cdafa95713c8ba34b87ffa7edeabee0b4d5d163bf71f711dfe00130cf"
+      },
+      {
+        "path": "publication-provenance-refresh.json",
+        "bytes": 2294,
+        "sha256": "0f1a0106f227021d3132d905eb6665fc2c535ed5fe251c5b6a80dbb05bc143f6"
+      }
+    ],
+    "targets_and_binaries": {
+      "included": false,
+      "reason": "per-side targets and binaries were disposable build products; the runner removes the temporary work tree and retains hashes in allocation-receipt.json"
+    },
+    "selected_scope": "fresh allocation receipt, exact build/correctness commands and Cargo jobs shim, 32-check reports, 240-row JSONL per side, source/fixture preflight, median/delta comparison, and publication provenance capture",
+    "omitted": [
+      {
+        "path": "allocation-receipt-progress.json",
+        "bytes": 7427,
+        "reason": "generated diagnostic/log output; receipt, commands, correctness and raw JSONL retain the bounded evidence"
+      },
+      {
+        "path": "build-candidate.log",
+        "bytes": 4638,
+        "reason": "generated diagnostic/log output; receipt, commands, correctness and raw JSONL retain the bounded evidence"
+      },
+      {
+        "path": "build-control.log",
+        "bytes": 4618,
+        "reason": "generated diagnostic/log output; receipt, commands, correctness and raw JSONL retain the bounded evidence"
+      },
+      {
+        "path": "correctness-candidate.log",
+        "bytes": 0,
+        "reason": "generated diagnostic/log output; receipt, commands, correctness and raw JSONL retain the bounded evidence"
+      },
+      {
+        "path": "correctness-control.log",
+        "bytes": 0,
+        "reason": "generated diagnostic/log output; receipt, commands, correctness and raw JSONL retain the bounded evidence"
+      },
+      {
+        "path": "measure-candidate.log",
+        "bytes": 0,
+        "reason": "generated diagnostic/log output; receipt, commands, correctness and raw JSONL retain the bounded evidence"
+      },
+      {
+        "path": "measure-control.log",
+        "bytes": 0,
+        "reason": "generated diagnostic/log output; receipt, commands, correctness and raw JSONL retain the bounded evidence"
+      }
+    ]
+  },
+  "publication_bundle_reference": {
+    "directory": "/var/tmp/litchi-doc-source-owner-portable-publication-20260909",
+    "archive_manifest": "archive-manifest.json",
+    "member_count": 100,
+    "member_bytes_total": 25289668,
+    "archive_manifest_sha256": "c0476ed94b8d48cbe0a8165299b5c20aaf0a06b171620006455da1e3254c4c83",
+    "publication_provenance_sha256": "dbdc07d3f08f1d19aea04eb1668d4922422653dce08552bb22e2375dbb9bfbbc",
+    "source_and_measurement_inputs_changed": false
+  },
+  "boundedness": {
+    "fresh_selected_bytes_exclude_targets_and_binaries": true,
+    "publication_artifact_is_separate_from_frozen_bundle": true,
+    "archive_member_count_and_hashes_are_checked_by_existing_runner": true,
+    "no_staging_or_commit": true
+  }
+}

@@ -1,0 +1,900 @@
+{
+  "baseline": {
+    "directory": "baseline-1d39eea51",
+    "harness_cargo_lock_sha256": "01146937be7eac11b4484aeb2fcf6ee181c157c47973e21a67b7c15fdd576b29",
+    "source_cargo_lock_sha256": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3",
+    "source_commit": "1d39eea516248c758b8ea429c879a4a3245e4fbb"
+  },
+  "candidate": {
+    "directory": "candidate-final",
+    "freeze_receipt": "../gates/freeze.json",
+    "freeze_receipt_sha256": "f19c50c75401cc9193d22d5605a0376720630e4185d15717db93338cdb8f39ec",
+    "harness_cargo_lock_sha256": "01146937be7eac11b4484aeb2fcf6ee181c157c47973e21a67b7c15fdd576b29",
+    "selected_embedded_data_sha256": "0d0a8407724d4ba4c53e2613b547ff227268ac88f8b3e3003bd5d6038663a815",
+    "selected_file_count": 11,
+    "source_cargo_lock_sha256": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3",
+    "source_commit": "1d39eea516248c758b8ea429c879a4a3245e4fbb"
+  },
+  "groups": [
+    {
+      "fixture": {
+        "payload_bytes": 1024,
+        "references": 16,
+        "source_bytes": 12688,
+        "source_sha256": "051e27ddd32c34ea60b9135c46f3ea24522830d3e5df42b15efe13499830b2d6",
+        "storages": 2
+      },
+      "lane": "read",
+      "level": "small",
+      "metrics": {
+        "allocation_calls": {
+          "baseline_median": 9087,
+          "baseline_p90": 9087,
+          "candidate_median": 10082,
+          "candidate_p90": 10082,
+          "delta_percent": 10.949708374601078,
+          "label": "allocation calls",
+          "ratio": 1.1094970837460107
+        },
+        "elapsed_ns": {
+          "baseline_median": 0.803644,
+          "baseline_p90": 0.813454,
+          "candidate_median": 0.946294,
+          "candidate_p90": 0.950715,
+          "delta_percent": 17.750396941929502,
+          "label": "elapsed (ms)",
+          "ratio": 1.177503969419295
+        },
+        "peak_live_delta": {
+          "baseline_median": 297902,
+          "baseline_p90": 297902,
+          "candidate_median": 298318,
+          "candidate_p90": 298318,
+          "delta_percent": 0.139643238380407,
+          "label": "peak live bytes",
+          "ratio": 1.001396432383804
+        },
+        "requested_bytes": {
+          "baseline_median": 949575,
+          "baseline_p90": 949575,
+          "candidate_median": 1021962,
+          "candidate_p90": 1021962,
+          "delta_percent": 7.623094542295237,
+          "label": "requested allocation bytes",
+          "ratio": 1.0762309454229524
+        },
+        "rss_kib": {
+          "baseline_median": 4316,
+          "baseline_p90": 4568,
+          "candidate_median": 4556,
+          "candidate_p90": 4572,
+          "delta_percent": 5.560704355885079,
+          "label": "maximum RSS (KiB)",
+          "ratio": 1.0556070435588507
+        }
+      }
+    },
+    {
+      "fixture": {
+        "payload_bytes": 1024,
+        "references": 16,
+        "source_bytes": 12688,
+        "source_sha256": "051e27ddd32c34ea60b9135c46f3ea24522830d3e5df42b15efe13499830b2d6",
+        "storages": 2
+      },
+      "lane": "noop-commit-save",
+      "level": "small",
+      "metrics": {
+        "allocation_calls": {
+          "baseline_median": 18408,
+          "baseline_p90": 18408,
+          "candidate_median": 20398,
+          "candidate_p90": 20398,
+          "delta_percent": 10.810517166449369,
+          "label": "allocation calls",
+          "ratio": 1.1081051716644936
+        },
+        "elapsed_ns": {
+          "baseline_median": 1.587338,
+          "baseline_p90": 1.609058,
+          "candidate_median": 1.874158,
+          "candidate_p90": 1.886989,
+          "delta_percent": 18.069245491508433,
+          "label": "elapsed (ms)",
+          "ratio": 1.1806924549150843
+        },
+        "peak_live_delta": {
+          "baseline_median": 316806,
+          "baseline_p90": 316806,
+          "candidate_median": 317612,
+          "candidate_p90": 317612,
+          "delta_percent": 0.254414373465149,
+          "label": "peak live bytes",
+          "ratio": 1.0025441437346514
+        },
+        "requested_bytes": {
+          "baseline_median": 1918354,
+          "baseline_p90": 1918354,
+          "candidate_median": 2063128,
+          "candidate_p90": 2063128,
+          "delta_percent": 7.546782293570425,
+          "label": "requested allocation bytes",
+          "ratio": 1.0754678229357042
+        },
+        "rss_kib": {
+          "baseline_median": 4504,
+          "baseline_p90": 4580,
+          "candidate_median": 4532,
+          "candidate_p90": 4564,
+          "delta_percent": 0.6216696269982238,
+          "label": "maximum RSS (KiB)",
+          "ratio": 1.0062166962699823
+        }
+      }
+    },
+    {
+      "fixture": {
+        "payload_bytes": 1024,
+        "references": 16,
+        "source_bytes": 12688,
+        "source_sha256": "051e27ddd32c34ea60b9135c46f3ea24522830d3e5df42b15efe13499830b2d6",
+        "storages": 2
+      },
+      "lane": "payload-replacement",
+      "level": "small",
+      "metrics": {
+        "allocation_calls": {
+          "baseline_median": 35770,
+          "baseline_p90": 35770,
+          "candidate_median": 41177,
+          "candidate_p90": 41177,
+          "delta_percent": 15.116019010343864,
+          "label": "allocation calls",
+          "ratio": 1.1511601901034387
+        },
+        "elapsed_ns": {
+          "baseline_median": 3.078105,
+          "baseline_p90": 3.106225,
+          "candidate_median": 3.851728,
+          "candidate_p90": 3.879048,
+          "delta_percent": 25.133093250555138,
+          "label": "elapsed (ms)",
+          "ratio": 1.2513309325055513
+        },
+        "peak_live_delta": {
+          "baseline_median": 513617,
+          "baseline_p90": 513617,
+          "candidate_median": 514397,
+          "candidate_p90": 514397,
+          "delta_percent": 0.1518641322230378,
+          "label": "peak live bytes",
+          "ratio": 1.0015186413222303
+        },
+        "requested_bytes": {
+          "baseline_median": 4196572,
+          "baseline_p90": 4196572,
+          "candidate_median": 4588950,
+          "candidate_p90": 4588950,
+          "delta_percent": 9.349964685462325,
+          "label": "requested allocation bytes",
+          "ratio": 1.0934996468546232
+        },
+        "rss_kib": {
+          "baseline_median": 4800,
+          "baseline_p90": 5068,
+          "candidate_median": 5060,
+          "candidate_p90": 5072,
+          "delta_percent": 5.416666666666667,
+          "label": "maximum RSS (KiB)",
+          "ratio": 1.0541666666666667
+        }
+      }
+    },
+    {
+      "fixture": {
+        "payload_bytes": 1024,
+        "references": 16,
+        "source_bytes": 12688,
+        "source_sha256": "051e27ddd32c34ea60b9135c46f3ea24522830d3e5df42b15efe13499830b2d6",
+        "storages": 2
+      },
+      "lane": "rename-binding-rewrite",
+      "level": "small",
+      "metrics": {
+        "allocation_calls": {
+          "baseline_median": 36193,
+          "baseline_p90": 36193,
+          "candidate_median": 41710,
+          "candidate_p90": 41710,
+          "delta_percent": 15.243279087116294,
+          "label": "allocation calls",
+          "ratio": 1.152432790871163
+        },
+        "elapsed_ns": {
+          "baseline_median": 3.174015,
+          "baseline_p90": 3.205865,
+          "candidate_median": 3.950798,
+          "candidate_p90": 3.984769,
+          "delta_percent": 24.473198771902467,
+          "label": "elapsed (ms)",
+          "ratio": 1.2447319877190246
+        },
+        "peak_live_delta": {
+          "baseline_median": 525472,
+          "baseline_p90": 525472,
+          "candidate_median": 526252,
+          "candidate_p90": 526252,
+          "delta_percent": 0.14843797576274284,
+          "label": "peak live bytes",
+          "ratio": 1.0014843797576274
+        },
+        "requested_bytes": {
+          "baseline_median": 4250631,
+          "baseline_p90": 4250631,
+          "candidate_median": 4653641,
+          "candidate_p90": 4653641,
+          "delta_percent": 9.481180558839382,
+          "label": "requested allocation bytes",
+          "ratio": 1.0948118055883937
+        },
+        "rss_kib": {
+          "baseline_median": 5032,
+          "baseline_p90": 5068,
+          "candidate_median": 5076,
+          "candidate_p90": 5088,
+          "delta_percent": 0.8744038155802861,
+          "label": "maximum RSS (KiB)",
+          "ratio": 1.0087440381558028
+        }
+      }
+    },
+    {
+      "fixture": {
+        "payload_bytes": 1024,
+        "references": 16,
+        "source_bytes": 12688,
+        "source_sha256": "051e27ddd32c34ea60b9135c46f3ea24522830d3e5df42b15efe13499830b2d6",
+        "storages": 2
+      },
+      "lane": "remove-inverse",
+      "level": "small",
+      "metrics": {
+        "allocation_calls": {
+          "baseline_median": 53826,
+          "baseline_p90": 53832,
+          "candidate_median": 61871,
+          "candidate_p90": 61879,
+          "delta_percent": 14.946308475457956,
+          "label": "allocation calls",
+          "ratio": 1.1494630847545795
+        },
+        "elapsed_ns": {
+          "baseline_median": 4.692472,
+          "baseline_p90": 4.731193,
+          "candidate_median": 5.837457,
+          "candidate_p90": 5.868567,
+          "delta_percent": 24.40046525583955,
+          "label": "elapsed (ms)",
+          "ratio": 1.2440046525583954
+        },
+        "peak_live_delta": {
+          "baseline_median": 332849,
+          "baseline_p90": 332849,
+          "candidate_median": 334045,
+          "candidate_p90": 334045,
+          "delta_percent": 0.3593220950040409,
+          "label": "peak live bytes",
+          "ratio": 1.0035932209500404
+        },
+        "requested_bytes": {
+          "baseline_median": 5510520,
+          "baseline_p90": 5510648,
+          "candidate_median": 6094591,
+          "candidate_p90": 6094763,
+          "delta_percent": 10.599199349607659,
+          "label": "requested allocation bytes",
+          "ratio": 1.1059919934960767
+        },
+        "rss_kib": {
+          "baseline_median": 4552,
+          "baseline_p90": 4836,
+          "candidate_median": 4572,
+          "candidate_p90": 4816,
+          "delta_percent": 0.4393673110720563,
+          "label": "maximum RSS (KiB)",
+          "ratio": 1.0043936731107206
+        }
+      }
+    },
+    {
+      "fixture": {
+        "payload_bytes": 4096,
+        "references": 128,
+        "source_bytes": 124952,
+        "source_sha256": "cf6f33744d0782c74470efb4f80fb54b83f8b0a54f08b30f3f17b6fbb328ff21",
+        "storages": 16
+      },
+      "lane": "read",
+      "level": "medium",
+      "metrics": {
+        "allocation_calls": {
+          "baseline_median": 67875,
+          "baseline_p90": 67875,
+          "candidate_median": 73107,
+          "candidate_p90": 73107,
+          "delta_percent": 7.70828729281768,
+          "label": "allocation calls",
+          "ratio": 1.0770828729281767
+        },
+        "elapsed_ns": {
+          "baseline_median": 5.626517,
+          "baseline_p90": 5.672247,
+          "candidate_median": 6.44425,
+          "candidate_p90": 6.48603,
+          "delta_percent": 14.533556016981741,
+          "label": "elapsed (ms)",
+          "ratio": 1.1453355601698174
+        },
+        "peak_live_delta": {
+          "baseline_median": 2292248,
+          "baseline_p90": 2292248,
+          "candidate_median": 2292664,
+          "candidate_p90": 2292664,
+          "delta_percent": 0.01814812358872164,
+          "label": "peak live bytes",
+          "ratio": 1.0001814812358871
+        },
+        "requested_bytes": {
+          "baseline_median": 7153519,
+          "baseline_p90": 7153519,
+          "candidate_median": 7544109,
+          "candidate_p90": 7544109,
+          "delta_percent": 5.4601099123382495,
+          "label": "requested allocation bytes",
+          "ratio": 1.0546010991233825
+        },
+        "rss_kib": {
+          "baseline_median": 6860,
+          "baseline_p90": 6876,
+          "candidate_median": 6844,
+          "candidate_p90": 6868,
+          "delta_percent": -0.23323615160349853,
+          "label": "maximum RSS (KiB)",
+          "ratio": 0.997667638483965
+        }
+      }
+    },
+    {
+      "fixture": {
+        "payload_bytes": 4096,
+        "references": 128,
+        "source_bytes": 124952,
+        "source_sha256": "cf6f33744d0782c74470efb4f80fb54b83f8b0a54f08b30f3f17b6fbb328ff21",
+        "storages": 16
+      },
+      "lane": "noop-commit-save",
+      "level": "medium",
+      "metrics": {
+        "allocation_calls": {
+          "baseline_median": 136530,
+          "baseline_p90": 136530,
+          "candidate_median": 146994,
+          "candidate_p90": 146994,
+          "delta_percent": 7.664249615469128,
+          "label": "allocation calls",
+          "ratio": 1.0766424961546912
+        },
+        "elapsed_ns": {
+          "baseline_median": 11.201294,
+          "baseline_p90": 11.274784,
+          "candidate_median": 12.884601,
+          "candidate_p90": 12.960661,
+          "delta_percent": 15.027790539200195,
+          "label": "elapsed (ms)",
+          "ratio": 1.150277905392002
+        },
+        "peak_live_delta": {
+          "baseline_median": 2459575,
+          "baseline_p90": 2459575,
+          "candidate_median": 2460381,
+          "candidate_p90": 2460381,
+          "delta_percent": 0.032769889106857894,
+          "label": "peak live bytes",
+          "ratio": 1.0003276988910685
+        },
+        "requested_bytes": {
+          "baseline_median": 14366009,
+          "baseline_p90": 14366009,
+          "candidate_median": 15147189,
+          "candidate_p90": 15147189,
+          "delta_percent": 5.437696718692018,
+          "label": "requested allocation bytes",
+          "ratio": 1.05437696718692
+        },
+        "rss_kib": {
+          "baseline_median": 7120,
+          "baseline_p90": 7140,
+          "candidate_median": 7112,
+          "candidate_p90": 7132,
+          "delta_percent": -0.11235955056179776,
+          "label": "maximum RSS (KiB)",
+          "ratio": 0.998876404494382
+        }
+      }
+    },
+    {
+      "fixture": {
+        "payload_bytes": 4096,
+        "references": 128,
+        "source_bytes": 124952,
+        "source_sha256": "cf6f33744d0782c74470efb4f80fb54b83f8b0a54f08b30f3f17b6fbb328ff21",
+        "storages": 16
+      },
+      "lane": "payload-replacement",
+      "level": "medium",
+      "metrics": {
+        "allocation_calls": {
+          "baseline_median": 271003,
+          "baseline_p90": 271003,
+          "candidate_median": 297626,
+          "candidate_p90": 297626,
+          "delta_percent": 9.823876488452157,
+          "label": "allocation calls",
+          "ratio": 1.0982387648845215
+        },
+        "elapsed_ns": {
+          "baseline_median": 22.138217,
+          "baseline_p90": 22.203207,
+          "candidate_median": 26.200373,
+          "candidate_p90": 26.309794,
+          "delta_percent": 18.349065780681425,
+          "label": "elapsed (ms)",
+          "ratio": 1.1834906578068143
+        },
+        "peak_live_delta": {
+          "baseline_median": 2508860,
+          "baseline_p90": 2508860,
+          "candidate_median": 2510056,
+          "candidate_p90": 2510056,
+          "delta_percent": 0.047671053785384596,
+          "label": "peak live bytes",
+          "ratio": 1.0004767105378538
+        },
+        "requested_bytes": {
+          "baseline_median": 28438013,
+          "baseline_p90": 28438013,
+          "candidate_median": 30461190,
+          "candidate_p90": 30461190,
+          "delta_percent": 7.114340231857971,
+          "label": "requested allocation bytes",
+          "ratio": 1.0711434023185797
+        },
+        "rss_kib": {
+          "baseline_median": 7356,
+          "baseline_p90": 7396,
+          "candidate_median": 7364,
+          "candidate_p90": 7604,
+          "delta_percent": 0.1087547580206634,
+          "label": "maximum RSS (KiB)",
+          "ratio": 1.0010875475802066
+        }
+      }
+    },
+    {
+      "fixture": {
+        "payload_bytes": 4096,
+        "references": 128,
+        "source_bytes": 124952,
+        "source_sha256": "cf6f33744d0782c74470efb4f80fb54b83f8b0a54f08b30f3f17b6fbb328ff21",
+        "storages": 16
+      },
+      "lane": "rename-binding-rewrite",
+      "level": "medium",
+      "metrics": {
+        "allocation_calls": {
+          "baseline_median": 273428,
+          "baseline_p90": 273428,
+          "candidate_median": 300161,
+          "candidate_p90": 300161,
+          "delta_percent": 9.776979680208319,
+          "label": "allocation calls",
+          "ratio": 1.0977697968020832
+        },
+        "elapsed_ns": {
+          "baseline_median": 22.648829,
+          "baseline_p90": 22.730979,
+          "candidate_median": 26.707595,
+          "candidate_p90": 26.928277,
+          "delta_percent": 17.920423170663714,
+          "label": "elapsed (ms)",
+          "ratio": 1.1792042317066371
+        },
+        "peak_live_delta": {
+          "baseline_median": 2591391,
+          "baseline_p90": 2591391,
+          "candidate_median": 2592587,
+          "candidate_p90": 2592587,
+          "delta_percent": 0.046152819084422224,
+          "label": "peak live bytes",
+          "ratio": 1.0004615281908442
+        },
+        "requested_bytes": {
+          "baseline_median": 28866398,
+          "baseline_p90": 28866398,
+          "candidate_median": 30897295,
+          "candidate_p90": 30897295,
+          "delta_percent": 7.035505434380833,
+          "label": "requested allocation bytes",
+          "ratio": 1.0703550543438083
+        },
+        "rss_kib": {
+          "baseline_median": 7632,
+          "baseline_p90": 7648,
+          "candidate_median": 7620,
+          "candidate_p90": 7648,
+          "delta_percent": -0.15723270440251574,
+          "label": "maximum RSS (KiB)",
+          "ratio": 0.9984276729559748
+        }
+      }
+    },
+    {
+      "fixture": {
+        "payload_bytes": 4096,
+        "references": 128,
+        "source_bytes": 124952,
+        "source_sha256": "cf6f33744d0782c74470efb4f80fb54b83f8b0a54f08b30f3f17b6fbb328ff21",
+        "storages": 16
+      },
+      "lane": "remove-inverse",
+      "level": "medium",
+      "metrics": {
+        "allocation_calls": {
+          "baseline_median": 412490,
+          "baseline_p90": 412522,
+          "candidate_median": 453386,
+          "candidate_p90": 453414,
+          "delta_percent": 9.914422167810129,
+          "label": "allocation calls",
+          "ratio": 1.0991442216781013
+        },
+        "elapsed_ns": {
+          "baseline_median": 34.325415,
+          "baseline_p90": 34.435746,
+          "candidate_median": 40.275049,
+          "candidate_p90": 40.4127,
+          "delta_percent": 17.333028602858853,
+          "label": "elapsed (ms)",
+          "ratio": 1.1733302860285886
+        },
+        "peak_live_delta": {
+          "baseline_median": 2548532,
+          "baseline_p90": 2548532,
+          "candidate_median": 2549728,
+          "candidate_p90": 2549728,
+          "delta_percent": 0.046928977152337105,
+          "label": "peak live bytes",
+          "ratio": 1.0004692897715233
+        },
+        "requested_bytes": {
+          "baseline_median": 42078167,
+          "baseline_p90": 42078923,
+          "candidate_median": 45197703,
+          "candidate_p90": 45198379,
+          "delta_percent": 7.413668946178192,
+          "label": "requested allocation bytes",
+          "ratio": 1.0741366894617819
+        },
+        "rss_kib": {
+          "baseline_median": 7372,
+          "baseline_p90": 7388,
+          "candidate_median": 7356,
+          "candidate_p90": 7392,
+          "delta_percent": -0.2170374389582203,
+          "label": "maximum RSS (KiB)",
+          "ratio": 0.9978296256104178
+        }
+      }
+    },
+    {
+      "fixture": {
+        "payload_bytes": 16384,
+        "references": 512,
+        "source_bytes": 1276136,
+        "source_sha256": "b151cea7148b062d48dced9a5808b68fcd0faaf82c68f55b6b0e12ab97ae491b",
+        "storages": 64
+      },
+      "lane": "read",
+      "level": "large",
+      "metrics": {
+        "allocation_calls": {
+          "baseline_median": 278284,
+          "baseline_p90": 278284,
+          "candidate_median": 298018,
+          "candidate_p90": 298018,
+          "delta_percent": 7.091316784292307,
+          "label": "allocation calls",
+          "ratio": 1.0709131678429231
+        },
+        "elapsed_ns": {
+          "baseline_median": 22.926921,
+          "baseline_p90": 23.122951,
+          "candidate_median": 26.038282,
+          "candidate_p90": 26.189893,
+          "delta_percent": 13.570775596077636,
+          "label": "elapsed (ms)",
+          "ratio": 1.1357077559607764
+        },
+        "peak_live_delta": {
+          "baseline_median": 10676156,
+          "baseline_p90": 10676156,
+          "candidate_median": 10676572,
+          "candidate_p90": 10676572,
+          "delta_percent": 0.0038965335463438337,
+          "label": "peak live bytes",
+          "ratio": 1.0000389653354635
+        },
+        "requested_bytes": {
+          "baseline_median": 30439339,
+          "baseline_p90": 30439339,
+          "candidate_median": 31934553,
+          "candidate_p90": 31934553,
+          "delta_percent": 4.912110607920888,
+          "label": "requested allocation bytes",
+          "ratio": 1.049121106079209
+        },
+        "rss_kib": {
+          "baseline_median": 17840,
+          "baseline_p90": 17864,
+          "candidate_median": 17824,
+          "candidate_p90": 18300,
+          "delta_percent": -0.08968609865470852,
+          "label": "maximum RSS (KiB)",
+          "ratio": 0.9991031390134529
+        }
+      }
+    },
+    {
+      "fixture": {
+        "payload_bytes": 16384,
+        "references": 512,
+        "source_bytes": 1276136,
+        "source_sha256": "b151cea7148b062d48dced9a5808b68fcd0faaf82c68f55b6b0e12ab97ae491b",
+        "storages": 64
+      },
+      "lane": "noop-commit-save",
+      "level": "large",
+      "metrics": {
+        "allocation_calls": {
+          "baseline_median": 559220,
+          "baseline_p90": 559220,
+          "candidate_median": 598688,
+          "candidate_p90": 598688,
+          "delta_percent": 7.057687493294232,
+          "label": "allocation calls",
+          "ratio": 1.0705768749329423
+        },
+        "elapsed_ns": {
+          "baseline_median": 46.480054,
+          "baseline_p90": 47.027537,
+          "candidate_median": 52.818458,
+          "candidate_p90": 53.440451,
+          "delta_percent": 13.636825809195482,
+          "label": "elapsed (ms)",
+          "ratio": 1.1363682580919547
+        },
+        "peak_live_delta": {
+          "baseline_median": 12121003,
+          "baseline_p90": 12121003,
+          "candidate_median": 12121809,
+          "candidate_p90": 12121809,
+          "delta_percent": 0.006649614722478,
+          "label": "peak live bytes",
+          "ratio": 1.0000664961472248
+        },
+        "requested_bytes": {
+          "baseline_median": 61078721,
+          "baseline_p90": 61078721,
+          "candidate_median": 64069149,
+          "candidate_p90": 64069149,
+          "delta_percent": 4.896022626276015,
+          "label": "requested allocation bytes",
+          "ratio": 1.0489602262627602
+        },
+        "rss_kib": {
+          "baseline_median": 19640,
+          "baseline_p90": 20664,
+          "candidate_median": 20408,
+          "candidate_p90": 20648,
+          "delta_percent": 3.9103869653767824,
+          "label": "maximum RSS (KiB)",
+          "ratio": 1.0391038696537678
+        }
+      }
+    },
+    {
+      "fixture": {
+        "payload_bytes": 16384,
+        "references": 512,
+        "source_bytes": 1276136,
+        "source_sha256": "b151cea7148b062d48dced9a5808b68fcd0faaf82c68f55b6b0e12ab97ae491b",
+        "storages": 64
+      },
+      "lane": "payload-replacement",
+      "level": "large",
+      "metrics": {
+        "allocation_calls": {
+          "baseline_median": 1112991,
+          "baseline_p90": 1112991,
+          "candidate_median": 1212222,
+          "candidate_p90": 1212222,
+          "delta_percent": 8.915705517834375,
+          "label": "allocation calls",
+          "ratio": 1.0891570551783438
+        },
+        "elapsed_ns": {
+          "baseline_median": 91.21766,
+          "baseline_p90": 91.944184,
+          "candidate_median": 106.112932,
+          "candidate_p90": 106.681775,
+          "delta_percent": 16.32937306218994,
+          "label": "elapsed (ms)",
+          "ratio": 1.1632937306218993
+        },
+        "peak_live_delta": {
+          "baseline_median": 13115084,
+          "baseline_p90": 13115084,
+          "candidate_median": 13116280,
+          "candidate_p90": 13116280,
+          "delta_percent": 0.009119270604747936,
+          "label": "peak live bytes",
+          "ratio": 1.0000911927060474
+        },
+        "requested_bytes": {
+          "baseline_median": 118819322,
+          "baseline_p90": 118819322,
+          "candidate_median": 126522899,
+          "candidate_p90": 126522899,
+          "delta_percent": 6.483437937812841,
+          "label": "requested allocation bytes",
+          "ratio": 1.0648343793781285
+        },
+        "rss_kib": {
+          "baseline_median": 21516,
+          "baseline_p90": 21740,
+          "candidate_median": 21748,
+          "candidate_p90": 21764,
+          "delta_percent": 1.0782673359360477,
+          "label": "maximum RSS (KiB)",
+          "ratio": 1.0107826733593606
+        }
+      }
+    },
+    {
+      "fixture": {
+        "payload_bytes": 16384,
+        "references": 512,
+        "source_bytes": 1276136,
+        "source_sha256": "b151cea7148b062d48dced9a5808b68fcd0faaf82c68f55b6b0e12ab97ae491b",
+        "storages": 64
+      },
+      "lane": "rename-binding-rewrite",
+      "level": "large",
+      "metrics": {
+        "allocation_calls": {
+          "baseline_median": 1122280,
+          "baseline_p90": 1122280,
+          "candidate_median": 1221621,
+          "candidate_p90": 1221621,
+          "delta_percent": 8.851712585094628,
+          "label": "allocation calls",
+          "ratio": 1.0885171258509463
+        },
+        "elapsed_ns": {
+          "baseline_median": 92.902609,
+          "baseline_p90": 94.059754,
+          "candidate_median": 107.863121,
+          "candidate_p90": 111.295157,
+          "delta_percent": 16.103435803401396,
+          "label": "elapsed (ms)",
+          "ratio": 1.161034358034014
+        },
+        "peak_live_delta": {
+          "baseline_median": 12477471,
+          "baseline_p90": 12477471,
+          "candidate_median": 12478667,
+          "candidate_p90": 12478667,
+          "delta_percent": 0.009585275734161194,
+          "label": "peak live bytes",
+          "ratio": 1.0000958527573416
+        },
+        "requested_bytes": {
+          "baseline_median": 118475216,
+          "baseline_p90": 118475216,
+          "candidate_median": 126176529,
+          "candidate_p90": 126176529,
+          "delta_percent": 6.500357846994767,
+          "label": "requested allocation bytes",
+          "ratio": 1.0650035784699476
+        },
+        "rss_kib": {
+          "baseline_median": 20676,
+          "baseline_p90": 20952,
+          "candidate_median": 20908,
+          "candidate_p90": 21448,
+          "delta_percent": 1.122073902108725,
+          "label": "maximum RSS (KiB)",
+          "ratio": 1.0112207390210872
+        }
+      }
+    },
+    {
+      "fixture": {
+        "payload_bytes": 16384,
+        "references": 512,
+        "source_bytes": 1276136,
+        "source_sha256": "b151cea7148b062d48dced9a5808b68fcd0faaf82c68f55b6b0e12ab97ae491b",
+        "storages": 64
+      },
+      "lane": "remove-inverse",
+      "level": "large",
+      "metrics": {
+        "allocation_calls": {
+          "baseline_median": 1704192,
+          "baseline_p90": 1704312,
+          "candidate_median": 1857546,
+          "candidate_p90": 1857660,
+          "delta_percent": 8.998633956737269,
+          "label": "allocation calls",
+          "ratio": 1.0899863395673728
+        },
+        "elapsed_ns": {
+          "baseline_median": 141.946988,
+          "baseline_p90": 142.452489,
+          "candidate_median": 164.784839,
+          "candidate_p90": 165.539483,
+          "delta_percent": 16.089000070927888,
+          "label": "elapsed (ms)",
+          "ratio": 1.1608900007092788
+        },
+        "peak_live_delta": {
+          "baseline_median": 13275572,
+          "baseline_p90": 13275572,
+          "candidate_median": 13276768,
+          "candidate_p90": 13276768,
+          "delta_percent": 0.009009028010243175,
+          "label": "peak live bytes",
+          "ratio": 1.0000900902801024
+        },
+        "requested_bytes": {
+          "baseline_median": 175944228,
+          "baseline_p90": 175947248,
+          "candidate_median": 187895356,
+          "candidate_p90": 187898236,
+          "delta_percent": 6.792566107937341,
+          "label": "requested allocation bytes",
+          "ratio": 1.0679256610793735
+        },
+        "rss_kib": {
+          "baseline_median": 20656,
+          "baseline_p90": 21640,
+          "candidate_median": 20928,
+          "candidate_p90": 21784,
+          "delta_percent": 1.3168086754453912,
+          "label": "maximum RSS (KiB)",
+          "ratio": 1.013168086754454
+        }
+      }
+    }
+  ],
+  "interpretation": {
+    "environment": "shared host; medians describe this capture environment",
+    "percentile_limit": "p90 values are descriptive order statistics from 15 samples per group; no tail or statistical-certainty claim",
+    "ratio": "candidate median divided by baseline median; values above 1 mean the candidate observed more of that metric",
+    "workload_limit": "authored bounded fixtures; storage, binding, and payload dimensions vary together"
+  },
+  "sample_count_per_group": 15,
+  "schema": "xlsx-custom-data-matched-statistics-v1",
+  "total_raw_samples": 450,
+  "warmups_per_process": 3
+}

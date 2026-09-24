@@ -1213,6 +1213,8 @@ dependencies = [
  "memchr",
  "quick-xml",
  "ryu",
+ "serde_json",
+ "sha2 0.11.0",
  "thiserror",
  "unicode-normalization",
  "url",
@@ -1341,6 +1343,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "litchi-xldm"
+version = "0.0.1"
+dependencies = [
+ "memchr",
+ "quick-xml",
+ "thiserror",
+]
+
+[[package]]
 name = "litchi-xls"
 version = "0.0.1"
 dependencies = [
@@ -1379,6 +1390,7 @@ dependencies = [
  "litchi-opc",
  "litchi-sheet",
  "litchi-spreadsheet-drawing",
+ "litchi-xldm",
  "memchr",
  "once_cell",
  "quick-xml",

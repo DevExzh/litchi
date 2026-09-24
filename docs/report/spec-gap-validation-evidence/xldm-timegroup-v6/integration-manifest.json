@@ -1,0 +1,517 @@
+{
+  "reconciliation_root": "/var/tmp/litchi-xldm-full-v6-primary-reconciliation-20260910",
+  "primary": "/home/zhuhe/code/litchi-spec-gaps",
+  "primary_head": "a487f5cad7978133fb313ae471863de298e500a5",
+  "feature_candidate": "/var/tmp/litchi-xldm-full-v6-integration-20260910",
+  "feature_candidate_base": "07fdb2f8a79e6b3f75d4572280de7ea264f1399e",
+  "scope": "Read-only reconciliation of all 26 XLDM/XLSX/XLSB feature paths; no primary writes, staging, or commits.",
+  "snapshot": {
+    "primary_head_dir": "/var/tmp/litchi-xldm-full-v6-primary-reconciliation-20260910/primary-head",
+    "primary_worktree_dir": "/var/tmp/litchi-xldm-full-v6-primary-reconciliation-20260910/primary-worktree",
+    "path_count": 26,
+    "records": [
+      {
+        "path": "crates/litchi-xldm/src/identity.rs",
+        "classification": "feature_only",
+        "primary_head_present": false,
+        "primary_worktree_present": false,
+        "feature_present": true,
+        "primary_head": null,
+        "primary_worktree": null,
+        "feature_candidate": {
+          "sha256": "e749ab853970ec6ec379d29d37e648f6d2a3c2b1b17283975f1e8c6439682c44",
+          "bytes": 218157
+        }
+      },
+      {
+        "path": "crates/litchi-xldm/src/olapproof.rs",
+        "classification": "feature_only",
+        "primary_head_present": false,
+        "primary_worktree_present": false,
+        "feature_present": true,
+        "primary_head": null,
+        "primary_worktree": null,
+        "feature_candidate": {
+          "sha256": "acbd8cbd8f8b2d97c8f3b13b0938a754cef2d195a37cc4e337b51190be43a5b2",
+          "bytes": 149768
+        }
+      },
+      {
+        "path": "crates/litchi-xldm/src/codec.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "8a579df7e84342012c3a494750909c2687a4608db2558364d29fe5e05c00cce6",
+          "bytes": 21489
+        },
+        "primary_worktree": {
+          "sha256": "8a579df7e84342012c3a494750909c2687a4608db2558364d29fe5e05c00cce6",
+          "bytes": 21489
+        },
+        "feature_candidate": {
+          "sha256": "97198d8f1f1869ac801364600b845f8a86b8d504f2f68c1947a2983eedc7af09",
+          "bytes": 45629
+        }
+      },
+      {
+        "path": "crates/litchi-xldm/src/generated.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "970e8634eda90e74db63fad0153442066ffb46f1ad4dfb736dac6be0cbae99ba",
+          "bytes": 19653
+        },
+        "primary_worktree": {
+          "sha256": "970e8634eda90e74db63fad0153442066ffb46f1ad4dfb736dac6be0cbae99ba",
+          "bytes": 19653
+        },
+        "feature_candidate": {
+          "sha256": "994276da46b844f6c90d781f232eae2c33c87286a05d9696018ef34d03784d9c",
+          "bytes": 20307
+        }
+      },
+      {
+        "path": "crates/litchi-xldm/src/lib.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "4977cf04f1fa30c973ae1d4a5699f93387db392bcc80e897aae79dc4584660cb",
+          "bytes": 1463
+        },
+        "primary_worktree": {
+          "sha256": "4977cf04f1fa30c973ae1d4a5699f93387db392bcc80e897aae79dc4584660cb",
+          "bytes": 1463
+        },
+        "feature_candidate": {
+          "sha256": "6fe2c4e903a69dc3d3f3b92305ea2c80d2143d8b7e874fa73e7c72c9b600cb20",
+          "bytes": 2421
+        }
+      },
+      {
+        "path": "crates/litchi-xldm/src/metadata/codec.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "7bbfe614e28db15ad4640771891ceb165f6d4972c3e5e96b73c8afbe83e8aa8a",
+          "bytes": 59957
+        },
+        "primary_worktree": {
+          "sha256": "7bbfe614e28db15ad4640771891ceb165f6d4972c3e5e96b73c8afbe83e8aa8a",
+          "bytes": 59957
+        },
+        "feature_candidate": {
+          "sha256": "2d3dbbe3482afcf2f01029cca9adae4798539c76b7b5ae0f846819ad9c2041de",
+          "bytes": 61405
+        }
+      },
+      {
+        "path": "crates/litchi-xldm/src/model.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "a4cc83820321407bc417fb9f24d2b15c888614a72b448e9594dc9320c1586626",
+          "bytes": 8048
+        },
+        "primary_worktree": {
+          "sha256": "a4cc83820321407bc417fb9f24d2b15c888614a72b448e9594dc9320c1586626",
+          "bytes": 8048
+        },
+        "feature_candidate": {
+          "sha256": "0c66214a99dacabda5836ce2fd041d78c9bce32d855dfc1102ed2593dee491fa",
+          "bytes": 9809
+        }
+      },
+      {
+        "path": "crates/litchi-xldm/src/native.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "e95deeaad8d09dfae95201d0a1cc159e575bede8ff4733ddf405ac261224ae07",
+          "bytes": 45101
+        },
+        "primary_worktree": {
+          "sha256": "e95deeaad8d09dfae95201d0a1cc159e575bede8ff4733ddf405ac261224ae07",
+          "bytes": 45101
+        },
+        "feature_candidate": {
+          "sha256": "deef932a363d61247bcf9e36817119f8dba4af778bbbe5115cf7cba3e1e33ace",
+          "bytes": 46234
+        }
+      },
+      {
+        "path": "crates/litchi-xldm/src/olap.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "022532640d71bcb0ac02462b49d93cc511fe7a4981fcde5464d0c882bac8a740",
+          "bytes": 51979
+        },
+        "primary_worktree": {
+          "sha256": "022532640d71bcb0ac02462b49d93cc511fe7a4981fcde5464d0c882bac8a740",
+          "bytes": 51979
+        },
+        "feature_candidate": {
+          "sha256": "b33562a95b024b9c8134dd6c0b5de8b1fcf5d785734e305b6316b9d4dfe02eb0",
+          "bytes": 50909
+        }
+      },
+      {
+        "path": "crates/litchi-xldm/src/tests.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "7ee96415ec8e9d2cabb14ff28146e70dc3fc5548a918e7b7298b499dab7724e5",
+          "bytes": 17744
+        },
+        "primary_worktree": {
+          "sha256": "7ee96415ec8e9d2cabb14ff28146e70dc3fc5548a918e7b7298b499dab7724e5",
+          "bytes": 17744
+        },
+        "feature_candidate": {
+          "sha256": "484079d2202e1e88061beb7b93696d0a7a2485b154f0c799d4561d889bf7e17e",
+          "bytes": 21113
+        }
+      },
+      {
+        "path": "crates/litchi-xldm/src/validation.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "2790407f8d480a1fd58cc98bdb4579382c49bf32d44d0fb804c2865d83f0f502",
+          "bytes": 21121
+        },
+        "primary_worktree": {
+          "sha256": "2790407f8d480a1fd58cc98bdb4579382c49bf32d44d0fb804c2865d83f0f502",
+          "bytes": 21121
+        },
+        "feature_candidate": {
+          "sha256": "abfa01911d328e42f78ce36333382211d56e1b32d43db9dbd762d7043e7a415b",
+          "bytes": 21846
+        }
+      },
+      {
+        "path": "crates/litchi-xlsb/Cargo.toml",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "6d9c70dfd7102b86cd68d3d7d91f4c944fcb54b5b7c112148837510a20a01f86",
+          "bytes": 1046
+        },
+        "primary_worktree": {
+          "sha256": "6d9c70dfd7102b86cd68d3d7d91f4c944fcb54b5b7c112148837510a20a01f86",
+          "bytes": 1046
+        },
+        "feature_candidate": {
+          "sha256": "0262bbc2e4c148e67b67b448b81b74b257375c3fdfd25a6888eb05fabd6cfa3e",
+          "bytes": 1081
+        }
+      },
+      {
+        "path": "crates/litchi-xlsb/src/data_model/mod.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "1051c43f1cce7bbb9b17307f8a47a5dff1c6c7c29ed9d6fd244d6a316d3c4887",
+          "bytes": 1314
+        },
+        "primary_worktree": {
+          "sha256": "1051c43f1cce7bbb9b17307f8a47a5dff1c6c7c29ed9d6fd244d6a316d3c4887",
+          "bytes": 1314
+        },
+        "feature_candidate": {
+          "sha256": "7e9f90f2e9e720b899c598a6e178d7ad650d1be89afabb90e2d6f9c8eb38abdc",
+          "bytes": 1471
+        }
+      },
+      {
+        "path": "crates/litchi-xlsb/src/data_model/package.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "2fc9f676e7c674d90399772c5541a13acace20277751005ed811c997084a8522",
+          "bytes": 18001
+        },
+        "primary_worktree": {
+          "sha256": "2fc9f676e7c674d90399772c5541a13acace20277751005ed811c997084a8522",
+          "bytes": 18001
+        },
+        "feature_candidate": {
+          "sha256": "6e62f8373b8e800e99b65d8a58b93be0ae08bca6ea747031efb0040a107bf97a",
+          "bytes": 18941
+        }
+      },
+      {
+        "path": "crates/litchi-xlsb/src/data_model/proof.rs",
+        "classification": "feature_only",
+        "primary_head_present": false,
+        "primary_worktree_present": false,
+        "feature_present": true,
+        "primary_head": null,
+        "primary_worktree": null,
+        "feature_candidate": {
+          "sha256": "3ef86240f745d1c8f9e468338e86ff51930f9a99c1f6d8e9d900e4bdbf795144",
+          "bytes": 4096
+        }
+      },
+      {
+        "path": "crates/litchi-xlsb/src/data_model/snapshot.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "cdf7f0f248d92a98926d3de95fd8141dc05637a2c5fb6f50cc834aafccae4448",
+          "bytes": 8182
+        },
+        "primary_worktree": {
+          "sha256": "cdf7f0f248d92a98926d3de95fd8141dc05637a2c5fb6f50cc834aafccae4448",
+          "bytes": 8182
+        },
+        "feature_candidate": {
+          "sha256": "1241cf23578ee13884bf2c0e456775c4fb7d390a02a9f634ceb7fdc50519d24e",
+          "bytes": 8963
+        }
+      },
+      {
+        "path": "crates/litchi-xlsb/src/data_model/transaction.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "5bfa4a123cdef7f2732aa7c91c3233ea98f5908403fa34007c8d803e44843567",
+          "bytes": 9610
+        },
+        "primary_worktree": {
+          "sha256": "5bfa4a123cdef7f2732aa7c91c3233ea98f5908403fa34007c8d803e44843567",
+          "bytes": 9610
+        },
+        "feature_candidate": {
+          "sha256": "e827fbf90bd1e354a5fa6e7f1fde998513da94a3e8cc10d0c70e7e73545cb6cb",
+          "bytes": 16113
+        }
+      },
+      {
+        "path": "crates/litchi-xlsb/src/writer/workbook/model.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "62376312e227bd4925ca99d82db2e2b86a4e4f604dbb617a7cd921a8dab32f19",
+          "bytes": 16957
+        },
+        "primary_worktree": {
+          "sha256": "62376312e227bd4925ca99d82db2e2b86a4e4f604dbb617a7cd921a8dab32f19",
+          "bytes": 16957
+        },
+        "feature_candidate": {
+          "sha256": "e22e29fc05b9ef60170a1dc0d56fb793af7893adaab2d103a1c4ea71ddbd8f55",
+          "bytes": 17031
+        }
+      },
+      {
+        "path": "crates/litchi-xlsb/src/writer/workbook/package.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "acf1f6259dd04d9bc3189a6f23defdef92f1e6b700aba2026095e8b540636f25",
+          "bytes": 42386
+        },
+        "primary_worktree": {
+          "sha256": "acf1f6259dd04d9bc3189a6f23defdef92f1e6b700aba2026095e8b540636f25",
+          "bytes": 42386
+        },
+        "feature_candidate": {
+          "sha256": "106bb6fa5bf36ed1d2e7921908b1db1c70e0aeb8bfba39f9b2423c66108809d9",
+          "bytes": 42320
+        }
+      },
+      {
+        "path": "crates/litchi-xlsb/tests/data_model.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "d30365ec07d34ec5ad5e038d0b0f8aee856b1a0f3458e844031d752fa2c4313a",
+          "bytes": 29348
+        },
+        "primary_worktree": {
+          "sha256": "d30365ec07d34ec5ad5e038d0b0f8aee856b1a0f3458e844031d752fa2c4313a",
+          "bytes": 29348
+        },
+        "feature_candidate": {
+          "sha256": "d9e0dd62f733f26064394cf7b00e8e19626690a3a997eb5eafeef27f6a16d336",
+          "bytes": 31055
+        }
+      },
+      {
+        "path": "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+        "classification": "shared_path_pending_primary_and_feature",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "1f92247b6cc24e1a7aa31a81c4bf5b18829691b80d66a71c34631aa557f2f7e7",
+          "bytes": 25630
+        },
+        "primary_worktree": {
+          "sha256": "4b1f5b18b67299b14f5ef18021187d7c5defa40d924235dba8a18594e7e11ea5",
+          "bytes": 25978
+        },
+        "feature_candidate": {
+          "sha256": "652b583c6d1a161d14ef96d644f3f53b726a1cb00623109d074ac031d484db6e",
+          "bytes": 26309
+        }
+      },
+      {
+        "path": "crates/litchi-xlsx/src/package.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "cf1a15d1fe57003b653aa66c26fb684d0c92c90231a165a9ed29a181f0cd8246",
+          "bytes": 36293
+        },
+        "primary_worktree": {
+          "sha256": "cf1a15d1fe57003b653aa66c26fb684d0c92c90231a165a9ed29a181f0cd8246",
+          "bytes": 36293
+        },
+        "feature_candidate": {
+          "sha256": "f5ae509a957e2c9c961ff0a796c63c093a26324ea45f6bc02dfc9f0130e36ce4",
+          "bytes": 36895
+        }
+      },
+      {
+        "path": "crates/litchi-xlsx/src/workbook/data_model/codec.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "aafa52f11fdfed52e81d153900e6284386c0d808a2999658a8b4d45242360f46",
+          "bytes": 76713
+        },
+        "primary_worktree": {
+          "sha256": "aafa52f11fdfed52e81d153900e6284386c0d808a2999658a8b4d45242360f46",
+          "bytes": 76713
+        },
+        "feature_candidate": {
+          "sha256": "1550f9fbc6b9cc308ea72950d8aae616eadb2c4250c7b4eb20550698f1e4118c",
+          "bytes": 115010
+        }
+      },
+      {
+        "path": "crates/litchi-xlsx/src/workbook/data_model/mod.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "89c4fde8850b2358ca605be244747e8fae691462d3b8e2ba2bb0b9238bf018fa",
+          "bytes": 2586
+        },
+        "primary_worktree": {
+          "sha256": "89c4fde8850b2358ca605be244747e8fae691462d3b8e2ba2bb0b9238bf018fa",
+          "bytes": 2586
+        },
+        "feature_candidate": {
+          "sha256": "239ef7782b0ed391d371eec872692cecd9215e389b5d74238eaede6e582b1734",
+          "bytes": 3236
+        }
+      },
+      {
+        "path": "crates/litchi-xlsx/src/workbook/data_model/model.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "1c80942bfffe6b49006349410823aea23fa9885d299855a8f5c45d79e06d12af",
+          "bytes": 3507
+        },
+        "primary_worktree": {
+          "sha256": "1c80942bfffe6b49006349410823aea23fa9885d299855a8f5c45d79e06d12af",
+          "bytes": 3507
+        },
+        "feature_candidate": {
+          "sha256": "454ff014fe04fe7145e7561cbcb9c00ab5a42d3cd3081b84e44bfd9b7d652beb",
+          "bytes": 6276
+        }
+      },
+      {
+        "path": "crates/litchi-xlsx/src/workbook/data_model/package.rs",
+        "classification": "feature_only",
+        "primary_head_present": true,
+        "primary_worktree_present": true,
+        "feature_present": true,
+        "primary_head": {
+          "sha256": "9b99a601804a97d00402a53fdd6edc49375bdd77a6bd65fd692c10757529c189",
+          "bytes": 79579
+        },
+        "primary_worktree": {
+          "sha256": "9b99a601804a97d00402a53fdd6edc49375bdd77a6bd65fd692c10757529c189",
+          "bytes": 79579
+        },
+        "feature_candidate": {
+          "sha256": "71eb8ec0333acaf212b9c2f4162c7a09ba407d68bb9b4bdd94129781b272830d",
+          "bytes": 105505
+        }
+      }
+    ]
+  },
+  "classification_counts": {
+    "feature_only": 25,
+    "shared_path_pending_primary_and_feature": 1
+  },
+  "pending_required_paths_patch": {
+    "path": "/var/tmp/litchi-xldm-full-v6-primary-reconciliation-20260910/primary-pending-required-paths.patch",
+    "sha256": "e60c8e41434f3cf68a5c1c5f617269fa659fe8da0f3e22dea5749ce42259c33a",
+    "bytes": 3009,
+    "paths_with_pending_hunks": [
+      "crates/litchi-xlsx/docs/FEATURE_MATRIX.md"
+    ]
+  },
+  "mixed_matrix": {
+    "path": "/var/tmp/litchi-xldm-full-v6-primary-reconciliation-20260910/mixed/crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+    "merge_status": "clean",
+    "sha256": "ed85e234a5e94301746836d8b5281f625decc92a4fe5b6f3ccb6daced5f232c3",
+    "bytes": 26657,
+    "base": "a487f5cad7978133fb313ae471863de298e500a5",
+    "ours": "current primary worktree preimage",
+    "theirs": "clean V6 feature candidate",
+    "preserves": [
+      "primary pending MS-OREACTXML commentsExtensible row",
+      "V6 Data Model time-groupings row"
+    ]
+  },
+  "primary_unrelated_overlap_note": "Only crates/litchi-xlsx/docs/FEATURE_MATRIX.md has a pending primary hunk among the 26 feature paths. All other primary dirty paths are outside the feature closure and remain untouched."
+}

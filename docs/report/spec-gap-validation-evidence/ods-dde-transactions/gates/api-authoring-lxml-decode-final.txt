@@ -1,0 +1,6 @@
+lxml decoded source/control values and cache scalar exactly
+dde-application: 'never\tcontacted\nDDE\rapp'
+dde-topic: 'file:///never\tcontacted\nDDE\rtopic.ods'
+name: 'Captured\tname\nwith\rcontrols'
+cache text: 'captured\ttext\nwith\rcontrols'
+empty-cache cell children: 0

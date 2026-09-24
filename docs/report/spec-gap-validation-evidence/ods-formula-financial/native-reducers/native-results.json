@@ -1,0 +1,836 @@
+{
+  "schema": "ods-formula-financial-reducer-native-results-v1",
+  "status": "captured compatibility fixture",
+  "contract_sha256": "fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b",
+  "oracle_sha256": "9701fb0e3f6917be16f538189245c1ae3fe53af956aa98241ce1aa4605ee7a26",
+  "rows": 41,
+  "observations": [
+    {
+      "id": "cumipmt.basic",
+      "function": "CUMIPMT",
+      "formula": "of:=CUMIPMT(0.1;2;100;1;2;0)",
+      "source_formula": "=CUMIPMT(0.1;2;100;1;2;0)",
+      "normative": {
+        "kind": "number",
+        "value": "-15.23809523809523895370986711378317591368126522378997638489279081198715557875344262494242321942928612",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -15.2380952380952
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "cumipmt.beginning_payment",
+      "function": "CUMIPMT",
+      "formula": "of:=CUMIPMT(0.1;2;100;1;2;1)",
+      "source_formula": "=CUMIPMT(0.1;2;100;1;2;1)",
+      "normative": {
+        "kind": "number",
+        "value": "-4.761904761904762156513157511373364509950402867030336115107209188012844421246557375057576780570713874",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -4.76190476190476
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "cumipmt.integer_type_truncates",
+      "function": "CUMIPMT",
+      "formula": "of:=CUMIPMT(0.1;2;100;1;1;1.9)",
+      "source_formula": "=CUMIPMT(0.1;2;100;1;1;1.9)",
+      "normative": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native kind/value {'kind': 'error', 'raw': 'Err:502'} differs from profile {'kind': 'number', 'value': '0', 'subtype': 'Number', 'tolerance': {'absolute': '0', 'relative': '1e-12'}}"
+    },
+    {
+      "id": "cumipmt.invalid_outer_domain",
+      "function": "CUMIPMT",
+      "formula": "of:=CUMIPMT(0;2;100;1;1;0)",
+      "source_formula": "=CUMIPMT(0;2;100;1;1;0)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:502'; profile error is '#NUM!'"
+    },
+    {
+      "id": "cumprinc.basic",
+      "function": "CUMPRINC",
+      "formula": "of:=CUMPRINC(0.1;2;100;1;1;0)",
+      "source_formula": "=CUMPRINC(0.1;2;100;1;1;0)",
+      "normative": {
+        "kind": "number",
+        "value": "-47.61904761904761892174342124431331774502479856648483194244639540599357778937672131247121160971464309",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -47.6190476190476
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "cumprinc.period_equal_nper_num",
+      "function": "CUMPRINC",
+      "formula": "of:=CUMPRINC(0.1;2;100;2;2;0)",
+      "source_formula": "=CUMPRINC(0.1;2;100;2;2;0)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "native": {
+        "kind": "number",
+        "value": -52.3809523809524
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native kind/value {'kind': 'number', 'value': -52.3809523809524} differs from profile {'kind': 'error', 'value': '#NUM!', 'error_class': 'generated'}"
+    },
+    {
+      "id": "cumprinc.reversed_empty",
+      "function": "CUMPRINC",
+      "formula": "of:=CUMPRINC(-1;0;-100;2;1;0)",
+      "source_formula": "=CUMPRINC(-1;0;-100;2;1;0)",
+      "normative": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native kind/value {'kind': 'error', 'raw': 'Err:502'} differs from profile {'kind': 'number', 'value': '0', 'subtype': 'Number', 'tolerance': {'absolute': '0', 'relative': '1e-12'}}"
+    },
+    {
+      "id": "cumprinc.invalid_type_on_empty",
+      "function": "CUMPRINC",
+      "formula": "of:=CUMPRINC(0.1;2;100;2;1;2)",
+      "source_formula": "=CUMPRINC(0.1;2;100;2;1;2)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:502'; profile error is '#NUM!'"
+    },
+    {
+      "id": "fvschedule.basic",
+      "function": "FVSCHEDULE",
+      "formula": "of:=FVSCHEDULE(100;{0.1|0.2})",
+      "source_formula": "=FVSCHEDULE(100;{0.1|0.2})",
+      "normative": {
+        "kind": "number",
+        "value": "132.0000000000000018873791418627661248831496577935492610291294162717674193219252742892422247678041458",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 132.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "fvschedule.negative_factor",
+      "function": "FVSCHEDULE",
+      "formula": "of:=FVSCHEDULE(100;{-2})",
+      "source_formula": "=FVSCHEDULE(100;{-2})",
+      "normative": {
+        "kind": "number",
+        "value": "-100",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -100.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "fvschedule.zero_factor_continues",
+      "function": "FVSCHEDULE",
+      "formula": "of:=FVSCHEDULE(100;{-1|0.5})",
+      "source_formula": "=FVSCHEDULE(100;{-1|0.5})",
+      "normative": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "fvschedule.formula_error_retained",
+      "function": "FVSCHEDULE",
+      "formula": "of:=FVSCHEDULE(100;{0.1|NA()|0.2})",
+      "source_formula": "=FVSCHEDULE(100;{0.1|NA()|0.2})",
+      "normative": {
+        "kind": "error",
+        "value": "#N/A",
+        "error_class": "formula"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:539"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:539'; profile error is '#N/A'"
+    },
+    {
+      "id": "npv.basic",
+      "function": "NPV",
+      "formula": "of:=NPV(0.1;{-100|110})",
+      "source_formula": "=NPV(0.1;{-100|110})",
+      "normative": {
+        "kind": "number",
+        "value": "-0.00000000000000045876984488642831785876904238226633264294793789441424721727326993149169246530745903",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native 0.0 differs from profile -4.587698448864283e-16 beyond tolerance 4.587698448864283e-28"
+    },
+    {
+      "id": "npv.split_argument_order",
+      "function": "NPV",
+      "formula": "of:=NPV(0.1;{-100};{110})",
+      "source_formula": "=NPV(0.1;{-100};{110})",
+      "normative": {
+        "kind": "number",
+        "value": "-0.00000000000000045876984488642831785876904238226633264294793789441424721727326993149169246530745903",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native 0.0 differs from profile -4.587698448864283e-16 beyond tolerance 4.587698448864283e-28"
+    },
+    {
+      "id": "npv.one_based_with_middle_zero",
+      "function": "NPV",
+      "formula": "of:=NPV(0.1;{-100|0|110})",
+      "source_formula": "=NPV(0.1;{-100|0|110})",
+      "normative": {
+        "kind": "number",
+        "value": "-8.26446280991735616432146761374808390369805966735761013882193218238297756480795727653389346309572639",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -8.26446280991738
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "npv.rate_zero_cancellation",
+      "function": "NPV",
+      "formula": "of:=NPV(0;{-1E+300|1|1E+300})",
+      "source_formula": "=NPV(0;{-1e300|1|1e300})",
+      "normative": {
+        "kind": "number",
+        "value": "1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native 0.0 differs from profile 1.0 beyond tolerance 1e-12"
+    },
+    {
+      "id": "npv.negative_base_integer_path",
+      "function": "NPV",
+      "formula": "of:=NPV(-2;{100|20})",
+      "source_formula": "=NPV(-2;{100|20})",
+      "normative": {
+        "kind": "number",
+        "value": "-80",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -80.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "npv.scaled_underflow_rescue",
+      "function": "NPV",
+      "formula": "of:=NPV(0.5;{0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|1E+300})",
+      "source_formula": "=NPV(0.5;{0 repeated 2000 times;1e300})",
+      "normative": {
+        "kind": "number",
+        "value": "0.00000000000000000000000000000000000000000000000000004379158148872769316384027994379803999803475295951235107179923935767640271734061287474325287983943748",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native 0.0 differs from profile 4.379158148872769e-53 beyond tolerance 4.379158148872769e-65",
+      "source_mapping": {
+        "kind": "repeat_expansion",
+        "repeat_count": 2000,
+        "tail": [
+          "1e300"
+        ],
+        "native_geometry": {
+          "rows": 2001,
+          "columns": 1
+        },
+        "note": "Expanded the compact corpus descriptor to an explicit one-column array literal for LibreOffice."
+      }
+    },
+    {
+      "id": "npv.rate_minus_one_divzero",
+      "function": "NPV",
+      "formula": "of:=NPV(-1;{100})",
+      "source_formula": "=NPV(-1;{100})",
+      "normative": {
+        "kind": "error",
+        "value": "#DIV/0!",
+        "error_class": "generated"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "#NUM!"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes '#NUM!'; profile error is '#DIV/0!'"
+    },
+    {
+      "id": "npv.rate_minus_one_formula_error",
+      "function": "NPV",
+      "formula": "of:=NPV(-1;{100|NA()})",
+      "source_formula": "=NPV(-1;{100|NA()})",
+      "normative": {
+        "kind": "error",
+        "value": "#N/A",
+        "error_class": "formula"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:539"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:539'; profile error is '#N/A'"
+    },
+    {
+      "id": "npv.formula_error_retained",
+      "function": "NPV",
+      "formula": "of:=NPV(0.1;{100|NA()|110})",
+      "source_formula": "=NPV(0.1;{100|NA()|110})",
+      "normative": {
+        "kind": "error",
+        "value": "#N/A",
+        "error_class": "formula"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:539"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:539'; profile error is '#N/A'"
+    },
+    {
+      "id": "mirr.basic",
+      "function": "MIRR",
+      "formula": "of:=MIRR({-100|110};0.1;0.1)",
+      "source_formula": "=MIRR({-100|110};0.1;0.1)",
+      "normative": {
+        "kind": "number",
+        "value": "0.1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.1
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "mirr.shared_masks",
+      "function": "MIRR",
+      "formula": "of:=MIRR({-100|110|20};0.1;0.1)",
+      "source_formula": "=MIRR({-100|110|20};0.1;0.1)",
+      "normative": {
+        "kind": "number",
+        "value": "0.187434208703791726038477005792198930693466399187886888244738318693145143804162152057257100116418975",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.187434208703792
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "mirr.negative_ratio_integer_power",
+      "function": "MIRR",
+      "formula": "of:=MIRR({110|-100};0;-2)",
+      "source_formula": "=MIRR({110|-100};0;-2)",
+      "normative": {
+        "kind": "number",
+        "value": "-2.1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -2.1
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "mirr.zero_ratio_power",
+      "function": "MIRR",
+      "formula": "of:=MIRR({110|110|-100};0;-2)",
+      "source_formula": "=MIRR({110|110|-100};0;-2)",
+      "normative": {
+        "kind": "number",
+        "value": "-1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -1.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "mirr.negative_ratio_noninteger_num",
+      "function": "MIRR",
+      "formula": "of:=MIRR({-100|110|0};-2;-2)",
+      "source_formula": "=MIRR({-100|110|0};-2;-2)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "#NUM!"
+      },
+      "comparison": "error-code-match",
+      "divergence_reason": null
+    },
+    {
+      "id": "mirr.text_empty_logical_compact",
+      "function": "MIRR",
+      "formula": "of:=MIRR([Data.A1:Data.E1];0.1;0.1)",
+      "source_formula": "=MIRR({-100|\"ignored\"|EMPTY|TRUE()|110};0.1;0.1)",
+      "normative": {
+        "kind": "number",
+        "value": "0.054039847444108727731181584629527318038494794235039140769636491451089195593268334145698588719816624",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.0540398474441086
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null,
+      "source_mapping": {
+        "kind": "reference_expansion",
+        "reference": "Data.A1:Data.E1",
+        "native_geometry": {
+          "rows": 1,
+          "columns": 5
+        },
+        "cells": {
+          "A1": -100,
+          "B1": "ignored",
+          "C1": "Empty",
+          "D1": true,
+          "E1": 110
+        },
+        "note": "Used a five-cell reference to retain a true empty cell; inline EMPTY is not valid LibreOffice formula syntax."
+      }
+    },
+    {
+      "id": "mirr.no_positive_num",
+      "function": "MIRR",
+      "formula": "of:=MIRR({-100|0};0.1;0.1)",
+      "source_formula": "=MIRR({-100|0};0.1;0.1)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:502'; profile error is '#NUM!'"
+    },
+    {
+      "id": "mirr.no_negative_num",
+      "function": "MIRR",
+      "formula": "of:=MIRR({0|110};0.1;0.1)",
+      "source_formula": "=MIRR({0|110};0.1;0.1)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:502'; profile error is '#NUM!'"
+    },
+    {
+      "id": "mirr.formula_error_retained",
+      "function": "MIRR",
+      "formula": "of:=MIRR({-100|NA()|110};0.1;0.1)",
+      "source_formula": "=MIRR({-100|NA()|110};0.1;0.1)",
+      "normative": {
+        "kind": "error",
+        "value": "#N/A",
+        "error_class": "formula"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:539"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:539'; profile error is '#N/A'"
+    },
+    {
+      "id": "xnpv.basic",
+      "function": "XNPV",
+      "formula": "of:=XNPV(0.1;{-100|110};{43831|44196})",
+      "source_formula": "=XNPV(0.1;{-100|110};{43831|44196})",
+      "normative": {
+        "kind": "number",
+        "value": "-0.00000000000000050464682937507115219133017060361472936864986148803904458980566915064127131538654019",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -1.4210854715202e-14
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native -1.4210854715202e-14 differs from profile -5.046468293750712e-16 beyond tolerance 5.046468293750712e-28"
+    },
+    {
+      "id": "xnpv.nonannual_interval",
+      "function": "XNPV",
+      "formula": "of:=XNPV(0.1;{-100|110};{43831|43861})",
+      "source_formula": "=XNPV(0.1;{-100|110};{43831|43861})",
+      "normative": {
+        "kind": "number",
+        "value": "9.1416579174873467464236770910409686615310872033514841662167899194356519352541640325783695019661792",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 9.14165791748734
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "xnpv.rate_zero_cancellation",
+      "function": "XNPV",
+      "formula": "of:=XNPV(0;{-1E+300|1|1E+300};{43831|43831|43831})",
+      "source_formula": "=XNPV(0;{-1e300|1|1e300};{43831|43831|43831})",
+      "normative": {
+        "kind": "number",
+        "value": "1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native 0.0 differs from profile 1.0 beyond tolerance 1e-12"
+    },
+    {
+      "id": "xnpv.equal_count_different_geometry",
+      "function": "XNPV",
+      "formula": "of:=XNPV(0.1;{-100|110|20|30};{43831;43832;43833;43834})",
+      "source_formula": "=XNPV(0.1;{-100|110|20|30};{43831;43832;43833;43834})",
+      "normative": {
+        "kind": "number",
+        "value": "59.93734597222166182097794183257972411123061579143737416721697196785281818235798189058145742991109539",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 59.9373459722217
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "xnpv.rate_minus_one_num",
+      "function": "XNPV",
+      "formula": "of:=XNPV(-1;{-100|110};{43831|44196})",
+      "source_formula": "=XNPV(-1;{-100|110};{43831|44196})",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:502'; profile error is '#NUM!'"
+    },
+    {
+      "id": "xnpv.rate_minus_one_formula_error",
+      "function": "XNPV",
+      "formula": "of:=XNPV(-1;{NA()|110};{43831|44196})",
+      "source_formula": "=XNPV(-1;{NA()|110};{43831|44196})",
+      "normative": {
+        "kind": "error",
+        "value": "#N/A",
+        "error_class": "formula"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:539"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:539'; profile error is '#N/A'"
+    },
+    {
+      "id": "xnpv.count_mismatch_value",
+      "function": "XNPV",
+      "formula": "of:=XNPV(0.1;{-100|110};{43831})",
+      "source_formula": "=XNPV(0.1;{-100|110};{43831})",
+      "normative": {
+        "kind": "error",
+        "value": "#VALUE!",
+        "error_class": "generated"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:502'; profile error is '#VALUE!'"
+    },
+    {
+      "id": "xnpv.non_number_value",
+      "function": "XNPV",
+      "formula": "of:=XNPV(0.1;{-100|\"110\"};{43831|44196})",
+      "source_formula": "=XNPV(0.1;{-100|\"110\"};{43831|44196})",
+      "normative": {
+        "kind": "error",
+        "value": "#VALUE!",
+        "error_class": "generated"
+      },
+      "native": {
+        "kind": "number",
+        "value": -100.0
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native kind/value {'kind': 'number', 'value': -100.0} differs from profile {'kind': 'error', 'value': '#VALUE!', 'error_class': 'generated'}"
+    },
+    {
+      "id": "xnpv_date_before_first_num",
+      "function": "XNPV",
+      "formula": "of:=XNPV(0.1;{-100|110};{43831|43830})",
+      "source_formula": "=XNPV(0.1;{-100|110};{43831|43830})",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "native": {
+        "kind": "number",
+        "value": 10.0287273663675
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native kind/value {'kind': 'number', 'value': 10.0287273663675} differs from profile {'kind': 'error', 'value': '#NUM!', 'error_class': 'generated'}"
+    },
+    {
+      "id": "xnpv_sign_num",
+      "function": "XNPV",
+      "formula": "of:=XNPV(0.1;{100|110};{43831|44196})",
+      "source_formula": "=XNPV(0.1;{100|110};{43831|44196})",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!",
+        "error_class": "generated"
+      },
+      "native": {
+        "kind": "number",
+        "value": 200.0
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native kind/value {'kind': 'number', 'value': 200.0} differs from profile {'kind': 'error', 'value': '#NUM!', 'error_class': 'generated'}"
+    },
+    {
+      "id": "xnpv.formula_error_retained",
+      "function": "XNPV",
+      "formula": "of:=XNPV(0.1;{NA()|110};{43831|44196})",
+      "source_formula": "=XNPV(0.1;{NA()|110};{43831|44196})",
+      "normative": {
+        "kind": "error",
+        "value": "#N/A",
+        "error_class": "formula"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:539"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:539'; profile error is '#N/A'"
+    }
+  ],
+  "comparison_counts": {
+    "numeric-tolerance": 15,
+    "divergence": 12,
+    "error-kind-match": 13,
+    "error-code-match": 1
+  },
+  "source_transformations": [
+    "npv.scaled_underflow_rescue",
+    "mirr.text_empty_logical_compact"
+  ]
+}

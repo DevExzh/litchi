@@ -1,0 +1,15 @@
+{
+  "directory": "/var/tmp/litchi-form-leaf-root-9xq8fk9_",
+  "checkout": "/var/tmp/litchi-form-leaf-root-9xq8fk9_/worktree",
+  "base": "1ad0624a01c78d9b5fe0ce61276456ca2be07887",
+  "files": [
+    "crates/litchi-xlsx/src/form_control/codec.rs",
+    "crates/litchi-xlsx/src/form_control/model.rs"
+  ],
+  "sha256": {
+    "crates/litchi-xlsx/src/form_control/codec.rs": "ee78a95bbd3a79a40c63411d1e0dfc2e65b1d0e1a39cda14f3741824ec816e33",
+    "crates/litchi-xlsx/src/form_control/model.rs": "9bf083b1fd85c686a74c978f8edd287c30e4622894616e7c67df1293f51f69c9"
+  },
+  "target": "/var/tmp/litchi-form-leaf-root-9xq8fk9_/target-isolated",
+  "shared_target": false
+}

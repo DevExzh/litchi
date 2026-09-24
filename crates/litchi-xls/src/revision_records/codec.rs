@@ -145,6 +145,34 @@ fn read_i32(data: &[u8], offset: usize) -> i32 {
         data[offset + 3],
     ])
 }
+
+// CODEPG identifiers referenced by MS-XLS 2.4.226. This validates inert
+// metadata, independently of the smaller set of available text decoders.
+// https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers
+fn validate_code_page(record_type: u16, code_page: u16, context: &str) -> Result<()> {
+    if matches!(
+        code_page,
+        37 | 437 | 500 | 708..=710 | 720 | 737 | 775 | 850 | 852 | 855 | 857 | 858
+            | 860..=866 | 869 | 870 | 874 | 875 | 932 | 936 | 949 | 950 | 1026 | 1047
+            | 1140..=1149 | 1200 | 1201 | 1250..=1258 | 1361 | 10000..=10008
+            | 10010 | 10017 | 10021 | 10029 | 10079 | 10081 | 10082 | 12000 | 12001
+            | 20000..=20005 | 20105..=20108 | 20127 | 20261 | 20269 | 20273 | 20277
+            | 20278 | 20280 | 20284 | 20285 | 20290 | 20297 | 20420 | 20423 | 20424
+            | 20833 | 20838 | 20866 | 20871 | 20880 | 20905 | 20924 | 20932 | 20936
+            | 20949 | 21025 | 21027 | 21866 | 28591..=28599 | 28603 | 28605 | 29001
+            | 38598 | 50220..=50222 | 50225 | 50227 | 50229 | 50930 | 50931 | 50933
+            | 50935..=50937 | 50939 | 51932 | 51936 | 51949 | 51950 | 52936 | 54936
+            | 57002..=57011 | 65000 | 65001
+    ) {
+        Ok(())
+    } else {
+        Err(invalid(
+            record_type,
+            format!("{context} has undefined CODEPG identifier {code_page}"),
+        ))
+    }
+}
+
 /// Decode an `XLUnicodeStringNoCch` inside a fixed-size field of `field`
 /// bytes: one option-flags byte followed by `cch` characters. Characters past
 /// `cch` are ignored per MS-XLS 2.5.294.
@@ -154,6 +182,34 @@ fn decode_fixed_string(
     cch: usize,
     context: &str,
 ) -> Result<String> {
+    validate_fixed_string(record_type, field, cch, context)?;
+    let flags = field[0];
+    let wide = flags & STRING_HIGH_BYTE != 0;
+    let byte_count = cch
+        .checked_mul(if wide { 2 } else { 1 })
+        .ok_or_else(|| invalid(record_type, format!("{context} length overflows")))?;
+    let bytes = &field[1..1 + byte_count];
+    if wide {
+        let units = bytes
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf16(&units)
+            .map_err(|_error| invalid(record_type, format!("{context} contains invalid UTF-16")))
+    } else {
+        Ok(bytes.iter().map(|&byte| char::from(byte)).collect())
+    }
+}
+
+/// Validate an `XLUnicodeStringNoCch` without materializing its characters.
+///
+/// The User Names package admission path only needs to establish that a known
+/// revision payload is structurally valid. Keeping this check separate from
+/// `decode_fixed_string` prevents that path from allocating a temporary UTF-16
+/// buffer or an owned `String` for every revision header/name.
+fn validate_fixed_string(record_type: u16, field: &[u8], cch: usize, context: &str) -> Result<()> {
     let Some((&flags, characters)) = field.split_first() else {
         return Err(invalid(record_type, format!("{context} field is empty")));
     };
@@ -174,17 +230,41 @@ fn decode_fixed_string(
         )
     })?;
     if wide {
-        let units = bytes
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
-            .collect::<Vec<_>>();
-        String::from_utf16(&units)
-            .map_err(|_error| invalid(record_type, format!("{context} contains invalid UTF-16")))
-    } else {
-        Ok(bytes.iter().map(|&byte| char::from(byte)).collect())
+        let mut pending_high = false;
+        for chunk in bytes.as_chunks::<2>().0 {
+            let unit = u16::from_le_bytes(*chunk);
+            match unit {
+                0xD800..=0xDBFF if pending_high => {
+                    return Err(invalid(
+                        record_type,
+                        format!("{context} contains invalid UTF-16"),
+                    ));
+                },
+                0xD800..=0xDBFF => pending_high = true,
+                0xDC00..=0xDFFF if pending_high => pending_high = false,
+                0xDC00..=0xDFFF => {
+                    return Err(invalid(
+                        record_type,
+                        format!("{context} contains invalid UTF-16"),
+                    ));
+                },
+                _ if pending_high => {
+                    return Err(invalid(
+                        record_type,
+                        format!("{context} contains invalid UTF-16"),
+                    ));
+                },
+                _ => {},
+            }
+        }
+        if pending_high {
+            return Err(invalid(
+                record_type,
+                format!("{context} contains invalid UTF-16"),
+            ));
+        }
     }
+    Ok(())
 }
 
 /// Validate the MS-XLS name-length split for `RRDRenSheet` and `RRInsertSh`.
@@ -687,6 +767,28 @@ impl FileLockPurpose {
 }
 
 impl FileLock {
+    /// Validate the fixed payload without retaining its name or unused bytes.
+    pub(crate) fn validate_payload_borrowed(data: &[u8]) -> Result<()> {
+        if data.len() != FILE_LOCK_PAYLOAD_LEN {
+            return Err(invalid(
+                FILE_LOCK_RECORD_TYPE,
+                format!(
+                    "FileLock payload has {} bytes; expected {FILE_LOCK_PAYLOAD_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        FileLockPurpose::from_u32(read_u32(data, 0))?;
+        let cch = usize::from(read_u16(data, 4));
+        if cch > FILE_LOCK_MAX_USER_CHARS {
+            return Err(invalid(
+                FILE_LOCK_RECORD_TYPE,
+                format!("FileLock user name has {cch} characters; maximum is 52"),
+            ));
+        }
+        validate_fixed_string(FILE_LOCK_RECORD_TYPE, &data[6..], cch, "FileLock stUsrName")
+    }
+
     /// Parse the fixed 162-byte record payload.
     /// # Errors
     ///
@@ -741,6 +843,55 @@ impl FileLock {
 }
 
 impl UsrExcl {
+    /// Validate the payload without materializing its fixed user name.
+    pub(crate) fn validate_payload_borrowed(data: &[u8]) -> Result<()> {
+        if data.len() < USR_EXCL_PREFIX_LEN + 1 + USR_EXCL_USER_FIELD_CHARS {
+            return Err(invalid(
+                USR_EXCL_RECORD_TYPE,
+                format!(
+                    "UsrExcl payload has {} bytes; expected at least {}",
+                    data.len(),
+                    USR_EXCL_PREFIX_LEN + 1 + USR_EXCL_USER_FIELD_CHARS
+                ),
+            ));
+        }
+        match read_u32(data, 0) {
+            0 | 1 => {},
+            other => {
+                return Err(invalid(
+                    USR_EXCL_RECORD_TYPE,
+                    format!("UsrExcl fExclusive is 0x{other:08X}; expected a Boolean"),
+                ));
+            },
+        }
+        ShortDtr::parse(USR_EXCL_RECORD_TYPE, &data[4..12])?;
+        let cch = read_u16(data, 12);
+        if usize::from(cch) > USR_EXCL_MAX_USER_CHARS {
+            return Err(invalid(
+                USR_EXCL_RECORD_TYPE,
+                format!("UsrExcl user name has {cch} characters; maximum is 54"),
+            ));
+        }
+        let field = &data[14..];
+        let wide = field[0] & STRING_HIGH_BYTE != 0;
+        let field_len = 1 + USR_EXCL_USER_FIELD_CHARS * if wide { 2 } else { 1 };
+        if field.len() != field_len {
+            return Err(invalid(
+                USR_EXCL_RECORD_TYPE,
+                format!(
+                    "UsrExcl stUser field has {} bytes; expected {field_len}",
+                    field.len()
+                ),
+            ));
+        }
+        validate_fixed_string(
+            USR_EXCL_RECORD_TYPE,
+            field,
+            usize::from(cch),
+            "UsrExcl stUser",
+        )
+    }
+
     /// Parse the record payload: `fExclusive`, `sdtr`, `cchUser`, and the
     /// fixed 147-character `stUser` field.
     /// # Errors
@@ -815,6 +966,71 @@ impl UsrExcl {
 }
 
 impl RrdHead {
+    /// Validate the fixed payload without materializing its user name.
+    pub(crate) fn validate_payload_borrowed(data: &[u8]) -> Result<()> {
+        const PAYLOAD_LEN: usize =
+            RRD_LEN + GUID_LEN + 2 + 2 + RRD_HEAD_USER_FIELD_LEN + SHORT_DTR_LEN + 2;
+        if data.len() != PAYLOAD_LEN {
+            return Err(invalid(
+                RRD_HEAD_RECORD_TYPE,
+                format!(
+                    "RRDHead payload has {} bytes; expected {PAYLOAD_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let header = RevisionRecordHeader::parse(RRD_HEAD_RECORD_TYPE, data, true)?;
+        if header.revision_type != RevisionType::Header {
+            return Err(invalid(
+                RRD_HEAD_RECORD_TYPE,
+                "RRDHead revision type is not REVTHEADER",
+            ));
+        }
+        if header.revision_id != 0 {
+            return Err(invalid(RRD_HEAD_RECORD_TYPE, "RRDHead has a nonzero revid"));
+        }
+        validate_code_page(
+            RRD_HEAD_RECORD_TYPE,
+            read_u16(data, RRD_LEN + GUID_LEN),
+            "RRDHead wFileCodePage",
+        )?;
+        let cch_offset = RRD_LEN + GUID_LEN + 2;
+        let cch = read_u16(data, cch_offset);
+        if usize::from(cch) > RRD_HEAD_MAX_USER_CHARS {
+            return Err(invalid(
+                RRD_HEAD_RECORD_TYPE,
+                format!("RRDHead user name has {cch} characters; maximum is 54"),
+            ));
+        }
+        let field_offset = cch_offset + 2;
+        validate_fixed_string(
+            RRD_HEAD_RECORD_TYPE,
+            &data[field_offset..field_offset + RRD_HEAD_USER_FIELD_LEN],
+            usize::from(cch),
+            "RRDHead stUser",
+        )?;
+        let dtr_offset = field_offset + RRD_HEAD_USER_FIELD_LEN;
+        ShortDtr::parse(
+            RRD_HEAD_RECORD_TYPE,
+            &data[dtr_offset..dtr_offset + SHORT_DTR_LEN],
+        )?;
+        if read_i16(data, dtr_offset + SHORT_DTR_LEN) < -1 {
+            return Err(invalid(
+                RRD_HEAD_RECORD_TYPE,
+                "RRDHead tabidMac is less than -1",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Validate and copy the fixed GUID without allocating the header name.
+    pub(crate) fn guid_from_payload(data: &[u8]) -> Result<[u8; GUID_LEN]> {
+        Self::validate_payload_borrowed(data)?;
+        let mut guid = [0u8; GUID_LEN];
+        guid.copy_from_slice(&data[RRD_LEN..RRD_LEN + GUID_LEN]);
+        Ok(guid)
+    }
+
     /// Parse the fixed 158-byte record payload.
     /// # Errors
     ///
@@ -841,6 +1057,8 @@ impl RrdHead {
         if header.revision_id != 0 {
             return Err(invalid(RRD_HEAD_RECORD_TYPE, "RRDHead has a nonzero revid"));
         }
+        let code_page = read_u16(data, RRD_LEN + GUID_LEN);
+        validate_code_page(RRD_HEAD_RECORD_TYPE, code_page, "RRDHead wFileCodePage")?;
         let mut guid = [0u8; GUID_LEN];
         guid.copy_from_slice(&data[RRD_LEN..RRD_LEN + GUID_LEN]);
         let cch_offset = RRD_LEN + GUID_LEN + 2;
@@ -905,32 +1123,49 @@ impl RrdHead {
 }
 
 impl RrTabId {
-    /// Parse the record payload, an array of 2-byte sheet identifiers.
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn parse_payload(data: &[u8]) -> Result<Self> {
+    /// Validate the identifier array without materializing a `Vec`.
+    pub(crate) fn validate_payload_borrowed(data: &[u8]) -> Result<()> {
         if !data.len().is_multiple_of(2) {
             return Err(invalid(
                 RR_TAB_ID_RECORD_TYPE,
                 "RRTabId payload has an odd byte count",
             ));
         }
+        let count = data.len() / 2;
+        if count > MAX_TAB_ID_COUNT {
+            return Err(invalid(
+                RR_TAB_ID_RECORD_TYPE,
+                format!("RRTabId has {count} sheet identifiers; maximum is {MAX_TAB_ID_COUNT}"),
+            ));
+        }
+        let mut seen = [0u64; 1024];
+        for chunk in data.as_chunks::<2>().0 {
+            let identifier = usize::from(u16::from_le_bytes(*chunk));
+            let word = identifier / 64;
+            let mask = 1u64 << (identifier % 64);
+            if seen[word] & mask != 0 {
+                return Err(invalid(
+                    RR_TAB_ID_RECORD_TYPE,
+                    format!("RRTabId contains duplicate sheet identifier {identifier}"),
+                ));
+            }
+            seen[word] |= mask;
+        }
+        Ok(())
+    }
+
+    /// Parse the record payload, an array of 2-byte sheet identifiers.
+    /// # Errors
+    ///
+    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    pub fn parse_payload(data: &[u8]) -> Result<Self> {
+        Self::validate_payload_borrowed(data)?;
         let sheet_ids = data
             .as_chunks::<2>()
             .0
             .iter()
             .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
             .collect::<Vec<_>>();
-        if sheet_ids.len() > MAX_TAB_ID_COUNT {
-            return Err(invalid(
-                RR_TAB_ID_RECORD_TYPE,
-                format!(
-                    "RRTabId has {} sheet identifiers; maximum is {MAX_TAB_ID_COUNT}",
-                    sheet_ids.len()
-                ),
-            ));
-        }
         Ok(Self { sheet_ids })
     }
 
@@ -941,6 +1176,59 @@ impl RrTabId {
 }
 
 impl RrdRenSheet {
+    /// Validate the fixed payload without materializing either sheet name.
+    pub(crate) fn validate_payload_borrowed(data: &[u8]) -> Result<()> {
+        const PAYLOAD_LEN: usize =
+            RRD_LEN + 2 + REN_SHEET_NAME_FIELD_LEN + 2 + REN_SHEET_NAME_FIELD_LEN;
+        if data.len() != PAYLOAD_LEN {
+            return Err(invalid(
+                RRD_REN_SHEET_RECORD_TYPE,
+                format!(
+                    "RRDRenSheet payload has {} bytes; expected {PAYLOAD_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let header = RevisionRecordHeader::parse(RRD_REN_SHEET_RECORD_TYPE, data, false)?;
+        header.require_reviewable(RRD_REN_SHEET_RECORD_TYPE)?;
+        if header.revision_type != RevisionType::RenameSheet {
+            return Err(invalid(
+                RRD_REN_SHEET_RECORD_TYPE,
+                "RRDRenSheet revision type is not REVTRENSHEET",
+            ));
+        }
+        header.require_sheet(RRD_REN_SHEET_RECORD_TYPE)?;
+        let old_cch = read_u16(data, RRD_LEN);
+        let old_field = &data[RRD_LEN + 2..RRD_LEN + 2 + REN_SHEET_NAME_FIELD_LEN];
+        validate_sheet_name_chars(
+            RRD_REN_SHEET_RECORD_TYPE,
+            old_field,
+            old_cch,
+            "RRDRenSheet stOldName",
+        )?;
+        validate_fixed_string(
+            RRD_REN_SHEET_RECORD_TYPE,
+            old_field,
+            usize::from(old_cch),
+            "RRDRenSheet stOldName",
+        )?;
+        let new_offset = RRD_LEN + 2 + REN_SHEET_NAME_FIELD_LEN;
+        let new_cch = read_u16(data, new_offset);
+        let new_field = &data[new_offset + 2..new_offset + 2 + REN_SHEET_NAME_FIELD_LEN];
+        validate_sheet_name_chars(
+            RRD_REN_SHEET_RECORD_TYPE,
+            new_field,
+            new_cch,
+            "RRDRenSheet stNewName",
+        )?;
+        validate_fixed_string(
+            RRD_REN_SHEET_RECORD_TYPE,
+            new_field,
+            usize::from(new_cch),
+            "RRDRenSheet stNewName",
+        )
+    }
+
     /// Parse the fixed 528-byte record payload.
     /// # Errors
     ///
@@ -1017,6 +1305,68 @@ impl RrdRenSheet {
 }
 
 impl RrdInsDel {
+    /// Validate the fixed fields and undo-tail framing without copying the
+    /// variable `Ducr` bytes.
+    pub(crate) fn validate_payload_borrowed(data: &[u8]) -> Result<()> {
+        const FIXED_LEN: usize = RRD_LEN + 2 + REF8U_LEN + 4;
+        if data.len() < FIXED_LEN {
+            return Err(invalid(
+                RRD_INS_DEL_RECORD_TYPE,
+                format!(
+                    "RRDInsDel payload has {} bytes; expected at least {FIXED_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let header = RevisionRecordHeader::parse(RRD_INS_DEL_RECORD_TYPE, data, false)?;
+        header.require_reviewable(RRD_INS_DEL_RECORD_TYPE)?;
+        match header.revision_type {
+            RevisionType::InsertRow
+            | RevisionType::InsertColumn
+            | RevisionType::DeleteRow
+            | RevisionType::DeleteColumn => {},
+            _ => {
+                return Err(invalid(
+                    RRD_INS_DEL_RECORD_TYPE,
+                    "RRDInsDel revision type is not an insert/delete",
+                ));
+            },
+        }
+        header.require_sheet(RRD_INS_DEL_RECORD_TYPE)?;
+        let flags = read_u16(data, RRD_LEN);
+        if flags & 0xFFFE != 0 {
+            return Err(invalid(
+                RRD_INS_DEL_RECORD_TYPE,
+                "RRDInsDel contains reserved flag bits",
+            ));
+        }
+        if flags & 0x0001 != 0 && header.revision_type != RevisionType::InsertRow {
+            return Err(invalid(
+                RRD_INS_DEL_RECORD_TYPE,
+                "RRDInsDel fEndOfList is set for a non row-insert",
+            ));
+        }
+        RevisionCellRange::parse(
+            RRD_INS_DEL_RECORD_TYPE,
+            &data[RRD_LEN + 2..RRD_LEN + 2 + REF8U_LEN],
+        )?;
+        let undo_count = read_u32(data, RRD_LEN + 2 + REF8U_LEN);
+        let undo_bytes = data.len() - FIXED_LEN;
+        if undo_count == 0 && undo_bytes != 0 {
+            return Err(invalid(
+                RRD_INS_DEL_RECORD_TYPE,
+                "RRDInsDel has undo bytes but a zero undo count",
+            ));
+        }
+        if undo_count > 0 && undo_bytes == 0 {
+            return Err(invalid(
+                RRD_INS_DEL_RECORD_TYPE,
+                "RRDInsDel is missing its Ducr undo data",
+            ));
+        }
+        Ok(())
+    }
+
     /// Parse the record payload.
     /// # Errors
     ///
@@ -1112,6 +1462,50 @@ impl RrdInsDel {
 }
 
 impl RrdMove {
+    /// Validate the fixed fields and undo-tail framing without copying the
+    /// variable `Ducr` bytes.
+    pub(crate) fn validate_payload_borrowed(data: &[u8]) -> Result<()> {
+        const FIXED_LEN: usize = RRD_LEN + 2 * REF8U_LEN + 2 + 4;
+        if data.len() < FIXED_LEN {
+            return Err(invalid(
+                RRD_MOVE_RECORD_TYPE,
+                format!(
+                    "RRDMove payload has {} bytes; expected at least {FIXED_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let header = RevisionRecordHeader::parse(RRD_MOVE_RECORD_TYPE, data, false)?;
+        header.require_reviewable(RRD_MOVE_RECORD_TYPE)?;
+        if header.revision_type != RevisionType::CellMove {
+            return Err(invalid(
+                RRD_MOVE_RECORD_TYPE,
+                "RRDMove revision type is not REVTMOVE",
+            ));
+        }
+        header.require_sheet(RRD_MOVE_RECORD_TYPE)?;
+        RevisionCellRange::parse(RRD_MOVE_RECORD_TYPE, &data[RRD_LEN..RRD_LEN + REF8U_LEN])?;
+        RevisionCellRange::parse(
+            RRD_MOVE_RECORD_TYPE,
+            &data[RRD_LEN + REF8U_LEN..RRD_LEN + 2 * REF8U_LEN],
+        )?;
+        let undo_count = read_u32(data, RRD_LEN + 2 * REF8U_LEN + 2);
+        let undo_bytes = data.len() - FIXED_LEN;
+        if undo_count == 0 && undo_bytes != 0 {
+            return Err(invalid(
+                RRD_MOVE_RECORD_TYPE,
+                "RRDMove has undo bytes but a zero undo count",
+            ));
+        }
+        if undo_count > 0 && undo_bytes == 0 {
+            return Err(invalid(
+                RRD_MOVE_RECORD_TYPE,
+                "RRDMove is missing its Ducr undo data",
+            ));
+        }
+        Ok(())
+    }
+
     /// Parse the record payload.
     /// # Errors
     ///
@@ -1196,6 +1590,49 @@ impl RrdMove {
 }
 
 impl RrInsertSh {
+    /// Validate the fixed payload without materializing the sheet name.
+    pub(crate) fn validate_payload_borrowed(data: &[u8]) -> Result<()> {
+        const PAYLOAD_LEN: usize = RRD_LEN + 2 + 2 + 2 + INSERT_SH_NAME_FIELD_LEN;
+        if data.len() != PAYLOAD_LEN {
+            return Err(invalid(
+                RR_INSERT_SH_RECORD_TYPE,
+                format!(
+                    "RRInsertSh payload has {} bytes; expected {PAYLOAD_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let header = RevisionRecordHeader::parse(RR_INSERT_SH_RECORD_TYPE, data, false)?;
+        header.require_reviewable(RR_INSERT_SH_RECORD_TYPE)?;
+        if header.revision_type != RevisionType::InsertSheet {
+            return Err(invalid(
+                RR_INSERT_SH_RECORD_TYPE,
+                "RRInsertSh revision type is not REVTINSERTSH",
+            ));
+        }
+        header.require_sheet(RR_INSERT_SH_RECORD_TYPE)?;
+        if read_u16(data, RRD_LEN + 2) != 0 {
+            return Err(invalid(
+                RR_INSERT_SH_RECORD_TYPE,
+                "RRInsertSh reserved field is nonzero",
+            ));
+        }
+        let cch = read_u16(data, RRD_LEN + 4);
+        let name_field = &data[RRD_LEN + 6..RRD_LEN + 6 + INSERT_SH_NAME_FIELD_LEN];
+        validate_sheet_name_chars(
+            RR_INSERT_SH_RECORD_TYPE,
+            name_field,
+            cch,
+            "RRInsertSh stName",
+        )?;
+        validate_fixed_string(
+            RR_INSERT_SH_RECORD_TYPE,
+            name_field,
+            usize::from(cch),
+            "RRInsertSh stName",
+        )
+    }
+
     /// Parse the fixed 276-byte record payload.
     /// # Errors
     ///
@@ -1280,6 +1717,84 @@ impl RevisionCellContent {
 }
 
 impl RrdChgCell {
+    /// Validate the fixed fields and variable-tail boundary without copying
+    /// the old value, formula, or differential-format bytes.
+    pub(crate) fn validate_payload_borrowed(data: &[u8]) -> Result<u16> {
+        if data.len() < RRD_CHG_CELL_FIXED_LEN {
+            return Err(invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                format!(
+                    "RRDChgCell payload has {} bytes; expected at least {RRD_CHG_CELL_FIXED_LEN}",
+                    data.len()
+                ),
+            ));
+        }
+        let header = RevisionRecordHeader::parse(RRD_CHG_CELL_RECORD_TYPE, data, false)?;
+        if header.revision_type != RevisionType::ChangeCell {
+            return Err(invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                "RRDChgCell revision type is not REVTCHANGECELL",
+            ));
+        }
+        if header.is_deleted_at_edge_of_sort() {
+            return Err(invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                "RRDChgCell sets fDelAtEdgeOfSort",
+            ));
+        }
+        header.require_sheet(RRD_CHG_CELL_RECORD_TYPE)?;
+        let flags = read_u32(data, RRD_LEN);
+        if flags & 0xF800_C000 != 0 {
+            return Err(invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                "RRDChgCell contains reserved flag bits",
+            ));
+        }
+        let _new_content =
+            RevisionCellContent::from_bits(RRD_CHG_CELL_RECORD_TYPE, flags & 0x7, "vt")?;
+        let old_content =
+            RevisionCellContent::from_bits(RRD_CHG_CELL_RECORD_TYPE, (flags >> 3) & 0x7, "vtOld")?;
+        let old_value_size = read_u32(data, RRD_LEN + 8);
+        let expected_old_size = match old_content {
+            RevisionCellContent::Blank => Some(0),
+            RevisionCellContent::RkNumber => Some(4),
+            RevisionCellContent::Xnum => Some(8),
+            RevisionCellContent::BoolError => Some(2),
+            RevisionCellContent::RichExtendedString | RevisionCellContent::Formula => None,
+        };
+        if let Some(expected) = expected_old_size
+            && old_value_size != expected
+        {
+            return Err(invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                format!(
+                    "RRDChgCell cbOldVal is {old_value_size}; expected {expected} for the old content type"
+                ),
+            ));
+        }
+        if old_content == RevisionCellContent::Formula && old_value_size < MIN_FORMULA_VALUE_LEN {
+            return Err(invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                "RRDChgCell old formula is smaller than 24 bytes",
+            ));
+        }
+        let formatting_run_count = read_u16(data, RRD_LEN + 12);
+        let old_value_size_usize = usize::try_from(old_value_size).map_err(|_error| {
+            invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                "RRDChgCell cbOldVal overflows usize",
+            )
+        })?;
+        let tail_len = data.len() - RRD_CHG_CELL_FIXED_LEN;
+        if old_value_size_usize > tail_len {
+            return Err(invalid(
+                RRD_CHG_CELL_RECORD_TYPE,
+                "RRDChgCell old value extends past the record payload",
+            ));
+        }
+        Ok(formatting_run_count)
+    }
+
     /// Parse the record payload.
     /// # Errors
     ///

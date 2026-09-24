@@ -1,0 +1,29 @@
+{
+  "archive": "scalar-cell-range-profile-01.tar.gz",
+  "sha256": "d930b66a9215223edbaf563798f5deaaacfbb98648716ab34e02df023307c0ad",
+  "scope": "Two sequential sampled whole-process cycle profiles of reference-range-1; includes setup/warmups, not paired acceptance or causal attribution.",
+  "cpu": 6,
+  "event": "cycles:u",
+  "frequency": 999,
+  "call_graph": "dwarf,8192",
+  "warmups": 2,
+  "iterations": 5,
+  "repeat": 200000,
+  "statuses": [
+    0,
+    0
+  ],
+  "before_elf": "0416017dc236eb55acbd79b0a7efae7131924642ac9ba03aaef7763669b6e1da",
+  "current_elf": "2ac378a8c07350afb26b7ab7f79e0d7af7c7100c0c52dea42e21e93a5c182a22",
+  "perf_version": "perf version 7.0.14",
+  "files": {
+    "scalar-cell-range-before.data": "15d803a4112f1aa1dfd4dc3f79035bb2d0ad5d393225b0a38ccafcc4e0963664",
+    "scalar-cell-range-before.stdout": "0abb6fc62912868255076f84036f7d70412191faad22f5c8ea8cf08a73a94dec",
+    "scalar-cell-range-before.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "scalar-cell-range-before-report.txt": "89315f276704f5e452660215e1fdb010f74479a7b4892c7996e47741e18f008b",
+    "scalar-cell-range-current.data": "94ab32d9996d1c7857e82c71ef0d0baec97a49705cf81eefb910f628b16dc67f",
+    "scalar-cell-range-current.stdout": "076ab73ba9a4b9d3b9894fa2718c551dd11c8a5b47b7067a754269896be6e036",
+    "scalar-cell-range-current.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "scalar-cell-range-current-report.txt": "9b6ec6d1e19771f148c881a86619da42e95f25b1523f3bfe0a108d7c7223e5ee"
+  }
+}

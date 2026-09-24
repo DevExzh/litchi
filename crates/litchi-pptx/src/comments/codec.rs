@@ -10,8 +10,8 @@ use litchi_ooxml_common::mce::process_ooxml;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
-use quick_xml::reader::NsReader;
-use std::collections::HashSet;
+use quick_xml::{Reader, reader::NsReader};
+use std::{borrow::Cow, collections::HashSet, ops::Range};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Attribute {
@@ -223,7 +223,7 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
     if xml.len() > MAX_PART_BYTES {
         return Err(invalid("presentation comment part is too large"));
     }
-    let processed = process_ooxml(xml)?;
+    let processed = process_comment_mce(xml)?;
     if processed.len() > MAX_PART_BYTES {
         return Err(invalid(
             "MCE-expanded presentation comment part is too large",
@@ -288,9 +288,13 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
             Event::CData(_) => {
                 return Err(invalid("CDATA is rejected in presentation comment parts"));
             },
-            Event::DocType(_) | Event::PI(_) => {
-                return Err(invalid("DTD and processing instructions are rejected"));
+            Event::DocType(_) => {
+                return Err(invalid("DTD is rejected in presentation comment parts"));
             },
+            // Processing instructions are inert markup.  Keep accepting them
+            // so source-bound collaboration edits can retain their exact
+            // surrounding bytes.
+            Event::PI(_) => {},
             Event::GeneralRef(reference) => {
                 let name = reference.decode().map_err(xml_error)?;
                 let value =
@@ -331,6 +335,77 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
         return Err(invalid("unterminated presentation comment XML"));
     }
     root.ok_or_else(|| invalid("missing presentation comment XML root"))
+}
+
+/// The common MCE processor rejects processing instructions while the legacy
+/// comments owner treats them as inert source markup. Remove PIs only from
+/// the temporary semantic input; source-bound collaboration codecs continue
+/// to retain the original bytes for exact no-ops and inverse patches.
+fn process_comment_mce(xml: &[u8]) -> Result<Cow<'_, [u8]>> {
+    let ranges = processing_instruction_ranges(xml)?;
+    if ranges.is_empty() {
+        return Ok(process_ooxml(xml)?);
+    }
+    let mut removed = 0usize;
+    for range in &ranges {
+        removed = removed
+            .checked_add(range.end - range.start)
+            .ok_or_else(|| invalid("processing-instruction source size overflow"))?;
+    }
+    let output_len = xml
+        .len()
+        .checked_sub(removed)
+        .ok_or_else(|| invalid("processing-instruction source size underflow"))?;
+    let mut filtered = Vec::new();
+    filtered
+        .try_reserve_exact(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "presentation comment MCE source",
+            source,
+        })?;
+    let mut cursor = 0usize;
+    for range in &ranges {
+        filtered.extend_from_slice(&xml[cursor..range.start]);
+        cursor = range.end;
+    }
+    filtered.extend_from_slice(&xml[cursor..]);
+    if filtered.len() != output_len {
+        return Err(invalid("presentation comment MCE source length changed"));
+    }
+    Ok(match process_ooxml(&filtered)? {
+        Cow::Borrowed(_) => Cow::Owned(filtered),
+        Cow::Owned(processed) => Cow::Owned(processed),
+    })
+}
+
+fn processing_instruction_ranges(xml: &[u8]) -> Result<Vec<Range<usize>>> {
+    let mut reader = Reader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    let mut ranges = Vec::new();
+    let mut buffer = Vec::new();
+    loop {
+        let before = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid("processing-instruction offset does not fit usize"))?;
+        let event = reader
+            .read_event_into(&mut buffer)
+            .map_err(xml_error)?
+            .into_owned();
+        let after = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid("processing-instruction offset does not fit usize"))?;
+        if matches!(event, Event::PI(_)) {
+            if ranges.len() >= MAX_NODES {
+                return Err(invalid(
+                    "presentation comment processing instructions exceed limit",
+                ));
+            }
+            ranges.push(before..after);
+        }
+        if matches!(event, Event::Eof) {
+            break;
+        }
+        buffer.clear();
+    }
+    Ok(ranges)
 }
 
 fn make_node(

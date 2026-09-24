@@ -412,9 +412,18 @@ fn fixture() -> (OpcPackage, PackURI, PackURI) {
     (package, workbook, worksheet)
 }
 
+fn zip_u32(bytes: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes([
+        bytes[offset],
+        bytes[offset + 1],
+        bytes[offset + 2],
+        bytes[offset + 3],
+    ])
+}
+
 fn corrupt_zip_member(mut bytes: Vec<u8>, member: &str) -> Vec<u8> {
     let member = member.as_bytes();
-    let mut local_found = false;
+    let mut local = None;
     let mut cursor = 0_usize;
     while let Some(relative) = bytes[cursor..]
         .windows(4)
@@ -427,17 +436,22 @@ fn corrupt_zip_member(mut bytes: Vec<u8>, member: &str) -> Vec<u8> {
         let data_start = name_start + name_length + extra_length;
         if &bytes[name_start..name_start + name_length] == member {
             assert!(data_start < bytes.len(), "ZIP member has no payload");
-            local_found = true;
+            local = Some((header, data_start));
             break;
         }
         cursor = header + 4;
     }
-    assert!(local_found, "ZIP member {member:?} was not found");
+    let Some((local_header, data_start)) = local else {
+        panic!("ZIP member {member:?} was not found");
+    };
 
     // Preserve structural ZIP admission and make the deferred read fail at
     // verification. A compressed-byte flip can preserve an equivalent stream
     // (for example by changing only a DEFLATE block-final marker), whereas a
-    // central-directory CRC mismatch is deterministic.
+    // declared-CRC mismatch is deterministic. Admission cross-checks the
+    // central record against the local header or the data descriptor, so the
+    // same CRC bit is flipped in every header that records it: the headers
+    // stay consistent with one another and only the payload disagrees.
     let mut cursor = 0_usize;
     while let Some(relative) = bytes[cursor..]
         .windows(4)
@@ -457,7 +471,30 @@ fn corrupt_zip_member(mut bytes: Vec<u8>, member: &str) -> Vec<u8> {
             break;
         }
         if &bytes[name_start..name_end] == member {
+            let crc = zip_u32(&bytes, header + 16);
+            let compressed_size = zip_u32(&bytes, header + 20);
+            assert_ne!(
+                compressed_size,
+                u32::MAX,
+                "fixture member must not be ZIP64"
+            );
             bytes[header + 16] ^= 1;
+            if zip_u32(&bytes, local_header + 14) == crc {
+                bytes[local_header + 14] ^= 1;
+            }
+            let flags = u16::from_le_bytes([bytes[local_header + 6], bytes[local_header + 7]]);
+            if flags & 0x0008 != 0 {
+                let mut descriptor = data_start + compressed_size as usize;
+                if &bytes[descriptor..descriptor + 4] == b"PK\x07\x08" {
+                    descriptor += 4;
+                }
+                assert_eq!(
+                    zip_u32(&bytes, descriptor),
+                    crc,
+                    "data descriptor CRC for ZIP member {member:?}"
+                );
+                bytes[descriptor] ^= 1;
+            }
             return bytes;
         }
         cursor = header + 4;

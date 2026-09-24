@@ -211,6 +211,24 @@ pub(super) fn content_parts(
     Ok(content_parts)
 }
 
+pub(super) fn ink_actions(
+    presentation: &Presentation<'_>,
+) -> Result<Vec<embedded::ink_actions::Snapshot>> {
+    ink_actions_with_limits(presentation, embedded::ink_actions::Limits::default())
+}
+
+pub(super) fn ink_actions_with_limits(
+    presentation: &Presentation<'_>,
+    limits: embedded::ink_actions::Limits,
+) -> Result<Vec<embedded::ink_actions::Snapshot>> {
+    let package = presentation.package();
+    let slide_parts = slides(presentation)?
+        .into_iter()
+        .enumerate()
+        .map(|(slide_index, slide)| (slide_index, slide.part().part()));
+    embedded::ink_actions::load_snapshots(package, slide_parts, &limits)
+}
+
 pub(super) fn hyperlinks(
     presentation: &Presentation<'_>,
 ) -> Result<Vec<(usize, crate::hyperlinks::Hyperlink)>> {

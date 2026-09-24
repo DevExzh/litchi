@@ -20,6 +20,8 @@ pub enum ReadResource {
     InputBytes,
     /// ZIP non-directory members.
     ArchiveMembers,
+    /// Total ZIP central-directory entries, including directory records.
+    ArchiveTotalEntries,
     /// ZIP member name bytes.
     ArchiveMemberNameBytes,
     /// ZIP central-directory metadata bytes.
@@ -69,6 +71,7 @@ impl fmt::Display for ReadResource {
         f.write_str(match self {
             Self::InputBytes => "package input bytes",
             Self::ArchiveMembers => "ZIP members",
+            Self::ArchiveTotalEntries => "ZIP total entries",
             Self::ArchiveMemberNameBytes => "ZIP member name bytes",
             Self::ArchiveMetadataBytes => "ZIP metadata bytes",
             Self::ArchiveCompressedBytes => "ZIP member compressed bytes",
@@ -113,6 +116,7 @@ impl fmt::Display for ReadResource {
 pub struct ReadLimits {
     input_bytes: u64,
     archive_members: usize,
+    archive_total_entries: usize,
     archive_member_name_bytes: u64,
     archive_metadata_bytes: u64,
     archive_compressed_bytes: u64,
@@ -154,6 +158,11 @@ impl ReadLimits {
     #[must_use]
     pub const fn max_archive_members(self) -> usize {
         self.archive_members
+    }
+    /// Maximum total ZIP central-directory entries, including directories.
+    #[must_use]
+    pub const fn max_archive_total_entries(self) -> usize {
+        self.archive_total_entries
     }
     /// Maximum bytes in one ZIP member name.
     #[must_use]
@@ -299,6 +308,7 @@ impl Default for ReadLimits {
         Self {
             input_bytes: 512 * MIB as u64,
             archive_members: 100_000,
+            archive_total_entries: 100_000,
             archive_member_name_bytes: 4 * KIB as u64,
             archive_metadata_bytes: 64 * MIB as u64,
             archive_compressed_bytes: 512 * MIB as u64,
@@ -345,6 +355,12 @@ impl ReadLimitsBuilder {
                 self.limits.relationship_parts as u64,
             ));
         }
+        if self.limits.archive_members > self.limits.archive_total_entries {
+            return Err(invalid(
+                ReadResource::ArchiveTotalEntries,
+                self.limits.archive_total_entries as u64,
+            ));
+        }
         if self.limits.parts > self.limits.archive_members {
             return Err(invalid(ReadResource::Parts, self.limits.parts as u64));
         }
@@ -375,6 +391,12 @@ impl ReadLimitsBuilder {
     pub fn max_archive_members(mut self, value: usize) -> Result<Self> {
         validate_count(ReadResource::ArchiveMembers, value)?;
         self.limits.archive_members = value;
+        Ok(self)
+    }
+    /// Set the total ZIP central-directory entry ceiling, including directories.
+    pub fn max_archive_total_entries(mut self, value: usize) -> Result<Self> {
+        validate_count(ReadResource::ArchiveTotalEntries, value)?;
+        self.limits.archive_total_entries = value;
         Ok(self)
     }
     /// Set the ZIP member-name byte ceiling.

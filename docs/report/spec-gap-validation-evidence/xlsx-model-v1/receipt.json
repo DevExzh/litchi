@@ -1,0 +1,119 @@
+{
+  "validation_base_commit": "ce0be842b60a28db142b795389e24be5bde8ae07",
+  "candidate_root": "/var/tmp/litchi-xlsx-model-v1-validation-20260910",
+  "candidate_git_head": "ce0be842b60a28db142b795389e24be5bde8ae07",
+  "workspace_head_at_audit": "ce0be842b60a28db142b795389e24be5bde8ae07",
+  "final_publication_commit": null,
+  "final_publication_commit_note": "The containing Git commit identifies publication; this field is unset to avoid a self-referential commit hash.",
+  "toolchain": "1.95.0",
+  "independent_final_review": "clear",
+  "owner_manifest": {
+    "file": "owner-manifest-v1.json",
+    "sha256": "b4620c4125d757fad7aee086327dabb2d519f054240310ea1a454898ff5f1e9b",
+    "path_count": 10,
+    "candidate_base_commit": "ce0be842b60a28db142b795389e24be5bde8ae07",
+    "matches_root_gate_owner_blobs": true
+  },
+  "custom_prerequisite": {
+    "binding_file": "custom-prerequisite-binding.json",
+    "binding_sha256": "0ae285d6141547098bb2aca647ae75e7857b28c619be099da71b5c46ca8fed8d",
+    "source_manifest": "custom-source-manifest-v7.json",
+    "source_manifest_sha256": "0448b5aba5e18f3b3c9939294f7dfa400c56a3a05d04a5f968d975d5f8896d2c",
+    "source_base_commit": "b2e2ff8e1fdabd4ab16a67ddf077e6968bf5e668",
+    "source_count": 17,
+    "current_head_matches_all": true,
+    "nonoverlap_preserved_count": 14
+  },
+  "source_audit": {
+    "file": "source-audit.json",
+    "sha256": "35f0647b88a18901e0229228508b3ae8ecd7ccd48512fee72753f53c5d8101a6",
+    "owner_path_count": 10,
+    "unexpected_source_changes": 0,
+    "survey_paths_checked": 4,
+    "root_candidate_package_tree_equivalent": true
+  },
+  "root_gate_receipt": {
+    "file": "root-final-gates-receipt.json",
+    "sha256": "f501ddc02e0b6eb2dc2b4a9e7f7b73f57f7f2abefe070764e43d8a546d89c932",
+    "source_receipt": "/var/tmp/litchi-xlsx-model-v7-root-final-gates-20260910.json",
+    "source_manifest_sha256": "33b11b4f80bfa5331fb1e157f33e7e8e634998d7c26d861aa4bd93b3568bdb29",
+    "tests_passed": 1437,
+    "doctests_passed": 2,
+    "ignored": 0,
+    "clippy": "pass",
+    "rustdoc_warning_denied": "pass",
+    "format": "pass",
+    "whitespace": "pass",
+    "gates_reexecuted_during_evidence_assembly": false
+  },
+  "commands_file": "commands.txt",
+  "commands_used_by_root": [
+    "cargo +1.95.0 test -p litchi-xlsx --all-features",
+    "cargo +1.95.0 clippy -p litchi-xlsx --all-targets --all-features -- -D warnings",
+    "RUSTDOCFLAGS=\"-D warnings\" cargo +1.95.0 doc -p litchi-xlsx --all-features --no-deps",
+    "rustfmt --edition 2024 --config skip_children=true --check <the 9 Rust owner paths>",
+    "git diff --check"
+  ],
+  "flags_absent_from_recorded_root_commands": [
+    "--offline",
+    "--locked"
+  ],
+  "artifacts": {
+    "README.md": {
+      "sha256": "d0528d5cc05880fdeffe96f19da0f9cedd0a2d7bb37f1866f6f30db565adbb9d",
+      "bytes": 4067
+    },
+    "owner-manifest-v1.json": {
+      "sha256": "b4620c4125d757fad7aee086327dabb2d519f054240310ea1a454898ff5f1e9b",
+      "bytes": 2852
+    },
+    "custom-source-manifest-v7.json": {
+      "sha256": "0448b5aba5e18f3b3c9939294f7dfa400c56a3a05d04a5f968d975d5f8896d2c",
+      "bytes": 2101
+    },
+    "custom-prerequisite-binding.json": {
+      "sha256": "0ae285d6141547098bb2aca647ae75e7857b28c619be099da71b5c46ca8fed8d",
+      "bytes": 11003
+    },
+    "source-audit.json": {
+      "sha256": "35f0647b88a18901e0229228508b3ae8ecd7ccd48512fee72753f53c5d8101a6",
+      "bytes": 4549
+    },
+    "root-final-gates-receipt.json": {
+      "sha256": "f501ddc02e0b6eb2dc2b4a9e7f7b73f57f7f2abefe070764e43d8a546d89c932",
+      "bytes": 1251
+    },
+    "commands.txt": {
+      "sha256": "ae4c419266d9227cbdd4e3ea58e1de97d217b3aa69a368abde33effb3469640c",
+      "bytes": 397
+    },
+    "Cargo.lock.gz": {
+      "sha256": "c23cce04b3454bdac7abef2a26622dd2987e82b707173a614e17faf4fa9d2c39",
+      "bytes": 33441,
+      "raw_sha256": "41f148118a4acdcb86b1abc174e914bec2ac0eb77738d6414f0e7febf7309ad8",
+      "raw_bytes": 138692
+    },
+    "tests.log.gz": {
+      "sha256": "0b4517920dc1da54923135d2481deccab944de3efa95f443fa7c27db600b9101",
+      "bytes": 29496,
+      "raw_sha256": "87daf42f5eef1ae71b8418544c4ac51b6eb1e2ee4da7ad2a6f2042fe6caf7c35",
+      "raw_bytes": 148366
+    },
+    "clippy.log.gz": {
+      "sha256": "9728e300d5401356ccce9f9a1f41bf3df79e78a87bee9bc37c97ac75965d5e4a",
+      "bytes": 1195,
+      "raw_sha256": "fdae0ae59319d50a7454d4d68fbe886dcfd5ab4d1049c94aa8b749c33a959b49",
+      "raw_bytes": 4814
+    },
+    "rustdoc.log.gz": {
+      "sha256": "f106f2fb9547ffcacc44ec36844f45543f639c0fa70f48b4aefa4f68874beabc",
+      "bytes": 381,
+      "raw_sha256": "37e0f7877044f699c90de54d86e25384aae65f2bf9cfbf1bd8b0ed59d495b6ba",
+      "raw_bytes": 1922
+    }
+  },
+  "cargo_lock_raw_sha256": "41f148118a4acdcb86b1abc174e914bec2ac0eb77738d6414f0e7febf7309ad8",
+  "scope": "Outer-validated XLSX Data Model descriptor/package/relationship handling with inert opaque XLDM payload and bounded source-preserving XML context; inner XLDM identity/dependency proof remains open and structural unverified replacements are refused.",
+  "root_gate_source_base_commit": "463ab2a5989bba49ffd95277dc29422a363de7f8",
+  "validation_base_commit_note": "Publication candidate base; root gates ran at the separately recorded source base plus exact Custom v7 and owner overlays, with identical package source."
+}

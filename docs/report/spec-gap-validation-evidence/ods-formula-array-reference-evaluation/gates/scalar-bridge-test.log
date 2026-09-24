@@ -1,0 +1,14 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+    Finished `test` profile [unoptimized] target(s) in 8.02s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-array-target/debug/deps/litchi_ods-2a6092c00c3fad53)
+
+running 6 tests
+test codec::formula::evaluation::value::scalar::tests::eager_bridge_handles_constants_but_rejects_lazy_dispatch ... ok
+test codec::formula::evaluation::value::scalar::tests::bridge_rejects_pending_frames_and_checks_constant_cancellation ... ok
+test codec::formula::evaluation::value::scalar::tests::failed_argument_releases_kernel_values_and_allows_reuse ... ok
+test codec::formula::evaluation::value::scalar::tests::empty_comparison_and_text_parameter_profiles_are_explicit ... ok
+test codec::formula::evaluation::value::scalar::tests::lazy_and_sequence_functions_do_not_consume_bridge_arguments ... ok
+test codec::formula::evaluation::value::scalar::tests::empty_keeps_any_identity_and_uses_required_conversion ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 371 filtered out; finished in 0.00s
+

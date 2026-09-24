@@ -39,6 +39,8 @@ use litchi_doc::captions::{
 };
 use std::io::Cursor;
 
+mod common;
+
 #[test]
 fn facade_exposes_contextual_caption_types_without_repeated_prefixes() {
     let info = Info::new(
@@ -157,18 +159,31 @@ fn base_template(table: &[u8]) -> Vec<u8> {
 }
 
 fn base_document(table: &[u8], template: bool) -> Vec<u8> {
-    let pointer_count = 117usize;
-    let word_len = 154 + pointer_count * 8;
-    let mut word = vec![0; word_len];
+    const DOP_INDEX: usize = 31;
+    let pointer_count = 136usize;
+    let pointer_end = 154 + pointer_count * 8;
+    let mut word = vec![0; pointer_end + 4];
     word[0..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
-    word[2..4].copy_from_slice(&0x0101u16.to_le_bytes());
+    // FibBase.csw and cslw are fixed MS-DOC counts.
+    word[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    word[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
+    word[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
     word[10..12].copy_from_slice(&u16::from(template).to_le_bytes());
     word[152..154].copy_from_slice(&(pointer_count as u16).to_le_bytes());
+    word[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+    word[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
+
+    let mut table = table.to_vec();
+    let dop_offset = table.len();
+    table.extend_from_slice(&[0u8; 500]);
+    let dop_pointer = 154 + DOP_INDEX * 8;
+    word[dop_pointer..dop_pointer + 4].copy_from_slice(&(dop_offset as u32).to_le_bytes());
+    word[dop_pointer + 4..dop_pointer + 8].copy_from_slice(&500u32.to_le_bytes());
 
     let mut writer = OleWriter::new();
     writer.create_stream(&["WordDocument"], &word).unwrap();
-    writer.create_stream(&["0Table"], table).unwrap();
+    writer.create_stream(&["0Table"], &table).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    output.into_inner()
+    common::with_valid_word97_dop(output.into_inner())
 }

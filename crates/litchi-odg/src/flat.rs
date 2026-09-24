@@ -5,9 +5,9 @@ use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
     name::{Namespace, ResolveResult},
-    reader::NsReader,
+    reader::{NsReader, Reader},
 };
-use std::{ops::Range, sync::Arc};
+use std::{borrow::Cow, ops::Range, sync::Arc};
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -183,16 +183,51 @@ impl FlatDrawingEdit {
     /// Returns an error when staged spans overlap, output parsing fails, or readback differs.
     pub fn commit(self) -> Result<FlatDrawingCommit> {
         let FlatDrawingEdit { source, changes } = self;
-        let mut replacements = Vec::with_capacity(changes.len());
+        let mut output_len = source.as_bytes().len();
+        for change in &changes {
+            let shape = &source.pages()[change.page].shapes()[change.shape];
+            let span = shape
+                .text_spans
+                .first()
+                .ok_or_else(|| invalid("flat ODG shape text source span is missing"))?;
+            let escaped_len = escaped_xml_len(&change.after)?;
+            output_len = output_len
+                .checked_sub(
+                    span.end
+                        .checked_sub(span.start)
+                        .ok_or_else(|| invalid("overlapping or invalid flat ODG text patch"))?,
+                )
+                .and_then(|length| length.checked_add(escaped_len))
+                .ok_or_else(|| invalid("flat ODG text output size overflow"))?;
+        }
+        if output_len > MAX_BYTES {
+            return Err(invalid(
+                "flat ODG edited output exceeds the input size limit",
+            ));
+        }
+        let mut replacements = Vec::new();
+        replacements
+            .try_reserve_exact(changes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "flat ODG replacements",
+                source,
+            })?;
         for change in &changes {
             let shape = &source.pages()[change.page].shapes()[change.shape];
             replacements.push((
                 shape.text_spans[0].clone(),
-                quick_xml::escape::escape(&change.after).into_owned(),
+                escaped_xml_string(&change.after, MAX_BYTES, "flat ODG replacement")?,
             ));
         }
         replacements.sort_unstable_by_key(|replacement| std::cmp::Reverse(replacement.0.start));
-        let mut bytes = source.as_bytes().to_vec();
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(output_len.max(source.as_bytes().len()))
+            .map_err(|source| Error::Allocation {
+                resource: "flat ODG edited output",
+                source,
+            })?;
+        bytes.extend_from_slice(source.as_bytes());
         let mut previous_start = bytes.len();
         for (span, replacement) in replacements {
             if span.end > previous_start || span.start > span.end || span.end > bytes.len() {
@@ -333,10 +368,16 @@ fn parse(bytes: Vec<u8>) -> Result<State> {
     if bytes.len() > MAX_BYTES {
         return Err(invalid("flat ODG exceeds the input size limit"));
     }
+    // Keep the direct UTF-8 failure before format detection. Raw admission
+    // must still precede detection because the detector uses `NsReader` and
+    // can otherwise own an oversized root namespace declaration; malformed
+    // UTF-8 therefore receives this typed source error instead of a generic
+    // non-flat classification.
+    let xml = std::str::from_utf8(&bytes).map_err(|_error| invalid("flat ODG is not UTF-8"))?;
+    validate_raw_events(xml)?;
     if litchi_odf_common::detect::flat(&bytes) != Some(FileFormat::Odg) {
         return Err(invalid("input is not a flat ODG document"));
     }
-    let xml = std::str::from_utf8(&bytes).map_err(|_error| invalid("flat ODG is not UTF-8"))?;
     let mut reader = NsReader::from_reader(xml.as_bytes());
     let mut depth = 0usize;
     let mut root_seen = false;
@@ -356,6 +397,7 @@ fn parse(bytes: Vec<u8>) -> Result<State> {
         let (resolved_namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| invalid(format!("invalid flat ODG XML: {error}")))?;
+        validate_borrowed_event(&event)?;
         let namespace = classify(&resolved_namespace);
         let event_end = position(&reader)?;
         match event {
@@ -403,55 +445,55 @@ fn parse(bytes: Vec<u8>) -> Result<State> {
                 let Some((_, page, shape)) = active_shapes.last().copied() else {
                     continue;
                 };
+                admit_text_bytes(text.as_ref(), text_bytes, "flat ODG text")?;
                 let decoded = text
                     .decode()
                     .map_err(|error| invalid(format!("invalid flat ODG text: {error}")))?;
+                let decoded = own_bounded_cow(decoded, MAX_TEXT_BYTES, "flat ODG text")?;
                 let value = quick_xml::escape::unescape(&decoded)
                     .map_err(|error| invalid(format!("invalid flat ODG text escape: {error}")))?;
-                text_bytes = text_bytes
-                    .checked_add(value.len())
-                    .ok_or_else(|| invalid("flat ODG text size overflow"))?;
-                if text_bytes > MAX_TEXT_BYTES {
-                    return Err(invalid("flat ODG text exceeds the extraction limit"));
-                }
-                pages[page].shapes[shape].text.push_str(&value);
-                pages[page].shapes[shape]
-                    .text_spans
-                    .push(event_start..event_end);
+                let value = own_bounded_cow(value, MAX_TEXT_BYTES, "flat ODG text")?;
+                append_text(
+                    &mut pages,
+                    page,
+                    shape,
+                    &value,
+                    &mut text_bytes,
+                    event_start..event_end,
+                )?;
             },
             Event::CData(text) if !paragraph_depths.is_empty() => {
                 let Some((_, page, shape)) = active_shapes.last().copied() else {
                     continue;
                 };
+                admit_text_bytes(text.as_ref(), text_bytes, "flat ODG CDATA")?;
                 let value = text
                     .decode()
                     .map_err(|error| invalid(format!("invalid flat ODG CDATA: {error}")))?;
-                text_bytes = text_bytes
-                    .checked_add(value.len())
-                    .ok_or_else(|| invalid("flat ODG text size overflow"))?;
-                if text_bytes > MAX_TEXT_BYTES {
-                    return Err(invalid("flat ODG text exceeds the extraction limit"));
-                }
-                pages[page].shapes[shape].text.push_str(&value);
-                pages[page].shapes[shape]
-                    .text_spans
-                    .push(event_start..event_end);
+                let value = own_bounded_cow(value, MAX_TEXT_BYTES, "flat ODG CDATA")?;
+                append_text(
+                    &mut pages,
+                    page,
+                    shape,
+                    &value,
+                    &mut text_bytes,
+                    event_start..event_end,
+                )?;
             },
             Event::GeneralRef(reference) if !paragraph_depths.is_empty() => {
                 let Some((_, page, shape)) = active_shapes.last().copied() else {
                     continue;
                 };
+                admit_text_bytes(reference.as_ref(), text_bytes, "flat ODG reference")?;
                 let value = resolve_reference(&reference)?;
-                text_bytes = text_bytes
-                    .checked_add(value.len())
-                    .ok_or_else(|| invalid("flat ODG text size overflow"))?;
-                if text_bytes > MAX_TEXT_BYTES {
-                    return Err(invalid("flat ODG text exceeds the extraction limit"));
-                }
-                pages[page].shapes[shape].text.push_str(&value);
-                pages[page].shapes[shape]
-                    .text_spans
-                    .push(event_start..event_end);
+                append_text(
+                    &mut pages,
+                    page,
+                    shape,
+                    &value,
+                    &mut text_bytes,
+                    event_start..event_end,
+                )?;
             },
             Event::End(element) => {
                 if paragraph_depths.last() == Some(&depth)
@@ -490,6 +532,239 @@ fn parse(bytes: Vec<u8>) -> Result<State> {
         return Err(invalid("flat ODG has an incomplete drawing structure"));
     }
     Ok(State { bytes, pages })
+}
+
+fn validate_borrowed_event(event: &Event<'_>) -> Result<()> {
+    match event {
+        Event::Start(element) | Event::Empty(element) => {
+            validate_raw_value(element.as_ref(), "flat ODG start event")?;
+            for raw_attribute in element.attributes() {
+                let attribute = raw_attribute.map_err(|error| {
+                    invalid(format!("invalid flat ODG event attribute: {error}"))
+                })?;
+                validate_raw_value(attribute.key.as_ref(), "flat ODG attribute name")?;
+                validate_raw_value(attribute.value.as_ref(), "flat ODG attribute value")?;
+            }
+        },
+        Event::End(element) => validate_raw_value(element.as_ref(), "flat ODG end event")?,
+        Event::Text(text) | Event::Comment(text) | Event::DocType(text) => {
+            validate_raw_value(text.as_ref(), "flat ODG text event")?;
+        },
+        Event::CData(text) => validate_raw_value(text.as_ref(), "flat ODG CDATA event")?,
+        Event::Decl(declaration) => {
+            validate_raw_value(declaration.as_ref(), "flat ODG declaration event")?;
+        },
+        Event::PI(instruction) => {
+            validate_raw_value(
+                instruction.as_ref(),
+                "flat ODG processing-instruction event",
+            )?;
+        },
+        Event::GeneralRef(reference) => {
+            validate_raw_value(reference.as_ref(), "flat ODG reference event")?;
+        },
+        Event::Eof => {},
+    }
+    Ok(())
+}
+
+/// Admit raw events before `NsReader` can store namespace declarations or
+/// clone an unknown prefix while resolving a qualified name.
+fn validate_raw_events(xml: &str) -> Result<()> {
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut depth = 0usize;
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| invalid(format!("invalid flat ODG XML: {error}")))?;
+        validate_borrowed_event(&event)?;
+        match event {
+            Event::Start(_) => {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("flat ODG XML depth overflow"))?;
+                if depth > MAX_DEPTH {
+                    return Err(invalid("flat ODG XML nesting exceeds the limit"));
+                }
+            },
+            Event::Empty(_) => {
+                let virtual_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("flat ODG XML depth overflow"))?;
+                if virtual_depth > MAX_DEPTH {
+                    return Err(invalid("flat ODG XML nesting exceeds the limit"));
+                }
+            },
+            Event::End(_) => {
+                depth = depth.saturating_sub(1);
+            },
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_)
+            | Event::PI(_)
+            | Event::Text(_) => {},
+            Event::Eof => break,
+        }
+    }
+    Ok(())
+}
+
+fn validate_raw_value(value: &[u8], owner: &str) -> Result<()> {
+    if value.len() > MAX_TEXT_BYTES {
+        return Err(invalid(format!("{owner} exceeds the limit")));
+    }
+    Ok(())
+}
+
+fn validate_decoded_value(value: &str, owner: &str) -> Result<()> {
+    if value.len() > MAX_TEXT_BYTES || value.contains('\0') {
+        return Err(invalid(format!("{owner} exceeds the limit")));
+    }
+    Ok(())
+}
+
+fn own_bounded_cow<'a>(value: Cow<'a, str>, maximum: usize, owner: &str) -> Result<String> {
+    match value {
+        Cow::Borrowed(value) => clone_bounded_string(value, maximum, owner),
+        Cow::Owned(value) => {
+            validate_decoded_value(&value, owner)?;
+            Ok(value)
+        },
+    }
+}
+
+fn clone_bounded_string(value: &str, maximum: usize, owner: &str) -> Result<String> {
+    validate_decoded_value(value, owner)?;
+    if value.len() > maximum {
+        return Err(invalid(format!("{owner} exceeds the limit")));
+    }
+    let mut result = String::new();
+    result
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "flat ODG text",
+            source,
+        })?;
+    result.push_str(value);
+    Ok(result)
+}
+
+fn admit_text_bytes(raw: &[u8], current: usize, owner: &str) -> Result<()> {
+    validate_raw_value(raw, owner)?;
+    let next = current
+        .checked_add(raw.len())
+        .ok_or_else(|| invalid("flat ODG text size overflow"))?;
+    if next > MAX_TEXT_BYTES {
+        return Err(invalid("flat ODG text exceeds the extraction limit"));
+    }
+    Ok(())
+}
+
+fn append_text(
+    pages: &mut [FlatPage],
+    page: usize,
+    shape: usize,
+    value: &str,
+    text_bytes: &mut usize,
+    span: Range<usize>,
+) -> Result<()> {
+    let next = text_bytes
+        .checked_add(value.len())
+        .ok_or_else(|| invalid("flat ODG text size overflow"))?;
+    if next > MAX_TEXT_BYTES {
+        return Err(invalid("flat ODG text exceeds the extraction limit"));
+    }
+    let flat_shape = pages
+        .get_mut(page)
+        .and_then(|page_value| page_value.shapes.get_mut(shape))
+        .ok_or_else(|| invalid("flat ODG text owner is missing"))?;
+    flat_shape
+        .text
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "flat ODG extracted text",
+            source,
+        })?;
+    flat_shape
+        .text_spans
+        .try_reserve_exact(1)
+        .map_err(|source| Error::Allocation {
+            resource: "flat ODG text spans",
+            source,
+        })?;
+    flat_shape.text.push_str(value);
+    flat_shape.text_spans.push(span);
+    *text_bytes = next;
+    Ok(())
+}
+
+fn escaped_xml_len(value: &str) -> Result<usize> {
+    value.chars().try_fold(0usize, |total, character| {
+        let extra = match character {
+            '&' => 4,
+            '<' | '>' => 3,
+            '\'' | '"' => 5,
+            _ => 0,
+        };
+        total
+            .checked_add(character.len_utf8())
+            .and_then(|size| size.checked_add(extra))
+            .ok_or_else(|| invalid("flat ODG escaped text size overflow"))
+    })
+}
+
+fn push_escaped_xml(output: &mut String, value: &str, owner: &str) -> Result<()> {
+    let escaped_len = escaped_xml_len(value)?;
+    let required = output
+        .len()
+        .checked_add(escaped_len)
+        .ok_or_else(|| invalid("flat ODG escaped text size overflow"))?;
+    if required > output.capacity() {
+        output
+            .try_reserve_exact(required - output.len())
+            .map_err(|source| Error::Allocation {
+                resource: "flat ODG escaped text",
+                source,
+            })?;
+    }
+    let mut start = 0usize;
+    for (index, character) in value.char_indices() {
+        let replacement = match character {
+            '&' => "&amp;",
+            '<' => "&lt;",
+            '>' => "&gt;",
+            '\'' => "&apos;",
+            '"' => "&quot;",
+            _ => continue,
+        };
+        output.push_str(&value[start..index]);
+        output.push_str(replacement);
+        start = index + character.len_utf8();
+    }
+    output.push_str(&value[start..]);
+    if output.len() > MAX_BYTES {
+        return Err(invalid(format!("{owner} exceeds the input size limit")));
+    }
+    Ok(())
+}
+
+fn escaped_xml_string(value: &str, maximum: usize, owner: &str) -> Result<String> {
+    let escaped_len = escaped_xml_len(value)?;
+    if escaped_len > maximum {
+        return Err(invalid(format!("{owner} exceeds the input size limit")));
+    }
+    let mut output = String::new();
+    output
+        .try_reserve_exact(escaped_len)
+        .map_err(|source| Error::Allocation {
+            resource: "flat ODG escaped text",
+            source,
+        })?;
+    push_escaped_xml(&mut output, value, owner)?;
+    Ok(output)
 }
 
 #[allow(
@@ -592,10 +867,13 @@ fn attribute(
             .map_err(|error| invalid(format!("invalid flat ODG attribute: {error}")))?;
         let (resolved, name) = reader.resolver().resolve_attribute(parsed_attribute.key);
         if resolved_bound(&resolved, namespace) && name.as_ref() == local {
-            return parsed_attribute
+            validate_raw_value(parsed_attribute.key.as_ref(), "flat ODG attribute name")?;
+            validate_raw_value(parsed_attribute.value.as_ref(), "flat ODG attribute value")?;
+            let value = parsed_attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                .map(|value| Some(value.into_owned()))
-                .map_err(|error| invalid(format!("invalid flat ODG attribute value: {error}")));
+                .map_err(|error| invalid(format!("invalid flat ODG attribute value: {error}")))?;
+            validate_decoded_value(value.as_ref(), "flat ODG attribute value")?;
+            return own_bounded_cow(value, MAX_TEXT_BYTES, "flat ODG attribute value").map(Some);
         }
     }
     Ok(None)
@@ -624,6 +902,7 @@ fn is_shape(local: &[u8]) -> bool {
 }
 
 fn resolve_reference(reference: &quick_xml::events::BytesRef<'_>) -> Result<String> {
+    validate_raw_value(reference.as_ref(), "flat ODG character reference")?;
     if let Some(character) = reference
         .resolve_char_ref()
         .map_err(|error| invalid(format!("invalid flat ODG character reference: {error}")))?

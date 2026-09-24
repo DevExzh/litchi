@@ -228,6 +228,11 @@ pub(super) fn transfer(
     source_anchor: usize,
     target_sheet: usize,
 ) -> Result<()> {
+    if target.drawing_load_policy() == crate::workbook::DrawingLoadPolicy::Skipped {
+        return Err(Error::UnsupportedFeature(
+            "drawing transfer requires an eager drawing projection".to_string(),
+        ));
+    }
     let source = super::root::validated_workbook_with_external_link_limits(
         source_bytes,
         target.external_link_limits(),
@@ -275,10 +280,8 @@ pub(super) fn transfer(
         target_relationships,
     )?;
     package.unsign();
-    *target = Workbook::from_opc_package_with_external_link_limits(
-        package,
-        target.external_link_limits(),
-    )?;
+    let validated = target.reparse_candidate(package)?;
+    *target = validated;
     validate_readback(
         target,
         target_sheet,
@@ -1464,7 +1467,12 @@ fn collect_chart_graph(source: &Workbook, root: PackURI) -> Result<ChartGraph> {
                 ));
             }
             let target = relationship.target_partname()?;
-            if !chart_owned_uri(&target) {
+            let is_calculation_chain = relationship.reltype()
+                == crate::calculation_chain::RELATIONSHIP_TYPE
+                || source.package.get_part(&target).is_ok_and(|part| {
+                    part.content_type() == crate::calculation_chain::CONTENT_TYPE
+                });
+            if is_calculation_chain || !chart_owned_uri(&target) {
                 return Err(refused(
                     DrawingTransferRefusal::WorkbookGlobalChartDependency(
                         target.as_str().to_string(),
@@ -1480,11 +1488,17 @@ fn collect_chart_graph(source: &Workbook, root: PackURI) -> Result<ChartGraph> {
 
 fn chart_owned_uri(uri: &PackURI) -> bool {
     let value = uri.as_str();
-    value.starts_with("/xl/")
-        && value != "/xl/workbook.bin"
-        && value != "/xl/styles.bin"
-        && value != "/xl/sharedStrings.bin"
-        && value != "/xl/calcChain.bin"
+    let starts_with_ascii_case_insensitive = |prefix: &str| {
+        value
+            .as_bytes()
+            .get(..prefix.len())
+            .is_some_and(|head| head.eq_ignore_ascii_case(prefix.as_bytes()))
+    };
+    starts_with_ascii_case_insensitive("/xl/")
+        && !value.eq_ignore_ascii_case("/xl/workbook.bin")
+        && !value.eq_ignore_ascii_case("/xl/styles.bin")
+        && !value.eq_ignore_ascii_case("/xl/sharedStrings.bin")
+        && !value.eq_ignore_ascii_case("/xl/calcChain.bin")
         && ![
             "/xl/worksheets/",
             "/xl/chartsheets/",
@@ -1492,7 +1506,7 @@ fn chart_owned_uri(uri: &PackURI) -> bool {
             "/xl/macrosheets/",
         ]
         .iter()
-        .any(|prefix| value.starts_with(prefix))
+        .any(|prefix| starts_with_ascii_case_insensitive(prefix))
 }
 
 fn copy_chart_graph(
@@ -1737,6 +1751,7 @@ fn attach_drawing_to_worksheet(
             "worksheet has no safe BrtDrawing insertion boundary".to_string(),
         ));
     }
+    crate::worksheet_index::maintain(package, &worksheet_uri, &worksheet_source, &output)?;
     package.get_part_mut(&worksheet_uri)?.set_blob(output);
     Ok(())
 }
@@ -1937,11 +1952,117 @@ mod tests {
             "/xl/workbook.bin",
             "/xl/styles.bin",
             "/xl/sharedStrings.bin",
+            "/xl/CALCCHAIN.BIN",
             "/xl/worksheets/sheet1.bin",
+            "/XL/WORKSHEETS/sheet1.bin",
+            // `%C3%A9` is the valid OPC spelling of a non-ASCII segment;
+            // keep it at the reserved-prefix boundary so this guard remains
+            // byte-safe for arbitrary future PackURI implementations.
+            "/xl/worksheets/%C3%A9-sheet.bin",
             "/xl/chartsheets/sheet1.bin",
         ] {
             assert!(!chart_owned_uri(&PackURI::new(value).unwrap()), "{value}");
         }
+    }
+
+    fn chart_fixture_with_chain_edge(
+        target_name: &str,
+        target_content_type: &str,
+        relationship_type: &str,
+    ) -> (Workbook, PackURI, PackURI) {
+        let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("test-data/poi/test-data/spreadsheet/testVarious.xlsb");
+        let mut source = Workbook::new(std::fs::File::open(fixture).expect("chart fixture"))
+            .expect("chart workbook");
+        let chart_uri = source
+            .package
+            .iter_parts()
+            .find(|part| part.content_type() == ct::DML_CHART)
+            .expect("chart part")
+            .partname()
+            .clone();
+        let target_uri = PackURI::new(target_name).expect("chain target URI");
+        if !source.package.contains_part(&target_uri) {
+            source.package.add_part(Box::new(BlobPart::new(
+                target_uri.clone(),
+                target_content_type.to_string(),
+                Vec::new(),
+            )));
+        }
+        let target_ref = target_uri.relative_ref(chart_uri.base_uri());
+        source
+            .package
+            .get_part_mut(&chart_uri)
+            .expect("chart part")
+            .rels_mut()
+            .try_add_relationship(
+                relationship_type.to_string(),
+                target_ref,
+                "rIdCalculationChainTest".to_string(),
+                TargetMode::Internal,
+            )
+            .expect("chart chain relationship");
+        (source, chart_uri, target_uri)
+    }
+
+    #[test]
+    fn chart_graph_rejects_canonical_calculation_chain_target() {
+        let (source, chart_uri, target_uri) =
+            chart_fixture_with_chain_edge("/xl/calcChain.bin", ct::OFC_PACKAGE, rt::PACKAGE);
+        let error = collect_chart_graph(&source, chart_uri).expect_err("canonical chain edge");
+        assert!(matches!(
+            error,
+            Error::DrawingTransfer(
+                DrawingTransferRefusal::WorkbookGlobalChartDependency(target)
+            ) if target == target_uri.as_str()
+        ));
+    }
+
+    #[test]
+    fn chart_graph_rejects_case_variant_canonical_calculation_chain_target() {
+        let (source, chart_uri, target_uri) =
+            chart_fixture_with_chain_edge("/xl/CALCCHAIN.BIN", ct::OFC_PACKAGE, rt::PACKAGE);
+        let error = collect_chart_graph(&source, chart_uri).expect_err("case-variant chain edge");
+        assert!(matches!(
+            error,
+            Error::DrawingTransfer(
+                DrawingTransferRefusal::WorkbookGlobalChartDependency(target)
+            ) if target == target_uri.as_str()
+        ));
+    }
+
+    #[test]
+    fn chart_graph_rejects_custom_calculation_chain_content_type() {
+        let (source, chart_uri, target_uri) = chart_fixture_with_chain_edge(
+            "/xl/customCalcChain.bin",
+            crate::calculation_chain::CONTENT_TYPE,
+            rt::PACKAGE,
+        );
+        let error = collect_chart_graph(&source, chart_uri).expect_err("custom chain content type");
+        assert!(matches!(
+            error,
+            Error::DrawingTransfer(
+                DrawingTransferRefusal::WorkbookGlobalChartDependency(target)
+            ) if target == target_uri.as_str()
+        ));
+    }
+
+    #[test]
+    fn chart_graph_rejects_custom_calculation_chain_relationship_type() {
+        let (source, chart_uri, target_uri) = chart_fixture_with_chain_edge(
+            "/xl/customCalcChainByRelationship.bin",
+            ct::OFC_PACKAGE,
+            crate::calculation_chain::RELATIONSHIP_TYPE,
+        );
+        let error =
+            collect_chart_graph(&source, chart_uri).expect_err("custom chain relationship type");
+        assert!(matches!(
+            error,
+            Error::DrawingTransfer(
+                DrawingTransferRefusal::WorkbookGlobalChartDependency(target)
+            ) if target == target_uri.as_str()
+        ));
     }
 
     #[test]

@@ -1,0 +1,10 @@
+{
+  "source": "3rdparty/specs/OpenDocument-v1.4-os.zip",
+  "source_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+  "entry": "part4-formula/OpenDocument-v1.4-os-part4-formula.html",
+  "entry_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+  "base_commit": "67360b209c5b428161b27f1f08650169d4997739",
+  "scope": "ODF 1.4 Part 4 array and local reference evaluation substrate, implicit intersection, matrix broadcasting, ordered reference operators and existing function lifting. Workbook recalculation, names, labels and external providers remain separate audit requirements.",
+  "performance_hypothesis": "A separate bounded value evaluator shares scalar kernels and borrows provider text. Lazy reference geometry avoids whole-sheet expansion; measure cell visits, allocations and scaling. Preserve the existing scalar entrypoints and compare all 94 established scalar cases across three phases.",
+  "status": "implementation and validation in progress; no completion or performance claim"
+}

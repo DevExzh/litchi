@@ -1,0 +1,50 @@
+{
+  "baseline_commit": "d623f3c2ecc0c837017f700174656f0e443759a5",
+  "matched_control_count": 28,
+  "scope": [
+    "ERROR.TYPE", "ISBLANK", "ISERR", "ISERROR", "ISEVEN", "ISLOGICAL",
+    "ISNA", "ISNONTEXT", "ISNUMBER", "ISODD", "ISTEXT", "N", "NA",
+    "NUMBERVALUE", "TYPE", "VALUE"
+  ],
+  "phases": ["evaluate", "parse-evaluate"],
+  "planned_lanes": [
+    {"name": "scalar", "coverage": "one exact scalar oracle per function", "reads": [0, 0]},
+    {"name": "reference-streaming", "coverage": "borrowed mixed-type 16x4 elementwise descriptors", "reads": [64, 64]},
+    {"name": "n-reference-intersection", "coverage": "N scalar intersection of a two-cell reference", "reads": [1, 1]},
+    {"name": "type-reference-scan", "coverage": "TYPE scans every rectangular reference cell then returns 64", "reads": [64, 64]},
+    {"name": "matrix-lifting", "coverage": "bounded literal elementwise results plus N [0,0] scalar", "reads": [0, 0]},
+    {"name": "type-array-metadata", "coverage": "TYPE classifies an inline array as 64", "reads": [0, 0]},
+    {"name": "shape-refusal", "coverage": "known reference-list refusal before resolver", "reads": [0, 0]},
+    {"name": "numbervalue-invalid-separator", "coverage": "separator validation before source selection", "reads": [0, 0]},
+    {"name": "lazy-if-cache", "coverage": "position-sensitive projected cells", "reads": [2, 2]},
+    {"name": "value-date-fraction", "coverage": "ISO date/time and mixed-fraction parsing", "reads": [0, 0]},
+    {"name": "numbervalue-transform", "coverage": "separator/grouping/percent transforms", "reads": [0, 0]},
+    {"name": "cancellation", "coverage": "sticky cancellation after first admitted read", "reads": [1, 1]},
+    {"name": "resource", "coverage": "zero-cell reference budget refusal", "reads": [0, 0]}
+  ],
+  "controls": [
+    "scalar-control-arithmetic", "scalar-control-sin", "scalar-control-imsum",
+    "database-control-dsum", "scalar-control-average", "scalar-control-counta",
+    "scalar-control-var", "scalar-control-stdev", "database-control-dvar",
+    "database-control-dstdev", "array-control-4x4-arithmetic",
+    "array-control-4x4-sin", "array-control-16x16-arithmetic",
+    "array-control-16x16-sin", "reference-array-16x4-arithmetic",
+    "scalar-aggregate-sum", "literal-aggregate-4x1-sum",
+    "reference-aggregate-64x4-sum", "reference-conditional-256x4-sumifs",
+    "reference-control-average", "reference-control-counta",
+    "representative-median", "representative-rank", "representative-percentrank",
+    "concat-borrowed-literals", "concat-owned-left", "concat-owned-right",
+    "concat-growth-chain"
+  ],
+  "read_policy": {
+    "admitted_reference": "charge work, check cancellation and cell limit, read borrowed cell, count successful read",
+    "known_refusal": "formula error or typed refusal before resolver read",
+    "cancellation": "one successful read total across four repeats per child",
+    "resource": "zero reads when max_reference_cells is zero"
+  },
+  "notes": [
+    "Exact case names and bounds follow the landed contract; the source-freeze hash is still required before timing.",
+    "Reference lists/unions, invalid separators, N intersection, and TYPE descriptor scans are checked by exact preflight.",
+    "The seven byte functions are excluded from baseline controls and belong to the prior profile."
+  ]
+}

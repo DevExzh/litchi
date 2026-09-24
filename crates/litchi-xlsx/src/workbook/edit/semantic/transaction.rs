@@ -8,6 +8,7 @@ mod snapshot;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, btree_map::Entry};
 use std::sync::Arc;
 
+use litchi_ooxml_common::mce::{Capabilities, StreamError, StreamLimits};
 use litchi_ooxml_common::web as common_web;
 use litchi_opc::{Part, Relationship, Relationships, TargetMode};
 use litchi_sheet::{
@@ -20,6 +21,7 @@ use crate::Style;
 use crate::cell::{Cell, Content};
 use crate::column::{OutlineAt, State as ColumnState, WidthAt};
 use crate::error::{EditBlock, Error, RemoveBlock, Result, TabEditBlock, allocation, invalid};
+use crate::form_control::OrdinaryFormControlOverlay;
 use crate::formula::{Formula, Kind as FormulaKind};
 use crate::layout;
 use crate::raw;
@@ -33,9 +35,11 @@ use crate::style::StyleLineage;
 use crate::web::{Binding as WebBinding, Bindings as WebBindings};
 
 use super::super::model::{
-    PartChange, PatchAuthority, RelationshipChange, StyleGuard, defaults_after, ensure_merge_area,
-    merge_conflicts, project_merges,
+    ContentTypesChange, PartChange, PatchAuthority, RelationshipChange, StyleGuard, SvgPartChange,
+    defaults_after, ensure_merge_area, merge_conflicts, project_merges,
+    validate_svg_final_removals,
 };
+use super::super::svg_lifecycle as svg_plan;
 use super::super::validation::{
     Added, FinalOrder, HyperlinkAction, MergeIntent, OptionalAction, OrderPlan, PanesAction,
     Placement, SheetActions, TabAction, Target, pending_merge,
@@ -47,7 +51,18 @@ use super::super::{
 use super::super::{codec, package};
 
 use self::snapshot::Snapshot;
+use super::super::svg::{PictureSelector, SvgInput};
 use super::worksheet::{NewSheet, TabEdit, WorksheetEdit};
+
+const MAX_SVG_INPUT_BYTES: usize = 32 * 1024 * 1024;
+
+#[derive(Debug, Clone)]
+pub(crate) struct SvgLifecycleIntent {
+    pub(crate) position: usize,
+    pub(crate) selector: PictureSelector,
+    pub(crate) attach: bool,
+    pub(crate) payload: Option<Arc<Vec<u8>>>,
+}
 
 const MAX_CELL_TRANSFER: u64 = 65_536;
 const MAX_CELL_DEPENDENCY_SCAN: usize = 1_048_576;
@@ -141,11 +156,154 @@ fn reduced_readback_store<'s>(
     store.avoids_omitted_cells(&ranges).then_some(store)
 }
 const MAX_HYPERLINK_EDITS: usize = 4_096;
+const MAX_SPARSE_VERIFICATION_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Clone, Copy)]
 enum CellTransfer {
     Copy,
     Move,
+}
+
+/// Verify a large worksheet's sparse cell rewrite without materializing every
+/// unchanged cell a second time.
+///
+/// Ok(false) means the worksheet is outside the scanner's first semantic
+/// slice, so the caller must retain the full materialized-parser fallback.
+fn verify_sparse_changed_cells(
+    content: &[u8],
+    targets: &[Address],
+    changes: &[Change],
+) -> Result<bool> {
+    if content.is_empty() || content.len() > MAX_SPARSE_VERIFICATION_BYTES {
+        return Ok(false);
+    }
+    if changes
+        .iter()
+        .any(|change| !matches!(change, Change::Cell { .. }))
+    {
+        return Ok(false);
+    }
+    if changes.iter().any(|change| {
+        matches!(
+            change,
+            Change::Cell {
+                after: State::Cell {
+                    style: crate::StyleState::Shared(_),
+                    ..
+                },
+                ..
+            }
+        )
+    }) {
+        return Ok(false);
+    }
+
+    let mut limits = StreamLimits::default();
+    limits.processing.max_input_bytes = content.len();
+    limits.processing.max_output_bytes = content.len();
+    let outcome = raw::worksheet::selected::scan_targets_bytes(
+        content,
+        &Capabilities::default(),
+        &limits,
+        targets,
+    )
+    .map_err(map_sparse_stream_error)?;
+    let selected = match outcome {
+        raw::selected_worksheet::RangeScanOutcome::Eligible(selected) => selected,
+        raw::selected_worksheet::RangeScanOutcome::NotEligible(_) => return Ok(false),
+    };
+    // Shared strings and direct styles need workbook-level resolution. The
+    // source store was already parsed, but this sparse verifier intentionally
+    // does not rebuild those dependency tables; retain the existing full-
+    // parser fallback whenever the output still contains one.
+    if selected.dependencies.max_shared_string_index.is_some()
+        || selected.dependencies.max_direct_style_index.is_some()
+    {
+        return Ok(false);
+    }
+
+    for change in changes {
+        let Change::Cell { address, after, .. } = change else {
+            return Ok(false);
+        };
+        let record = selected
+            .cells
+            .binary_search_by_key(address, |record| record.address)
+            .ok()
+            .and_then(|index| selected.cells.get(index));
+        match after {
+            State::Missing => {
+                if record.is_some() {
+                    return Err(invalid(format!(
+                        "sparse worksheet verification retained removed cell {address}"
+                    )));
+                }
+            },
+            State::Cell {
+                content: expected,
+                style,
+                shared_string,
+            } => {
+                if !matches!(style, crate::StyleState::Default) || shared_string.is_some() {
+                    return Ok(false);
+                }
+                let record = record.ok_or_else(|| {
+                    invalid(format!(
+                        "sparse worksheet verification lost changed cell {address}"
+                    ))
+                })?;
+                // A deferred shared-string payload is a mismatch: only a
+                // validated semantic cell equal to the staged content passes.
+                if !matches!(
+                    &record.payload,
+                    raw::selected_worksheet::SelectedPayload::Cell(cell) if cell == expected
+                ) {
+                    return Err(invalid(format!(
+                        "sparse worksheet edit verification failed at {address}"
+                    )));
+                }
+            },
+        }
+    }
+    Ok(true)
+}
+
+fn map_sparse_stream_error(error: StreamError<Error, Error>) -> Error {
+    match error {
+        StreamError::Input {
+            raw_error: Some(error),
+            ..
+        }
+        | StreamError::Mce {
+            raw_error: Some(error),
+            ..
+        }
+        | StreamError::Callback {
+            raw_error: Some(error),
+            ..
+        } => error,
+        StreamError::Callback {
+            raw_error: None,
+            active_error: Some(error),
+        }
+        | StreamError::Input {
+            raw_error: None,
+            active_error: Some(error),
+            ..
+        }
+        | StreamError::Mce {
+            raw_error: None,
+            active_error: Some(error),
+            ..
+        } => error,
+        StreamError::Input { error, .. } => Error::Package(litchi_opc::OpcError::IoError(error)),
+        StreamError::Mce { error, .. } => Error::MarkupCompatibility(error),
+        StreamError::Callback {
+            raw_error: None,
+            active_error: None,
+        } => invalid("sparse worksheet stream failed without a callback error"),
+        _ => invalid("unknown sparse worksheet stream error"),
+    }
 }
 
 /// Isolated workbook transaction. Dropping it rolls back every pending change.
@@ -161,6 +319,17 @@ pub struct Edit {
     pub(in crate::workbook::edit) added: Vec<Added>,
     pub(in crate::workbook::edit) removed: BTreeSet<usize>,
     pub(in crate::workbook::edit) cross_workbook_scalar: bool,
+    pub(in crate::workbook::edit) svg_lifecycle: Vec<SvgLifecycleIntent>,
+    pub(in crate::workbook::edit) svg_preflight:
+        HashMap<(usize, usize), super::super::svg_lifecycle::DrawingPreflight>,
+    pub(in crate::workbook::edit) svg_projected_owners:
+        HashMap<(usize, PictureSelector), super::super::svg_lifecycle::ProjectedSvgOwner>,
+    pub(in crate::workbook::edit) svg_staged_payload_bytes: usize,
+    /// Materialized part-byte census of `base`, taken when the transaction
+    /// stages its first SVG lifecycle intent. The census decodes every part
+    /// payload (ADR 0030), so an edit that stages no SVG lifecycle intent never
+    /// takes it.
+    pub(in crate::workbook::edit) svg_base_part_bytes: Option<usize>,
 }
 
 impl Edit {
@@ -177,7 +346,143 @@ impl Edit {
             added: Vec::new(),
             removed: BTreeSet::new(),
             cross_workbook_scalar: false,
+            svg_lifecycle: Vec::new(),
+            svg_preflight: HashMap::new(),
+            svg_projected_owners: HashMap::new(),
+            svg_staged_payload_bytes: 0,
+            svg_base_part_bytes: None,
         })
+    }
+
+    /// Take, once, the base census the SVG lifecycle planner checks at commit.
+    fn take_svg_base_census(&mut self) -> Result<()> {
+        if self.svg_base_part_bytes.is_none() {
+            self.svg_base_part_bytes = Some(svg_plan::materialized_part_bytes(&self.base)?);
+        }
+        Ok(())
+    }
+
+    pub(super) fn stage_svg_attach(
+        &mut self,
+        position: usize,
+        selector: PictureSelector,
+        input: SvgInput<'_>,
+    ) -> Result<()> {
+        self.stage_svg_attach_with_admission(position, selector, input, || Ok(()))
+    }
+
+    #[cfg(test)]
+    pub(in crate::workbook::edit) fn stage_svg_attach_after_preflight_failure_for_test(
+        &mut self,
+        position: usize,
+        selector: PictureSelector,
+        input: SvgInput<'_>,
+    ) -> Result<()> {
+        self.stage_svg_attach_with_admission(position, selector, input, || {
+            Err(invalid("deterministic SVG staging admission failure"))
+        })
+    }
+
+    fn stage_svg_attach_with_admission<F>(
+        &mut self,
+        position: usize,
+        selector: PictureSelector,
+        input: SvgInput<'_>,
+        admit: F,
+    ) -> Result<()>
+    where
+        F: FnOnce() -> Result<()>,
+    {
+        guard::no_removal(self, "SVG lifecycle")?;
+        if self.svg_lifecycle.len() >= svg_plan::MAX_SVG_LIFECYCLE_INTENTS {
+            return Err(invalid(format!(
+                "SVG lifecycle intents exceed {}",
+                svg_plan::MAX_SVG_LIFECYCLE_INTENTS
+            )));
+        }
+        let bytes = input.as_bytes();
+        if bytes.is_empty() {
+            return Err(invalid("SVG payload cannot be empty"));
+        }
+        let input_limit = svg_plan::payload_limit(&self.base).min(MAX_SVG_INPUT_BYTES);
+        if bytes.len() > input_limit {
+            return Err(invalid(format!(
+                "SVG attachment input exceeds {} bytes",
+                input_limit
+            )));
+        }
+        self.take_svg_base_census()?;
+        svg_plan::check_payload_budget(&self.base, self.svg_staged_payload_bytes, bytes.len())?;
+        let prepared = svg_plan::preflight_with_pending(
+            &self.base,
+            position,
+            selector,
+            true,
+            &mut self.svg_preflight,
+            &mut self.svg_projected_owners,
+        )?;
+        self.svg_lifecycle
+            .try_reserve(1)
+            .map_err(|source| allocation("SVG lifecycle intents", source))?;
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(bytes.len())
+            .map_err(|source| allocation("SVG attachment input", source))?;
+        admit()?;
+        owned.extend_from_slice(bytes);
+        let staged_payload_bytes = self
+            .svg_staged_payload_bytes
+            .checked_add(bytes.len())
+            .ok_or_else(|| invalid("SVG lifecycle staged payload bytes overflow"))?;
+        let intent = SvgLifecycleIntent {
+            position,
+            selector,
+            attach: true,
+            payload: Some(Arc::new(owned)),
+        };
+        prepared.commit(&mut self.svg_preflight, &mut self.svg_projected_owners);
+        self.svg_lifecycle.push(intent);
+        self.svg_staged_payload_bytes = staged_payload_bytes;
+        Ok(())
+    }
+
+    pub(super) fn stage_svg_detach(
+        &mut self,
+        position: usize,
+        selector: PictureSelector,
+    ) -> Result<bool> {
+        guard::no_removal(self, "SVG lifecycle")?;
+        if self.svg_lifecycle.len() >= svg_plan::MAX_SVG_LIFECYCLE_INTENTS {
+            return Err(invalid(format!(
+                "SVG lifecycle intents exceed {}",
+                svg_plan::MAX_SVG_LIFECYCLE_INTENTS
+            )));
+        }
+        let prepared = svg_plan::preflight_with_pending(
+            &self.base,
+            position,
+            selector,
+            false,
+            &mut self.svg_preflight,
+            &mut self.svg_projected_owners,
+        )?;
+        if !prepared.is_effective() {
+            prepared.commit(&mut self.svg_preflight, &mut self.svg_projected_owners);
+            return Ok(false);
+        }
+        self.take_svg_base_census()?;
+        self.svg_lifecycle
+            .try_reserve(1)
+            .map_err(|source| allocation("SVG lifecycle intents", source))?;
+        let intent = SvgLifecycleIntent {
+            position,
+            selector,
+            attach: false,
+            payload: None,
+        };
+        prepared.commit(&mut self.svg_preflight, &mut self.svg_projected_owners);
+        self.svg_lifecycle.push(intent);
+        Ok(true)
     }
 
     /// Create or replace the complete persisted Office Add-in task-pane graph.
@@ -924,6 +1229,7 @@ impl Edit {
                 .saturating_add(usize::from(self.panes.is_some()))
                 .saturating_add(usize::from(self.defined_names.is_some()))
                 .saturating_add(self.drawings.len())
+                .saturating_add(self.svg_lifecycle.len())
                 .saturating_add(usize::from(self.active.is_some()))
                 .saturating_add(
                     self.order
@@ -946,6 +1252,7 @@ impl Edit {
                 .saturating_add(usize::from(added.actions.page_setup.is_some()))
                 .saturating_add(usize::from(added.actions.print_options.is_some()))
                 .saturating_add(added.actions.hyperlinks.len())
+                .saturating_add(added.actions.form_control_scalars.len())
         })
     }
 
@@ -954,6 +1261,7 @@ impl Edit {
             && self.panes.is_none()
             && self.defined_names.is_none()
             && self.drawings.is_empty()
+            && self.svg_lifecycle.is_empty()
             && self
                 .order
                 .as_ref()
@@ -1006,6 +1314,18 @@ impl Edit {
                 rejected: Box::new(other),
             });
         }
+        if self.svg_lifecycle.iter().any(|intent| {
+            other.svg_lifecycle.iter().any(|candidate| {
+                intent.position == candidate.position && intent.selector == candidate.selector
+            })
+        }) {
+            return Err(JoinError {
+                failure: JoinFailure::Overlap(ConflictSet {
+                    conflicts: Box::new([]),
+                }),
+                rejected: Box::new(other),
+            });
+        }
         let conflicts = self.conflicts_with(&other);
         if !conflicts.is_empty() {
             return Err(JoinError {
@@ -1015,6 +1335,68 @@ impl Edit {
         }
 
         let other_cross_workbook_scalar = other.cross_workbook_scalar;
+        let Some(combined_svg_intents) = self
+            .svg_lifecycle
+            .len()
+            .checked_add(other.svg_lifecycle.len())
+        else {
+            return Err(JoinError {
+                failure: JoinFailure::Overlap(ConflictSet {
+                    conflicts: Box::new([]),
+                }),
+                rejected: Box::new(other),
+            });
+        };
+        if combined_svg_intents > super::super::svg_lifecycle::MAX_SVG_LIFECYCLE_INTENTS {
+            return Err(JoinError {
+                failure: JoinFailure::Overlap(ConflictSet {
+                    conflicts: Box::new([]),
+                }),
+                rejected: Box::new(other),
+            });
+        }
+        let other_svg_staged_payload_bytes = other.svg_staged_payload_bytes;
+        let Some(combined_svg_staged_payload_bytes) = self
+            .svg_staged_payload_bytes
+            .checked_add(other_svg_staged_payload_bytes)
+        else {
+            return Err(JoinError {
+                failure: JoinFailure::Overlap(ConflictSet {
+                    conflicts: Box::new([]),
+                }),
+                rejected: Box::new(other),
+            });
+        };
+        if svg_plan::check_payload_budget(&self.base, 0, combined_svg_staged_payload_bytes).is_err()
+        {
+            return Err(JoinError {
+                failure: JoinFailure::Overlap(ConflictSet {
+                    conflicts: Box::new([]),
+                }),
+                rejected: Box::new(other),
+            });
+        }
+        if self
+            .svg_lifecycle
+            .try_reserve(other.svg_lifecycle.len())
+            .is_err()
+            || self
+                .svg_preflight
+                .try_reserve(other.svg_preflight.len())
+                .is_err()
+            || self
+                .svg_projected_owners
+                .try_reserve(other.svg_projected_owners.len())
+                .is_err()
+            || self.added.try_reserve(other.added.len()).is_err()
+        {
+            return Err(JoinError {
+                failure: JoinFailure::Overlap(ConflictSet {
+                    conflicts: Box::new([]),
+                }),
+                rejected: Box::new(other),
+            });
+        }
         let added_offset = self.added.len();
         if self.panes.is_none() {
             self.panes = other.panes;
@@ -1023,6 +1405,12 @@ impl Edit {
             self.defined_names = other.defined_names;
         }
         self.drawings.extend(other.drawings);
+        self.svg_lifecycle.extend(other.svg_lifecycle);
+        self.svg_preflight.extend(other.svg_preflight);
+        self.svg_projected_owners.extend(other.svg_projected_owners);
+        self.svg_staged_payload_bytes = combined_svg_staged_payload_bytes;
+        // Both transactions share one base, so either census describes it.
+        self.svg_base_part_bytes = self.svg_base_part_bytes.or(other.svg_base_part_bytes);
         if self.active.is_none() {
             self.active = other.active.map(|target| match target {
                 Target::Base(position) => Target::Base(position),
@@ -1097,6 +1485,9 @@ impl Edit {
                         accepted.print_options = actions.print_options;
                     }
                     accepted.hyperlinks.extend(actions.hyperlinks);
+                    accepted
+                        .form_control_scalars
+                        .extend(actions.form_control_scalars);
                 },
             }
         }
@@ -1134,7 +1525,13 @@ impl Edit {
             added,
             removed: _,
             cross_workbook_scalar,
+            svg_lifecycle: svg_intents,
+            svg_preflight: _,
+            svg_projected_owners: _,
+            svg_staged_payload_bytes: _,
+            svg_base_part_bytes,
         } = self;
+        let has_svg_lifecycle = !svg_intents.is_empty();
         ensure_defined_name_edit_is_composable(
             requested_defined_names.as_deref(),
             requested_order.as_ref(),
@@ -1145,10 +1542,14 @@ impl Edit {
         let mut changes = Vec::new();
         let mut package_changes = Vec::new();
         let mut parts = Vec::new();
+        let mut form_control_validations: Vec<(litchi_opc::PackURI, OrdinaryFormControlOverlay)> =
+            Vec::new();
         let mut relationship_changes = Vec::new();
         let mut validated_worksheet_stores = Vec::new();
         let mut needs_recalculation = false;
         let mut drawing_graph = Vec::new();
+        let mut svg_parts = Vec::new();
+        let mut content_types = None;
 
         let effective_renames = take_effective_renames(&base, &mut sheets)?;
         if let Some((position, _)) = effective_renames.first() {
@@ -1422,7 +1823,36 @@ impl Edit {
                 page_setup,
                 print_options,
                 hyperlinks,
+                form_control_scalars,
             } = requested;
+            if !form_control_scalars.is_empty() && data.kind != WorksheetKind::Worksheet {
+                return Err(Error::NotWorksheet {
+                    sheet: data.name.clone(),
+                });
+            }
+            let form_control_overlays = if form_control_scalars.is_empty() {
+                Vec::new()
+            } else {
+                crate::form_control::ordinary_form_control_overlays(
+                    &base.inner.package,
+                    &data.part_uri,
+                    &form_control_scalars,
+                )?
+            };
+            for overlay in &form_control_overlays {
+                package_changes.push(PackageChange::FormControl {
+                    sheet: data.name.as_str().into(),
+                    control: overlay.position,
+                    before: Box::new(crate::form_control::parse(&overlay.before_properties)?),
+                    after: Box::new(crate::form_control::parse(&overlay.after_properties)?),
+                });
+            }
+            form_control_validations.extend(
+                form_control_overlays
+                    .iter()
+                    .cloned()
+                    .map(|overlay| (data.part_uri.clone(), overlay)),
+            );
             if defaults.is_none()
                 && web.is_none()
                 && cells.is_empty()
@@ -1434,6 +1864,7 @@ impl Edit {
                 && page_setup.is_none()
                 && print_options.is_none()
                 && hyperlinks.is_empty()
+                && form_control_overlays.is_empty()
                 && drawing.is_none()
             {
                 continue;
@@ -1639,8 +2070,41 @@ impl Edit {
                 && effective_page_setup.is_none()
                 && effective_print_options.is_none()
                 && effective_hyperlinks.is_none()
+                && form_control_overlays.is_empty()
                 && drawing.is_none()
             {
+                continue;
+            }
+
+            let has_worksheet_edit = effective_defaults.is_some()
+                || effective_web.is_some()
+                || !effective_cells.is_empty()
+                || !effective_rows.is_empty()
+                || !effective_columns.is_empty()
+                || !merge_projection.plan.is_empty()
+                || effective_page_breaks.is_some()
+                || effective_page_margins.is_some()
+                || effective_page_setup.is_some()
+                || effective_print_options.is_some()
+                || effective_hyperlinks.is_some()
+                || drawing.is_some();
+            if !has_worksheet_edit {
+                for overlay in form_control_overlays {
+                    parts.push(PartChange {
+                        uri: overlay.property_uri,
+                        before: overlay.before_properties,
+                        after: overlay.after_properties,
+                        before_source: None,
+                        after_source: None,
+                    });
+                    parts.push(PartChange {
+                        uri: overlay.vml_uri,
+                        before: overlay.before_vml,
+                        after: overlay.after_vml,
+                        before_source: None,
+                        after_source: None,
+                    });
+                }
                 continue;
             }
 
@@ -1663,6 +2127,28 @@ impl Edit {
                 cells: effective_cells,
                 rows: effective_rows,
                 columns: effective_columns,
+            };
+            // A sparse payload-only edit on a large, plain worksheet can
+            // validate its rewritten cells through the streaming worksheet
+            // scanner. Keep the target list before ordinary takes ownership
+            // of the cell map; the scanner retains only these records while
+            // still validating the complete XML/MCE stream.
+            let sparse_cell_targets = if ordinary.defaults.is_none()
+                && ordinary.rows.is_empty()
+                && ordinary.columns.is_empty()
+                && effective_web.is_none()
+                && effective_page_breaks.is_none()
+                && effective_page_margins.is_none()
+                && effective_page_setup.is_none()
+                && effective_print_options.is_none()
+                && effective_hyperlinks.is_none()
+                && add.is_empty()
+                && !has_merge_removes
+                && drawing.is_none()
+            {
+                ordinary.cells.keys().copied().collect::<Vec<_>>()
+            } else {
+                Vec::new()
             };
             // Metadata-only worksheet edits already validate the source store
             // above and each metadata codec validates its own complete XML
@@ -1785,33 +2271,49 @@ impl Edit {
                 after.ok_or_else(|| invalid("effective worksheet edit produced no bytes"))?;
             let compacted =
                 raw::compact::changed_worksheet(&after, "compact changed worksheet output")?;
+            // Verification order: the reduced readback (change 0744) when it
+            // is admitted; otherwise the sparse streaming verifier for a large
+            // plain worksheet with a payload-only cell edit (spec-gap branch);
+            // otherwise the complete parse, whose result and error remain
+            // authoritative. The two narrowed readbacks each fall back rather
+            // than refuse.
+            let mut sparse_verified = false;
             let parsed = if requires_store_verification {
                 let strings = || base.inner.shared_strings();
-                Some(
-                    match reduced_readback_store(
-                        &after,
-                        &compacted,
-                        &omitted,
-                        store.stored_cell_count(),
-                        changed_cells,
-                        strings,
-                    ) {
-                        Some(reduced) => {
-                            #[cfg(test)]
-                            raw::worksheet::lane::route::note_admitted(
-                                raw::worksheet::lane::route::Pass::Readback,
-                            );
-                            VerifiedStore::Reduced(reduced)
-                        },
-                        // A declined or refused reduced readback falls back to
-                        // the complete parse, whose result and error stay
-                        // authoritative.
-                        None => VerifiedStore::Complete(raw::worksheet::parse(
-                            compacted.bytes(),
-                            strings,
-                        )?),
+                match reduced_readback_store(
+                    &after,
+                    &compacted,
+                    &omitted,
+                    store.stored_cell_count(),
+                    changed_cells,
+                    strings,
+                ) {
+                    Some(reduced) => {
+                        #[cfg(test)]
+                        raw::worksheet::lane::route::note_admitted(
+                            raw::worksheet::lane::route::Pass::Readback,
+                        );
+                        Some(VerifiedStore::Reduced(reduced))
                     },
-                )
+                    None => {
+                        sparse_verified = !sparse_cell_targets.is_empty()
+                            && store.stored_cell_count() > MAX_VALIDATED_STORE_HANDOFF_CELLS
+                            && store.merge_ranges().is_empty()
+                            && verify_sparse_changed_cells(
+                                compacted.bytes(),
+                                &sparse_cell_targets,
+                                &changes[change_start..],
+                            )?;
+                        if sparse_verified {
+                            None
+                        } else {
+                            Some(VerifiedStore::Complete(raw::worksheet::parse(
+                                compacted.bytes(),
+                                strings,
+                            )?))
+                        }
+                    },
+                }
             } else {
                 None
             };
@@ -1873,15 +2375,17 @@ impl Edit {
                         after,
                         ..
                     } => {
-                        let parsed =
-                            parsed.as_ref().map(VerifiedStore::store).ok_or_else(|| {
-                                invalid("worksheet cell verification lost the parsed store")
-                            })?;
-                        let actual = State::read(parsed.entry(*address), &base);
-                        if actual != *after {
-                            return Err(invalid(format!(
-                                "worksheet edit verification failed at {sheet}!{address}"
-                            )));
+                        if let Some(parsed) = parsed.as_ref().map(VerifiedStore::store) {
+                            let actual = State::read(parsed.entry(*address), &base);
+                            if actual != *after {
+                                return Err(invalid(format!(
+                                    "worksheet edit verification failed at {sheet}!{address}"
+                                )));
+                            }
+                        } else if !sparse_verified {
+                            return Err(invalid(
+                                "worksheet cell verification lost the parsed store",
+                            ));
                         }
                     },
                     Change::Row {
@@ -1986,7 +2490,25 @@ impl Edit {
                 uri: data.part_uri.clone(),
                 before,
                 after,
+                before_source: None,
+                after_source: None,
             });
+            for overlay in form_control_overlays {
+                parts.push(PartChange {
+                    uri: overlay.property_uri,
+                    before: overlay.before_properties,
+                    after: overlay.after_properties,
+                    before_source: None,
+                    after_source: None,
+                });
+                parts.push(PartChange {
+                    uri: overlay.vml_uri,
+                    before: overlay.before_vml,
+                    after: overlay.after_vml,
+                    before_source: None,
+                    after_source: None,
+                });
+            }
         }
         if !drawings.is_empty() {
             return Err(invalid("drawing transfer target disappeared during commit"));
@@ -2574,6 +3096,8 @@ impl Edit {
                     uri: base.inner.workbook_uri.clone(),
                     before,
                     after: Arc::new(after),
+                    before_source: None,
+                    after_source: None,
                 });
             }
         }
@@ -2599,6 +3123,20 @@ impl Edit {
         graph.extend(created.into_iter().map(|sheet| sheet.graph));
         graph.extend(calculation_graph);
         graph.extend(drawing_graph);
+
+        let preexisting_relationship_changes = relationship_changes.clone();
+        svg_plan::plan(
+            &base,
+            &svg_intents,
+            svg_base_part_bytes,
+            &graph,
+            &preexisting_relationship_changes,
+            &mut parts,
+            &mut relationship_changes,
+            &mut svg_parts,
+            &mut content_types,
+            &mut package_changes,
+        )?;
 
         let web_patch = match requested_panes {
             Some(PanesAction::Put { panes, conformance }) => {
@@ -2633,6 +3171,8 @@ impl Edit {
             && package_changes.is_empty()
             && parts.is_empty()
             && relationship_changes.is_empty()
+            && content_types.is_none()
+            && svg_parts.is_empty()
             && graph.is_empty()
             && web_patch.is_none()
         {
@@ -2650,11 +3190,52 @@ impl Edit {
         for change in &relationship_changes {
             change.validate(&package)?;
         }
-        for part in &parts {
-            package
-                .get_part_mut(&part.uri)?
-                .set_blob_shared(Arc::clone(&part.after));
+        for change in &svg_parts {
+            if change.action == super::super::model::GraphAction::Add {
+                change.validate(&package)?;
+            }
         }
+        // Source-proven XML transitions are applied through their proofs so
+        // stale provenance cannot silently fall back to a canonical rewrite.
+        for change in &parts {
+            if let (Some(expected), Some(replacement)) =
+                (&change.before_source, &change.after_source)
+            {
+                if expected.bytes() != change.before.as_slice()
+                    || replacement.bytes() != change.after.as_slice()
+                {
+                    return Err(Error::PatchConflict {
+                        part: change.uri.to_string(),
+                    });
+                }
+                package.try_replace_owned_xml_part(expected.bytes(), replacement.clone())?;
+            } else if package.get_part(&change.uri)?.content_type()
+                == crate::form_control::CONTROL_PROPERTIES_CONTENT_TYPE
+            {
+                package.try_replace_owned_xml_part_bytes(
+                    &change.uri,
+                    change.before.as_slice(),
+                    Arc::clone(&change.after),
+                )?;
+            } else {
+                package
+                    .get_part_mut(&change.uri)?
+                    .set_blob_shared(Arc::clone(&change.after));
+            }
+        }
+        if let Some(change) = &content_types {
+            change.validate(&package)?;
+            change.apply(&mut package)?;
+        }
+        for change in &svg_parts {
+            if change.action == super::super::model::GraphAction::Add {
+                change.apply(&mut package)?;
+            }
+        }
+        // Manifest edits must be validated before graph publication and are
+        // applied after changed XML/relationship members are staged.
+        // (The concrete SVG planner supplies this token when needed.)
+        // Content types are otherwise untouched by ordinary worksheet edits.
         for change in &relationship_changes {
             change.apply(&mut package)?;
         }
@@ -2662,8 +3243,30 @@ impl Edit {
             change.validate(&package)?;
             change.apply(&mut package)?;
         }
+        for change in &svg_parts {
+            if change.action == super::super::model::GraphAction::Remove {
+                change.validate(&package)?;
+            }
+        }
+        // SVG media removals happen only after all graph transitions are
+        // visible to the final incoming-edge census.
+        for change in &svg_parts {
+            if change.action == super::super::model::GraphAction::Remove {
+                change.apply(&mut package)?;
+            }
+        }
         if let Some(web) = &web_patch {
             web.apply(&mut package)?;
+        }
+        if has_svg_lifecycle {
+            validate_svg_final_removals(&package, &svg_parts)?;
+        }
+        for (worksheet_uri, overlay) in &form_control_validations {
+            crate::form_control::validate_ordinary_form_control_candidate(
+                &package,
+                worksheet_uri,
+                overlay,
+            )?;
         }
         let workbook = Workbook::from_package_with_styles(package, Some(&base))?;
         if needs_recalculation {
@@ -2690,8 +3293,21 @@ impl Edit {
             codec::validate_web_integrity(&workbook)?;
         }
         workbook.adopt_validated_worksheet_stores(&base, validated_worksheet_stores)?;
-        let authority =
-            cross_workbook_scalar.then(|| PatchAuthority::new(base.clone(), workbook.clone()));
+        let svg_read_guards = if has_svg_lifecycle {
+            svg_plan::read_guards(&base, &workbook, &svg_intents)?
+        } else {
+            Box::new([])
+        };
+        let svg_final_guards = if has_svg_lifecycle {
+            svg_plan::capture_final_guards(&base, &workbook, &svg_intents)?
+        } else {
+            Box::new([])
+        };
+        // A paired control edit depends on its complete owner graph, including
+        // incoming edges. Pin this bounded profile to the validated immutable
+        // source; matching only the two changed payloads is insufficient.
+        let authority = (cross_workbook_scalar || !form_control_validations.is_empty())
+            .then(|| PatchAuthority::new(base.clone(), workbook.clone()));
         Ok(Commit {
             workbook: workbook.clone(),
             patch: Patch {
@@ -2699,12 +3315,16 @@ impl Edit {
                 package_changes: package_changes.into_boxed_slice(),
                 parts: parts.into_boxed_slice(),
                 relationships: relationship_changes.into_boxed_slice(),
+                content_types,
+                svg_parts: svg_parts.into_boxed_slice(),
                 graph: graph.into_boxed_slice(),
                 web: web_patch,
                 style_guard,
                 source: Some(base),
                 target: Some(workbook),
                 authority,
+                svg_read_guards,
+                svg_final_guards,
             },
         })
     }
@@ -2773,6 +3393,60 @@ impl Edit {
 
     pub(super) fn actions(&mut self, position: usize) -> &mut BTreeMap<Address, Action> {
         &mut self.sheets.entry(position).or_default().cells
+    }
+
+    pub(super) fn stage_form_control_scalar<'a>(
+        &mut self,
+        position: usize,
+        selector: impl Into<crate::form_control::ControlSelector<'a>>,
+        field: crate::form_control::ScalarField,
+        value: Option<crate::form_control::ScalarValue>,
+    ) -> Result<()> {
+        guard::no_removal(self, "form-control scalar edit")?;
+        let data = self
+            .base
+            .inner
+            .sheets
+            .get(position)
+            .ok_or_else(|| invalid("form-control worksheet disappeared"))?;
+        if data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: data.name.clone(),
+            });
+        }
+        let operation_count = self
+            .sheets
+            .get(&position)
+            .map_or(0, |actions| actions.form_control_scalars.len())
+            .checked_add(1)
+            .ok_or_else(|| invalid("form-control scalar operation count overflow"))?;
+        crate::form_control::validate_scalar_operation_count(
+            operation_count,
+            crate::form_control::OwnerLimits::from_read_limits(
+                self.base.inner.package.read_limits(),
+            ),
+        )?;
+        let action = crate::form_control::FormControlScalarAction::new(selector, field, value);
+        let mut combined = self
+            .sheets
+            .get(&position)
+            .map_or_else(Vec::new, |actions| actions.form_control_scalars.clone());
+        combined
+            .try_reserve(1)
+            .map_err(|source| allocation("form-control scalar edit plan", source))?;
+        combined.push(action);
+        let overlays = crate::form_control::ordinary_form_control_overlays(
+            &self.base.inner.package,
+            &data.part_uri,
+            &combined,
+        )?;
+        let actions = self.sheets.entry(position).or_default();
+        if overlays.is_empty() {
+            actions.form_control_scalars.clear();
+        } else {
+            actions.form_control_scalars = combined;
+        }
+        Ok(())
     }
 
     pub(super) fn web_bindings(&mut self, position: usize) -> Result<&mut WebBindings> {
@@ -3128,6 +3802,12 @@ impl Edit {
                     position: *position,
                 });
             }
+            if !left.form_control_scalars.is_empty() && !right.form_control_scalars.is_empty() {
+                conflicts.push(Conflict::FormControls {
+                    sheet: sheet.into(),
+                    position: *position,
+                });
+            }
             if left.web.is_some() && right.web.is_some() {
                 conflicts.push(Conflict::Web {
                     sheet: sheet.into(),
@@ -3259,6 +3939,7 @@ impl Edit {
         self.panes.is_some()
             || self.defined_names.is_some()
             || !self.drawings.is_empty()
+            || !self.svg_lifecycle.is_empty()
             || self.active.is_some()
             || self.order.as_ref().is_some_and(OrderPlan::is_effective)
             || self.sheets.values().any(|actions| !actions.is_empty())
@@ -3380,6 +4061,8 @@ fn project_hyperlink_actions(
                 owner: owner.clone(),
                 before: previous_relationship,
                 after: next_relationship,
+                before_source: None,
+                after_source: None,
             };
             apply_relationship_change_to_collection(&mut verification_relationships, &delta)?;
             physical_changes.push(delta);

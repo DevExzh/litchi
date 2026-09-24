@@ -1,0 +1,32 @@
+{
+  "tests": 879,
+  "targets": 52,
+  "subprocess_tests": 1,
+  "doctests": 2,
+  "required_integration_groups": [
+    "arithmetic_uses_odf_precedence_and_left_associativity",
+    "text_and_logical_values_follow_the_declared_scalar_profile",
+    "comparisons_keep_scalar_types_and_use_exact_text_ordering",
+    "formula_errors_are_values_and_propagate_without_becoming_rust_failures",
+    "declared_text_conversion_and_mixed_ordering_profile_are_typed",
+    "numeric_domain_and_nonfinite_results_become_formula_number_errors",
+    "source_and_forced_recalculation_marker_survive_evaluation",
+    "context_dependent_features_are_explicit_capability_refusals",
+    "supported_boolean_functions_eagerly_evaluate_children_before_arity_errors",
+    "cancellation_is_checked_before_work_and_leaves_no_reservation",
+    "zero_step_and_zero_stack_limits_are_typed_and_atomic",
+    "text_limit_failure_is_typed_and_releases_temporary_storage",
+    "decoded_quoted_text_obeys_the_decoded_byte_boundary",
+    "escaped_literal_copy_has_its_own_work_boundary_after_source_scan",
+    "cancellation_before_a_long_escaped_quote_scan_is_atomic",
+    "borrowed_plain_text_has_no_output_reservation",
+    "owned_text_result_keeps_its_output_reservation_until_drop",
+    "storage_admission_accounts_for_live_operands_and_ancestor_budget",
+    "storage_limit_refusal_is_atomic_for_owned_text",
+    "number_to_text_reservation_covers_tiny_and_large_finite_values",
+    "repeated_escaped_literals_and_left_associative_concat_keep_full_output_budgeted",
+    "long_comparison_chain_honors_the_work_limit",
+    "byte_work_limit_rejects_literal_number_and_comparison_scans",
+    "long_left_chain_evaluates_iteratively_under_explicit_work_limit"
+  ]
+}

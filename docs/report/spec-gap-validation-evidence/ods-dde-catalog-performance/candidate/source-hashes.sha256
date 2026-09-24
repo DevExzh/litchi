@@ -1,0 +1,16 @@
+650c381d29558d9f818fa98fb0c1afcd412a83cd7edb846779ce89afb9c2e1c8  Cargo.toml
+f269d5d26b041dca9d589342f3b0f3cdd796ea4c9afb72b09bf9b1933001d8ac  crates/litchi-core/Cargo.toml
+f7b841a25029ccd8cca3d91057264271b652beb1231f71fd4e82a53e627b1820  crates/litchi-core/src/lib.rs
+8b0aa977a404eadf4b466f9aa1dcb871c3b5cf18a7462fa3fe11ace65278ace1  crates/litchi-ods/Cargo.toml
+0cbb8163ec05794b3ffaf6d3d993d0addcccfb59adfc1e40e80cf264329d3984  crates/litchi-ods/src/lib.rs
+c41be279b72bea929e86361f4a5bcc3675ced2f60edca0a1147f57892b6ec4d9  crates/litchi-ods/src/model/mod.rs
+98c15134cd0a89fd16e4aa8e2b7fc22aa4f1e10c5189a125f0a9186e3976f4d8  crates/litchi-ods/src/model/dde.rs
+cc67145d64775ea993797c927639b4c98c100ada47e23df06e6429139686e427  crates/litchi-ods/src/model/dde/lexical.rs
+38225c1d3d40008fe60008b86cc81a398d64ff95955cab964d73fd0829fdc35b  crates/litchi-ods/src/model/dde/source_backed.rs
+d8be57303a27c65d68312b18477a9356c5d4df8fa054910dace9b2318f009706  crates/litchi-ods/src/model/dde/transaction.rs
+5e5a23698cdf3918dc9576ead1cc43bed2c6354c09a7674ea7a49e03910be9ec  crates/litchi-ods/src/facade/mod.rs
+af69bfa318bec97ade9da279ee7cb19fd3fe302d84e4acb8a53e3565fffd0daa  crates/litchi-ods/src/facade/source.rs
+cf50c89c0dc4aea48ef37362199ea4cd3103a1198ed12a8409e9b10c172ae57f  crates/litchi-ods/src/authoring/mutable.rs
+7035e640338ecfb9304b8424799143381cc2d84750bc89b7ead548baf0408948  docs/report/spec-gap-validation-evidence/ods-dde-catalog-performance/candidate/harness/Cargo.toml
+72ab567fdd7bf3ee727b7ae490e8b4b8e53c14e44c86b155462e3737a13010a6  docs/report/spec-gap-validation-evidence/ods-dde-catalog-performance/candidate/harness/Cargo.lock
+fe8772fc09eb1608dab3af06b12cdaa877c3b4a6c5073f3576ccb306b8948bf5  docs/report/spec-gap-validation-evidence/ods-dde-catalog-performance/candidate/harness/src/main.rs

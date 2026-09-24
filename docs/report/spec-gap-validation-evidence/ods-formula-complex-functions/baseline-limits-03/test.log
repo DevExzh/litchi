@@ -1,0 +1,55 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+    Finished `test` profile [unoptimized] target(s) in 0.40s
+     Running tests/ods_formula_complex_limits.rs (/home/zhuhe/code/litchi-array-target/debug/deps/ods_formula_complex_limits-a4eee3220fcb66ee)
+
+running 8 tests
+test complex_real_and_imaginary_projections_are_finite_numbers ... FAILED
+test complex_sequence_reads_charge_work_and_mid_read_cancellation_is_atomic ... ok
+test long_malformed_complex_text_charges_work_before_returning_a_formula_error ... FAILED
+test scalar_complex_zero_work_and_storage_limits_are_typed_and_atomic ... ok
+test complex_sequence_references_omit_empty_logical_and_malformed_text ... FAILED
+test value_complex_zero_work_and_storage_limits_are_typed_and_atomic ... ok
+test non_finite_complex_inputs_remain_formula_number_errors ... FAILED
+test owned_complex_text_survives_source_and_resolver_drop_until_result_drop ... FAILED
+
+failures:
+
+---- complex_real_and_imaginary_projections_are_finite_numbers stdout ----
+
+thread 'complex_real_and_imaginary_projections_are_finite_numbers' (1478823) panicked at crates/litchi-ods/tests/ods_formula_complex_limits.rs:192:37:
+"=IMREAL(COMPLEX(3;4))" should evaluate: ODS formula evaluation profile does not implement this function
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- long_malformed_complex_text_charges_work_before_returning_a_formula_error stdout ----
+
+thread 'long_malformed_complex_text_charges_work_before_returning_a_formula_error' (1478826) panicked at crates/litchi-ods/tests/ods_formula_complex_limits.rs:210:5:
+wrong long-text failure: Unsupported(Function)
+
+---- complex_sequence_references_omit_empty_logical_and_malformed_text stdout ----
+
+thread 'complex_sequence_references_omit_empty_logical_and_malformed_text' (1478825) panicked at crates/litchi-ods/tests/ods_formula_complex_limits.rs:287:6:
+IMSUM should ignore non-complex sequence cells: Unsupported(Function)
+
+---- non_finite_complex_inputs_remain_formula_number_errors stdout ----
+
+thread 'non_finite_complex_inputs_remain_formula_number_errors' (1478827) panicked at crates/litchi-ods/tests/ods_formula_complex_limits.rs:389:37:
+"=IMREAL(COMPLEX(1e309;0))" should return a formula error: ODS formula evaluation profile does not implement this function
+
+---- owned_complex_text_survives_source_and_resolver_drop_until_result_drop stdout ----
+
+thread 'owned_complex_text_survives_source_and_resolver_drop_until_result_drop' (1478828) panicked at crates/litchi-ods/tests/ods_formula_complex_limits.rs:356:14:
+complex text result should evaluate: Unsupported(Function)
+
+
+failures:
+    complex_real_and_imaginary_projections_are_finite_numbers
+    complex_sequence_references_omit_empty_logical_and_malformed_text
+    long_malformed_complex_text_charges_work_before_returning_a_formula_error
+    non_finite_complex_inputs_remain_formula_number_errors
+    owned_complex_text_survives_source_and_resolver_drop_until_result_drop
+
+test result: FAILED. 3 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-ods --test ods_formula_complex_limits`
+error: 1 target failed:
+    `-p litchi-ods --test ods_formula_complex_limits`

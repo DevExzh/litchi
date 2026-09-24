@@ -31,7 +31,7 @@ impl Editor {
     pub fn new(bytes: Vec<u8>) -> Result<Self, OleError> {
         let streams = {
             let mut ole = OleFile::open(Cursor::new(bytes.as_slice()))?;
-            reject_protected_container(&ole, "Property Set editing")?;
+            reject_protected_container(&ole, "Property Set editing", ole.directory_entry_count())?;
             let paths = ole.list_streams();
             let mut streams = try_vec_with_capacity(paths.len(), "property-set editor streams")?;
             for path in paths {

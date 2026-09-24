@@ -1264,7 +1264,7 @@ mod tests {
     }
 
     #[test]
-    fn shapes_original_and_resaved_keep_their_typed_refusals() -> Result<(), Box<dyn Error>> {
+    fn shapes_original_and_resaved_keep_their_typed_behavior() -> Result<(), Box<dyn Error>> {
         for (relative, digest, original) in [
             (
                 "test-data/ooxml/pptx/shapes.pptx",
@@ -1285,25 +1285,18 @@ mod tests {
             let view = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
                 OwnedSource::new(bytes),
             ))?;
-            let error = view
-                .slide(0)
-                .ok_or("missing shapes slide")?
-                .images()
-                .expect_err("fixture must preserve its refusal");
             if original {
-                assert!(
-                    matches!(error, litchi_pptx::Error::Invalid(ref reason) if reason.contains("unsupported nested element")),
-                    "{error:?}"
-                );
+                let images = view.slide(0).ok_or("missing shapes slide")?.images()?;
+                assert_eq!(images.len(), 1, "original picture inventory");
+                assert_eq!(images[0].relationship_id(), "rId2");
             } else {
+                let error = view
+                    .slide(0)
+                    .ok_or("missing shapes slide")?
+                    .images()
+                    .expect_err("resaved fixture must preserve its malformed picture refusal");
                 assert!(
-                    matches!(
-                        error,
-                        litchi_pptx::Error::UnsafeEdit {
-                            operation: "source-backed picture inventory",
-                            ..
-                        }
-                    ),
+                    matches!(error, litchi_pptx::Error::Invalid(ref reason) if reason.contains("stretch requires exactly one direct fillRect")),
                     "{error:?}"
                 );
             }

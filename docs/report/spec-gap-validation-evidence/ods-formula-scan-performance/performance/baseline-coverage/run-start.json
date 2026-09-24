@@ -1,0 +1,11 @@
+{
+  "label": "baseline-coverage",
+  "group": "coverage",
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/baseline/ods-formula-reference-profile",
+  "binary_sha256": "421a788fe9c2199bc4b224f4bcc05bb19c15c0ea6d0b61bf56ffe45f764bd274",
+  "harness": "/var/tmp/ods-scan-worktree/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/harness/run.py",
+  "output": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/baseline-coverage",
+  "warmups": 3,
+  "iterations": 15,
+  "started_at": "2026-09-13T08:27:42Z"
+}

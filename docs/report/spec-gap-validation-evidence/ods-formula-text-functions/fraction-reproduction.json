@@ -1,0 +1,13 @@
+{
+  "verified": true,
+  "cases": 5474,
+  "seed": 20260920,
+  "source_sha256": "a2196dd849e2d85faaacd49f876aba8920f9aff00b50e1fad474ae6c278f276e",
+  "verifier_sha256": "0ffec4f8ad2c3c3912127a07606d535fa64e20355f5e8df53c2db4ac9342e30b",
+  "input_sha256": "34e01260c98a9fb7e774e93ee6da295381d79de344e378a21b6d277a8f46367b",
+  "output_sha256": "06f417d0f9c2810886e8fe5dc4267cff78f8ecbef05a02a8cf88d9f65d37c9b8",
+  "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+  "temporary_tree_cleaned": true,
+  "scope": "Pure production helper compiled with an equivalent Number-error enum; exact Python Fraction comparison for this retained deterministic corpus, not an integration or universal rounding claim"
+}

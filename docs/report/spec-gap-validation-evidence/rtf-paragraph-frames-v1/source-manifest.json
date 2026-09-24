@@ -1,0 +1,111 @@
+{
+  "candidate_root": "/var/tmp/litchi-rtf-paragraph-frames-validation-20260909",
+  "base_commit": "1b3f2c2d0c059e8e59272775a97d0567e14e67f2",
+  "base_subject": "feat(oleps): add bounded non-simple property set transactions",
+  "source_worktree": "/home/zhuhe/code/litchi",
+  "feature": "RTF positioned paragraph frames, including table-cell paragraph frame retention",
+  "staged": false,
+  "paths": [
+    {
+      "path": "crates/litchi-rtf/src/api/story.rs",
+      "sha256": "96152c8b345e608501382c52d5e2658d0a02ba44c7e45a00a3907a89ce6b2102",
+      "bytes": 26223
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/lexer/codec/control_word/dispatch.rs",
+      "sha256": "76eef48998127bdb1f98ce3da1415c34dd47cc9f53f6eda8902b7885dcbd7fb7",
+      "bytes": 128794
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/lexer/codec/control_word/model.rs",
+      "sha256": "ef2e82ac0ee5ce812bf91394de7980957776472651688bfba7f8e0ea3feb5b9d",
+      "bytes": 38372
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/api.rs",
+      "sha256": "cae46425db18fc5bc43564a700bf06118bab4cb6535aa15d4972a179aaa9bf1d",
+      "bytes": 32471
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/content.rs",
+      "sha256": "25b949b59754cc35d0ed68237efabe95f820d5a4d75bff5940d484aa783fbb5f",
+      "bytes": 43311
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/controls.rs",
+      "sha256": "74793d5b5b2308896e919f19937394440b5b091ab462ad0b62c1365e167e855d",
+      "bytes": 165997
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/mod.rs",
+      "sha256": "6d5257e41b492acaccd916c03ee1b1511d60615b3355a04499b45b431ed4d081",
+      "bytes": 97000
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/styles.rs",
+      "sha256": "cc6df6d853513489963c6797c20846427b446b840efb3aa4eff8e4fa83f43e27",
+      "bytes": 202872
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/tables.rs",
+      "sha256": "3b5d42eab2808d10ed60a1d86844ba7057bb5a2acbeff2c93ae667bf1b547f61",
+      "bytes": 25047
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/writer/codec/mod.rs",
+      "sha256": "01821a0c65eac3f83df722a3282a1bb981f2fbb2607ee96ac47fcac3dd8f5156",
+      "bytes": 21201
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/writer/codec/output/content.rs",
+      "sha256": "e0f04017d6c6f2a5d7e500986d6c05e95048484b00a3a89f0a764993ee53bd0c",
+      "bytes": 59382
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/writer/codec/output/table.rs",
+      "sha256": "b50711448491f05d25856051439c0ab892cab60b468ca07b84f6c8306d0ed8a0",
+      "bytes": 51665
+    },
+    {
+      "path": "crates/litchi-rtf/src/content/table.rs",
+      "sha256": "6df19c880400431d822a73a02e04f28f899d6e44eec4625d6c66b5257d0be0ed",
+      "bytes": 83854
+    },
+    {
+      "path": "crates/litchi-rtf/src/edit.rs",
+      "sha256": "5ccd26c94e8dc89a06c87fc1c3f9b07af1cfdc62c03783a7b41b5369f5980598",
+      "bytes": 434401
+    },
+    {
+      "path": "crates/litchi-rtf/src/lib.rs",
+      "sha256": "8875a5f99fc51e7297cb1896620a125b989f2de04826c16a7f2975707e72e3f6",
+      "bytes": 23950
+    },
+    {
+      "path": "crates/litchi-rtf/src/model/document/model.rs",
+      "sha256": "655e2f96927902a51431db80ba3b48a0736ec460c12c934f99646092e3e6a88c",
+      "bytes": 239231
+    },
+    {
+      "path": "crates/litchi-rtf/src/model/types.rs",
+      "sha256": "0e40ec7a18b8c5636a2373bb2d3fe74a808cbf6fd50cf77cbfd7d9bad656255b",
+      "bytes": 73054
+    },
+    {
+      "path": "crates/litchi-rtf/src/text/mod.rs",
+      "sha256": "8a7111369a906b8c911677a841c03f98dcec9a455284eb0562d10f6cf95abfef",
+      "bytes": 1606
+    },
+    {
+      "path": "crates/litchi-rtf/tests/paragraph_layout_transactions.rs",
+      "sha256": "17dc990031dd99f9be7db7de3ed2006dec470c6cb22a080443f69f66a4876f95",
+      "bytes": 25851
+    },
+    {
+      "path": "crates/litchi-rtf/tests/paragraph_frames.rs",
+      "sha256": "39ba9278cef405286e2b93751075c7483799176740bf8375529120b937144d56",
+      "bytes": 18108
+    }
+  ],
+  "revision": "v4 implicit legacy cell invariant and no-op allocation"
+}

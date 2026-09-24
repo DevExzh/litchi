@@ -59,12 +59,24 @@ impl TryFrom<&str> for ContentType {
 }
 
 /// Parsed content type mappings used by the package reader.
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ContentTypeMap {
     defaults: HashMap<String, ContentType>,
     overrides: HashMap<String, (PackURI, ContentType)>,
 }
 
 impl ContentTypeMap {
+    pub(crate) fn empty() -> Self {
+        Self {
+            defaults: HashMap::new(),
+            overrides: HashMap::new(),
+        }
+    }
+
+    pub(crate) fn mapping_count(&self) -> usize {
+        self.defaults.len().saturating_add(self.overrides.len())
+    }
+
     pub(crate) fn from_xml(xml: &[u8], limits: ReadLimits) -> Result<Self> {
         limits.check(
             ReadResource::ContentTypesBytes,
@@ -149,16 +161,32 @@ impl ContentTypeMap {
     }
 
     pub(crate) fn get(&self, pack_uri: &PackURI) -> Result<String> {
+        self.lookup(pack_uri)
+            .map(|content_type| content_type.as_str().to_string())
+            .ok_or_else(|| OpcError::ContentTypeNotFound(pack_uri.to_string()))
+    }
+
+    /// Return the parsed content type without allocating. This is used when a
+    /// source manifest may be reused after a package edit; the caller can
+    /// compare the source declaration to the current part directly.
+    pub(crate) fn lookup(&self, pack_uri: &PackURI) -> Option<&ContentType> {
         if let Some((_, content_type)) = self.overrides.get(&pack_uri.as_str().to_ascii_lowercase())
         {
-            return Ok(content_type.as_str().to_string());
+            return Some(content_type);
         }
 
         let extension = pack_uri.ext().to_ascii_lowercase();
-        self.defaults
-            .get(&extension)
-            .map(|content_type| content_type.as_str().to_string())
-            .ok_or_else(|| OpcError::ContentTypeNotFound(pack_uri.to_string()))
+        self.defaults.get(&extension)
+    }
+
+    /// Return all explicit source overrides, including their original URI
+    /// spelling. Unused defaults are intentionally not exposed: OPC permits
+    /// a default declaration to remain in a manifest when no current part uses
+    /// its extension.
+    pub(crate) fn overrides(&self) -> impl Iterator<Item = (&PackURI, &ContentType)> {
+        self.overrides
+            .values()
+            .map(|(partname, content_type)| (partname, content_type))
     }
 
     /// Return an explicitly declared Override mapping without consulting a
@@ -200,7 +228,7 @@ impl ContentTypeMap {
     }
 }
 
-fn validate_content_type(value: &str) -> std::result::Result<(), String> {
+pub(crate) fn validate_content_type(value: &str) -> std::result::Result<(), String> {
     let mut components = value.split(';');
     let media_type = components.next().unwrap_or_default();
     let Some((type_name, subtype)) = media_type.split_once('/') else {

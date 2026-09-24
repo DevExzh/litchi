@@ -1,21 +1,104 @@
 //! Workbook and CFB transaction layer for XLS OLE objects.
 
-use super::super::codec::{ranges, u32_at};
-use super::super::semantic::{FormControl, ObjectMetadataEdit, OleObjectRecord};
+use super::super::codec::{parse_subrecords, ranges, u32_at};
+use super::super::semantic::{
+    EmbeddedObjectDraft, EmbeddedPayload, FormControl, ObjectMetadataEdit, OleObjectRecord,
+    validate_compound_file_for_publication,
+};
+use super::super::validation::validate_picture_formula;
 use super::super::{BOUNDSHEET, CFB_STREAM, CONTINUE, EOF, Limits, OBJ, TXO, invalid};
 use crate::error::{Error, Result};
+use crate::protection::{
+    FILESHARING_TYPE, OBJECTPROTECT_TYPE, PASSWORD_TYPE, PROT4REV_TYPE, PROT4REVPASS_TYPE,
+    PROTECT_TYPE, SCENPROTECT_TYPE, WINPROTECT_TYPE, WRITEPROTECT_TYPE,
+};
 use litchi_cfb::OleFile;
 use litchi_ole_common::object::{Editor as ObjectEditor, Target, Targets};
+use litchi_ole_common::property_set::document_summary::DIGITAL_SIGNATURE;
+use litchi_ole_common::property_set::{Binding, PropertySetReader};
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
+
+/// Identity facts recovered from `Obj` records that the typed OLE/control
+/// grammar could not classify.  Such records remain opaque and are retained
+/// byte-for-byte.  Their recoverable IDs/storage references still participate
+/// in admission checks; an unparseable identity blocks operations that would
+/// otherwise change object topology.
+#[derive(Clone, Default)]
+struct OpaqueObjectIdentity {
+    ids: HashSet<u16>,
+    storages: HashSet<String>,
+    present: bool,
+    ambiguous: bool,
+}
+
+impl OpaqueObjectIdentity {
+    fn note_id(&mut self, object_id: u16) -> Result<()> {
+        if object_id == 0 {
+            self.ambiguous = true;
+            return Ok(());
+        }
+        self.ids
+            .try_reserve(1)
+            .map_err(|_error| Error::Allocation("opaque Obj identity index"))?;
+        if !self.ids.insert(object_id) {
+            self.ambiguous = true;
+        }
+        Ok(())
+    }
+
+    fn note_storage(&mut self, storage: String) -> Result<()> {
+        self.storages
+            .try_reserve(1)
+            .map_err(|_error| Error::Allocation("opaque Obj storage identity index"))?;
+        if !self.storages.insert(storage) {
+            self.ambiguous = true;
+        }
+        Ok(())
+    }
+
+    fn require_topology_proof(&self) -> Result<()> {
+        if self.ambiguous {
+            return Err(Error::UnsafeEdit(
+                "an opaque Obj has an unproven identity; the requested object-topology edit is refused".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn check_new_identity(&self, object_id: u16, storage: &str) -> Result<()> {
+        self.require_topology_proof()?;
+        if self.ids.contains(&object_id) {
+            return Err(invalid(OBJ, "duplicate workbook object ID in opaque Obj"));
+        }
+        if self.storages.contains(storage) {
+            return Err(invalid(
+                OBJ,
+                "duplicate workbook storage identity in opaque Obj",
+            ));
+        }
+        Ok(())
+    }
+
+    fn check_storage_rewrite(&self, storage: &str) -> Result<()> {
+        if self.ambiguous || self.storages.contains(storage) {
+            return Err(Error::UnsafeEdit(
+                "an opaque Obj may alias the selected storage; payload rewrite is refused".into(),
+            ));
+        }
+        Ok(())
+    }
+}
 
 #[derive(Clone)]
 pub struct Editor {
     package: ObjectEditor,
+    limits: Limits,
     workbook_path: Vec<String>,
     workbook: Vec<u8>,
     sheets: Vec<Vec<OleObjectRecord>>,
     form_controls: Vec<Vec<FormControl>>,
+    opaque_identity: OpaqueObjectIdentity,
     /// Number of form-control Obj records already present in each source
     /// worksheet. Newly authored controls are appended at the worksheet EOF;
     /// existing controls remain in their original byte representation.
@@ -31,16 +114,18 @@ impl Editor {
         // the original CFB bytes to the neutral object editor so the target
         // catalog can be derived solely from Obj/FtPictFmla records.
         let (workbook_path, workbook) = read_workbook(&bytes, limits)?;
-        let (sheets, form_controls) = parse_workbook(&workbook)?;
+        let (sheets, form_controls, opaque_identity) = parse_workbook(&workbook)?;
         let targets = targets_for_sheets(&sheets)?;
         let package = ObjectEditor::open(bytes, targets, limits)?;
         let preserved_control_counts = form_controls.iter().map(Vec::len).collect();
         Ok(Self {
             package,
+            limits,
             workbook_path,
             workbook,
             sheets,
             form_controls,
+            opaque_identity,
             preserved_control_counts,
         })
     }
@@ -83,6 +168,10 @@ impl Editor {
     pub fn add_form_control(&mut self, worksheet: usize, control: FormControl) -> Result<()> {
         control.validate()?;
         let object_id = control.object_id();
+        self.opaque_identity.require_topology_proof()?;
+        if self.opaque_identity.ids.contains(&object_id) {
+            return Err(invalid(OBJ, "duplicate workbook object ID in opaque Obj"));
+        }
         if self
             .sheets
             .iter()
@@ -120,6 +209,9 @@ impl Editor {
         let storage = object
             .storage_name()
             .ok_or_else(|| invalid(OBJ, "new Obj has no MBD/LNK reference"))?;
+        self.opaque_identity
+            .check_new_identity(object.object_id(), &storage)?;
+        validate_compound_file_for_publication(&compound_file, self.limits)?;
         if self
             .sheets
             .iter()
@@ -133,6 +225,10 @@ impl Editor {
         {
             return Err(invalid(OBJ, "duplicate workbook object ID"));
         }
+        self.sheets
+            .get(worksheet)
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
+        self.ensure_storage_capacity(&storage)?;
         let mut candidate = self.clone();
         candidate
             .sheets
@@ -146,10 +242,44 @@ impl Editor {
         Ok(())
     }
 
+    /// Adds a storage-backed, inert embedded payload with its complete XLS
+    /// identity closure.
+    ///
+    /// The draft authors one picture `Obj` (`cmo.ot=8`, `fDde=0`, and
+    /// `fPrstm=0`) together with the matching `MBDxxxxxxxx` storage.  The
+    /// supplied CFB remains opaque; common CFB validation bounds and retains
+    /// all of its streams, while no OLE server, macro, control, link, or
+    /// native payload is activated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the worksheet or object identity is invalid, the
+    /// identity is already present, or the payload cannot be admitted by the
+    /// bounded common CFB editor.
+    pub fn add_embedded_payload(
+        &mut self,
+        worksheet: usize,
+        draft: EmbeddedObjectDraft,
+    ) -> Result<()> {
+        self.sheets
+            .get(worksheet)
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
+        self.opaque_identity
+            .check_new_identity(draft.object_id(), &draft.storage_name())?;
+        // Check the target cardinality before parsing/capturing the supplied
+        // CFB.  The neutral add_storage API receives the target only after it
+        // has captured the candidate, so the XLS owner must perform this
+        // host-level preflight to keep max_objects an ingress bound.
+        self.ensure_storage_capacity(&draft.storage_name())?;
+        draft.payload().validate_for_publication(self.limits)?;
+        self.add(worksheet, draft.object_record(), draft.payload().to_vec())
+    }
+
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove(&mut self, worksheet: usize, object_id: u16) -> Result<OleObjectRecord> {
+        self.opaque_identity.require_topology_proof()?;
         let mut candidate = self.clone();
         let sheet = candidate
             .sheets
@@ -167,12 +297,34 @@ impl Editor {
                 .flatten()
                 .any(|value| value.storage_name().as_deref() == Some(&storage))
         {
+            if candidate.opaque_identity.storages.contains(&storage) {
+                return Err(Error::UnsafeEdit(
+                    "removing the selected Obj would orphan an opaque MBD/LNK reference".into(),
+                ));
+            }
             let target = target_for_storage(storage)?;
             candidate.package.remove_storage(target.key())?;
         }
         candidate.commit()?;
         *self = candidate;
         Ok(removed)
+    }
+
+    /// Removes one storage-backed embedded payload and its unreferenced MBD
+    /// storage.
+    ///
+    /// The selected `Obj` and its selected storage are removed as one
+    /// identity-checked operation.  Unknown streams and unrelated object
+    /// storages remain untouched.  A linked/DDE or controls-stream object is
+    /// refused because it is outside this inert embedded-payload API.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected object is absent or is not a valid
+    /// storage-backed embedded object.
+    pub fn remove_embedded_payload(&mut self, worksheet: usize, object_id: u16) -> Result<()> {
+        self.embedded_storage(worksheet, object_id)?;
+        self.remove(worksheet, object_id).map(|_| ())
     }
 
     /// # Errors
@@ -188,6 +340,19 @@ impl Editor {
             return Err(invalid(
                 OBJ,
                 "reorder must contain every worksheet OLE object",
+            ));
+        }
+        if sheet
+            .iter()
+            .map(OleObjectRecord::object_id)
+            .eq(ids.iter().copied())
+        {
+            return Ok(());
+        }
+        if candidate.opaque_identity.present {
+            return Err(Error::UnsafeEdit(
+                "reordering typed Obj records with opaque Obj records is not source-complete"
+                    .into(),
             ));
         }
         let mut remaining = sheet.clone();
@@ -214,6 +379,24 @@ impl Editor {
         object_id: u16,
         edit: ObjectMetadataEdit,
     ) -> Result<()> {
+        let object = self
+            .sheets
+            .get(worksheet)
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?
+            .iter()
+            .find(|value| value.object_id() == object_id)
+            .ok_or_else(|| invalid(OBJ, "OLE object ID not found"))?;
+        if edit.is_empty() {
+            // Preserve malformed/producer-specific source bytes exactly for a
+            // semantic no-op; no source rewrite is needed.
+            return Ok(());
+        }
+        let mut probe = object.clone();
+        edit.apply(&mut probe)?;
+        if probe == *object {
+            return Ok(());
+        }
+        self.opaque_identity.require_topology_proof()?;
         let mut candidate = self.clone();
         let sheet = candidate
             .sheets
@@ -224,6 +407,9 @@ impl Editor {
             .find(|value| value.object_id() == object_id)
             .ok_or_else(|| invalid(OBJ, "OLE object ID not found"))?;
         edit.apply(object)?;
+        if candidate.opaque_identity.ids.contains(&object.object_id()) {
+            return Err(invalid(OBJ, "duplicate workbook object ID in opaque Obj"));
+        }
         candidate.commit()?;
         *self = candidate;
         Ok(())
@@ -244,9 +430,46 @@ impl Editor {
             })
             .ok_or_else(|| invalid(OBJ, "storage has no Obj reference"))?;
         let target = target_for_storage(storage)?;
+        // Let an exact replacement remain an inert no-op even when the
+        // retained payload contains a signature.  A changed replacement is
+        // admitted below under the explicit nested security policy.
+        if self
+            .package
+            .objects()
+            .get(target.key())
+            .is_some_and(|object| object.compound() == compound_file.as_slice())
+        {
+            return Ok(());
+        }
+        self.opaque_identity.check_storage_rewrite(storage_name)?;
+        validate_compound_file_for_publication(&compound_file, self.limits)?;
         self.package
             .replace(target.key(), compound_file)
             .map_err(Into::into)
+    }
+
+    /// Replaces one storage-backed embedded payload while retaining its XLS
+    /// object ID and `MBDxxxxxxxx` storage identity.
+    ///
+    /// The replacement owns the selected storage's complete inert CFB
+    /// subtree.  Unselected worksheet records, object identities, and
+    /// unrelated CFB streams remain retained by the common bounded editor.
+    /// The operation never activates OLE, macro, control, link, or native
+    /// content and refuses DDE, control-stream, and malformed object shapes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the worksheet/object identity is absent or is not
+    /// a storage-backed embedded object, or if the replacement CFB is invalid,
+    /// protected, or exceeds the configured limits.
+    pub fn replace_embedded_payload(
+        &mut self,
+        worksheet: usize,
+        object_id: u16,
+        payload: EmbeddedPayload,
+    ) -> Result<()> {
+        let storage = self.embedded_storage(worksheet, object_id)?;
+        self.replace_storage(&storage, payload.to_vec())
     }
 
     /// # Errors
@@ -270,6 +493,60 @@ impl Editor {
         self.preserved_control_counts = self.form_controls.iter().map(Vec::len).collect();
         Ok(())
     }
+
+    fn embedded_storage(&self, worksheet: usize, object_id: u16) -> Result<String> {
+        let object = self
+            .sheets
+            .get(worksheet)
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?
+            .iter()
+            .find(|value| value.object_id() == object_id)
+            .ok_or_else(|| invalid(OBJ, "OLE object ID not found"))?;
+        object.validate()?;
+        let flags = object
+            .subrecords
+            .iter()
+            .find_map(|value| match value {
+                super::super::semantic::ObjSubrecord::PictureFlags(value) => Some(*value),
+                _ => None,
+            })
+            .ok_or_else(|| invalid(OBJ, "embedded Obj has no FtPioGrbit"))?;
+        if flags.is_dde() || flags.is_control() || flags.uses_control_stream() {
+            return Err(invalid(
+                OBJ,
+                "embedded payload API requires an MBD storage-backed Obj",
+            ));
+        }
+        let storage = object
+            .storage_name()
+            .ok_or_else(|| invalid(OBJ, "embedded Obj has no MBD storage reference"))?;
+        if !storage.starts_with("MBD") {
+            return Err(invalid(
+                OBJ,
+                "embedded payload API requires an MBD storage reference",
+            ));
+        }
+        Ok(storage)
+    }
+
+    fn ensure_storage_capacity(&self, storage: &str) -> Result<()> {
+        if self
+            .sheets
+            .iter()
+            .flatten()
+            .any(|value| value.storage_name().as_deref() == Some(storage))
+        {
+            return Ok(());
+        }
+        let count = targets_for_sheets(&self.sheets)?.len();
+        if count >= self.limits.max_objects {
+            return Err(Error::InvalidData(format!(
+                "adding storage would exceed the configured object limit of {}",
+                self.limits.max_objects
+            )));
+        }
+        Ok(())
+    }
 }
 
 pub(crate) fn read_workbook(bytes: &[u8], limits: Limits) -> Result<(Vec<String>, Vec<u8>)> {
@@ -280,15 +557,50 @@ pub(crate) fn read_workbook(bytes: &[u8], limits: Limits) -> Result<(Vec<String>
         ));
     }
     let mut ole = OleFile::open(Cursor::new(bytes))?;
-    let entries = ole.list_directory_entries(&[])?;
-    for name in ["Workbook", "Book"] {
-        let Some((actual_name, declared_size)) = entries
-            .iter()
-            .find(|entry| entry.entry_type == CFB_STREAM && entry.name.eq_ignore_ascii_case(name))
-            .map(|entry| (entry.name.clone(), entry.size))
-        else {
-            continue;
-        };
+    let max_entries = limits
+        .max_objects
+        .saturating_mul(limits.max_storage_depth)
+        .saturating_add(limits.max_streams);
+    let mut encrypted = false;
+    let mut document_summary_size = None;
+    let mut workbook_stream = None;
+    let mut book_stream = None;
+    ole.visit_directory_entries(&[], max_entries, |ole, sid| {
+        let entry = ole.directory_entry_by_sid(sid).ok_or_else(|| {
+            litchi_cfb::OleError::CorruptedFile("directory visitor returned an unknown SID".into())
+        })?;
+        if entry.entry_type != CFB_STREAM {
+            return Ok::<(), Error>(());
+        }
+        if entry.name.eq_ignore_ascii_case("encryption") {
+            encrypted = true;
+        }
+        if document_summary_size.is_none()
+            && entry
+                .name
+                .eq_ignore_ascii_case("\u{0005}DocumentSummaryInformation")
+        {
+            document_summary_size = Some(entry.size);
+        }
+        if workbook_stream.is_none() && entry.name.eq_ignore_ascii_case("Workbook") {
+            workbook_stream = Some((entry.name.clone(), entry.size));
+        } else if book_stream.is_none() && entry.name.eq_ignore_ascii_case("Book") {
+            book_stream = Some((entry.name.clone(), entry.size));
+        }
+        Ok::<(), Error>(())
+    })?;
+    if encrypted {
+        return Err(Error::PasswordProtected);
+    }
+    if let Some(size) = document_summary_size {
+        if size > max_size {
+            return Err(Error::InvalidData(
+                "DocumentSummaryInformation exceeds configured read limit".into(),
+            ));
+        }
+    }
+    reject_document_summary_signature(&mut ole)?;
+    if let Some((actual_name, declared_size)) = workbook_stream.or(book_stream) {
         if declared_size > max_size {
             return Err(Error::InvalidData(format!(
                 "{actual_name} stream exceeds configured read limit"
@@ -300,9 +612,143 @@ pub(crate) fn read_workbook(bytes: &[u8], limits: Limits) -> Result<(Vec<String>
                 "{actual_name} stream exceeds configured read limit"
             )));
         }
+        reject_protected_workbook(&workbook)?;
         return Ok((vec![actual_name], workbook));
     }
     Err(Error::InvalidData("Workbook stream not found".into()))
+}
+
+fn reject_document_summary_signature<R: std::io::Read + std::io::Seek>(
+    ole: &mut OleFile<R>,
+) -> Result<()> {
+    match ole.property_set(Binding::DocumentSummaryInformation) {
+        Ok(stream) => {
+            if stream
+                .sections
+                .iter()
+                .any(|section| section.property(DIGITAL_SIGNATURE).is_some())
+            {
+                return Err(Error::UnsafeEdit(
+                    "DocumentSummaryInformation contains PIDDSI DigitalSignature; refusing a rewrite".into(),
+                ));
+            }
+        },
+        Err(litchi_cfb::OleError::StreamNotFound) => {},
+        Err(error) => return Err(Error::Cfb(error)),
+    }
+    Ok(())
+}
+
+const FILEPASS_TYPE: u16 = 0x002F;
+
+fn reject_protected_workbook(input: &[u8]) -> Result<()> {
+    for (_, _, kind, body_start, body_end) in ranges(input)? {
+        let body = &input[body_start..body_end];
+        if kind == FILEPASS_TYPE {
+            return Err(Error::PasswordProtected);
+        }
+        let active = match kind {
+            PROTECT_TYPE | WINPROTECT_TYPE | OBJECTPROTECT_TYPE | SCENPROTECT_TYPE
+            | PROT4REV_TYPE => parse_protection_bool(kind, body)?,
+            PASSWORD_TYPE | PROT4REVPASS_TYPE => {
+                if body.len() != 2 {
+                    return Err(Error::InvalidLength {
+                        expected: 2,
+                        found: body.len(),
+                    });
+                }
+                u16::from_le_bytes([body[0], body[1]]) != 0
+            },
+            WRITEPROTECT_TYPE => {
+                if !body.is_empty() {
+                    return Err(Error::InvalidLength {
+                        expected: 0,
+                        found: body.len(),
+                    });
+                }
+                true
+            },
+            FILESHARING_TYPE => parse_file_sharing_active(body)?,
+            _ => false,
+        };
+        if active {
+            return Err(Error::UnsafeEdit(format!(
+                "BIFF protection record 0x{kind:04X} is active"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn parse_protection_bool(kind: u16, body: &[u8]) -> Result<bool> {
+    if body.len() != 2 {
+        return Err(Error::InvalidLength {
+            expected: 2,
+            found: body.len(),
+        });
+    }
+    match u16::from_le_bytes([body[0], body[1]]) {
+        0 => Ok(false),
+        1 => Ok(true),
+        value => Err(invalid(
+            kind,
+            format!("protection Boolean must be 0 or 1, found 0x{value:04X}"),
+        )),
+    }
+}
+
+fn parse_file_sharing_active(body: &[u8]) -> Result<bool> {
+    if body.len() < 6 {
+        return Err(Error::InvalidLength {
+            expected: 6,
+            found: body.len(),
+        });
+    }
+    // `fReadOnlyRec` is a user-interface recommendation. It does not make
+    // the workbook protected or authorize refusing an otherwise writable
+    // edit. Still validate the Boolean so malformed FILESHARING records do
+    // not become an accidental permissive path.
+    parse_protection_bool(FILESHARING_TYPE, &body[..2])?;
+    let password = u16::from_le_bytes([body[2], body[3]]) != 0;
+    let marker = u16::from_le_bytes([body[4], body[5]]);
+    if !password {
+        if marker != 0 || body.len() != 6 {
+            return Err(invalid(
+                FILESHARING_TYPE,
+                "FILESHARING without a password has an invalid username marker",
+            ));
+        }
+    } else {
+        if marker > 54 {
+            return Err(invalid(
+                FILESHARING_TYPE,
+                "FILESHARING username exceeds 54 characters",
+            ));
+        }
+        let flags = *body.get(6).ok_or(Error::InvalidLength {
+            expected: 7,
+            found: body.len(),
+        })?;
+        if flags & !1 != 0 {
+            return Err(invalid(
+                FILESHARING_TYPE,
+                "FILESHARING string flags are invalid",
+            ));
+        }
+        let expected = 7usize
+            .checked_add(usize::from(marker) * if flags == 1 { 2 } else { 1 })
+            .ok_or_else(|| invalid(FILESHARING_TYPE, "FILESHARING length overflow"))?;
+        if body.len() != expected {
+            return Err(Error::InvalidLength {
+                expected,
+                found: body.len(),
+            });
+        }
+    }
+    // `wResPass` is the security-bearing part of FILESHARING. A set
+    // `fReadOnlyRec` with no write-reservation password remains readable and
+    // writable through this inert editor.
+    Ok(password)
 }
 
 fn target_for_storage(storage: String) -> Result<Target> {
@@ -327,27 +773,55 @@ pub(crate) fn targets_for_sheets(sheets: &[Vec<OleObjectRecord>]) -> Result<Targ
     clippy::type_complexity,
     reason = "type mirrors the decoded BIFF record structure"
 )]
-fn parse_workbook(input: &[u8]) -> Result<(Vec<Vec<OleObjectRecord>>, Vec<Vec<FormControl>>)> {
+fn parse_workbook(
+    input: &[u8],
+) -> Result<(
+    Vec<Vec<OleObjectRecord>>,
+    Vec<Vec<FormControl>>,
+    OpaqueObjectIdentity,
+)> {
     let (_, starts) = bindings(input)?;
     let mut sheets = Vec::new();
     let mut form_controls = Vec::new();
+    let mut opaque_identity = OpaqueObjectIdentity::default();
     for (index, (start, worksheet)) in starts.iter().enumerate() {
         if !worksheet {
             continue;
         }
         let end = starts.get(index + 1).map_or(input.len(), |value| value.0);
-        let (objects, controls) = parse_sheet(&input[*start..end])?;
+        let (objects, controls, sheet_opaque) = parse_sheet(&input[*start..end])?;
+        merge_opaque_identity(&mut opaque_identity, sheet_opaque)?;
         sheets.push(objects);
         form_controls.push(controls);
     }
     validate_entries(&sheets, &form_controls)?;
-    Ok((sheets, form_controls))
+    for object in sheets.iter().flatten() {
+        if opaque_identity.ids.contains(&object.object_id()) {
+            opaque_identity.ambiguous = true;
+        }
+    }
+    for control in form_controls.iter().flatten() {
+        if opaque_identity.ids.contains(&control.object_id()) {
+            opaque_identity.ambiguous = true;
+        }
+    }
+    for object in sheets.iter().flatten() {
+        if let Some(storage) = object.storage_name()
+            && opaque_identity.storages.contains(&storage)
+        {
+            opaque_identity.ambiguous = true;
+        }
+    }
+    Ok((sheets, form_controls, opaque_identity))
 }
 
-fn parse_sheet(input: &[u8]) -> Result<(Vec<OleObjectRecord>, Vec<FormControl>)> {
+fn parse_sheet(
+    input: &[u8],
+) -> Result<(Vec<OleObjectRecord>, Vec<FormControl>, OpaqueObjectIdentity)> {
     let records = ranges(input)?;
     let mut objects = Vec::new();
     let mut controls = Vec::new();
+    let mut opaque_identity = OpaqueObjectIdentity::default();
     for (index, value) in records.iter().enumerate() {
         if value.2 != OBJ {
             continue;
@@ -372,9 +846,131 @@ fn parse_sheet(input: &[u8]) -> Result<(Vec<OleObjectRecord>, Vec<FormControl>)>
             objects.push(object);
         } else if let Some(control) = FormControl::parse(body, txo) {
             controls.push(control);
+        } else {
+            opaque_identity.present = true;
+            inspect_opaque_obj(body, &mut opaque_identity)?;
         }
     }
-    Ok((objects, controls))
+    Ok((objects, controls, opaque_identity))
+}
+
+fn merge_opaque_identity(
+    destination: &mut OpaqueObjectIdentity,
+    source: OpaqueObjectIdentity,
+) -> Result<()> {
+    destination.present |= source.present;
+    destination.ambiguous |= source.ambiguous;
+    destination
+        .ids
+        .try_reserve(source.ids.len())
+        .map_err(|_error| Error::Allocation("opaque Obj identity index"))?;
+    for object_id in source.ids {
+        if !destination.ids.insert(object_id) {
+            destination.ambiguous = true;
+        }
+    }
+    destination
+        .storages
+        .try_reserve(source.storages.len())
+        .map_err(|_error| Error::Allocation("opaque Obj storage identity index"))?;
+    for storage in source.storages {
+        if !destination.storages.insert(storage) {
+            destination.ambiguous = true;
+        }
+    }
+    Ok(())
+}
+
+fn inspect_opaque_obj(body: &[u8], identity: &mut OpaqueObjectIdentity) -> Result<()> {
+    let Ok(subrecords) = parse_subrecords(body) else {
+        identity.ambiguous = true;
+        return Ok(());
+    };
+    // An opaque record can participate in identity admission only when its
+    // complete ordinary embedding prefix is proven.  In particular, do not
+    // infer an MBD/LNK name from an arbitrary formula tail: lPosInCtlStm is a
+    // Ctls offset when fPrstm is set, and camera/DDE/control forms have
+    // different FtPictFmla ownership rules.
+    let Some(super::super::semantic::ObjSubrecord::Common(common)) = subrecords.first() else {
+        identity.ambiguous = true;
+        return Ok(());
+    };
+    let common_count = subrecords
+        .iter()
+        .filter(|value| matches!(value, super::super::semantic::ObjSubrecord::Common(_)))
+        .count();
+    if common_count != 1 || common.object_type != 8 || common.object_id == 0 {
+        identity.ambiguous = true;
+        return Ok(());
+    }
+    identity.note_id(common.object_id)?;
+    if !matches!(
+        subrecords.last(),
+        Some(super::super::semantic::ObjSubrecord::End)
+    ) {
+        identity.ambiguous = true;
+        return Ok(());
+    }
+
+    // The storage identity is safe to recover only from the normative
+    // two-byte FtCf selector. A malformed FtCf body is retained as an
+    // opaque ClipboardFormat and must not be treated as an ordinary
+    // embedded-object prefix.
+    let picture_formats = subrecords
+        .iter()
+        .filter(|value| {
+            matches!(
+                value,
+                super::super::semantic::ObjSubrecord::PictureFormat(_)
+            )
+        })
+        .count();
+    let malformed_picture_format = subrecords.iter().any(|value| {
+        matches!(
+            value,
+            super::super::semantic::ObjSubrecord::ClipboardFormat(_)
+        )
+    });
+    if picture_formats != 1 || malformed_picture_format {
+        identity.ambiguous = true;
+        return Ok(());
+    }
+
+    let flags = subrecords
+        .iter()
+        .filter_map(|value| match value {
+            super::super::semantic::ObjSubrecord::PictureFlags(value) => Some(*value),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let formulas = subrecords
+        .iter()
+        .filter_map(|value| match value {
+            super::super::semantic::ObjSubrecord::PictureFormula(value) => Some(value),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    if flags.len() != 1 || formulas.len() != 1 {
+        identity.ambiguous = true;
+        return Ok(());
+    }
+    let flags = flags[0];
+    if flags.is_dde() || flags.is_control() || flags.uses_control_stream() || flags.camera_picture()
+    {
+        identity.ambiguous = true;
+        return Ok(());
+    }
+    let formula = formulas[0];
+    if validate_picture_formula(formula, flags).is_err() {
+        identity.ambiguous = true;
+        return Ok(());
+    }
+    let Some(position) = formula.storage_position else {
+        identity.ambiguous = true;
+        return Ok(());
+    };
+    identity.note_storage(format!("MBD{position:08X}"))?;
+    Ok(())
 }
 
 fn validate_entries(
@@ -548,4 +1144,21 @@ fn bindings(input: &[u8]) -> Result<(Vec<(usize, usize)>, Vec<(usize, bool)>)> {
             .collect(),
         starts,
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::OpaqueObjectIdentity;
+
+    #[test]
+    fn duplicate_opaque_storage_identity_is_ambiguous() {
+        let mut identity = OpaqueObjectIdentity::default();
+        identity
+            .note_storage("MBD0000002A".to_string())
+            .expect("first opaque storage should be indexed");
+        identity
+            .note_storage("MBD0000002A".to_string())
+            .expect("duplicate opaque storage should be retained as a refusal");
+        assert!(identity.ambiguous);
+    }
 }

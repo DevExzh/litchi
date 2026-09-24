@@ -1,0 +1,506 @@
+[
+  {
+    "function": "ABS",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/abs.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=ABS(0)",
+    "cached": "0"
+  },
+  {
+    "function": "ABS",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/abs.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=ABS(1)",
+    "cached": "1"
+  },
+  {
+    "function": "ABS",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/abs.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=ABS(-10)",
+    "cached": "10"
+  },
+  {
+    "function": "EXP",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/exp.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=EXP(1)",
+    "cached": "2.71828182845904"
+  },
+  {
+    "function": "LN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/ln.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=LN(86)",
+    "cached": "4.45434729625351"
+  },
+  {
+    "function": "LN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/ln.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=LN(2.7182818)",
+    "cached": "0.999999989530502"
+  },
+  {
+    "function": "LN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/ln.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=LN(EXP(3))",
+    "cached": "3"
+  },
+  {
+    "function": "LN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/ln.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=LN(0.0001)",
+    "cached": "-9.21034037197618"
+  },
+  {
+    "function": "LOG",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/log.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=LOG(10;3)",
+    "cached": "2.09590327428938"
+  },
+  {
+    "function": "LOG",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/log.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=LOG(7^4;7)",
+    "cached": "4"
+  },
+  {
+    "function": "LOG",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/log.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=LOG(10)",
+    "cached": "1"
+  },
+  {
+    "function": "LOG",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/log.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=LOG(8; 2)",
+    "cached": "3"
+  },
+  {
+    "function": "LOG",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/log.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=LOG(86; 2.7182818)",
+    "cached": "4.45434734288829"
+  },
+  {
+    "function": "LOG10",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/log10.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=LOG10(10)",
+    "cached": "1"
+  },
+  {
+    "function": "LOG10",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/log10.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=LOG10(7^4)",
+    "cached": "3.38039216005703"
+  },
+  {
+    "function": "LOG10",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/log10.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=LOG10(8)",
+    "cached": "0.903089986991943"
+  },
+  {
+    "function": "LOG10",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/log10.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=LOG10(86)",
+    "cached": "1.93449845124357"
+  },
+  {
+    "function": "LOG10",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/log10.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=LOG10(100000)",
+    "cached": "5"
+  },
+  {
+    "function": "LOG10",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/log10.fods",
+    "sheet": "Sheet2",
+    "row": 8,
+    "column": 1,
+    "formula": "of:=LOG10(10^5)",
+    "cached": "5"
+  },
+  {
+    "function": "POWER",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/power.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=POWER(4;3)",
+    "cached": "64"
+  },
+  {
+    "function": "POWER",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/power.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=POWER(0;0)",
+    "cached": "1"
+  },
+  {
+    "function": "POWER",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/power.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=POWER(-3;-2)",
+    "cached": "0.111111111111111"
+  },
+  {
+    "function": "POWER",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/power.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=POWER(-3;2)",
+    "cached": "9"
+  },
+  {
+    "function": "POWER",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/power.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=POWER(3;-2)",
+    "cached": "0.111111111111111"
+  },
+  {
+    "function": "POWER",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/power.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=POWER(5;2)",
+    "cached": "25"
+  },
+  {
+    "function": "POWER",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/power.fods",
+    "sheet": "Sheet2",
+    "row": 8,
+    "column": 1,
+    "formula": "of:=POWER(98.6;3.2)",
+    "cached": "2401077.22206958"
+  },
+  {
+    "function": "POWER",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/power.fods",
+    "sheet": "Sheet2",
+    "row": 9,
+    "column": 1,
+    "formula": "of:=POWER(4;5/4)",
+    "cached": "5.65685424949238"
+  },
+  {
+    "function": "SQRT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sqrt.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=SQRT(16.2)",
+    "cached": "4.02492235949962"
+  },
+  {
+    "function": "SQRTPI",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sqrtpi.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=SQRTPI(16.2)",
+    "cached": "7.13398913569082"
+  },
+  {
+    "function": "SIGN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sign.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=SIGN(3.4)",
+    "cached": "1"
+  },
+  {
+    "function": "SIGN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sign.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=SIGN(-4.5)",
+    "cached": "-1"
+  },
+  {
+    "function": "SIGN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sign.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=SIGN(0)",
+    "cached": "0"
+  },
+  {
+    "function": "SIGN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sign.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=SIGN(4-4)",
+    "cached": "0"
+  },
+  {
+    "function": "SIGN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sign.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=SIGN(10)",
+    "cached": "1"
+  },
+  {
+    "function": "SIGN",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sign.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=SIGN(-0.00001)",
+    "cached": "-1"
+  },
+  {
+    "function": "MOD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=MOD(22;3)",
+    "cached": "1"
+  },
+  {
+    "function": "MOD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=MOD(11.25;2.5)",
+    "cached": "1.25"
+  },
+  {
+    "function": "MOD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=MOD(3; 2)",
+    "cached": "1"
+  },
+  {
+    "function": "MOD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=MOD(-3; 2)",
+    "cached": "1"
+  },
+  {
+    "function": "MOD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=MOD(3; -2)",
+    "cached": "-1"
+  },
+  {
+    "function": "MOD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=MOD(-3; -2)",
+    "cached": "-1"
+  },
+  {
+    "function": "MOD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+    "sheet": "Sheet2",
+    "row": 8,
+    "column": 1,
+    "formula": "of:=MOD((3^31)-1;2)",
+    "cached": "0"
+  },
+  {
+    "function": "MOD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+    "sheet": "Sheet2",
+    "row": 28,
+    "column": 1,
+    "formula": "of:=MOD((3^31);14)",
+    "cached": "3"
+  },
+  {
+    "function": "MOD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+    "sheet": "Sheet2",
+    "row": 29,
+    "column": 1,
+    "formula": "of:=MOD((3^31)-1;14)",
+    "cached": "2"
+  },
+  {
+    "function": "MOD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+    "sheet": "Sheet2",
+    "row": 30,
+    "column": 1,
+    "formula": "of:=MOD((3^31)-2;14)",
+    "cached": "1"
+  },
+  {
+    "function": "MOD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+    "sheet": "Sheet2",
+    "row": 31,
+    "column": 1,
+    "formula": "of:=MOD((3^31)-3;14)",
+    "cached": "0"
+  },
+  {
+    "function": "MOD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+    "sheet": "Sheet2",
+    "row": 32,
+    "column": 1,
+    "formula": "of:=MOD(5310866044487;128)",
+    "cached": "71"
+  },
+  {
+    "function": "MOD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+    "sheet": "Sheet2",
+    "row": 33,
+    "column": 1,
+    "formula": "of:=MOD(40595547922587;128)",
+    "cached": "27"
+  },
+  {
+    "function": "MOD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+    "sheet": "Sheet2",
+    "row": 34,
+    "column": 1,
+    "formula": "of:=MOD(7;2.1)",
+    "cached": "0.699999999999999"
+  },
+  {
+    "function": "MOD",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/mod.fods",
+    "sheet": "Sheet2",
+    "row": 35,
+    "column": 1,
+    "formula": "of:=MOD(2;7.1)",
+    "cached": "2"
+  },
+  {
+    "function": "QUOTIENT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/quotient.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=QUOTIENT(11;3)",
+    "cached": "3"
+  },
+  {
+    "function": "QUOTIENT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/quotient.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=QUOTIENT(4.5; 3.1)",
+    "cached": "1"
+  },
+  {
+    "function": "QUOTIENT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/quotient.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=QUOTIENT(-10; 3)",
+    "cached": "-3"
+  },
+  {
+    "function": "QUOTIENT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/quotient.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=QUOTIENT(-5;10)",
+    "cached": "-0"
+  },
+  {
+    "function": "QUOTIENT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/quotient.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=QUOTIENT(5;-10)",
+    "cached": "-0"
+  },
+  {
+    "function": "QUOTIENT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/quotient.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=QUOTIENT(0;-10)",
+    "cached": "-0"
+  }
+]

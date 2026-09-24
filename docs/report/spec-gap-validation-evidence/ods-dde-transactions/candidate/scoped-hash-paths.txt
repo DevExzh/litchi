@@ -1,0 +1,9 @@
+crates/litchi-ods/src/authoring/mutable.rs
+crates/litchi-ods/src/facade/mod.rs
+crates/litchi-ods/src/facade/source.rs
+crates/litchi-ods/src/model/dde/lexical.rs
+crates/litchi-ods/src/model/dde/source_backed.rs
+crates/litchi-ods/src/model/dde/transaction.rs
+crates/litchi-ods/src/model/dde.rs
+crates/litchi-ods/tests/ods_dde_facades.rs
+crates/litchi-ods/tests/ods_dde_transactions.rs

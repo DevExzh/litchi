@@ -1,0 +1,20 @@
+{
+  "baseline": {
+    "sha256": "412287de2566991d60f494fb0deffd768deb238c0ad5f020d8d72979ed544cc2",
+    "file_bytes": 1236720,
+    "size_output": "   text\t   data\t    bss\t    dec\t    hex\tfilename\n 839696\t  18496\t   4018\t 862210\t  d2802\tdocs/report/spec-gap-validation-evidence/ods-formula-logical-evaluation/performance/baseline/ods-formula-logical-evaluation-profile\n",
+    "status": 0
+  },
+  "before-dispatch": {
+    "sha256": "636de431ef448e97cc5f8e97c44ce4a6edb994919191008da05d603aad32446c",
+    "file_bytes": 1244800,
+    "size_output": "   text\t   data\t    bss\t    dec\t    hex\tfilename\n 847128\t  18496\t    690\t 866314\t  d380a\tdocs/report/spec-gap-validation-evidence/ods-formula-logical-evaluation/performance/before-dispatch/candidate/ods-formula-logical-evaluation-profile\n",
+    "status": 0
+  },
+  "candidate": {
+    "sha256": "a1aaeb473345ac7e4e3c3d3e5192c86a77442d2b5dbdc00874cad6364e8265f8",
+    "file_bytes": 1245320,
+    "size_output": "   text\t   data\t    bss\t    dec\t    hex\tfilename\n 847504\t  18496\t   4402\t 870402\t  d4802\tdocs/report/spec-gap-validation-evidence/ods-formula-logical-evaluation/performance/candidate/ods-formula-logical-evaluation-profile\n",
+    "status": 0
+  }
+}

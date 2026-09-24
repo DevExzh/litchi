@@ -1,0 +1,1030 @@
+{
+  "schema": 1,
+  "contract_sha256": "fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b",
+  "baseline_commit": "f945a5129ad8967a863cf4937de01ee2152b9fbf",
+  "phases": [
+    "evaluate",
+    "parse-evaluate"
+  ],
+  "warmups": 3,
+  "samples": 15,
+  "matched_controls": [
+    {
+      "name": "control-scalar-arithmetic",
+      "source": "=0.17+1.25",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 1.42,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "matched-control"
+    },
+    {
+      "name": "control-scalar-sin",
+      "source": "=SIN(0.17)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 0.16918234906699603,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "matched-control"
+    },
+    {
+      "name": "control-array-arithmetic",
+      "source": "={1|2|3|4}+1",
+      "evaluation_path": "value",
+      "shape": "4x1",
+      "expected": {
+        "kind": "array",
+        "rows": 4,
+        "columns": 1,
+        "values": [
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "matched-control"
+    },
+    {
+      "name": "control-array-sin",
+      "source": "=SIN({0.1|0.2|0.3|0.4})",
+      "evaluation_path": "value",
+      "shape": "4x1",
+      "expected": {
+        "kind": "array",
+        "rows": 4,
+        "columns": 1,
+        "values": [
+          0.09983341664682815,
+          0.19866933079506122,
+          0.29552020666133955,
+          0.3894183423086505
+        ]
+      },
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "matched-control"
+    },
+    {
+      "name": "control-scalar-aggregate",
+      "source": "=SUM(1.25)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 1.25,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "matched-control"
+    },
+    {
+      "name": "control-reference-sum-64",
+      "source": "=SUM([.D1:.D64])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 185.5,
+      "reference_reads": 64,
+      "repeat": 32,
+      "class": "matched-control"
+    },
+    {
+      "name": "control-reference-average-64",
+      "source": "=AVERAGE([.D1:.D64])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 2.8984375,
+      "reference_reads": 64,
+      "repeat": 32,
+      "class": "matched-control"
+    },
+    {
+      "name": "control-reference-conditional-sumif-64",
+      "source": "=SUMIF([.D1:.D64];\">=2\";[.D1:.D64])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 163.5,
+      "reference_reads": 112,
+      "repeat": 32,
+      "class": "matched-control"
+    },
+    {
+      "name": "control-lazy-if",
+      "source": "=IF({FALSE()|FALSE()};SUM([.D1:.D64]);0)",
+      "evaluation_path": "value",
+      "shape": "2x1",
+      "expected": {
+        "kind": "array",
+        "rows": 2,
+        "columns": 1,
+        "values": [
+          0,
+          0
+        ]
+      },
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "matched-control"
+    },
+    {
+      "name": "control-iferror",
+      "source": "=IFERROR(1/0;42)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 42.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "matched-control"
+    },
+    {
+      "name": "control-ifna",
+      "source": "=IFNA(#N/A;42)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 42.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "matched-control"
+    }
+  ],
+  "candidate_cases": [
+    {
+      "name": "financial-cumipmt-core",
+      "source": "=CUMIPMT(0.1;2;100;1;1;0)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": -10.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-cumprinc-core",
+      "source": "=CUMPRINC(0.1;2;100;1;1;0)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": -47.61904761904762,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-effect-core",
+      "source": "=EFFECT(0.1;2)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 0.1025,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-fv-core",
+      "source": "=FV(0.1;1;-110)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 110.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-fvschedule-core",
+      "source": "=FVSCHEDULE(100;{0.1|0.2})",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 132.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-ipmt-core",
+      "source": "=IPMT(0.1;1;2;100)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": -10.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-irr-core",
+      "source": "=IRR({-100|110})",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.1,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-ispmt-core",
+      "source": "=ISPMT(0.1;1;2;100)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": -5.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-mirr-core",
+      "source": "=MIRR({-100|110};0.1;0.1)",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.1,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-nominal-core",
+      "source": "=NOMINAL(0.1025;2)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 0.1,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-nper-core",
+      "source": "=NPER(0.1;-110;100)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 1.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-npv-core",
+      "source": "=NPV(0.1;{-100|110})",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-pduration-core",
+      "source": "=PDURATION(0.1;100;121)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 2.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-pmt-core",
+      "source": "=PMT(0.1;1;100)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": -110.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-ppmt-core",
+      "source": "=PPMT(0.1;1;2;100)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": -47.61904761904762,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-pv-core",
+      "source": "=PV(0.1;1;-110)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 100.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-rate-core",
+      "source": "=RATE(1;-110;100)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 0.1,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-rri-core",
+      "source": "=RRI(2;100;121)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 0.1,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-xirr-core",
+      "source": "=XIRR({-100|110};{43831|44196})",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.1,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-xnpv-core",
+      "source": "=XNPV(0.1;{-100|110};{43831|44196})",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-cumipmt-span-4",
+      "source": "=CUMIPMT(0.1;4;100;1;3;0)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": -23.32040508511097,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-cumprinc-span-4",
+      "source": "=CUMPRINC(0.1;4;100;1;3;0)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": -71.32083602671833,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-cumipmt-span-64",
+      "source": "=CUMIPMT(0.1;64;100;1;63;0)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": -540.5277414286135,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-cumprinc-span-64",
+      "source": "=CUMPRINC(0.1;64;100;1;63;0)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": -90.88865232676221,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-cumipmt-span-512",
+      "source": "=CUMIPMT(0.1;512;100;1;511;0)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": -5019.090909090909,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-cumprinc-span-512",
+      "source": "=CUMPRINC(0.1;512;100;1;511;0)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": -90.90909090909099,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-cumipmt-span-2048",
+      "source": "=CUMIPMT(0.1;2048;100;1;2047;0)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": -20379.090909090908,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-cumprinc-span-2048",
+      "source": "=CUMPRINC(0.1;2048;100;1;2047;0)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": -90.9090909090919,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-effect-zero",
+      "source": "=EFFECT(0;2)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 0.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-fv-zero-rate",
+      "source": "=FV(0;2;-10)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 20.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-pmt-zero-rate",
+      "source": "=PMT(0;2;100)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": -50.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-pv-zero-rate",
+      "source": "=PV(0;2;-50)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 100.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-nper-zero-rate",
+      "source": "=NPER(0;-50;100)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 2.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-rri-negative-inputs",
+      "source": "=RRI(2;-100;-121)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": 0.1,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial"
+    },
+    {
+      "name": "financial-fvschedule-zero-factor",
+      "source": "=FVSCHEDULE(100;{0|-1|0.1})",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial-sequence"
+    },
+    {
+      "name": "financial-fvschedule-formula-error",
+      "source": "=FVSCHEDULE(100;{0.1|#N/A|0.2})",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": {
+        "kind": "formula_error",
+        "value": "#N/A"
+      },
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial-error"
+    },
+    {
+      "name": "financial-npv-split-arguments",
+      "source": "=NPV(0.1;{-100};{110})",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial-sequence"
+    },
+    {
+      "name": "financial-npv-reference-list",
+      "source": "=NPV(0.1;[.A1:.A1]~[.A2:.A2])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.0,
+      "reference_reads": 2,
+      "repeat": 32,
+      "class": "financial-sequence"
+    },
+    {
+      "name": "financial-npv-projected-if",
+      "source": "=IF({TRUE()|FALSE()};NPV(0.1;[.A1:.A4]);0)",
+      "evaluation_path": "value",
+      "shape": "2x1",
+      "expected": {
+        "kind": "array",
+        "rows": 2,
+        "columns": 1,
+        "values": [
+          0.0,
+          0.0
+        ]
+      },
+      "reference_reads": 4,
+      "repeat": 32,
+      "class": "financial-projected"
+    },
+    {
+      "name": "financial-irr-negative-branch",
+      "source": "=IRR({-100|0|100};-2)",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": -2.0,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial-solver"
+    },
+    {
+      "name": "financial-irr-no-sign-variation",
+      "source": "=IRR({1|2})",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": {
+        "kind": "formula_error",
+        "value": "#NUM!"
+      },
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial-error"
+    },
+    {
+      "name": "financial-xirr-nonannual",
+      "source": "=XIRR({-100|110};{43831|44011})",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.21320772540428345,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial-solver"
+    },
+    {
+      "name": "financial-xnpv-nonannual",
+      "source": "=XNPV(0.1;{-100|110};{43831|44011})",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 4.949374402715122,
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial-stream"
+    },
+    {
+      "name": "financial-fvschedule-reference-list-refusal",
+      "source": "=FVSCHEDULE(100;[.C1:.C2]~[.C3:.C4])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": {
+        "kind": "formula_error",
+        "value": "#VALUE!"
+      },
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial-refusal"
+    },
+    {
+      "name": "financial-xirr-reference-list-refusal",
+      "source": "=XIRR([.A1:.A2]~[.A3:.A4];{43831|44196})",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": {
+        "kind": "formula_error",
+        "value": "#VALUE!"
+      },
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial-refusal"
+    },
+    {
+      "name": "financial-xnpv-reference-list-refusal",
+      "source": "=XNPV(0.1;[.A1:.A2]~[.A3:.A4];[.B1:.B4])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": {
+        "kind": "formula_error",
+        "value": "#VALUE!"
+      },
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial-refusal"
+    },
+    {
+      "name": "financial-effect-invalid-rate",
+      "source": "=EFFECT(-0.1;2)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": {
+        "kind": "formula_error",
+        "value": "#NUM!"
+      },
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial-error"
+    },
+    {
+      "name": "financial-nominal-invalid-rate",
+      "source": "=NOMINAL(0;2)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": {
+        "kind": "formula_error",
+        "value": "#NUM!"
+      },
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial-error"
+    },
+    {
+      "name": "financial-pduration-invalid-rate",
+      "source": "=PDURATION(0;100;121)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": {
+        "kind": "formula_error",
+        "value": "#NUM!"
+      },
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial-error"
+    },
+    {
+      "name": "financial-ppmt-invalid-period",
+      "source": "=PPMT(0.1;2;2;100)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": {
+        "kind": "formula_error",
+        "value": "#NUM!"
+      },
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial-error"
+    },
+    {
+      "name": "financial-rri-nonintegral-negative",
+      "source": "=RRI(3;100;-800)",
+      "evaluation_path": "scalar",
+      "shape": "scalar",
+      "expected": {
+        "kind": "formula_error",
+        "value": "#NUM!"
+      },
+      "reference_reads": 0,
+      "repeat": 32,
+      "class": "financial-error"
+    },
+    {
+      "name": "financial-fvschedule-4",
+      "source": "=FVSCHEDULE(100;[.C1:.C4])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 100.04060618151823,
+      "reference_reads": 4,
+      "repeat": 8,
+      "class": "financial-stream"
+    },
+    {
+      "name": "financial-npv-4",
+      "source": "=NPV(0.1;[.A1:.A4])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": -1.4210854715202004e-14,
+      "reference_reads": 4,
+      "repeat": 8,
+      "class": "financial-stream"
+    },
+    {
+      "name": "financial-fvschedule-64",
+      "source": "=FVSCHEDULE(100;[.C1:.C64])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 100.84509450979577,
+      "reference_reads": 64,
+      "repeat": 8,
+      "class": "financial-stream"
+    },
+    {
+      "name": "financial-npv-64",
+      "source": "=NPV(0.1;[.A1:.A64])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": -1.4210854715202004e-14,
+      "reference_reads": 64,
+      "repeat": 8,
+      "class": "financial-stream"
+    },
+    {
+      "name": "financial-fvschedule-1024",
+      "source": "=FVSCHEDULE(100;[.C1:.C1024])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 187.00028223879542,
+      "reference_reads": 1024,
+      "repeat": 1,
+      "class": "financial-stream"
+    },
+    {
+      "name": "financial-npv-1024",
+      "source": "=NPV(0.1;[.A1:.A1024])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": -1.4210854715202004e-14,
+      "reference_reads": 1024,
+      "repeat": 1,
+      "class": "financial-stream",
+      "max_steps": 8000000
+    },
+    {
+      "name": "financial-fvschedule-4096",
+      "source": "=FVSCHEDULE(100;[.C1:.C4096])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 652814.146471943,
+      "reference_reads": 4096,
+      "repeat": 1,
+      "class": "financial-stream"
+    },
+    {
+      "name": "financial-npv-4096",
+      "source": "=NPV(0.1;[.A1:.A4096])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": -1.4210854715202004e-14,
+      "reference_reads": 4096,
+      "repeat": 1,
+      "class": "financial-stream",
+      "max_steps": 8000000
+    },
+    {
+      "name": "financial-irr-4",
+      "source": "=IRR([.A1:.A4])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.1,
+      "reference_reads": 4,
+      "repeat": 4,
+      "class": "financial-solver"
+    },
+    {
+      "name": "financial-xirr-4",
+      "source": "=XIRR([.A1:.A4];[.B1:.B4])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.1,
+      "reference_reads": 8,
+      "repeat": 4,
+      "class": "financial-solver"
+    },
+    {
+      "name": "financial-xnpv-4",
+      "source": "=XNPV(0.1;[.A1:.A4];[.B1:.B4])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.0,
+      "reference_reads": 8,
+      "repeat": 4,
+      "class": "financial-stream"
+    },
+    {
+      "name": "financial-mirr-4",
+      "source": "=MIRR({-100|0|0|110};0.1;0.1)",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.03228011545636722,
+      "reference_reads": 0,
+      "repeat": 4,
+      "class": "financial-array"
+    },
+    {
+      "name": "financial-irr-64",
+      "source": "=IRR([.A1:.A64])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.1,
+      "reference_reads": 64,
+      "repeat": 4,
+      "class": "financial-solver"
+    },
+    {
+      "name": "financial-xirr-64",
+      "source": "=XIRR([.A1:.A64];[.B1:.B64])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.1,
+      "reference_reads": 128,
+      "repeat": 4,
+      "class": "financial-solver"
+    },
+    {
+      "name": "financial-xnpv-64",
+      "source": "=XNPV(0.1;[.A1:.A64];[.B1:.B64])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.0,
+      "reference_reads": 128,
+      "repeat": 4,
+      "class": "financial-stream"
+    },
+    {
+      "name": "financial-mirr-64",
+      "source": "=MIRR({-100|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|110};0.1;0.1)",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.001514004946889358,
+      "reference_reads": 0,
+      "repeat": 4,
+      "class": "financial-array"
+    },
+    {
+      "name": "financial-irr-1024",
+      "source": "=IRR([.A1:.A1024])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.1,
+      "reference_reads": 1024,
+      "repeat": 1,
+      "class": "financial-solver"
+    },
+    {
+      "name": "financial-xirr-1024",
+      "source": "=XIRR([.A1:.A1024];[.B1:.B1024])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.1,
+      "reference_reads": 2048,
+      "repeat": 1,
+      "class": "financial-solver"
+    },
+    {
+      "name": "financial-xnpv-1024",
+      "source": "=XNPV(0.1;[.A1:.A1024];[.B1:.B1024])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 0.0,
+      "reference_reads": 2048,
+      "repeat": 1,
+      "class": "financial-stream",
+      "max_steps": 8000000
+    },
+    {
+      "name": "financial-mirr-1024",
+      "source": "=MIRR({-100|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|110};0.1;0.1)",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": 9.317167139766269e-05,
+      "reference_reads": 0,
+      "repeat": 1,
+      "class": "financial-array",
+      "max_steps": 8000000
+    },
+    {
+      "name": "financial-irr-reference-list-refusal",
+      "source": "=IRR([.A1:.A2]~[.A3:.A4])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": {
+        "kind": "formula_error",
+        "value": "#VALUE!"
+      },
+      "reference_reads": 0,
+      "repeat": 1,
+      "class": "financial-refusal"
+    },
+    {
+      "name": "financial-npv-reference-limit",
+      "source": "=NPV(0.1;[.A1:.A4])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": {
+        "kind": "failure",
+        "value": "ReferenceCells"
+      },
+      "reference_reads": 0,
+      "repeat": 1,
+      "class": "financial-resource",
+      "max_reference_cells": 3
+    },
+    {
+      "name": "financial-irr-work-limit",
+      "source": "=IRR({-100|110})",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": {
+        "kind": "failure",
+        "value": "Work"
+      },
+      "reference_reads": 0,
+      "repeat": 1,
+      "class": "financial-resource",
+      "max_steps": 2
+    },
+    {
+      "name": "financial-npv-cancel-after-read",
+      "source": "=NPV(0.1;[.A1:.A4])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": {
+        "kind": "failure",
+        "value": "Cancelled"
+      },
+      "reference_reads": 1,
+      "repeat": 4,
+      "class": "financial-cancellation"
+    },
+    {
+      "name": "financial-npv-cancel-before-read",
+      "source": "=NPV(0.1;[.A1:.A4])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": {
+        "kind": "failure",
+        "value": "Cancelled"
+      },
+      "reference_reads": 0,
+      "repeat": 4,
+      "class": "financial-cancellation"
+    },
+    {
+      "name": "financial-npv-retained-formula-error",
+      "source": "=NPV(0.1;[.A1:.A4])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": {
+        "kind": "formula_error",
+        "value": "#N/A"
+      },
+      "reference_reads": 4,
+      "repeat": 1,
+      "class": "financial-error"
+    },
+    {
+      "name": "financial-npv-late-provider-failure",
+      "source": "=NPV(0.1;[.A1:.A4])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": {
+        "kind": "failure",
+        "value": "Unsupported"
+      },
+      "reference_reads": 1,
+      "repeat": 1,
+      "class": "financial-error"
+    },
+    {
+      "name": "financial-irr-cancel-during-scan",
+      "source": "=IRR([.A1:.A4])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": {
+        "kind": "failure",
+        "value": "Cancelled"
+      },
+      "reference_reads": 1,
+      "repeat": 1,
+      "class": "financial-cancellation"
+    },
+    {
+      "name": "financial-xnpv-late-date-provider-failure",
+      "source": "=XNPV(0.1;[.A1:.A4];[.B1:.B4])",
+      "evaluation_path": "value",
+      "shape": "scalar",
+      "expected": {
+        "kind": "failure",
+        "value": "Unsupported"
+      },
+      "reference_reads": 4,
+      "repeat": 1,
+      "class": "financial-error"
+    }
+  ],
+  "counts": {
+    "matched_controls": 11,
+    "candidate_cases": 80,
+    "baseline_timed_groups": 22,
+    "candidate_timed_groups": 182
+  }
+}

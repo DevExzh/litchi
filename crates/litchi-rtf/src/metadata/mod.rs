@@ -9,6 +9,7 @@ pub(crate) mod file_table;
 pub(crate) mod generator;
 pub(crate) mod info;
 pub(crate) mod mail_merge;
+pub(crate) mod smart_tag;
 pub(crate) mod theme;
 pub(crate) mod user_property;
 pub(crate) mod window_caption;
@@ -19,9 +20,10 @@ pub(crate) mod xsl_transform;
 pub(crate) use external_reference::DocumentExternalReferenceSpans;
 
 pub use info::{
-    DocumentInfo as Info, DocumentProtection as Protection, ProtectionLevel, ProtectionType,
-    RtfTimestamp as Timestamp,
+    DocumentInfo as Info, DocumentProtection as Protection, MAX_PASSWORD_HASH_BYTES, PasswordHash,
+    ProtectionLevel, ProtectionType, RtfTimestamp as Timestamp,
 };
+pub use smart_tag::{SmartTag, SmartTagAttribute};
 pub use user_property::{
     UserProperty, UserPropertyDateTime as DateTime, UserPropertyType as PropertyType,
     UserPropertyValue as Value,

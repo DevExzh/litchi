@@ -66,7 +66,11 @@ pub use error::{OpcError, Result, SpliceResource};
 pub use execution::OpenSession;
 pub use limits::{ReadLimits, ReadLimitsBuilder, ReadResource};
 pub use members::{NonPartMember, NonPartReason};
-pub use package::{CompressedPartTransfer, FontEmbedding, OpcPackage, SaveOptions};
+pub use package::{
+    CanonicalRelationshipsPlan, CompressedPartTransfer, ContentTypeEdit, ContentTypesEditPlan,
+    FontEmbedding, OpcPackage, OwnedContentTypes, OwnedRelationships, RelationshipEdit,
+    RelationshipSourcePlan, RelationshipsEditPlan, SaveOptions,
+};
 pub use packuri::PackURI;
 pub use part::{BlobPart, Part, PartMetadata, XmlPart};
 pub use pkgreader::{
@@ -77,20 +81,22 @@ pub use pkgwriter::PackageWriter;
 pub use prepared::PreparedOoxmlSource;
 pub use rel::{Relationship, Relationships, TargetMode};
 pub use source_backed::{
-    AuthorizedPrecompressedPart, PartBatch, PartData, PartView, RetainedPrecompressedPart,
-    SourceArtifact, SourceArtifactFingerprint, SourceArtifactRestoreProof, SourceBackedPackage,
-    SourceCacheCounterDelta, SourceCacheDiagnostics, SourceCacheDiagnosticsError,
-    SourceCacheLimitError, SourceCacheLimits, SourceLineage, SourcePartSpliceFragment,
-    SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
-    SourcePartSplicePublication, SourcePartSpliceReplay, SourcePartSpliceReplayError,
-    SourcePartSpliceReplayHandle, SourcePartSpliceReplayProof, SourceReadDiagnostics,
-    SourceReadPolicy, SourceReadPolicyError, SourceRelationshipTarget, SourceTopologyPlan,
-    VerifiedDecodedReaderError,
+    AuthorizedPrecompressedPart, EffectiveContentType, EffectivePart, EffectivePartData,
+    EffectiveTopology, PartBatch, PartData, PartReadSession, PartView, PreparedTopology,
+    RetainedPrecompressedPart, SourceArtifact, SourceArtifactFingerprint,
+    SourceArtifactRestoreProof, SourceBackedPackage, SourceCacheCounterDelta,
+    SourceCacheDiagnostics, SourceCacheDiagnosticsError, SourceCacheLimitError, SourceCacheLimits,
+    SourceLineage, SourcePartSpliceFragment, SourcePartSpliceLimits, SourcePartSplicePlan,
+    SourcePartSpliceProof, SourcePartSplicePublication, SourcePartSpliceReplay,
+    SourcePartSpliceReplayError, SourcePartSpliceReplayHandle, SourcePartSpliceReplayProof,
+    SourceReadDiagnostics, SourceReadPolicy, SourceReadPolicyError, SourceRelationshipTarget,
+    SourceTopologyPlan, VerifiedDecodedReaderError,
 };
 #[cfg(feature = "performance-diagnostics")]
 pub use source_backed::{CacheState, DiagnosticSnapshot, FlightState, Operation};
 pub use validation::{validate_read_at, validate_read_at_with_limits};
 pub use xml_splice::{
-    AuthoredXmlFragment, SourceXmlPart, XmlSourceRange, XmlSplicePublication,
-    authored_xml_requires_source_proof,
+    AuthoredXmlFragment, OwnedAttributeUpdate, OwnedChildElement, OwnedElementEdit,
+    OwnedElementUpdate, OwnedXmlPart, SourceXmlPart, XmlSourceRange, XmlSplicePublication,
+    authored_xml_requires_source_proof, validate_source_xml_bytes,
 };

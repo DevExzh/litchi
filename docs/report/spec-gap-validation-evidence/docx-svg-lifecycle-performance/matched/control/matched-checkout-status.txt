@@ -1,0 +1,8 @@
+label=control
+checkout_head=211806feea6e83279975ff77adeb5c8fa7be01a6
+checkout_tree=fdf74a209b00b94a38731e4e37e58b8392de722a
+checkout_status=clean
+status_check=git status --porcelain was empty immediately before cargo metadata/build/timing
+local_source_inputs=all path dependencies resolved inside this detached committed checkout
+shared_dirty_workspace_used_for_build=false
+temporary_checkout_removed_after_verification=true

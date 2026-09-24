@@ -504,12 +504,18 @@ mod tests {
     fn explicit_opens_match_serial_parts_deterministically() {
         let bytes = archive();
         let expected = package_parts(&OpcPackage::from_bytes(&bytes).unwrap());
+        let limits = ReadLimits::builder()
+            .max_input_bytes(bytes.len() as u64)
+            .unwrap()
+            .build()
+            .unwrap();
 
         for _ in 0..3 {
             let (_source, context) = execution_context(16 * MIB);
             let session = OpenSession::new(context).unwrap();
-            let package = session.from_bytes(&bytes, ReadLimits::default()).unwrap();
+            let package = session.from_bytes(&bytes, limits).unwrap();
             assert_eq!(package_parts(&package), expected);
+            assert_eq!(package.read_limits(), limits);
         }
     }
 

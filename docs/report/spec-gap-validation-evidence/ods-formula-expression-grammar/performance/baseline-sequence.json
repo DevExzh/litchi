@@ -1,0 +1,41 @@
+{
+  "harness": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/harness/run.py",
+  "harness_sha256": "6a92e819429e6eaf359d6186aa67d17f2f546980bb5a3e6633cb2259de433790",
+  "warmups": 3,
+  "iterations": 15,
+  "jobs": [
+    {
+      "label": "baseline-comparable",
+      "group": "comparable",
+      "binary_sha256": "a6b31cf05245eb6e03258223411cec42d44b1af3281151006941851a7e903bc7",
+      "harness": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/harness/run.py",
+      "output": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/baseline",
+      "warmups": 3,
+      "iterations": 15,
+      "finished_at": null,
+      "status": 0,
+      "raw_sha256": "d8503ba9f2e5cf9ba968b3efbf533264418610a5b8c56b7a0deaf87a437f2952",
+      "row_count": 12,
+      "started_at": null,
+      "elapsed_seconds": null
+    },
+    {
+      "label": "baseline-literals",
+      "group": "literals",
+      "binary_sha256": "a6b31cf05245eb6e03258223411cec42d44b1af3281151006941851a7e903bc7",
+      "harness": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/harness/run.py",
+      "output": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/baseline-literals",
+      "warmups": 3,
+      "iterations": 15,
+      "finished_at": null,
+      "status": 0,
+      "raw_sha256": "820991769d8854b8f3369f6f0d27956ff91c0ef714903ef332a626c4f97263b4",
+      "row_count": 9,
+      "started_at": null,
+      "elapsed_seconds": null
+    }
+  ],
+  "order": "baseline-comparable, baseline-literals",
+  "timestamps_recorded": false,
+  "measurement_note": "Baseline lane wall timestamps were not captured; raw CSVs, per-lane /usr/bin/time files, and source/build receipts are authoritative."
+}

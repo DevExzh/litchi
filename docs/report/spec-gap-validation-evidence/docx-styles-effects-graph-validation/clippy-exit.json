@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "clippy",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-docx",
+    "--lib",
+    "--test",
+    "styles_with_effects",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "exit_code": 0
+}

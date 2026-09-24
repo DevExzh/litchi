@@ -1,0 +1,17 @@
+{
+  "gates": {
+    "passed": 1378,
+    "failed": 0,
+    "ignored": 0
+  },
+  "native": {
+    "cached_observations": 48,
+    "functions": 8,
+    "exclusions": 15
+  },
+  "oracles": {
+    "observations": 512,
+    "functions": 8,
+    "modes_per_observation": 2
+  }
+}

@@ -5,6 +5,7 @@ use litchi_sheet::Rect;
 use litchi_sheet::view::{Position, View};
 
 use super::invalid;
+use crate::data_type_icons::ShowDataTypeIcons;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PivotSelectionAxis {
@@ -242,6 +243,7 @@ pub struct Entry {
     pub(super) view: View,
     pub(super) pivot_selections: Vec<PivotSelection>,
     pub(super) extensions: Vec<Extension>,
+    pub(super) show_data_type_icons: Option<ShowDataTypeIcons>,
     pub(super) retained_xml: Vec<u8>,
 }
 impl Entry {
@@ -255,6 +257,11 @@ impl Entry {
     #[must_use]
     pub fn extensions(&self) -> &[Extension] {
         &self.extensions
+    }
+    /// The inert `showDataTypeIcons` value owned by this worksheet view.
+    #[must_use]
+    pub const fn show_data_type_icons(&self) -> Option<ShowDataTypeIcons> {
+        self.show_data_type_icons
     }
     /// Complete MCE-processed `sheetView` markup retained for source fidelity.
     #[must_use]

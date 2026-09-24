@@ -1,0 +1,14 @@
+{
+  "reviewer": "corpus_binding_review",
+  "verdict": "CLEAR for p232V6",
+  "reviewed_patch_sha256": "b2bb8d5b1cc65ed74999d6be002dd0ad045cdb5562fd7a3472cb6d0ca25adf41",
+  "checks": [
+    "localMSPPTX2.22/5.20 cardinality",
+    "XMLtokenURI dispatch and opaque foreignowner",
+    "source/stale/signature/output limits beforecloning",
+    "legacyfacadeflush/retirement",
+    "CR/LF escaping andexactlimitprobes"
+  ],
+  "focused_tests": 20,
+  "integration_scope": "authoritative /home/zhuhe/code/litchi-spec-gaps; root_primary_snapshot field in preparer manifest describes a separate checkout and was not used for integration"
+}

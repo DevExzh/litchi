@@ -312,6 +312,7 @@ fn reopen_artifact(bytes: &[u8]) -> Result<Database> {
 fn operation_name(kind: ChangeKind, action: ChangeAction) -> String {
     let kind = match kind {
         ChangeKind::Connection => "connection",
+        ChangeKind::Settings => "settings",
         ChangeKind::Query => "query",
         ChangeKind::Table => "table",
         ChangeKind::Column => "column",
@@ -346,6 +347,7 @@ fn valid_operation_name(value: &str) -> bool {
             parts.next(),
             Some(
                 "connection"
+                    | "settings"
                     | "query"
                     | "table"
                     | "column"

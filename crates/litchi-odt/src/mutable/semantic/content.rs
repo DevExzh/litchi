@@ -43,6 +43,16 @@ impl Content<'_> {
         self.document.dynamic_text_fields()
     }
 
+    /// Inspect in-content RDFa declarations and inline `text:meta` values.
+    pub fn in_content_metadata(&self) -> Result<crate::ContentMetadata> {
+        self.document.in_content_metadata()
+    }
+
+    /// Inspect inert XForms model declarations below `office:forms`.
+    pub fn xforms_models(&self) -> Result<Vec<crate::xforms::Model>> {
+        self.document.xforms_models()
+    }
+
     /// Parse the document's semantic sections from the authoritative snapshot.
     pub fn sections(&self) -> Result<Vec<crate::Section>> {
         self.document.sections()
@@ -170,5 +180,70 @@ impl ContentMut<'_> {
     /// Append a validated note to a paragraph selected in document order.
     pub fn insert_note(&mut self, paragraph_index: usize, note: &crate::note::Note) -> Result<()> {
         self.document.insert_note(paragraph_index, note)
+    }
+
+    /// Set or clear RDFa on one paragraph.
+    pub fn set_paragraph_rdfa(
+        &mut self,
+        position: litchi_core::Position,
+        value: &crate::RdfaAttributes,
+    ) -> Result<()> {
+        self.document.set_paragraph_rdfa(position, value)
+    }
+
+    /// Set or clear RDFa on one uniquely named bookmark start.
+    pub fn set_bookmark_rdfa(&mut self, name: &str, value: &crate::RdfaAttributes) -> Result<()> {
+        self.document.set_bookmark_rdfa(name, value)
+    }
+
+    /// Set or clear RDFa on one inline `text:meta` element.
+    pub fn set_text_meta_rdfa(
+        &mut self,
+        position: litchi_core::Position,
+        value: &crate::RdfaAttributes,
+    ) -> Result<()> {
+        self.document.set_text_meta_rdfa(position, value)
+    }
+
+    /// Insert an inline `text:meta` into a paragraph.
+    pub fn insert_text_meta(
+        &mut self,
+        paragraph: litchi_core::Position,
+        value: &crate::TextMeta,
+    ) -> Result<()> {
+        self.document.insert_text_meta(paragraph, value)
+    }
+
+    /// Replace one inline `text:meta` element.
+    pub fn replace_text_meta(
+        &mut self,
+        position: litchi_core::Position,
+        value: &crate::TextMeta,
+    ) -> Result<()> {
+        self.document.replace_text_meta(position, value)
+    }
+
+    /// Remove one inline `text:meta` element.
+    pub fn remove_text_meta(&mut self, position: litchi_core::Position) -> Result<()> {
+        self.document.remove_text_meta(position)
+    }
+
+    /// Insert a typed XForms model at the end of `office:forms`.
+    pub fn insert_xforms_model(&mut self, model: &crate::xforms::Model) -> Result<()> {
+        self.document.insert_xforms_model(model)
+    }
+
+    /// Replace one typed XForms model.
+    pub fn replace_xforms_model(
+        &mut self,
+        position: litchi_core::Position,
+        model: &crate::xforms::Model,
+    ) -> Result<()> {
+        self.document.replace_xforms_model(position, model)
+    }
+
+    /// Remove one typed XForms model.
+    pub fn remove_xforms_model(&mut self, position: litchi_core::Position) -> Result<()> {
+        self.document.remove_xforms_model(position)
     }
 }

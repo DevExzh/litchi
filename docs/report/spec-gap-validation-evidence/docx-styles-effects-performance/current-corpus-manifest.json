@@ -1,0 +1,78 @@
+{
+  "schema": "docx-styles-effects-corpus-v1",
+  "source_commit": "d000d977b99e03f8542c7dae74acf767a91b1feb",
+  "fixtures": [
+    {
+      "name": "Bug54849.docx",
+      "source_path": "test-data/poi/test-data/document/Bug54849.docx",
+      "copy_path": "fixtures/Bug54849.docx",
+      "bytes": 27566,
+      "sha256": "f54182713ea5ce5d77b9593d3d9d24e645460043cec0b40ef59c932385f084d3",
+      "members": [
+        {"name": "word/stylesWithEffects.xml", "bytes": 19883, "sha256": "799de1f7a4ce43f0ca101dc750e8a8bd6e75bcb721f7744d4787dad576cda3b1"},
+        {"name": "word/glossary/stylesWithEffects.xml", "bytes": 16138, "sha256": "d27f6ced340ffa173b3b861b08a4006e76673a411687b4145f5e46dc6dae13eb"}
+      ]
+    },
+    {
+      "name": "ms-office-2010-signed.docx",
+      "source_path": "test-data/poi/test-data/xmldsign/ms-office-2010-signed.docx",
+      "copy_path": "fixtures/ms-office-2010-signed.docx",
+      "bytes": 16142,
+      "sha256": "bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f",
+      "members": [
+        {"name": "word/stylesWithEffects.xml", "bytes": 15710, "sha256": "00c5cda7671bf545a8c97312f14b2b8bc0ee7fa469b36c25ee158c8a5c1c1568"}
+      ]
+    },
+    {
+      "name": "ComplexNumberedLists.docx",
+      "source_path": "test-data/ooxml/docx/ComplexNumberedLists.docx",
+      "copy_path": "fixtures/ComplexNumberedLists.docx",
+      "bytes": 14458,
+      "sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6",
+      "members": [
+        {"name": "word/stylesWithEffects.xml", "bytes": 15955, "sha256": "b4bf5d355a45daf0a1085e73fe27041b5db22bfa23820f18ffaa7f9c8cb70f18"}
+      ]
+    },
+    {
+      "name": "testGlossary.docx",
+      "source_path": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx",
+      "copy_path": "fixtures/testGlossary.docx",
+      "bytes": 25741,
+      "sha256": "8ccd581d8f0ae102b220228ad26b3974821a7ce8e3ff7df4b78f7da8a0d06ed9",
+      "members": [
+        {"name": "word/stylesWithEffects.xml", "bytes": 20117, "sha256": "e72df38e71a351ebaaf7b102e8ab7862b7e5eb04cc86e187f8510746b70d3f54"},
+        {"name": "word/glossary/stylesWithEffects.xml", "bytes": 16244, "sha256": "78112f02ff4e0b94a6c99f8688d86c6fa91d54d6c57c504001453b9c73e3dad1"}
+      ]
+    }
+  ],
+  "lanes": [
+    "native_capture_bug_main", "native_capture_bug_glossary",
+    "native_capture_signed_main", "native_capture_signed_glossary_absent",
+    "native_capture_complex_main", "native_capture_complex_glossary_absent",
+    "native_capture_glossary_main", "native_capture_glossary_glossary",
+    "source_noop_main", "source_noop_glossary", "projection_main", "projection_glossary",
+    "replace_main", "replace_glossary", "remove_main", "remove_glossary",
+    "add_main_absent", "add_glossary_missing", "inverse_replace_main", "inverse_remove_main",
+    "stale_patch_main", "signed_noop", "signed_changed", "independent_main", "independent_glossary",
+    "cap_parts", "cap_total_part_bytes", "cap_total_relationships",
+    "cap_total_relationship_xml_events", "cap_total_relationship_xml_bytes",
+    "cap_relationship_parts", "cap_relationship_graph_nodes",
+    "malformed_duplicate_owner", "malformed_third_orphan", "malformed_external",
+    "malformed_wrong_content_type", "malformed_outbound", "malformed_shared_inbound",
+    "malformed_root", "malformed_namespace", "malformed_opaque_xml",
+    "malformed_unbound_descendant", "malformed_invalid_qname", "malformed_raw_attribute",
+    "malformed_raw_text", "malformed_control", "malformed_invalid_char_ref",
+    "malformed_empty_prefix", "malformed_reserved_xml_uri", "malformed_xml_version",
+    "malformed_xml_events", "malformed_xml_depth"
+  ],
+  "expected_refusals": [
+    "add_glossary_missing", "signed_changed", "stale_patch_main",
+    "malformed_duplicate_owner", "malformed_third_orphan", "malformed_external",
+    "malformed_wrong_content_type", "malformed_outbound", "malformed_shared_inbound",
+    "malformed_root", "malformed_namespace", "malformed_opaque_xml",
+    "malformed_unbound_descendant", "malformed_invalid_qname", "malformed_raw_attribute",
+    "malformed_raw_text", "malformed_control", "malformed_invalid_char_ref",
+    "malformed_empty_prefix", "malformed_reserved_xml_uri", "malformed_xml_version",
+    "malformed_xml_events", "malformed_xml_depth"
+  ]
+}

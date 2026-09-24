@@ -91,7 +91,21 @@ impl WorkbookInfo {
 
     fn parse(content: &[u8]) -> Result<Self> {
         let processed = litchi_ooxml_common::mce::process_ooxml(content)?;
-        let content = std::str::from_utf8(processed.as_ref())
+        Self::parse_processed(processed.as_ref())
+    }
+
+    fn parse_with_mce(
+        content: &[u8],
+        capabilities: &litchi_ooxml_common::mce::Capabilities,
+        limits: &litchi_ooxml_common::mce::Limits,
+    ) -> Result<Self> {
+        let processed =
+            litchi_ooxml_common::mce::process_markup_compatibility(content, capabilities, limits)?;
+        Self::parse_processed(processed.xml.as_ref())
+    }
+
+    fn parse_processed(content: &[u8]) -> Result<Self> {
+        let content = std::str::from_utf8(content)
             .map_err(|error| invalid(format!("workbook XML is not UTF-8: {error}")))?;
         let mut reader = NsReader::from_reader(content.as_bytes());
         let mut info = Self::new();
@@ -527,6 +541,23 @@ pub fn parse_catalog(content: &[u8]) -> Result<Catalog> {
     })
 }
 
+/// Parse the workbook catalog with an explicit markup-compatibility profile
+/// and bounded preprocessing policy.
+pub fn parse_catalog_with_mce(
+    content: &[u8],
+    capabilities: &litchi_ooxml_common::mce::Capabilities,
+    limits: &litchi_ooxml_common::mce::Limits,
+) -> Result<Catalog> {
+    WorkbookInfo::parse_with_mce(content, capabilities, limits).map(|info| Catalog {
+        sheets: info.sheets,
+        active_sheet_index: info.active_tab.unwrap_or(0),
+        uses_1904_date_system: info.uses_1904_date_system,
+        defined_names: info.defined_names,
+        pivot_caches: info.pivot_caches,
+        external_reference_ids: info.external_reference_ids,
+    })
+}
+
 fn parse_workbook_details(content: &str) -> Result<Catalog> {
     parse_catalog(content.as_bytes())
 }
@@ -633,7 +664,20 @@ fn optional_u32(
 ) -> Result<Option<u32>> {
     unqualified_attribute_value(element, name, decoder)?
         .map(|value| {
-            value
+            let lexical = value.trim_matches([' ', '\t', '\r', '\n']);
+            let (negative, digits) = match lexical.as_bytes().first().copied() {
+                Some(b'+') => (false, &lexical.as_bytes()[1..]),
+                Some(b'-') => (true, &lexical.as_bytes()[1..]),
+                _ => (false, lexical.as_bytes()),
+            };
+            if digits.is_empty()
+                || !digits.iter().all(u8::is_ascii_digit)
+                || (negative && digits.iter().any(|digit| *digit != b'0'))
+            {
+                return Err(invalid(format!("invalid {description} value '{value}'")));
+            }
+            std::str::from_utf8(digits)
+                .expect("unsigned workbook catalog digits are ASCII")
                 .parse::<u32>()
                 .map_err(|_source| invalid(format!("invalid {description} value '{value}'")))
         })

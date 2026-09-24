@@ -5,6 +5,39 @@ use super::{
 };
 
 impl Parser<'_> {
+    /// Whether any visible or structural document-body content has already
+    /// been accepted.  Body content is not limited to decoded characters:
+    /// fields, drawings, objects, bookmarks, notes, and break events all
+    /// occupy source order even when their text position is still zero.
+    fn root_body_started(&self) -> bool {
+        self.body_text_len != 0
+            || self.section_note_options_closed
+            || !self.body_story_events.is_empty()
+            || !self.body_boundaries.is_empty()
+            || self.body_paragraph_breaks != 0
+            || self.current_table.is_some()
+            || self.current_row.is_some()
+            || !self.tables.is_empty()
+            || !self.pictures.is_empty()
+            || !self.picture_compatibility_records.is_empty()
+            || !self.fields.is_empty()
+            || !self.form_fields.is_empty()
+            || !self.objects.is_empty()
+            || !self.shapes.is_empty()
+            || !self.shape_groups.is_empty()
+            || !self.annotations.is_empty()
+            || !self.notes.is_empty()
+            || !self.bookmarks.bookmarks().is_empty()
+            || !self.navigation_entries.is_empty()
+            || !self.generated_list_markers.is_empty()
+            || !self.legacy_text_boxes.is_empty()
+            || !self.legacy_drawings.is_empty()
+            || self
+                .sections
+                .iter()
+                .any(|section| !section.headers_footers.is_empty())
+    }
+
     /// Dispatch the destination-specific handling that a group may open with.
     ///
     /// Returns `true` when the group was fully consumed by a specialised
@@ -127,9 +160,27 @@ impl Parser<'_> {
                     self.states.pop();
                     return Ok(true);
                 },
-                Token::Control(ControlWord::XmlAttributeName | ControlWord::XmlAttributeValue) => {
+                Token::Control(
+                    ControlWord::XmlAttributeGroup
+                    | ControlWord::XmlAttribute(_)
+                    | ControlWord::XmlAttributeNamespace(_)
+                    | ControlWord::XmlAttributeName
+                    | ControlWord::XmlAttributeValue
+                    | ControlWord::FactoidName,
+                ) => {
                     return Err(RtfError::MalformedDocument(
-                        "RTF custom XML attribute destinations must be starred".to_string(),
+                        "RTF SmartTag/XML attribute destinations must be grouped and starred"
+                            .to_string(),
+                    ));
+                },
+                Token::Control(
+                    ControlWord::MoveFromStart
+                    | ControlWord::MoveFromEnd
+                    | ControlWord::MoveToStart
+                    | ControlWord::MoveToEnd,
+                ) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF move-bookmark destinations must be starred".to_string(),
                     ));
                 },
                 Token::Control(
@@ -168,11 +219,62 @@ impl Parser<'_> {
                 Token::Control(ControlWord::IgnorableDestination) => {
                     if matches!(
                         self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::PasswordHash))
+                    ) {
+                        if self.states.len() != 3
+                            || self.root_body_started()
+                            || self.current_table.is_some()
+                            || self.current_row.is_some()
+                            || !self.tables.is_empty()
+                            || self
+                                .current_state()
+                                .is_ok_and(|state| state.in_table || state.table_nesting_level != 0)
+                        {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF passwordhash destination must occur in the root header"
+                                    .to_string(),
+                            ));
+                        }
+                        self.parse_info_password_hash()?;
+                        self.states.pop();
+                        return Ok(true);
+                    }
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
                         Some(Token::Control(
                             ControlWord::BookmarkStart | ControlWord::BookmarkEnd
                         ))
                     ) {
                         self.parse_bookmark_destination()?;
+                        self.states.pop();
+                        return Ok(true);
+                    }
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::XmlOpen))
+                    ) {
+                        self.parse_smart_tag_open_destination()?;
+                        self.states.pop();
+                        return Ok(true);
+                    }
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::XmlClose))
+                    ) {
+                        self.parse_smart_tag_close_destination()?;
+                        self.states.pop();
+                        return Ok(true);
+                    }
+                    if matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(
+                            ControlWord::MoveFromStart
+                                | ControlWord::MoveFromEnd
+                                | ControlWord::MoveToStart
+                                | ControlWord::MoveToEnd,
+                        ))
+                    ) {
+                        self.parse_move_bookmark_destination()?;
                         self.states.pop();
                         return Ok(true);
                     }
@@ -183,6 +285,17 @@ impl Parser<'_> {
                             self.parse_custom_xml_attribute_destination()?;
                             self.states.pop();
                             return Ok(true);
+                        },
+                        Some(Token::Control(
+                            ControlWord::XmlAttributeGroup
+                            | ControlWord::XmlAttribute(_)
+                            | ControlWord::XmlAttributeNamespace(_)
+                            | ControlWord::FactoidName,
+                        )) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF SmartTag metadata is only valid inside a starred xmlopen"
+                                    .to_string(),
+                            ));
                         },
                         Some(Token::Control(
                             ControlWord::ProtectionRangeStart | ControlWord::ProtectionRangeEnd,

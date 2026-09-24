@@ -56,6 +56,12 @@ pub struct WorkbookWriter {
     pub(super) external_links: Vec<crate::external_link::Link>,
     pub(super) pivot_caches: Vec<AuthoredPivotCache>,
     pub(super) xml_maps: Option<crate::xml_maps::XmlMapInfo>,
+    pub(super) data_model: Option<crate::data_model::Model>,
+    /// Optional typed DrawingML theme; `None` uses the writer's Office
+    /// template as an authoring policy.
+    pub(super) theme: Option<crate::theme::Theme>,
+    /// Optional DrawingML 2012 applied-theme family metadata.
+    pub(super) theme_family: Option<crate::theme::Family>,
     #[cfg(feature = "vba-inspection")]
     pub(super) vba: Option<Arc<Vec<u8>>>,
 }
@@ -71,23 +77,6 @@ pub(super) struct AuthoredPivotCache {
     pub(super) version_created: u8,
     pub(super) bytes: Vec<u8>,
 }
-
-/// Minimal Worksheet Binary Index payload for an empty worksheet.
-///
-/// This binary blob was captured from an Excel-generated empty XLSB file
-/// (`excel_empty.xlsb`) and represents a valid Worksheet Binary Index part
-/// for a simple sheet without additional features. According to
-/// [MS-XLSB] 2.1.7.63 (Worksheet Binary Index), a worksheet MUST have a
-/// corresponding binary index part.
-///
-/// TODO: If we start emitting advanced worksheet features that rely on the
-/// binary index (for example, very large sheets or complex structures),
-/// this payload should be generated from the official ABNF grammar instead
-/// of using this minimal fixed template.
-pub(super) const XLSB_WORKSHEET_BINARY_INDEX_EMPTY: [u8; 29] = [
-    0x2a, 0x18, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x95, 0x02, 0x00,
-];
 
 impl WorkbookWriter {
     /// Create a new XLSB workbook writer
@@ -105,6 +94,9 @@ impl WorkbookWriter {
             external_links: Vec::new(),
             pivot_caches: Vec::new(),
             xml_maps: None,
+            data_model: None,
+            theme: None,
+            theme_family: None,
             #[cfg(feature = "vba-inspection")]
             vba: None,
         }
@@ -117,6 +109,22 @@ impl WorkbookWriter {
     /// * `is_1904` - `true` for 1904 date system (Mac), `false` for 1900 (Windows, default)
     pub fn set_date_system(&mut self, is_1904: bool) {
         self.is_1904 = is_1904;
+    }
+
+    /// Set the typed DrawingML Theme used by the generated workbook.
+    ///
+    /// The Theme is validated and encoded only after the complete typed model
+    /// is supplied; failed validation leaves the writer unchanged.
+    pub fn set_theme(&mut self, theme: crate::theme::Theme) -> Result<&mut Self> {
+        litchi_drawingml::theme::codec::encode_part(&theme.name, &theme.colors, &theme.fonts)?;
+        self.theme = Some(theme);
+        Ok(self)
+    }
+
+    /// Set the optional DrawingML 2012 applied-theme family metadata.
+    pub fn set_theme_family(&mut self, family: crate::theme::Family) -> Result<&mut Self> {
+        self.theme_family = Some(family);
+        Ok(self)
     }
 
     /// Validated workbook formula calculation policy written to `BrtCalcProp`.
@@ -231,6 +239,12 @@ impl WorkbookWriter {
         connections: crate::package::connections::Connections,
     ) -> Result<()> {
         crate::package::connections::write::validate_connections(&connections)?;
+        if let Some(model) = self.data_model.as_ref() {
+            crate::data_model::validate_definition_connections(
+                &model.definition,
+                Some(&connections),
+            )?;
+        }
         self.connections = Some(connections);
         Ok(())
     }
@@ -292,6 +306,33 @@ impl WorkbookWriter {
     /// Compatibility alias for [`Self::clear_xml_maps`].
     pub fn clear_xml_map_info(&mut self) -> Option<crate::xml_maps::XmlMapInfo> {
         self.clear_xml_maps()
+    }
+
+    /// Attach a complete inert XLSB Data Model pair for a new workbook.
+    ///
+    /// The workbook records are validated and emitted by the BIFF12 writer;
+    /// the model part remains opaque and is never refreshed or evaluated.
+    pub fn set_data_model(&mut self, value: crate::data_model::Model) -> Result<&mut Self> {
+        crate::data_model::serialize_workbook_records(&value.definition)?;
+        crate::data_model::validate_model_payload_and_groupings(&value)?;
+        if let Some(connections) = self.connections.as_ref() {
+            crate::data_model::validate_definition_connections(
+                &value.definition,
+                Some(connections),
+            )?;
+        }
+        self.data_model = Some(value);
+        Ok(self)
+    }
+
+    /// Borrow the Data Model scheduled for authoring.
+    pub fn data_model(&self) -> Option<&crate::data_model::Model> {
+        self.data_model.as_ref()
+    }
+
+    /// Remove and return the Data Model scheduled for authoring.
+    pub fn clear_data_model(&mut self) -> Option<crate::data_model::Model> {
+        self.data_model.take()
     }
 
     /// Attach a PivotCache definition (MS-XLSB 2.1.7.38) to the workbook.

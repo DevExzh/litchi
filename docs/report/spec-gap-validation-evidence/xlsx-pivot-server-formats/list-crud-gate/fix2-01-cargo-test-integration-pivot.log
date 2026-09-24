@@ -1,0 +1,55 @@
+   Compiling litchi-xlsx v0.0.1 (/var/tmp/xlsx-pivot-server-formats-gate.6rNu9B/worktree/crates/litchi-xlsx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.98s
+     Running tests/pivot_server_formats.rs (/var/tmp/xlsx-pivot-server-formats-gate.6rNu9B/cargo-target/debug/deps/pivot_server_formats-48ebe4e39f9c09af)
+
+running 47 tests
+test no_invalid_cache_field_items_fixture_is_synthesized ... ok
+test caller_limits_reject_before_server_format_collection_allocation ... ok
+test optional_x14_pivot_cache_id_may_be_absent_when_its_owner_is_present ... ok
+test server_format_children_use_the_extension_namespace_and_allow_legal_spacing ... ok
+test exact_no_op_and_inverse_do_not_regenerate_the_owner ... ok
+test retained_relationship_xml_part_limit_has_exact_and_one_under_mutation_bounds ... ok
+test removed_signature_graph_still_requires_explicit_edit_policy ... ok
+test duplicate_known_payloads_and_mce_branches_are_retained_as_source_diagnostics ... ok
+test strict_root_and_alternate_prefixes_keep_typed_values ... ok
+test greater_than_65535_server_format_text_is_allowed_within_caller_limits ... ok
+test explicit_keep_set_clear_distinguishes_absent_attributes ... ok
+test equal_typed_reorder_retains_each_lexical_leaf_source ... ok
+test unknown_ext_uri_with_the_same_qname_is_not_a_server_format_owner ... ok
+test insert_remove_is_an_exact_noop_but_remove_insert_is_a_source_change ... ok
+test duplicate_known_uri_unknown_uri_and_wrong_qname_are_rejected_or_inert ... ok
+test fixture_closes_exact_workbook_reference_cache_and_nonworksheet_geometry ... ok
+test changed_writes_escape_decoded_controls_and_literal_xstring_markers ... ok
+test numeric_xml_controls_are_rejected_in_typed_and_opaque_attributes ... ok
+test changed_scalar_preserves_unchanged_entity_lexical_attributes ... ok
+test structural_list_cardinality_and_invalid_operations_are_failure_atomic ... ok
+test retained_relationship_archive_member_bound_uses_public_source_capture ... ok
+test typed_reads_are_selector_first_and_close_the_logical_cache_identity ... ok
+test strict_and_transitional_roots_keep_the_same_extension_qnames_and_relationship_closure ... ok
+test diagnostic_index_requires_exact_pivot_row_c_x_owner_chain ... ok
+test mce_selected_owner_is_readable_but_scalar_publication_is_refused ... ok
+test unpaired_surrogate_is_rejected_but_escaped_control_and_literal_are_retained ... ok
+test opaque_namespaced_wrapped_and_mce_index_references_refuse_structural_edits ... ok
+test workbook_facade_resolves_server_formats_by_semantic_selector ... ok
+test structural_list_aggregate_cap_is_checked_before_publication ... ok
+test proven_index_references_are_remapped_and_invalid_removals_are_refused ... ok
+test exact_source_aggregate_cap_admits_equal_size_edit_but_rejects_growth ... ok
+test u32_whitespace_and_strict_transitional_relationship_ids_are_accepted ... ok
+test ordinary_patch_rejects_stale_workbook_root_namespace_and_mce_context ... ok
+test stale_signed_and_limited_publications_refuse_before_mutation ... ok
+test retained_relationship_limits_account_for_mutated_root_and_unknown_edges ... ok
+test unchanged_reference_indices_retain_whitespace_and_entity_lexical_spelling ... ok
+test core_namespace_child_and_nested_server_format_content_are_rejected ... ok
+test count_child_and_pivot_value_index_bounds_are_checked_before_typed_use ... ok
+test retained_xml_event_depth_and_attribute_limits_are_honored_by_owner_scan ... ok
+test caller_encoded_attribute_limit_admits_exact_output_and_rejects_one_under ... ok
+test workbook_facade_scalar_edit_commit_save_reopen_and_inverse ... ok
+test workbook_facade_patch_is_stale_checked_and_composes_with_ordinary_edit ... ok
+test scalar_set_replace_clear_preserves_children_count_and_opaque_siblings ... ok
+test structural_list_crud_preserves_order_count_comments_and_prefix_in_both_dialects ... ok
+test ordinary_workbook_facade_supports_structural_list_edits_and_exact_inverse ... ok
+test nonworksheet_eligibility_and_cache_closure_are_enforced ... ok
+test ordinary_workbook_patch_apply_refuses_encrypted_provenance ... ok
+
+test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+

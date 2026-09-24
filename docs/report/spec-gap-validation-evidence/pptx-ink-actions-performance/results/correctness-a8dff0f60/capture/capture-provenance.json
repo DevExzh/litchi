@@ -1,0 +1,54 @@
+{
+  "binary": "/var/tmp/pptx-ink-actions-correctness-a8dff0f60.l7raBv/capture-target-parent/target/release/pptx-ink-actions-performance",
+  "binary_sha256": "a47055e7e28e6a2d96b7fb89ba6a7a5e6c51c9a8c842c54ce2461bd633a8d123",
+  "build_exit_code": 0,
+  "build_succeeded": true,
+  "capture_head": "a8dff0f606ea671ad2d648c80e6ec1a0d3a7ba80",
+  "cargo_lock_sha256": "3c773b848134c52df596034ffbbe8688dde9924fb741dee8bc8bce0eaa772f2e",
+  "cargo_version_exit_code": 0,
+  "committed_inputs_exit_code": 0,
+  "expected_capture_head": "a8dff0f606ea671ad2d648c80e6ec1a0d3a7ba80",
+  "failures": [],
+  "head_check": {
+    "actual": "a8dff0f606ea671ad2d648c80e6ec1a0d3a7ba80",
+    "verified_expected": "a8dff0f606ea671ad2d648c80e6ec1a0d3a7ba80"
+  },
+  "helper": {
+    "git_blob": "ad7e43e8c2c362c1b9e1938806f59b9fb3ab1dea",
+    "path": "crates/litchi-pptx/tests/pptx_ink_actions.rs",
+    "sha256": "bec6baafcf735d778216fb54fe6299312707e912dcaed5f89de988f7112bb58e"
+  },
+  "host_probe_exit_code": 0,
+  "lanes_executed": 42,
+  "lanes_requested": 42,
+  "matrix_exit_code": 0,
+  "metadata_after_exit_code": 0,
+  "metadata_after_sha256": "a47fd72c93e5f8955aeb92733ccf77ad0f31fcfbdf80f92b567fcfba92c5ec33",
+  "metadata_before_exit_code": 0,
+  "metadata_before_sha256": "a47fd72c93e5f8955aeb92733ccf77ad0f31fcfbdf80f92b567fcfba92c5ec33",
+  "preflight_ok": true,
+  "production_source_baseline_commit": "2a2ffa1cae4e6b7070082768ce84483e5d411dc8",
+  "rustc_version_exit_code": 0,
+  "rustfmt_version_exit_code": 0,
+  "samples": 1,
+  "scenario_gate_order": [
+    "host-probe",
+    "matrix-correctness",
+    "lanes"
+  ],
+  "schema": "pptx-ink-actions-correctness-capture-provenance-v1",
+  "semantic_owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+  "semantic_owner_design": {
+    "git_blob": "597400950b1027c47cd6e4cbbedd23915bc0980e",
+    "path": "docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md",
+    "sha256": "30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d"
+  },
+  "source_manifest_after_exit_code": 0,
+  "source_manifest_after_sha256": "e1777b98800a21afb090dd713f5d5a9c7cdc15e2d6bc720f75b99ad075d03e6c",
+  "source_manifest_before_exit_code": 0,
+  "source_manifest_before_sha256": "e1777b98800a21afb090dd713f5d5a9c7cdc15e2d6bc720f75b99ad075d03e6c",
+  "target": "/var/tmp/pptx-ink-actions-correctness-a8dff0f60.l7raBv/capture-target-parent/target",
+  "timed_performance_claim": false,
+  "usr_bin_time": false,
+  "warmup": 1
+}

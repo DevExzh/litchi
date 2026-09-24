@@ -1,0 +1,13 @@
+{
+  "archive": "scalar-cell-pairs-03.tar.gz",
+  "sha256": "6fc53857a5ae3ca3c1daa02e500b49570fec7b2acaf66adae8ceb36c80e15354",
+  "file_count": 1138,
+  "status": "complete",
+  "child_count": 162,
+  "pair_count": 81,
+  "deterministic_mismatch_pairs": 0,
+  "binaries_unchanged": true,
+  "runner_unchanged": true,
+  "harness_unchanged": true,
+  "source_receipts_unchanged": true
+}

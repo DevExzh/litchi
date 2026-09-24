@@ -1,0 +1,121 @@
+source=v5 measured candidate (portable replay uses baseline-source.json and baseline-source.patch)
+harness=docs/report/spec-gap-validation-evidence/xls-user-names/performance/harness/src/main.rs
+profile=release (lto=true, panic=abort), allocator=instrumented System
+runs=5 processes; operation iterations=300,300,60 for 1,16,255 users
+command=see performance/README.md for detached-worktree reverse-patch replay with the locked harness
+binary=/var/tmp/litchi-xls-profiler-baseline-target/release/litchi-xls-profiler-baseline (hash in harness-and-binary-sha256.txt)
+
+RUN 1
+build=release
+CASE users=1 name_len=8 bytes=580 runs=300
+  parse_slice   us/op=      0.89 alloc/op=    7.00 alloc_bytes/op=   10188.0 dealloc/op=    7.00 dealloc_bytes/op=   10188.0 peak_live_delta=    9600.0
+  parse_shared  us/op=      0.85 alloc/op=    5.00 alloc_bytes/op=    9008.0 dealloc/op=    5.00 dealloc_bytes/op=    9008.0 peak_live_delta=    9000.0
+  edit_create   us/op=      0.14 alloc/op=    3.00 alloc_bytes/op=     224.0 dealloc/op=    3.00 dealloc_bytes/op=     224.0 peak_live_delta=     224.0
+  noop_commit   us/op=      0.23 alloc/op=    3.00 alloc_bytes/op=     224.0 dealloc/op=    3.00 dealloc_bytes/op=     224.0 peak_live_delta=     224.0
+  rename_commit us/op=      1.70 alloc/op=   22.00 alloc_bytes/op=   19878.0 dealloc/op=   22.00 dealloc_bytes/op=   19878.0 peak_live_delta=   17934.0
+
+CASE users=16 name_len=16 bytes=1368 runs=300
+  parse_slice   us/op=      2.99 alloc/op=   37.00 alloc_bytes/op=   13096.0 dealloc/op=   37.00 dealloc_bytes/op=   13096.0 peak_live_delta=   11472.0
+  parse_shared  us/op=      2.90 alloc/op=   35.00 alloc_bytes/op=   10344.0 dealloc/op=   35.00 dealloc_bytes/op=   10344.0 peak_live_delta=   10088.0
+  edit_create   us/op=      0.69 alloc/op=   18.00 alloc_bytes/op=    1792.0 dealloc/op=   18.00 dealloc_bytes/op=    1792.0 peak_live_delta=    1792.0
+  noop_commit   us/op=      0.76 alloc/op=   18.00 alloc_bytes/op=    1792.0 dealloc/op=   18.00 dealloc_bytes/op=    1792.0 peak_live_delta=    1792.0
+  rename_commit us/op=      6.00 alloc/op=   97.00 alloc_bytes/op=   25666.0 dealloc/op=   97.00 dealloc_bytes/op=   25666.0 peak_live_delta=   20878.0
+
+CASE users=255 name_len=54 bytes=23486 runs=60
+  parse_slice   us/op=     61.11 alloc/op=  515.00 alloc_bytes/op=   97746.0 dealloc/op=  515.00 dealloc_bytes/op=   97746.0 peak_live_delta=   60490.0
+  parse_shared  us/op=     60.65 alloc/op=  513.00 alloc_bytes/op=   50756.0 dealloc/op=  513.00 dealloc_bytes/op=   50756.0 peak_live_delta=   36986.0
+  edit_create   us/op=     11.28 alloc/op=  257.00 alloc_bytes/op=   36338.0 dealloc/op=  257.00 dealloc_bytes/op=   36338.0 peak_live_delta=   36338.0
+  noop_commit   us/op=     11.25 alloc/op=  257.00 alloc_bytes/op=   36338.0 dealloc/op=  257.00 dealloc_bytes/op=   36338.0 peak_live_delta=   36338.0
+  rename_commit us/op=    113.15 alloc/op= 1292.00 alloc_bytes/op=  185120.0 dealloc/op= 1292.00 dealloc_bytes/op=  185120.0 peak_live_delta=   96678.0
+
+RUN 2
+build=release
+CASE users=1 name_len=8 bytes=580 runs=300
+  parse_slice   us/op=      0.85 alloc/op=    7.00 alloc_bytes/op=   10188.0 dealloc/op=    7.00 dealloc_bytes/op=   10188.0 peak_live_delta=    9600.0
+  parse_shared  us/op=      0.77 alloc/op=    5.00 alloc_bytes/op=    9008.0 dealloc/op=    5.00 dealloc_bytes/op=    9008.0 peak_live_delta=    9000.0
+  edit_create   us/op=      0.15 alloc/op=    3.00 alloc_bytes/op=     224.0 dealloc/op=    3.00 dealloc_bytes/op=     224.0 peak_live_delta=     224.0
+  noop_commit   us/op=      0.21 alloc/op=    3.00 alloc_bytes/op=     224.0 dealloc/op=    3.00 dealloc_bytes/op=     224.0 peak_live_delta=     224.0
+  rename_commit us/op=      1.73 alloc/op=   22.00 alloc_bytes/op=   19878.0 dealloc/op=   22.00 dealloc_bytes/op=   19878.0 peak_live_delta=   17934.0
+
+CASE users=16 name_len=16 bytes=1368 runs=300
+  parse_slice   us/op=      3.02 alloc/op=   37.00 alloc_bytes/op=   13096.0 dealloc/op=   37.00 dealloc_bytes/op=   13096.0 peak_live_delta=   11472.0
+  parse_shared  us/op=      2.89 alloc/op=   35.00 alloc_bytes/op=   10344.0 dealloc/op=   35.00 dealloc_bytes/op=   10344.0 peak_live_delta=   10088.0
+  edit_create   us/op=      0.67 alloc/op=   18.00 alloc_bytes/op=    1792.0 dealloc/op=   18.00 dealloc_bytes/op=    1792.0 peak_live_delta=    1792.0
+  noop_commit   us/op=      0.73 alloc/op=   18.00 alloc_bytes/op=    1792.0 dealloc/op=   18.00 dealloc_bytes/op=    1792.0 peak_live_delta=    1792.0
+  rename_commit us/op=      6.01 alloc/op=   97.00 alloc_bytes/op=   25666.0 dealloc/op=   97.00 dealloc_bytes/op=   25666.0 peak_live_delta=   20878.0
+
+CASE users=255 name_len=54 bytes=23486 runs=60
+  parse_slice   us/op=     61.42 alloc/op=  515.00 alloc_bytes/op=   97746.0 dealloc/op=  515.00 dealloc_bytes/op=   97746.0 peak_live_delta=   60490.0
+  parse_shared  us/op=     60.62 alloc/op=  513.00 alloc_bytes/op=   50756.0 dealloc/op=  513.00 dealloc_bytes/op=   50756.0 peak_live_delta=   36986.0
+  edit_create   us/op=     11.26 alloc/op=  257.00 alloc_bytes/op=   36338.0 dealloc/op=  257.00 dealloc_bytes/op=   36338.0 peak_live_delta=   36338.0
+  noop_commit   us/op=     11.42 alloc/op=  257.00 alloc_bytes/op=   36338.0 dealloc/op=  257.00 dealloc_bytes/op=   36338.0 peak_live_delta=   36338.0
+  rename_commit us/op=    113.13 alloc/op= 1292.00 alloc_bytes/op=  185120.0 dealloc/op= 1292.00 dealloc_bytes/op=  185120.0 peak_live_delta=   96678.0
+
+RUN 3
+build=release
+CASE users=1 name_len=8 bytes=580 runs=300
+  parse_slice   us/op=      0.85 alloc/op=    7.00 alloc_bytes/op=   10188.0 dealloc/op=    7.00 dealloc_bytes/op=   10188.0 peak_live_delta=    9600.0
+  parse_shared  us/op=      0.84 alloc/op=    5.00 alloc_bytes/op=    9008.0 dealloc/op=    5.00 dealloc_bytes/op=    9008.0 peak_live_delta=    9000.0
+  edit_create   us/op=      0.14 alloc/op=    3.00 alloc_bytes/op=     224.0 dealloc/op=    3.00 dealloc_bytes/op=     224.0 peak_live_delta=     224.0
+  noop_commit   us/op=      0.21 alloc/op=    3.00 alloc_bytes/op=     224.0 dealloc/op=    3.00 dealloc_bytes/op=     224.0 peak_live_delta=     224.0
+  rename_commit us/op=      1.69 alloc/op=   22.00 alloc_bytes/op=   19878.0 dealloc/op=   22.00 dealloc_bytes/op=   19878.0 peak_live_delta=   17934.0
+
+CASE users=16 name_len=16 bytes=1368 runs=300
+  parse_slice   us/op=      3.02 alloc/op=   37.00 alloc_bytes/op=   13096.0 dealloc/op=   37.00 dealloc_bytes/op=   13096.0 peak_live_delta=   11472.0
+  parse_shared  us/op=      2.96 alloc/op=   35.00 alloc_bytes/op=   10344.0 dealloc/op=   35.00 dealloc_bytes/op=   10344.0 peak_live_delta=   10088.0
+  edit_create   us/op=      0.67 alloc/op=   18.00 alloc_bytes/op=    1792.0 dealloc/op=   18.00 dealloc_bytes/op=    1792.0 peak_live_delta=    1792.0
+  noop_commit   us/op=      0.75 alloc/op=   18.00 alloc_bytes/op=    1792.0 dealloc/op=   18.00 dealloc_bytes/op=    1792.0 peak_live_delta=    1792.0
+  rename_commit us/op=      5.97 alloc/op=   97.00 alloc_bytes/op=   25666.0 dealloc/op=   97.00 dealloc_bytes/op=   25666.0 peak_live_delta=   20878.0
+
+CASE users=255 name_len=54 bytes=23486 runs=60
+  parse_slice   us/op=     61.01 alloc/op=  515.00 alloc_bytes/op=   97746.0 dealloc/op=  515.00 dealloc_bytes/op=   97746.0 peak_live_delta=   60490.0
+  parse_shared  us/op=     62.26 alloc/op=  513.00 alloc_bytes/op=   50756.0 dealloc/op=  513.00 dealloc_bytes/op=   50756.0 peak_live_delta=   36986.0
+  edit_create   us/op=     11.24 alloc/op=  257.00 alloc_bytes/op=   36338.0 dealloc/op=  257.00 dealloc_bytes/op=   36338.0 peak_live_delta=   36338.0
+  noop_commit   us/op=     11.26 alloc/op=  257.00 alloc_bytes/op=   36338.0 dealloc/op=  257.00 dealloc_bytes/op=   36338.0 peak_live_delta=   36338.0
+  rename_commit us/op=    112.34 alloc/op= 1292.00 alloc_bytes/op=  185120.0 dealloc/op= 1292.00 dealloc_bytes/op=  185120.0 peak_live_delta=   96678.0
+
+RUN 4
+build=release
+CASE users=1 name_len=8 bytes=580 runs=300
+  parse_slice   us/op=      0.85 alloc/op=    7.00 alloc_bytes/op=   10188.0 dealloc/op=    7.00 dealloc_bytes/op=   10188.0 peak_live_delta=    9600.0
+  parse_shared  us/op=      0.77 alloc/op=    5.00 alloc_bytes/op=    9008.0 dealloc/op=    5.00 dealloc_bytes/op=    9008.0 peak_live_delta=    9000.0
+  edit_create   us/op=      0.14 alloc/op=    3.00 alloc_bytes/op=     224.0 dealloc/op=    3.00 dealloc_bytes/op=     224.0 peak_live_delta=     224.0
+  noop_commit   us/op=      0.22 alloc/op=    3.00 alloc_bytes/op=     224.0 dealloc/op=    3.00 dealloc_bytes/op=     224.0 peak_live_delta=     224.0
+  rename_commit us/op=      1.74 alloc/op=   22.00 alloc_bytes/op=   19878.0 dealloc/op=   22.00 dealloc_bytes/op=   19878.0 peak_live_delta=   17934.0
+
+CASE users=16 name_len=16 bytes=1368 runs=300
+  parse_slice   us/op=      3.01 alloc/op=   37.00 alloc_bytes/op=   13096.0 dealloc/op=   37.00 dealloc_bytes/op=   13096.0 peak_live_delta=   11472.0
+  parse_shared  us/op=      2.89 alloc/op=   35.00 alloc_bytes/op=   10344.0 dealloc/op=   35.00 dealloc_bytes/op=   10344.0 peak_live_delta=   10088.0
+  edit_create   us/op=      0.67 alloc/op=   18.00 alloc_bytes/op=    1792.0 dealloc/op=   18.00 dealloc_bytes/op=    1792.0 peak_live_delta=    1792.0
+  noop_commit   us/op=      0.73 alloc/op=   18.00 alloc_bytes/op=    1792.0 dealloc/op=   18.00 dealloc_bytes/op=    1792.0 peak_live_delta=    1792.0
+  rename_commit us/op=      5.99 alloc/op=   97.00 alloc_bytes/op=   25666.0 dealloc/op=   97.00 dealloc_bytes/op=   25666.0 peak_live_delta=   20878.0
+
+CASE users=255 name_len=54 bytes=23486 runs=60
+  parse_slice   us/op=     61.11 alloc/op=  515.00 alloc_bytes/op=   97746.0 dealloc/op=  515.00 dealloc_bytes/op=   97746.0 peak_live_delta=   60490.0
+  parse_shared  us/op=     60.44 alloc/op=  513.00 alloc_bytes/op=   50756.0 dealloc/op=  513.00 dealloc_bytes/op=   50756.0 peak_live_delta=   36986.0
+  edit_create   us/op=     11.24 alloc/op=  257.00 alloc_bytes/op=   36338.0 dealloc/op=  257.00 dealloc_bytes/op=   36338.0 peak_live_delta=   36338.0
+  noop_commit   us/op=     11.36 alloc/op=  257.00 alloc_bytes/op=   36338.0 dealloc/op=  257.00 dealloc_bytes/op=   36338.0 peak_live_delta=   36338.0
+  rename_commit us/op=    112.05 alloc/op= 1292.00 alloc_bytes/op=  185120.0 dealloc/op= 1292.00 dealloc_bytes/op=  185120.0 peak_live_delta=   96678.0
+
+RUN 5
+build=release
+CASE users=1 name_len=8 bytes=580 runs=300
+  parse_slice   us/op=      0.85 alloc/op=    7.00 alloc_bytes/op=   10188.0 dealloc/op=    7.00 dealloc_bytes/op=   10188.0 peak_live_delta=    9600.0
+  parse_shared  us/op=      0.81 alloc/op=    5.00 alloc_bytes/op=    9008.0 dealloc/op=    5.00 dealloc_bytes/op=    9008.0 peak_live_delta=    9000.0
+  edit_create   us/op=      0.15 alloc/op=    3.00 alloc_bytes/op=     224.0 dealloc/op=    3.00 dealloc_bytes/op=     224.0 peak_live_delta=     224.0
+  noop_commit   us/op=      0.21 alloc/op=    3.00 alloc_bytes/op=     224.0 dealloc/op=    3.00 dealloc_bytes/op=     224.0 peak_live_delta=     224.0
+  rename_commit us/op=      1.71 alloc/op=   22.00 alloc_bytes/op=   19878.0 dealloc/op=   22.00 dealloc_bytes/op=   19878.0 peak_live_delta=   17934.0
+
+CASE users=16 name_len=16 bytes=1368 runs=300
+  parse_slice   us/op=      3.02 alloc/op=   37.00 alloc_bytes/op=   13096.0 dealloc/op=   37.00 dealloc_bytes/op=   13096.0 peak_live_delta=   11472.0
+  parse_shared  us/op=      2.88 alloc/op=   35.00 alloc_bytes/op=   10344.0 dealloc/op=   35.00 dealloc_bytes/op=   10344.0 peak_live_delta=   10088.0
+  edit_create   us/op=      0.67 alloc/op=   18.00 alloc_bytes/op=    1792.0 dealloc/op=   18.00 dealloc_bytes/op=    1792.0 peak_live_delta=    1792.0
+  noop_commit   us/op=      0.75 alloc/op=   18.00 alloc_bytes/op=    1792.0 dealloc/op=   18.00 dealloc_bytes/op=    1792.0 peak_live_delta=    1792.0
+  rename_commit us/op=      6.00 alloc/op=   97.00 alloc_bytes/op=   25666.0 dealloc/op=   97.00 dealloc_bytes/op=   25666.0 peak_live_delta=   20878.0
+
+CASE users=255 name_len=54 bytes=23486 runs=60
+  parse_slice   us/op=     60.65 alloc/op=  515.00 alloc_bytes/op=   97746.0 dealloc/op=  515.00 dealloc_bytes/op=   97746.0 peak_live_delta=   60490.0
+  parse_shared  us/op=     60.33 alloc/op=  513.00 alloc_bytes/op=   50756.0 dealloc/op=  513.00 dealloc_bytes/op=   50756.0 peak_live_delta=   36986.0
+  edit_create   us/op=     11.13 alloc/op=  257.00 alloc_bytes/op=   36338.0 dealloc/op=  257.00 dealloc_bytes/op=   36338.0 peak_live_delta=   36338.0
+  noop_commit   us/op=     11.33 alloc/op=  257.00 alloc_bytes/op=   36338.0 dealloc/op=  257.00 dealloc_bytes/op=   36338.0 peak_live_delta=   36338.0
+  rename_commit us/op=    111.81 alloc/op= 1292.00 alloc_bytes/op=  185120.0 dealloc/op= 1292.00 dealloc_bytes/op=  185120.0 peak_live_delta=   96678.0

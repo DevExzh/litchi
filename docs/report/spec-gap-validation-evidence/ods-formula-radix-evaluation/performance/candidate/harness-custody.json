@@ -1,0 +1,14 @@
+{
+  "before": {
+    "Cargo.toml": "f337daad9e20c4b63c10fc84fc998f2ee16762170d513c59e1e7c4b471c9cdff",
+    "Cargo.lock": "0bd5dc7cfe53d0a6625406040d86b10f3f257f9cc061747c4a77077e5f1c8df0",
+    "run.py": "a96ad565525121c9f00135326c21798ffde574c39e4caf8dd34453ae32876c6f",
+    "src/main.rs": "11c3d7df4156199ae15e4e9931551d2dcc4644601ce3dbfea0a273a13e576c61"
+  },
+  "after": {
+    "Cargo.toml": "f337daad9e20c4b63c10fc84fc998f2ee16762170d513c59e1e7c4b471c9cdff",
+    "Cargo.lock": "0bd5dc7cfe53d0a6625406040d86b10f3f257f9cc061747c4a77077e5f1c8df0",
+    "run.py": "a96ad565525121c9f00135326c21798ffde574c39e4caf8dd34453ae32876c6f",
+    "src/main.rs": "11c3d7df4156199ae15e4e9931551d2dcc4644601ce3dbfea0a273a13e576c61"
+  }
+}

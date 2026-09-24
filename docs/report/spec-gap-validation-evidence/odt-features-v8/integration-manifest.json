@@ -1,0 +1,216 @@
+{
+  "worktree": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910",
+  "base_commit": "ed0a5c7e5",
+  "candidate_kind": "clean detached current-HEAD integration of the reviewed V8 ODT owned closure",
+  "scope": "Final clean current-HEAD integration of the exact V8 reviewed 17-path owned closure; no unrelated pending ODT changes are included",
+  "status": "Detached from committed ed0a5c7e5; only the 17 reviewed owned paths are overlaid; primary worktree untouched",
+  "paths": [
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/docs/FEATURE_MATRIX.md",
+      "bytes": 33128,
+      "sha256": "948dc9d82e3718204af90336ba55f74b83557e7bdf7fc0fcce5aeb400045c075"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/src/content_metadata.rs",
+      "bytes": 92017,
+      "sha256": "9983cb7a752ddd8eba0cc86c7f019cbd77a616dc2ab02e8718df7b0b6bdc3ae5"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/src/document/semantic.rs",
+      "bytes": 31797,
+      "sha256": "f8fff4bfe721efe26395d4b1b711bbbba15fb80b8e73ae91a9ab25abdd0be9f7"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/src/document/source.rs",
+      "bytes": 28467,
+      "sha256": "5c576710e7e1edc1cdf9c48e91cc651b7a244320201f905b2ca38c89400dafa5"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/src/elements/bookmark/writing.rs",
+      "bytes": 24229,
+      "sha256": "eaff4d11432d47c3118224a3dc99c52e6f3eaa480732597c778c55127c965520"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/src/elements/element.rs",
+      "bytes": 34824,
+      "sha256": "2e6b7af29b26c65067befee6f391b00bdd886fac235062b42461e209cccb2c7f"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/src/elements/field/model/metadata.rs",
+      "bytes": 49996,
+      "sha256": "a49b609f2f1c024adbc8585224bb49177fa40eaddfc024c67905a80e220e3f7b"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/src/elements/text.rs",
+      "bytes": 188497,
+      "sha256": "712aeee5723d32ed5def21eba08b0dab51028a7ddab466fd1fa5ce7dcc26244b"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/src/generic/flat.rs",
+      "bytes": 14704,
+      "sha256": "683772a3c7cc774380375e4ff7440703980f9707fd9e1c7680e63c715041d617"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/src/generic/package.rs",
+      "bytes": 22997,
+      "sha256": "0fc0591a6090e32bc22483339d2b64356ba8df52d2548a1f518c7e0def2c013b"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/src/lib.rs",
+      "bytes": 14919,
+      "sha256": "1fbbf9b483a65538edb2a345d4794b6cc9115703bfddf3ec06230a4095afe407"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/src/mutable/codec/semantic/metadata.rs",
+      "bytes": 2555,
+      "sha256": "2ce8057c5901f6f334d1b675d3ea7c080c925277ab86e6f14077770dab608932"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/src/mutable/codec/semantic/mod.rs",
+      "bytes": 323,
+      "sha256": "38cb9d93db8bf291144f2359ff9bc481cc0146b02c970f71ff56a00b071fd32f"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/src/mutable/codec/semantic/xforms.rs",
+      "bytes": 1278,
+      "sha256": "2a82fe628ab45789f711b384a544d241f3ef7ad7df03885d0f19dca6879a4621"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/src/mutable/semantic/content.rs",
+      "bytes": 8650,
+      "sha256": "a212fe8e7b058de05c45b9d0aff2f1ddd3345d04c99d9a3b982c264500a23a97"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/src/xforms.rs",
+      "bytes": 97379,
+      "sha256": "21ad999c01c4c6fc5a9dbb2298e112898771b4bc730d586c1568872154d5c201"
+    },
+    {
+      "path": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910/crates/litchi-odt/tests/in_content_metadata.rs",
+      "bytes": 6840,
+      "sha256": "c97c7aca619daa97bf533abe6b1e0b64e622badc26a621b4c5e90787e4da1819"
+    }
+  ],
+  "delta_paths": [
+    {
+      "path": "crates/litchi-odt/src/elements/element.rs",
+      "v7_sha256": "14701fda348f755f0b72fd7d0c97e00ba4fdaf5f747a731afa2c6fe80ac7c63e",
+      "v8_sha256": "2e6b7af29b26c65067befee6f391b00bdd886fac235062b42461e209cccb2c7f",
+      "change": "Keep parsed lexical provenance through attributes_mut; compare current value to the parsed baseline so no-op and partial mutable borrows preserve untouched lexicals while changed values use caller escaping; add serialize/reopen regressions"
+    }
+  ],
+  "spec": {
+    "path": "/var/tmp/OpenDocument-v1.4-os-part3-schema-20260910.html",
+    "sha256": "43fb603f9f54f030db7082518aff6f136297d182abb20124a859d271a7969a15",
+    "relevant": "numbered-paragraph RNG lines 17797-17833"
+  },
+  "rng": {
+    "path": "/var/tmp/odf14-spec-20260910/OpenDocument-v1.4-schema.rng",
+    "sha256": "4034ec6be29205d5fc1ee5f42468ac6ef824287b3aba6d9289032af4fafbda7f",
+    "relevant_lines": "17797-17833"
+  },
+  "adrs": {
+    "path": "/var/tmp/litchi-odt-accepted-adrs-20260910.md",
+    "sha256": "561b6c556617294268ae85df1d26875974be835682da6f40dc4649a42ea2cc23"
+  },
+  "v6": {
+    "worktree": "/var/tmp/litchi-odt-feature-work-v6-20260910",
+    "manifest": "/var/tmp/litchi-odt-feature-manifest-v6-final-20260910.json",
+    "manifest_sha256": "f1715f1ed5c3424fb717b36e2c3dbcb53fc97aff4f3fface821af72c5cb391ff",
+    "preserved": true,
+    "independent_review_receipt": "/var/tmp/litchi-odt-review-v6-independent-check-20260910/review-receipt.md",
+    "independent_review_receipt_sha256": "1de5feb93dcb0a33d593ae1e883185119ac17bd19112da81bde408b76c65846c"
+  },
+  "v7_delta_patch": {
+    "path": "/var/tmp/litchi-odt-feature-v7-delta-20260910.patch",
+    "bytes": 13321,
+    "sha256": "8006c59f996db3d8bee497e24b7361bf88e0f159121500766be016ecb738306b",
+    "base": "V6 candidate",
+    "candidate": "V7 candidate"
+  },
+  "validation": {
+    "toolchain": "1.95.0",
+    "rustfmt_toolchain": "1.98.1",
+    "rustup_home": "/tmp/litchi-spec-gap-rustup",
+    "cargo_build_jobs": 4,
+    "cpu_affinity": "8-31",
+    "target": "/var/tmp/litchi-odt-feature-v8-target-195",
+    "focused_attribute_test": "1 parsed-lexical mutable-borrow provenance test passed; no-op and partial-change serialization/reopen cases",
+    "full_tests": "1,031 tests across 60 suites passed; 0 failures (see log)",
+    "clippy": "cargo +1.95.0 clippy -p litchi-odt --all-features --all-targets --offline -- -D warnings passed",
+    "rustdoc": "RUSTDOCFLAGS=-Dwarnings cargo +1.95.0 doc -p litchi-odt --all-features --no-deps --offline passed",
+    "fmt": "rustfmt 1.98.1 --edition 2024 and git diff --check passed",
+    "focused_log": "/var/tmp/litchi-odt-feature-v8-attribute-focused-20260910.log",
+    "focused_log_sha256": "feec0d6274d0523ac715ba1f464a5cf8556780631c03e662b68c6f4be586f8ed",
+    "logs": [
+      {
+        "path": "/var/tmp/litchi-odt-feature-v8-tests-20260910.log",
+        "sha256": "4a17ea85dcbf25515fa2f935115de3d6915570ada400b375f9fc130459c18042"
+      },
+      {
+        "path": "/var/tmp/litchi-odt-feature-v8-clippy-20260910.log",
+        "sha256": "e33e2e9f6afc47973c522355bf89a7578483816c9973a102e211e7b2cdea9477"
+      },
+      {
+        "path": "/var/tmp/litchi-odt-feature-v8-rustdoc-20260910.log",
+        "sha256": "5019c9e3953c483e100b99f816dffd84a8c1e5fa6dc2d3235c30d15400a6eb88"
+      }
+    ]
+  },
+  "independent_harness": {
+    "directory": "/var/tmp/litchi-odt-review-v8-independent-20260910",
+    "target": "/var/tmp/litchi-odt-review-v8-independent-target-20260910",
+    "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-odt-review-v8-independent-target-20260910 TMPDIR=/var/tmp CARGO_BUILD_JOBS=4 taskset -c 8-31 cargo +1.95.0 run --manifest-path /var/tmp/litchi-odt-review-v8-independent-20260910/Cargo.toml --bin litchi-odt-review-v8-independent --offline --quiet",
+    "cargo_toml_sha256": "f2a98c4564266d9bb327801522dbf80d2e461711bfc100f04dd04da6798507bd",
+    "cargo_lock_sha256": "3e97105551a5990711dc88716347e662f43aef9063bcde3dcb3d351a4dcdb7d0",
+    "main_sha256": "bb328705aa60b365deec175bc9cb38a0a7904e8af0dcca70b4e5f6fbaa916717",
+    "log": "/var/tmp/litchi-odt-review-v8-independent-20260910/harness-v8.log",
+    "log_sha256": "6d79dccbd3ea214fa35ad1f19cd881571180943dc3ecbbe9487633fc0451afb8",
+    "result": "All 23 named cases passed, including parsed lexical no-op mutable borrow preservation, partial mutable change preserving another raw lexical, serialization/reopen, and caller literal refusal.",
+    "receipt": {
+      "path": "/var/tmp/litchi-odt-review-v8-independent-20260910/review-receipt-v8.md",
+      "sha256": "6d66f29c0ce42fb0aa17ab84f074fc1bb97c860749229eb57f6b6f8503e3c40b"
+    }
+  },
+  "integration": {
+    "worktree": "/var/tmp/litchi-odt-feature-work-v8-integration-20260910",
+    "base_commit": "ffcdd9a5084918fdb2dce83b5ea75a0307517ee7",
+    "tests_log": "/var/tmp/litchi-odt-feature-v8-integration-tests-20260910.log",
+    "tests_log_sha256": "8845ace5ec5524b83168291dd8627ec3e715e70865b1c37b7f2c0abf34832936",
+    "clippy_log": "/var/tmp/litchi-odt-feature-v8-integration-clippy-20260910.log",
+    "clippy_log_sha256": "b7dfc0510426dde2e72952e1d454b44680bf848711c66e817861466905e8a83d",
+    "rustdoc_log": "/var/tmp/litchi-odt-feature-v8-integration-rustdoc-20260910.log",
+    "rustdoc_log_sha256": "a5d0aa172a22d9d8e59719d10ef6c3728d2c706623502f39f3aadeac39c6c0d4",
+    "result": "Current HEAD integration overlay passed 1,031 tests across 60 suites, strict Clippy, warning-denied rustdoc, rustfmt, and diff check; no primary edits."
+  },
+  "v7": {
+    "worktree": "/var/tmp/litchi-odt-feature-work-v7-20260910",
+    "manifest": "/var/tmp/litchi-odt-feature-manifest-v7-final-20260910.json",
+    "manifest_sha256": "55e959a5addbee8db3e6db7777778cb5cd50635ef12902b97b2415adde9806f7",
+    "preserved": true,
+    "delta_patch": "/var/tmp/litchi-odt-feature-v7-delta-20260910.patch",
+    "delta_patch_sha256": "8006c59f996db3d8bee497e24b7361bf88e0f159121500766be016ecb738306b"
+  },
+  "v8_delta_patch": {
+    "path": "/var/tmp/litchi-odt-feature-v8-delta-20260910.patch",
+    "bytes": 2635,
+    "sha256": "e77fa918e1a2cf2cbaf181a395bbdcdc44ee794f8e2ceb9db7f715b14d9af8ea",
+    "base": "V7 candidate",
+    "candidate": "V8 candidate"
+  },
+  "current_head_integration": {
+    "base_commit": "ed0a5c7e5",
+    "worktree": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910",
+    "owned_path_count": 17,
+    "source_hashes_match_v8_manifest": true,
+    "delta_patch": "/var/tmp/litchi-odt-feature-v8-final-owned-delta-20260910.patch",
+    "delta_patch_sha256": "4621048963f47111808efc15418ceacae3b02e92ef99dee83967b73e32413862",
+    "delta_patch_bytes": 280675,
+    "dependency_metadata": "/var/tmp/litchi-odt-v8-final-metadata.json",
+    "dependency_metadata_sha256": "102ad17e7e75be37467504836e69c3943d5923917ddd5ec9cebb3c526766358b",
+    "locked_check_log": "/var/tmp/litchi-odt-v8-final-check.log",
+    "locked_check_log_sha256": "62a1914fe331fc249fcb75ffd78782445324cd28632b9909b42bb713f387e925",
+    "dependency_check": "cargo metadata --locked --offline --no-deps and cargo check -p litchi-odt --all-features --locked --offline passed",
+    "full_gates": "Root-owned next gate; no claim made here"
+  }
+}

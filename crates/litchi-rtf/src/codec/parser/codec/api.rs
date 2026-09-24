@@ -1,5 +1,5 @@
 use super::{
-    Bump, ColorTable, ControlWord, Cow, DrawingStoryCapture, FontTable, HashMap,
+    Bump, ColorTable, ControlWord, Cow, DrawingStoryCapture, FontTable, HashMap, HashSet,
     MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES, ParseLimits, ParsedDocument, Parser, Range, RefCell,
     RtfError, RtfResult, SmallVec, State, Token, control_symbol_text,
     disables_body_block_reservation, initial_body_block_capacity,
@@ -50,6 +50,9 @@ impl<'a> Parser<'a> {
             current_table: None,
             current_row: None,
             current_cell_text: SmallVec::new(),
+            current_cell_paragraphs: Vec::new(),
+            current_cell_paragraph_start: 0,
+            current_cell_paragraph_frame: None,
             current_cell_nested: Vec::new(),
             current_cell_drawings: DrawingStoryCapture::default(),
             current_cell_story_events: Vec::new(),
@@ -77,6 +80,14 @@ impl<'a> Parser<'a> {
             pending_custom_xml_attribute: None,
             next_custom_xml_order: 0,
             custom_xml_text_bytes: 0,
+            smart_tags: Vec::new(),
+            open_smart_tags: Vec::new(),
+            smart_tag_spans: Vec::new(),
+            open_move_bookmarks: HashMap::new(),
+            move_bookmark_spans: Vec::new(),
+            completed_move_bookmarks: HashSet::new(),
+            move_bookmarks: Vec::new(),
+            unmatched_move_bookmarks: false,
             math_zones: Vec::new(),
             math_text_bytes: 0,
             protection_ranges: Vec::new(),
@@ -198,6 +209,8 @@ impl<'a> Parser<'a> {
             body_after_last_paragraph_break: 0,
             body_boundaries: Vec::new(),
             next_bookmark_order: 0,
+            next_smart_tag_order: 0,
+            next_move_bookmark_order: 0,
             shapes: Vec::new(),
             drawing_order: Vec::new(),
             body_story_events: Vec::new(),
@@ -548,6 +561,8 @@ impl<'a> Parser<'a> {
         self.finalize_table()?;
         self.finalize_bookmarks()?;
         self.finalize_custom_xml_tags()?;
+        self.finalize_smart_tags()?;
+        self.finalize_move_bookmarks()?;
         self.finalize_protection_ranges()?;
         self.finalize_editable_regions()?;
         self.finalize_annotations()?;
@@ -616,6 +631,8 @@ impl<'a> Parser<'a> {
             xml_namespaces: self.xml_namespaces,
             saw_xml_namespace_table: self.saw_xml_namespace_table,
             custom_xml_tags: self.custom_xml_tags,
+            smart_tags: self.smart_tags,
+            unmatched_move_bookmarks: self.unmatched_move_bookmarks,
             math_zones: self.math_zones,
             protection_ranges: self.protection_ranges,
             editable_regions: self.editable_regions,
@@ -677,6 +694,7 @@ impl<'a> Parser<'a> {
             paragraph_group_table: self.paragraph_group_table,
             sections: self.sections,
             bookmarks: self.bookmarks,
+            move_bookmarks: self.move_bookmarks,
             shapes: self.shapes,
             drawing_order: self.drawing_order,
             body_paragraph_count,

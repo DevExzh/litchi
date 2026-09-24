@@ -1,0 +1,34 @@
+{
+  "README.md": {
+    "bytes": 786,
+    "sha256": "f79de3720517bea64ff58ce71349a5055dc5db05cf9e26c580b80a4c74d15ac8"
+  },
+  "effects-graph-validation-optimization.patch.gz": {
+    "bytes": 914,
+    "sha256": "4474cce7ae57f5e181bb9ee392e28088e2d34bca5b535cbd27eeb668221e899e"
+  },
+  "effects-optimization-evidence-manifest.txt": {
+    "bytes": 4278,
+    "sha256": "250ba1544c7e4b3c4d78d87ad80111df7abaec35f5cd9116b129e695ff89e8e0"
+  },
+  "generated-fixtures.json": {
+    "bytes": 2963,
+    "sha256": "91651362fd7824da871c008bb2734ba78f34c451b75acaaf7b2bfe7811783795"
+  },
+  "replace_main-1m-p1.json": {
+    "bytes": 98825,
+    "sha256": "abd0e0e13fcf09be01be95710a021a9d9fedf8f52ede22b7c92cda041ea7d940"
+  },
+  "replace_main-1m-p2.json": {
+    "bytes": 98822,
+    "sha256": "7505bd083f98ce60f96c426a51a59d87ff649cfbda1a0c902a8af1f1a52effe1"
+  },
+  "replace_main-1m-p3.json": {
+    "bytes": 98820,
+    "sha256": "72d9af00d59272cf4773496eb82db77c3566ddcb0637626b375a9fc1c22cd9bc"
+  },
+  "verification.json": {
+    "bytes": 590,
+    "sha256": "ce8c43c1c10333c74174823241c30c601a234a41fbfb9298e45a3d8f0eee794c"
+  }
+}

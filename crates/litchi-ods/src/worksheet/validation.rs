@@ -46,6 +46,15 @@ pub(crate) fn validate_sheet(sheet: &Sheet) -> Result<()> {
     if let Some(style_name) = &sheet.style_name {
         validate_non_empty_text(style_name, "sheet style name")?;
     }
+    if let Some(template_name) = &sheet.template_name {
+        validate_non_empty_text(template_name, "table template name")?;
+    }
+    if let Some(title) = &sheet.title {
+        validate_text(title, "table title")?;
+    }
+    if let Some(description) = &sheet.description {
+        validate_text(description, "table description")?;
+    }
     if sheet.rows.len() > MAX_PHYSICAL_RUNS {
         return Err(Error::InvalidFormat(format!(
             "sheet '{}' exceeds the {MAX_PHYSICAL_RUNS} physical row-run safety limit",
@@ -115,6 +124,7 @@ fn semantic_cell_footprint(row: &Row) -> Result<usize> {
                     || !matches!(cell.value, CellValue::Empty)
                     || !cell.text.is_empty()
                     || cell.formula.is_some()
+                    || cell.range_source.is_some()
                     || !cell.hyperlinks.is_empty() =>
             {
                 1
@@ -164,6 +174,18 @@ pub(crate) fn validate_cell(cell: &Cell) -> Result<()> {
     cell.value.validate()?;
     validate_text(&cell.text, "cell text")?;
     validate_optional_name(cell.style_name.as_deref(), "cell style name")?;
+    if let Some(source) = &cell.range_source {
+        validate_text(source.name(), "cell range source name")?;
+        validate_text(source.href(), "cell range source href")?;
+        validate_optional_text(source.filter_name(), "cell range source filter name")?;
+        validate_optional_text(source.filter_options(), "cell range source filter options")?;
+        validate_optional_text(source.refresh_delay(), "cell range source refresh delay")?;
+        if source.rows() == 0 || source.columns() == 0 {
+            return Err(Error::InvalidFormat(
+                "cell range source dimensions must be positive".to_string(),
+            ));
+        }
+    }
     if let Some(formula) = &cell.formula {
         validate_non_empty_text(formula, "cell formula")?;
     }
@@ -236,7 +258,14 @@ fn validate_optional_name(value: Option<&str>, label: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_non_empty_text(value: &str, label: &str) -> Result<()> {
+fn validate_optional_text(value: Option<&str>, label: &str) -> Result<()> {
+    if let Some(value) = value {
+        validate_text(value, label)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_non_empty_text(value: &str, label: &str) -> Result<()> {
     validate_text(value, label)?;
     if value.is_empty() {
         return Err(Error::InvalidFormat(format!("{label} must be non-empty")));
@@ -285,6 +314,10 @@ mod sparse_accounting_tests {
             name: "Sheet1".to_string(),
             rows,
             style_name: None,
+            template_name: None,
+            style_usage: crate::model::structure::StyleUsage::default(),
+            title: None,
+            description: None,
         }
     }
 

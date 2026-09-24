@@ -1,0 +1,1724 @@
+[
+  {
+    "function": "SUM",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sum.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=SUM([.J2:.J4])",
+    "cached": "6",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      }
+    ]
+  },
+  {
+    "function": "SUM",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sum.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=SUM([.J2];[.J3];[.J4])",
+    "cached": "6",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      }
+    ]
+  },
+  {
+    "function": "SUM",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sum.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=SUM({1;2;3})",
+    "cached": "6",
+    "cells": []
+  },
+  {
+    "function": "SUM",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sum.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=SUM([.J2:.J4];{1;2};3)",
+    "cached": "12",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      }
+    ]
+  },
+  {
+    "function": "SUM",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sum.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=SUM([.J3:.J5];[.J10:.J11])",
+    "cached": "8",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 10,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 10,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "SUM",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sum.fods",
+    "sheet": "Sheet2",
+    "row": 9,
+    "column": 1,
+    "formula": "of:=SUM([.J2:.K4])",
+    "cached": "21",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 11,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 11,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 11,
+        "type": "number",
+        "value": "6"
+      }
+    ]
+  },
+  {
+    "function": "SUM",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sum.fods",
+    "sheet": "Sheet2",
+    "row": 10,
+    "column": 1,
+    "formula": "of:=SUM([.J2:.L5])",
+    "cached": "21",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 11,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 12,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 11,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 12,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 11,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 12,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 10,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 11,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 12,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "PRODUCT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/product.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=PRODUCT(2;3;4)",
+    "cached": "24",
+    "cells": []
+  },
+  {
+    "function": "PRODUCT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/product.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=PRODUCT(2;3;4;{2;3})",
+    "cached": "144",
+    "cells": []
+  },
+  {
+    "function": "PRODUCT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/product.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=PRODUCT([.G1:.G2];[.H1:.H2];{2;3};2)",
+    "cached": "1440",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 7,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 8,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 7,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 8,
+        "type": "number",
+        "value": "5"
+      }
+    ]
+  },
+  {
+    "function": "PRODUCT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/product.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=PRODUCT(1+[.G5:.G7])-1",
+    "cached": "0.716",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 7,
+        "type": "number",
+        "value": "0.1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 7,
+        "type": "number",
+        "value": "0.2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 7,
+        "type": "number",
+        "value": "0.3"
+      }
+    ]
+  },
+  {
+    "function": "PRODUCT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/product.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=PRODUCT({1;2;3})",
+    "cached": "6",
+    "cells": []
+  },
+  {
+    "function": "PRODUCT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/product.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=PRODUCT({1.1;1.2;1.3;1.4})",
+    "cached": "2.4024",
+    "cells": []
+  },
+  {
+    "function": "PRODUCT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/product.fods",
+    "sheet": "Sheet2",
+    "row": 9,
+    "column": 1,
+    "formula": "of:=PRODUCT(-2;-3)",
+    "cached": "6",
+    "cells": []
+  },
+  {
+    "function": "PRODUCT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/product.fods",
+    "sheet": "Sheet2",
+    "row": 10,
+    "column": 1,
+    "formula": "of:=PRODUCT(3;0)",
+    "cached": "0",
+    "cells": []
+  },
+  {
+    "function": "PRODUCT",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/product.fods",
+    "sheet": "Sheet2",
+    "row": 11,
+    "column": 1,
+    "formula": "of:=PRODUCT(0;3)",
+    "cached": "0",
+    "cells": []
+  },
+  {
+    "function": "SUMSQ",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sumsq.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=SUMSQ([.J2:.J4])",
+    "cached": "14",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      }
+    ]
+  },
+  {
+    "function": "SUMSQ",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sumsq.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=SUMSQ([.J2];[.J3];[.J4])",
+    "cached": "14",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      }
+    ]
+  },
+  {
+    "function": "SUMSQ",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sumsq.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=SUMSQ({1;2;3})",
+    "cached": "14",
+    "cells": []
+  },
+  {
+    "function": "SUMSQ",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sumsq.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=SUMSQ([.J2:.J4];{1;2};3)",
+    "cached": "28",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      }
+    ]
+  },
+  {
+    "function": "SUMSQ",
+    "source": "sc/qa/unit/data/functions/mathematical/fods/sumsq.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=SUMSQ([.J3:.J5];[.J10:.J11])",
+    "cached": "22",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 10,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 10,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "SUMPRODUCT",
+    "source": "sc/qa/unit/data/functions/array/fods/sumproduct.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=SUMPRODUCT([.I1:.J3];[.K1:.L3])",
+    "cached": "397",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 11,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 12,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 11,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 12,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 11,
+        "type": "number",
+        "value": "12"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 12,
+        "type": "number",
+        "value": "13"
+      }
+    ]
+  },
+  {
+    "function": "SUMPRODUCT",
+    "source": "sc/qa/unit/data/functions/array/fods/sumproduct.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=SUMPRODUCT([.N2:.O4]; [.Q2:.R4])",
+    "cached": "156",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 14,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 15,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 17,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 18,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 14,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 15,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 17,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 18,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 14,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 15,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 17,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 18,
+        "type": "number",
+        "value": "3"
+      }
+    ]
+  },
+  {
+    "function": "SUMPRODUCT",
+    "source": "sc/qa/unit/data/functions/array/fods/sumproduct.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=SUMPRODUCT([.I5:.I6]+1)",
+    "cached": "5",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 9,
+        "type": "number",
+        "value": "2"
+      }
+    ]
+  },
+  {
+    "function": "SUMPRODUCT",
+    "source": "sc/qa/unit/data/functions/array/fods/sumproduct.fods",
+    "sheet": "Sheet2",
+    "row": 9,
+    "column": 1,
+    "formula": "of:=SUMPRODUCT([.J16:.J18];[.K16:.K18])",
+    "cached": "18",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 11,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 11,
+        "type": "number",
+        "value": "0"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 11,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "SUMPRODUCT",
+    "source": "sc/qa/unit/data/functions/array/fods/sumproduct.fods",
+    "sheet": "Sheet2",
+    "row": 10,
+    "column": 1,
+    "formula": "of:=SUMPRODUCT([.J16:.J18]*[.K16:.K18])",
+    "cached": "18",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 11,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 11,
+        "type": "number",
+        "value": "0"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 11,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "SUMPRODUCT",
+    "source": "sc/qa/unit/data/functions/array/fods/sumproduct.fods",
+    "sheet": "Sheet2",
+    "row": 11,
+    "column": 1,
+    "formula": "of:=SUMPRODUCT(2*[.K16:.K18])",
+    "cached": "28",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 11,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 11,
+        "type": "number",
+        "value": "0"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 11,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "SUMPRODUCT",
+    "source": "sc/qa/unit/data/functions/array/fods/sumproduct.fods",
+    "sheet": "Sheet2",
+    "row": 12,
+    "column": 1,
+    "formula": "of:=SUMPRODUCT([.J16:.J18];[.L16:.L18])",
+    "cached": "18",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 12,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 12,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 12,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "SUMPRODUCT",
+    "source": "sc/qa/unit/data/functions/array/fods/sumproduct.fods",
+    "sheet": "Sheet2",
+    "row": 13,
+    "column": 1,
+    "formula": "of:=SUMPRODUCT([.J16:.J18]*[.L16:.L18])",
+    "cached": "18",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 12,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 12,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 12,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "SUMPRODUCT",
+    "source": "sc/qa/unit/data/functions/array/fods/sumproduct.fods",
+    "sheet": "Sheet2",
+    "row": 14,
+    "column": 1,
+    "formula": "of:=SUMPRODUCT(2*[.L16:.L18])",
+    "cached": "28",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 12,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 12,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 12,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "SUMX2MY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumx2my2.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=SUMX2MY2([.I1:.I2];[.J1:.J2])",
+    "cached": "-10",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "SUMX2MY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumx2my2.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=SUMX2MY2([.L1:.L2];[.M1:.M2])",
+    "cached": "-26",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 12,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 13,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 12,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 13,
+        "type": "number",
+        "value": "8"
+      }
+    ]
+  },
+  {
+    "function": "SUMX2MY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumx2my2.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=SUMX2MY2({3;4}; {1;2})",
+    "cached": "20",
+    "cells": []
+  },
+  {
+    "function": "SUMX2MY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumx2my2.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=SUMX2MY2({3;4;5}; {1;2;3})",
+    "cached": "36",
+    "cells": []
+  },
+  {
+    "function": "SUMX2MY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumx2my2.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=SUMX2MY2([.P2:.P8];[.Q2:.Q8])",
+    "cached": "-55",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 16,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 17,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 16,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 17,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 16,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 17,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 16,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 17,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 16,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 17,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 16,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 17,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 16,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 17,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "SUMX2MY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumx2my2.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=SUMX2MY2({2;3;9;1;8;7;5}; {6;5;11;7;5;4;4})",
+    "cached": "-55",
+    "cells": []
+  },
+  {
+    "function": "SUMX2PY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumx2py2.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=SUMX2PY2([.I1:.I2];[.J1:.J2])",
+    "cached": "30",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "SUMX2PY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumx2py2.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=SUMX2PY2([.L1:.L2];[.M1:.M2])",
+    "cached": "174",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 12,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 13,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 12,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 13,
+        "type": "number",
+        "value": "8"
+      }
+    ]
+  },
+  {
+    "function": "SUMX2PY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumx2py2.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=SUMX2PY2({3;4}; {1;2})",
+    "cached": "30",
+    "cells": []
+  },
+  {
+    "function": "SUMX2PY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumx2py2.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=SUMX2PY2({3;4;5}; {1;2;3})",
+    "cached": "64",
+    "cells": []
+  },
+  {
+    "function": "SUMX2PY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumx2py2.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=SUMX2PY2([.P2:.P8];[.Q2:.Q8])",
+    "cached": "521",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 16,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 17,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 16,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 17,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 16,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 17,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 16,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 17,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 16,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 17,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 16,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 17,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 16,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 17,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "SUMX2PY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumx2py2.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=SUMX2PY2({2;3;9;1;8;7;5}; {6;5;11;7;5;4;4})",
+    "cached": "521",
+    "cells": []
+  },
+  {
+    "function": "SUMXMY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumxmy2.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=SUMXMY2([.I1:.I2];[.J1:.J2])",
+    "cached": "2",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "SUMXMY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumxmy2.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=SUMXMY2([.L1:.L2];[.M1:.M2])",
+    "cached": "2",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 12,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 13,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 12,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 13,
+        "type": "number",
+        "value": "8"
+      }
+    ]
+  },
+  {
+    "function": "SUMXMY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumxmy2.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=SUMXMY2({3;4}; {1;2})",
+    "cached": "8",
+    "cells": []
+  },
+  {
+    "function": "SUMXMY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumxmy2.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=SUMXMY2({3;4;5}; {1;2;3})",
+    "cached": "12",
+    "cells": []
+  },
+  {
+    "function": "SUMXMY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumxmy2.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=SUMXMY2([.P2:.P8];[.Q2:.Q8])",
+    "cached": "79",
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 16,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 17,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 16,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 17,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 16,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 17,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 16,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 17,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 16,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 17,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 16,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 17,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 16,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 17,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "SUMXMY2",
+    "source": "sc/qa/unit/data/functions/array/fods/sumxmy2.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=SUMXMY2({2;3;9;1;8;7;5}; {6;5;11;7;5;4;4})",
+    "cached": "79",
+    "cells": []
+  }
+]

@@ -1,0 +1,3 @@
+Independent review by performance_authority_docs: PASS.
+
+Source hashes match. The four provider cases remain opt-in with 443 selectable names and unchanged 37 default cases/201 rows. Nested provider vectors align with elapsed sample_order. Procfs accounting includes probe/child overhead and does not claim exact device attribution. Filesystem cases exercise real positional reads and atomic replacement with per-sample source/output/oracle checks. Simulator and sink-copy scopes are explicit, provider fields are optional, and selector/counter/sink limits are checked. No timed measurements were performed.

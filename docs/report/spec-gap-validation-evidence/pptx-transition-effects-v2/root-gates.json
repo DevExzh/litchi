@@ -1,0 +1,32 @@
+{
+  "actor": "root",
+  "candidate": "/var/tmp/litchi-pptx-transition-effects-validation-20260910",
+  "base_commit": "995bdaf09352297bde17e6ed7d986360f8c10134",
+  "source_manifest_sha256": "dc484e1d58933294d4973bad0f38debefb14ef80958ab723c255bc117e86636f",
+  "ordinary_tests": 885,
+  "doctests": 6,
+  "toolchain": "1.95.0",
+  "cpu_set": "8-31",
+  "gates": {
+    "tests": {
+      "exit_code": 0,
+      "path": "/var/tmp/litchi-pptx-transition-effects-root-tests-v2-20260910.log",
+      "sha256": "61ac577de25914e6dd92d71621c5c27d67bcd5b47285d8d44a8c9e45ed8c9daa"
+    },
+    "clippy": {
+      "exit_code": 0,
+      "path": "/var/tmp/litchi-pptx-transition-effects-root-clippy-v2-20260910.log",
+      "sha256": "0f63fad422d1b426a01a4059d57632c104da716bda6d6ae6d607b32ee5f35d74"
+    },
+    "rustdoc": {
+      "exit_code": 0,
+      "path": "/var/tmp/litchi-pptx-transition-effects-root-rustdoc-v2-20260910.log",
+      "sha256": "4e762d629a47df820bcee0701e99759db22dc15c4cc08c9e6d9dca64ff3caf4d"
+    },
+    "rustfmt": {
+      "exit_code": 0,
+      "path": "/var/tmp/litchi-pptx-transition-effects-root-rustfmt-v2-20260910.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

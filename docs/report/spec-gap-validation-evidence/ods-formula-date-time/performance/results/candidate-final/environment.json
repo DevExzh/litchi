@@ -1,0 +1,2029 @@
+{
+  "binary_sha256": "1fcd44b899ea89d5e1a1d28bc485835c7d6ac02e87611b515347690fbd47fc6e",
+  "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+  "case_scope": "all-date-time-cases",
+  "cases": [
+    "scalar-control-arithmetic",
+    "scalar-control-sin",
+    "scalar-control-imsum",
+    "database-control-dsum",
+    "scalar-control-average",
+    "scalar-control-counta",
+    "scalar-control-var",
+    "scalar-control-stdev",
+    "database-control-dvar",
+    "database-control-dstdev",
+    "array-control-4x4-arithmetic",
+    "array-control-4x4-sin",
+    "array-control-16x16-arithmetic",
+    "array-control-16x16-sin",
+    "reference-array-16x4-arithmetic",
+    "scalar-aggregate-sum",
+    "literal-aggregate-4x1-sum",
+    "reference-aggregate-64x4-sum",
+    "reference-conditional-256x4-sumifs",
+    "reference-control-average",
+    "reference-control-counta",
+    "representative-median",
+    "representative-rank",
+    "representative-percentrank",
+    "concat-borrowed-literals",
+    "concat-owned-left",
+    "concat-owned-right",
+    "concat-growth-chain",
+    "value-date-fraction-value-date",
+    "value-date-fraction-value-time",
+    "value-date-fraction-value-mixed-fraction",
+    "lazy-if-cache-isnumber",
+    "lazy-if-cache-isblank",
+    "lazy-if-cache-istext",
+    "date-core-date",
+    "date-core-datedif",
+    "date-core-datevalue",
+    "date-core-day",
+    "date-core-days",
+    "date-core-days360",
+    "date-core-eastersunday",
+    "date-core-edate",
+    "date-core-eomonth",
+    "date-core-hour",
+    "date-core-isoweeknum",
+    "date-core-minute",
+    "date-core-month",
+    "date-core-networkdays",
+    "date-core-now",
+    "date-core-second",
+    "date-core-time",
+    "date-core-timevalue",
+    "date-core-today",
+    "date-core-weekday",
+    "date-core-weeknum",
+    "date-core-workday",
+    "date-core-year",
+    "date-core-yearfrac",
+    "date-parser-datevalue-iso",
+    "date-parser-datevalue-datetime",
+    "date-parser-datevalue-enus",
+    "date-parser-datevalue-month",
+    "date-parser-timevalue-clock",
+    "date-parser-timevalue-datetime",
+    "date-parser-timevalue-fraction",
+    "date-parser-datevalue-number",
+    "date-parser-timevalue-number",
+    "date-boundary-date-rollover",
+    "date-boundary-date-1900",
+    "date-boundary-days360-eu",
+    "date-boundary-edate-clamp",
+    "date-boundary-eomonth-clamp",
+    "date-boundary-yearfrac-basis1",
+    "date-boundary-weeknum-noninteger",
+    "date-boundary-weekday-17",
+    "date-networkdays-holidays-0",
+    "date-networkdays-holidays-1",
+    "date-networkdays-holidays-16",
+    "date-networkdays-holidays-64",
+    "date-networkdays-holidays-256",
+    "date-workday-holidays-0",
+    "date-workday-holidays-1",
+    "date-workday-holidays-16",
+    "date-workday-holidays-64",
+    "date-workday-holidays-256",
+    "date-networkdays-workweek-default",
+    "date-networkdays-workweek-custom",
+    "date-networkdays-workweek-alloff",
+    "date-networkdays-workweek-malformed",
+    "date-workday-workweek-default",
+    "date-workday-workweek-custom",
+    "date-workday-workweek-alloff",
+    "date-workday-workweek-malformed",
+    "date-networkdays-interval-7",
+    "date-networkdays-interval-31",
+    "date-networkdays-interval-365",
+    "date-networkdays-interval-4096",
+    "date-workday-offset-0",
+    "date-workday-offset-1",
+    "date-workday-offset-64",
+    "date-workday-offset-256",
+    "date-workday-offset-1024",
+    "date-sequence-networkdays-projection",
+    "date-sequence-workday-projection",
+    "date-projected-day",
+    "date-lazy-unselected",
+    "date-timestamp-now",
+    "date-timestamp-today",
+    "date-timestamp-eastersunday",
+    "date-missing-now",
+    "date-missing-today",
+    "date-missing-eastersunday",
+    "date-list-refusal",
+    "date-direct-sequence-refusal",
+    "date-cancel-networkdays",
+    "date-cancel-workday",
+    "date-resource-networkdays",
+    "date-work-limit-networkdays",
+    "date-formula-error-sequence",
+    "date-dateparam-error"
+  ],
+  "contract_sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f",
+  "cpu": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           48 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  32\nOn-line CPU(s) list:                     0-31\nVendor ID:                               AuthenticAMD\nModel name:                              AMD EPYC 9R45\nCPU family:                              26\nModel:                                   2\nThread(s) per core:                      1\nCore(s) per socket:                      32\nSocket(s):                               1\nStepping:                                1\nBogoMIPS:                                5200.00\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch topoext perfctr_core ssbd perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 clzero xsaveerptr rdpru wbnoinvd arat avx512vbmi pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid movdiri movdir64b fsrm avx512_vp2intersect flush_l1d\nHypervisor vendor:                       KVM\nVirtualization type:                     full\nL1d cache:                               1.5 MiB (32 instances)\nL1i cache:                               1 MiB (32 instances)\nL2 cache:                                32 MiB (32 instances)\nL3 cache:                                128 MiB (4 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-31\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Mitigation; IBPB on VMEXIT only\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP disabled; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected\n",
+  "kernel": "7.0.0-1012-aws",
+  "label": "candidate-final",
+  "libc": "glibc 2.43",
+  "measurement_context_after": {
+    "allowlisted_environment": {},
+    "cpu_count": 32,
+    "load_average": [
+      2.712890625,
+      2.6796875,
+      2.27197265625
+    ]
+  },
+  "measurement_context_before": {
+    "allowlisted_environment": {},
+    "cpu_count": 32,
+    "load_average": [
+      3.671875,
+      2.830078125,
+      2.30224609375
+    ]
+  },
+  "phases": [
+    "evaluate",
+    "parse-evaluate"
+  ],
+  "preflight": {
+    "binary": "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance",
+    "cases": [
+      "scalar-control-arithmetic",
+      "scalar-control-sin",
+      "scalar-control-imsum",
+      "database-control-dsum",
+      "scalar-control-average",
+      "scalar-control-counta",
+      "scalar-control-var",
+      "scalar-control-stdev",
+      "database-control-dvar",
+      "database-control-dstdev",
+      "array-control-4x4-arithmetic",
+      "array-control-4x4-sin",
+      "array-control-16x16-arithmetic",
+      "array-control-16x16-sin",
+      "reference-array-16x4-arithmetic",
+      "scalar-aggregate-sum",
+      "literal-aggregate-4x1-sum",
+      "reference-aggregate-64x4-sum",
+      "reference-conditional-256x4-sumifs",
+      "reference-control-average",
+      "reference-control-counta",
+      "representative-median",
+      "representative-rank",
+      "representative-percentrank",
+      "concat-borrowed-literals",
+      "concat-owned-left",
+      "concat-owned-right",
+      "concat-growth-chain",
+      "value-date-fraction-value-date",
+      "value-date-fraction-value-time",
+      "value-date-fraction-value-mixed-fraction",
+      "lazy-if-cache-isnumber",
+      "lazy-if-cache-isblank",
+      "lazy-if-cache-istext",
+      "date-core-date",
+      "date-core-datedif",
+      "date-core-datevalue",
+      "date-core-day",
+      "date-core-days",
+      "date-core-days360",
+      "date-core-eastersunday",
+      "date-core-edate",
+      "date-core-eomonth",
+      "date-core-hour",
+      "date-core-isoweeknum",
+      "date-core-minute",
+      "date-core-month",
+      "date-core-networkdays",
+      "date-core-now",
+      "date-core-second",
+      "date-core-time",
+      "date-core-timevalue",
+      "date-core-today",
+      "date-core-weekday",
+      "date-core-weeknum",
+      "date-core-workday",
+      "date-core-year",
+      "date-core-yearfrac",
+      "date-parser-datevalue-iso",
+      "date-parser-datevalue-datetime",
+      "date-parser-datevalue-enus",
+      "date-parser-datevalue-month",
+      "date-parser-timevalue-clock",
+      "date-parser-timevalue-datetime",
+      "date-parser-timevalue-fraction",
+      "date-parser-datevalue-number",
+      "date-parser-timevalue-number",
+      "date-boundary-date-rollover",
+      "date-boundary-date-1900",
+      "date-boundary-days360-eu",
+      "date-boundary-edate-clamp",
+      "date-boundary-eomonth-clamp",
+      "date-boundary-yearfrac-basis1",
+      "date-boundary-weeknum-noninteger",
+      "date-boundary-weekday-17",
+      "date-networkdays-holidays-0",
+      "date-networkdays-holidays-1",
+      "date-networkdays-holidays-16",
+      "date-networkdays-holidays-64",
+      "date-networkdays-holidays-256",
+      "date-workday-holidays-0",
+      "date-workday-holidays-1",
+      "date-workday-holidays-16",
+      "date-workday-holidays-64",
+      "date-workday-holidays-256",
+      "date-networkdays-workweek-default",
+      "date-networkdays-workweek-custom",
+      "date-networkdays-workweek-alloff",
+      "date-networkdays-workweek-malformed",
+      "date-workday-workweek-default",
+      "date-workday-workweek-custom",
+      "date-workday-workweek-alloff",
+      "date-workday-workweek-malformed",
+      "date-networkdays-interval-7",
+      "date-networkdays-interval-31",
+      "date-networkdays-interval-365",
+      "date-networkdays-interval-4096",
+      "date-workday-offset-0",
+      "date-workday-offset-1",
+      "date-workday-offset-64",
+      "date-workday-offset-256",
+      "date-workday-offset-1024",
+      "date-sequence-networkdays-projection",
+      "date-sequence-workday-projection",
+      "date-projected-day",
+      "date-lazy-unselected",
+      "date-timestamp-now",
+      "date-timestamp-today",
+      "date-timestamp-eastersunday",
+      "date-missing-now",
+      "date-missing-today",
+      "date-missing-eastersunday",
+      "date-list-refusal",
+      "date-direct-sequence-refusal",
+      "date-cancel-networkdays",
+      "date-cancel-workday",
+      "date-resource-networkdays",
+      "date-work-limit-networkdays",
+      "date-formula-error-sequence",
+      "date-dateparam-error"
+    ],
+    "commands": [
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case scalar-control-arithmetic --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case scalar-control-sin --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case scalar-control-imsum --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case database-control-dsum --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case scalar-control-average --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case scalar-control-counta --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case scalar-control-var --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case scalar-control-stdev --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case database-control-dvar --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case database-control-dstdev --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case array-control-4x4-arithmetic --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case array-control-4x4-sin --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case array-control-16x16-arithmetic --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case array-control-16x16-sin --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case reference-array-16x4-arithmetic --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case scalar-aggregate-sum --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case literal-aggregate-4x1-sum --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case reference-aggregate-64x4-sum --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case reference-conditional-256x4-sumifs --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case reference-control-average --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case reference-control-counta --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case representative-median --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case representative-rank --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case representative-percentrank --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case concat-borrowed-literals --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case concat-owned-left --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case concat-owned-right --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case concat-growth-chain --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case value-date-fraction-value-date --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case value-date-fraction-value-time --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case value-date-fraction-value-mixed-fraction --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case lazy-if-cache-isnumber --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case lazy-if-cache-isblank --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case lazy-if-cache-istext --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-date --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-datedif --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-datevalue --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-day --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-days --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-days360 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-eastersunday --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-edate --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-eomonth --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-hour --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-isoweeknum --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-minute --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-month --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-networkdays --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-now --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-second --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-time --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-timevalue --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-today --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-weekday --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-weeknum --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-workday --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-year --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-core-yearfrac --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-parser-datevalue-iso --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-parser-datevalue-datetime --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-parser-datevalue-enus --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-parser-datevalue-month --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-parser-timevalue-clock --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-parser-timevalue-datetime --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-parser-timevalue-fraction --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-parser-datevalue-number --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-parser-timevalue-number --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-boundary-date-rollover --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-boundary-date-1900 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-boundary-days360-eu --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-boundary-edate-clamp --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-boundary-eomonth-clamp --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-boundary-yearfrac-basis1 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-boundary-weeknum-noninteger --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-boundary-weekday-17 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-networkdays-holidays-0 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-networkdays-holidays-1 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-networkdays-holidays-16 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-networkdays-holidays-64 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-networkdays-holidays-256 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-workday-holidays-0 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-workday-holidays-1 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-workday-holidays-16 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-workday-holidays-64 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-workday-holidays-256 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-networkdays-workweek-default --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-networkdays-workweek-custom --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-networkdays-workweek-alloff --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-networkdays-workweek-malformed --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-workday-workweek-default --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-workday-workweek-custom --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-workday-workweek-alloff --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-workday-workweek-malformed --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-networkdays-interval-7 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-networkdays-interval-31 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-networkdays-interval-365 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-networkdays-interval-4096 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-workday-offset-0 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-workday-offset-1 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-workday-offset-64 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-workday-offset-256 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-workday-offset-1024 --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-sequence-networkdays-projection --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-sequence-workday-projection --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-projected-day --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-lazy-unselected --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-timestamp-now --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-timestamp-today --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-timestamp-eastersunday --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-missing-now --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-missing-today --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-missing-eastersunday --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-list-refusal --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-direct-sequence-refusal --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-cancel-networkdays --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-cancel-workday --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-resource-networkdays --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-work-limit-networkdays --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-formula-error-sequence --phase evaluate --warmups 0 --iterations 1 --preflight-only",
+      "/var/tmp/litchi-ods-date-time-candidate-final-9a8gmuae/release/ods-formula-date-time-performance --case date-dateparam-error --phase evaluate --warmups 0 --iterations 1 --preflight-only"
+    ],
+    "descriptions": {
+      "array-control-16x16-arithmetic": {
+        "evaluation_path": "value",
+        "expected": [
+          [
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702
+          ],
+          [
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608
+          ],
+          [
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514
+          ],
+          [
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42
+          ],
+          [
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749
+          ],
+          [
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655
+          ],
+          [
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561
+          ],
+          [
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467
+          ],
+          [
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796
+          ],
+          [
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702
+          ],
+          [
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608
+          ],
+          [
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514
+          ],
+          [
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42
+          ],
+          [
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749
+          ],
+          [
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655
+          ],
+          [
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561,
+            1.608,
+            1.655,
+            1.702,
+            1.749,
+            1.796,
+            1.42,
+            1.467,
+            1.514,
+            1.561
+          ]
+        ],
+        "shape": "16x16",
+        "source": "={0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000|0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000|0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000}+1.25"
+      },
+      "array-control-16x16-sin": {
+        "evaluation_path": "value",
+        "expected": [
+          [
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615
+          ],
+          [
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646
+          ],
+          [
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687
+          ],
+          [
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603
+          ],
+          [
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706
+          ],
+          [
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043
+          ],
+          [
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015
+          ],
+          [
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674
+          ],
+          [
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527
+          ],
+          [
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615
+          ],
+          [
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646
+          ],
+          [
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687
+          ],
+          [
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603
+          ],
+          [
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706
+          ],
+          [
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043
+          ],
+          [
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706,
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015
+          ]
+        ],
+        "shape": "16x16",
+        "source": "=SIN({0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000|0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000|0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000})"
+      },
+      "array-control-4x4-arithmetic": {
+        "evaluation_path": "value",
+        "expected": [
+          [
+            1.42,
+            1.467,
+            1.514,
+            1.561
+          ],
+          [
+            1.608,
+            1.655,
+            1.702,
+            1.749
+          ],
+          [
+            1.796,
+            1.42,
+            1.467,
+            1.514
+          ],
+          [
+            1.561,
+            1.608,
+            1.655,
+            1.702
+          ]
+        ],
+        "shape": "4x4",
+        "source": "={0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000}+1.25"
+      },
+      "array-control-4x4-sin": {
+        "evaluation_path": "value",
+        "expected": [
+          [
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687,
+            0.3060108173253015
+          ],
+          [
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615,
+            0.47854771647582706
+          ],
+          [
+            0.5192729584437527,
+            0.16918234906699603,
+            0.21530095309184674,
+            0.2609440448548687
+          ],
+          [
+            0.3060108173253015,
+            0.3504017363273646,
+            0.39401876037078043,
+            0.4367655571845615
+          ]
+        ],
+        "shape": "4x4",
+        "source": "=SIN({0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000})"
+      },
+      "concat-borrowed-literals": {
+        "evaluation_path": "scalar",
+        "expected": "leftright",
+        "shape": "scalar",
+        "source": "=\"left\"&\"right\""
+      },
+      "concat-growth-chain": {
+        "evaluation_path": "scalar",
+        "expected": "abcdefgh",
+        "shape": "scalar",
+        "source": "=\"a\"&\"b\"&\"c\"&\"d\"&\"e\"&\"f\"&\"g\"&\"h\""
+      },
+      "concat-owned-left": {
+        "evaluation_path": "scalar",
+        "expected": "leftmidright",
+        "shape": "scalar",
+        "source": "=(\"left\"&\"mid\")&\"right\""
+      },
+      "concat-owned-right": {
+        "evaluation_path": "scalar",
+        "expected": "leftmidright",
+        "shape": "scalar",
+        "source": "\"left\"&(\"mid\"&\"right\")"
+      },
+      "database-control-dstdev": {
+        "evaluation_path": "value",
+        "expected": 3.0,
+        "shape": "scalar",
+        "source": "=DSTDEV([.A1:.B4];2;[.D1:.D2])"
+      },
+      "database-control-dsum": {
+        "evaluation_path": "value",
+        "expected": 12.0,
+        "shape": "scalar",
+        "source": "=DSUM([.A1:.B4];2;[.D1:.D2])"
+      },
+      "database-control-dvar": {
+        "evaluation_path": "value",
+        "expected": 9.0,
+        "shape": "scalar",
+        "source": "=DVAR([.A1:.B4];2;[.D1:.D2])"
+      },
+      "date-boundary-date-1900": {
+        "evaluation_path": "scalar",
+        "expected": 61.0,
+        "shape": "scalar",
+        "source": "=DATE(1900;3;1)"
+      },
+      "date-boundary-date-rollover": {
+        "evaluation_path": "scalar",
+        "expected": 43891.0,
+        "shape": "scalar",
+        "source": "=DATE(2020;2;30)"
+      },
+      "date-boundary-days360-eu": {
+        "evaluation_path": "scalar",
+        "expected": 29.0,
+        "shape": "scalar",
+        "source": "=DAYS360(DATE(2024;1;31);DATE(2024;2;29);TRUE())"
+      },
+      "date-boundary-edate-clamp": {
+        "evaluation_path": "scalar",
+        "expected": 45351.0,
+        "shape": "scalar",
+        "source": "=EDATE(DATE(2024;1;31);1)"
+      },
+      "date-boundary-eomonth-clamp": {
+        "evaluation_path": "scalar",
+        "expected": 45351.0,
+        "shape": "scalar",
+        "source": "=EOMONTH(DATE(2024;2;10);0)"
+      },
+      "date-boundary-weekday-17": {
+        "evaluation_path": "scalar",
+        "expected": 1.0,
+        "shape": "scalar",
+        "source": "=WEEKDAY(DATE(2024;1;7);17)"
+      },
+      "date-boundary-weeknum-noninteger": {
+        "evaluation_path": "scalar",
+        "expected": "#NUM!",
+        "shape": "scalar",
+        "source": "=WEEKNUM(44199;21.5)"
+      },
+      "date-boundary-yearfrac-basis1": {
+        "evaluation_path": "scalar",
+        "expected": 1.0,
+        "shape": "scalar",
+        "source": "=YEARFRAC(DATE(2024;1;1);DATE(2025;1;1);1)"
+      },
+      "date-cancel-networkdays": {
+        "evaluation_path": "value",
+        "expected": {
+          "failure": "Cancelled"
+        },
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.A1:.A16])"
+      },
+      "date-cancel-workday": {
+        "evaluation_path": "value",
+        "expected": {
+          "failure": "Cancelled"
+        },
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;1;1);64;[.A1:.A16])"
+      },
+      "date-core-date": {
+        "evaluation_path": "scalar",
+        "expected": 44197.0,
+        "shape": "scalar",
+        "source": "=DATE(2020;13;1)"
+      },
+      "date-core-datedif": {
+        "evaluation_path": "scalar",
+        "expected": 1.0,
+        "shape": "scalar",
+        "source": "=DATEDIF(DATE(2020;1;31);DATE(2021;3;1);\"Y\")"
+      },
+      "date-core-datevalue": {
+        "evaluation_path": "scalar",
+        "expected": 45382.0,
+        "shape": "scalar",
+        "source": "=DATEVALUE(\"2024-03-31T12:34:56\")"
+      },
+      "date-core-day": {
+        "evaluation_path": "scalar",
+        "expected": 31.0,
+        "shape": "scalar",
+        "source": "=DAY(DATE(2024;3;31)+0.75)"
+      },
+      "date-core-days": {
+        "evaluation_path": "scalar",
+        "expected": 1.0,
+        "shape": "scalar",
+        "source": "=DAYS(DATE(2024;4;1)+0.5;DATE(2024;3;31)+0.5)"
+      },
+      "date-core-days360": {
+        "evaluation_path": "scalar",
+        "expected": 29.0,
+        "shape": "scalar",
+        "source": "=DAYS360(DATE(2024;1;31);DATE(2024;2;29))"
+      },
+      "date-core-eastersunday": {
+        "evaluation_path": "scalar",
+        "expected": 45382.0,
+        "shape": "scalar",
+        "source": "=EASTERSUNDAY(2024)"
+      },
+      "date-core-edate": {
+        "evaluation_path": "scalar",
+        "expected": 45351.0,
+        "shape": "scalar",
+        "source": "=EDATE(DATE(2024;1;31);1)"
+      },
+      "date-core-eomonth": {
+        "evaluation_path": "scalar",
+        "expected": 45351.0,
+        "shape": "scalar",
+        "source": "=EOMONTH(DATE(2024;2;10);0)"
+      },
+      "date-core-hour": {
+        "evaluation_path": "scalar",
+        "expected": 18.0,
+        "shape": "scalar",
+        "source": "=HOUR(0.75)"
+      },
+      "date-core-isoweeknum": {
+        "evaluation_path": "scalar",
+        "expected": 1.0,
+        "shape": "scalar",
+        "source": "=ISOWEEKNUM(DATE(2024;1;1))"
+      },
+      "date-core-minute": {
+        "evaluation_path": "scalar",
+        "expected": 54.0,
+        "shape": "scalar",
+        "source": "=MINUTE(-1/256)"
+      },
+      "date-core-month": {
+        "evaluation_path": "scalar",
+        "expected": 3.0,
+        "shape": "scalar",
+        "source": "=MONTH(DATE(2024;3;31)+0.5)"
+      },
+      "date-core-networkdays": {
+        "evaluation_path": "scalar",
+        "expected": 2.0,
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;3;29);DATE(2024;4;1))"
+      },
+      "date-core-now": {
+        "evaluation_path": "scalar",
+        "expected": 45382.5,
+        "shape": "scalar",
+        "source": "=NOW()"
+      },
+      "date-core-second": {
+        "evaluation_path": "scalar",
+        "expected": 22.0,
+        "shape": "scalar",
+        "source": "=SECOND(-1/256)"
+      },
+      "date-core-time": {
+        "evaluation_path": "scalar",
+        "expected": 0.5208333333333334,
+        "shape": "scalar",
+        "source": "=TIME(12;30;0)"
+      },
+      "date-core-timevalue": {
+        "evaluation_path": "scalar",
+        "expected": 0.5208333333333334,
+        "shape": "scalar",
+        "source": "=TIMEVALUE(\"12:30:00\")"
+      },
+      "date-core-today": {
+        "evaluation_path": "scalar",
+        "expected": 45382.0,
+        "shape": "scalar",
+        "source": "=TODAY()"
+      },
+      "date-core-weekday": {
+        "evaluation_path": "scalar",
+        "expected": 1.0,
+        "shape": "scalar",
+        "source": "=WEEKDAY(DATE(2024;1;1);2)"
+      },
+      "date-core-weeknum": {
+        "evaluation_path": "scalar",
+        "expected": 1.0,
+        "shape": "scalar",
+        "source": "=WEEKNUM(DATE(2024;1;1);21)"
+      },
+      "date-core-workday": {
+        "evaluation_path": "scalar",
+        "expected": 45383.0,
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;3;29);1)"
+      },
+      "date-core-year": {
+        "evaluation_path": "scalar",
+        "expected": 2024.0,
+        "shape": "scalar",
+        "source": "=YEAR(DATE(2024;3;31)+0.5)"
+      },
+      "date-core-yearfrac": {
+        "evaluation_path": "scalar",
+        "expected": 1.0027397260273974,
+        "shape": "scalar",
+        "source": "=YEARFRAC(DATE(2024;1;1);DATE(2025;1;1);3)"
+      },
+      "date-dateparam-error": {
+        "evaluation_path": "value",
+        "expected": "#N/A",
+        "shape": "1x1",
+        "source": "=DAY([.C1])"
+      },
+      "date-direct-sequence-refusal": {
+        "evaluation_path": "value",
+        "expected": "#VALUE!",
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.A1:.A2]~[.A3:.A4])"
+      },
+      "date-formula-error-sequence": {
+        "evaluation_path": "value",
+        "expected": "#N/A",
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.C1:.C16])"
+      },
+      "date-lazy-unselected": {
+        "evaluation_path": "value",
+        "expected": [
+          0.0,
+          0.0
+        ],
+        "shape": "2x1",
+        "source": "=IF({FALSE()|FALSE()};NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.A1:.A256];[.B1:.B7]);0)"
+      },
+      "date-list-refusal": {
+        "evaluation_path": "value",
+        "expected": "#VALUE!",
+        "shape": "scalar",
+        "source": "=DAY([.A1:.A2]~[.A3:.A4])"
+      },
+      "date-missing-eastersunday": {
+        "evaluation_path": "scalar",
+        "expected": {
+          "failure": "CalculationClock"
+        },
+        "shape": "scalar",
+        "source": "=EASTERSUNDAY()"
+      },
+      "date-missing-now": {
+        "evaluation_path": "scalar",
+        "expected": {
+          "failure": "CalculationClock"
+        },
+        "shape": "scalar",
+        "source": "=NOW()"
+      },
+      "date-missing-today": {
+        "evaluation_path": "scalar",
+        "expected": {
+          "failure": "CalculationClock"
+        },
+        "shape": "scalar",
+        "source": "=TODAY()"
+      },
+      "date-networkdays-holidays-0": {
+        "evaluation_path": "value",
+        "expected": 262.0,
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;31))"
+      },
+      "date-networkdays-holidays-1": {
+        "evaluation_path": "value",
+        "expected": 261.0,
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;31);[.A1:.A1])"
+      },
+      "date-networkdays-holidays-16": {
+        "evaluation_path": "value",
+        "expected": 250.0,
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;31);[.A1:.A16])"
+      },
+      "date-networkdays-holidays-256": {
+        "evaluation_path": "value",
+        "expected": 246.0,
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;31);[.A1:.A256])"
+      },
+      "date-networkdays-holidays-64": {
+        "evaluation_path": "value",
+        "expected": 246.0,
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;31);[.A1:.A64])"
+      },
+      "date-networkdays-interval-31": {
+        "evaluation_path": "scalar",
+        "expected": 23.0,
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;1;31))"
+      },
+      "date-networkdays-interval-365": {
+        "evaluation_path": "scalar",
+        "expected": 261.0,
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;30))"
+      },
+      "date-networkdays-interval-4096": {
+        "evaluation_path": "scalar",
+        "expected": 2926.0,
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2035;3;19))"
+      },
+      "date-networkdays-interval-7": {
+        "evaluation_path": "scalar",
+        "expected": 5.0,
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;1;7))"
+      },
+      "date-networkdays-workweek-alloff": {
+        "evaluation_path": "value",
+        "expected": 0.0,
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);;[.B1:.B7])"
+      },
+      "date-networkdays-workweek-custom": {
+        "evaluation_path": "value",
+        "expected": 32.0,
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);;[.B1:.B7])"
+      },
+      "date-networkdays-workweek-default": {
+        "evaluation_path": "value",
+        "expected": 24.0,
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);;[.B1:.B7])"
+      },
+      "date-networkdays-workweek-malformed": {
+        "evaluation_path": "value",
+        "expected": "#VALUE!",
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);;[.B1:.B7])"
+      },
+      "date-parser-datevalue-datetime": {
+        "evaluation_path": "scalar",
+        "expected": 45382.0,
+        "shape": "scalar",
+        "source": "=DATEVALUE(\"2024-03-31 12:34:56\")"
+      },
+      "date-parser-datevalue-enus": {
+        "evaluation_path": "scalar",
+        "expected": 45382.0,
+        "shape": "scalar",
+        "source": "=DATEVALUE(\"3/31/2024\")"
+      },
+      "date-parser-datevalue-iso": {
+        "evaluation_path": "scalar",
+        "expected": 45382.0,
+        "shape": "scalar",
+        "source": "=DATEVALUE(\"2024-03-31\")"
+      },
+      "date-parser-datevalue-month": {
+        "evaluation_path": "scalar",
+        "expected": 45382.0,
+        "shape": "scalar",
+        "source": "=DATEVALUE(\"Mar 31, 2024\")"
+      },
+      "date-parser-datevalue-number": {
+        "evaluation_path": "scalar",
+        "expected": 123.0,
+        "shape": "scalar",
+        "source": "=DATEVALUE(\"123\")"
+      },
+      "date-parser-timevalue-clock": {
+        "evaluation_path": "scalar",
+        "expected": 0.5208333333333334,
+        "shape": "scalar",
+        "source": "=TIMEVALUE(\"12:30:00\")"
+      },
+      "date-parser-timevalue-datetime": {
+        "evaluation_path": "scalar",
+        "expected": 0.12783564814814816,
+        "shape": "scalar",
+        "source": "=TIMEVALUE(\"2020-01-02T03:04:05\")"
+      },
+      "date-parser-timevalue-fraction": {
+        "evaluation_path": "scalar",
+        "expected": 0.5208391203703704,
+        "shape": "scalar",
+        "source": "=TIMEVALUE(\"12:30:00.5\")"
+      },
+      "date-parser-timevalue-number": {
+        "evaluation_path": "scalar",
+        "expected": 0.5,
+        "shape": "scalar",
+        "source": "=TIMEVALUE(\"0.5\")"
+      },
+      "date-projected-day": {
+        "evaluation_path": "value",
+        "expected": [
+          29.0,
+          1.0
+        ],
+        "shape": "2x1",
+        "source": "=DAY({43890|43891})"
+      },
+      "date-resource-networkdays": {
+        "evaluation_path": "value",
+        "expected": {
+          "failure": "ReferenceCells"
+        },
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.A1:.A16])"
+      },
+      "date-sequence-networkdays-projection": {
+        "evaluation_path": "value",
+        "expected": [
+          22.0,
+          22.0
+        ],
+        "shape": "2x1",
+        "source": "=IF({TRUE()|TRUE()};NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.A1:.A16];[.B1:.B7]);0)"
+      },
+      "date-sequence-workday-projection": {
+        "evaluation_path": "value",
+        "expected": [
+          45385.0,
+          45385.0
+        ],
+        "shape": "2x1",
+        "source": "=IF({TRUE()|TRUE()};WORKDAY(DATE(2024;1;1);64;[.A1:.A16];[.B1:.B7]);0)"
+      },
+      "date-timestamp-eastersunday": {
+        "evaluation_path": "scalar",
+        "expected": 45767.0,
+        "shape": "scalar",
+        "source": "=EASTERSUNDAY()"
+      },
+      "date-timestamp-now": {
+        "evaluation_path": "scalar",
+        "expected": 45382.5,
+        "shape": "scalar",
+        "source": "=NOW()"
+      },
+      "date-timestamp-today": {
+        "evaluation_path": "scalar",
+        "expected": 45382.0,
+        "shape": "scalar",
+        "source": "=TODAY()"
+      },
+      "date-work-limit-networkdays": {
+        "evaluation_path": "scalar",
+        "expected": {
+          "failure": "Work"
+        },
+        "shape": "scalar",
+        "source": "=NETWORKDAYS(DATE(2024;1;1);DATE(2035;3;19))"
+      },
+      "date-workday-holidays-0": {
+        "evaluation_path": "value",
+        "expected": 45380.0,
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;1;1);64)"
+      },
+      "date-workday-holidays-1": {
+        "evaluation_path": "value",
+        "expected": 45380.0,
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;1;1);64;[.A1:.A1])"
+      },
+      "date-workday-holidays-16": {
+        "evaluation_path": "value",
+        "expected": 45385.0,
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;1;1);64;[.A1:.A16])"
+      },
+      "date-workday-holidays-256": {
+        "evaluation_path": "value",
+        "expected": 45385.0,
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;1;1);64;[.A1:.A256])"
+      },
+      "date-workday-holidays-64": {
+        "evaluation_path": "value",
+        "expected": 45385.0,
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;1;1);64;[.A1:.A64])"
+      },
+      "date-workday-offset-0": {
+        "evaluation_path": "scalar",
+        "expected": 45292.0,
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;1;1);0)"
+      },
+      "date-workday-offset-1": {
+        "evaluation_path": "scalar",
+        "expected": 45293.0,
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;1;1);1)"
+      },
+      "date-workday-offset-1024": {
+        "evaluation_path": "scalar",
+        "expected": 46724.0,
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;1;1);1024)"
+      },
+      "date-workday-offset-256": {
+        "evaluation_path": "scalar",
+        "expected": 45650.0,
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;1;1);256)"
+      },
+      "date-workday-offset-64": {
+        "evaluation_path": "scalar",
+        "expected": 45380.0,
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;1;1);64)"
+      },
+      "date-workday-workweek-alloff": {
+        "evaluation_path": "value",
+        "expected": "#NUM!",
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;1;1);1;;[.B1:.B7])"
+      },
+      "date-workday-workweek-custom": {
+        "evaluation_path": "value",
+        "expected": 45356.0,
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;1;1);64;;[.B1:.B7])"
+      },
+      "date-workday-workweek-default": {
+        "evaluation_path": "value",
+        "expected": 45380.0,
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;1;1);64;;[.B1:.B7])"
+      },
+      "date-workday-workweek-malformed": {
+        "evaluation_path": "value",
+        "expected": "#VALUE!",
+        "shape": "scalar",
+        "source": "=WORKDAY(DATE(2024;1;1);64;;[.B1:.B7])"
+      },
+      "lazy-if-cache-isblank": {
+        "evaluation_path": "value",
+        "expected": [
+          true,
+          false
+        ],
+        "shape": "2x1",
+        "source": "=IF({TRUE()|TRUE()};ISBLANK([.A1:.A2]);FALSE())"
+      },
+      "lazy-if-cache-isnumber": {
+        "evaluation_path": "value",
+        "expected": [
+          true,
+          false
+        ],
+        "shape": "2x1",
+        "source": "=IF({TRUE()|TRUE()};ISNUMBER([.A3:.A4]);FALSE())"
+      },
+      "lazy-if-cache-istext": {
+        "evaluation_path": "value",
+        "expected": [
+          false,
+          true
+        ],
+        "shape": "2x1",
+        "source": "=IF({TRUE()|TRUE()};ISTEXT([.A1:.A2]);FALSE())"
+      },
+      "literal-aggregate-4x1-sum": {
+        "evaluation_path": "value",
+        "expected": 10.0,
+        "shape": "1x1",
+        "source": "=SUM({1|2|3|4})"
+      },
+      "reference-aggregate-64x4-sum": {
+        "evaluation_path": "value",
+        "expected": 260.5999999999999,
+        "shape": "scalar",
+        "source": "=SUM([.A1:.D64])"
+      },
+      "reference-array-16x4-arithmetic": {
+        "evaluation_path": "value",
+        "expected": [
+          [
+            2.26,
+            2.261,
+            2.262,
+            2.263
+          ],
+          [
+            2.2640000000000002,
+            2.2649999999999997,
+            2.266,
+            2.267
+          ],
+          [
+            2.268,
+            2.269,
+            2.27,
+            2.271
+          ],
+          [
+            2.2720000000000002,
+            2.2729999999999997,
+            2.274,
+            2.275
+          ],
+          [
+            2.276,
+            2.26,
+            2.261,
+            2.262
+          ],
+          [
+            2.263,
+            2.2640000000000002,
+            2.2649999999999997,
+            2.266
+          ],
+          [
+            2.267,
+            2.268,
+            2.269,
+            2.27
+          ],
+          [
+            2.271,
+            2.2720000000000002,
+            2.2729999999999997,
+            2.274
+          ],
+          [
+            2.275,
+            2.276,
+            2.26,
+            2.261
+          ],
+          [
+            2.262,
+            2.263,
+            2.2640000000000002,
+            2.2649999999999997
+          ],
+          [
+            2.266,
+            2.267,
+            2.268,
+            2.269
+          ],
+          [
+            2.27,
+            2.271,
+            2.2720000000000002,
+            2.2729999999999997
+          ],
+          [
+            2.274,
+            2.275,
+            2.276,
+            2.26
+          ],
+          [
+            2.261,
+            2.262,
+            2.263,
+            2.2640000000000002
+          ],
+          [
+            2.2649999999999997,
+            2.266,
+            2.267,
+            2.268
+          ],
+          [
+            2.269,
+            2.27,
+            2.271,
+            2.2720000000000002
+          ]
+        ],
+        "shape": "16x4",
+        "source": "=[.A1:.D16]+1.25"
+      },
+      "reference-conditional-256x4-sumifs": {
+        "evaluation_path": "value",
+        "expected": 4232.0,
+        "shape": "scalar",
+        "source": "=SUMIFS([.I1:.L256];[.A1:.D256];\">=2\";[.E1:.H256];1)"
+      },
+      "reference-control-average": {
+        "evaluation_path": "value",
+        "expected": 1.0179687499999996,
+        "shape": "scalar",
+        "source": "=AVERAGE([.A1:.D64])"
+      },
+      "reference-control-counta": {
+        "evaluation_path": "value",
+        "expected": 256.0,
+        "shape": "scalar",
+        "source": "=COUNTA([.E1:.H64])"
+      },
+      "representative-median": {
+        "evaluation_path": "scalar",
+        "expected": 3.0,
+        "shape": "scalar",
+        "source": "=MEDIAN(1;2;4;8)"
+      },
+      "representative-percentrank": {
+        "evaluation_path": "scalar",
+        "expected": 1.0,
+        "shape": "scalar",
+        "source": "=PERCENTRANK(8;8;3)"
+      },
+      "representative-rank": {
+        "evaluation_path": "scalar",
+        "expected": 1.0,
+        "shape": "scalar",
+        "source": "=RANK(8;8;1)"
+      },
+      "scalar-aggregate-sum": {
+        "evaluation_path": "scalar",
+        "expected": 1.25,
+        "shape": "scalar",
+        "source": "=SUM(1.25)"
+      },
+      "scalar-control-arithmetic": {
+        "evaluation_path": "scalar",
+        "expected": 1.42,
+        "shape": "scalar",
+        "source": "=0.17+1.25"
+      },
+      "scalar-control-average": {
+        "evaluation_path": "scalar",
+        "expected": 2.5,
+        "shape": "scalar",
+        "source": "=AVERAGE(1.25;2.5;3.75)"
+      },
+      "scalar-control-counta": {
+        "evaluation_path": "scalar",
+        "expected": 3.0,
+        "shape": "scalar",
+        "source": "=COUNTA(1.25;\"x\";TRUE())"
+      },
+      "scalar-control-imsum": {
+        "evaluation_path": "scalar",
+        "expected": 3.0,
+        "shape": "scalar",
+        "source": "=IMREAL(IMSUM(COMPLEX(2;3);COMPLEX(1;4)))"
+      },
+      "scalar-control-sin": {
+        "evaluation_path": "scalar",
+        "expected": 0.16918234906699603,
+        "shape": "scalar",
+        "source": "=SIN(0.17)"
+      },
+      "scalar-control-stdev": {
+        "evaluation_path": "scalar",
+        "expected": 1.25,
+        "shape": "scalar",
+        "source": "=STDEV(1.25;2.5;3.75)"
+      },
+      "scalar-control-var": {
+        "evaluation_path": "scalar",
+        "expected": 1.5625,
+        "shape": "scalar",
+        "source": "=VAR(1.25;2.5;3.75)"
+      },
+      "value-date-fraction-value-date": {
+        "evaluation_path": "scalar",
+        "expected": 45293.0,
+        "shape": "scalar",
+        "source": "=VALUE(\"2024-01-02\")"
+      },
+      "value-date-fraction-value-mixed-fraction": {
+        "evaluation_path": "scalar",
+        "expected": 3.5,
+        "shape": "scalar",
+        "source": "=VALUE(\"3 1/2\")"
+      },
+      "value-date-fraction-value-time": {
+        "evaluation_path": "scalar",
+        "expected": 0.5242592592592593,
+        "shape": "scalar",
+        "source": "=VALUE(\"12:34:56\")"
+      }
+    },
+    "iterations": 1,
+    "phase": "evaluate",
+    "reference_reads": {
+      "array-control-16x16-arithmetic": 0,
+      "array-control-16x16-sin": 0,
+      "array-control-4x4-arithmetic": 0,
+      "array-control-4x4-sin": 0,
+      "concat-borrowed-literals": 0,
+      "concat-growth-chain": 0,
+      "concat-owned-left": 0,
+      "concat-owned-right": 0,
+      "database-control-dstdev": 7,
+      "database-control-dsum": 7,
+      "database-control-dvar": 7,
+      "date-boundary-date-1900": 0,
+      "date-boundary-date-rollover": 0,
+      "date-boundary-days360-eu": 0,
+      "date-boundary-edate-clamp": 0,
+      "date-boundary-eomonth-clamp": 0,
+      "date-boundary-weekday-17": 0,
+      "date-boundary-weeknum-noninteger": 0,
+      "date-boundary-yearfrac-basis1": 0,
+      "date-cancel-networkdays": 1,
+      "date-cancel-workday": 1,
+      "date-core-date": 0,
+      "date-core-datedif": 0,
+      "date-core-datevalue": 0,
+      "date-core-day": 0,
+      "date-core-days": 0,
+      "date-core-days360": 0,
+      "date-core-eastersunday": 0,
+      "date-core-edate": 0,
+      "date-core-eomonth": 0,
+      "date-core-hour": 0,
+      "date-core-isoweeknum": 0,
+      "date-core-minute": 0,
+      "date-core-month": 0,
+      "date-core-networkdays": 0,
+      "date-core-now": 0,
+      "date-core-second": 0,
+      "date-core-time": 0,
+      "date-core-timevalue": 0,
+      "date-core-today": 0,
+      "date-core-weekday": 0,
+      "date-core-weeknum": 0,
+      "date-core-workday": 0,
+      "date-core-year": 0,
+      "date-core-yearfrac": 0,
+      "date-dateparam-error": 1,
+      "date-direct-sequence-refusal": 0,
+      "date-formula-error-sequence": 16,
+      "date-lazy-unselected": 0,
+      "date-list-refusal": 0,
+      "date-missing-eastersunday": 0,
+      "date-missing-now": 0,
+      "date-missing-today": 0,
+      "date-networkdays-holidays-0": 0,
+      "date-networkdays-holidays-1": 1,
+      "date-networkdays-holidays-16": 16,
+      "date-networkdays-holidays-256": 256,
+      "date-networkdays-holidays-64": 64,
+      "date-networkdays-interval-31": 0,
+      "date-networkdays-interval-365": 0,
+      "date-networkdays-interval-4096": 0,
+      "date-networkdays-interval-7": 0,
+      "date-networkdays-workweek-alloff": 7,
+      "date-networkdays-workweek-custom": 7,
+      "date-networkdays-workweek-default": 7,
+      "date-networkdays-workweek-malformed": 7,
+      "date-parser-datevalue-datetime": 0,
+      "date-parser-datevalue-enus": 0,
+      "date-parser-datevalue-iso": 0,
+      "date-parser-datevalue-month": 0,
+      "date-parser-datevalue-number": 0,
+      "date-parser-timevalue-clock": 0,
+      "date-parser-timevalue-datetime": 0,
+      "date-parser-timevalue-fraction": 0,
+      "date-parser-timevalue-number": 0,
+      "date-projected-day": 0,
+      "date-resource-networkdays": 0,
+      "date-sequence-networkdays-projection": 46,
+      "date-sequence-workday-projection": 46,
+      "date-timestamp-eastersunday": 0,
+      "date-timestamp-now": 0,
+      "date-timestamp-today": 0,
+      "date-work-limit-networkdays": 0,
+      "date-workday-holidays-0": 0,
+      "date-workday-holidays-1": 1,
+      "date-workday-holidays-16": 16,
+      "date-workday-holidays-256": 256,
+      "date-workday-holidays-64": 64,
+      "date-workday-offset-0": 0,
+      "date-workday-offset-1": 0,
+      "date-workday-offset-1024": 0,
+      "date-workday-offset-256": 0,
+      "date-workday-offset-64": 0,
+      "date-workday-workweek-alloff": 7,
+      "date-workday-workweek-custom": 7,
+      "date-workday-workweek-default": 7,
+      "date-workday-workweek-malformed": 7,
+      "lazy-if-cache-isblank": 2,
+      "lazy-if-cache-isnumber": 2,
+      "lazy-if-cache-istext": 2,
+      "literal-aggregate-4x1-sum": 0,
+      "reference-aggregate-64x4-sum": 256,
+      "reference-array-16x4-arithmetic": 64,
+      "reference-conditional-256x4-sumifs": 1792,
+      "reference-control-average": 256,
+      "reference-control-counta": 256,
+      "representative-median": 0,
+      "representative-percentrank": 0,
+      "representative-rank": 0,
+      "scalar-aggregate-sum": 0,
+      "scalar-control-arithmetic": 0,
+      "scalar-control-average": 0,
+      "scalar-control-counta": 0,
+      "scalar-control-imsum": 0,
+      "scalar-control-sin": 0,
+      "scalar-control-stdev": 0,
+      "scalar-control-var": 0,
+      "value-date-fraction-value-date": 0,
+      "value-date-fraction-value-mixed-fraction": 0,
+      "value-date-fraction-value-time": 0
+    },
+    "status": "ok",
+    "stdout": "preflight.stdout.log",
+    "warmups": 0
+  },
+  "profile_input_sha256": {
+    "analyze_profile.py": "fe4c96bfe1e08f578351a9e596e97ddab783dd12bfe7ddf04e89c09c17d57cb6",
+    "case-matrix.json": "00f9d041b08a2c06f88754abb52799098da81a54d63c423f24a501097131ee70",
+    "development-preflight.json": "888010acbd90cb5e7b1eda1703448160c2d1de0d7b79a2268d472604ad9de89b",
+    "harness/Cargo.lock": "5261723f62e5ebbea6875cb51b29dbfbfdfd6dca1a651febf7779a2d65a70319",
+    "harness/Cargo.toml": "878f74e54b5d3511c37725e64618f6d5f74e7b8b1f91ae544192760fcdd83e15",
+    "harness/src/main.rs": "4ee72f232197b2e2f0d4aa57501d4d0d1abf8d54fc77c702063349df746edfb9",
+    "measurement-preflight.json": "892fc4f7b4569027090d1737d54f4aad65d472768cce1c73a835fc9304308ac5",
+    "performance-plan.md": "e1c5f9a3781bdf5a14f9735bf3a421a3050c2f1a3c2cb3b2f8b2c096eb1c2e9a",
+    "run_profile.py": "5fe1c77ce699f0c9f4bfaa70afc705286bbde18023358a2f6288309774ec5d23",
+    "test_analyze_profile.py": "4f5d1a674fff99b9b254ae6c86ba6f2c460bafbb018112ae7ee442863612e28d",
+    "test_run_profile.py": "bccd03386e846c56040232a921c2fa4e3a3aa337a7ad5182e8492e037131bb70"
+  },
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "rustc_verbose": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+  "samples_per_group": 15,
+  "source_git_head": "45e56928edfc334b45132330d405bc4c7b6f7b4c",
+  "source_root": "/home/zhuhe/code/litchi-spec-gaps/.codex-tmp/ods-date-time-gates-6v44ua/checkout",
+  "warmups_per_child": 3
+}

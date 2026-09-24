@@ -1,0 +1,101 @@
+{
+  "status": "native observation retained; semantic contract landed, production support pending",
+  "scope": {
+    "functions": [
+      "ERROR.TYPE",
+      "ISBLANK",
+      "ISERR",
+      "ISERROR",
+      "ISEVEN",
+      "ISLOGICAL",
+      "ISNA",
+      "ISNONTEXT",
+      "ISNUMBER",
+      "ISODD",
+      "ISTEXT",
+      "N",
+      "NA",
+      "NUMBERVALUE",
+      "TYPE",
+      "VALUE"
+    ],
+    "formula_rows": 123,
+    "raw_inspection_rows": 28,
+    "conversion_rows": 95,
+    "comparison_counts": {
+      "exact": 49,
+      "numeric-tolerance": 46,
+      "error-kind-match": 11,
+      "divergence": 17
+    }
+  },
+  "fixture": {
+    "input": "inspection-native.fods",
+    "input_sha256": "a6f9147497ba3bbf5d5b6a5a75caa1a8d547d4cd53ab942d6b0ba1c542faec1a",
+    "recalculated_output": "recalculated.ods",
+    "recalculated_output_sha256": "cde1c8510ee5cfa7141a8a07ab77c1d584ebcfc7155c813b4f1317ee6e0f5955",
+    "recalculated_content_xml_sha256": "89974c848026ed2f98e8dc583d26630686cdd369379c7be4bc81e33b2cac3666",
+    "native_results": "native-results.json",
+    "authorship": "Repository-local fixture authored for this evidence receipt; no downloaded or upstream fixture content.",
+    "native_results_sha256": "523956c654c2c6cede4cc7900f81e7526a166de0db7a53afeb02b5e1dee1afba"
+  },
+  "converter": {
+    "executable": "/usr/bin/libreoffice",
+    "version": "LibreOffice 26.2.5.2 620(Build:2)",
+    "command": "libreoffice --headless -env:UserInstallation=file://<temporary-profile> --convert-to ods --outdir <temporary-output> inspection-native.fods",
+    "filter": "calc8",
+    "locale": {
+      "LANG": "C.UTF-8",
+      "LC_ALL": "C.UTF-8",
+      "LC_CTYPE": "C.UTF-8",
+      "LC_NUMERIC": "C.UTF-8"
+    },
+    "fresh_profile": true,
+    "recalculated": true,
+    "temporary_profile_removed_by_reproduce": true
+  },
+  "normative_source": {
+    "contract": "contract.md",
+    "contract_sha256": "f227e861c55e3360d60d41a42ee7f101ba3c29bbc00d25d56cc01d80c3cd7923",
+    "archive": "3rdparty/specs/OpenDocument-v1.4-os.zip",
+    "archive_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+    "member": "part4-formula/OpenDocument-v1.4-os-part4-formula.html",
+    "member_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+    "sections": [
+      "6.13.11",
+      "6.13.14-6.13.17",
+      "6.13.19-6.13.23",
+      "6.13.25-6.13.28",
+      "6.13.33-6.13.34"
+    ]
+  },
+  "interpretation": {
+    "profile": "Fixed en_US semantic contract; native host remains C.UTF-8 and is reported separately.",
+    "numeric_tolerance": "1e-13 relative/absolute for binary64 values.",
+    "error_codes": "#N/A is compared exactly; other generated formula errors are recorded as native tokens and compared by error kind.",
+    "formula_spelling": "formula is the authored input; native_formula records LibreOffice persistence, including scientific notation rewrites.",
+    "known_native_divergences": [
+      "LibreOffice uses native TYPE code 8 for a reference to a formula number and for a formula logical; direct TYPE(TRUE()) returns 1 under this host.",
+      "LibreOffice rejects numeric Text and Empty inputs for ISEVEN/ISODD even though the selected contract converts them.",
+      "LibreOffice rejects omitted NUMBERVALUE separators under this host although the contract default is decimal \".\" and group \",\".",
+      "LibreOffice accepts VALUE(\"1 1/100\") and VALUE(\"3/4\") despite the selected required mixed-fraction grammar.",
+      "LibreOffice rejects several required en_US date forms under C.UTF-8 and accepts VALUE(\"24:00\")/VALUE(\"1899-12-29\") outside the selected domain.",
+      "LibreOffice applies ordinary coercion to VALUE(Number/Logical) where the contract returns #VALUE!."
+    ]
+  },
+  "reproduction": {
+    "script": "reproduce.py",
+    "verification": "Checks input SHA-256, converts with a fresh profile, checks stable content.xml SHA-256 and exact typed formula/native-formula sequence against native-results.json. Temporary profile/output are removed on exit; raw ODS ZIP metadata is not used for reproduction equality."
+  },
+  "independent_oracle": {
+    "script": "../inspection_oracle.py",
+    "goldens": "../inspection-goldens.json",
+    "script_sha256": "bca73a83c699b56d09f11bdabf75c22b518901a8fc0a4b6c3778a4e61c6de270",
+    "goldens_sha256": "4cd3cfd4da0df1cfef9aa0d463b0c9b369c2c94579597a8a0ddc93df81ba1aa4",
+    "functions": 16,
+    "observations": 107,
+    "verification": "python3 inspection_oracle.py --check",
+    "rust_consumer_test": "crates/litchi-ods/tests/ods_formula_inspection_oracle.rs",
+    "rust_test_scope": "scalar rows without the <Empty> marker; resolver-backed Empty/Reference rows stay in existing evaluation/resource suites"
+  }
+}

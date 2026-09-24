@@ -1,0 +1,2 @@
+fbb969989aabed2e057b2ddfc4cfd10ef1f6ebe9b7697c3755283515158d5b09  test-data/ooxml/xlsb/date.xlsb
+6675f4bde45d1291e1d56783b7abe2857f56837ca674c7877dfc125fb49a4724  test-data/ooxml/xlsb/hyperlink.xlsb

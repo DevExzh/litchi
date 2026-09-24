@@ -131,6 +131,7 @@ pub(crate) fn owned_table(
             owned_cell.set_revision(cell.revision());
             owned_cell.set_borders(cell.borders().clone());
             owned_cell.set_shading(cell.shading());
+            owned_cell.set_paragraphs(cell.paragraphs().to_vec())?;
             for nested in cell.nested_tables() {
                 owned_cell.add_nested_table(nested.text_offset, owned_table(&nested.table)?)?;
             }
@@ -208,6 +209,11 @@ pub struct RtfDocument<'a> {
     xml_namespaces: Option<Vec<crate::XmlNamespace<'a>>>,
     /// Ordered inert custom XML markup tags spanning body text.
     custom_xml_tags: Vec<crate::CustomXmlTag<'a>>,
+    /// Ordered inert SmartTag/factoid ranges spanning body text.
+    smart_tags: Vec<crate::SmartTag<'a>>,
+    /// Whether a recognized move-bookmark marker lacks a same-kind start/end
+    /// match and therefore is not represented by a complete range.
+    unmatched_move_bookmarks: bool,
     /// Ordered inert math zones anchored in the body story.
     math_zones: Vec<crate::MathZone<'a>>,
     /// Ordered inert protection-exception ranges spanning body text.
@@ -331,6 +337,13 @@ pub struct RtfDocument<'a> {
     sections: Vec<super::super::section::Section<'a>>,
     /// Bookmarks
     bookmarks: super::super::bookmark::BookmarkTable<'a>,
+    /// Complete inert tracked-move start/end ranges in source order.
+    ///
+    /// A Move From and Move To range with the same tag are the two source
+    /// locations of one move.  The model retains that shared tag but does not
+    /// expose a cross-location pair index or apply deleted/inserted fallback
+    /// semantics when one location is absent.
+    move_bookmarks: Vec<crate::MoveBookmark<'a>>,
     /// Shapes
     pub(super) shapes: Vec<super::super::shape::Shape<'a>>,
     /// Exact source order of non-background root drawings in the body story.
@@ -712,6 +725,12 @@ impl<'a> RtfDocument<'a> {
                 .into_iter()
                 .map(crate::CustomXmlTag::into_owned)
                 .collect(),
+            smart_tags: parsed
+                .smart_tags
+                .into_iter()
+                .map(crate::SmartTag::into_owned)
+                .collect(),
+            unmatched_move_bookmarks: parsed.unmatched_move_bookmarks,
             math_zones: parsed
                 .math_zones
                 .into_iter()
@@ -817,6 +836,11 @@ impl<'a> RtfDocument<'a> {
                 .map(crate::ParagraphGroupPropertyTable::into_owned),
             sections: Self::convert_sections_to_owned(parsed.sections),
             bookmarks: Self::convert_bookmarks_to_owned(&parsed.bookmarks),
+            move_bookmarks: parsed
+                .move_bookmarks
+                .into_iter()
+                .map(crate::MoveBookmark::into_owned)
+                .collect(),
             shapes: Self::convert_shapes_to_owned(parsed.shapes),
             drawing_order: parsed.drawing_order,
             body_boundaries: parsed.body_boundaries,
@@ -1186,6 +1210,10 @@ impl<'a> RtfDocument<'a> {
         self.unknown_syntax_markers
     }
 
+    pub(crate) const fn has_unmatched_move_bookmarks(&self) -> bool {
+        self.unmatched_move_bookmarks
+    }
+
     pub(crate) fn field_safety(&self) -> &[crate::validation::FieldSafety] {
         &self.field_safety
     }
@@ -1223,6 +1251,30 @@ impl<'a> RtfDocument<'a> {
     pub(crate) fn local_paragraph_property_editability(&self) -> Result<(), &'static str> {
         if !self.body_story_events.is_empty() || !self.tables.is_empty() {
             return Err("the body contains tables or positioned structure");
+        }
+        Ok(())
+    }
+
+    pub(crate) fn positioned_paragraph_property_editability(&self) -> Result<(), &'static str> {
+        if !self.tables.is_empty() {
+            return Err("the body contains tables or positioned structure");
+        }
+        // Bookmark markers and passive break markers are zero-width body
+        // offsets. The layout writer re-emits them around the rewritten
+        // paragraph runs, so they do not change the paragraph's local
+        // property closure. Other story events carry payloads or paragraph
+        // boundaries that this narrow rewrite cannot reconstruct safely.
+        if self.body_story_events.iter().any(|event| {
+            !matches!(
+                event,
+                crate::BodyStoryEvent::BookmarkStart(_)
+                    | crate::BodyStoryEvent::BookmarkEnd(_)
+                    | crate::BodyStoryEvent::PageBreak(_)
+                    | crate::BodyStoryEvent::ColumnBreak(_)
+                    | crate::BodyStoryEvent::SoftBreak(_)
+            )
+        }) {
+            return Err("the body contains unsupported positioned structure");
         }
         Ok(())
     }
@@ -2571,6 +2623,66 @@ impl<'a> RtfDocument<'a> {
     #[must_use]
     pub fn custom_xml_tags(&self) -> &[crate::CustomXmlTag<'_>] {
         &self.custom_xml_tags
+    }
+
+    /// Return inert SmartTag/factoid ranges in body source order.
+    #[must_use]
+    pub fn smart_tags(&self) -> &[crate::SmartTag<'_>] {
+        &self.smart_tags
+    }
+
+    /// Replace one SmartTag's inert metadata while retaining its body range.
+    ///
+    /// The position and covered text must remain unchanged so the body story
+    /// and every other source-bound event keep their proven offsets.
+    pub fn replace_smart_tag(
+        &mut self,
+        index: usize,
+        tag: crate::SmartTag<'a>,
+    ) -> RtfResult<crate::SmartTag<'a>> {
+        tag.validate()?;
+        let current = self
+            .smart_tags
+            .get(index)
+            .ok_or_else(|| RtfError::MalformedDocument("SmartTag index is out of range".into()))?;
+        if current.position != tag.position || current.content != tag.content {
+            return Err(RtfError::MalformedDocument(
+                "SmartTag edits cannot change its body range".to_string(),
+            ));
+        }
+        Ok(std::mem::replace(
+            self.smart_tags.get_mut(index).ok_or_else(|| {
+                RtfError::MalformedDocument("SmartTag index is out of range".into())
+            })?,
+            tag,
+        ))
+    }
+
+    /// Remove one SmartTag's inert markers while retaining body text.
+    pub fn remove_smart_tag(&mut self, index: usize) -> RtfResult<crate::SmartTag<'a>> {
+        if index >= self.smart_tags.len() {
+            return Err(RtfError::MalformedDocument(
+                "SmartTag index is out of range".into(),
+            ));
+        }
+        let removed = self.smart_tags.remove(index);
+        self.body_story_events.retain(|event| {
+            !matches!(
+                event,
+                crate::BodyStoryEvent::SmartTagOpen(value)
+                    | crate::BodyStoryEvent::SmartTagClose(value)
+                    if *value == index
+            )
+        });
+        for event in &mut self.body_story_events {
+            if let crate::BodyStoryEvent::SmartTagOpen(value)
+            | crate::BodyStoryEvent::SmartTagClose(value) = event
+                && *value > index
+            {
+                *value -= 1;
+            }
+        }
+        Ok(removed)
     }
 
     /// Return the math zones anchored in the body story, in source order.
@@ -4151,6 +4263,72 @@ impl<'a> RtfDocument<'a> {
         &self.bookmarks
     }
 
+    /// Return complete inert tracked-move start/end ranges in body source order.
+    ///
+    /// Ranges with the same tag and opposite [`crate::MoveBookmarkKind`] values are
+    /// the corresponding Move From/Move To locations.  The retained model
+    /// keeps those ranges independent and performs no move execution or
+    /// deleted/inserted fallback when the other location is absent.
+    #[must_use]
+    pub fn move_bookmarks(&self) -> &[crate::MoveBookmark<'_>] {
+        &self.move_bookmarks
+    }
+
+    /// Replace one tracked-move bookmark's inert metadata while retaining its
+    /// kind, tag, and body range.
+    pub fn replace_move_bookmark(
+        &mut self,
+        index: usize,
+        bookmark: crate::MoveBookmark<'a>,
+    ) -> RtfResult<crate::MoveBookmark<'a>> {
+        bookmark.validate()?;
+        let current = self.move_bookmarks.get(index).ok_or_else(|| {
+            RtfError::MalformedDocument("move-bookmark index is out of range".into())
+        })?;
+        if current.kind != bookmark.kind
+            || current.tag != bookmark.tag
+            || current.position != bookmark.position
+            || current.content != bookmark.content
+        {
+            return Err(RtfError::MalformedDocument(
+                "move-bookmark edits cannot change its identity or body range".to_string(),
+            ));
+        }
+        Ok(std::mem::replace(
+            self.move_bookmarks.get_mut(index).ok_or_else(|| {
+                RtfError::MalformedDocument("move-bookmark index is out of range".into())
+            })?,
+            bookmark,
+        ))
+    }
+
+    /// Remove one tracked-move bookmark marker pair while retaining body text.
+    pub fn remove_move_bookmark(&mut self, index: usize) -> RtfResult<crate::MoveBookmark<'a>> {
+        if index >= self.move_bookmarks.len() {
+            return Err(RtfError::MalformedDocument(
+                "move-bookmark index is out of range".into(),
+            ));
+        }
+        let removed = self.move_bookmarks.remove(index);
+        self.body_story_events.retain(|event| {
+            !matches!(
+                event,
+                crate::BodyStoryEvent::MoveBookmarkStart(value)
+                    | crate::BodyStoryEvent::MoveBookmarkEnd(value)
+                    if *value == index
+            )
+        });
+        for event in &mut self.body_story_events {
+            if let crate::BodyStoryEvent::MoveBookmarkStart(value)
+            | crate::BodyStoryEvent::MoveBookmarkEnd(value) = event
+                && *value > index
+            {
+                *value -= 1;
+            }
+        }
+        Ok(removed)
+    }
+
     /// Get all shapes in the document.
     ///
     /// Returns drawing objects, text boxes, and other shapes.
@@ -4959,6 +5137,13 @@ impl<'a> RtfDocument<'a> {
                 let bookmark = self.bookmarks.bookmarks().get(index)?;
                 bookmark.position.checked_add(bookmark.content.len())?
             },
+            crate::BodyStoryEvent::MoveBookmarkStart(index) => {
+                self.move_bookmarks.get(index)?.position
+            },
+            crate::BodyStoryEvent::MoveBookmarkEnd(index) => {
+                let bookmark = self.move_bookmarks.get(index)?;
+                bookmark.position.checked_add(bookmark.content.len())?
+            },
             crate::BodyStoryEvent::AnnotationStart(index) => self.annotations.get(index)?.position,
             crate::BodyStoryEvent::AnnotationEnd(index) => self.annotations.get(index)?.range_end,
             crate::BodyStoryEvent::Note(index) => self.notes.get(index)?.position,
@@ -4988,6 +5173,11 @@ impl<'a> RtfDocument<'a> {
             },
             crate::BodyStoryEvent::CustomXmlClose(index) => {
                 let tag = self.custom_xml_tags.get(index)?;
+                tag.position.checked_add(tag.content.len())?
+            },
+            crate::BodyStoryEvent::SmartTagOpen(index) => self.smart_tags.get(index)?.position,
+            crate::BodyStoryEvent::SmartTagClose(index) => {
+                let tag = self.smart_tags.get(index)?;
                 tag.position.checked_add(tag.content.len())?
             },
             crate::BodyStoryEvent::MathZone(index) => self.math_zones.get(index)?.position,

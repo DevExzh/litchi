@@ -26,6 +26,7 @@ mod stream_move;
 mod validation;
 pub mod writer;
 
+pub use directory_name::{DirectoryNameKey, directory_names_equal, validate_directory_name};
 pub use file::{DirectoryEntry, OleError, OleFile, OleFileLimits, is_ole_file};
 pub use overlay::{
     ArtifactFingerprint, ComposedOverlaySource, OutputProgress, OverlayError, OverlayLimits,

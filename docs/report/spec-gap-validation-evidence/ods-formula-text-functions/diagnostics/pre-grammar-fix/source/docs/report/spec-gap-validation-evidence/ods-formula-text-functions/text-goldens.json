@@ -1,0 +1,4794 @@
+{
+  "schema": "litchi-ods-text-oracle-v1",
+  "contract_sha256": "b0b7f6ffd8a33c93f98c9728c938eb2d55476680e11797a9b87dcf49223312e7",
+  "normative_source": {
+    "archive_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+    "member_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+    "sections": [
+      "6.20.2",
+      "6.20.3",
+      "6.20.4",
+      "6.20.5",
+      "6.20.6",
+      "6.20.7",
+      "6.20.8",
+      "6.20.9",
+      "6.20.10",
+      "6.20.11",
+      "6.20.12",
+      "6.20.13",
+      "6.20.14",
+      "6.20.15",
+      "6.20.16",
+      "6.20.17",
+      "6.20.18",
+      "6.20.19",
+      "6.20.20",
+      "6.20.21",
+      "6.20.22",
+      "6.20.23",
+      "6.20.24",
+      "6.20.25",
+      "6.20.26",
+      "6.20.27"
+    ]
+  },
+  "profile": {
+    "unicode": "17.0.0-selected-pinned-data",
+    "character_unit": "unicode_scalar_value",
+    "byte_functions": "out_of_scope_for_this_26_function_oracle",
+    "normalization": "none",
+    "search": "literal; FIND sensitive; SEARCH Unicode-case-insensitive",
+    "format_provider": "test-en-US-dollar-comma-period-half-away",
+    "currency_symbol": "$",
+    "decimal_separator": ".",
+    "group_separator": ",",
+    "default_currency_decimals": 2,
+    "rounding": "half-away-from-zero",
+    "comparison": "exact UTF-8 text / exact logical / exact binary64 bits"
+  },
+  "function_counts": {
+    "ASC": 4,
+    "CHAR": 6,
+    "CLEAN": 3,
+    "CODE": 4,
+    "CONCATENATE": 5,
+    "DOLLAR": 8,
+    "EXACT": 4,
+    "FIND": 5,
+    "FIXED": 8,
+    "JIS": 4,
+    "LEFT": 7,
+    "LEN": 4,
+    "LOWER": 4,
+    "MID": 5,
+    "PROPER": 4,
+    "REPLACE": 4,
+    "REPT": 4,
+    "RIGHT": 5,
+    "SEARCH": 9,
+    "SUBSTITUTE": 5,
+    "T": 5,
+    "TEXT": 93,
+    "TRIM": 4,
+    "UNICHAR": 5,
+    "UNICODE": 4,
+    "UPPER": 6
+  },
+  "observations": [
+    {
+      "id": "asc-000",
+      "function": "ASC",
+      "formula": "=ASC(\"ＡＢＣ ｶﾞﾊﾟ\\￥\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "ＡＢＣ ｶﾞﾊﾟ\\￥"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "ABC ｶﾞﾊﾟ\\\\"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "asc-001",
+      "function": "ASC",
+      "formula": "=ASC(\"ｶﾞﾊﾟ\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "ｶﾞﾊﾟ"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "ｶﾞﾊﾟ"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "asc-002",
+      "function": "ASC",
+      "formula": "=ASC(\"―‘’”「」\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "―‘’”「」"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "ｰ`'\"｢｣"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "asc-003",
+      "function": "ASC",
+      "formula": "=ASC(\"Aあ😀\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "Aあ😀"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "Aあ😀"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "char-004",
+      "function": "CHAR",
+      "formula": "=CHAR(1)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "\u0001"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "char-005",
+      "function": "CHAR",
+      "formula": "=CHAR(127)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "405fc00000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": ""
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "char-006",
+      "function": "CHAR",
+      "formula": "=CHAR(255)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "406fe00000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "ÿ"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "char-007",
+      "function": "CHAR",
+      "formula": "=CHAR(65.9)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "405079999999999a"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "A"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "char-008",
+      "function": "CHAR",
+      "formula": "=CHAR(0)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "char-009",
+      "function": "CHAR",
+      "formula": "=CHAR(256)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "4070000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "clean-010",
+      "function": "CLEAN",
+      "formula": "=CLEAN([.A1])",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "a\u0000b\u001fc"
+        }
+      ],
+      "cells": {
+        "A1": {
+          "kind": "Text",
+          "value": "a\u0000b\u001fc"
+        }
+      },
+      "expected": {
+        "kind": "Text",
+        "value": "abc"
+      },
+      "expected_reads": 1,
+      "origin": "reference"
+    },
+    {
+      "id": "clean-011",
+      "function": "CLEAN",
+      "formula": "=CLEAN(\"a͸b​c d\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "a͸b​c d"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "ab​c d"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "clean-012",
+      "function": "CLEAN",
+      "formula": "=CLEAN(\"plain text\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "plain text"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "plain text"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "code-013",
+      "function": "CODE",
+      "formula": "=CODE(\"A😀\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "A😀"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "4050400000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "code-014",
+      "function": "CODE",
+      "formula": "=CODE(\"😀\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "😀"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "40ff600000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "code-015",
+      "function": "CODE",
+      "formula": "=CODE(\"\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": ""
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "code-016",
+      "function": "CODE",
+      "formula": "=CODE([.A1])",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "é"
+        }
+      ],
+      "cells": {
+        "A1": {
+          "kind": "Text",
+          "value": "é"
+        }
+      },
+      "expected": {
+        "kind": "Number",
+        "bits": "406d200000000000"
+      },
+      "expected_reads": 1,
+      "origin": "reference"
+    },
+    {
+      "id": "concatenate-017",
+      "function": "CONCATENATE",
+      "formula": "=CONCATENATE(\"a\";\"β\";2;TRUE())",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "a"
+        },
+        {
+          "kind": "Text",
+          "value": "β"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        },
+        {
+          "kind": "Logical",
+          "value": true
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "aβ2TRUE"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "concatenate-018",
+      "function": "CONCATENATE",
+      "formula": "=CONCATENATE([.A1];\"!\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "hello"
+        },
+        {
+          "kind": "Text",
+          "value": "!"
+        }
+      ],
+      "cells": {
+        "A1": {
+          "kind": "Text",
+          "value": "hello"
+        }
+      },
+      "expected": {
+        "kind": "Text",
+        "value": "hello!"
+      },
+      "expected_reads": 1,
+      "origin": "reference"
+    },
+    {
+      "id": "concatenate-019",
+      "function": "CONCATENATE",
+      "formula": "=CONCATENATE(\"x\";#N/A;\"y\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "x"
+        },
+        {
+          "kind": "Error",
+          "value": "NotAvailable"
+        },
+        {
+          "kind": "Text",
+          "value": "y"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "NotAvailable"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "concatenate-020",
+      "function": "CONCATENATE",
+      "formula": "=CONCATENATE(COMPLEX(1;2))",
+      "args": [
+        {
+          "kind": "Complex",
+          "real": "3ff0000000000000",
+          "imaginary": "4000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "complex_type"
+    },
+    {
+      "id": "concatenate-021",
+      "function": "CONCATENATE",
+      "formula": "=CONCATENATE()",
+      "args": [],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "dollar-022",
+      "function": "DOLLAR",
+      "formula": "=DOLLAR(255)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "406fe00000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "$255.00"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "dollar-023",
+      "function": "DOLLAR",
+      "formula": "=DOLLAR(1234.567;2)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "40934a449ba5e354"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "$1,234.57"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "dollar-024",
+      "function": "DOLLAR",
+      "formula": "=DOLLAR(-1234.567;-2)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "c0934a449ba5e354"
+        },
+        {
+          "kind": "Number",
+          "bits": "c000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "($1,200)"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "dollar-025",
+      "function": "DOLLAR",
+      "formula": "=DOLLAR(12.5;0)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "4029000000000000"
+        },
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "$13"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "dollar-026",
+      "function": "DOLLAR",
+      "formula": "=DOLLAR(999.5;0)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "408f3c0000000000"
+        },
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "$1,000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "dollar-027",
+      "function": "DOLLAR",
+      "formula": "=DOLLAR(-0.5;0)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "bfe0000000000000"
+        },
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "($1)"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "dollar-028",
+      "function": "DOLLAR",
+      "formula": "=DOLLAR(-0.0001;2)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "bf1a36e2eb1c432d"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "$0.00"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "dollar-029",
+      "function": "DOLLAR",
+      "formula": "=DOLLAR(1e100;2)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "54b249ad2594c37d"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "$10,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000.00"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "exact-030",
+      "function": "EXACT",
+      "formula": "=EXACT(\"Text\";\"Text\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "Text"
+        },
+        {
+          "kind": "Text",
+          "value": "Text"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Logical",
+        "value": true
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "exact-031",
+      "function": "EXACT",
+      "formula": "=EXACT(\"Text\";\"text\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "Text"
+        },
+        {
+          "kind": "Text",
+          "value": "text"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Logical",
+        "value": false
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "exact-032",
+      "function": "EXACT",
+      "formula": "=EXACT(\"é\";\"é\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "é"
+        },
+        {
+          "kind": "Text",
+          "value": "é"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Logical",
+        "value": false
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "exact-033",
+      "function": "EXACT",
+      "formula": "=EXACT(\"x\";#N/A)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "x"
+        },
+        {
+          "kind": "Error",
+          "value": "NotAvailable"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "NotAvailable"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "find-034",
+      "function": "FIND",
+      "formula": "=FIND(\"na\";\"banana\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "na"
+        },
+        {
+          "kind": "Text",
+          "value": "banana"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "4008000000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "find-035",
+      "function": "FIND",
+      "formula": "=FIND(\"NA\";\"banana\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "NA"
+        },
+        {
+          "kind": "Text",
+          "value": "banana"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "find-036",
+      "function": "FIND",
+      "formula": "=FIND(\"a\";\"banana\";4)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "a"
+        },
+        {
+          "kind": "Text",
+          "value": "banana"
+        },
+        {
+          "kind": "Number",
+          "bits": "4010000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "4010000000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "find-037",
+      "function": "FIND",
+      "formula": "=FIND(\"\";\"abc\";2)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": ""
+        },
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "4000000000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "fixed-038",
+      "function": "FIXED",
+      "formula": "=FIXED(1234.567)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "40934a449ba5e354"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1,234.57"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "fixed-039",
+      "function": "FIXED",
+      "formula": "=FIXED(1234.567;1)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "40934a449ba5e354"
+        },
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1,234.6"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "fixed-040",
+      "function": "FIXED",
+      "formula": "=FIXED(1234.567;2;TRUE())",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "40934a449ba5e354"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        },
+        {
+          "kind": "Logical",
+          "value": true
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1234.57"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "fixed-041",
+      "function": "FIXED",
+      "formula": "=FIXED(-1234.567;-2)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "c0934a449ba5e354"
+        },
+        {
+          "kind": "Number",
+          "bits": "c000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "-1,200"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "fixed-042",
+      "function": "FIXED",
+      "formula": "=FIXED(999.5;0)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "408f3c0000000000"
+        },
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1,000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "fixed-043",
+      "function": "FIXED",
+      "formula": "=FIXED(-0.5;0)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "bfe0000000000000"
+        },
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "-1"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "fixed-044",
+      "function": "FIXED",
+      "formula": "=FIXED(-0.0001;2)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "bf1a36e2eb1c432d"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "0.00"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "fixed-045",
+      "function": "FIXED",
+      "formula": "=FIXED(1e100;2;TRUE())",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "54b249ad2594c37d"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        },
+        {
+          "kind": "Logical",
+          "value": true
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.00"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "jis-046",
+      "function": "JIS",
+      "formula": "=JIS(\"ABC\\`'\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "ABC\\`'"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "ＡＢＣ￥‘’"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "jis-047",
+      "function": "JIS",
+      "formula": "=JIS(\"ｶﾞﾊﾟ\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "ｶﾞﾊﾟ"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "ガパ"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "jis-048",
+      "function": "JIS",
+      "formula": "=JIS(\"ｶﾟ\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "ｶﾟ"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "カ゜"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "jis-049",
+      "function": "JIS",
+      "formula": "=JIS(\"Aあ😀\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "Aあ😀"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "Ａあ😀"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "left-050",
+      "function": "LEFT",
+      "formula": "=LEFT(\"abcdef\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abcdef"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "a"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "left-051",
+      "function": "LEFT",
+      "formula": "=LEFT(\"α😀β\";2)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "α😀β"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "α😀"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "left-052",
+      "function": "LEFT",
+      "formula": "=LEFT(\"abc\";1.9)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Number",
+          "bits": "3ffe666666666666"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "a"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "left-053",
+      "function": "LEFT",
+      "formula": "=LEFT(\"abc\";0)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": ""
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "left-054",
+      "function": "LEFT",
+      "formula": "=LEFT(\"abc\";-0.9)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Number",
+          "bits": "bfeccccccccccccd"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "left-055",
+      "function": "LEFT",
+      "formula": "=LEFT(\"abc\";-1)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Number",
+          "bits": "bff0000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "len-056",
+      "function": "LEN",
+      "formula": "=LEN(\"α😀é\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "α😀é"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "4010000000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "len-057",
+      "function": "LEN",
+      "formula": "=LEN(1.5)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff8000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "4008000000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "len-058",
+      "function": "LEN",
+      "formula": "=LEN([.A1])",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "hello"
+        }
+      ],
+      "cells": {
+        "A1": {
+          "kind": "Text",
+          "value": "hello"
+        }
+      },
+      "expected": {
+        "kind": "Number",
+        "bits": "4014000000000000"
+      },
+      "expected_reads": 1,
+      "origin": "reference"
+    },
+    {
+      "id": "len-059",
+      "function": "LEN",
+      "formula": "=LEN(\"\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": ""
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "0000000000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "lower-060",
+      "function": "LOWER",
+      "formula": "=LOWER(\"ABC Greek Σ\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "ABC Greek Σ"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "abc greek σ"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "lower-061",
+      "function": "LOWER",
+      "formula": "=LOWER(\"ΟΣ\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "ΟΣ"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "ος"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "lower-062",
+      "function": "LOWER",
+      "formula": "=LOWER(\"İ ß\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "İ ß"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "i̇ ß"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "lower-063",
+      "function": "LOWER",
+      "formula": "=LOWER(\"꟏\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "꟏"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "꟏"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "mid-064",
+      "function": "MID",
+      "formula": "=MID(\"abcdef\";2;3)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abcdef"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        },
+        {
+          "kind": "Number",
+          "bits": "4008000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "bcd"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "mid-065",
+      "function": "MID",
+      "formula": "=MID(\"α😀β\";2;1)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "α😀β"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        },
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "😀"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "mid-066",
+      "function": "MID",
+      "formula": "=MID(\"abc\";1.9;1.9)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Number",
+          "bits": "3ffe666666666666"
+        },
+        {
+          "kind": "Number",
+          "bits": "3ffe666666666666"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "a"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "mid-067",
+      "function": "MID",
+      "formula": "=MID(\"abc\";9;2)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Number",
+          "bits": "4022000000000000"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": ""
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "mid-068",
+      "function": "MID",
+      "formula": "=MID(\"abc\";0;2)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "proper-069",
+      "function": "PROPER",
+      "formula": "=PROPER(\"hELLO, wORLD!\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "hELLO, wORLD!"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "Hello, World!"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "proper-070",
+      "function": "PROPER",
+      "formula": "=PROPER(\"élan déjà\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "élan déjà"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "Élan Déjà"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "proper-071",
+      "function": "PROPER",
+      "formula": "=PROPER(\"áBC\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "áBC"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "ÁBc"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "proper-072",
+      "function": "PROPER",
+      "formula": "=PROPER(\"꟏oo\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "꟏oo"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "꟎oo"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "replace-073",
+      "function": "REPLACE",
+      "formula": "=REPLACE(\"abcdef\";2;3;\"X\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abcdef"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        },
+        {
+          "kind": "Number",
+          "bits": "4008000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "X"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "aXef"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "replace-074",
+      "function": "REPLACE",
+      "formula": "=REPLACE(\"abc\";2;0;\"X\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        },
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "X"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "aXbc"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "replace-075",
+      "function": "REPLACE",
+      "formula": "=REPLACE(\"abc\";99;2;\"X\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Number",
+          "bits": "4058c00000000000"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "X"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "abcX"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "replace-076",
+      "function": "REPLACE",
+      "formula": "=REPLACE(\"abc\";0;1;\"X\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        },
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "X"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "rept-077",
+      "function": "REPT",
+      "formula": "=REPT(\"ab\";3)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "ab"
+        },
+        {
+          "kind": "Number",
+          "bits": "4008000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "ababab"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "rept-078",
+      "function": "REPT",
+      "formula": "=REPT(\"ab\";0)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "ab"
+        },
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": ""
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "rept-079",
+      "function": "REPT",
+      "formula": "=REPT(\"😀\";2)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "😀"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "😀😀"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "rept-080",
+      "function": "REPT",
+      "formula": "=REPT(\"ab\";-1)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "ab"
+        },
+        {
+          "kind": "Number",
+          "bits": "bff0000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "right-081",
+      "function": "RIGHT",
+      "formula": "=RIGHT(\"abcdef\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abcdef"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "f"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "right-082",
+      "function": "RIGHT",
+      "formula": "=RIGHT(\"α😀β\";2)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "α😀β"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "😀β"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "right-083",
+      "function": "RIGHT",
+      "formula": "=RIGHT(\"abc\";1.9)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Number",
+          "bits": "3ffe666666666666"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "c"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "right-084",
+      "function": "RIGHT",
+      "formula": "=RIGHT(\"abc\";0)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": ""
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "right-085",
+      "function": "RIGHT",
+      "formula": "=RIGHT(\"abc\";-1)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Number",
+          "bits": "bff0000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "search-086",
+      "function": "SEARCH",
+      "formula": "=SEARCH(\"NA\";\"banana\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "NA"
+        },
+        {
+          "kind": "Text",
+          "value": "banana"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "4008000000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "search-087",
+      "function": "SEARCH",
+      "formula": "=SEARCH(\"ss\";\"aßb\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "ss"
+        },
+        {
+          "kind": "Text",
+          "value": "aßb"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "4000000000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "search-088",
+      "function": "SEARCH",
+      "formula": "=SEARCH(\"s\";\"aßb\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "s"
+        },
+        {
+          "kind": "Text",
+          "value": "aßb"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "search-089",
+      "function": "SEARCH",
+      "formula": "=SEARCH(\"ß\";\"ss\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "ß"
+        },
+        {
+          "kind": "Text",
+          "value": "ss"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "3ff0000000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "search-090",
+      "function": "SEARCH",
+      "formula": "=SEARCH(\"s\";\"ßs\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "s"
+        },
+        {
+          "kind": "Text",
+          "value": "ßs"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "4000000000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "search-091",
+      "function": "SEARCH",
+      "formula": "=SEARCH(\"ss\";\"sß\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "ss"
+        },
+        {
+          "kind": "Text",
+          "value": "sß"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "4000000000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "search-092",
+      "function": "SEARCH",
+      "formula": "=SEARCH(\"😀\";\"a😀b\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "😀"
+        },
+        {
+          "kind": "Text",
+          "value": "a😀b"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "4000000000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "search-093",
+      "function": "SEARCH",
+      "formula": "=SEARCH(\"x\";\"abc\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "x"
+        },
+        {
+          "kind": "Text",
+          "value": "abc"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "search-094",
+      "function": "SEARCH",
+      "formula": "=SEARCH(\"\";\"abc\";4)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": ""
+        },
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Number",
+          "bits": "4010000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "4010000000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "substitute-095",
+      "function": "SUBSTITUTE",
+      "formula": "=SUBSTITUTE(\"a-b-a\";\"a\";\"X\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "a-b-a"
+        },
+        {
+          "kind": "Text",
+          "value": "a"
+        },
+        {
+          "kind": "Text",
+          "value": "X"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "X-b-X"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "substitute-096",
+      "function": "SUBSTITUTE",
+      "formula": "=SUBSTITUTE(\"a-b-a\";\"a\";\"X\";2)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "a-b-a"
+        },
+        {
+          "kind": "Text",
+          "value": "a"
+        },
+        {
+          "kind": "Text",
+          "value": "X"
+        },
+        {
+          "kind": "Number",
+          "bits": "4000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "a-b-X"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "substitute-097",
+      "function": "SUBSTITUTE",
+      "formula": "=SUBSTITUTE(\"abc\";\"\";\"X\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Text",
+          "value": ""
+        },
+        {
+          "kind": "Text",
+          "value": "X"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "abc"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "substitute-098",
+      "function": "SUBSTITUTE",
+      "formula": "=SUBSTITUTE(\"abc\";\"z\";\"X\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Text",
+          "value": "z"
+        },
+        {
+          "kind": "Text",
+          "value": "X"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "abc"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "substitute-099",
+      "function": "SUBSTITUTE",
+      "formula": "=SUBSTITUTE(\"abc\";\"a\";\"X\";0)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc"
+        },
+        {
+          "kind": "Text",
+          "value": "a"
+        },
+        {
+          "kind": "Text",
+          "value": "X"
+        },
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "t-100",
+      "function": "T",
+      "formula": "=T(\"text\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "text"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "text"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "t-101",
+      "function": "T",
+      "formula": "=T(5)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "4014000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": ""
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "t-102",
+      "function": "T",
+      "formula": "=T(TRUE())",
+      "args": [
+        {
+          "kind": "Logical",
+          "value": true
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": ""
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "t-103",
+      "function": "T",
+      "formula": "=T(COMPLEX(1;2))",
+      "args": [
+        {
+          "kind": "Complex",
+          "real": "3ff0000000000000",
+          "imaginary": "4000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": ""
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "t-104",
+      "function": "T",
+      "formula": "=T(#N/A)",
+      "args": [
+        {
+          "kind": "Error",
+          "value": "NotAvailable"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "NotAvailable"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-105",
+      "function": "TEXT",
+      "formula": "=TEXT(12.34567;\"###.##\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "4028b0fba8826aa9"
+        },
+        {
+          "kind": "Text",
+          "value": "###.##"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "12.35"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-106",
+      "function": "TEXT",
+      "formula": "=TEXT(12.34567;\"000.00\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "4028b0fba8826aa9"
+        },
+        {
+          "kind": "Text",
+          "value": "000.00"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "012.35"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-107",
+      "function": "TEXT",
+      "formula": "=TEXT(0.125;\"0%\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3fc0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0%"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "13%"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-108",
+      "function": "TEXT",
+      "formula": "=TEXT(\"raw\";\"@\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "raw"
+        },
+        {
+          "kind": "Text",
+          "value": "@"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "raw"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-109",
+      "function": "TEXT",
+      "formula": "=TEXT(999.5;\"0\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "408f3c0000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-110",
+      "function": "TEXT",
+      "formula": "=TEXT(-0.5;\"0\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "bfe0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "-1"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-111",
+      "function": "TEXT",
+      "formula": "=TEXT(1.25;\"0.0\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff4000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0.0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1.3"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-112",
+      "function": "TEXT",
+      "formula": "=TEXT(1.2;\"???.??\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff3333333333333"
+        },
+        {
+          "kind": "Text",
+          "value": "???.??"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "  1.2 "
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-113",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"???\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "???"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "  1"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-114",
+      "function": "TEXT",
+      "formula": "=TEXT(1.2;\"0.??\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff3333333333333"
+        },
+        {
+          "kind": "Text",
+          "value": "0.??"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1.2 "
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-115",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"0?0\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0?0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "0 1"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-116",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"#?0\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "#?0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": " 1"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-117",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"0.?0\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0.?0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1. 0"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-118",
+      "function": "TEXT",
+      "formula": "=TEXT(0.1;\"0.0E#?\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3fb999999999999a"
+        },
+        {
+          "kind": "Text",
+          "value": "0.0E#?"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1.0E-1"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-119",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"0.##\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0.##"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-120",
+      "function": "TEXT",
+      "formula": "=TEXT(1234567.89;\"#,##0.00\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "4132d687e3d70a3d"
+        },
+        {
+          "kind": "Text",
+          "value": "#,##0.00"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1,234,567.89"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-121",
+      "function": "TEXT",
+      "formula": "=TEXT(1e100;\"0\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "54b249ad2594c37d"
+        },
+        {
+          "kind": "Text",
+          "value": "0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-122",
+      "function": "TEXT",
+      "formula": "=TEXT(1.999;\"0.00\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ffffbe76c8b4396"
+        },
+        {
+          "kind": "Text",
+          "value": "0.00"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "2.00"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-123",
+      "function": "TEXT",
+      "formula": "=TEXT(0.5;\"#/#\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3fe0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "#/#"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1/2"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-124",
+      "function": "TEXT",
+      "formula": "=TEXT(1.25;\"#/#\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff4000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "#/#"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "5/4"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-125",
+      "function": "TEXT",
+      "formula": "=TEXT(1.25;\"# ?/?\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff4000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "# ?/?"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1 1/4"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-126",
+      "function": "TEXT",
+      "formula": "=TEXT(0.5;\"# ??/??\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3fe0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "# ??/??"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "  1/ 2"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-127",
+      "function": "TEXT",
+      "formula": "=TEXT(0.333333;\"#/#\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3fd55553ef6b5d46"
+        },
+        {
+          "kind": "Text",
+          "value": "#/#"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1/3"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-128",
+      "function": "TEXT",
+      "formula": "=TEXT(0.1;\"# ?/?\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3fb999999999999a"
+        },
+        {
+          "kind": "Text",
+          "value": "# ?/?"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": " 1/9"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-129",
+      "function": "TEXT",
+      "formula": "=TEXT(0.09;\"# ?/?\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3fb70a3d70a3d70a"
+        },
+        {
+          "kind": "Text",
+          "value": "# ?/?"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": " 1/9"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-130",
+      "function": "TEXT",
+      "formula": "=TEXT(0.999;\"# ?/?\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3feff7ced916872b"
+        },
+        {
+          "kind": "Text",
+          "value": "# ?/?"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-131",
+      "function": "TEXT",
+      "formula": "=TEXT(-1.25;\"# ?/?\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "bff4000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "# ?/?"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "-1 1/4"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-132",
+      "function": "TEXT",
+      "formula": "=TEXT(0.11805555555555555;\"# ?/?\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3fbe38e38e38e38e"
+        },
+        {
+          "kind": "Text",
+          "value": "# ?/?"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": " 1/9"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-133",
+      "function": "TEXT",
+      "formula": "=TEXT(0.13392857142857142;\"# ?/?\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3fc1249249249249"
+        },
+        {
+          "kind": "Text",
+          "value": "# ?/?"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": " 1/8"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-134",
+      "function": "TEXT",
+      "formula": "=TEXT(0.2361111111111111;\"# ?/?\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3fce38e38e38e38e"
+        },
+        {
+          "kind": "Text",
+          "value": "# ?/?"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": " 2/9"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-135",
+      "function": "TEXT",
+      "formula": "=TEXT(0.005050505050505051;\"# ??/??\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3f74afd6a052bf5b"
+        },
+        {
+          "kind": "Text",
+          "value": "# ??/??"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "  1/99"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-136",
+      "function": "TEXT",
+      "formula": "=TEXT(18446744073709551616;\"#/#\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "43f0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "#/#"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Number"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-137",
+      "function": "TEXT",
+      "formula": "=TEXT(18446744073709549568;\"#/#\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "43efffffffffffff"
+        },
+        {
+          "kind": "Text",
+          "value": "#/#"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "18446744073709549568/1"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-138",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"0/???????\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0/???????"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-139",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"0/\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0/"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-140",
+      "function": "TEXT",
+      "formula": "=TEXT(12300;\"0.00E+00\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "40c8060000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0.00E+00"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1.23E+04"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-141",
+      "function": "TEXT",
+      "formula": "=TEXT(0.0123;\"0.0E+00\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3f8930be0ded288d"
+        },
+        {
+          "kind": "Text",
+          "value": "0.0E+00"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1.2E-02"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-142",
+      "function": "TEXT",
+      "formula": "=TEXT(9999;\"0.0E+00\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "40c3878000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0.0E+00"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1.0E+04"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-143",
+      "function": "TEXT",
+      "formula": "=TEXT(123;\"00.0E+00\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "405ec00000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "00.0E+00"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "01.2E+02"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-144",
+      "function": "TEXT",
+      "formula": "=TEXT(0;\"0.0E+00\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0.0E+00"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "0.0E+00"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-145",
+      "function": "TEXT",
+      "formula": "=TEXT(9.9995;\"0.00E+00\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "4023ffbe76c8b439"
+        },
+        {
+          "kind": "Text",
+          "value": "0.00E+00"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1.00E+01"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-146",
+      "function": "TEXT",
+      "formula": "=TEXT(5e-324;\"0.00E+00\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "0000000000000001"
+        },
+        {
+          "kind": "Text",
+          "value": "0.00E+00"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "5.00E-324"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-147",
+      "function": "TEXT",
+      "formula": "=TEXT(2.2250738585072014e-308;\"0.00E+00\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "0010000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0.00E+00"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "2.23E-308"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-148",
+      "function": "TEXT",
+      "formula": "=TEXT(1.7976931348623157e308;\"0.00E+00\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "7fefffffffffffff"
+        },
+        {
+          "kind": "Text",
+          "value": "0.00E+00"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1.80E+308"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-149",
+      "function": "TEXT",
+      "formula": "=TEXT(12.3;\"0.0;\"\"NEG\"\"0.0;\"\"ZERO\"\";\"\"TEXT:\"\"@\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "402899999999999a"
+        },
+        {
+          "kind": "Text",
+          "value": "0.0;\"NEG\"0.0;\"ZERO\";\"TEXT:\"@"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "12.3"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-150",
+      "function": "TEXT",
+      "formula": "=TEXT(-12.3;\"0.0;\"\"NEG\"\"0.0;\"\"ZERO\"\";\"\"TEXT:\"\"@\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "c02899999999999a"
+        },
+        {
+          "kind": "Text",
+          "value": "0.0;\"NEG\"0.0;\"ZERO\";\"TEXT:\"@"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "NEG12.3"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-151",
+      "function": "TEXT",
+      "formula": "=TEXT(0;\"0.0;\"\"NEG\"\"0.0;\"\"ZERO\"\";\"\"TEXT:\"\"@\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0.0;\"NEG\"0.0;\"ZERO\";\"TEXT:\"@"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "ZERO"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-152",
+      "function": "TEXT",
+      "formula": "=TEXT(\"raw\";\"0.0;\"\"NEG\"\"0.0;\"\"ZERO\"\";\"\"TEXT:\"\"@\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "raw"
+        },
+        {
+          "kind": "Text",
+          "value": "0.0;\"NEG\"0.0;\"ZERO\";\"TEXT:\"@"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "TEXT:raw"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-153",
+      "function": "TEXT",
+      "formula": "=TEXT(12;\"@;@;@;\"\"text:\"\"@\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "4028000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "@;@;@;\"text:\"@"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "12"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-154",
+      "function": "TEXT",
+      "formula": "=TEXT(-12;\"@;@;@;\"\"text:\"\"@\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "c028000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "@;@;@;\"text:\"@"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "-12"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-155",
+      "function": "TEXT",
+      "formula": "=TEXT(0;\"@;@;@;\"\"text:\"\"@\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "@;@;@;\"text:\"@"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "0"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-156",
+      "function": "TEXT",
+      "formula": "=TEXT(TRUE();\"\"\"L:\"\"@\")",
+      "args": [
+        {
+          "kind": "Logical",
+          "value": true
+        },
+        {
+          "kind": "Text",
+          "value": "\"L:\"@"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "L:TRUE"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-157",
+      "function": "TEXT",
+      "formula": "=TEXT(TRUE();\"0\")",
+      "args": [
+        {
+          "kind": "Logical",
+          "value": true
+        },
+        {
+          "kind": "Text",
+          "value": "0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-158",
+      "function": "TEXT",
+      "formula": "=TEXT(\"raw\";\"0\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "raw"
+        },
+        {
+          "kind": "Text",
+          "value": "0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-159",
+      "function": "TEXT",
+      "formula": "=TEXT(45292.25;\"yyyy-mm-dd hh:mm:ss\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "40e61d8800000000"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyy-mm-dd hh:mm:ss"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "2024-01-01 06:00:00"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-160",
+      "function": "TEXT",
+      "formula": "=TEXT(45292;\"ddd\"\", \"\"mmm d\"\", \"\"yyyy\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "40e61d8000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "ddd\", \"mmm d\", \"yyyy"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "Mon, Jan 1, 2024"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-161",
+      "function": "TEXT",
+      "formula": "=TEXT(45292.5;\"h:mm AM/PM\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "40e61d9000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "h:mm AM/PM"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "12:00 PM"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-162",
+      "function": "TEXT",
+      "formula": "=TEXT(0.75;\"h \"\"AM/PM\"\"\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3fe8000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "h \"AM/PM\""
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "18 AM/PM"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-163",
+      "function": "TEXT",
+      "formula": "=TEXT(0.75;\"h \\A\\M\\/\\P\\M\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3fe8000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "h \\A\\M\\/\\P\\M"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "18 AM/PM"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-164",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"yyyy_)\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyy_)"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1899 "
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-165",
+      "function": "TEXT",
+      "formula": "=TEXT(0;\"yyyy\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyy"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1899"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-166",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"yyyy\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyy"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1899"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-167",
+      "function": "TEXT",
+      "formula": "=TEXT(59;\"yyyy-mm-dd\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "404d800000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyy-mm-dd"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1900-02-27"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-168",
+      "function": "TEXT",
+      "formula": "=TEXT(60;\"yyyy-mm-dd\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "404e000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyy-mm-dd"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1900-02-28"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-169",
+      "function": "TEXT",
+      "formula": "=TEXT(61;\"yyyy-mm-dd\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "404e800000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyy-mm-dd"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1900-03-01"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-170",
+      "function": "TEXT",
+      "formula": "=TEXT(1.9999999;\"yyyy-mm-dd hh:mm:ss\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3fffffffe5280d65"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyy-mm-dd hh:mm:ss"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1900-01-01 00:00:00"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-171",
+      "function": "TEXT",
+      "formula": "=TEXT(2958465;\"yyyy-mm-dd\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "4146924080000000"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyy-mm-dd"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "9999-12-31"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-172",
+      "function": "TEXT",
+      "formula": "=TEXT(-1;\"yyyy\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "bff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyy"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1899"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-173",
+      "function": "TEXT",
+      "formula": "=TEXT(-1.25;\"yyyy-mm-dd hh:mm\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "bff4000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyy-mm-dd hh:mm"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1899-12-28 18:00"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-174",
+      "function": "TEXT",
+      "formula": "=TEXT(-363;\"yyyy-mm-dd\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "c076b00000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyy-mm-dd"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "1899-01-01"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-175",
+      "function": "TEXT",
+      "formula": "=TEXT(-364;\"yyyy\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "c076c00000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyy"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Number"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-176",
+      "function": "TEXT",
+      "formula": "=TEXT(2958466;\"yyyy\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "4146924100000000"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyy"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Number"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-177",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"yyyyy\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyyy"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-178",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"yyyy!mm\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "yyyy!mm"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-179",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"0Q\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0Q"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-180",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"0E\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0E"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-181",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"0:0\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0:0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-182",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"0,0\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0,0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-183",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"0.0.0\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0.0.0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-184",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"0;0;0;0;0\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0;0;0;0;0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-185",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": ""
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-186",
+      "function": "TEXT",
+      "formula": "=TEXT(12.3;\"\"\"literal\"\"\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "402899999999999a"
+        },
+        {
+          "kind": "Text",
+          "value": "\"literal\""
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "literal"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-187",
+      "function": "TEXT",
+      "formula": "=TEXT(12.3;\"\"\"USD \"\"#,##0.00\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "402899999999999a"
+        },
+        {
+          "kind": "Text",
+          "value": "\"USD \"#,##0.00"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "USD 12.30"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-188",
+      "function": "TEXT",
+      "formula": "=TEXT(12.3;\"\\$0.00\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "402899999999999a"
+        },
+        {
+          "kind": "Text",
+          "value": "\\$0.00"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "$12.30"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-189",
+      "function": "TEXT",
+      "formula": "=TEXT(12.3;\"_ 0.0\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "402899999999999a"
+        },
+        {
+          "kind": "Text",
+          "value": "_ 0.0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": " 12.3"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-190",
+      "function": "TEXT",
+      "formula": "=TEXT(12.3;\"\"\"He said \"\"\"\"x\"\"\"\" \"\"0.0\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "402899999999999a"
+        },
+        {
+          "kind": "Text",
+          "value": "\"He said \"\"x\"\" \"0.0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "He said \"x\" 12.3"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-191",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"\"\"unterminated\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "\"unterminated"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-192",
+      "function": "TEXT",
+      "formula": "=TEXT(1;\"0\\\")",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Text",
+          "value": "0\\"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "text-193",
+      "function": "TEXT",
+      "formula": "=TEXT(COMPLEX(1;2);\"@\")",
+      "args": [
+        {
+          "kind": "Complex",
+          "real": "3ff0000000000000",
+          "imaginary": "4000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "complex_type"
+    },
+    {
+      "id": "text-194",
+      "function": "TEXT",
+      "formula": "=TEXT(#N/A;\"0\")",
+      "args": [
+        {
+          "kind": "Error",
+          "value": "NotAvailable"
+        },
+        {
+          "kind": "Text",
+          "value": "0"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "NotAvailable"
+      },
+      "expected_reads": 0,
+      "origin": "formula_error"
+    },
+    {
+      "id": "text-195",
+      "function": "TEXT",
+      "formula": "=TEXT(1;#N/A)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        },
+        {
+          "kind": "Error",
+          "value": "NotAvailable"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "NotAvailable"
+      },
+      "expected_reads": 0,
+      "origin": "formula_error"
+    },
+    {
+      "id": "text-196",
+      "function": "TEXT",
+      "formula": "=TEXT([.A2];\"@\")",
+      "args": [
+        {
+          "kind": "Empty"
+        }
+      ],
+      "cells": {
+        "A2": {
+          "kind": "Empty"
+        }
+      },
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 1,
+      "origin": "reference"
+    },
+    {
+      "id": "text-197",
+      "function": "TEXT",
+      "formula": "=TEXT( ;\"@\")",
+      "args": [
+        {
+          "kind": "Missing"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "missing"
+    },
+    {
+      "id": "trim-198",
+      "function": "TRIM",
+      "formula": "=TRIM([.A1])",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "  a\t\n b  c "
+        }
+      ],
+      "cells": {
+        "A1": {
+          "kind": "Text",
+          "value": "  a\t\n b  c "
+        }
+      },
+      "expected": {
+        "kind": "Text",
+        "value": "a b c"
+      },
+      "expected_reads": 1,
+      "origin": "reference"
+    },
+    {
+      "id": "trim-199",
+      "function": "TRIM",
+      "formula": "=TRIM(\"a  b\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "a  b"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "a  b"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "trim-200",
+      "function": "TRIM",
+      "formula": "=TRIM(\"   \")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "   "
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": ""
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "trim-201",
+      "function": "TRIM",
+      "formula": "=TRIM([.A1])",
+      "args": [
+        {
+          "kind": "Text",
+          "value": " a  b "
+        }
+      ],
+      "cells": {
+        "A1": {
+          "kind": "Text",
+          "value": " a  b "
+        }
+      },
+      "expected": {
+        "kind": "Text",
+        "value": "a b"
+      },
+      "expected_reads": 1,
+      "origin": "reference"
+    },
+    {
+      "id": "unichar-202",
+      "function": "UNICHAR",
+      "formula": "=UNICHAR(0)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "0000000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "\u0000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "unichar-203",
+      "function": "UNICHAR",
+      "formula": "=UNICHAR(128512)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "40ff600000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "😀"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "unichar-204",
+      "function": "UNICHAR",
+      "formula": "=UNICHAR(55296)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "40eb000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "unichar-205",
+      "function": "UNICHAR",
+      "formula": "=UNICHAR(1114112)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "4131000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "unichar-206",
+      "function": "UNICHAR",
+      "formula": "=UNICHAR(65.9)",
+      "args": [
+        {
+          "kind": "Number",
+          "bits": "405079999999999a"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "A"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "unicode-207",
+      "function": "UNICODE",
+      "formula": "=UNICODE(\"😀x\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "😀x"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "40ff600000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "unicode-208",
+      "function": "UNICODE",
+      "formula": "=UNICODE(\"é\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "é"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Number",
+        "bits": "406d200000000000"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "unicode-209",
+      "function": "UNICODE",
+      "formula": "=UNICODE(\"\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": ""
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "unicode-210",
+      "function": "UNICODE",
+      "formula": "=UNICODE([.A1])",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "Ω"
+        }
+      ],
+      "cells": {
+        "A1": {
+          "kind": "Text",
+          "value": "Ω"
+        }
+      },
+      "expected": {
+        "kind": "Number",
+        "bits": "408d480000000000"
+      },
+      "expected_reads": 1,
+      "origin": "reference"
+    },
+    {
+      "id": "upper-211",
+      "function": "UPPER",
+      "formula": "=UPPER(\"abc Greek σ\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "abc Greek σ"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "ABC GREEK Σ"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "upper-212",
+      "function": "UPPER",
+      "formula": "=UPPER(\"Straße\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "Straße"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "STRASSE"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "upper-213",
+      "function": "UPPER",
+      "formula": "=UPPER(\"i̇\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "i̇"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "İ"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "upper-214",
+      "function": "UPPER",
+      "formula": "=UPPER(\"꟎\")",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "꟎"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Text",
+        "value": "꟎"
+      },
+      "expected_reads": 0,
+      "origin": "direct"
+    },
+    {
+      "id": "upper-215",
+      "function": "UPPER",
+      "formula": "=UPPER([.A1])",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "mixed"
+        }
+      ],
+      "cells": {
+        "A1": {
+          "kind": "Text",
+          "value": "mixed"
+        }
+      },
+      "expected": {
+        "kind": "Text",
+        "value": "MIXED"
+      },
+      "expected_reads": 1,
+      "origin": "reference"
+    },
+    {
+      "id": "left-216",
+      "function": "LEFT",
+      "formula": "=LEFT([.A1]~[.A2])",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "ignored"
+        }
+      ],
+      "cells": {
+        "A1": {
+          "kind": "Text",
+          "value": "a"
+        },
+        "A2": {
+          "kind": "Text",
+          "value": "b"
+        }
+      },
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "reference_list_refusal"
+    },
+    {
+      "id": "upper-217",
+      "function": "UPPER",
+      "formula": "=UPPER(;)",
+      "args": [
+        {
+          "kind": "Missing"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "Value"
+      },
+      "expected_reads": 0,
+      "origin": "missing"
+    },
+    {
+      "id": "find-218",
+      "function": "FIND",
+      "formula": "=FIND(\"x\";#N/A;1)",
+      "args": [
+        {
+          "kind": "Text",
+          "value": "x"
+        },
+        {
+          "kind": "Error",
+          "value": "NotAvailable"
+        },
+        {
+          "kind": "Number",
+          "bits": "3ff0000000000000"
+        }
+      ],
+      "cells": {},
+      "expected": {
+        "kind": "Error",
+        "value": "NotAvailable"
+      },
+      "expected_reads": 0,
+      "origin": "formula_error"
+    }
+  ]
+}

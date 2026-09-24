@@ -1,0 +1,529 @@
+diff --git a/crates/litchi-ods/src/codec/formula.rs b/crates/litchi-ods/src/codec/formula.rs
+index 8b03fd9f4..2085b53df 100644
+--- a/crates/litchi-ods/src/codec/formula.rs
++++ b/crates/litchi-ods/src/codec/formula.rs
+@@ -391,7 +391,10 @@ impl<'a> FormulaParser<'a> {
+-        // A function name may also be a valid column-plus-row spelling (for
+-        // example, `BIN2DEC` is column BIN, row 2, followed by `DEC`).  When
+-        // the complete identifier is followed by an opening parenthesis, the
+-        // function grammar takes precedence over that speculative cell parse.
+-        // Keep the whitespace unconsumed so the normal token loop handles it.
+-        if let Some(function) = self.try_parse_function_call()? {
+-            return Ok(function);
++        // Scan the ordinary ASCII candidate once. A function name may also be
++        // a valid column-plus-row spelling (for example, `BIN2DEC` is column
++        // BIN, row 2, followed by `DEC`). The complete invocation therefore
++        // takes precedence over a cell parse, while a bare spelling still
++        // follows the legacy cell/name rules.
++        if let Some(token) = self.try_parse_compact_identifier_or_ref()? {
++            return match token {
++                Token::CellRef(cell_ref) => self.finish_cell_ref(cell_ref),
++                token => Ok(token),
++            };
+@@ -405,12 +408,10 @@ impl<'a> FormulaParser<'a> {
+-            if let Ok(cell_ref) = self.try_parse_cell_ref() {
+-                // Check if it's a range
+-                self.skip_whitespace();
+-                if self.peek() == Some(b':') {
+-                    self.advance();
+-                    let end = self.try_parse_cell_ref()?;
+-                    return Ok(Token::RangeRef(RangeRef {
+-                        start: cell_ref,
+-                        end,
+-                    }));
+-                }
+-                return Ok(Token::CellRef(cell_ref));
++            match self.try_parse_cell_ref() {
++                Ok(cell_ref) => return self.finish_cell_ref(cell_ref),
++                // Syntax failure is the expected speculative miss for names
++                // such as `SUM`. Allocation and typed resource failures are
++                // real failures and must not be hidden by the fallback name
++                // parser.
++                Err(error) if matches!(&error, Error::InvalidFormat(_)) => {
++                    self.position = start_pos;
++                },
++                Err(error) => return Err(error),
+@@ -418,3 +418,0 @@ impl<'a> FormulaParser<'a> {
+-
+-            // Rewind: not a valid cell ref (e.g., "SUM(" should be a function)
+-            self.position = start_pos;
+@@ -456,2 +454,26 @@ impl<'a> FormulaParser<'a> {
+-    /// Recognize a known function invocation before trying a cell reference.
+-    fn try_parse_function_call(&mut self) -> Result<Option<Token>> {
++    /// Finish a successfully parsed legacy cell and consume a possible range
++    /// endpoint. The first endpoint has already been admitted and copied, so
++    /// this keeps the common cell path free of a second identifier scan.
++    fn finish_cell_ref(&mut self, cell_ref: CellRef) -> Result<Token> {
++        self.skip_whitespace();
++        if self.peek() == Some(b':') {
++            self.advance();
++            let end = self.try_parse_cell_ref()?;
++            Ok(Token::RangeRef(RangeRef {
++                start: cell_ref,
++                end,
++            }))
++        } else {
++            Ok(Token::CellRef(cell_ref))
++        }
++    }
++
++    /// Scan an ASCII identifier/cell candidate once and classify the compact
++    /// forms that make up the common formula path.
++    ///
++    /// Spaced sheet names and malformed suffixes deliberately return `None` so
++    /// the established parser below can preserve their exact behavior. This
++    /// method does not move `position` until a function or cell has passed all
++    /// syntax checks, which also lets us defer fallible component copies until
++    /// after the row has been parsed.
++    fn try_parse_compact_identifier_or_ref(&mut self) -> Result<Option<Token>> {
+@@ -469,3 +491,4 @@ impl<'a> FormulaParser<'a> {
+-            // This lexer accepts ASCII identifiers, so a longer spelling
+-            // cannot match the standard catalog. Avoid scanning a large
+-            // unknown identifier twice before its ordinary refusal path.
++            // Keep the previous bounded-name fast rejection. Long inputs are
++            // handed to the established parser, which may still recognize a
++            // legacy cell with a large column or row component without asking
++            // the function catalog to normalize the whole spelling.
+@@ -481,0 +505,3 @@ impl<'a> FormulaParser<'a> {
++        // Function invocation takes precedence over the cell shape. Keep
++        // whitespace between the name and `(` unconsumed, as the old function
++        // lookahead did.
+@@ -490,3 +516,18 @@ impl<'a> FormulaParser<'a> {
+-        if self.input.get(lookahead) != Some(&b'(') {
+-            self.position = start;
+-            return Ok(None);
++        if self.input.get(lookahead) == Some(&b'(') {
++            // The parser input was validated as UTF-8 before tokenization;
++            // this slice is ASCII by construction. Keep the defensive branch
++            // so this helper remains total if its caller is reused later.
++            let identifier = match std::str::from_utf8(&self.input[start..end]) {
++                Ok(identifier) => identifier,
++                Err(_) => {
++                    self.position = start;
++                    return Ok(None);
++                },
++            };
++            if let Some(function) = lookup_function(identifier) {
++                self.position = end;
++                return Ok(Some(Token::Function(copy_formula_component(
++                    function,
++                    "formula function name",
++                )?)));
++            }
+@@ -495,8 +536 @@ impl<'a> FormulaParser<'a> {
+-        let identifier = match std::str::from_utf8(&self.input[start..end]) {
+-            Ok(identifier) => identifier,
+-            Err(_) => {
+-                self.position = start;
+-                return Ok(None);
+-            },
+-        };
+-        let Some(function) = lookup_function(identifier) else {
++        let Some(parts) = parse_compact_cell_parts(&self.input[start..end]) else {
+@@ -505,0 +540,29 @@ impl<'a> FormulaParser<'a> {
++
++        // The legacy sheet parser permits literal spaces inside an unquoted
++        // sheet name. For example, `A1 Sheet.B2` is one sheet-qualified cell,
++        // while `A1 + Sheet.B2` is two cells. Hand the former back to that
++        // parser before copying the compact cell components. The check is
++        // limited to the legacy space character; tabs and other formula
++        // whitespace were never part of that sheet-name spelling.
++        if parts.sheet.is_none() && self.has_spaced_sheet_qualifier(end) {
++            self.position = start;
++            return Ok(None);
++        }
++
++        // All syntax, including checked row parsing, succeeded before these
++        // fallible copies. This prevents a failed speculative column/sheet
++        // allocation from being mistaken for an identifier fallback.
++        let sheet = parts
++            .sheet
++            .map(|(sheet_start, sheet_end)| {
++                let value =
++                    std::str::from_utf8(&self.input[start + sheet_start..start + sheet_end])
++                        .map_err(|_error| Error::InvalidFormat("Invalid sheet name".to_string()))?;
++                copy_formula_component(value, "formula sheet name")
++            })
++            .transpose()?;
++        let column =
++            std::str::from_utf8(&self.input[start + parts.column.0..start + parts.column.1])
++                .map_err(|_error| Error::InvalidFormat("Invalid column".to_string()))?;
++        let column = copy_upper_ascii(column, "formula column")?;
++
+@@ -507,4 +570,25 @@ impl<'a> FormulaParser<'a> {
+-        Ok(Some(Token::Function(copy_formula_component(
+-            function,
+-            "formula function name",
+-        )?)))
++        Ok(Some(Token::CellRef(CellRef {
++            sheet,
++            column,
++            row: parts.row,
++            column_absolute: false,
++            row_absolute: false,
++        })))
++    }
++
++    /// Check whether a compact cell is followed by a legacy space-bearing
++    /// sheet locator. This is only called after a compact coordinate matched,
++    /// so it does no work on names, functions, or ordinary operator spacing.
++    fn has_spaced_sheet_qualifier(&self, end: usize) -> bool {
++        if self.input.get(end) != Some(&b' ') {
++            return false;
++        }
++        let mut position = end;
++        while self
++            .input
++            .get(position)
++            .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_' || *byte == b' ')
++        {
++            position += 1;
++        }
++        self.input.get(position) == Some(&b'.')
+@@ -554 +638 @@ impl<'a> FormulaParser<'a> {
+-        let mut sheet = None;
++        let mut sheet_range = None;
+@@ -574,3 +658 @@ impl<'a> FormulaParser<'a> {
+-                let sheet_name = std::str::from_utf8(&self.input[start..self.position])
+-                    .map_err(|_error| Error::InvalidFormat("Invalid sheet name".to_string()))?;
+-                sheet = Some(copy_formula_component(sheet_name, "formula sheet name")?);
++                sheet_range = Some((start, self.position));
+@@ -607,3 +689 @@ impl<'a> FormulaParser<'a> {
+-        let column = std::str::from_utf8(&self.input[col_start..self.position])
+-            .map_err(|_error| Error::InvalidFormat("Invalid column".to_string()))?;
+-        let column = copy_upper_ascii(column, "formula column")?;
++        let col_end = self.position;
+@@ -641,0 +722,15 @@ impl<'a> FormulaParser<'a> {
++        // Defer component copies until all of the coordinate syntax, including
++        // checked row parsing, has succeeded. A speculative name parse can
++        // therefore backtrack only syntax errors and never hide an allocation
++        // failure from its caller.
++        let sheet = sheet_range
++            .map(|(start, end)| {
++                let sheet_name = std::str::from_utf8(&self.input[start..end])
++                    .map_err(|_error| Error::InvalidFormat("Invalid sheet name".to_string()))?;
++                copy_formula_component(sheet_name, "formula sheet name")
++            })
++            .transpose()?;
++        let column = std::str::from_utf8(&self.input[col_start..col_end])
++            .map_err(|_error| Error::InvalidFormat("Invalid column".to_string()))?;
++        let column = copy_upper_ascii(column, "formula column")?;
++
+@@ -682,0 +778,68 @@ impl<'a> FormulaParser<'a> {
++#[derive(Clone, Copy)]
++struct CompactCellParts {
++    /// Offset range for an optional compact sheet name.
++    sheet: Option<(usize, usize)>,
++    /// Offset range for the column label.
++    column: (usize, usize),
++    /// Checked decimal row value.
++    row: u32,
++}
++
++/// Parse the compact, ASCII cell spelling from an already scanned candidate.
++///
++/// The returned ranges are offsets into `input`; no owned component is made
++/// until the caller has received a complete, checked coordinate. Returning
++/// `None` means a syntax miss, so the caller can preserve the legacy fallback
++/// for names, spaced sheet names, and malformed suffixes.
++fn parse_compact_cell_parts(input: &[u8]) -> Option<CompactCellParts> {
++    let coordinate_start = if let Some(dot) = input.iter().position(|byte| *byte == b'.') {
++        if dot == 0
++            || input[..dot]
++                .iter()
++                .any(|byte| !byte.is_ascii_alphanumeric() && *byte != b'_')
++        {
++            return None;
++        }
++        Some(dot + 1)
++    } else {
++        None
++    };
++    let coordinate_start = coordinate_start.unwrap_or(0);
++    let sheet_range = coordinate_start.checked_sub(1).map(|dot| (0, dot));
++
++    let mut position = coordinate_start;
++    let column_start = position;
++    while input
++        .get(position)
++        .is_some_and(|byte| byte.is_ascii_alphabetic())
++    {
++        position += 1;
++    }
++    if column_start == position {
++        return None;
++    }
++    let column_end = position;
++
++    let row_start = position;
++    while input
++        .get(position)
++        .is_some_and(|byte| byte.is_ascii_digit())
++    {
++        position += 1;
++    }
++    if row_start == position || position != input.len() {
++        return None;
++    }
++
++    let mut row = 0_u32;
++    for byte in &input[row_start..position] {
++        row = row.checked_mul(10)?.checked_add(u32::from(byte - b'0'))?;
++    }
++
++    Some(CompactCellParts {
++        sheet: sheet_range,
++        column: (column_start, column_end),
++        row,
++    })
++}
++
+@@ -783,0 +947 @@ fn formula_limit_error(resource: Resource, actual: usize, maximum: usize) -> Err
++#[inline]
+@@ -1169,0 +1334,26 @@ mod tests {
++    #[test]
++    fn test_compact_cell_handoff_preserves_space_bearing_sheet_names() {
++        let formula = FormulaParser::new("=A1 Sheet.B2+A1 .C3")
++            .parse()
++            .expect("legacy space-bearing sheet names should parse");
++        assert!(matches!(
++            &formula.tokens[0],
++            Token::CellRef(CellRef {
++                sheet: Some(sheet),
++                column,
++                row: 2,
++                ..
++            }) if sheet == "A1 Sheet" && column == "B"
++        ));
++        assert!(matches!(formula.tokens[1], Token::Operator('+')));
++        assert!(matches!(
++            &formula.tokens[2],
++            Token::CellRef(CellRef {
++                sheet: Some(sheet),
++                column,
++                row: 3,
++                ..
++            }) if sheet == "A1 " && column == "C"
++        ));
++    }
++
+diff --git a/crates/litchi-ods/src/codec/formula/reference.rs b/crates/litchi-ods/src/codec/formula/reference.rs
+index e57b60b6c..ad4d691ad 100644
+--- a/crates/litchi-ods/src/codec/formula/reference.rs
++++ b/crates/litchi-ods/src/codec/formula/reference.rs
+@@ -897,0 +898 @@ impl<'a> Parser<'a> {
++    #[inline]
+@@ -950,0 +952 @@ fn invalid(message: impl Into<String>) -> Error {
++#[cold]
+@@ -970,0 +973 @@ fn limit_error(resource: &'static str, actual: usize, maximum: usize) -> Error {
++#[inline]
+diff --git a/crates/litchi-ods/tests/ods_formula_tokenizer_regression.rs b/crates/litchi-ods/tests/ods_formula_tokenizer_regression.rs
+new file mode 100644
+index 000000000..b4190ea43
+--- /dev/null
++++ b/crates/litchi-ods/tests/ods_formula_tokenizer_regression.rs
+@@ -0,0 +1,204 @@
++//! Compact regressions for the legacy formula-tokenizer path.
++//!
++//! These cases keep the common lexer boundary observable without repeating the
++//! complete function catalog or the structured OpenFormula reference matrix.
++
++#![allow(
++    unsafe_code,
++    reason = "The integration-only allocator injects one fallible failure."
++)]
++
++use litchi_core::Error;
++use litchi_ods::codec::formula::{FormulaParser, Token};
++use std::alloc::{GlobalAlloc, Layout, System};
++use std::cell::Cell;
++
++thread_local! {
++    static FAIL_ONE_BYTE: Cell<bool> = const { Cell::new(false) };
++    static INJECTION_FIRED: Cell<bool> = const { Cell::new(false) };
++}
++
++struct OneByteFailureAllocator;
++
++#[global_allocator]
++static GLOBAL: OneByteFailureAllocator = OneByteFailureAllocator;
++
++// SAFETY: All non-injected operations delegate unchanged to the system
++// allocator. The one injected null result is scoped to this test thread and is
++// consumed once, so it exercises only a fallible `try_reserve` call.
++unsafe impl GlobalAlloc for OneByteFailureAllocator {
++    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
++        if should_fail(layout.size()) {
++            std::ptr::null_mut()
++        } else {
++            // SAFETY: The caller supplies a valid layout for the allocation.
++            unsafe { System.alloc(layout) }
++        }
++    }
++
++    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
++        if should_fail(layout.size()) {
++            std::ptr::null_mut()
++        } else {
++            // SAFETY: The caller supplies a valid layout for the allocation.
++            unsafe { System.alloc_zeroed(layout) }
++        }
++    }
++
++    unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
++        // SAFETY: The pointer/layout pair comes from a prior allocator call.
++        unsafe { System.dealloc(pointer, layout) }
++    }
++
++    unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, size: usize) -> *mut u8 {
++        if should_fail(size) {
++            std::ptr::null_mut()
++        } else {
++            // SAFETY: The pointer/layout pair and new size are supplied by the
++            // allocator caller.
++            unsafe { System.realloc(pointer, layout, size) }
++        }
++    }
++}
++
++fn should_fail(size: usize) -> bool {
++    FAIL_ONE_BYTE.with(|armed| {
++        if armed.get() && size == 1 {
++            armed.set(false);
++            INJECTION_FIRED.with(|fired| fired.set(true));
++            true
++        } else {
++            false
++        }
++    })
++}
++
++fn arm_one_byte_failure() {
++    INJECTION_FIRED.with(|fired| fired.set(false));
++    FAIL_ONE_BYTE.with(|armed| armed.set(true));
++}
++
++fn disarm_one_byte_failure() {
++    FAIL_ONE_BYTE.with(|armed| armed.set(false));
++}
++
++fn injection_fired() -> bool {
++    INJECTION_FIRED.with(Cell::get)
++}
++
++fn assert_cell(
++    token: &Token,
++    expected_sheet: Option<&str>,
++    expected_column: &str,
++    expected_row: u32,
++    expected_column_absolute: bool,
++    expected_row_absolute: bool,
++) {
++    let Token::CellRef(cell) = token else {
++        panic!("expected a legacy cell token, got {token:?}");
++    };
++    assert_eq!(cell.sheet.as_deref(), expected_sheet);
++    assert_eq!(cell.column, expected_column);
++    assert_eq!(cell.row, expected_row);
++    assert_eq!(cell.column_absolute, expected_column_absolute);
++    assert_eq!(cell.row_absolute, expected_row_absolute);
++}
++
++#[test]
++fn repeated_function_and_cell_scans_keep_each_lexical_boundary() {
++    let source = "=LOG10 (A1)+BIN2DEC\t(\"101\")+LOG10";
++    let formula = FormulaParser::new(source)
++        .parse()
++        .expect("mixed function and cell-shaped names should parse");
++    assert_eq!(formula.text, source);
++    assert_eq!(formula.tokens.len(), 11);
++    assert!(matches!(&formula.tokens[0], Token::Function(name) if name == "LOG10"));
++    assert!(matches!(formula.tokens[1], Token::LParen));
++    assert_cell(&formula.tokens[2], None, "A", 1, false, false);
++    assert!(matches!(formula.tokens[3], Token::RParen));
++    assert!(matches!(formula.tokens[4], Token::Operator('+')));
++    assert!(matches!(&formula.tokens[5], Token::Function(name) if name == "BIN2DEC"));
++    assert!(matches!(formula.tokens[6], Token::LParen));
++    assert!(matches!(&formula.tokens[7], Token::String(value) if value == "101"));
++    assert!(matches!(formula.tokens[8], Token::RParen));
++    assert!(matches!(formula.tokens[9], Token::Operator('+')));
++    assert_cell(&formula.tokens[10], None, "LOG", 10, false, false);
++}
++
++#[test]
++fn legacy_sheet_names_spaces_and_lowercase_absolute_columns_are_preserved() {
++    let source = "=Sales Data.$a$1+Summary Sheet.b$2+Data.c3";
++    let formula = FormulaParser::new(source)
++        .parse()
++        .expect("space-bearing sheet names and lowercase columns should parse");
++    assert_eq!(formula.text, source);
++    assert_eq!(formula.tokens.len(), 5);
++    assert_cell(&formula.tokens[0], Some("Sales Data"), "A", 1, true, true);
++    assert!(matches!(formula.tokens[1], Token::Operator('+')));
++    assert_cell(
++        &formula.tokens[2],
++        Some("Summary Sheet"),
++        "B",
++        2,
++        false,
++        true,
++    );
++    assert!(matches!(formula.tokens[3], Token::Operator('+')));
++    assert_cell(&formula.tokens[4], Some("Data"), "C", 3, false, false);
++
++    // The legacy scanner treats every alphanumeric/space run before a dot as
++    // a sheet name. Keep that behavior when the run begins with a cell-shaped
++    // prefix; the compact common path must not split these into two tokens.
++    for (source, expected_sheet) in [("=A1 Sheet.B2", "A1 Sheet"), ("=A1 .B2", "A1 ")] {
++        let formula = FormulaParser::new(source)
++            .parse()
++            .expect("legacy spaced sheet scanner should preserve the full prefix");
++        assert_eq!(formula.text, source);
++        assert_eq!(formula.tokens.len(), 1);
++        assert_cell(
++            &formula.tokens[0],
++            Some(expected_sheet),
++            "B",
++            2,
++            false,
++            false,
++        );
++    }
++}
++
++#[test]
++fn malformed_identifier_suffixes_remain_typed_syntax_errors() {
++    for source in ["=LOG10X(A1)", "=BIN2DEC_1(A1)", "=VLOOKUPX (A1)"] {
++        let error = FormulaParser::new(source)
++            .parse()
++            .expect_err("unknown function suffix should not be reclassified as a valid call");
++        assert!(
++            matches!(error, Error::InvalidFormat(_)),
++            "unexpected error for {source:?}: {error}"
++        );
++    }
++}
++
++#[test]
++fn speculative_cell_allocation_failure_is_not_swallowed_by_fallback() {
++    // Each spelling first retains the original formula, then reserves the
++    // one-byte normalized column. The compact form and the two legacy forms
++    // exercise both parser paths while keeping failure independent of the
++    // allocator ordinal and unable to abort unrelated paths.
++    for source in ["=A1", "=.A1", "=$A$1"] {
++        arm_one_byte_failure();
++        let result = FormulaParser::new(source).parse();
++        let fired = injection_fired();
++        disarm_one_byte_failure();
++
++        assert!(
++            fired,
++            "the targeted one-byte allocation was not exercised for {source}"
++        );
++        let error = result.expect_err("the injected column allocation must fail");
++        let Error::Allocation { resource, .. } = error else {
++            panic!("speculative cell parse swallowed allocation failure for {source}: {error}");
++        };
++        assert_eq!(resource, "formula column");
++    }
++}

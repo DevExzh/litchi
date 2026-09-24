@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--release",
+    "--manifest-path",
+    "/var/tmp/ods-tokenizer-baseline-20260913/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/harness/Cargo.toml"
+  ],
+  "cwd": "/var/tmp/ods-tokenizer-baseline-20260913",
+  "env": {
+    "CARGO_TARGET_DIR": "/var/tmp/ods-tokenizer-baseline-target-20260913"
+  },
+  "status": 0,
+  "elapsed_seconds": 11.224526405334473
+}

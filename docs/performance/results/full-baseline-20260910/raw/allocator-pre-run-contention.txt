@@ -1,0 +1,36 @@
+snapshot_kind=pre_run_contention
+2026-09-10T03:06:47+00:00
+pid 3300813's current affinity list: 2
+loadavg=
+6.31 11.23 10.55 7/1240 3300816
+cpus_allowed_list=
+2
+online_cpus=
+0-31
+top_processes=
+    PID    PPID PSR %CPU %MEM STAT COMMAND
+3300087 3297325  18  151  1.4 Sl   rustc
+1416416  225771   8 99.9  0.0 Rs   git
+1416559  225771  24 99.9  0.0 Rs   git
+ 225771  192616  15  2.9  0.8 Sl+  codex
+1511943  198235  12  1.1  0.0 Ssl+ lazygit
+3297325  225771  19  1.0  0.0 Ssl  cargo
+ 227706  188364  13  0.9  0.5 Sl+  codex
+ 127282  127198  18  0.6  0.0 S    run-pipeline3
+3298386  127282   1  0.4  0.0 S    wget-at
+2632040  252768  23  0.3  0.4 Sl+  kimi-code
+   5191       1  23  0.3  0.0 Ss   tmux: server
+2882696  224533  14  0.3  0.0 Sl+  codex
+1221149  395345  17  0.3  0.4 Sl+  kimi-code
+3300526  127282   5  0.3  0.0 S    wget-at
+ 198235  198234   9  0.2  0.3 Ssl  nvim
+1309380 1309379   4  0.2  0.2 Ssl  nvim
+1490696 1490695   7  0.2  0.0 Ssl  nvim
+    244       2  16  0.1  0.0 S    kswapd0
+3083261       2  13  0.1  0.0 I    kworker/u130:0-events_unbound
+3200998       2   3  0.1  0.0 I    kworker/u129:4-ext4-rsv-conversion
+2381033       1   9  0.0  0.0 Ssl  bun
+1489627 1435459  30  0.0  0.0 Sl+  codex
+2955700       2   6  0.0  0.0 I    kworker/u129:0-events_unbound
+3132425       2  15  0.0  0.0 I    kworker/u130:2-events_unbound
+ 228610  225771  23  0.0  0.0 Sl   codex-code-mode

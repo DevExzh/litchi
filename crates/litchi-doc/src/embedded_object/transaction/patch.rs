@@ -65,15 +65,23 @@ impl Patch {
     /// Returns a conflict when the source snapshot bytes do not exactly match
     /// the patch base, or a validation error when the replacement is invalid.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, TransactionError> {
-        if source.fingerprint() != self.before_fingerprint || source.bytes() != self.before.as_ref()
+        if source.fingerprint() != self.before_fingerprint
+            || source.source_bytes() != self.before.as_ref()
         {
             return Err(TransactionError::Conflict);
         }
         if self.is_noop() {
             return Ok(source.clone());
         }
-        Snapshot::open(self.after.as_ref().to_vec(), source.limits())
-            .map_err(TransactionError::Invalid)
+        source
+            .authorize_changed()
+            .map_err(TransactionError::Invalid)?;
+        Snapshot::open_with_policy(
+            self.after.as_ref().to_vec(),
+            source.limits(),
+            source.protection_policy(),
+        )
+        .map_err(TransactionError::Invalid)
     }
 
     /// Returns the exact inverse replacement.

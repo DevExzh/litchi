@@ -1,0 +1,17 @@
+{
+  "reviewer": "rtf_smarttag_v2_review",
+  "verdict": "CLEAR for V3",
+  "manifest_sha256": "5fbf7982b214be1ee8ad0712ab4e5adf4adb11ba41b1911eeb52a4c655ecec22",
+  "focused_tests": 14,
+  "probes": {
+    "extra_byte": "declared-size overflow before push",
+    "odd_nibble": "odd hexadecimal digit",
+    "nonhex": "non-hex SDATA"
+  },
+  "retained_contracts": [
+    "76byte observed sample with explicit12byte tail",
+    "rootheader and nested known destination validation",
+    "exact immutable no-op and inverse",
+    "inert metadata and no invented OfficeCrypto layout"
+  ]
+}

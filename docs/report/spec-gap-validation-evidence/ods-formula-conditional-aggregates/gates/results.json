@@ -1,0 +1,107 @@
+[
+  {
+    "name": "ods-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-ods"
+    ],
+    "exit_code": 0,
+    "seconds": 13.955734014511108,
+    "log_sha256": "72385005a2cb42c430be7c2e0462ba593b1c0e700466426d8a84e045288ef6d4"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi-ods",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 15.167307376861572,
+    "log_sha256": "7b466ca3dde997fbac3ea03c01a1dfb7e74f4f867c5caa87272fe2eb30584157"
+  },
+  {
+    "name": "rustdoc",
+    "command": [
+      "cargo",
+      "doc",
+      "--locked",
+      "-p",
+      "litchi-ods",
+      "--no-deps"
+    ],
+    "exit_code": 0,
+    "seconds": 5.667609453201294,
+    "log_sha256": "606d687bdcf10fc321091ec59a0dabac1509153be9e4503e41a647af9ce39644"
+  },
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-ods",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 0.9207031726837158,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "batch-format",
+    "command": [
+      "rustfmt",
+      "--edition",
+      "2024",
+      "--check",
+      "--config",
+      "skip_children=true",
+      "crates/litchi-ods/src/codec/formula/evaluation.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/value/conditional.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/value/criteria.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/value/database.rs",
+      "crates/litchi-ods/src/codec/formula/evaluation/value/scalar.rs",
+      "crates/litchi-ods/tests/ods_formula_conditional_evaluation.rs",
+      "crates/litchi-ods/tests/ods_formula_conditional_limits.rs",
+      "crates/litchi-ods/tests/ods_formula_conditional_native.rs",
+      "crates/litchi-ods/tests/ods_formula_conditional_oracle.rs",
+      "crates/litchi-ods/tests/ods_formula_criterion_text_profile.rs",
+      "crates/litchi-ods/tests/ods_formula_evaluation.rs"
+    ],
+    "exit_code": 0,
+    "seconds": 0.08813047409057617,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "boundaries",
+    "command": [
+      "python3",
+      "tools/check_crate_boundaries.py"
+    ],
+    "exit_code": 0,
+    "seconds": 226.52619767189026,
+    "log_sha256": "cdea9514ba7c77c1608a6e73b2eeaf093accc70aefd1c3591af13d73e8b871fa"
+  },
+  {
+    "name": "diff-check",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 0.06984305381774902,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

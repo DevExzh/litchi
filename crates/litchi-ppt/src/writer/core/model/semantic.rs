@@ -19,7 +19,7 @@ use crate::header_footer::{
 use crate::modify_password::{ModifyPassword, validate_value as validate_modify_password};
 use crate::transition::TransitionInfo;
 use crate::writer::blip::{Id as PictureId, Kind as PictureKind};
-use crate::writer::chart::Chart;
+use crate::writer::chart::{Chart, PositionedChart};
 use crate::writer::comments::SlideComment;
 use crate::writer::core::codec::sound_collection_error;
 use crate::writer::custom_shows::CustomShow;
@@ -33,6 +33,7 @@ use crate::writer::table::{PositionedTable, Table};
 use crate::writer::text_format::{FontEntity, Paragraph, TextAlign};
 use litchi_core::unit::pt_to_emu_i32;
 use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
 use zeroize::Zeroizing;
 
 impl Writer {
@@ -926,13 +927,13 @@ impl Writer {
         Ok(())
     }
 
-    /// Validate a native-chart request and refuse incomplete binary authoring.
+    /// Validate and add a bounded standalone Graph chart.
     ///
-    /// No presentation state is changed. A structurally valid request returns
-    /// [`litchi_ograph::Error::UnsupportedAuthoring`] through
-    /// [`WriteError::Graph`] until the complete Office-compatible BIFF chart
-    /// grammar is implemented. Invalid chart definitions, frames, or slide
-    /// indexes continue to return [`WriteError::InvalidData`].
+    /// The complete Graph package, object metadata, and shape payload are
+    /// prepared before the slide collection is changed. Invalid chart
+    /// definitions, frames, or slide indexes continue to return
+    /// [`WriteError::InvalidData`], while bounded Graph grammar failures are
+    /// returned through [`WriteError::Graph`].
     ///
     /// # Arguments
     ///
@@ -944,10 +945,6 @@ impl Writer {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "callers pass an owned chart definition, which binary chart authoring will consume once implemented"
-    )]
     pub fn add_chart(
         &mut self,
         slide: usize,
@@ -983,10 +980,19 @@ impl Writer {
         self.slides
             .get(slide)
             .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
-        Err(litchi_ograph::Error::UnsupportedAuthoring {
-            reason: "PPT chart creation requires the complete Office-compatible BIFF chart grammar",
-        }
-        .into())
+        let workbook = Arc::from(chart.to_graph_package()?.into_boxed_slice());
+        let slide_data = self
+            .slides
+            .get_mut(slide)
+            .ok_or_else(|| WriteError::InvalidData(format!("Slide {slide} does not exist")))?;
+        slide_data.charts.push(PositionedChart {
+            x: x_emu,
+            y: y_emu,
+            width: width_emu,
+            height: height_emu,
+            workbook,
+        });
+        Ok(())
     }
 }
 

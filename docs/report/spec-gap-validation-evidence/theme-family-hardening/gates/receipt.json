@@ -1,0 +1,124 @@
+{
+  "base": "f4f29c9306d182072aabe8eca08145470fdcfadd",
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "commands": [
+    {
+      "name": "compile",
+      "argv": [
+        "cargo",
+        "check",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": "",
+      "RUSTFLAGS": "",
+      "CARGO_ENCODED_RUSTFLAGS": ""
+    },
+    {
+      "name": "tests",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--no-fail-fast"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": "",
+      "RUSTFLAGS": "",
+      "CARGO_ENCODED_RUSTFLAGS": ""
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": "",
+      "RUSTFLAGS": "",
+      "CARGO_ENCODED_RUSTFLAGS": ""
+    },
+    {
+      "name": "rustdoc",
+      "argv": [
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--no-deps"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": "-D warnings",
+      "RUSTFLAGS": "",
+      "CARGO_ENCODED_RUSTFLAGS": ""
+    },
+    {
+      "name": "format",
+      "argv": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-xlsb",
+        "--check"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": "",
+      "RUSTFLAGS": "",
+      "CARGO_ENCODED_RUSTFLAGS": ""
+    },
+    {
+      "name": "diff",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": "",
+      "RUSTFLAGS": "",
+      "CARGO_ENCODED_RUSTFLAGS": ""
+    }
+  ],
+  "source_unchanged": true,
+  "test_totals_including_doctests": {
+    "passed": 1156,
+    "failed": 0,
+    "ignored": 12
+  },
+  "logs": {
+    "clippy.log": "bc133cafef9f9b22c67081fe4b519e5ecd538616a27a75c55442c4949ec4d4fc",
+    "compile.log": "382727f1a084b796c30c8424933c5bd598757bddb9cc83150275b4151705e439",
+    "diff.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rustdoc.log": "d0e62d64096f88d46c73d6201485abcd2e835a7d091b8cb4cdf84693459e2e3d",
+    "tests.log": "a13d0615b6b9e64f7feecac657a6d74a3cd7d9fe8e6dba826e82b96ad51f828e"
+  },
+  "passed": true
+}

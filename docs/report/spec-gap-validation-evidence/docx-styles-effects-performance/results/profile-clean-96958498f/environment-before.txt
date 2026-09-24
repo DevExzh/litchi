@@ -1,0 +1,4 @@
+CARGO_INCREMENTAL=0
+CARGO_TARGET_DIR=/var/tmp/litchi-docx-styles-effects-profile-target-96958498f-20260912-a
+DOCX_PROFILE_GENERATED_FIXTURES=/var/tmp/litchi-docx-styles-effects-profile-results-96958498f-20260912-a/generated-fixtures.json
+LC_ALL=C

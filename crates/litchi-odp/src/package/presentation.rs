@@ -277,6 +277,14 @@ impl Presentation {
         declaration::parse(self.package.content_xml())
     }
 
+    /// Inspect all typed `draw:layer-set` declarations lazily.
+    ///
+    /// The inventory is inert: layer visibility and protection are metadata
+    /// values and no rendering or access-control behavior is executed.
+    pub fn layers(&self) -> Result<crate::model::LayerInventory> {
+        crate::model::layer::inventory(self.package.content_xml(), self.package.styles_xml())
+    }
+
     /// Inspect static page names, IDs, and layout/master references.
     ///
     /// # Errors

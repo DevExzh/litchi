@@ -9,6 +9,7 @@
 use super::{Commit, Limits, Snapshot, Value};
 use crate::external_link::ExternalLinkLimits;
 use crate::package::error::{Error, Result};
+use crate::workbook::DrawingLoadPolicy;
 use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_opc::{OpcPackage, PackURI, Part};
 
@@ -63,7 +64,34 @@ pub fn apply_with_external_link_limits(
     commit: &Commit,
     external_link_limits: ExternalLinkLimits,
 ) -> Result<Snapshot> {
-    let applied = apply_retaining_parse(package, worksheet, commit, external_link_limits)?;
+    apply_with_external_link_limits_and_drawing_policy(
+        package,
+        worksheet,
+        commit,
+        external_link_limits,
+        DrawingLoadPolicy::Eager,
+    )
+}
+
+/// Apply a cell commit while retaining the caller's typed drawing boundary.
+///
+/// Workbook-level publication uses this internal seam so a skipped drawing
+/// projection validates only the selected worksheet dependency closure and
+/// leaves unrelated drawing XML opaque.
+pub(crate) fn apply_with_external_link_limits_and_drawing_policy(
+    package: &mut OpcPackage,
+    worksheet: &PackURI,
+    commit: &Commit,
+    external_link_limits: ExternalLinkLimits,
+    drawing_load_policy: DrawingLoadPolicy,
+) -> Result<Snapshot> {
+    let applied = apply_retaining_parse(
+        package,
+        worksheet,
+        commit,
+        external_link_limits,
+        drawing_load_policy,
+    )?;
     match applied {
         Applied::Unchanged(snapshot) => Ok(snapshot),
         Applied::Published { snapshot, workbook } => {
@@ -102,7 +130,8 @@ pub(crate) enum Applied {
 /// Nothing the caller owns is touched: every refusal below leaves the caller's
 /// package, and any workbook parsed from it, exactly as they were. An exact
 /// no-op is answered from the stored bytes, without cloning the package or
-/// parsing a candidate at all.
+/// parsing a candidate at all. The candidate is parsed under the caller's
+/// drawing policy, so a skipped drawing projection stays opaque.
 ///
 /// # Errors
 ///
@@ -113,6 +142,7 @@ pub(crate) fn apply_retaining_parse(
     worksheet: &PackURI,
     commit: &Commit,
     external_link_limits: ExternalLinkLimits,
+    drawing_load_policy: DrawingLoadPolicy,
 ) -> Result<Applied> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
@@ -122,11 +152,13 @@ pub(crate) fn apply_retaining_parse(
     }
 
     let mut candidate = package.clone();
+    crate::worksheet_index::maintain(&mut candidate, worksheet, part.blob(), &updated)?;
     candidate.get_part_mut(worksheet)?.set_blob(updated);
     candidate.unsign();
-    let parsed = crate::Workbook::from_opc_package_with_external_link_limits(
+    let parsed = crate::Workbook::reparse_candidate_with_policy(
         candidate,
         external_link_limits,
+        drawing_load_policy,
     )?;
     let worksheet_index = (0..parsed.worksheet_count())
         .find_map(|index| {

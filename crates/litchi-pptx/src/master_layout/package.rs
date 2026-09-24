@@ -1,6 +1,5 @@
 //! Package-level authoring and relationship-graph operations.
 
-use crate::parts::{SlideLayoutPart, SlideMasterPart};
 use crate::{Error, Result};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -12,10 +11,9 @@ use std::collections::HashSet;
 
 use super::codec::{
     IdListAnchor, MAX_NAME_CHARS, MAX_PLACEHOLDERS_PER_OPERATION, MAX_SCAN_DEPTH, MAX_SCAN_NODES,
-    P_NS, R_NS, SPTREE_DEPTH, STRICT_SLIDE_LAYOUT_REL, STRICT_SLIDE_MASTER_REL, check_size,
-    escape_xml, find_placeholder_span, insert_bytes, insert_id_list_entry, invalid, layout_xml,
-    local_name, master_xml, next_shape_id, placeholder_shape_xml, remove_id_list_entry,
-    replace_span, scan_element_span, shape_id_within,
+    P_NS, R_NS, STRICT_SLIDE_LAYOUT_REL, STRICT_SLIDE_MASTER_REL, check_size, escape_xml,
+    insert_id_list_entry, invalid, layout_xml, local_name, master_xml, remove_id_list_entry,
+    validate_layout_inputs, validate_xml10_chars,
 };
 use super::model::{
     AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID, PlaceholderSpec,
@@ -25,6 +23,62 @@ use super::model::{
 // ============================================================================
 // Authoring operations
 // ============================================================================
+
+/// Run the complete slide-layout authoring preflight against borrowed package
+/// state. The legacy [`crate::Package`] facade calls this before its generic
+/// transaction clones the OPC graph, so malformed names, duplicate identities,
+/// invalid master ID lists, and final generated XML limits fail without a
+/// package clone.
+pub(crate) fn preflight_add_slide_layout(
+    package: &OpcPackage,
+    master_part_name: &PackURI,
+    kind: SlideLayoutKind,
+    name: &str,
+    placeholders: &[PlaceholderSpec],
+) -> Result<()> {
+    require_name(name)?;
+    require_placeholders(placeholders)?;
+    validate_layout_inputs(name, placeholders)?;
+
+    let master_part = package.get_part(master_part_name)?;
+    if master_part.content_type() != ct::PML_SLIDE_MASTER {
+        return Err(Error::ContentType {
+            expected: ct::PML_SLIDE_MASTER.to_string(),
+            actual: master_part.content_type().to_string(),
+        });
+    }
+    let references = parse_layout_id_list(master_part.blob())?;
+    allocate_id(references.iter().filter_map(LayoutReference::layout_id))?;
+    let layout_index = next_part_index(package, "/ppt/slideLayouts/slideLayout", ".xml")?;
+    let layout_uri = PackURI::new(format!("/ppt/slideLayouts/slideLayout{layout_index}.xml"))
+        .map_err(|error| Error::Uri(format!("slide layout partname: {error}")))?;
+    let layout_xml = layout_xml(kind, name, placeholders)?;
+    check_size(layout_xml.as_bytes())?;
+
+    let target = format!("../slideLayouts/slideLayout{layout_index}.xml");
+    let relationship_id = layout_relationship_id(master_part, &target);
+    let entry = format!(
+        "<p:sldLayoutId xmlns:p=\"{P_NS}\" xmlns:r=\"{R_NS}\" id=\"{}\" r:id=\"{}\"/>",
+        references
+            .iter()
+            .filter_map(LayoutReference::layout_id)
+            .max()
+            .unwrap_or(MIN_MASTER_OR_LAYOUT_ID - 1)
+            .checked_add(1)
+            .ok_or_else(|| invalid("slide layout ID overflow"))?,
+        escape_xml(&relationship_id)
+    );
+    let patched_master = insert_id_list_entry(
+        master_part.blob(),
+        "sldLayoutIdLst",
+        &entry,
+        IdListAnchor::AfterElement("clrMap"),
+    )?;
+    check_size(&patched_master)?;
+    relative_target("/ppt/slideLayouts/", master_part_name.as_str())?;
+    let _ = layout_uri;
+    Ok(())
+}
 
 /// Create a new slide master and reference it from the presentation part.
 ///
@@ -140,6 +194,7 @@ fn add_slide_layout_inner(
 ) -> Result<AuthoredSlideLayout> {
     require_name(name)?;
     require_placeholders(placeholders)?;
+    validate_layout_inputs(name, placeholders)?;
     let master_uri = master_part_name.clone();
     let master_part = package.get_part(&master_uri)?;
     if master_part.content_type() != ct::PML_SLIDE_MASTER {
@@ -201,13 +256,14 @@ fn add_slide_layout_inner(
     })
 }
 
-/// Add or replace a placeholder shape on a slide master or slide layout.
+/// Add or update a placeholder shape on a slide, slide master, or slide layout.
 ///
 /// A placeholder is identified by its `p:ph` type and index (an absent index
 /// matches `idx` zero, per the ECMA default). When a matching placeholder
-/// already exists its shape is replaced in place, keeping its shape ID;
-/// otherwise a new shape is appended to the shape tree with the next free
-/// shape ID. The optional text replaces the placeholder's prompt text.
+/// already exists its name, prompt text, and typed p232 extension are patched
+/// in place, keeping all other shape bytes and its shape ID; otherwise a new
+/// shape is appended to the shape tree with the next free shape ID. The
+/// optional text replaces the placeholder's prompt text.
 ///
 /// # Errors
 ///
@@ -217,68 +273,7 @@ pub fn store_placeholder_shape(
     part_name: &PackURI,
     spec: &PlaceholderSpec,
 ) -> Result<()> {
-    let uri = part_name.clone();
-    let part = package.get_part(&uri)?;
-    let content_type = part.content_type();
-    if content_type != ct::PML_SLIDE_MASTER && content_type != ct::PML_SLIDE_LAYOUT {
-        return Err(Error::ContentType {
-            expected: format!("{} or {}", ct::PML_SLIDE_MASTER, ct::PML_SLIDE_LAYOUT),
-            actual: content_type.to_string(),
-        });
-    }
-    if let Some(name) = &spec.name {
-        require_name(name)?;
-    }
-    let xml = part.blob().to_vec();
-    let existing = find_placeholder_span(&xml, spec.kind.as_str(), spec.effective_index())?;
-    let shape_id = match &existing {
-        Some(span) => shape_id_within(&xml[span.start..span.end])?,
-        None => next_shape_id(&xml)?,
-    };
-    let shape = placeholder_shape_xml(shape_id, spec, true);
-    let patched = if let Some(span) = existing {
-        replace_span(&xml, &span, shape.as_bytes())?
-    } else {
-        let tree = scan_element_span(&xml, "spTree", SPTREE_DEPTH)?
-            .ok_or_else(|| invalid("slide master or layout has no shape tree"))?;
-        if tree.empty {
-            return Err(invalid("slide master or layout has an empty shape tree"));
-        }
-        insert_bytes(&xml, tree.close_start, shape.as_bytes())?
-    };
-    // The patched part must inventory the placeholder back through the same
-    // scan the read side's shape parser performs.
-    if find_placeholder_span(&patched, spec.kind.as_str(), spec.effective_index())?.is_none() {
-        return Err(invalid("patched placeholder shape did not round-trip"));
-    }
-    package.get_part_mut(&uri)?.set_blob(patched);
-
-    // Run the read-side placeholder inventory over the patched part.
-    let part = package.get_part(&uri)?;
-    let matches = |shape: crate::shape::Shape<'_>| {
-        shape.placeholder().is_some_and(|placeholder| {
-            placeholder.kind().unwrap_or("obj") == spec.kind.as_str()
-                && placeholder.index() == spec.effective_index()
-        })
-    };
-    let found = if part.content_type() == ct::PML_SLIDE_MASTER {
-        SlideMasterPart::from_part(part)?
-            .shapes()?
-            .placeholders()
-            .any(matches)
-    } else {
-        SlideLayoutPart::from_part(part)?
-            .shapes()?
-            .placeholders()
-            .any(matches)
-    };
-    if !found {
-        return Err(invalid(
-            "read-side placeholder inventory lost the authored shape",
-        ));
-    }
-    invalidate_signatures(package);
-    Ok(())
+    super::placeholder::store_placeholder_shape_source(package, part_name, spec)
 }
 
 /// Delete a slide layout that is not referenced by any slide.
@@ -786,6 +781,32 @@ fn next_part_index(package: &OpcPackage, prefix: &str, suffix: &str) -> Result<u
     }
 }
 
+fn layout_relationship_id(master_part: &dyn Part, target: &str) -> String {
+    if let Some(existing) = master_part.rels().iter().find(|relationship| {
+        relationship.reltype() == rt::SLIDE_LAYOUT
+            && relationship.target_ref() == target
+            && !relationship.is_external()
+    }) {
+        return existing.r_id().to_owned();
+    }
+    let mut used: Vec<u32> = master_part
+        .rels()
+        .iter()
+        .filter_map(|relationship| relationship.r_id().strip_prefix("rId"))
+        .filter_map(|value| value.parse::<u32>().ok())
+        .collect();
+    used.sort_unstable();
+    let mut next = 1u32;
+    for value in used {
+        match value.cmp(&next) {
+            std::cmp::Ordering::Equal => next = next.saturating_add(1),
+            std::cmp::Ordering::Greater => break,
+            std::cmp::Ordering::Less => {},
+        }
+    }
+    format!("rId{next}")
+}
+
 /// Resolve the theme relationship target for a newly created master.
 ///
 /// Returns the relationship target (relative to `/ppt/slideMasters/`) and,
@@ -885,6 +906,7 @@ fn require_name(name: &str) -> Result<()> {
     if name.chars().count() > MAX_NAME_CHARS {
         return Err(invalid("slide layout name exceeds 256 characters"));
     }
+    validate_xml10_chars(name, "authored name")?;
     Ok(())
 }
 

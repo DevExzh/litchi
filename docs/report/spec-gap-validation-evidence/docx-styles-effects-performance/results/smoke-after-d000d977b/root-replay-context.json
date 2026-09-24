@@ -1,0 +1,7 @@
+{
+  "frozen_head": "16cf1e3c612a14bd3517cd1b57dd57fce2fb6c35",
+  "verification_worktree": "/var/tmp/docx-smoke-root-replay-6vr5c9l8",
+  "verifier_exit_code": 0,
+  "verification_worktree_removed": true,
+  "initial_replay_refusal": "The first attempt used retention HEAD411828b53 instead of capture HEAD16cf1e3c6; the verifier rejected the HEAD mismatch before writing a result."
+}

@@ -1,0 +1,13 @@
+{
+  "archive": "scalar-cell-baseline-tests.tar.gz",
+  "sha256": "54aac6103bdefc8668730e7e579687b76e3b7dbc4eb992f6a82813ed73e9e0bd",
+  "description": "Pre-optimization scalar-cell semantic controls:66 integration tests pass on validated1ddaf production.",
+  "status": 0,
+  "tests_passed": 66,
+  "files": {
+    "test.log": "fcac1f52fd6cb13ca9cf577dc2b58f423e66ee3862710442565f3c77da28f021",
+    "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "1ddaf1adcf4157c3f84bdbae62aa882867037da85a97aab1bd9a9a225eda7e5e",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/references.rs": "680a3fd9c3b80951408f3210f5c5373dcea7dd00c1b561b0902043438b79d907",
+    "crates/litchi-ods/tests/ods_formula_array_reference_evaluation.rs": "38300d3bbe2ad3a23c7839d567af07620bd96252c8aabc2ff61787fd39a480ee"
+  }
+}

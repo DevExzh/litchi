@@ -1,0 +1,23 @@
+{
+  "base_commit": "b8e5d5fe257fd95747c69a3c44a53cedd96f77ed",
+  "selected_files": {
+    "crates/litchi-ods/src/codec/formula/evaluation.rs": "500d71a8a6f6d7776011d04d4cc462e4299a81d8a8b60916b7a8624244d91cda",
+    "crates/litchi-ods/src/codec/formula/evaluation/descriptive.rs": "0311f15ba569cbfe52b75a67bdc300b3dc74e0ca98db8d401f2e14541253ed3d",
+    "crates/litchi-ods/src/codec/formula/evaluation/descriptive/harmonic.rs": "8e273a095fbd8bca95be1a5778a620eb31847d8e98b4c5559cebe26bb1704cab",
+    "crates/litchi-ods/src/codec/formula/evaluation/descriptive/moments.rs": "e857b413183796793057ae59280d37579eec26e6f6ac15a5f3275f7d83e706d4",
+    "crates/litchi-ods/src/codec/formula/evaluation/descriptive/reciprocal_sum.rs": "a05e30c707e8865cb72bc6edd81740c03edb9222ae4df94e150f4227e0a31920",
+    "crates/litchi-ods/src/codec/formula/evaluation/numerics.rs": "627ec3d9c5f0f15d43f483fc64b28a861c9235877173a1db087a82c7697ee6e0",
+    "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "2d230ccb34781b985c430964efd5fceb86ea25bbdc3dc1ebbd14efc516928be6",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/descriptive.rs": "6ef63b74468e40dba853b81b9b2d0ba692a14c6df39d2ab6209c893aacef9c8e",
+    "crates/litchi-ods/tests/ods_formula_descriptive_evaluation.rs": "358893f8efe6bdd96032d35768832ae89ccf2d680b2457bd88ac8ee8859dea82",
+    "crates/litchi-ods/tests/ods_formula_descriptive_limits.rs": "7b06dcc3da84cd4fc5f4409d4a981ef5a1044a120b846b7c9b685ce7ddc60e61",
+    "crates/litchi-ods/tests/ods_formula_descriptive_native.rs": "f79d29dac020a958369cddc103cf624295dfcbdcb6022ae62de79d9ee34ed148",
+    "crates/litchi-ods/tests/ods_formula_descriptive_oracle.rs": "215680a9981ab7a51c23a7a8b9b11ed80b3c9176a946735c53a43cd002c24bbe",
+    "docs/report/spec-gap-validation-evidence/ods-formula-descriptive-statistics/contract.md": "6d0127bbf1867553860ba20013aab530c9931ea961e022532e9c16df4424965f",
+    "docs/report/spec-gap-validation-evidence/ods-formula-descriptive-statistics/numeric_oracle.py": "d099323fd7d83342051d96659567fc8fabc215206ddac930c167434124ededf4",
+    "docs/report/spec-gap-validation-evidence/ods-formula-descriptive-statistics/numeric-goldens.json": "d59ac0779387ff5cb56de44f21d6760e57a82b30d8ac9fc6c6a253c235a2dfb9",
+    "docs/report/spec-gap-validation-evidence/ods-formula-descriptive-statistics/native/cached-results.json": "3eeb69e01c6885fbb86d7a7b4d4d8bb23c43eb88bf501b37e16ce20a617112bf",
+    "docs/report/spec-gap-validation-evidence/ods-formula-descriptive-statistics/native/provenance.json": "57cf56e54ea1a44f621d788b63790e6c5d92e4fc67bb2d3ba49dd0b21a1eff1d",
+    "Cargo.lock": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3"
+  }
+}

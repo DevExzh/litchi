@@ -1,0 +1,508 @@
+{
+  "before_after": {
+    "binary_sha256_stable": true,
+    "git_status_clean": true,
+    "metadata_sha256": "086f7069ec3db14f37b58dab3e3c98688cbca3e79c11726429e31af4f5d27ce9",
+    "source_manifest_sha256": "b956b95d16b54ddae6025d9c3935d968a19e79838b6d0bdbfda6fdc2978b125a"
+  },
+  "binary": {
+    "copied_into_retention": false,
+    "path": "/var/tmp/pptx-ink-actions-732f3beca-target-parent.rSYID1/target/release/pptx-ink-actions-performance",
+    "sha256": "d93270463e109cd075f3b72702d0ba2b24c7422b779085b881a73c06e746cc3b",
+    "size_bytes": 4236952
+  },
+  "build_hostprobe_raw_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+  "captured_head": "732f3beca1418553c1db8ae4dcb5899e06b7a7db",
+  "clean_source_worktree": "/var/tmp/litchi-pptx-ink-actions-profiler-732f3beca-preflight",
+  "cleanup": {
+    "future_matrix_requires": "A fresh runner-owned target unless root explicitly authorizes reuse.",
+    "raw_receipts_retained_until_root_byte_audit": true,
+    "safe_after_audit": "After root completes a full raw Git byte audit of every retained raw_receipt, remove only the explicitly listed external target-parent and raw receipt directories; keep this tracked retention copy and its complete raw copy.",
+    "target_retained_until_root_byte_audit": true
+  },
+  "files": [
+    {
+      "bytes": 167,
+      "path": "binary-after.sha256",
+      "sha256": "285259bf43da13902c673c30a4a263255fe34aca9e8cdb483c84516e4077d3c8"
+    },
+    {
+      "bytes": 310,
+      "path": "binary-file.txt",
+      "sha256": "cf65be71493eaa1173bd07a475dd05d3b21dcb697ce2c5157c34cae53508ac48"
+    },
+    {
+      "bytes": 43,
+      "path": "binary-stat.txt",
+      "sha256": "695ef8fe2250d509ef5d98a4d80ef8ca0f0906796f41fd4c7eb53396b9a147d7"
+    },
+    {
+      "bytes": 167,
+      "path": "binary.sha256",
+      "sha256": "285259bf43da13902c673c30a4a263255fe34aca9e8cdb483c84516e4077d3c8"
+    },
+    {
+      "bytes": 1972,
+      "path": "build-provenance.txt",
+      "sha256": "7bd1c40b754ad79d8a4887c44ed6ecd3eeb9ced50cca1ed1c0bddd16b83bb859"
+    },
+    {
+      "bytes": 217,
+      "path": "cargo-lock.sha256",
+      "sha256": "ad0dbc4e6c0e8c34f11a7205c718f4c5fe5f90d51230f1d84a03488416703a9a"
+    },
+    {
+      "bytes": 18476,
+      "path": "commands.jsonl",
+      "sha256": "140c7282dcc1670f1925b1a92630e8eb86ffbe2dcc8c7c7abccebbbe52db8812"
+    },
+    {
+      "bytes": 663,
+      "path": "committed-inputs-guard.stdout",
+      "sha256": "acd46af4ba7bc9f7bb3bb84b7af7241272037755e488618e6e3886acf953544f"
+    },
+    {
+      "bytes": 0,
+      "path": "git-status-after.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "git-status-before.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 702,
+      "path": "host-preflight.txt",
+      "sha256": "7232fd0d939113d60103d9606dae3b9245c5a0623a39a87901e5e429c24352f7"
+    },
+    {
+      "bytes": 41,
+      "path": "host-probe-missing-capture-head.stderr",
+      "sha256": "58c4a02b86168b5b7f6c15b75f1ecd63b1e4f6196a82c421a2ab242d732d6d55"
+    },
+    {
+      "bytes": 0,
+      "path": "host-probe.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 954,
+      "path": "host-probe.stdout",
+      "sha256": "e66ae8f9b3b9e2cdf80c1e70d24739f39c971d62290a106d0a5455c686d8a17a"
+    },
+    {
+      "bytes": 1841811,
+      "path": "source-manifest-after.txt",
+      "sha256": "b956b95d16b54ddae6025d9c3935d968a19e79838b6d0bdbfda6fdc2978b125a"
+    },
+    {
+      "bytes": 1841811,
+      "path": "source-manifest-before.txt",
+      "sha256": "b956b95d16b54ddae6025d9c3935d968a19e79838b6d0bdbfda6fdc2978b125a"
+    },
+    {
+      "bytes": 1841811,
+      "path": "source-manifest-preflight.txt",
+      "sha256": "baee972c26504c82db326e1a55f8f2ec34090e65bbc538c07f26067271eeff8b"
+    },
+    {
+      "bytes": 1724,
+      "path": "README.md",
+      "sha256": "574b80665d9319e75dec0ae0f083bc97fd3eb5fa0bc50a90f52b91de8c4e3d27"
+    }
+  ],
+  "harness_lock_sha256": "3c773b848134c52df596034ffbbe8688dde9924fb741dee8bc8bce0eaa772f2e",
+  "helper_sha256": "bec6baafcf735d778216fb54fe6299312707e912dcaed5f89de988f7112bb58e",
+  "host_probe": {
+    "initial_missing_capture_head_exit_code": 1,
+    "initial_missing_capture_head_stderr": "host-probe-missing-capture-head.stderr",
+    "native_powerpoint_claim": false,
+    "successful_exit_code": 0,
+    "successful_stderr": "host-probe.stderr",
+    "successful_stdout": "host-probe.stdout",
+    "synthetic_complete_opc": true
+  },
+  "preflight_raw_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+  "production_source_baseline_commit": "2a2ffa1cae4e6b7070082768ce84483e5d411dc8",
+  "raw_receipts": [
+    {
+      "bytes": 602820,
+      "retained_path": "raw/preflight/cargo-metadata.json",
+      "sha256": "e04472032a4a4ee8c5cc596981209ee300fb76736242dc21020d2eac5d7d08d8",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "cargo-metadata.json"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/preflight/cargo-metadata.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "cargo-metadata.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/preflight/cargo-version.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "cargo-version.stderr"
+    },
+    {
+      "bytes": 36,
+      "retained_path": "raw/preflight/cargo-version.txt",
+      "sha256": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "cargo-version.txt"
+    },
+    {
+      "bytes": 663,
+      "retained_path": "raw/preflight/committed-inputs-guard.stdout",
+      "sha256": "acd46af4ba7bc9f7bb3bb84b7af7241272037755e488618e6e3886acf953544f",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "committed-inputs-guard.stdout"
+    },
+    {
+      "bytes": 702,
+      "retained_path": "raw/preflight/host-preflight.txt",
+      "sha256": "7232fd0d939113d60103d9606dae3b9245c5a0623a39a87901e5e429c24352f7",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "host-preflight.txt"
+    },
+    {
+      "bytes": 8363,
+      "retained_path": "raw/preflight/preflight-commands.jsonl",
+      "sha256": "6122f62d8d5b393352a95b5078c8d5e7be6ccdd786bb9742f7f55007596f0db7",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "preflight-commands.jsonl"
+    },
+    {
+      "bytes": 663,
+      "retained_path": "raw/preflight/receipt.txt",
+      "sha256": "acd46af4ba7bc9f7bb3bb84b7af7241272037755e488618e6e3886acf953544f",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "receipt.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/preflight/rustc-vV.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "rustc-vV.stderr"
+    },
+    {
+      "bytes": 196,
+      "retained_path": "raw/preflight/rustc-vV.txt",
+      "sha256": "4fdff2578428e9c5c08ddd7a0d3079c1a106b1cdaa46e73e46f7cd32b0fb9cad",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "rustc-vV.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/preflight/rustfmt-version.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "rustfmt-version.stderr"
+    },
+    {
+      "bytes": 45,
+      "retained_path": "raw/preflight/rustfmt-version.txt",
+      "sha256": "21e923568a260155c34a6f780f9513d3962c088aa3bbe8c91ab5385f470547d1",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "rustfmt-version.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/preflight/scaffold-tests.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "scaffold-tests.stderr"
+    },
+    {
+      "bytes": 137,
+      "retained_path": "raw/preflight/scaffold-tests.stdout",
+      "sha256": "71559e58278fe6ff65664886c898f2f4737562e6e9c5c6cd3e8dee89f6483038",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "scaffold-tests.stdout"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/preflight/source-manifest.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "source-manifest.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/preflight/source-manifest.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "source-manifest.stdout"
+    },
+    {
+      "bytes": 1841811,
+      "retained_path": "raw/preflight/source-manifest.txt",
+      "sha256": "baee972c26504c82db326e1a55f8f2ec34090e65bbc538c07f26067271eeff8b",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb",
+      "source_relative": "source-manifest.txt"
+    },
+    {
+      "bytes": 167,
+      "retained_path": "raw/build-hostprobe/binary-after.sha256",
+      "sha256": "285259bf43da13902c673c30a4a263255fe34aca9e8cdb483c84516e4077d3c8",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "binary-after.sha256"
+    },
+    {
+      "bytes": 310,
+      "retained_path": "raw/build-hostprobe/binary-file.txt",
+      "sha256": "cf65be71493eaa1173bd07a475dd05d3b21dcb697ce2c5157c34cae53508ac48",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "binary-file.txt"
+    },
+    {
+      "bytes": 43,
+      "retained_path": "raw/build-hostprobe/binary-stat.txt",
+      "sha256": "695ef8fe2250d509ef5d98a4d80ef8ca0f0906796f41fd4c7eb53396b9a147d7",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "binary-stat.txt"
+    },
+    {
+      "bytes": 167,
+      "retained_path": "raw/build-hostprobe/binary.sha256",
+      "sha256": "285259bf43da13902c673c30a4a263255fe34aca9e8cdb483c84516e4077d3c8",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "binary.sha256"
+    },
+    {
+      "bytes": 265,
+      "retained_path": "raw/build-hostprobe/build-context.txt",
+      "sha256": "6b85ff2ce0b1cff0a30370496c0bd4fefab12150dfdb01bb88321541bb2a8e2a",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "build-context.txt"
+    },
+    {
+      "bytes": 1972,
+      "retained_path": "raw/build-hostprobe/build-provenance.txt",
+      "sha256": "7bd1c40b754ad79d8a4887c44ed6ecd3eeb9ced50cca1ed1c0bddd16b83bb859",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "build-provenance.txt"
+    },
+    {
+      "bytes": 4197,
+      "retained_path": "raw/build-hostprobe/cargo-build-release.stderr",
+      "sha256": "3acce9a2cadec2c575b7ebab49493a948e1fb5850d77d424fa5097d9e5fa1233",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "cargo-build-release.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/build-hostprobe/cargo-build-release.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "cargo-build-release.stdout"
+    },
+    {
+      "bytes": 217,
+      "retained_path": "raw/build-hostprobe/cargo-lock.sha256",
+      "sha256": "ad0dbc4e6c0e8c34f11a7205c718f4c5fe5f90d51230f1d84a03488416703a9a",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "cargo-lock.sha256"
+    },
+    {
+      "bytes": 602654,
+      "retained_path": "raw/build-hostprobe/cargo-metadata-after.json",
+      "sha256": "086f7069ec3db14f37b58dab3e3c98688cbca3e79c11726429e31af4f5d27ce9",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "cargo-metadata-after.json"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/build-hostprobe/cargo-metadata-after.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "cargo-metadata-after.stderr"
+    },
+    {
+      "bytes": 602654,
+      "retained_path": "raw/build-hostprobe/cargo-metadata-before.json",
+      "sha256": "086f7069ec3db14f37b58dab3e3c98688cbca3e79c11726429e31af4f5d27ce9",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "cargo-metadata-before.json"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/build-hostprobe/cargo-metadata-before.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "cargo-metadata-before.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/build-hostprobe/cargo-version-before.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "cargo-version-before.stderr"
+    },
+    {
+      "bytes": 36,
+      "retained_path": "raw/build-hostprobe/cargo-version-before.txt",
+      "sha256": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "cargo-version-before.txt"
+    },
+    {
+      "bytes": 18476,
+      "retained_path": "raw/build-hostprobe/commands.jsonl",
+      "sha256": "140c7282dcc1670f1925b1a92630e8eb86ffbe2dcc8c7c7abccebbbe52db8812",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "commands.jsonl"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/build-hostprobe/git-status-after.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "git-status-after.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/build-hostprobe/git-status-before.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "git-status-before.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/build-hostprobe/host-probe-with-head.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "host-probe-with-head.stderr"
+    },
+    {
+      "bytes": 954,
+      "retained_path": "raw/build-hostprobe/host-probe-with-head.stdout",
+      "sha256": "e66ae8f9b3b9e2cdf80c1e70d24739f39c971d62290a106d0a5455c686d8a17a",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "host-probe-with-head.stdout"
+    },
+    {
+      "bytes": 41,
+      "retained_path": "raw/build-hostprobe/host-probe.stderr",
+      "sha256": "58c4a02b86168b5b7f6c15b75f1ecd63b1e4f6196a82c421a2ab242d732d6d55",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "host-probe.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/build-hostprobe/host-probe.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "host-probe.stdout"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/build-hostprobe/rustc-vV-before.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "rustc-vV-before.stderr"
+    },
+    {
+      "bytes": 196,
+      "retained_path": "raw/build-hostprobe/rustc-vV-before.txt",
+      "sha256": "4fdff2578428e9c5c08ddd7a0d3079c1a106b1cdaa46e73e46f7cd32b0fb9cad",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "rustc-vV-before.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/build-hostprobe/rustfmt-version-before.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "rustfmt-version-before.stderr"
+    },
+    {
+      "bytes": 45,
+      "retained_path": "raw/build-hostprobe/rustfmt-version-before.txt",
+      "sha256": "21e923568a260155c34a6f780f9513d3962c088aa3bbe8c91ab5385f470547d1",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "rustfmt-version-before.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/build-hostprobe/source-manifest-after.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "source-manifest-after.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/build-hostprobe/source-manifest-after.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "source-manifest-after.stdout"
+    },
+    {
+      "bytes": 1841811,
+      "retained_path": "raw/build-hostprobe/source-manifest-after.txt",
+      "sha256": "b956b95d16b54ddae6025d9c3935d968a19e79838b6d0bdbfda6fdc2978b125a",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "source-manifest-after.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/build-hostprobe/source-manifest-before.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "source-manifest-before.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/build-hostprobe/source-manifest-before.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "source-manifest-before.stdout"
+    },
+    {
+      "bytes": 1841811,
+      "retained_path": "raw/build-hostprobe/source-manifest-before.txt",
+      "sha256": "b956b95d16b54ddae6025d9c3935d968a19e79838b6d0bdbfda6fdc2978b125a",
+      "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M",
+      "source_relative": "source-manifest-before.txt"
+    }
+  ],
+  "raw_summary": {
+    "complete_copy": true,
+    "directories": [
+      {
+        "byte_count": 2455436,
+        "file_count": 17,
+        "label": "preflight",
+        "retained_directory": "raw/preflight",
+        "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-preflight.32vJlb"
+      },
+      {
+        "byte_count": 4916016,
+        "file_count": 32,
+        "label": "build-hostprobe",
+        "retained_directory": "raw/build-hostprobe",
+        "source_directory": "/var/tmp/pptx-ink-actions-732f3beca-build-hostprobe.b7aZ1M"
+      }
+    ],
+    "symlink_count_in_sources": 0
+  },
+  "schema": "pptx-ink-actions-build-hostprobe-retention-v1",
+  "scope": "durable build and public host-probe provenance; no performance claim",
+  "semantic_owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+  "semantic_owner_design": {
+    "git_blob": "597400950b1027c47cd6e4cbbedd23915bc0980e",
+    "path": "docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md",
+    "sha256": "30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d"
+  },
+  "timing": {
+    "build_only": true,
+    "lane_commands_run": 0,
+    "matrix_commands_run": 0,
+    "performance_claim": false,
+    "usr_bin_time_invocations": 0
+  }
+}

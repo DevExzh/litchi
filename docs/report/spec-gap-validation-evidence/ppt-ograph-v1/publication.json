@@ -1,0 +1,121 @@
+{
+  "integration_base": "22ba76ce61543c3ae3506ae64762194b5a1ddf5b",
+  "source_sha256": {
+    "crates/litchi-ograph/src/chart.rs": "805611c3deae64e6e62492c8a3a5439e4995fd67723146654db5d010b36e051e",
+    "crates/litchi-ograph/src/chart/codec/mod.rs": "f6ed7e92c424eba15258cb5d61c841ff25ff0ec8e19a8389cd1ffc7a5560dd9b",
+    "crates/litchi-ograph/src/chart/codec/records.rs": "b6e7a4303a74b5d9ac3194ec3fc056fd888d1470d9d1042dddb0194610c52ec8",
+    "crates/litchi-ograph/src/chart/codec/records/encode.rs": "6f06671a33f6d2a651bd092a8cc20047085b91571d494eb363e0c8b05767f189",
+    "crates/litchi-ograph/src/chart/codec/records/parse.rs": "53d4c13cbf165d31be7a601856b856f18949199428386e37000a0d8031e146fd",
+    "crates/litchi-ograph/src/chart/codec/records/wire.rs": "c5667af1bd1a46d36140d2bfdee24449d5648a4705650b75f948189bf5f8e708",
+    "crates/litchi-ograph/src/chart/model/aggregate/mod.rs": "840947fbcd9f707a911f93a6f15f2265ab66e9675e112a2156a34f9f74f8b2ae",
+    "crates/litchi-ograph/src/chart/model/aggregate/semantic.rs": "5fb12467a800ba5e72a3aa3396d4916715cb806cd53112dece47925ab2885c3f",
+    "crates/litchi-ograph/src/chart/model/mod.rs": "65df815a6a22b31ce77916dbd6dfd2a4e3c8dd927e0b2d5c9be8a7ad399710ba",
+    "crates/litchi-ograph/src/chart/model/tests.rs": "bbdf47f1cd8c265b526d4ce1aa33ff39626b6d8e76d86eb437f48cdbc5bffe40",
+    "crates/litchi-ograph/src/error.rs": "c7f6cc889ad609c0a695957f4ae9f4fe0f9890755a3b701d094d45e7da4d71bd",
+    "crates/litchi-ograph/src/package/semantic.rs": "38a2a09b89cddec6007f6676e2b380874be818583aed4ddb0daac232b308e83f",
+    "crates/litchi-ograph/src/package/tests.rs": "ee2464519a43f7648508a8eb9e31818f53346053f9910daec5f13dc01a2ab457",
+    "crates/litchi-ppt/docs/FEATURE_MATRIX.md": "06bd88adb627385b3f15555bb5ec21c5438c9fec01cb8213cb98fb08ee806ab1",
+    "crates/litchi-ppt/src/writer/chart.rs": "91cf38fee539ae97e6d92767111cb8a52ef274cd8cba9a19916c314f7fabfa32",
+    "crates/litchi-ppt/src/writer/core/model/semantic.rs": "9d527da9c3dc8816d4ec3bf48d2911c43c4336b020c4f5bb403788ddecf40f84",
+    "crates/litchi-ppt/src/writer/mod.rs": "46e63c7687bcd5a705b8a2d5fb16d20ceba13d9c0e49888a25e859a16849eabb",
+    "crates/litchi-ppt/tests/ppt_chart_writer.rs": "42681aec10436835325a109737ea068fc819cfd40dc3494698c0dea701e15ebf"
+  },
+  "root_test_counts": {
+    "passed": 1314,
+    "failed": 0,
+    "ignored": 11,
+    "targets": 36
+  },
+  "archives": {
+    "root-integration.json.gz": {
+      "raw_sha256": "0cf1db7496e82b31f15290c32c05188fd7a53c97aa908568d209dce19ce04930",
+      "gzip_sha256": "f7fc2767bc0dbc6cdb3c99b4c36ebf1954740ac17f2e287c3d84eb63fa50587c"
+    },
+    "root-gates.json.gz": {
+      "raw_sha256": "3224d187c386ec465a04f789f7ed7c7eda50485a773a934c50acb0785974ce9e",
+      "gzip_sha256": "6ffb154633fce00b7eec77cb4b9628fdfa9a7c9e397344e7592dbebd7d8c6707"
+    },
+    "root-test-counts.json.gz": {
+      "raw_sha256": "6404384687cb5d22896a3b04a8d2583c0466cf43c6aa0010db796f9b38c92ae3",
+      "gzip_sha256": "225038e37960e8bdf4a73350372e1cf04b6720c3583003cb4a044bd702d98036"
+    },
+    "root-source-after.json.gz": {
+      "raw_sha256": "db1983a3d862eb2df3a01fd535ad287edbb7f8b71a1d31526b540446ba6d4f48",
+      "gzip_sha256": "e13db6864f9037e8f5ad30635e5ee3eeab78acd45e7b9ecf59b45ffe4e4cf0ea"
+    },
+    "root-build-environment.json.gz": {
+      "raw_sha256": "a715da691e440414884cea9dc9375b67d392aebd603f0834766fb730dc499582",
+      "gzip_sha256": "6fc4f4c2cf220e3ab96b9b17324f73b59144d911114186cc937a3bd0bb0f792a"
+    },
+    "root-test.log.gz": {
+      "raw_sha256": "10d80dd32bd4b1bb52b835d277de2bddc66abbeb7a9550983d3dfa8191f41112",
+      "gzip_sha256": "8356d53f055d2b07e6c399fe013e0152ede745b067396b6bc4c4c86a83d622b4"
+    },
+    "root-clippy.log.gz": {
+      "raw_sha256": "8c30328102cb9714e63cc055dafd4166bed80324ef848e9fde951332709df4a9",
+      "gzip_sha256": "4013a8da6a42095c03d9510d29abeb3dac12ecf0046a99639bd78b2389f2fe18"
+    },
+    "root-rustdoc.log.gz": {
+      "raw_sha256": "f697f5b9eff0a6233d710e9a8f1790cfe3afd57ef0276f15b5847a1f7c82ede1",
+      "gzip_sha256": "12f262e97227cbfaedfa6519f33c16fd4de37f8b3b6d5b4404c33196f9889a72"
+    },
+    "root-rustfmt.log.gz": {
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    "author-README.md.gz": {
+      "raw_sha256": "f114bf0ebcd2e6a999bf73bdb2d30da5c3bae6cd0b94d580fcd1cf3591cea2d1",
+      "gzip_sha256": "5abc094bde155a7819f2b0fcf849dbf12f1be8e7a77657ae928ed498a20a4a68"
+    },
+    "author-SHA256SUMS.gz": {
+      "raw_sha256": "f6eaefc66ba2d584e88b2a69443d79ccb494f0dc9648f0fb6b05d8d6a4742200",
+      "gzip_sha256": "81865db5d3c2ecc3494c86a6a5ce4454efe71b1388778e324e9ec6a264db4e99"
+    },
+    "author-source-manifest.json.gz": {
+      "raw_sha256": "30bc4909e1b0637927c6cc20505a1ccb7aa5a248d8395ab8ad1b381e1c2527e7",
+      "gzip_sha256": "788756acf964054019f95453c442167e29141cb3626bbd7e8bd6e6429ba97dbc"
+    },
+    "author-citations.md.gz": {
+      "raw_sha256": "efdb69bba5eaceb4befa7217c7dfac629fb17c516c0aba8a4cd7bc66e08172e3",
+      "gzip_sha256": "936c815f9ca53d9723997cffe8888fc1eddfa2b4cb14bf0792562f7ab074ceb1"
+    },
+    "author-ograph-authoring-final.patch.gz": {
+      "raw_sha256": "b0c9cfc79e6c4808fedc61d4f9a4f7ba58c071604569abfa232e27aec99f34a5",
+      "gzip_sha256": "6c9d385856b312aefb47d0d0b49533ced18ef9ee67d1ade8b8954be6d9cce518"
+    },
+    "author-candidate-status.txt.gz": {
+      "raw_sha256": "57835da86bd1bab74d4baf14accc991fd1e849ac819a5bbff604bf6f09cf0916",
+      "gzip_sha256": "d54e8f22fafad2e6a5c1fa4ed680c9e827ab76977919cf3b9258dc100b861682"
+    },
+    "author-reconstruction.log.gz": {
+      "raw_sha256": "6cd0779470f86596dcc3d184a1cc0540fdd322b3519093fb947e8cdfe699cc01",
+      "gzip_sha256": "d6b6b82173c82957304fbaf20d717ff89e4876a64f7b26bf23ea854a941d4996"
+    },
+    "author-tests.log.gz": {
+      "raw_sha256": "83813fbfebd4ebbef0f3e7dfdf911a5a89fe3a101275732192b103df7093e766",
+      "gzip_sha256": "e062829cf1ac9cd6a533ae8c25a1e73d1f3ac16dcf17bd354c95bfc2b5ea26d9"
+    },
+    "author-doctests.log.gz": {
+      "raw_sha256": "314c84711e4038b1f978458e413d2a51af9fa313bf07b336ed996b6a97143d06",
+      "gzip_sha256": "d2bda3bf2e3ad73a7255cfd459b68713a198a9fbb49cf67f90e80a771889fe08"
+    },
+    "author-clippy.log.gz": {
+      "raw_sha256": "58dfb3af4748a33c5a2a7093269b46cb0b66751f940e939b79e1830f2320f0d1",
+      "gzip_sha256": "86edeace9d4ee2e0195d70c16e0d2ce450a868d9f281a46d641a5326d5e24a8b"
+    },
+    "author-rustdoc.log.gz": {
+      "raw_sha256": "1dd3064831dd8d8700f3eaf57b91497c7728b5b1662afdbb9ac0c795ee333c76",
+      "gzip_sha256": "2aa137775aaf4c94331e8437b0c790641d5cf8fb8036cd520d41d68c64b85915"
+    },
+    "author-rustfmt.log.gz": {
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    "independent-review.json.gz": {
+      "raw_sha256": "0ede7fb76373826805e04d09398c8142e43f1d103424c2b0ee638842c6ca2800",
+      "gzip_sha256": "beb37a9441812fc3361c50c87b76f1d05d1554b3324772dd70df5d76f977e35b"
+    }
+  },
+  "scope": "Standalone MS-OGRAPH Bar, stacked Line and axis-free Pie authoring with PPT embedding and source-bound neutral cache edits. Excludes Excel-hosted charts, mixed/secondary axes, arbitrary parsed-chart mutation, rendering/evaluation, native acceptance and PhotoAlbum.",
+  "review_observation_note": "Independent review observed sibling /home/zhuhe/code/litchi. Root verified all 18 integration worktree preimages and tested current integration base separately."
+}

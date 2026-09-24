@@ -11,11 +11,12 @@ pub use facade::{
     Block, Builder, CapabilityState, Commit, Edit, FormsChange, HeadingChange, History,
     InlineBlock, InlineChange, JoinError, JoinFailure, ListChange, MergeConflict, MergePlan,
     ParagraphChange, Patch, ResourceChange, ResourceMember, ResourcePayloadChange,
-    SecurityCapabilities, SecurityPolicy, SecurityReport, Template, TextBody, TransferPlan,
-    TransferPolicy, TransferSelector, ValidationCapabilities,
+    SecurityCapabilities, SecurityPolicy, SecurityReport, StructureChange, StructureKind,
+    StructureLifecycleChange, StructureSelector, Template, TextBody, TransferPlan, TransferPolicy,
+    TransferSelector, ValidationCapabilities,
 };
 pub use model::block::Content as ContentBlock;
 pub use model::{
-    block, bookmark, field, form, formatting, heading, inline, link, list, paragraph, resource,
-    style,
+    annotation, block, bookmark, change, field, form, formatting, frame, heading, index, inline,
+    link, list, note, paragraph, resource, ruby, section, style, table,
 };

@@ -1,0 +1,14 @@
+{
+  "reviewer": "corpus_binding_review",
+  "verdict": "CLEAR for DOC protectionV5",
+  "manifest_sha256": "fa335e7c6a71284a2c099c17a4bdf748c266f459aad1ce70f1fbd6ac136ac6e8",
+  "owned_paths": 44,
+  "findings": [
+    "0101/cswNew2/DOP594 normative shape and writer correct",
+    "malformed/unrecognized refused under default and AllowProtected",
+    "changedpatch destinationpolicy before publication; exactnoops retained",
+    "testhelper relocation and provenance correct",
+    "no Keynote"
+  ],
+  "root_source_match": "all44 clean overlay bytes identical to reviewedV5"
+}

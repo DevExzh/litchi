@@ -554,6 +554,12 @@ struct Span {
     parent: Option<usize>,
 }
 
+#[derive(Clone, Debug)]
+struct ResolvedAttribute {
+    namespace: Option<String>,
+    local: String,
+}
+
 struct CellLocation<'a> {
     cell: &'a Cell,
     range: Range<usize>,
@@ -1017,6 +1023,10 @@ fn validate_planned_rows(rows: &[PlannedRow]) -> Result<()> {
         name: "litchi-row-plan".to_string(),
         rows: planned_rows,
         style_name: None,
+        template_name: None,
+        style_usage: crate::model::structure::StyleUsage::default(),
+        title: None,
+        description: None,
     };
     crate::worksheet::validation::validate_sheet(&sheet)
 }
@@ -1026,6 +1036,10 @@ fn audit_inserted_row(row: &Row) -> Result<()> {
         name: "litchi-inserted-row".to_string(),
         rows: vec![row.clone()],
         style_name: None,
+        template_name: None,
+        style_usage: crate::model::structure::StyleUsage::default(),
+        title: None,
+        description: None,
     };
     crate::worksheet::validation::validate_sheet(&sheet)?;
     if row.style_name.is_some()
@@ -3818,7 +3832,663 @@ pub(crate) fn put_style_graph(
     insert_automatic_styles(source, &markup, max_output)
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Add the additive ODF data-style vocabulary to the mutable automatic-style
+/// owner.  Catalog admission and source-qualified identity are delegated to
+/// the shared borrowed scanner; package publication remains on the established
+/// exact source splice path.
+pub(crate) fn put_extended_style_graph(
+    source: &[u8],
+    graph: &crate::data_style::Graph,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    graph.validate()?;
+    let markup_len = extended_graph_markup_size(graph)?;
+    if markup_len == 0 {
+        return Ok(source.to_vec());
+    }
+    let owner = ensure_extended_names_available(source, graph, max_output)?;
+    preflight_extended_graph_candidate(&owner, markup_len, max_output)?;
+    let markup = graph.to_xml()?;
+    debug_assert_eq!(markup.len(), markup_len);
+    let candidate =
+        insert_extended_automatic_styles(source, &markup, max_output, owner.owner_range.clone())?;
+    verify_extended_graph_visible(&candidate, graph, max_output)?;
+    Ok(candidate)
+}
+
+fn extended_graph_markup_size(graph: &crate::data_style::Graph) -> Result<usize> {
+    let mut size = 0usize;
+    for style in &graph.number_styles {
+        size = size
+            .checked_add(style.serialized_markup_size()?)
+            .ok_or_else(|| invalid_error("ODS extended style graph markup size overflows"))?;
+    }
+    for style in &graph.data_styles {
+        size = size
+            .checked_add(style.serialized_markup_size()?)
+            .ok_or_else(|| invalid_error("ODS extended style graph markup size overflows"))?;
+    }
+    if size > crate::data_style::MAX_STYLE_GRAPH_BYTES {
+        return invalid("ODS extended style graph exceeds its aggregate byte limit");
+    }
+    Ok(size)
+}
+
+#[derive(Clone, Debug)]
+struct ExtendedGraphOwner {
+    owner_range: Option<Range<usize>>,
+    content_len: usize,
+    opening: Option<ExtendedGraphOwnerOpening>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ExtendedGraphOwnerOpening {
+    opening_len: usize,
+    closing_len: usize,
+    self_closing: bool,
+}
+
+fn preflight_extended_graph_candidate(
+    owner: &ExtendedGraphOwner,
+    markup_len: usize,
+    max_output: usize,
+) -> Result<()> {
+    if markup_len > max_output {
+        return invalid(format!(
+            "ODS extended style graph markup exceeds its {max_output} byte limit"
+        ));
+    }
+    let candidate_len = match (&owner.owner_range, owner.opening) {
+        (Some(range), Some(opening)) if opening.self_closing => {
+            let replacement_len = opening
+                .opening_len
+                .checked_sub(1)
+                .and_then(|length| length.checked_add(markup_len))
+                .and_then(|length| length.checked_add(opening.closing_len))
+                .ok_or_else(|| invalid_error("ODS automatic-styles insertion size overflows"))?;
+            owner
+                .content_len
+                .checked_sub(
+                    range.end.checked_sub(range.start).ok_or_else(|| {
+                        invalid_error("ODS automatic-styles owner range is reversed")
+                    })?,
+                )
+                .and_then(|length| length.checked_add(replacement_len))
+                .ok_or_else(|| invalid_error("ODS automatic-styles candidate size overflows"))?
+        },
+        (Some(_), Some(_)) => owner
+            .content_len
+            .checked_add(markup_len)
+            .ok_or_else(|| invalid_error("ODS automatic-styles candidate size overflows"))?,
+        (None, None) => {
+            let container_len = "<office:automatic-styles xmlns:office=\""
+                .len()
+                .checked_add(OFFICE.len())
+                .and_then(|length| length.checked_add("\">".len()))
+                .and_then(|length| length.checked_add(markup_len))
+                .and_then(|length| length.checked_add("</office:automatic-styles>".len()))
+                .ok_or_else(|| invalid_error("ODS automatic-styles container size overflows"))?;
+            owner
+                .content_len
+                .checked_add(container_len)
+                .ok_or_else(|| invalid_error("ODS automatic-styles candidate size overflows"))?
+        },
+        (Some(_), None) => {
+            return invalid("ODS automatic-styles owner opening metadata is missing");
+        },
+        (None, Some(_)) => {
+            return invalid("ODS automatic-styles owner range is missing");
+        },
+    };
+    if candidate_len > max_output {
+        return invalid(format!(
+            "ODS extended style graph candidate exceeds its {max_output} byte limit"
+        ));
+    }
+    Ok(())
+}
+
+fn ensure_extended_names_available(
+    source: &[u8],
+    graph: &crate::data_style::Graph,
+    max_output: usize,
+) -> Result<ExtendedGraphOwner> {
+    let package = Package::from_bytes(copy_package_bytes(
+        source,
+        max_output,
+        "extended data-style name source",
+    )?)?;
+    let catalog = crate::data_style::source::scan_with_limits(
+        package.content_xml().as_bytes(),
+        crate::data_style::Owner::ContentAutomatic,
+        data_style_scan_limits(max_output),
+    )?;
+    for style in &graph.number_styles {
+        if catalog.entries().iter().any(|entry| {
+            entry.family() == crate::data_style::Family::Number && entry.name() == style.name
+        }) {
+            return invalid(format!(
+                "ODS automatic data-style name '{}' already exists",
+                style.name
+            ));
+        }
+    }
+    for style in &graph.data_styles {
+        if catalog
+            .entries()
+            .iter()
+            .any(|entry| entry.family() == style.family() && entry.name() == style.name)
+        {
+            return invalid(format!(
+                "ODS automatic data-style name '{}' already exists",
+                style.name
+            ));
+        }
+    }
+    let owner_range = catalog.owner_range();
+    let opening = owner_range
+        .as_ref()
+        .map(|range| owner_opening_metadata(package.content_xml().as_bytes(), range))
+        .transpose()?;
+    Ok(ExtendedGraphOwner {
+        owner_range,
+        content_len: package.content_xml().len(),
+        opening,
+    })
+}
+
+fn owner_opening_metadata(
+    source: &[u8],
+    range: &Range<usize>,
+) -> Result<ExtendedGraphOwnerOpening> {
+    if range.start >= range.end || range.end > source.len() {
+        return invalid("ODS automatic-styles owner range is outside content.xml");
+    }
+    let opening_len = source
+        .get(range.start..range.end)
+        .and_then(|value| unquoted_tag_end(value).map(|end| end + 1))
+        .ok_or_else(|| invalid_error("ODS automatic-styles owner opening is missing"))?;
+    let opening = source
+        .get(range.start..range.start + opening_len)
+        .ok_or_else(|| {
+            invalid_error("ODS automatic-styles owner opening is outside content.xml")
+        })?;
+    let self_closing = opening.ends_with(b"/>");
+    let closing_len = if self_closing {
+        let slash = opening
+            .len()
+            .checked_sub(2)
+            .ok_or_else(|| invalid_error("ODS automatic-styles opening is empty"))?;
+        let name_end = opening[1..slash]
+            .iter()
+            .position(|byte| byte.is_ascii_whitespace())
+            .map_or(slash, |offset| offset + 1);
+        let name_len = name_end
+            .checked_sub(1)
+            .ok_or_else(|| invalid_error("ODS automatic-styles QName is missing"))?;
+        2usize
+            .checked_add(name_len)
+            .and_then(|length| length.checked_add(1))
+            .ok_or_else(|| invalid_error("ODS automatic-styles closing tag size overflows"))?
+    } else {
+        0
+    };
+    Ok(ExtendedGraphOwnerOpening {
+        opening_len,
+        closing_len,
+        self_closing,
+    })
+}
+
+fn unquoted_tag_end(source: &[u8]) -> Option<usize> {
+    let mut quote = None;
+    for (index, byte) in source.iter().copied().enumerate() {
+        match (quote, byte) {
+            (Some(delimiter), value) if value == delimiter => quote = None,
+            (Some(_), _) => {},
+            (None, b'\'' | b'"') => quote = Some(byte),
+            (None, b'>') => return Some(index),
+            _ => {},
+        }
+    }
+    None
+}
+
+/// Read one source-qualified data-style definition from either package style
+/// owner. Unsupported bodies remain represented by the shared source
+/// projection and retain their metadata identity for source-preserving edits.
+pub(crate) fn resolve_data_style(
+    content_xml: &str,
+    styles_xml: Option<&str>,
+    selector: crate::data_style::Selector<'_>,
+    max_owner_bytes: usize,
+) -> Result<crate::data_style::Entry> {
+    selector.validate()?;
+    let source = data_style_owner_source(content_xml, styles_xml, selector.owner)?;
+    let catalog = crate::data_style::source::scan_with_limits(
+        source,
+        selector.owner,
+        data_style_scan_limits(max_owner_bytes),
+    )?;
+    Ok(catalog.lookup(selector)?.entry().clone())
+}
+
+/// Read all recognized data-style roots from one physical style owner.
+pub(crate) fn data_style_catalog(
+    content_xml: &str,
+    styles_xml: Option<&str>,
+    owner: crate::data_style::Owner,
+    max_owner_bytes: usize,
+) -> Result<Vec<crate::data_style::Entry>> {
+    let source = data_style_owner_source(content_xml, styles_xml, owner)?;
+    let catalog = crate::data_style::source::scan_with_limits(
+        source,
+        owner,
+        data_style_scan_limits(max_owner_bytes),
+    )?;
+    let mut entries = Vec::new();
+    entries
+        .try_reserve(catalog.entries().len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODS data-style catalog",
+            source,
+        })?;
+    for entry in catalog.entries() {
+        entries.push(entry.entry().clone());
+    }
+    Ok(entries)
+}
+
+fn data_style_owner_source<'a>(
+    content_xml: &'a str,
+    styles_xml: Option<&'a str>,
+    owner: crate::data_style::Owner,
+) -> Result<&'a [u8]> {
+    match owner {
+        crate::data_style::Owner::ContentAutomatic => Ok(content_xml.as_bytes()),
+        crate::data_style::Owner::CommonStyles | crate::data_style::Owner::StylesAutomatic => {
+            styles_xml
+                .map(str::as_bytes)
+                .ok_or_else(|| invalid_error("ODS styles.xml owner is absent"))
+        },
+    }
+}
+
+fn data_style_scan_limits(max_owner_bytes: usize) -> crate::data_style::source::Limits {
+    crate::data_style::source::Limits {
+        owner_bytes: max_owner_bytes,
+        ..crate::data_style::source::Limits::default()
+    }
+}
+
+/// Resolve a name used by an effective cell style. Content automatic styles
+/// win only when that name is unique there; otherwise the common owner is
+/// consulted without inventing a family.
+pub(crate) fn resolve_effective_data_style(
+    content_xml: &str,
+    styles_xml: Option<&str>,
+    name: &str,
+    max_owner_bytes: usize,
+) -> Result<crate::data_style::Entry> {
+    if name.is_empty() {
+        return invalid("ODS effective data-style name is empty");
+    }
+    let content = data_style_catalog(
+        content_xml,
+        styles_xml,
+        crate::data_style::Owner::ContentAutomatic,
+        max_owner_bytes,
+    )?;
+    let mut content_match = None;
+    for entry in content.into_iter().filter(|entry| entry.name() == name) {
+        if content_match.is_some() {
+            return invalid(format!(
+                "ODS effective data-style name '{name}' is ambiguous in content automatic styles"
+            ));
+        }
+        content_match = Some(entry);
+    }
+    if let Some(entry) = content_match {
+        return Ok(entry);
+    }
+    let common = data_style_catalog(
+        content_xml,
+        styles_xml,
+        crate::data_style::Owner::CommonStyles,
+        max_owner_bytes,
+    )?;
+    let mut common_match = None;
+    for entry in common.into_iter().filter(|entry| entry.name() == name) {
+        if common_match.is_some() {
+            return invalid(format!(
+                "ODS effective data-style name '{name}' is ambiguous in common styles"
+            ));
+        }
+        common_match = Some(entry);
+    }
+    common_match
+        .ok_or_else(|| invalid_error(format!("ODS effective data-style '{name}' was not found")))
+}
+
+/// Replace the automatic styles represented by a complete extended graph.
+/// Every graph node must be present exactly once in the selected mutable
+/// owner, and the selector must identify one of those nodes.  The shared
+/// scanner supplies source-qualified identities and exact ranges; opaque or
+/// body-kind-mismatched entries are refused before any splice.  Requiring the
+/// complete graph here prevents a caller from accidentally losing additional
+/// staged nodes by passing a graph that is only partially applied.
+pub(crate) fn replace_extended_style_graph(
+    source: &[u8],
+    selector: crate::data_style::Selector<'_>,
+    graph: &crate::data_style::Graph,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    selector.validate()?;
+    if !selector.owner.is_mutable() {
+        return Err(Error::Unsupported(
+            "ODS common data styles are read-only".to_string(),
+        ));
+    }
+    graph.validate()?;
+    if graph.number_styles.is_empty() && graph.data_styles.is_empty() {
+        return Ok(source.to_vec());
+    }
+    let package = Package::from_bytes(copy_package_bytes(
+        source,
+        max_output,
+        "extended data-style replacement source",
+    )?)?;
+    let catalog = crate::data_style::source::scan_with_limits(
+        package.content_xml().as_bytes(),
+        selector.owner,
+        data_style_scan_limits(max_output),
+    )?;
+    let content_source = package.content_xml().as_bytes();
+    let mut edits = Vec::new();
+    let mut selected = false;
+    edits
+        .try_reserve(
+            graph
+                .number_styles
+                .len()
+                .saturating_add(graph.data_styles.len()),
+        )
+        .map_err(|error| Error::Allocation {
+            resource: "ODS extended style replacement edits",
+            source: error,
+        })?;
+
+    for style in &graph.number_styles {
+        let node_selector =
+            crate::data_style::Selector::automatic(&style.name, crate::data_style::Family::Number);
+        if node_selector == selector {
+            selected = true;
+        }
+        let entry = catalog.lookup(node_selector)?;
+        require_number_body_match(entry.entry(), style)?;
+        let crate::data_style::Entry::Number(existing) = entry.entry() else {
+            return Err(Error::Unsupported(
+                "ODS selected number-style body is outside the typed replacement envelope"
+                    .to_string(),
+            ));
+        };
+        // A semantically identical typed node is an exact source no-op.  In
+        // particular, do not canonicalize its prefix, quote style, entity
+        // spelling, whitespace, or opaque descendants merely because it was
+        // included in a complete replacement graph.
+        if existing.value != *style {
+            let range = entry.range();
+            let replacement_len = style.serialized_markup_size()?;
+            preflight_replacement_candidate(
+                content_source,
+                &edits,
+                &range,
+                replacement_len,
+                max_output,
+            )?;
+            let replacement = style.to_xml()?.into_bytes();
+            debug_assert_eq!(replacement.len(), replacement_len);
+            edits.push((range, replacement));
+        }
+    }
+    for style in &graph.data_styles {
+        let node_selector = crate::data_style::Selector::automatic(&style.name, style.family());
+        if node_selector == selector {
+            selected = true;
+        }
+        let entry = catalog.lookup(node_selector)?;
+        require_data_body_match(entry.entry(), style)?;
+        let crate::data_style::Entry::Existing(existing) = entry.entry() else {
+            return Err(Error::Unsupported(
+                "ODS selected data-style body is outside the typed replacement envelope"
+                    .to_string(),
+            ));
+        };
+        if existing.value != *style {
+            let range = entry.range();
+            let replacement_len = style.serialized_markup_size()?;
+            preflight_replacement_candidate(
+                content_source,
+                &edits,
+                &range,
+                replacement_len,
+                max_output,
+            )?;
+            let replacement = style.to_xml()?.into_bytes();
+            debug_assert_eq!(replacement.len(), replacement_len);
+            edits.push((range, replacement));
+        }
+    }
+    if !selected {
+        return invalid(format!(
+            "replacement graph has no node for '{}'/{:?}",
+            selector.name, selector.family
+        ));
+    }
+    if edits.is_empty() {
+        return copy_package_bytes(source, max_output, "unchanged extended data-style source");
+    }
+    // The edit ranges are offsets into content.xml, not into the enclosing
+    // ZIP package.  Charge the XML candidate against that same source here;
+    // the publication seam separately checks the physical package limit.
+    preflight_replacement_output(package.content_xml().as_bytes(), &edits, max_output)?;
+    splice_content_edits(source, edits, max_output)
+}
+
+/// Charge the complete source replacement before handing the edits to the
+/// package publication seam.  The typed model already bounds each canonical
+/// fragment; this check ensures a caller's smaller package cap is enforced
+/// before the final candidate buffer or ZIP rewrite is allocated.
+fn preflight_replacement_output(
+    source: &[u8],
+    edits: &[(Range<usize>, Vec<u8>)],
+    max_output: usize,
+) -> Result<()> {
+    preflight_replacement_lengths(
+        source.len(),
+        edits
+            .iter()
+            .map(|(range, replacement)| (range.clone(), replacement.len())),
+        max_output,
+    )
+}
+
+fn preflight_replacement_candidate(
+    source: &[u8],
+    edits: &[(Range<usize>, Vec<u8>)],
+    range: &Range<usize>,
+    replacement_len: usize,
+    max_output: usize,
+) -> Result<()> {
+    preflight_replacement_lengths(
+        source.len(),
+        edits
+            .iter()
+            .map(|(range, replacement)| (range.clone(), replacement.len()))
+            .chain(std::iter::once((range.clone(), replacement_len))),
+        max_output,
+    )
+}
+
+fn preflight_replacement_lengths(
+    source_len: usize,
+    edits: impl IntoIterator<Item = (Range<usize>, usize)>,
+    max_output: usize,
+) -> Result<()> {
+    let mut output_len = source_len;
+    for (range, replacement_len) in edits {
+        let removed = range
+            .end
+            .checked_sub(range.start)
+            .ok_or_else(|| invalid_error("ODS extended style replacement range is reversed"))?;
+        if range.end > source_len {
+            return invalid("ODS extended style replacement range is outside the source");
+        }
+        output_len = output_len
+            .checked_sub(removed)
+            .and_then(|length| length.checked_add(replacement_len))
+            .ok_or_else(|| invalid_error("ODS extended style replacement size overflows"))?;
+    }
+    if output_len > max_output {
+        return invalid(format!(
+            "ODS extended style replacement exceeds its {max_output} byte limit"
+        ));
+    }
+    Ok(())
+}
+
+fn require_number_body_match(
+    entry: &crate::data_style::Entry,
+    replacement: &crate::data_style::Number,
+) -> Result<()> {
+    let crate::data_style::Entry::Number(existing) = entry else {
+        return Err(Error::Unsupported(
+            "ODS selected number-style body is outside the typed replacement envelope".to_string(),
+        ));
+    };
+    if number_body_kind(&existing.value) != number_body_kind(replacement) {
+        return Err(Error::Unsupported(
+            "ODS number-style replacement would change its actual body family".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn require_data_body_match(
+    entry: &crate::data_style::Entry,
+    replacement: &crate::data_style::Data,
+) -> Result<()> {
+    let crate::data_style::Entry::Existing(existing) = entry else {
+        return Err(Error::Unsupported(
+            "ODS selected data-style body is outside the typed replacement envelope".to_string(),
+        ));
+    };
+    if data_body_kind(&existing.value) != data_body_kind(replacement) {
+        return Err(Error::Unsupported(
+            "ODS data-style replacement would change its actual body family".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NumberBodyKind {
+    Empty,
+    Decimal,
+    Scientific,
+    Fraction,
+}
+
+fn number_body_kind(value: &crate::data_style::Number) -> NumberBodyKind {
+    match value.format {
+        None => NumberBodyKind::Empty,
+        Some(crate::data_style::Format::Decimal(_)) => NumberBodyKind::Decimal,
+        Some(crate::data_style::Format::Scientific(_)) => NumberBodyKind::Scientific,
+        Some(crate::data_style::Format::Fraction(_)) => NumberBodyKind::Fraction,
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DataBodyKind {
+    Date,
+    Time,
+    Currency,
+    Percentage,
+    Boolean,
+}
+
+fn data_body_kind(value: &crate::data_style::Data) -> DataBodyKind {
+    match value.body {
+        crate::data_style::Body::Date => DataBodyKind::Date,
+        crate::data_style::Body::Time { .. } => DataBodyKind::Time,
+        crate::data_style::Body::Currency { .. } => DataBodyKind::Currency,
+        crate::data_style::Body::Percentage { .. } => DataBodyKind::Percentage,
+        crate::data_style::Body::Boolean => DataBodyKind::Boolean,
+    }
+}
+
+/// Patch only common metadata on one automatic data-style root. The shared
+/// source entry performs the lexical attribute edit and the complete candidate
+/// owner is re-scanned before publication through the package source seam.
+pub(crate) fn patch_data_style(
+    source: &[u8],
+    selector: crate::data_style::Selector<'_>,
+    patch: &crate::data_style::Patch,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    selector.validate()?;
+    patch.validate()?;
+    if !selector.owner.is_mutable() {
+        return Err(Error::Unsupported(
+            "ODS common data styles are read-only".to_string(),
+        ));
+    }
+    let package = Package::from_bytes(copy_package_bytes(
+        source,
+        max_output,
+        "extended data-style metadata source",
+    )?)?;
+    let xml = package.content_xml();
+    let catalog = crate::data_style::source::scan_with_limits(
+        xml.as_bytes(),
+        selector.owner,
+        data_style_scan_limits(max_output),
+    )?;
+    let entry = catalog.lookup(selector)?;
+    let patched = entry.patch_metadata(patch, max_output)?;
+    if patched == xml.as_bytes() {
+        return Ok(source.to_vec());
+    }
+    // Re-scan the complete candidate owner before publication.  The lexical
+    // patch is bounded, but the owner scan remains the authority for root
+    // identity, namespace bindings, body classification, and duplicate
+    // closure after an inserted metadata declaration.
+    let patched_catalog = crate::data_style::source::scan_with_limits(
+        &patched,
+        selector.owner,
+        data_style_scan_limits(max_output),
+    )?;
+    let _ = patched_catalog.lookup(selector)?;
+    // `patch_metadata` returns the complete source owner after validating the
+    // selected source range and all lexical namespace bindings.  Publish that
+    // checked owner through the source-candidate seam rather than treating it
+    // as a compact authored fragment: source owners may use inherited aliases,
+    // noncompact attribute spacing, comments, and other retained bytes.  The
+    // bounded writer checks the final package before returning its allocation.
+    let part = XmlSourcePart::load(package.package(), CONTENT_PATH)?;
+    let opening_range = entry.opening_range();
+    let expected_opening = xml
+        .as_bytes()
+        .get(opening_range.clone())
+        .ok_or_else(|| invalid_error("ODS data-style opening range is invalid"))?;
+    let proof = part.checked_range(opening_range, expected_opening)?;
+    let publication = XmlSplicePublication::from_source_start_tag_candidate_with_limit(
+        part, proof, patched, max_output,
+    )?;
+    rebuild_package_with_xml_splices(package.package(), vec![publication], max_output)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum StyleNodeKind {
     Number,
     Date,
@@ -4283,6 +4953,238 @@ fn parse_style_switch(value: Option<&str>, enabled: &str, disabled: &str) -> Opt
 }
 
 fn insert_automatic_styles(source: &[u8], markup: &str, max_output: usize) -> Result<Vec<u8>> {
+    insert_automatic_styles_with_name_check(source, markup, max_output, true)
+}
+
+fn insert_extended_automatic_styles(
+    source: &[u8],
+    markup: &str,
+    max_output: usize,
+    owner_range: Option<Range<usize>>,
+) -> Result<Vec<u8>> {
+    let (xml, spans) = content_spans(source)?;
+    let automatic = match owner_range {
+        Some(range) => Some(
+            spans
+                .iter()
+                .enumerate()
+                .find(|(_, span)| {
+                    span.start == range.start
+                        && span.end == range.end
+                        && is_element(span, OFFICE, "automatic-styles")
+                })
+                .map(|(index, _)| index)
+                .ok_or_else(|| {
+                    invalid_error(
+                        "ODS extended data-style direct automatic-styles owner changed before insertion",
+                    )
+                })?,
+        ),
+        None => None,
+    };
+    let container = || {
+        format!(
+            "<office:automatic-styles xmlns:office=\"{OFFICE}\">{markup}</office:automatic-styles>"
+        )
+    };
+    let Some(automatic) = automatic else {
+        let root = spans
+            .iter()
+            .enumerate()
+            .find(|(_, span)| span.parent.is_none() && is_element(span, OFFICE, "document-content"))
+            .map(|(index, _)| index)
+            .ok_or_else(|| invalid_error("ODS document-content root is missing"))?;
+        let body = spans
+            .iter()
+            .enumerate()
+            .find(|(_, span)| span.parent == Some(root) && is_element(span, OFFICE, "body"))
+            .map(|(index, _)| index)
+            .ok_or_else(|| invalid_error("ODS direct office:body owner is missing"))?;
+        let markup = container().into_bytes();
+        return splice_content(
+            source,
+            spans[body].start..spans[body].start,
+            markup,
+            max_output,
+        );
+    };
+    if xml[spans[automatic].start..spans[automatic].tag_end].ends_with("/>") {
+        let replacement = expanded_self_closing_owner(
+            xml.as_bytes(),
+            &spans[automatic],
+            markup.as_bytes(),
+            max_output,
+        )?;
+        return publish_extended_empty_expansion(
+            source,
+            &xml,
+            &spans[automatic],
+            replacement,
+            max_output,
+        );
+    }
+    splice_content(
+        source,
+        spans[automatic].close_start..spans[automatic].close_start,
+        markup.as_bytes().to_vec(),
+        max_output,
+    )
+}
+
+fn expanded_self_closing_owner(
+    xml: &[u8],
+    span: &Span,
+    markup: &[u8],
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    let opening = xml
+        .get(span.start..span.tag_end)
+        .ok_or_else(|| invalid_error("ODS self-closing automatic-styles tag range is invalid"))?;
+    if !opening.ends_with(b"/>") {
+        return invalid("ODS self-closing automatic-styles tag is missing its close marker");
+    }
+    let slash = opening
+        .len()
+        .checked_sub(2)
+        .ok_or_else(|| invalid_error("ODS self-closing automatic-styles tag is empty"))?;
+    let name_end = opening[1..slash]
+        .iter()
+        .position(|byte| byte.is_ascii_whitespace())
+        .map_or(slash, |offset| offset + 1);
+    if name_end <= 1 || name_end > slash {
+        return invalid("ODS automatic-styles QName is missing");
+    }
+    let name = &opening[1..name_end];
+    let closing_len = 2usize
+        .checked_add(name.len())
+        .and_then(|length| length.checked_add(1))
+        .ok_or_else(|| invalid_error("ODS automatic-styles closing tag length overflows"))?;
+    let output_len = opening
+        .len()
+        .checked_sub(1)
+        .and_then(|length| length.checked_add(markup.len()))
+        .and_then(|length| length.checked_add(closing_len))
+        .ok_or_else(|| invalid_error("ODS automatic-styles insertion length overflows"))?;
+    if output_len > max_output {
+        return invalid("ODS automatic-styles insertion exceeds its byte limit");
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|error| Error::Allocation {
+            resource: "ODS automatic-styles insertion",
+            source: error,
+        })?;
+    output.extend_from_slice(&opening[..slash]);
+    output.push(b'>');
+    output.extend_from_slice(markup);
+    output.extend_from_slice(b"</");
+    output.extend_from_slice(name);
+    output.push(b'>');
+    Ok(output)
+}
+
+fn publish_extended_empty_expansion(
+    source: &[u8],
+    xml: &str,
+    span: &Span,
+    replacement: Vec<u8>,
+    max_output: usize,
+) -> Result<Vec<u8>> {
+    let removed = span
+        .end
+        .checked_sub(span.start)
+        .ok_or_else(|| invalid_error("ODS automatic-styles source range is reversed"))?;
+    let candidate_len = xml
+        .len()
+        .checked_sub(removed)
+        .and_then(|length| length.checked_add(replacement.len()))
+        .ok_or_else(|| invalid_error("ODS automatic-styles candidate length overflows"))?;
+    if candidate_len > max_output {
+        return invalid("ODS automatic-styles candidate exceeds its byte limit");
+    }
+    let mut candidate = Vec::new();
+    candidate
+        .try_reserve_exact(candidate_len)
+        .map_err(|error| Error::Allocation {
+            resource: "ODS automatic-styles candidate",
+            source: error,
+        })?;
+    candidate.extend_from_slice(
+        xml.as_bytes()
+            .get(..span.start)
+            .ok_or_else(|| invalid_error("ODS automatic-styles source prefix is invalid"))?,
+    );
+    candidate.extend_from_slice(&replacement);
+    candidate.extend_from_slice(
+        xml.as_bytes()
+            .get(span.end..)
+            .ok_or_else(|| invalid_error("ODS automatic-styles source suffix is invalid"))?,
+    );
+
+    let package = Package::from_bytes(copy_package_bytes(
+        source,
+        max_output,
+        "extended data-style empty-owner expansion",
+    )?)?;
+    let part = XmlSourcePart::load(package.package(), CONTENT_PATH)?;
+    let opening_range = span.start..span.tag_end;
+    let expected_opening = xml
+        .as_bytes()
+        .get(opening_range.clone())
+        .ok_or_else(|| invalid_error("ODS automatic-styles opening range is invalid"))?;
+    let proof = part.checked_range(opening_range, expected_opening)?;
+    let publication = XmlSplicePublication::from_source_empty_expansion_candidate_with_limit(
+        part, proof, candidate, max_output,
+    )?;
+    rebuild_package_with_xml_splices(package.package(), vec![publication], max_output)
+}
+
+fn verify_extended_graph_visible(
+    source: &[u8],
+    graph: &crate::data_style::Graph,
+    max_output: usize,
+) -> Result<()> {
+    let package = Package::from_bytes(copy_package_bytes(
+        source,
+        max_output,
+        "extended data-style insertion readback",
+    )?)?;
+    let catalog = crate::data_style::source::scan_with_limits(
+        package.content_xml().as_bytes(),
+        crate::data_style::Owner::ContentAutomatic,
+        data_style_scan_limits(max_output),
+    )?;
+    for style in &graph.number_styles {
+        let selector =
+            crate::data_style::Selector::automatic(&style.name, crate::data_style::Family::Number);
+        let entry = catalog.lookup(selector)?.entry();
+        let crate::data_style::Entry::Number(existing) = entry else {
+            return invalid("ODS extended data-style insertion readback changed a number body");
+        };
+        if existing.value != *style {
+            return invalid("ODS extended data-style insertion readback changed a number value");
+        }
+    }
+    for style in &graph.data_styles {
+        let selector = crate::data_style::Selector::automatic(&style.name, style.family());
+        let entry = catalog.lookup(selector)?.entry();
+        let crate::data_style::Entry::Existing(existing) = entry else {
+            return invalid("ODS extended data-style insertion readback changed a data body");
+        };
+        if existing.value != *style {
+            return invalid("ODS extended data-style insertion readback changed a data value");
+        }
+    }
+    Ok(())
+}
+
+fn insert_automatic_styles_with_name_check(
+    source: &[u8],
+    markup: &str,
+    max_output: usize,
+    check_names: bool,
+) -> Result<Vec<u8>> {
     let (xml, spans) = content_spans(source)?;
     let automatic = spans
         .iter()
@@ -4301,12 +5203,15 @@ fn insert_automatic_styles(source: &[u8], markup: &str, max_output: usize) -> Re
             max_output,
         );
     };
-    for name in style_names(markup)? {
-        for (index, span) in spans.iter().enumerate() {
-            if span.parent == Some(automatic)
-                && attribute(&xml, &spans[index], b"style:name")?.as_deref() == Some(name.as_str())
-            {
-                return invalid("ODS automatic style name already exists");
+    if check_names {
+        for name in style_names(markup)? {
+            for (index, span) in spans.iter().enumerate() {
+                if span.parent == Some(automatic)
+                    && attribute(&xml, &spans[index], b"style:name")?.as_deref()
+                        == Some(name.as_str())
+                {
+                    return invalid("ODS automatic style name already exists");
+                }
             }
         }
     }
@@ -4350,11 +5255,12 @@ pub(crate) fn replace_style_graph(
             ));
         }
         let index = matches[0];
-        if automatic_style_kind(&xml, &spans[index])? != Some(expected_kind) {
+        if automatic_style_kind(&xml, &spans, index)? != Some(expected_kind) {
             return invalid(format!(
                 "ODS automatic style '{name}' has a different family"
             ));
         }
+        admit_style_replacement_source(&xml, &spans, index, expected_kind)?;
         edits.push((spans[index].start..spans[index].end, markup.into_bytes()));
     }
     splice_content_edits(source, edits, max_output)
@@ -4457,7 +5363,7 @@ fn direct_named_styles(
     let mut matches = Vec::new();
     for (index, span) in spans.iter().enumerate() {
         if span.parent == Some(automatic)
-            && attribute(xml, span, b"style:name")?.as_deref() == Some(name)
+            && resolved_attribute(xml, spans, index, STYLE, "name")?.as_deref() == Some(name)
         {
             matches.push(index);
         }
@@ -4465,7 +5371,10 @@ fn direct_named_styles(
     Ok(matches)
 }
 
-fn automatic_style_kind(xml: &str, span: &Span) -> Result<Option<StyleNodeKind>> {
+fn automatic_style_kind(xml: &str, spans: &[Span], index: usize) -> Result<Option<StyleNodeKind>> {
+    let span = spans
+        .get(index)
+        .ok_or_else(|| invalid_error("ODS automatic style span is missing"))?;
     if span.namespace.as_deref() == Some(NUMBER) {
         return Ok(match span.local.as_str() {
             "number-style" => Some(StyleNodeKind::Number),
@@ -4480,11 +5389,397 @@ fn automatic_style_kind(xml: &str, span: &Span) -> Result<Option<StyleNodeKind>>
     if span.namespace.as_deref() != Some(STYLE) || span.local != "style" {
         return Ok(None);
     }
-    Ok(match attribute(xml, span, b"style:family")?.as_deref() {
-        Some("text") => Some(StyleNodeKind::Text),
-        Some("table-cell") => Some(StyleNodeKind::Cell),
-        _ => None,
-    })
+    Ok(
+        match resolved_attribute(xml, spans, index, STYLE, "family")?.as_deref() {
+            Some("text") => Some(StyleNodeKind::Text),
+            Some("table-cell") => Some(StyleNodeKind::Cell),
+            _ => None,
+        },
+    )
+}
+
+fn admit_style_replacement_source(
+    xml: &str,
+    spans: &[Span],
+    index: usize,
+    kind: StyleNodeKind,
+) -> Result<()> {
+    match kind {
+        StyleNodeKind::Number => {
+            admit_number_style_source(xml, spans, index)?;
+            admit_style_source_events(xml, spans, index)
+        },
+        StyleNodeKind::Date
+        | StyleNodeKind::Time
+        | StyleNodeKind::Currency
+        | StyleNodeKind::Percentage
+        | StyleNodeKind::Boolean => {
+            admit_closed_data_style_source(xml, spans, index, kind)?;
+            admit_style_source_events(xml, spans, index)
+        },
+        StyleNodeKind::Text | StyleNodeKind::Cell => Ok(()),
+    }
+}
+
+fn admit_style_source_events(xml: &str, spans: &[Span], index: usize) -> Result<()> {
+    let (wrapped, target_depth) = resolved_element_fragment(xml, spans, index)?;
+    let target = spans
+        .get(index)
+        .ok_or_else(|| invalid_error("ODS style event target is missing"))?;
+    let mut reader = NsReader::from_str(&wrapped);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut target_started = false;
+    let mut stack = Vec::<(Option<String>, String)>::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| invalid_error(format!("invalid ODS style source XML: {error}")))?;
+        let event_is_empty = matches!(&event, Event::Empty(_));
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let element_namespace = resolve_namespace(&namespace)?;
+                let local = decode(element.local_name().as_ref(), "style source local name")?;
+                let is_target = !target_started
+                    && depth == target_depth
+                    && element_namespace.as_deref() == target.namespace.as_deref()
+                    && local == target.local;
+                if is_target {
+                    if event_is_empty {
+                        return Ok(());
+                    }
+                    target_started = true;
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid_error("ODS style source depth overflows"))?;
+                    if stack.len() >= MAX_SHEET_COPY_DEPTH {
+                        return invalid(format!(
+                            "ODS style source depth exceeds the {MAX_SHEET_COPY_DEPTH} limit"
+                        ));
+                    }
+                    stack.try_reserve(1).map_err(|_error| {
+                        invalid_error("ODS style source stack allocation failed")
+                    })?;
+                    stack.push((element_namespace, local));
+                    continue;
+                }
+                if target_started {
+                    if !event_is_empty {
+                        depth = depth
+                            .checked_add(1)
+                            .ok_or_else(|| invalid_error("ODS style source depth overflows"))?;
+                        if stack.len() >= MAX_SHEET_COPY_DEPTH {
+                            return invalid(format!(
+                                "ODS style source depth exceeds the {MAX_SHEET_COPY_DEPTH} limit"
+                            ));
+                        }
+                        stack.try_reserve(1).map_err(|_error| {
+                            invalid_error("ODS style source stack allocation failed")
+                        })?;
+                        stack.push((element_namespace, local));
+                    }
+                } else if !event_is_empty {
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid_error("ODS style source depth overflows"))?;
+                }
+            },
+            Event::End(_) => {
+                if target_started {
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| invalid_error("ODS style source depth underflows"))?;
+                    stack
+                        .pop()
+                        .ok_or_else(|| invalid_error("ODS style source stack underflows"))?;
+                    if stack.is_empty() {
+                        return Ok(());
+                    }
+                } else {
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| invalid_error("ODS style source depth underflows"))?;
+                }
+            },
+            Event::Text(text) => {
+                if target_started {
+                    let Some((namespace, local)) = stack.last() else {
+                        return invalid("ODS style source text owner is missing");
+                    };
+                    let whitespace = text.iter().all(u8::is_ascii_whitespace);
+                    if style_character_data_element(namespace.as_deref(), local) {
+                        continue;
+                    }
+                    if style_empty_particle(namespace.as_deref(), local) {
+                        return refuse_style_replacement(
+                            "text inside an empty data-style particle",
+                        );
+                    }
+                    if !whitespace {
+                        return refuse_style_replacement(
+                            "non-whitespace text outside data-style character content",
+                        );
+                    }
+                }
+            },
+            Event::CData(_) => {
+                if target_started {
+                    let Some((namespace, local)) = stack.last() else {
+                        return invalid("ODS style source CDATA owner is missing");
+                    };
+                    if !style_character_data_element(namespace.as_deref(), local) {
+                        return refuse_style_replacement(
+                            "CDATA outside data-style character content",
+                        );
+                    }
+                }
+            },
+            Event::GeneralRef(_) => {
+                if target_started {
+                    let Some((namespace, local)) = stack.last() else {
+                        return invalid("ODS style source reference owner is missing");
+                    };
+                    if !style_character_data_element(namespace.as_deref(), local) {
+                        return refuse_style_replacement(
+                            "general reference outside data-style character content",
+                        );
+                    }
+                }
+            },
+            Event::Comment(_) | Event::PI(_) | Event::DocType(_) => {
+                if target_started {
+                    return refuse_style_replacement("opaque XML event in a data-style source");
+                }
+            },
+            Event::Decl(_) => {},
+            Event::Eof => return invalid("ODS style source ended before its selected owner"),
+        }
+        buffer.clear();
+    }
+}
+
+fn style_character_data_element(namespace: Option<&str>, local: &str) -> bool {
+    namespace == Some(NUMBER) && matches!(local, "text" | "currency-symbol")
+}
+
+fn style_empty_particle(namespace: Option<&str>, local: &str) -> bool {
+    namespace == Some(NUMBER)
+        && matches!(
+            local,
+            "number" | "year" | "month" | "day" | "hours" | "minutes" | "seconds" | "boolean"
+        )
+}
+
+fn admit_number_style_source(xml: &str, spans: &[Span], index: usize) -> Result<()> {
+    admit_style_root_attributes(xml, spans, index)?;
+    let mut number_seen = false;
+    let mut text_before_number = 0usize;
+    let mut text_after_number = 0usize;
+    for child in direct_children(spans, index) {
+        if is_element(&spans[child], NUMBER, "number") {
+            if number_seen {
+                return refuse_style_replacement("duplicate number:number children");
+            }
+            number_seen = true;
+            admit_style_attributes(
+                xml,
+                spans,
+                child,
+                &[(NUMBER, "decimal-places"), (NUMBER, "min-integer-digits")],
+            )?;
+            refuse_nested_style_children(spans, child)?;
+        } else if is_element(&spans[child], NUMBER, "text") {
+            if direct_children(spans, child).next().is_some() {
+                return refuse_style_replacement("nested number:text content");
+            }
+            admit_style_attributes(xml, spans, child, &[])?;
+            if number_seen {
+                text_after_number = text_after_number.saturating_add(1);
+                if text_after_number > 1 {
+                    return refuse_style_replacement("more than one trailing number:text child");
+                }
+            } else {
+                text_before_number = text_before_number.saturating_add(1);
+                if text_before_number > 1 {
+                    return refuse_style_replacement("more than one leading number:text child");
+                }
+            }
+        } else {
+            return refuse_style_replacement(format!(
+                "number-style child '{}:{}'",
+                spans[child].namespace.as_deref().unwrap_or(""),
+                spans[child].local
+            ));
+        }
+    }
+    if !number_seen {
+        return refuse_style_replacement("number-style without number:number");
+    }
+    Ok(())
+}
+
+fn admit_closed_data_style_source(
+    xml: &str,
+    spans: &[Span],
+    index: usize,
+    kind: StyleNodeKind,
+) -> Result<()> {
+    admit_style_root_attributes(xml, spans, index)?;
+    let expected = match kind {
+        StyleNodeKind::Date => &[
+            (NUMBER, "year"),
+            (NUMBER, "text"),
+            (NUMBER, "month"),
+            (NUMBER, "text"),
+            (NUMBER, "day"),
+        ][..],
+        StyleNodeKind::Time => &[
+            (NUMBER, "hours"),
+            (NUMBER, "text"),
+            (NUMBER, "minutes"),
+            (NUMBER, "text"),
+            (NUMBER, "seconds"),
+        ][..],
+        StyleNodeKind::Currency => &[(NUMBER, "currency-symbol"), (NUMBER, "number")][..],
+        StyleNodeKind::Percentage => &[(NUMBER, "number"), (NUMBER, "text")][..],
+        StyleNodeKind::Boolean => &[(NUMBER, "boolean")][..],
+        StyleNodeKind::Number | StyleNodeKind::Text | StyleNodeKind::Cell => {
+            return invalid("ODS closed data-style family is invalid");
+        },
+    };
+    let mut child_count = 0usize;
+    for child in direct_children(spans, index) {
+        let Some((namespace, local)) = expected.get(child_count) else {
+            return refuse_style_replacement(format!(
+                "unsupported {} data-style child envelope",
+                style_node_kind_name(kind)
+            ));
+        };
+        if !is_element(&spans[child], namespace, local) {
+            return refuse_style_replacement(format!(
+                "unsupported {} data-style child envelope",
+                style_node_kind_name(kind)
+            ));
+        }
+        child_count = child_count.saturating_add(1);
+        let allowed = if is_element(&spans[child], NUMBER, "number") {
+            &[(NUMBER, "decimal-places"), (NUMBER, "min-integer-digits")][..]
+        } else if matches!(
+            spans[child].local.as_str(),
+            "year" | "month" | "day" | "hours" | "minutes"
+        ) {
+            &[(NUMBER, "style")][..]
+        } else if is_element(&spans[child], NUMBER, "seconds") {
+            &[(NUMBER, "style"), (NUMBER, "decimal-places")][..]
+        } else {
+            &[][..]
+        };
+        admit_style_attributes(xml, spans, child, allowed)?;
+        refuse_nested_style_children(spans, child)?;
+    }
+    if child_count != expected.len() {
+        return refuse_style_replacement(format!(
+            "unsupported {} data-style child envelope",
+            style_node_kind_name(kind)
+        ));
+    }
+    Ok(())
+}
+
+fn admit_style_root_attributes(xml: &str, spans: &[Span], index: usize) -> Result<()> {
+    let attributes = resolved_attributes(xml, spans, index)?;
+    admit_resolved_style_attributes(&attributes, &[(STYLE, "name")])?;
+    let has_name = attributes.iter().any(|attribute| {
+        attribute.namespace.as_deref() == Some(STYLE) && attribute.local == "name"
+    });
+    if has_name {
+        Ok(())
+    } else {
+        invalid("ODS automatic style replacement source has no style:name")
+    }
+}
+
+fn admit_style_attributes(
+    xml: &str,
+    spans: &[Span],
+    index: usize,
+    allowed: &[(&str, &str)],
+) -> Result<()> {
+    let attributes = resolved_attributes(xml, spans, index)?;
+    admit_resolved_style_attributes(&attributes, allowed)
+}
+
+fn admit_resolved_style_attributes(
+    attributes: &[ResolvedAttribute],
+    allowed: &[(&str, &str)],
+) -> Result<()> {
+    let mut seen = Vec::<(String, String)>::new();
+    for attribute in attributes {
+        let Some(namespace) = attribute.namespace.as_deref() else {
+            return refuse_style_replacement(format!(
+                "unqualified attribute '{}'",
+                attribute.local
+            ));
+        };
+        if !allowed.iter().any(|(expected_namespace, expected_local)| {
+            *expected_namespace == namespace && *expected_local == attribute.local
+        }) {
+            return refuse_style_replacement(format!(
+                "attribute '{}:{}'",
+                namespace, attribute.local
+            ));
+        }
+        if seen.iter().any(|(seen_namespace, seen_local)| {
+            seen_namespace == namespace && seen_local == &attribute.local
+        }) {
+            return invalid(format!(
+                "ODS automatic style replacement source duplicates attribute '{}:{}'",
+                namespace, attribute.local
+            ));
+        }
+        seen.push((namespace.to_string(), attribute.local.clone()));
+    }
+    Ok(())
+}
+
+fn refuse_nested_style_children(spans: &[Span], index: usize) -> Result<()> {
+    if direct_children(spans, index).next().is_none() {
+        Ok(())
+    } else {
+        refuse_style_replacement("nested data-style child")
+    }
+}
+
+fn direct_children<'a>(spans: &'a [Span], parent: usize) -> impl Iterator<Item = usize> + 'a {
+    let end = spans[parent].end;
+    spans
+        .iter()
+        .enumerate()
+        .skip(parent.saturating_add(1))
+        .take_while(move |(_, span)| span.start < end)
+        .filter_map(move |(index, span)| (span.parent == Some(parent)).then_some(index))
+}
+
+fn style_node_kind_name(kind: StyleNodeKind) -> &'static str {
+    match kind {
+        StyleNodeKind::Number => "number",
+        StyleNodeKind::Date => "date",
+        StyleNodeKind::Time => "time",
+        StyleNodeKind::Currency => "currency",
+        StyleNodeKind::Percentage => "percentage",
+        StyleNodeKind::Boolean => "boolean",
+        StyleNodeKind::Text => "text",
+        StyleNodeKind::Cell => "cell",
+    }
+}
+
+fn refuse_style_replacement<T>(reason: impl Into<String>) -> Result<T> {
+    Err(Error::Unsupported(format!(
+        "ODS automatic style replacement refuses unsupported source {}",
+        reason.into()
+    )))
 }
 
 fn style_names(markup: &str) -> Result<Vec<String>> {
@@ -5767,6 +7062,148 @@ fn resolved_attribute(
     }
 }
 
+fn resolved_attributes(xml: &str, spans: &[Span], index: usize) -> Result<Vec<ResolvedAttribute>> {
+    let (wrapped, target_depth) = resolved_element_openings(xml, spans, index)?;
+    let target = spans
+        .get(index)
+        .ok_or_else(|| invalid_error("ODS resolved attributes element is missing"))?;
+    let mut reader = NsReader::from_str(&wrapped);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| {
+                invalid_error(format!("invalid ODS resolved attributes XML: {error}"))
+            })?;
+        let event_is_empty = matches!(&event, Event::Empty(_));
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let element_namespace = resolve_namespace(&namespace)?;
+                let is_target = depth == target_depth
+                    && element_namespace.as_deref() == target.namespace.as_deref()
+                    && element.local_name().as_ref() == target.local.as_bytes();
+                if is_target {
+                    let mut attributes = Vec::new();
+                    for raw in element.attributes().with_checks(true) {
+                        let raw = raw.map_err(|error| {
+                            invalid_error(format!("invalid ODS resolved attribute: {error}"))
+                        })?;
+                        if is_namespace_declaration(raw.key.as_ref()) {
+                            continue;
+                        }
+                        let (attribute_namespace, local) =
+                            reader.resolver().resolve_attribute(raw.key);
+                        let namespace = match attribute_namespace {
+                            ResolveResult::Bound(Namespace(uri)) => {
+                                Some(decode(uri, "resolved attribute namespace")?)
+                            },
+                            ResolveResult::Unbound => None,
+                            ResolveResult::Unknown(prefix) => {
+                                return invalid(format!(
+                                    "ODS resolved attribute has unbound prefix '{}'",
+                                    String::from_utf8_lossy(prefix.as_ref())
+                                ));
+                            },
+                        };
+                        attributes.try_reserve(1).map_err(|_error| {
+                            invalid_error("ODS resolved attribute allocation failed")
+                        })?;
+                        attributes.push(ResolvedAttribute {
+                            namespace,
+                            local: decode(local.as_ref(), "resolved attribute local name")?,
+                        });
+                    }
+                    return Ok(attributes);
+                }
+                if !event_is_empty {
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid_error("ODS resolved attribute depth overflows"))?;
+                }
+            },
+            Event::End(_) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid_error("ODS resolved attribute depth underflows"))?;
+            },
+            Event::Eof => return invalid("ODS resolved attributes element was not found"),
+            Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::Comment(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {},
+        }
+        buffer.clear();
+    }
+}
+
+fn resolved_element_openings(xml: &str, spans: &[Span], index: usize) -> Result<(String, usize)> {
+    let target = spans
+        .get(index)
+        .ok_or_else(|| invalid_error("ODS resolved element is missing"))?;
+    resolved_element_prefix(xml, spans, index, target.tag_end)
+}
+
+fn resolved_element_fragment(xml: &str, spans: &[Span], index: usize) -> Result<(String, usize)> {
+    let target = spans
+        .get(index)
+        .ok_or_else(|| invalid_error("ODS resolved element is missing"))?;
+    resolved_element_prefix(xml, spans, index, target.end)
+}
+
+fn resolved_element_prefix(
+    xml: &str,
+    spans: &[Span],
+    index: usize,
+    target_end: usize,
+) -> Result<(String, usize)> {
+    let target = spans
+        .get(index)
+        .ok_or_else(|| invalid_error("ODS resolved element is missing"))?;
+    let mut ancestors = Vec::new();
+    let mut parent = target.parent;
+    while let Some(parent_index) = parent {
+        if ancestors.len() >= MAX_SHEET_COPY_DEPTH {
+            return invalid(format!(
+                "ODS resolved element ancestor depth exceeds the {MAX_SHEET_COPY_DEPTH} limit"
+            ));
+        }
+        ancestors
+            .try_reserve(1)
+            .map_err(|_error| invalid_error("ODS resolved element ancestor allocation failed"))?;
+        let ancestor = spans
+            .get(parent_index)
+            .ok_or_else(|| invalid_error("ODS resolved element ancestor is missing"))?;
+        ancestors.push(ancestor);
+        parent = ancestor.parent;
+    }
+    let mut wrapped = String::new();
+    for ancestor in ancestors.iter().rev() {
+        bounded_append(
+            &mut wrapped,
+            xml.get(ancestor.start..ancestor.tag_end)
+                .ok_or_else(|| invalid_error("ODS resolved element ancestor tag is invalid"))?,
+            crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+        )?;
+    }
+    bounded_append(
+        &mut wrapped,
+        xml.get(target.start..target_end)
+            .ok_or_else(|| invalid_error("ODS resolved element source range is invalid"))?,
+        crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+    )?;
+    Ok((wrapped, ancestors.len()))
+}
+
+fn is_namespace_declaration(name: &[u8]) -> bool {
+    name == b"xmlns" || name.starts_with(b"xmlns:")
+}
+
 fn attribute(xml: &str, span: &Span, name: &[u8]) -> Result<Option<String>> {
     let tag = xml
         .get(span.start..span.tag_end)
@@ -6028,6 +7465,170 @@ mod scalar_transfer_tests {
         ] {
             scalar_sheet_is_refused(table)?;
         }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod extended_data_style_tests {
+    use super::{
+        data_style_catalog, patch_data_style, put_extended_style_graph,
+        replace_extended_style_graph,
+    };
+    use litchi_core::Result;
+    use litchi_odf_common::{constants, core::PackageWriter};
+
+    const CONTENT: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.3"><office:automatic-styles><number:number-style style:name="Sci"><number:scientific-number number:decimal-places="2" number:min-exponent-digits="3"/></number:number-style></office:automatic-styles><office:body><office:spreadsheet/></office:body></office:document-content>"#;
+
+    fn package() -> Result<Vec<u8>> {
+        package_with_content(CONTENT)
+    }
+
+    fn package_with_content(content: &str) -> Result<Vec<u8>> {
+        let mut writer = PackageWriter::new();
+        writer.set_mimetype(constants::ODF_SPREADSHEET)?;
+        writer.add_file("content.xml", content.as_bytes())?;
+        writer.finish_to_bytes()
+    }
+
+    #[test]
+    fn catalog_reads_scientific_and_metadata_patch_preserves_body() -> Result<()> {
+        let bytes = package()?;
+        let package = super::Package::from_bytes(bytes.clone())?;
+        let entries = data_style_catalog(
+            package.content_xml(),
+            package.styles_xml(),
+            crate::data_style::Owner::ContentAutomatic,
+            usize::MAX,
+        )?;
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name(), "Sci");
+        assert_eq!(entries[0].family(), crate::data_style::Family::Number);
+
+        let patch = crate::data_style::Patch::default().set_display_name("Scientific")?;
+        let changed = patch_data_style(
+            &bytes,
+            crate::data_style::Selector::automatic("Sci", crate::data_style::Family::Number),
+            &patch,
+            bytes.len() + 4_096,
+        )?;
+        let changed_package = super::Package::from_bytes(changed)?;
+        assert!(
+            changed_package
+                .content_xml()
+                .contains("display-name=\"Scientific\"")
+        );
+        assert!(
+            changed_package
+                .content_xml()
+                .contains("number:scientific-number")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn extended_graph_put_is_source_checked() -> Result<()> {
+        let bytes = package()?;
+        let number = crate::data_style::NumberBuilder::scientific("Added")?
+            .decimal_places(3)?
+            .build()?;
+        let mut builder = crate::data_style::Graph::builder();
+        builder.number_style(number)?;
+        let graph = builder.build()?;
+        let changed = put_extended_style_graph(&bytes, &graph, bytes.len() + 8_192)?;
+        let package = super::Package::from_bytes(changed)?;
+        assert!(package.content_xml().contains("style:name=\"Added\""));
+        Ok(())
+    }
+
+    #[test]
+    fn extended_graph_put_uses_direct_owner_after_nested_lookalike() -> Result<()> {
+        const CONTENT_WITH_NESTED_LOOKALIKE: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:future="urn:example:future" office:version="1.3"><future:wrapper><o:automatic-styles><number:number-style style:name="Nested"><number:decimal-number number:decimal-places="1"/></number:number-style></o:automatic-styles></future:wrapper><o:automatic-styles future:keep="yes"/><office:body><office:spreadsheet/></office:body></office:document-content>"#;
+        let bytes = package_with_content(CONTENT_WITH_NESTED_LOOKALIKE)?;
+        let number = crate::data_style::NumberBuilder::scientific("Added")?
+            .decimal_places(3)?
+            .build()?;
+        let mut builder = crate::data_style::Graph::builder();
+        builder.number_style(number.clone())?;
+        let graph = builder.build()?;
+
+        let changed = put_extended_style_graph(&bytes, &graph, bytes.len() + 8_192)?;
+        let package = super::Package::from_bytes(changed)?;
+        let xml = package.content_xml();
+        let wrapper_end = xml
+            .find("</future:wrapper>")
+            .ok_or_else(|| super::invalid_error("nested lookalike wrapper is missing"))?;
+        let added = xml
+            .find("style:name=\"Added\"")
+            .ok_or_else(|| super::invalid_error("direct graph insertion is missing"))?;
+        assert!(added > wrapper_end);
+        assert!(xml.contains("future:keep=\"yes\""));
+        assert!(xml.contains("<o:automatic-styles future:keep=\"yes\">"));
+        assert!(xml.contains("</o:automatic-styles>"));
+        Ok(())
+    }
+
+    #[test]
+    fn extended_graph_put_creates_direct_owner_when_only_nested_lookalike_exists() -> Result<()> {
+        const CONTENT_WITHOUT_DIRECT_OWNER: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:future="urn:example:future" office:version="1.3"><future:wrapper><o:automatic-styles><number:number-style style:name="Nested"><number:decimal-number number:decimal-places="1"/></number:number-style></o:automatic-styles></future:wrapper><office:body><office:spreadsheet/></office:body></office:document-content>"#;
+        let bytes = package_with_content(CONTENT_WITHOUT_DIRECT_OWNER)?;
+        let number = crate::data_style::NumberBuilder::fraction("Added")?.build()?;
+        let mut builder = crate::data_style::Graph::builder();
+        builder.number_style(number)?;
+        let graph = builder.build()?;
+
+        let changed = put_extended_style_graph(&bytes, &graph, bytes.len() + 8_192)?;
+        let package = super::Package::from_bytes(changed)?;
+        let xml = package.content_xml();
+        let wrapper_end = xml
+            .find("</future:wrapper>")
+            .ok_or_else(|| super::invalid_error("nested lookalike wrapper is missing"))?;
+        let added = xml
+            .find("style:name=\"Added\"")
+            .ok_or_else(|| super::invalid_error("direct graph insertion is missing"))?;
+        assert!(added > wrapper_end);
+        let owner = xml
+            .find("<office:automatic-styles")
+            .ok_or_else(|| super::invalid_error("direct owner was not authored"))?;
+        assert!(owner < added);
+        Ok(())
+    }
+
+    #[test]
+    fn extended_replacement_checks_actual_number_body_and_complete_graph() -> Result<()> {
+        let bytes = package()?;
+        let fraction = crate::data_style::NumberBuilder::fraction("Sci")?.build()?;
+        let mut graph = crate::data_style::Graph::builder();
+        graph.number_style(fraction)?;
+        let graph = graph.build()?;
+        assert!(
+            replace_extended_style_graph(
+                &bytes,
+                crate::data_style::Selector::automatic("Sci", crate::data_style::Family::Number,),
+                &graph,
+                bytes.len() + 4_096,
+            )
+            .is_err()
+        );
+
+        let scientific = crate::data_style::NumberBuilder::scientific("Sci")?
+            .decimal_places(2)?
+            .min_exponent_digits(3)?
+            .build()?;
+        let missing = crate::data_style::NumberBuilder::scientific("Missing")?.build()?;
+        let mut graph = crate::data_style::Graph::builder();
+        graph.number_style(scientific)?;
+        graph.number_style(missing)?;
+        let graph = graph.build()?;
+        assert!(
+            replace_extended_style_graph(
+                &bytes,
+                crate::data_style::Selector::automatic("Sci", crate::data_style::Family::Number,),
+                &graph,
+                bytes.len() + 4_096,
+            )
+            .is_err()
+        );
         Ok(())
     }
 }

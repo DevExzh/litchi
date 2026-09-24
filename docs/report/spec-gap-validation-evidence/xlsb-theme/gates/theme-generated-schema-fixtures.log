@@ -1,0 +1,13 @@
+    Finished `test` profile [unoptimized] target(s) in 0.08s
+     Running unittests src/lib.rs (/tmp/litchi-xlsb-theme-target-20260910/debug/deps/litchi_xlsb-f76a3fac198269b7)
+
+running 7 tests
+test theme::splice_tests::empty_elements_count_toward_the_caller_depth_limit ... ok
+test theme::splice_tests::conformance_rejects_a_scheme_from_the_other_drawingml_namespace ... ok
+test theme::splice_tests::root_namespace_probe_has_a_finite_declaration_limit ... ok
+test theme::splice_tests::missing_optional_root_name_can_be_inserted ... ok
+test theme::splice_tests::name_splice_preserves_quote_style_and_attribute_whitespace_values ... ok
+test theme::splice_tests::strict_arbitrary_prefix_preserves_namespace_uri_in_user_values ... ok
+test theme::splice_tests::multiple_replacements_have_one_checked_output_size ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 653 filtered out; finished in 0.00s

@@ -93,8 +93,8 @@ use content::{equation, form_field, math_properties};
 use drawing::{legacy_drawing, legacy_text_box, object, page_border, picture_compatibility};
 use metadata::{
     custom_xml, data_store, document_origin, document_variable, external_reference, file_table,
-    generator, info, mail_merge, theme, user_property, window_caption, write_reservation,
-    xml_namespace, xsl_transform,
+    generator, info, mail_merge, smart_tag, theme, user_property, window_caption,
+    write_reservation, xml_namespace, xsl_transform,
 };
 use model::{document, types};
 use numbering::{
@@ -111,8 +111,8 @@ use policy::{
     document_view, document_word_2003_compatibility, document_xml_policies,
 };
 use review::{
-    annotation, bookmark, editable_region, note_options, note_separator, protection_range,
-    protection_user, review_display, revision_save,
+    annotation, bookmark, editable_region, move_bookmark, note_options, note_separator,
+    protection_range, protection_user, review_display, revision_save,
 };
 use text::{
     border, character_positioning, document_default_formatting, hyphenation, kinsoku, language,
@@ -215,11 +215,11 @@ mod native {
         equation, error, external_reference, field, file_table, form_field, generated_list_marker,
         generator, hyphenation, info, kinsoku, language, latent_style, legacy_drawing,
         legacy_numbering, legacy_paragraph_numbering, legacy_text_box, limits, list, mail_merge,
-        math, math_properties, navigation_entry, note_options, note_separator, object, page_border,
-        paragraph_group, picture, picture_compatibility, protection_range, protection_user,
-        review_display, revision_save, section, shape, style_list_filter, stylesheet, table, theme,
-        types, user_property, window_caption, write_reservation, writer, xml_namespace,
-        xsl_transform,
+        math, math_properties, move_bookmark, navigation_entry, note_options, note_separator,
+        object, page_border, paragraph_group, picture, picture_compatibility, protection_range,
+        protection_user, review_display, revision_save, section, shape, smart_tag,
+        style_list_filter, stylesheet, table, theme, types, user_property, window_caption,
+        write_reservation, writer, xml_namespace, xsl_transform,
     };
 
     pub use annotation::{Annotation, AnnotationType, Revision, RevisionAuthor, RevisionType};
@@ -330,7 +330,8 @@ mod native {
         DocumentHyphenation, MAX_HYPHENATION_CONSECUTIVE_LINES, MAX_HYPHENATION_HOT_ZONE_TWIPS,
     };
     pub use info::{
-        DocumentInfo, DocumentProtection, ProtectionLevel, ProtectionType, RtfTimestamp,
+        DocumentInfo, DocumentProtection, MAX_PASSWORD_HASH_BYTES, PasswordHash, ProtectionLevel,
+        ProtectionType, RtfTimestamp,
     };
     pub use kinsoku::DocumentKinsoku;
     pub use language::{DocumentLanguageDefaults, LanguageId};
@@ -376,6 +377,7 @@ mod native {
         DocumentMathProperties, MathBinaryOperatorBreak, MathBinarySubtractionBreak, MathFlag,
         MathJustification, MathLimitPlacement,
     };
+    pub use move_bookmark::{MoveBookmark, MoveBookmarkKind};
     pub use navigation_entry::{
         IndexEntry, IndexPageReference, NavigationEntry, TableOfContentsEntry,
     };
@@ -427,22 +429,23 @@ mod native {
         ShapeRotationDegrees, ShapeThemeColor, ShapeThemeValue, ShapeTwips, ShapeType,
         ShapeVerticalAnchor, ShapeWrapSide, ShapeWrapStyle, ShapeZOrder, StoryDrawing, WrapMode,
     };
+    pub use smart_tag::{SmartTag, SmartTagAttribute};
     pub use style_list_filter::{DocumentStyleListFilter, DocumentStyleSortMethod};
     pub use stylesheet::{Style, StyleSheet, StyleType, TableStyleConditionalFormatting};
     pub use table::{
-        Cell, CellNestedTable, CellRevision, CellRevisionKind, CellStoryEvent, CellStoryReference,
-        FloatingTablePosition, MAX_FLOATING_TABLE_DISTANCE_TWIPS, MAX_TABLE_CELLS_PER_ROW,
-        MAX_TABLE_DISTANCE_TWIPS, MAX_TABLE_GEOMETRY_TWIPS, MAX_TABLE_NESTING_DEPTH,
-        MAX_TABLE_ROW_INDEX, MAX_TABLE_WIDTH_PERCENT, Row, Table, TableAutoformatFlag,
-        TableAutoformatFlags, TableCellBorderSide, TableCellBorders, TableCellCoordinate,
-        TableCellLayout, TableCellMergeAxis, TableCellMergeRole, TableCellMergeState,
-        TableCellPath, TableCellTextFlow, TableCellVerticalAlignment, TableDistanceKind,
-        TableDistanceScope, TableDistanceTarget, TableDistanceUnit, TableEdge, TableEdgeDistances,
-        TableHorizontalPosition, TableHorizontalReference, TableIndent, TableIndentUnit,
-        TablePreferredWidth, TablePreferredWidthUnit, TableRowAlignment, TableRowBandIndex,
-        TableRowBanding, TableRowBorderSide, TableRowBorders, TableRowCellDefaults,
-        TableRowGeometry, TableRowHeight, TableRowLayout, TableShading, TableSideDistance,
-        TableStyleBorderSide, TableStyleDefaultBorders, TableVerticalPosition,
+        Cell, CellNestedTable, CellParagraph, CellRevision, CellRevisionKind, CellStoryEvent,
+        CellStoryReference, FloatingTablePosition, MAX_FLOATING_TABLE_DISTANCE_TWIPS,
+        MAX_TABLE_CELLS_PER_ROW, MAX_TABLE_DISTANCE_TWIPS, MAX_TABLE_GEOMETRY_TWIPS,
+        MAX_TABLE_NESTING_DEPTH, MAX_TABLE_ROW_INDEX, MAX_TABLE_WIDTH_PERCENT, Row, Table,
+        TableAutoformatFlag, TableAutoformatFlags, TableCellBorderSide, TableCellBorders,
+        TableCellCoordinate, TableCellLayout, TableCellMergeAxis, TableCellMergeRole,
+        TableCellMergeState, TableCellPath, TableCellTextFlow, TableCellVerticalAlignment,
+        TableDistanceKind, TableDistanceScope, TableDistanceTarget, TableDistanceUnit, TableEdge,
+        TableEdgeDistances, TableHorizontalPosition, TableHorizontalReference, TableIndent,
+        TableIndentUnit, TablePreferredWidth, TablePreferredWidthUnit, TableRowAlignment,
+        TableRowBandIndex, TableRowBanding, TableRowBorderSide, TableRowBorders,
+        TableRowCellDefaults, TableRowGeometry, TableRowHeight, TableRowLayout, TableShading,
+        TableSideDistance, TableStyleBorderSide, TableStyleDefaultBorders, TableVerticalPosition,
         TableVerticalReference, TableWrapDistances,
     };
     pub use theme::DocumentTheme;
@@ -451,10 +454,13 @@ mod native {
         AssociatedUnderlineStyle, CharacterGrid, CharacterType, Color, ColorRef, ColorTable,
         DocumentElement, EmbeddedFont, EmbeddedFontFormat, EmphasisMark, FitText, Font,
         FontCharset, FontFamily, FontPage, FontPitch, FontRef, FontTable, FontTheme, Formatting,
-        Indentation, MAX_PARAGRAPH_DROP_CAP_LINES, Paragraph, ParagraphContent, ParagraphDropCap,
-        ParagraphDropCapKind, ParagraphFontAlignment, ParagraphLineBreaking,
-        ParagraphLogicalIndentation, ParagraphSpacingPolicy, ParagraphWrapping, RevisionMetadata,
-        Run, Spacing, StyleBlock, TextDirection, UnderlineStyle,
+        Indentation, MAX_PARAGRAPH_DROP_CAP_LINES, MAX_PARAGRAPH_FRAME_TWIPS, Paragraph,
+        ParagraphContent, ParagraphDropCap, ParagraphDropCapKind, ParagraphFontAlignment,
+        ParagraphFrame, ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference,
+        ParagraphFrameTextFlow, ParagraphFrameVerticalPosition, ParagraphFrameVerticalReference,
+        ParagraphFrameWrap, ParagraphLineBreaking, ParagraphLogicalIndentation,
+        ParagraphSpacingPolicy, ParagraphWrapping, RevisionMetadata, Run, Spacing, StyleBlock,
+        TextDirection, UnderlineStyle,
     };
     pub use user_property::{
         UserProperty, UserPropertyDateTime, UserPropertyType, UserPropertyValue,

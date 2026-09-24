@@ -1,0 +1,279 @@
+{
+  "upstream": "https://github.com/LibreOffice/core",
+  "raw_url": "https://raw.githubusercontent.com/LibreOffice/core/d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "commit": "d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "inputs": {
+    "sc/qa/unit/data/functions/mathematical/fods/sumif.fods": "b328e0dd643a2d241501ad11701cceba12177e5e59cd0dab3f1c558fa2922fe5",
+    "sc/qa/unit/data/functions/mathematical/fods/sumif_wildcards.fods": "7e8a1909bc78f6dacab71f7a73a0f9f5473dd92009092ca8bd7ad20c88d61f72",
+    "sc/qa/unit/data/functions/statistical/fods/averageif.fods": "bdf8f6eca621b037335bbe42b950404465e14b351584216e0b85d2ad219d08ff",
+    "sc/qa/unit/data/functions/statistical/fods/averageif_wildcards.fods": "659f0e1b6b943206445052d6e87bb939a11528c72d612aa2e6ee37375cd8b7e0",
+    "sc/qa/unit/data/functions/statistical/fods/averageifs.fods": "adef601bbff1fd778bc8aaaa5ae1bee029d0c8d9aa52d9b0c44357ff644f1f8f",
+    "sc/qa/unit/data/functions/statistical/fods/countif.fods": "3e6ee0c69ca63eb6381df89daf62cb5b4f88768b2abd9a1a2f750e76247e1763",
+    "sc/qa/unit/data/functions/statistical/fods/countifs.fods": "05686e0989138451948fd76ad83547307d7a89599230518363afb5665a817d79",
+    "sc/qa/unit/data/xls/opencl/math/sumifs.xls": "813c493fd001683f3b7ae488689fdced7df053a5586fbb006fb76fc9295ff4b0"
+  },
+  "source_staging": "Receipt inputs were assembled in a temporary tree from exact raw GitHub files at the pinned commit; the repository auxiliary checkout was not assumed to be pinned.",
+  "byte_comparison": "Each staged input was SHA-256 checked against the exact raw GitHub file at commit before extraction.",
+  "selected_observations": 64,
+  "selected_functions": [
+    "AVERAGEIF",
+    "AVERAGEIFS",
+    "COUNTIF",
+    "COUNTIFS",
+    "SUMIF",
+    "SUMIFS"
+  ],
+  "excluded_profile_variances": [
+    {
+      "function": "SUMIF",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/sumif.fods",
+      "sheet": "Sheet2",
+      "row": 2,
+      "column": 1,
+      "formula": "of:=SUMIF([.I1:.I5];\"unpaid\";[.H1:.H5])",
+      "cached": "6",
+      "kind": "case_profile_variance",
+      "reason": "LibreOffice's cache matches the case-variant literal Unpaid; the selected conditional profile keeps case policy explicit, so this native case-insensitive result is not promoted as normative."
+    },
+    {
+      "function": "SUMIF",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/sumif.fods",
+      "sheet": "Sheet2",
+      "row": 18,
+      "column": 1,
+      "formula": "of:=SUMIF([.H2:.H8])",
+      "kind": "arity_exclusion",
+      "reason": "The fixture omits the criterion argument; the selected SUMIF contract requires a criterion."
+    },
+    {
+      "function": "SUMIF",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/sumif.fods",
+      "sheet": "Sheet2",
+      "row": 31,
+      "column": 1,
+      "formula": "of:=SUMIF({-10|10|20|30};\">0\")",
+      "cached": "60",
+      "kind": "reference_profile_variance",
+      "reason": "The native fixture supplies an inline array as the range; the selected ODF profile admits worksheet references and reference lists, so this host result is retained only as an explicit out-of-profile source observation."
+    },
+    {
+      "function": "SUMIF",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/sumif.fods",
+      "sheet": "Sheet2",
+      "rows": [
+        28,
+        30
+      ],
+      "kind": "empty_relational_criterion_variance",
+      "reason": "LibreOffice interprets bare > and >= criteria as a host numeric comparison; the selected Criterion profile gives an empty right side no matches for relational operators, so these native cache results are excluded."
+    },
+    {
+      "function": "SUMIF",
+      "source": "sc/qa/unit/data/functions/mathematical/fods/sumif_wildcards.fods",
+      "sheet": "Sheet2",
+      "rows": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25
+      ],
+      "kind": "host_regex_and_formula_dependency",
+      "reason": "The wildcard-profile rows exercise LibreOffice regular-expression matching and their source range includes upstream formula cells; the selected profile leaves host regex/wildcard behavior explicit and the bounded resolver refuses formula-cell inputs."
+    },
+    {
+      "function": "AVERAGEIF",
+      "source": "sc/qa/unit/data/functions/statistical/fods/averageif_wildcards.fods",
+      "sheet": "Sheet2",
+      "rows": [
+        14,
+        15
+      ],
+      "kind": "host_wildcard_variance",
+      "reason": "Rows 14 and 15 use host wildcard criteria (*West and *(New Office)); wildcard enablement and whole-cell policy are host properties, so their native caches remain explicit exclusions."
+    },
+    {
+      "function": "AVERAGEIFS",
+      "source": "sc/qa/unit/data/functions/statistical/fods/averageifs.fods",
+      "sheet": "Sheet2",
+      "row": 5,
+      "column": 1,
+      "formula": "of:=AVERAGEIFS([.L2:.L6];[.J2:.J6];\"pen.*\";[.K2:.K6];\"<\"&MAX([.K2:.K6]))",
+      "cached": "65",
+      "kind": "host_regex_variance",
+      "reason": "The criterion pen.* relies on LibreOffice regular-expression matching; the selected profile does not infer regex enablement from a host cache."
+    },
+    {
+      "function": "COUNTIF",
+      "source": "sc/qa/unit/data/functions/statistical/fods/countif.fods",
+      "sheet": "Sheet2",
+      "rows": [
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42
+      ],
+      "kind": "host_regex_and_case_profile",
+      "reason": "These rows intentionally exercise regex, inline case controls, and case variants; they remain native profile evidence rather than selected numeric expectations."
+    },
+    {
+      "function": "COUNTIFS",
+      "source": "sc/qa/unit/data/functions/statistical/fods/countifs.fods",
+      "sheet": "Sheet2",
+      "row": 8,
+      "column": 1,
+      "formula": "of:=COUNTIFS([.L1:.L8]; \".+\")",
+      "cached": "4",
+      "kind": "host_regex_variance",
+      "reason": "The criterion .+ relies on LibreOffice regular-expression matching; the selected profile does not infer regex enablement from a host cache."
+    },
+    {
+      "function": "COUNTIF",
+      "source": "sc/qa/unit/data/functions/statistical/fods/countif.fods",
+      "sheet": "Sheet2",
+      "row": 7,
+      "column": 1,
+      "formula": "of:=COUNTIF([.L1:.L5]; \">=P\")",
+      "cached": "2",
+      "kind": "case_profile_variance",
+      "reason": "The native cache applies its host text collation to the mixed-case comparison; the selected profile uses case-sensitive Unicode scalar ordering and does not promote this host ordering result."
+    },
+    {
+      "function": "COUNTIF",
+      "source": "sc/qa/unit/data/functions/statistical/fods/countif.fods",
+      "sheet": "Sheet2",
+      "row": 17,
+      "column": 1,
+      "formula": "of:=COUNTIF([.F24:.F28];[.F24:.F28])",
+      "cached": "2",
+      "kind": "criterion_reference_shape_exclusion",
+      "reason": "The criterion argument is a multi-cell reference; the selected criterion contract admits only a single-cell reference."
+    },
+    {
+      "function": "COUNTIFS",
+      "source": "sc/qa/unit/data/functions/statistical/fods/countifs.fods",
+      "sheet": "Sheet2",
+      "row": 39,
+      "column": 1,
+      "formula": "of:=COUNTIFS([.$I$38:.$I$39];[.F39])",
+      "cached": "1",
+      "formula_cell_attributes": {
+        "office_value": "1",
+        "office_value_type": "float",
+        "display": "0"
+      },
+      "expected_literal": {
+        "sheet": "Sheet2",
+        "row": 39,
+        "column": 2,
+        "value_type": "float",
+        "office_value": "0",
+        "display": "0"
+      },
+      "criterion_cell": {
+        "sheet": "Sheet2",
+        "row": 39,
+        "column": 6,
+        "value_type": "string",
+        "display": "2"
+      },
+      "candidate_cells": [
+        {
+          "sheet": "Sheet2",
+          "row": 38,
+          "column": 9,
+          "value_type": "string",
+          "display": "3"
+        },
+        {
+          "sheet": "Sheet2",
+          "row": 39,
+          "column": 9,
+          "value_type": "string",
+          "display": "1"
+        }
+      ],
+      "kind": "stale_cached_result_variance",
+      "reason": "The pinned FODS stores A39 with office:value=1 but displays 0 in its text:p, while the expected literal B39 is float 0/display 0. F39 is Text 2 and I38/I39 are Text 3 and 1. The attribute, displayed result, and expected literal disagree, so the native cache is internally stale/inconsistent and is excluded rather than promoted; the selected evaluator result 0 is not treated as a production failure."
+    },
+    {
+      "function": "COUNTIF",
+      "source": "sc/qa/unit/data/functions/statistical/fods/countif.fods",
+      "sheet": "Sheet2",
+      "rows": [
+        33,
+        62
+      ],
+      "kind": "empty_numeric_inequality_variance",
+      "reason": "LibreOffice counts Empty cells as unequal for the numeric-looking <>7 criterion; the selected profile keeps Empty separate from Number criteria and therefore does not promote these host-coercion results."
+    },
+    {
+      "function": "COUNTIFS",
+      "source": "sc/qa/unit/data/functions/statistical/fods/countifs.fods",
+      "sheet": "Sheet2",
+      "row": 7,
+      "column": 1,
+      "formula": "of:=COUNTIFS([.L1:.L5]; \">=P\")",
+      "cached": "2",
+      "kind": "case_profile_variance",
+      "reason": "The native cache applies its host text collation to the mixed-case comparison; the selected profile uses case-sensitive Unicode scalar ordering and does not promote this host ordering result."
+    },
+    {
+      "function": "COUNTIFS",
+      "source": "sc/qa/unit/data/functions/statistical/fods/countifs.fods",
+      "sheet": "Sheet2",
+      "row": 17,
+      "column": 1,
+      "formula": "of:=COUNTIFS([.F24:.F28];[.F24:.F28])",
+      "cached": "2",
+      "kind": "criterion_reference_shape_exclusion",
+      "reason": "The criterion argument is a multi-cell reference; the selected criterion contract admits only a single-cell reference."
+    },
+    {
+      "function": "COUNTIF",
+      "source": "sc/qa/unit/data/functions/statistical/fods/countif.fods",
+      "sheet": "Sheet2",
+      "row": 43,
+      "column": 1,
+      "formula": "of:=COUNTIF([.BM5:.BM9];0)",
+      "cached": "0",
+      "kind": "unmaterialized_source_variance",
+      "reason": "The selected fixture closure lies beyond the bounded source cells materialized by the FODS table; no inferred empty-source cache is promoted."
+    }
+  ],
+  "converter": {
+    "command": "/usr/bin/libreoffice",
+    "version": "LibreOffice 26.2.5.2 620(Build:2)",
+    "soffice_binary_sha256": "51ac4b1ad2e310024b9d55f49f615bc134bb7304a87808c40f5d5c847a45b05d"
+  },
+  "sumifs_materialization": "The pinned SUMIFS source is BIFF8/XLS.  A temporary, SHA-checked copy is converted to FODS by the exact LibreOffice binary recorded above; the retained closure contains only literal Data/Main cells and the formula value emitted by that conversion.  This receipt does not claim byte-preservation of the original BIFF8 cached value or absence of conversion recalculation.  The checkout is never modified.",
+  "coverage_notes": {
+    "regex_and_wildcards": "Regex and wildcard rows remain explicit host-profile exclusions; selected rows use literal, numeric, empty, and relational criteria whose behavior is independent of those host switches.",
+    "sumifs_source": "No SUMIFS FODS fixture exists at the pinned upstream revision.  The selected SUMIFS observation therefore comes from the pinned opencl/math/sumifs.xls source through the bounded conversion receipt.",
+    "text_materialization": "Retained string closures were audited at the pinned source bytes and contain direct text:p content only.  text_value rejects nested span, space, tab, or line-break markup rather than silently dropping it."
+  }
+}

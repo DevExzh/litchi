@@ -1,0 +1,38 @@
+{
+  "scope": "Generated slide and direct SVG extension grammar; no native acceptance or rendering proof",
+  "ecma_archive_sha256": "bd25da1109f73762356596918bf5ff8b74a1331642dba5f1c1d1dfc6bed34ecd",
+  "schema_source_sha256": "30ae3393d282bb2f66291e17bf37db3ac98f574f3c4b0443ff449fe3c1067736",
+  "lxml_version": [
+    6,
+    0,
+    2,
+    0
+  ],
+  "reports": [
+    {
+      "path": "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/source.xml",
+      "sha256": "2f2874cfa3b2a3596dee3ecd100288f9f84cbe9cc27179c98bb8a84baa745af4",
+      "bytes": 982,
+      "valid": true,
+      "svg_owners": []
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/attached.xml",
+      "sha256": "d5dce81d4df79ff4901dbbd7275948ddf6cd5e99d0e739e57e42570f266ca525",
+      "bytes": 1223,
+      "valid": true,
+      "svg_owners": [
+        {
+          "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed": "rIdSvg"
+        }
+      ]
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/detached.xml",
+      "sha256": "2f2874cfa3b2a3596dee3ecd100288f9f84cbe9cc27179c98bb8a84baa745af4",
+      "bytes": 982,
+      "valid": true,
+      "svg_owners": []
+    }
+  ]
+}

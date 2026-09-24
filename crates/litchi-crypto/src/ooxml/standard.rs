@@ -1,34 +1,78 @@
-//! `[MS-OFFCRYPTO]` Standard Encryption (AES-128/SHA-1 profile).
+//! `[MS-OFFCRYPTO]` Standard Encryption profiles.
+//!
+//! Standard Encryption always uses SHA-1 for password derivation and AES-128,
+//! AES-192, or AES-256 for the package cipher. Legacy RC4 containers are
+//! intentionally outside this OOXML profile owner; callers receive an
+//! unsupported-profile error rather than silently accepting a weak downgrade.
 
-use aes::Aes128;
 use aes::cipher::{Block, BlockCipherDecrypt, BlockCipherEncrypt, KeyInit};
+use aes::{Aes128, Aes192, Aes256};
 use rand::TryRng;
 use rand::rngs::SysRng;
 use sha1::{Digest, Sha1};
 use subtle::ConstantTimeEq;
 use zeroize::Zeroizing;
 
-use super::{Error, Limits, Result, container, declared_size, malformed, password_bytes};
+use super::{Error, Limits, Mode, Result, container, declared_size, malformed, password_bytes};
 
 const BLOCK: usize = 16;
 const BLOCK_U32: u32 = 16;
 const SPIN_COUNT: u32 = 50_000;
-const FLAGS: u32 = 0x24;
-const REQUIRED_FLAGS: u32 = 0x24;
-const FORBIDDEN_FLAGS: u32 = 0x18;
+const FLAGS_AES: u32 = 0x24;
+const CRYPTO_API: u32 = 0x04;
+const DOC_PROPERTIES: u32 = 0x08;
+const EXTERNAL: u32 = 0x10;
+const AES: u32 = 0x20;
 const ALG_AES_128: u32 = 0x660e;
 const ALG_AES_192: u32 = 0x660f;
 const ALG_AES_256: u32 = 0x6610;
 const ALG_SHA1: u32 = 0x8004;
-const KEY_BITS: u32 = 128;
+const KEY_BITS_AES_128: u32 = 128;
+const KEY_BITS_AES_192: u32 = 192;
+const KEY_BITS_AES_256: u32 = 256;
 const PROVIDER_AES: u32 = 0x18;
-const PROVIDER: &str = "Microsoft Enhanced RSA and AES Cryptographic Provider";
+const PROVIDER_AES_NAME: &str = "Microsoft Enhanced RSA and AES Cryptographic Provider";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Cipher {
+    Aes128,
+    Aes192,
+    Aes256,
+}
+
+impl Cipher {
+    const fn key_bits(self) -> u32 {
+        match self {
+            Self::Aes128 => KEY_BITS_AES_128,
+            Self::Aes192 => KEY_BITS_AES_192,
+            Self::Aes256 => KEY_BITS_AES_256,
+        }
+    }
+
+    const fn alg_id(self) -> u32 {
+        match self {
+            Self::Aes128 => ALG_AES_128,
+            Self::Aes192 => ALG_AES_192,
+            Self::Aes256 => ALG_AES_256,
+        }
+    }
+
+    const fn mode(self) -> Mode {
+        match self {
+            Self::Aes128 => Mode::Standard,
+            Self::Aes192 => Mode::StandardAes192,
+            Self::Aes256 => Mode::StandardAes256,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 struct Verifier {
+    cipher: Cipher,
     salt: [u8; BLOCK],
     encrypted: [u8; BLOCK],
-    hash: [u8; 32],
+    hash: [u8; BLOCK * 2],
+    hash_len: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -37,7 +81,18 @@ enum Direction {
     Decrypt,
 }
 
-pub(super) fn encrypt(package: Vec<u8>, password: &str, limits: &Limits) -> Result<Vec<u8>> {
+pub(super) fn profile(info: &[u8], limits: &Limits) -> Result<Mode> {
+    Limits::bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
+    Ok(parse(info)?.cipher.mode())
+}
+
+pub(super) fn encrypt(
+    package: Vec<u8>,
+    password: &str,
+    mode: Mode,
+    limits: &Limits,
+) -> Result<Vec<u8>> {
+    let cipher = cipher_for_mode(mode)?;
     let mut rng = SysRng;
     let mut salt = Zeroizing::new([0u8; BLOCK]);
     let mut verifier = Zeroizing::new([0u8; BLOCK]);
@@ -45,21 +100,33 @@ pub(super) fn encrypt(package: Vec<u8>, password: &str, limits: &Limits) -> Resu
         .map_err(|error| Error::Random(error.to_string()))?;
     rng.try_fill_bytes(verifier.as_mut())
         .map_err(|error| Error::Random(error.to_string()))?;
-    encrypt_with(package, password, &salt, &verifier, limits)
+    encrypt_with(package, password, cipher, &salt, &verifier, limits)
+}
+
+fn cipher_for_mode(mode: Mode) -> Result<Cipher> {
+    match mode {
+        Mode::Standard => Ok(Cipher::Aes128),
+        Mode::StandardAes192 => Ok(Cipher::Aes192),
+        Mode::StandardAes256 => Ok(Cipher::Aes256),
+        _ => Err(Error::Unsupported(format!(
+            "{mode} is not a Standard Encryption profile"
+        ))),
+    }
 }
 
 fn encrypt_with(
     package: Vec<u8>,
     password: &str,
+    cipher: Cipher,
     salt: &[u8; BLOCK],
     verifier: &[u8; BLOCK],
     limits: &Limits,
 ) -> Result<Vec<u8>> {
-    let key = key(password, salt, limits)?;
-    let (encrypted_verifier, hash) = encrypt_verifier(&key, verifier)?;
-    let info = build_info(salt, &encrypted_verifier, &hash)?;
+    let key = key(password, salt, cipher.key_bits(), limits)?;
+    let (encrypted_verifier, encrypted_hash, hash_len) = encrypt_verifier(&key, cipher, verifier)?;
+    let info = build_info(cipher, salt, &encrypted_verifier, &encrypted_hash, hash_len)?;
     Limits::bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
-    let encrypted = encrypt_package(package, &key, limits)?;
+    let encrypted = encrypt_package(package, &key, cipher, limits)?;
     container::write(&info, encrypted, limits)
 }
 
@@ -76,41 +143,50 @@ pub(super) fn decrypt(
         limits.max_encrypted_bytes,
     )?;
     let verifier = parse(info)?;
-    let key = key(password, &verifier.salt, limits)?;
+    let key = key(password, &verifier.salt, verifier.cipher.key_bits(), limits)?;
     verify(&key, &verifier)?;
-    decrypt_package(encrypted, &key, limits)
+    decrypt_package(encrypted, &key, verifier.cipher, limits)
 }
 
-pub(super) fn validate_info(info: &[u8], limits: &Limits) -> Result<()> {
-    Limits::bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
-    parse(info).map(|_| ())
-}
-
-fn key(password: &str, salt: &[u8; BLOCK], limits: &Limits) -> Result<Zeroizing<[u8; BLOCK]>> {
+fn key(
+    password: &str,
+    salt: &[u8; BLOCK],
+    key_bits: u32,
+    limits: &Limits,
+) -> Result<Zeroizing<Vec<u8>>> {
+    if !matches!(
+        key_bits,
+        KEY_BITS_AES_128 | KEY_BITS_AES_192 | KEY_BITS_AES_256
+    ) {
+        return Err(Error::Unsupported(format!(
+            "Standard key size {key_bits} bits"
+        )));
+    }
     let encoded = password_bytes(password, limits)?;
     let mut hasher = Sha1::new();
     hasher.update(salt);
     hasher.update(encoded.as_slice());
     let mut hash = Zeroizing::new(<[u8; 20]>::from(hasher.finalize()));
-
     for iterator in 0..SPIN_COUNT {
         let mut spin = Sha1::new();
         spin.update(iterator.to_le_bytes());
         spin.update(hash.as_slice());
-        hash = Zeroizing::new(<[u8; 20]>::from(spin.finalize()));
+        let digest = spin.finalize();
+        hash.copy_from_slice(&digest);
     }
-
     let mut finalizer = Sha1::new();
     finalizer.update(hash.as_slice());
     finalizer.update([0u8; 4]);
-    let intermediate = Zeroizing::new(<[u8; 20]>::from(finalizer.finalize()));
-    let x1 = digest_xor(intermediate.as_slice(), 0x36);
-    let x2 = digest_xor(intermediate.as_slice(), 0x5c);
-    let mut output = Zeroizing::new([0u8; BLOCK]);
-    output.copy_from_slice(&x1[..BLOCK.min(x1.len())]);
-    // AES-128 requires only the first 16 bytes of X1; retaining this explicit
-    // branch makes the X1 || X2 rule visible without allocating X3.
-    let _ = x2;
+    let final_hash = Zeroizing::new(<[u8; 20]>::from(finalizer.finalize()));
+    let x1 = digest_xor(final_hash.as_slice(), 0x36);
+    let x2 = digest_xor(final_hash.as_slice(), 0x5c);
+    let required = usize::try_from(key_bits / 8)
+        .map_err(|_err| malformed("Standard key size does not fit usize"))?;
+    let mut output = Zeroizing::new(Vec::new());
+    output
+        .try_reserve_exact(required)
+        .map_err(|_err| Error::Allocation("Standard derived key"))?;
+    output.extend(x1.as_slice().iter().chain(x2.as_slice()).take(required));
     Ok(output)
 }
 
@@ -124,40 +200,49 @@ fn digest_xor(input: &[u8], fill: u8) -> Zeroizing<[u8; 20]> {
     Zeroizing::new(<[u8; 20]>::from(sha.finalize()))
 }
 
-fn encrypt_verifier(key: &[u8; BLOCK], verifier: &[u8; BLOCK]) -> Result<([u8; BLOCK], [u8; 32])> {
-    let cipher = cipher(key)?;
+fn encrypt_verifier(
+    key: &[u8],
+    cipher: Cipher,
+    verifier: &[u8; BLOCK],
+) -> Result<([u8; BLOCK], [u8; BLOCK * 2], usize)> {
     let mut encrypted = *verifier;
-    cipher.encrypt_block((&mut encrypted).into());
-
-    let mut sha = Sha1::new();
-    sha.update(verifier);
-    let hash = Zeroizing::new(<[u8; 20]>::from(sha.finalize()));
-    let mut padded = Zeroizing::new([0u8; 32]);
-    padded[..hash.len()].copy_from_slice(hash.as_slice());
-    crypt_blocks(&cipher, padded.as_mut(), Direction::Encrypt)?;
-    Ok((encrypted, *padded))
+    let mut hash = [0u8; BLOCK * 2];
+    let digest = Zeroizing::new(<[u8; 20]>::from(Sha1::digest(verifier)));
+    aes_crypt(key, cipher, &mut encrypted, Direction::Encrypt)?;
+    hash[..digest.len()].copy_from_slice(digest.as_slice());
+    let hash_len = BLOCK * 2;
+    aes_crypt(key, cipher, &mut hash[..hash_len], Direction::Encrypt)?;
+    Ok((encrypted, hash, hash_len))
 }
 
-fn build_info(salt: &[u8; BLOCK], verifier: &[u8; BLOCK], hash: &[u8; 32]) -> Result<Vec<u8>> {
+fn build_info(
+    cipher: Cipher,
+    salt: &[u8; BLOCK],
+    verifier: &[u8; BLOCK],
+    hash: &[u8; BLOCK * 2],
+    hash_len: usize,
+) -> Result<Vec<u8>> {
+    let flags = FLAGS_AES;
+    let provider_type = PROVIDER_AES;
+    let provider = PROVIDER_AES_NAME;
     let mut output = Vec::new();
     output
         .try_reserve_exact(256)
         .map_err(|_err| Error::Allocation("Standard EncryptionInfo"))?;
     output.extend_from_slice(&3u16.to_le_bytes());
     output.extend_from_slice(&2u16.to_le_bytes());
-    output.extend_from_slice(&FLAGS.to_le_bytes());
-
+    output.extend_from_slice(&flags.to_le_bytes());
     let size_offset = output.len();
     output.extend_from_slice(&0u32.to_le_bytes());
-    output.extend_from_slice(&FLAGS.to_le_bytes());
+    output.extend_from_slice(&flags.to_le_bytes());
     output.extend_from_slice(&0u32.to_le_bytes());
-    output.extend_from_slice(&ALG_AES_128.to_le_bytes());
+    output.extend_from_slice(&cipher.alg_id().to_le_bytes());
     output.extend_from_slice(&ALG_SHA1.to_le_bytes());
-    output.extend_from_slice(&KEY_BITS.to_le_bytes());
-    output.extend_from_slice(&PROVIDER_AES.to_le_bytes());
+    output.extend_from_slice(&cipher.key_bits().to_le_bytes());
+    output.extend_from_slice(&provider_type.to_le_bytes());
     output.extend_from_slice(&0u32.to_le_bytes());
     output.extend_from_slice(&0u32.to_le_bytes());
-    for unit in PROVIDER.encode_utf16() {
+    for unit in provider.encode_utf16() {
         output.extend_from_slice(&unit.to_le_bytes());
     }
     output.extend_from_slice(&0u16.to_le_bytes());
@@ -170,18 +255,15 @@ fn build_info(salt: &[u8; BLOCK], verifier: &[u8; BLOCK], hash: &[u8; 32]) -> Re
         .get_mut(size_offset..size_offset + 4)
         .ok_or_else(|| malformed("Standard EncryptionHeader size field is unavailable"))?
         .copy_from_slice(&header_size.to_le_bytes());
-
     output.extend_from_slice(&BLOCK_U32.to_le_bytes());
     output.extend_from_slice(salt);
     output.extend_from_slice(verifier);
     output.extend_from_slice(&20u32.to_le_bytes());
-    output.extend_from_slice(hash);
+    output.extend_from_slice(&hash[..hash_len]);
     Ok(output)
 }
 
 fn parse(info: &[u8]) -> Result<Verifier> {
-    const VERIFIER_LEN: usize = 4 + BLOCK + BLOCK + 4 + 32;
-
     if info.len() < 12 {
         return Err(malformed(
             "Standard EncryptionInfo is shorter than its header",
@@ -204,7 +286,6 @@ fn parse(info: &[u8]) -> Result<Verifier> {
     if header_size < 34 || header_end > info.len() {
         return Err(malformed("Standard EncryptionHeader has an invalid size"));
     }
-
     let header = &info[12..header_end];
     let inner_flags = read_u32(header, 0, "EncryptionHeader.Flags")?;
     validate_flags(inner_flags)?;
@@ -217,16 +298,16 @@ fn parse(info: &[u8]) -> Result<Verifier> {
     let algorithm = read_u32(header, 8, "EncryptionHeader.AlgID")?;
     let hash_algorithm = read_u32(header, 12, "EncryptionHeader.AlgIDHash")?;
     let key_bits = read_u32(header, 16, "EncryptionHeader.KeySize")?;
-    validate_profile(algorithm, hash_algorithm, key_bits)?;
-    // ProviderType is a SHOULD in the specification and is not security
-    // authoritative, so any value remains readable.
+    let cipher = validate_profile(outer_flags, algorithm, hash_algorithm, key_bits)?;
     let _provider = read_u32(header, 20, "EncryptionHeader.ProviderType")?;
     let _reserved1 = read_u32(header, 24, "EncryptionHeader.Reserved1")?;
     require_u32(header, 28, 0, "EncryptionHeader.Reserved2")?;
     validate_provider_name(&header[32..])?;
 
+    let hash_len = BLOCK * 2;
+    let verifier_len = 4 + BLOCK + BLOCK + 4 + hash_len;
     let verifier_end = header_end
-        .checked_add(VERIFIER_LEN)
+        .checked_add(verifier_len)
         .ok_or_else(|| malformed("Standard verifier size overflows usize"))?;
     if verifier_end != info.len() {
         return Err(malformed(
@@ -243,11 +324,14 @@ fn parse(info: &[u8]) -> Result<Verifier> {
         20,
         "EncryptionVerifier.VerifierHashSize",
     )?;
-    let hash = array::<32>(verifier, 4 + BLOCK + BLOCK + 4, "EncryptedVerifierHash")?;
+    let mut hash = [0u8; BLOCK * 2];
+    hash[..hash_len].copy_from_slice(array_slice(verifier, 4 + BLOCK + BLOCK + 4, hash_len)?);
     Ok(Verifier {
+        cipher,
         salt,
         encrypted,
         hash,
+        hash_len,
     })
 }
 
@@ -276,29 +360,35 @@ fn validate_provider_name(bytes: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn verify(key: &[u8; BLOCK], verifier: &Verifier) -> Result<()> {
-    let cipher = cipher(key)?;
+fn verify(key: &[u8], verifier: &Verifier) -> Result<()> {
     let mut clear = Zeroizing::new(verifier.encrypted);
-    cipher.decrypt_block((&mut *clear).into());
-    let mut sha = Sha1::new();
-    sha.update(clear.as_slice());
-    let expected = Zeroizing::new(<[u8; 20]>::from(sha.finalize()));
     let mut stored = Zeroizing::new(verifier.hash);
-    crypt_blocks(&cipher, stored.as_mut(), Direction::Decrypt)?;
+    aes_crypt(key, verifier.cipher, clear.as_mut(), Direction::Decrypt)?;
+    aes_crypt(
+        key,
+        verifier.cipher,
+        &mut stored[..verifier.hash_len],
+        Direction::Decrypt,
+    )?;
+    let expected = Zeroizing::new(<[u8; 20]>::from(Sha1::digest(clear.as_slice())));
     if !bool::from(stored[..20].ct_eq(expected.as_slice())) {
         return Err(Error::Password);
     }
     Ok(())
 }
 
-fn encrypt_package(mut package: Vec<u8>, key: &[u8; BLOCK], limits: &Limits) -> Result<Vec<u8>> {
+fn encrypt_package(
+    mut package: Vec<u8>,
+    key: &[u8],
+    cipher: Cipher,
+    limits: &Limits,
+) -> Result<Vec<u8>> {
     let clear_len = package.len();
     let cipher_len = round_up(clear_len, BLOCK)?;
     let total = cipher_len
         .checked_add(8)
         .ok_or_else(|| malformed("Standard EncryptedPackage size overflows usize"))?;
     Limits::bytes("EncryptedPackage", total, limits.max_encrypted_bytes)?;
-
     package
         .try_reserve_exact(total.saturating_sub(package.len()))
         .map_err(|_err| Error::Allocation("Standard EncryptedPackage"))?;
@@ -312,16 +402,21 @@ fn encrypt_package(mut package: Vec<u8>, key: &[u8; BLOCK], limits: &Limits) -> 
                 .map_err(|_err| malformed("plaintext size does not fit u64"))?
                 .to_le_bytes(),
         );
-    let cipher = cipher(key)?;
     let ciphertext = package
         .get_mut(8..)
         .ok_or_else(|| malformed("Standard EncryptedPackage ciphertext is unavailable"))?;
-    crypt_blocks(&cipher, ciphertext, Direction::Encrypt)?;
+    aes_crypt(key, cipher, ciphertext, Direction::Encrypt)?;
     Ok(package)
 }
 
-fn decrypt_package(mut encrypted: Vec<u8>, key: &[u8; BLOCK], limits: &Limits) -> Result<Vec<u8>> {
-    if encrypted.len() < 8 + BLOCK {
+fn decrypt_package(
+    mut encrypted: Vec<u8>,
+    key: &[u8],
+    cipher: Cipher,
+    limits: &Limits,
+) -> Result<Vec<u8>> {
+    let minimum = 8 + BLOCK;
+    if encrypted.len() < minimum {
         return Err(malformed("Standard EncryptedPackage is too short"));
     }
     let declared = u64::from_le_bytes(array::<8>(&encrypted, 0, "StreamSize")?);
@@ -331,20 +426,19 @@ fn decrypt_package(mut encrypted: Vec<u8>, key: &[u8; BLOCK], limits: &Limits) -
             "Standard EncryptedPackage declares an empty package",
         ));
     }
-    let expected_cipher = round_up(clear_len, BLOCK)?;
-    if encrypted.len() != expected_cipher + 8 {
+    let cipher_len = round_up(clear_len, BLOCK)?;
+    if encrypted.len() != cipher_len + 8 {
         return Err(malformed(
             "Standard EncryptedPackage length disagrees with StreamSize",
         ));
     }
-    let cipher = cipher(key)?;
     let ciphertext = encrypted
         .get_mut(8..)
         .ok_or_else(|| malformed("Standard EncryptedPackage ciphertext is unavailable"))?;
-    crypt_blocks(&cipher, ciphertext, Direction::Decrypt)?;
+    aes_crypt(key, cipher, ciphertext, Direction::Decrypt)?;
     let source_end = clear_len
         .checked_add(8)
-        .ok_or_else(|| malformed("Standard plaintext range overflows usize"))?;
+        .ok_or_else(|| malformed("Standard decrypted package range overflows usize"))?;
     if encrypted.get(8..source_end).is_none() {
         return Err(malformed("Standard decrypted package is truncated"));
     }
@@ -353,25 +447,31 @@ fn decrypt_package(mut encrypted: Vec<u8>, key: &[u8; BLOCK], limits: &Limits) -
     Ok(encrypted)
 }
 
-fn cipher(key: &[u8; BLOCK]) -> Result<Aes128> {
-    Aes128::new_from_slice(key)
-        .map_err(|_err| malformed("AES-128 key length invariant was violated"))
-}
-
-fn crypt_blocks(cipher: &Aes128, bytes: &mut [u8], direction: Direction) -> Result<()> {
+fn aes_crypt(key: &[u8], cipher: Cipher, bytes: &mut [u8], direction: Direction) -> Result<()> {
     if !bytes.len().is_multiple_of(BLOCK) {
         return Err(malformed("AES data is not aligned to a 16-byte block"));
     }
-    for chunk in bytes.as_chunks_mut::<BLOCK>().0.iter_mut() {
-        let block: &mut Block<Aes128> = (&mut chunk[..])
-            .try_into()
-            .map_err(|_err| malformed("AES block conversion failed"))?;
-        match direction {
-            Direction::Encrypt => cipher.encrypt_block(block),
-            Direction::Decrypt => cipher.decrypt_block(block),
-        }
+    macro_rules! run {
+        ($ty:ty) => {{
+            let cipher = <$ty as KeyInit>::new_from_slice(key)
+                .map_err(|_err| malformed("AES key length invariant was violated"))?;
+            for chunk in bytes.as_chunks_mut::<BLOCK>().0 {
+                let block: &mut Block<$ty> = (&mut chunk[..])
+                    .try_into()
+                    .map_err(|_err| malformed("AES block conversion failed"))?;
+                match direction {
+                    Direction::Encrypt => cipher.encrypt_block(block),
+                    Direction::Decrypt => cipher.decrypt_block(block),
+                }
+            }
+            Ok(())
+        }};
     }
-    Ok(())
+    match cipher {
+        Cipher::Aes128 => run!(Aes128),
+        Cipher::Aes192 => run!(Aes192),
+        Cipher::Aes256 => run!(Aes256),
+    }
 }
 
 fn round_up(value: usize, multiple: usize) -> Result<usize> {
@@ -386,7 +486,7 @@ fn read_u32(bytes: &[u8], offset: usize, field: &'static str) -> Result<u32> {
 }
 
 fn validate_flags(flags: u32) -> Result<()> {
-    if flags & REQUIRED_FLAGS != REQUIRED_FLAGS || flags & FORBIDDEN_FLAGS != 0 {
+    if flags & CRYPTO_API == 0 || flags & (DOC_PROPERTIES | EXTERNAL) != 0 {
         return Err(malformed(format!(
             "Standard EncryptionHeader flags {flags:#010x} violate the Standard profile"
         )));
@@ -394,33 +494,38 @@ fn validate_flags(flags: u32) -> Result<()> {
     Ok(())
 }
 
-fn validate_profile(algorithm: u32, hash_algorithm: u32, key_bits: u32) -> Result<()> {
-    let required_key_bits = match algorithm {
-        ALG_AES_128 => 128,
-        ALG_AES_192 => 192,
-        ALG_AES_256 => 256,
+fn validate_profile(
+    flags: u32,
+    algorithm: u32,
+    hash_algorithm: u32,
+    key_bits: u32,
+) -> Result<Cipher> {
+    if hash_algorithm != ALG_SHA1 {
+        return Err(malformed(format!(
+            "EncryptionHeader.AlgIDHash is {hash_algorithm:#010x}, expected SHA-1"
+        )));
+    }
+    if flags & AES == 0 {
+        return Err(Error::Unsupported(
+            "Standard RC4/legacy non-AES encryption is not an OOXML AES profile".into(),
+        ));
+    }
+    let cipher = match algorithm {
+        ALG_AES_128 => Cipher::Aes128,
+        ALG_AES_192 => Cipher::Aes192,
+        ALG_AES_256 => Cipher::Aes256,
         _ => {
             return Err(malformed(format!(
                 "EncryptionHeader.AlgID {algorithm:#010x} is not a Standard AES algorithm"
             )));
         },
     };
-    if hash_algorithm != ALG_SHA1 {
+    if key_bits != cipher.key_bits() {
         return Err(malformed(format!(
-            "EncryptionHeader.AlgIDHash is {hash_algorithm:#010x}, expected {ALG_SHA1:#010x}"
+            "EncryptionHeader.KeySize {key_bits} contradicts AlgID {algorithm:#x}"
         )));
     }
-    if key_bits != required_key_bits {
-        return Err(malformed(format!(
-            "EncryptionHeader.KeySize {key_bits} contradicts AlgID {algorithm:#010x}"
-        )));
-    }
-    if algorithm != ALG_AES_128 {
-        return Err(Error::Unsupported(format!(
-            "Standard AES-{key_bits}/SHA-1 encryption"
-        )));
-    }
-    Ok(())
+    Ok(cipher)
 }
 
 fn require_u32(bytes: &[u8], offset: usize, expected: u32, field: &'static str) -> Result<()> {
@@ -444,6 +549,15 @@ fn array<const N: usize>(bytes: &[u8], offset: usize, field: &'static str) -> Re
         .map_err(|_err| malformed(format!("{field} has the wrong length")))
 }
 
+fn array_slice(bytes: &[u8], offset: usize, length: usize) -> Result<&[u8]> {
+    let end = offset
+        .checked_add(length)
+        .ok_or_else(|| malformed("array slice offset overflows usize"))?;
+    bytes
+        .get(offset..end)
+        .ok_or_else(|| malformed("array slice is truncated"))
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(
@@ -451,7 +565,7 @@ mod tests {
         reason = "test code panics on failure; expect keeps assertions concise"
     )]
     use super::*;
-    use crate::ooxml::{Kind, Mode, inspect, open_with, rekey};
+    use crate::ooxml::{Kind, inspect, open_with};
 
     const SALT: [u8; BLOCK] = [
         0x92, 0x25, 0x50, 0xf6, 0xb6, 0x4f, 0xfe, 0x5b, 0xd3, 0x96, 0xdf, 0x5e, 0xe9, 0x17, 0xda,
@@ -460,35 +574,38 @@ mod tests {
     const VERIFIER: [u8; BLOCK] = *b"fixed verifier!!";
 
     #[test]
-    fn standard_round_trip_is_move_first_and_wrong_password_is_typed() {
+    fn standard_aes_key_sizes_round_trip() {
         let limits = Limits::default();
-        let clear = Vec::from(&b"PK\x03\x04deterministic standard package"[..]);
-        let encrypted = encrypt_with(clear.clone(), "correct horse", &SALT, &VERIFIER, &limits)
-            .expect("encrypt Standard package");
-        assert_eq!(
-            inspect(&encrypted).expect("classify Standard package"),
-            Kind::Encrypted(Mode::Standard)
-        );
-        let opened = open_with(encrypted.clone(), "correct horse", &limits)
-            .expect("decrypt Standard package");
-        assert_eq!(opened.mode(), Some(Mode::Standard));
-        assert_eq!(opened.bytes(), clear);
+        let clear = Vec::from(&b"PK\x03\x04deterministic Standard package"[..]);
+        for mode in [Mode::Standard, Mode::StandardAes192, Mode::StandardAes256] {
+            let encrypted = encrypt(clear.clone(), "correct horse", mode, &limits)
+                .expect("encrypt Standard package");
+            assert_eq!(
+                inspect(&encrypted).expect("classify package"),
+                Kind::Encrypted(mode)
+            );
+            let opened = open_with(encrypted, "correct horse", &limits).expect("decrypt package");
+            assert_eq!(opened.mode(), Some(mode));
+            assert_eq!(
+                opened.integrity(),
+                Some(crate::ooxml::IntegrityStatus::Unauthenticated)
+            );
+            assert_eq!(opened.bytes(), clear);
+        }
+    }
+
+    #[test]
+    fn standard_wrong_password_is_typed() {
+        let limits = Limits::default();
+        let encrypted = encrypt(
+            Vec::from(&b"PK\x03\x04deterministic package"[..]),
+            "correct horse",
+            Mode::StandardAes256,
+            &limits,
+        )
+        .expect("encrypt Standard package");
         assert!(matches!(
             open_with(encrypted, "wrong", &limits),
-            Err(Error::Password)
-        ));
-
-        let for_rekey = encrypt_with(clear.clone(), "old", &SALT, &VERIFIER, &limits)
-            .expect("encrypt package for rekey");
-        let rekeyed = rekey(for_rekey, "old", "new").expect("rekey Standard package");
-        assert_eq!(
-            open_with(rekeyed.clone(), "new", &limits)
-                .expect("open rekeyed package")
-                .bytes(),
-            clear
-        );
-        assert!(matches!(
-            open_with(rekeyed, "old", &limits),
             Err(Error::Password)
         ));
     }
@@ -513,6 +630,7 @@ mod tests {
              0B B9 50 46 D3 91 41 84");
         let parsed = parse(&info).expect("published Standard vector");
         assert_eq!(parsed.salt, SALT);
+        assert_eq!(parsed.cipher, Cipher::Aes128);
         assert_eq!(
             parsed.encrypted,
             [
@@ -523,76 +641,19 @@ mod tests {
     }
 
     #[test]
-    fn declared_size_is_bounded_before_output_allocation() {
-        let limits = Limits {
-            max_plaintext_bytes: 32,
-            ..Limits::default()
-        };
-        let key = Zeroizing::new([0u8; BLOCK]);
-        let mut encrypted = vec![0u8; 8 + 48];
-        encrypted[..8].copy_from_slice(&33u64.to_le_bytes());
-        assert!(matches!(
-            decrypt_package(encrypted, &key, &limits),
-            Err(Error::Limit {
-                resource: "declared plaintext",
-                actual: 33,
-                maximum: 32,
-            })
-        ));
-    }
-
-    #[test]
-    fn contradictory_algorithm_and_key_size_are_malformed() {
-        let (encrypted, hash) = encrypt_verifier(&[0u8; BLOCK], &VERIFIER).expect("verifier");
-        let mut info = build_info(&SALT, &encrypted, &hash).expect("info");
-        info[20] ^= 1;
-        assert!(matches!(parse(&info), Err(Error::Malformed(_))));
-    }
-
-    #[test]
-    fn valid_unimplemented_aes_profiles_are_unsupported() {
-        let (encrypted, hash) = encrypt_verifier(&[0u8; BLOCK], &VERIFIER).expect("verifier");
-        for (algorithm, key_bits) in [(ALG_AES_192, 192u32), (ALG_AES_256, 256u32)] {
-            let mut info = build_info(&SALT, &encrypted, &hash).expect("info");
+    fn valid_aes_profiles_are_admitted_to_the_parser() {
+        let key = Zeroizing::new(vec![0u8; 16]);
+        let (encrypted, hash, hash_len) =
+            encrypt_verifier(&key, Cipher::Aes128, &VERIFIER).expect("verifier");
+        for (cipher, mode, algorithm, key_bits) in [
+            (Cipher::Aes192, Mode::StandardAes192, ALG_AES_192, 192u32),
+            (Cipher::Aes256, Mode::StandardAes256, ALG_AES_256, 256u32),
+        ] {
+            let mut info = build_info(cipher, &SALT, &encrypted, &hash, hash_len).expect("info");
             info[20..24].copy_from_slice(&algorithm.to_le_bytes());
             info[28..32].copy_from_slice(&key_bits.to_le_bytes());
-            assert!(matches!(parse(&info), Err(Error::Unsupported(_))));
+            assert_eq!(profile(&info, &Limits::default()).expect("profile"), mode);
         }
-    }
-
-    #[test]
-    fn mandatory_constants_and_reserved_values_are_malformed() {
-        let (encrypted, hash) = encrypt_verifier(&[0u8; BLOCK], &VERIFIER).expect("verifier");
-        for offset in [16usize, 24, 40] {
-            let mut info = build_info(&SALT, &encrypted, &hash).expect("info");
-            info[offset..offset + 4].copy_from_slice(&1u32.to_le_bytes());
-            assert!(matches!(parse(&info), Err(Error::Malformed(_))));
-        }
-
-        let mut info = build_info(&SALT, &encrypted, &hash).expect("info");
-        let verifier_offset = 12
-            + usize::try_from(read_u32(&info, 8, "header size").expect("size"))
-                .expect("usize header size");
-        info[verifier_offset..verifier_offset + 4].copy_from_slice(&15u32.to_le_bytes());
-        assert!(matches!(parse(&info), Err(Error::Malformed(_))));
-    }
-
-    #[test]
-    fn flags_ignore_undefined_bits_but_require_matching_safe_bits() {
-        let (encrypted, hash) = encrypt_verifier(&[0u8; BLOCK], &VERIFIER).expect("verifier");
-        let mut info = build_info(&SALT, &encrypted, &hash).expect("info");
-        let extended = FLAGS | 0x8000_0000;
-        info[4..8].copy_from_slice(&extended.to_le_bytes());
-        info[12..16].copy_from_slice(&extended.to_le_bytes());
-        parse(&info).expect("undefined flag bits are ignored");
-
-        info[4..8].copy_from_slice(&FLAGS.to_le_bytes());
-        assert!(matches!(parse(&info), Err(Error::Malformed(_))));
-
-        let forbidden = FLAGS | 0x08;
-        info[4..8].copy_from_slice(&forbidden.to_le_bytes());
-        info[12..16].copy_from_slice(&forbidden.to_le_bytes());
-        assert!(matches!(parse(&info), Err(Error::Malformed(_))));
     }
 
     fn hex(value: &str) -> Vec<u8> {

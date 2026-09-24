@@ -1,0 +1,142 @@
+{
+  "arabic_indirect_subtraction_checks": 14,
+  "canonical_signed_bfs": {
+    "distance_matches_unrestricted": true,
+    "max_scope_distance": 11,
+    "reached_scope": true,
+    "roundtrip_witnesses": true,
+    "sample_witnesses": {
+      "0": "",
+      "1999": "IMM",
+      "3888": "IIXCMMMM",
+      "3999": "IMMMM",
+      "4": "IV",
+      "49": "IL",
+      "499": "ID",
+      "8": "IIX",
+      "999": "IM"
+    }
+  },
+  "denominations": {
+    "C": 100,
+    "D": 500,
+    "I": 1,
+    "L": 50,
+    "M": 1000,
+    "V": 5,
+    "X": 10
+  },
+  "execution": {
+    "command": [
+      "python3",
+      "docs/report/spec-gap-validation-evidence/ods-formula-roman-evaluation/numerical-review/check_roman.py"
+    ],
+    "status": 0
+  },
+  "greedy_format_shape_checks": {
+    "accepted_examples": 22,
+    "rejected_examples": {
+      "0:IL": true,
+      "1:IL": true,
+      "2:VL": true,
+      "3:IXC": true
+    }
+  },
+  "method": "independent integer BFS and canonical-sign state BFS; no Cargo/Rust execution",
+  "scope": {
+    "count": 4000,
+    "max": 3999,
+    "min": 0
+  },
+  "script_sha256": "6e70059c7c9220ca72c5837d06ccf6751608df95137d8210e145844291703e36",
+  "source_like_greedy_checks": {
+    "0": {
+      "max_output_digits": 15,
+      "roundtrip_and_shape": true,
+      "sample_spellings": {
+        "1999": "MCMXCIX",
+        "3999": "MMMCMXCIX",
+        "45": "XLV",
+        "49": "XLIX",
+        "499": "CDXCIX",
+        "99": "XCIX",
+        "999": "CMXCIX"
+      }
+    },
+    "1": {
+      "max_output_digits": 15,
+      "roundtrip_and_shape": true,
+      "sample_spellings": {
+        "1999": "MCMXCIX",
+        "3999": "MMMCMXCIX",
+        "45": "VL",
+        "49": "VLIV",
+        "499": "LDVLIV",
+        "99": "XCIX",
+        "999": "CMXCIX"
+      }
+    },
+    "2": {
+      "max_output_digits": 15,
+      "roundtrip_and_shape": true,
+      "sample_spellings": {
+        "1999": "MIM",
+        "3999": "MMMIM",
+        "45": "XLV",
+        "49": "IL",
+        "499": "ID",
+        "99": "IC",
+        "999": "IM"
+      }
+    },
+    "3": {
+      "max_output_digits": 15,
+      "roundtrip_and_shape": true,
+      "sample_spellings": {
+        "1999": "MIM",
+        "3999": "MMMIM",
+        "45": "VL",
+        "49": "IL",
+        "499": "ID",
+        "99": "IC",
+        "999": "IM"
+      }
+    }
+  },
+  "source_like_simplified_checks": {
+    "checked_numbers": 4000,
+    "roundtrip_and_unrestricted_distance": true
+  },
+  "source_sha256": {
+    "evaluation_dispatch": "5b2320a6204b96185b6e91eaa27d3f166ac19555e71b307c79a0600329975cf4",
+    "normative_archive": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+    "normative_entry": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+    "roman_module": "3441233624f68e5efc72157953d3b7137bbb86f6c9835fd809eee40674342da1",
+    "roman_tests": "4bcc00fd7278787c1ae77a4bd58118677a743a92bf023f6f725309bd6b8877ff",
+    "specification": "b24e1f76160ad8a89f7259a135f020e7d5678f3b29297eeedf4385bd921d1989"
+  },
+  "unrestricted_signed_bfs": {
+    "distance_histogram": {
+      "0": 1,
+      "1": 7,
+      "10": 120,
+      "11": 20,
+      "12": 0,
+      "13": 0,
+      "14": 0,
+      "15": 0,
+      "2": 43,
+      "3": 156,
+      "4": 377,
+      "5": 651,
+      "6": 837,
+      "7": 824,
+      "8": 622,
+      "9": 342
+    },
+    "max_depth": 15,
+    "max_scope_distance": 11,
+    "prefix_sum_bound": 15000,
+    "reached_scope": true
+  }
+}

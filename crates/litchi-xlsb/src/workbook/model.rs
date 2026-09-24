@@ -12,6 +12,18 @@ use litchi_core::sheet::{
 };
 use litchi_opc::OpcPackage;
 
+/// Typed drawing projection selected when the workbook was opened.
+///
+/// The state is intentionally kept separately from `sheet_drawings`: an
+/// eager workbook can legitimately have no drawing relationships yet, and a
+/// later structural edit may add one.  Reparse operations must preserve the
+/// caller's original projection in that case.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DrawingLoadPolicy {
+    Eager,
+    Skipped,
+}
+
 /// XLSB workbook implementation
 #[allow(
     dead_code,
@@ -38,6 +50,7 @@ pub struct Workbook {
     pub(super) structured_tables: Vec<(usize, crate::package::table::Table)>,
     pub(super) chart_sheets: Vec<(usize, crate::package::chartsheet::ChartSheet)>,
     pub(super) sheet_drawings: Vec<crate::package::drawing::SheetDrawing>,
+    pub(super) drawing_load_policy: DrawingLoadPolicy,
     pub(super) connections: Option<crate::package::connections::Connections>,
 }
 
@@ -50,11 +63,20 @@ impl std::fmt::Debug for Workbook {
             .field("cell_xfs_count", &self.styles.cell_xfs.len())
             .field("calc", &self.calc)
             .field("is_1904", &self.is_1904)
+            .field("drawings_parsed", &self.drawings_parsed())
             .finish()
     }
 }
 
 impl Workbook {
+    /// Return the drawing projection boundary selected when this workbook was
+    /// opened.  Internal publication helpers must carry this state through
+    /// every reconstruction; a skipped projection is an intentional opaque
+    /// boundary, not an invitation to parse drawings later.
+    #[must_use]
+    pub(crate) const fn drawing_load_policy(&self) -> DrawingLoadPolicy {
+        self.drawing_load_policy
+    }
     /// Translate a public worksheet ordinal to the full workbook sheet-catalog
     /// position used by formula and package metadata.
     pub(crate) fn catalog_position_for_worksheet(
@@ -199,12 +221,29 @@ impl Workbook {
     ///
     /// These are inert data snapshots. Internal image and chart parts are
     /// resolved during package loading; external targets are never fetched.
+    /// The slice is empty for a workbook opened through the drawing-skipped
+    /// projection, even when the underlying package contains drawing parts;
+    /// use [`Self::drawings_parsed`] to distinguish that state from an eager
+    /// workbook with no drawing relationships.
     pub fn sheet_drawings(&self) -> &[crate::package::drawing::SheetDrawing] {
         &self.sheet_drawings
     }
 
+    /// Whether standard SpreadsheetDrawing parts were decoded into the typed
+    /// drawing inventory.
+    ///
+    /// A `false` result means the workbook was opened through the explicit
+    /// drawing-skipped projection; it does not mean that the OPC package has
+    /// no drawing parts. Those parts remain preserved for lossless publication.
+    #[must_use]
+    pub const fn drawings_parsed(&self) -> bool {
+        matches!(self.drawing_load_policy, DrawingLoadPolicy::Eager)
+    }
+
     /// Look up the drawing inventory of one sheet, selected by zero-based
-    /// sheet index; `None` when the sheet has no Drawings part.
+    /// sheet index. Returns `None` when the sheet has no Drawings part or when
+    /// the workbook uses the drawing-skipped projection; use
+    /// [`Self::drawings_parsed`] to distinguish those cases.
     pub fn sheet_drawing(
         &self,
         sheet_index: usize,

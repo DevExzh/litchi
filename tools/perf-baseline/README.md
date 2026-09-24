@@ -15,6 +15,26 @@ claim. [Evidence and replay](../../docs/performance/results/change-0508/README.m
 
 The sections below retain the dated evolution of earlier default matrices.
 
+## Historical 2026-09-10 publication scope
+
+The portable historical publication at
+[`docs/performance/results/full-baseline-20260910/`](../../docs/performance/results/full-baseline-20260910/)
+contains one control capture from commit `1b3f2c2d`. It reports 201 normal
+rows across 37 cases and 31 deterministic corpora, with zero normal filesystem
+rows, plus a separate two-row `tmpfs` allocator smoke. The raw report is kept
+immutable; its derived view removes only 25 misaligned per-sample
+`operation_metrics` envelopes while preserving top-level timing and sink
+values. The allocator sidecar failure and manual V1-manifest rerun are
+retained.
+
+This publication is descriptive historical evidence. It makes no causal,
+latency-improvement, scaling, physical-cold-cache, native-producer, or
+production optimization claim. The `cold-requested` label is a requested
+harness state, not proof of cache eviction. The full artifact, transformation
+verifier, lock overlay and contention records are in the linked publication;
+do not treat the historical capture as a measurement of the current feature
+HEAD.
+
 0465 adds the existing materialized `odp_existing_append_lifecycle` case to the
 checked default matrix. Preflight preserves all prior 198 identities; the
 checked identity is 37 default cases, 201 rows and 31 deterministic corpora,
@@ -128,6 +148,17 @@ the interval. It excludes allocator-internal realloc overlap and RSS. The
 observer mutex can perturb scheduling, so use normal binaries for latency and
 scaling claims. Recapture both sides and update policy identity before using V3
 comparisons; earlier allocator policies remain historical.
+
+The allocator binary's canonical default selection now has a fail-closed
+213-row operation coverage contract (201 rows before the spec-gap merge,
+[0759](../../docs/performance/0759-spec-gap-branch-merge.md), added the four
+0508 semantic text-export cases). See
+[`FULL_DEFAULT_ALLOCATOR_COVERAGE.md`](../../docs/performance/FULL_DEFAULT_ALLOCATOR_COVERAGE.md)
+for the row matrix, absent-vector rules, allocator elapsed claim, and the
+required provenance for temporary dependency-lock overlays. A clean-tree
+status observed after restoring such an overlay does not prove that the
+executable was built from the unmodified lock file; the capture manifest must
+record the base lock digest and overlay identity.
 
 Allocator evidence correction: [change 0421](../../docs/performance/changes/0421-allocator-peak-counter.md)
 fixes under-reported `peak_live_bytes_*` values. 0421 allocator reports
@@ -252,18 +283,26 @@ and summary SHA-256
 This partial custom publication metric is intentionally not entered into
 `claim-registry-v1.json`.
 
-The non-iWork Phase-1 CRUD taxonomy is recorded in the machine-readable
-[`docs/performance/crud-coverage-index-v1.json`](../../docs/performance/crud-coverage-index-v1.json).
-It is a representative (not exhaustive) mapping: `measured` is reserved for
-the full-run timing contract; the checked identity artifact is not timing
-evidence. Scheduled/manual full runs validate `target/perf/container-baseline.json`
-with at least 15 samples for each measured selector/corpus. `correctness-only`
-rows explicitly make no retained baseline timing claim. Each category binds to
-exact selectors and either checked schema-2 corpus IDs or an explicit
-generated-per-run shape. Validate it with
-`python3 tools/validate_crud_coverage_index.py`; the checker reads the current
-selector registry directly, treats documentation paths as navigation only, and
-keeps unsupported work explicit.
+The current non-iWork Phase-1 CRUD taxonomy is recorded in the machine-readable
+[`docs/performance/crud-coverage-index-v2.json`](../../docs/performance/crud-coverage-index-v2.json).
+Version 2 binds the exact `Case::name` order, count, and newline-delimited
+selector-name SHA-256 from `tools/perf-baseline/src/lib.rs` (currently 443
+selectors). Its coverage section accounts for every selector as either a
+representative mapping or an explicit exclusion reason. The historical
+[`crud-coverage-index-v1.json`](../../docs/performance/crud-coverage-index-v1.json)
+is retained unchanged for old publication replay. The mapping remains
+representative rather than exhaustive: `measured` is reserved for the full-run
+timing contract; the checked identity artifact is not timing evidence.
+Scheduled/manual full runs validate `target/perf/container-baseline.json` with
+at least 15 samples for each measured selector/corpus. `correctness-only` rows
+explicitly make no retained baseline timing claim. Each category binds to exact
+selectors and either checked schema-2 corpus IDs or an explicit generated-per-run
+shape. Validate the current index with
+`python3 tools/validate_crud_coverage_index.py`; the checker reads and compares
+the complete current selector registry with a fail-closed Rust lexer/parser that
+ignores nested comments and string literals and rejects wildcard or unsupported
+`Case::name` arms. Documentation paths are navigation only, and unsupported work
+stays explicit.
 
 ## Real-producer security correctness corpus
 
@@ -380,6 +419,32 @@ CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \
   --case all --warmup 3 --samples 30 \
   --json target/perf/xlsb-crud.json
 ```
+
+`--backend owned` retains the existing workload mix: facade identification/open
+and full text, with direct owned APIs for the other cases. `owned_direct` uses
+the eager XLSB constructor; `owned_without_drawings` uses the explicit cell/catalog
+projection, preserving raw drawing parts while omitting their typed inventory.
+Both support read and cell CRUD cases; `full_text` remains facade-only.
+`source_backed` supports only `open_identify`, `worksheet_catalog`,
+`selected_worksheet_cell`, and `full_stored_cell_scan`. Specify supported cases
+explicitly for these backends. Their unsupported `all` combination fails before
+corpus loading because it includes facade-only and edit workloads.
+These are different API/validation scopes, so their timings do not establish an
+equivalent-work speedup. Each timed open includes cloning the in-memory input.
+
+Source-backed reports include positional read calls, requested/returned bytes,
+and part-cache diagnostics split at constructor return into open and operation
+intervals. Counts must agree across all timed samples and the untimed representative
+run. Retained part bytes describe the cache, not total heap usage or peak RSS;
+cold part loads do not directly measure decompressed bytes. The fixture
+geometry gate checks stored-cell counts against dimensions; only scan cases
+check the returned stored-cell sequence. It is not an allocation-level proof
+against rectangular expansion. Fresh untimed scan replays compare complete
+coordinates and values with the eager corpus oracle. Source-backed timing
+includes counter instrumentation. Its separate cell-limit gate is inapplicable
+because that API has no cell-value-limit parameter. Reopen and preservation gates
+include package-level and per-part relationships; they check semantic digests,
+not compressed ZIP member identity.
 
 The default XLSB fixture SHA-256 is
 `8c600e97d719b0266dcfb49c1872feb8d10c6ed12bc768ff16ace7dae555ebfc`.
@@ -1418,6 +1483,9 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
 `--corpus-manifest` writes the additive schema-2 deterministic corpus catalog
 and places a reference under `corpus_catalog` in the schema-1 report.  It does
 not change the existing case/corpus identity keys or their comparator digest.
+When a filesystem selector emits warm and cold rows over the same input, the
+catalog retains one content-addressed corpus and records `cache_state` under
+each binding's optional `dimensions` object.
 See [`docs/performance/CORPUS_MANIFEST_V2.md`](../../docs/performance/CORPUS_MANIFEST_V2.md).
 
 For a short local smoke run:
@@ -1719,6 +1787,10 @@ Cold-verified samples are admitted only when all of the following hold:
   dirty, and writeback bytes; only its basename, executable hash/version, and
   stderr digest/length plus method/fallback evidence are retained, and any
   unrecognized fallback is ineligible; and
+- the same child records one strict post-operation `fincore` observation. Its
+  size and residency/dirty/writeback counters are retained separately under
+  `fincore_post`; a missing, malformed, or changed post probe is an explicit
+  ineligible result and never falls back to `cold-requested` or `warm`; and
 - the child’s `/proc/self/io` `read_bytes` delta is positive during the
   source-touching interval.
 
@@ -1746,8 +1818,12 @@ does not prove physical-media temperature, device-cache state, or durable
 storage latency.
 
 Each sample uses a fresh child process and reports child operation time plus
-parent-observed wall time. A separate child primes the warm path immediately
-before each warm sample; the cold sample requests Linux `posix_fadvise`
+parent-observed wall time. The verified-cold child records the pre-operation
+page-cache observation after its private-file `DONTNEED` request and the
+post-operation observation immediately after the timed interval; neither
+fincore command is part of the timed operation. A separate child primes the
+warm path immediately before each warm sample; the cold sample requests Linux
+`posix_fadvise`
 `DONTNEED` immediately before timing and records whether that advisory request
 was accepted. `cold-requested` is a cache-state request, not a claim that the
 kernel or storage device delivered a guaranteed cold cache. The additive
@@ -4673,6 +4749,14 @@ allocator-only comparator; the checked normal policy continues to reject this
 binary identity. The existing raw `filesystem_evidence` samples remain
 unchanged.
 
+The separate full-default allocator contract is operation-scoped and covers
+213 warm in-process rows (144 substrate, 9 fresh legacy writers, 45 XLSX,
+3 ODP append and 12 plain RTF/ODT/ODS/ODP text-export rows). It requires the
+exact default corpus, payload, writer, XLSX, and semantic shape sets and the
+plain RTF variant, rejects duplicate `(case, corpus)` identities,
+and records the canonical identity digest in `allocation_coverage`; every
+allocator elapsed vector remains evidence-only.
+
 ### Optional ordinary-save process-counter diagnostics
 
 The benchmark-only `ordinary-save-process-metrics` feature adds
@@ -4770,7 +4854,8 @@ When `cold-verified` is selected, the evidence object additionally records
 `cold_verified_samples` entry records the explicit status, numeric
 `filesystem_magic`, page/source and aligned-source byte counts, aligned-source
 SHA-256, fsync/advice state, fincore size/resident/dirty/writeback counts,
-`read_bytes_before`/`after`/`delta`, and method/fallback evidence. Fincore
+`read_bytes_before`/`after`/`delta`, the additive `fincore_post` status/size/
+resident/dirty/writeback observation, and method/fallback evidence. Fincore
 provenance is privacy-preserving: `fincore_tool` is only the canonical
 basename, `fincore_sha256` and `fincore_version` identify the executable, and
 `fincore_stderr_sha256`/`fincore_stderr_bytes` plus their version-stderr

@@ -1,0 +1,17 @@
+{
+  "source_manifest": "reports/source-manifest.json",
+  "source_manifest_sha256": "24c6246c0c2fc166d8d63291227806f7f7411ef979f9f3ebfe7b35e769e81345",
+  "source_base_commit": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+  "candidate_overlay_commit": null,
+  "source_files_verified_per_side": {
+    "control": 780,
+    "candidate": 780
+  },
+  "fixture_manifest": "reports/fixture-manifest.json",
+  "fixture_manifest_sha256": "0fd601a0e774b6873b4d358e10fac2e552e0e9e357e0b10d52828c17b5d5f6be",
+  "fixture_files_verified_per_side": {
+    "control": 8,
+    "candidate": 8
+  },
+  "fixture_count": 8
+}

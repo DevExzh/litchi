@@ -25,6 +25,8 @@ const MAIN: &str = "/ppt/presentation.xml";
 const SLIDE: &str = "/ppt/slides/slide1.xml";
 const SLIDE_THREE: &str = "/ppt/slides/slide3.xml";
 const UNUSED: &str = "/ppt/media/unused.bin";
+const SVG_MEDIA: &str = "/ppt/media/vector.svg";
+const SVG_EXTENSION_URI: &str = "{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
 
 struct VersionedSource {
     bytes: Vec<u8>,
@@ -166,6 +168,52 @@ fn fixture_with_presentation_namespace(
             .unwrap();
         package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     }
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
+fn svg_transition_fixture() -> Vec<u8> {
+    let morph = r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="future" xmlns:future="urn:litchi:future" xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main"><mc:Choice Requires="p159"><p:transition spd="fast"><p159:morph option="byWord"/></p:transition><!--inactive-owner-comment--></mc:Choice><mc:Choice Requires="p159" future:branch="keep"><future:unknown/></mc:Choice><mc:Fallback future:data="keep"><p:transition><p:fade/></p:transition><!--fallback-comment--></mc:Fallback></mc:AlternateContent>"#;
+    let slide = format!(
+        r#"<p:sld xmlns:p="{PML}" xmlns:a="{DRAWINGML}" xmlns:r="{REL}" xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:pic><p:nvPicPr><p:cNvPr id="42" name="SVG Photo"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rIdRaster"><a:extLst><a:ext uri="{SVG_EXTENSION_URI}"><asvg:svgBlip r:embed="rIdSvg"/></a:ext></a:extLst></a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="1" y="2"/><a:ext cx="3" cy="4"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic></p:spTree></p:cSld><p:clrMapOvr/>{morph}</p:sld>"#
+    );
+    let source = fixture("", slide, false);
+    let mut package = OpcPackage::from_bytes(&source).unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/ppt/media/raster.png").unwrap(),
+            "image/png".to_owned(),
+            b"raster-image".to_vec(),
+        )))
+        .unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new(SVG_MEDIA).unwrap(),
+            "image/svg+xml".to_owned(),
+            br#"<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>"#.to_vec(),
+        )))
+        .unwrap();
+    package
+        .get_part_mut(&PackURI::new(SLIDE).unwrap())
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            rt::IMAGE.to_owned(),
+            "../media/raster.png".to_owned(),
+            "rIdRaster".to_owned(),
+            litchi_opc::TargetMode::Internal,
+        )
+        .unwrap();
+    package
+        .get_part_mut(&PackURI::new(SLIDE).unwrap())
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            rt::IMAGE.to_owned(),
+            "../media/vector.svg".to_owned(),
+            "rIdSvg".to_owned(),
+            litchi_opc::TargetMode::Internal,
+        )
+        .unwrap();
     PackageWriter::to_bytes(&package).unwrap()
 }
 
@@ -1173,6 +1221,460 @@ fn direct_transition_supports_strict_and_noncanonical_prefixes() {
 }
 
 #[test]
+fn source_backed_transition_alias_and_default_namespaces_are_rewritten_qname_safely() {
+    let alias_slide = shape_xml(PML, "before")
+        .replace("xmlns:p=", "xmlns:q=")
+        .replace("<p:", "<q:")
+        .replace("</p:", "</q:");
+    let alias_source = fixture("", alias_slide, false);
+    let alias_editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(alias_source)))
+            .unwrap();
+    let requested = Transition::new(TransitionKind::Preset(
+        litchi_pptx::transition::Preset::new("p:literal").unwrap(),
+    ));
+    let mut alias_edit = alias_editor.edit_slide(0).unwrap();
+    assert!(alias_edit.set_transition(&requested).unwrap());
+    let alias_commit = alias_edit.commit();
+    let mut alias_output = Vec::new();
+    alias_editor
+        .publish_slide_commit_to_stream(&mut alias_output, &alias_commit)
+        .unwrap();
+    let alias_package = OpcPackage::from_bytes(&alias_output).unwrap();
+    let alias_xml = std::str::from_utf8(
+        alias_package
+            .get_part(&PackURI::new(SLIDE).unwrap())
+            .unwrap()
+            .blob(),
+    )
+    .unwrap();
+    assert!(alias_xml.contains("<q:transition"));
+    assert!(alias_xml.contains(r#"prst="p:literal""#));
+    assert!(!alias_xml.contains(r#"prst="q:literal""#));
+    assert!(alias_xml.contains("http://schemas.microsoft.com/office/powerpoint/2012/main"));
+
+    let default_slide = shape_xml(PML, "before")
+        .replace(
+            "xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\"",
+            "xmlns=\"http://schemas.openxmlformats.org/presentationml/2006/main\"",
+        )
+        .replace("<p:", "<")
+        .replace("</p:", "</");
+    let default_source = fixture("", default_slide, false);
+    let default_editor = SourceBackedPresentationEditor::from_read_at(Arc::new(
+        VersionedSource::new(default_source),
+    ))
+    .unwrap();
+    let requested = Transition::new(TransitionKind::Morph(
+        litchi_pptx::transition::Morph::ByChar,
+    ));
+    let mut default_edit = default_editor.edit_slide(0).unwrap();
+    assert!(default_edit.set_transition(&requested).unwrap());
+    let default_commit = default_edit.commit();
+    let mut default_output = Vec::new();
+    default_editor
+        .publish_slide_commit_to_stream(&mut default_output, &default_commit)
+        .unwrap();
+    let default_package = OpcPackage::from_bytes(&default_output).unwrap();
+    let default_xml = std::str::from_utf8(
+        default_package
+            .get_part(&PackURI::new(SLIDE).unwrap())
+            .unwrap()
+            .blob(),
+    )
+    .unwrap();
+    assert!(default_xml.contains("<transition"));
+    assert!(default_xml.contains("</transition>"));
+    assert!(!default_xml.contains("<p:transition"));
+    assert!(default_xml.contains("http://schemas.microsoft.com/office/powerpoint/2015/09/main"));
+}
+
+#[test]
+fn source_backed_extension_transition_edit_reopens_and_preserves_opaque_package_members() {
+    let morph = r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main"><mc:Choice Requires="p159"><p:transition spd="fast"><p159:morph option="byWord"/></p:transition></mc:Choice><mc:Fallback><p:transition spd="fast"><p:fade/></p:transition></mc:Fallback></mc:AlternateContent>"#;
+    let slide = slide_with_tail(
+        PML,
+        "before",
+        &format!("{morph}<p:extLst><p:ext uri=\"urn:opaque\"><p:extData/></p:ext></p:extLst>"),
+    );
+    let source_bytes = fixture("", slide, false);
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        source_bytes.clone(),
+    )))
+    .unwrap();
+    let snapshot = editor.slide_snapshot(0).unwrap();
+    let current = snapshot.transition().unwrap().unwrap();
+    assert_eq!(
+        current.kind(),
+        &TransitionKind::Morph(litchi_pptx::transition::Morph::ByWord)
+    );
+
+    let requested = Transition::new(TransitionKind::Preset(
+        litchi_pptx::transition::Preset::with_options("wind", true, false).unwrap(),
+    ))
+    .with_speed(Speed::Slow)
+    .with_click(false)
+    .with_after(Ms::new(1250).unwrap());
+    let mut edit = snapshot.edit();
+    assert!(edit.set_transition(&requested).unwrap());
+    let commit = edit.commit();
+    let mut output = Vec::new();
+    editor
+        .publish_slide_commit_to_stream(&mut output, &commit)
+        .unwrap();
+
+    let source = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let candidate = OpcPackage::from_bytes(&output).unwrap();
+    assert_eq!(source.part_count(), candidate.part_count());
+    assert_eq!(
+        relationship_signatures(source.rels()),
+        relationship_signatures(candidate.rels())
+    );
+    for part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
+        let output_part = candidate.get_part(part.partname()).unwrap();
+        assert_eq!(part.content_type(), output_part.content_type());
+        assert_eq!(
+            relationship_signatures(part.rels()),
+            relationship_signatures(output_part.rels())
+        );
+        if part.partname().as_str() == SLIDE {
+            let output_xml = std::str::from_utf8(output_part.blob()).unwrap();
+            assert!(output_xml.contains(r#"Requires="p15""#));
+            assert!(output_xml.contains(r#"<p15:prstTrans prst="wind" invX="1"/>"#));
+            assert!(output_xml.contains(r#"<mc:Fallback><p:transition"#));
+            assert!(output_xml.contains(r#"uri="urn:opaque""#));
+        } else {
+            assert_eq!(part.blob(), output_part.blob());
+        }
+    }
+
+    let reopened =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(output)))
+            .unwrap();
+    let reopened_transition = reopened
+        .slide_snapshot(0)
+        .unwrap()
+        .transition()
+        .unwrap()
+        .unwrap();
+    assert!(reopened_transition.same_semantics(&requested));
+}
+
+#[test]
+fn source_backed_p14_transition_effects_edit_reopen_and_inverse() {
+    let targets = [
+        TransitionKind::Conveyor(litchi_pptx::transition::LeftRight::Right),
+        TransitionKind::Doors(litchi_pptx::transition::Axis::Vertical),
+        TransitionKind::Ferris(litchi_pptx::transition::LeftRight::Left),
+        TransitionKind::Flash,
+        TransitionKind::Flip(litchi_pptx::transition::LeftRight::Right),
+        TransitionKind::FlyThrough(litchi_pptx::transition::FlyThrough::new(
+            litchi_pptx::transition::InOut::Out,
+            true,
+        )),
+        TransitionKind::Gallery(litchi_pptx::transition::LeftRight::Left),
+        TransitionKind::Glitter(litchi_pptx::transition::Glitter::new(
+            Side::Down,
+            litchi_pptx::transition::GlitterPattern::Hexagon,
+        )),
+        TransitionKind::Honeycomb,
+        TransitionKind::Pan(Side::Up),
+        TransitionKind::Prism(litchi_pptx::transition::Prism::new(Side::Right, true, true)),
+        TransitionKind::Reveal(litchi_pptx::transition::Reveal::new(
+            litchi_pptx::transition::LeftRight::Right,
+            true,
+        )),
+        TransitionKind::Shred(litchi_pptx::transition::Shred::new(
+            litchi_pptx::transition::ShredPattern::Rectangle,
+            litchi_pptx::transition::InOut::Out,
+        )),
+        TransitionKind::Switch(litchi_pptx::transition::LeftRight::Right),
+        TransitionKind::Vortex(Side::Left),
+        TransitionKind::Warp(litchi_pptx::transition::InOut::Out),
+        TransitionKind::WheelReverse(litchi_pptx::transition::Spokes::Eight),
+        TransitionKind::Window(litchi_pptx::transition::Axis::Horizontal),
+    ];
+
+    for kind in targets {
+        let active = litchi_pptx::transition::write(&Transition::new(kind.clone())).unwrap();
+        let source = fixture("", slide_with_tail(PML, "before", &active), false);
+        let editor =
+            SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
+                .unwrap();
+        let snapshot = editor.slide_snapshot(0).unwrap();
+        let original = snapshot.transition().unwrap().unwrap();
+        let requested = Transition::new(kind)
+            .with_speed(Speed::Slow)
+            .with_click(false)
+            .with_after(Ms::new(1250).unwrap());
+        let mut edit = snapshot.edit();
+        assert!(edit.set_transition(&requested).unwrap());
+        let commit = edit.commit();
+
+        let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        assert!(
+            restored
+                .transition()
+                .unwrap()
+                .unwrap()
+                .same_semantics(&original)
+        );
+
+        let mut output = Vec::new();
+        editor
+            .publish_slide_commit_to_stream(&mut output, &commit)
+            .unwrap();
+        let reopened =
+            SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(output)))
+                .unwrap();
+        let readback = reopened
+            .slide_snapshot(0)
+            .unwrap()
+            .transition()
+            .unwrap()
+            .unwrap();
+        assert!(readback.same_semantics(&requested));
+    }
+}
+
+#[test]
+fn transition_choice_edit_resolves_ancestor_namespaces_and_keeps_inactive_bindings() {
+    let inactive = r#"<mc:Choice Requires="p159"><p159:future value="keep"/></mc:Choice>"#;
+    let owner = format!(
+        r#"<mc:AlternateContent><mc:Choice Requires="p15" xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main"><p:transition><p15:prstTrans prst="wind"/></p:transition></mc:Choice>{inactive}<mc:Fallback><p:transition><p:fade/></p:transition></mc:Fallback></mc:AlternateContent>"#,
+    );
+    let slide = slide_with_tail(PML, "before", &owner).replacen(
+        "<p:sld ",
+        r#"<p:sld xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main" xmlns:p159="urn:example:future" "#,
+        1,
+    );
+    let source = fixture("", slide, false);
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
+            .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    edit.set_transition(&Transition::new(TransitionKind::Morph(
+        litchi_pptx::transition::Morph::ByWord,
+    )))
+    .unwrap();
+    let mut output = Vec::new();
+    editor
+        .publish_slide_commit_to_stream(&mut output, &edit.commit())
+        .unwrap();
+    let package = OpcPackage::from_bytes(&output).unwrap();
+    let xml = package
+        .get_part(&PackURI::new(SLIDE).unwrap())
+        .unwrap()
+        .blob();
+    let text = std::str::from_utf8(xml).unwrap();
+    assert!(text.contains(inactive));
+    assert!(text.contains(r#"<mc:AlternateContent><mc:Choice Requires="p159""#));
+
+    let mut older = litchi_ooxml_common::mce::Capabilities::ooxml_baseline();
+    older.understand_namespace("http://schemas.microsoft.com/office/powerpoint/2012/main");
+    let processed = litchi_ooxml_common::mce::process_markup_compatibility(
+        xml,
+        &older,
+        &litchi_ooxml_common::mce::Limits::default(),
+    )
+    .unwrap();
+    let processed = std::str::from_utf8(&processed.xml).unwrap();
+    assert!(processed.contains("<p:fade"));
+    assert!(!processed.contains(":morph"));
+    let reopened =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(output)))
+            .unwrap();
+    assert_eq!(
+        reopened
+            .slide_snapshot(0)
+            .unwrap()
+            .transition()
+            .unwrap()
+            .unwrap()
+            .kind(),
+        &TransitionKind::Morph(litchi_pptx::transition::Morph::ByWord)
+    );
+}
+
+#[test]
+fn transition_extension_prefix_collision_refuses_without_changing_source() {
+    let owner = r#"<mc:AlternateContent><mc:Choice Requires="p15"><p:transition><p15:prstTrans prst="wind"/></p:transition></mc:Choice><mc:Fallback><p:transition><p:fade/></p:transition></mc:Fallback></mc:AlternateContent>"#;
+    let slide = slide_with_tail(PML, "before", owner).replacen(
+        "<p:sld ",
+        r#"<p:sld xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main" xmlns:p159="urn:example:future" "#,
+        1,
+    );
+    let source = fixture("", slide, false);
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        source.clone(),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    assert!(matches!(
+        edit.set_transition(&Transition::new(TransitionKind::Morph(
+            litchi_pptx::transition::Morph::ByWord
+        ))),
+        Err(Error::UnsafeEdit { .. })
+    ));
+    let commit = edit.commit();
+    assert!(!commit.is_changed());
+    let mut output = Vec::new();
+    editor
+        .publish_slide_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, source);
+}
+
+#[test]
+fn source_backed_extension_transition_timing_edit_retains_typed_effect() {
+    let morph = r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main"><mc:Choice Requires="p14 p159"><p:transition spd="fast" p14:dur="700.5ms"><p159:morph option="byChar"/></p:transition></mc:Choice><mc:Fallback><p:transition spd="fast"><p:fade/></p:transition></mc:Fallback></mc:AlternateContent>"#;
+    let source = fixture("", slide_with_tail(PML, "before", morph), false);
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
+            .unwrap();
+    let snapshot = editor.slide_snapshot(0).unwrap();
+    let current = snapshot.transition().unwrap().unwrap();
+    let requested = current.clone().with_speed(Speed::Slow);
+    let mut edit = snapshot.edit();
+    assert!(edit.set_transition(&requested).unwrap());
+    let commit = edit.commit();
+    let mut output = Vec::new();
+    editor
+        .publish_slide_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    let reopened =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(output)))
+            .unwrap();
+    let reopened_transition = reopened
+        .slide_snapshot(0)
+        .unwrap()
+        .transition()
+        .unwrap()
+        .unwrap();
+    assert!(reopened_transition.same_semantics(&requested));
+    assert_eq!(
+        reopened_transition.duration_offset().unwrap().as_str(),
+        "700.5"
+    );
+}
+
+#[test]
+fn source_backed_transition_edit_preserves_svg_resource_inventory_and_inactive_mce_bytes() {
+    let source_bytes = svg_transition_fixture();
+    let source = SourceBackedPresentation::from_read_at(Arc::new(VersionedSource::new(
+        source_bytes.clone(),
+    )))
+    .unwrap();
+    let source_slide = source.slide(0).unwrap();
+    let source_svg = source_slide.read_svg_image(0).unwrap();
+    let source_svg_bytes = source_svg.bytes().to_vec();
+    assert_eq!(source_svg.descriptor().relationship_id(), "rIdSvg");
+
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        source_bytes.clone(),
+    )))
+    .unwrap();
+    let snapshot = editor.slide_snapshot(0).unwrap();
+    let current = snapshot.transition().unwrap().unwrap();
+    let requested = current.clone().with_speed(Speed::Slow);
+    let mut edit = snapshot.edit();
+    assert!(edit.set_transition(&requested).unwrap());
+    let commit = edit.commit();
+    let mut output = Vec::new();
+    editor
+        .publish_slide_commit_to_stream(&mut output, &commit)
+        .unwrap();
+
+    let source_package = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let output_package = OpcPackage::from_bytes(&output).unwrap();
+    let source_slide_part = source_package
+        .get_part(&PackURI::new(SLIDE).unwrap())
+        .unwrap();
+    let output_slide_part = output_package
+        .get_part(&PackURI::new(SLIDE).unwrap())
+        .unwrap();
+    assert_eq!(
+        relationship_signatures(source_slide_part.rels()),
+        relationship_signatures(output_slide_part.rels())
+    );
+    assert_eq!(
+        output_package
+            .get_part(&PackURI::new(SVG_MEDIA).unwrap())
+            .unwrap()
+            .blob(),
+        source_svg_bytes.as_slice()
+    );
+    let output_xml = std::str::from_utf8(output_slide_part.blob()).unwrap();
+    assert!(output_xml.contains("inactive-owner-comment"));
+    assert!(output_xml.contains("future:branch=\"keep\""));
+    assert!(output_xml.contains("future:data=\"keep\""));
+    assert!(output_xml.contains("fallback-comment"));
+
+    let reopened =
+        SourceBackedPresentation::from_read_at(Arc::new(VersionedSource::new(output))).unwrap();
+    let reopened_slide = reopened.slide(0).unwrap();
+    assert_eq!(
+        reopened_slide.read_svg_image(0).unwrap().bytes(),
+        source_svg_bytes
+    );
+    assert!(reopened_slide.images().unwrap()[0].svg().is_some());
+}
+
+#[test]
+fn source_backed_transition_semantic_noop_preserves_optional_attribute_lexical_presence() {
+    let preset = r#"<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main"><mc:Choice Requires="p15"><p:transition><p15:prstTrans invX="false"/></p:transition></mc:Choice><mc:Fallback><p:transition><p:fade/></p:transition></mc:Fallback></mc:AlternateContent>"#;
+    let source_bytes = fixture("", slide_with_tail(PML, "before", preset), false);
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        source_bytes.clone(),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
+    let requested = Transition::new(TransitionKind::Preset(
+        litchi_pptx::transition::Preset::without_name(),
+    ));
+    assert!(!edit.set_transition(&requested).unwrap());
+    let commit = edit.commit();
+    assert!(!commit.is_changed());
+    let mut output = Vec::new();
+    editor
+        .publish_slide_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, source_bytes);
+}
+
+#[test]
+fn source_backed_exact_unknown_transition_noop_shares_source() {
+    let source_bytes = fixture(
+        "",
+        slide_with_tail(
+            PML,
+            "before",
+            r#"<p:transition><p:vendorEffect xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/></p:transition>"#,
+        ),
+        false,
+    );
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        source_bytes.clone(),
+    )))
+    .unwrap();
+    let snapshot = editor.slide_snapshot(0).unwrap();
+    let requested = snapshot.transition().unwrap().unwrap();
+    let mut edit = snapshot.edit();
+    assert!(!edit.set_transition(&requested).unwrap());
+    let commit = edit.commit();
+    assert!(!commit.is_changed());
+
+    let mut output = Vec::new();
+    editor
+        .publish_slide_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, source_bytes);
+}
+
+#[test]
 fn direct_transition_semantic_noop_shares_signed_source_exactly() {
     let slide = slide_with_tail(
         PML,
@@ -1229,7 +1731,7 @@ fn direct_transition_semantic_noop_shares_signed_source_exactly() {
 }
 
 #[test]
-fn direct_transition_refuses_extensions_sound_protection_and_unsafe_targets_atomically() {
+fn direct_transition_rejects_unsafe_sources_and_supports_typed_extensions() {
     let cases = [
         "<p:transition><p:fade vendor=\"1\"/></p:transition>",
         "<p:transition><p:sndAc><p:stSnd r:embed=\"rIdSound\"/></p:sndAc></p:transition>",
@@ -1271,21 +1773,17 @@ fn direct_transition_refuses_extensions_sound_protection_and_unsafe_targets_atom
     let mut edit = editor.edit_slide(0).unwrap();
     let duration =
         Transition::new(TransitionKind::Fade { black: None }).with_duration(Ms::new(900).unwrap());
-    assert!(matches!(
-        edit.set_transition(&duration),
-        Err(Error::UnsafeEdit { .. })
-    ));
+    assert!(edit.set_transition(&duration).unwrap());
+
+    let source = fixture("", shape_xml(PML, "before"), false);
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
+            .unwrap();
+    let mut edit = editor.edit_slide(0).unwrap();
     let ripple = Transition::new(TransitionKind::Ripple(
         litchi_pptx::transition::Ripple::Center,
     ));
-    assert!(matches!(
-        edit.set_transition(&ripple),
-        Err(Error::UnsafeEdit { .. })
-    ));
-    assert!(
-        edit.set_transition(&Transition::new(TransitionKind::Fade { black: None }))
-            .unwrap()
-    );
+    assert!(edit.set_transition(&ripple).unwrap());
 }
 
 #[test]
@@ -1299,8 +1797,7 @@ fn direct_transition_rejects_malformed_dtd_limits_stale_source_and_partial_sink(
         fixture("", duplicate, false),
     )))
     .unwrap();
-    let mut edit = editor.edit_slide(0).unwrap();
-    assert!(matches!(edit.clear_transition(), Err(Error::Invalid(_))));
+    assert!(matches!(editor.edit_slide(0), Err(Error::Invalid(_))));
 
     let dtd = format!("<!DOCTYPE p:sld>{}", shape_xml(PML, "before"));
     let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(

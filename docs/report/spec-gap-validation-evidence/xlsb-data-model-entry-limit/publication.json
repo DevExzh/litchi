@@ -1,0 +1,60 @@
+{
+  "integration_base": "141970fd6df99e9553641fc52eb4e9b2b1687279",
+  "source_sha256": {
+    "crates/litchi-xlsb/src/data_model/package.rs": "46913da45f887577f98baaed522546aa7832a8414620b7511794635869df1361"
+  },
+  "root_test_counts": {
+    "passed": 818,
+    "failed": 0,
+    "ignored": 12,
+    "targets": 20
+  },
+  "archives": {
+    "root-integration.json.gz": {
+      "raw_sha256": "e392d3023b496956c9f3f491b814173f747879fd8cdf5dbccf4646588cf3d22e",
+      "gzip_sha256": "7179606b3a6e2befc6a69da0b42e1080a163c295e85178644b8ca098e4399296"
+    },
+    "root-gates.json.gz": {
+      "raw_sha256": "9826016b64f50a8267f1de13aadf3e7c3f021320fa0ec54fd383be3da7accefe",
+      "gzip_sha256": "f11a8d8252ec6c4f567c346b839841e55fd0874e3710ae602e92984573d29f83"
+    },
+    "root-test-counts.json.gz": {
+      "raw_sha256": "312e0fc3ea4b981ca40bd58bb2e04bd49059557ab463eb1540be5f71ba36598f",
+      "gzip_sha256": "81e6275de9d2c2f94333f035608a48ccfd0913f4156f3cb69fb030ccfd417d75"
+    },
+    "root-source-after.json.gz": {
+      "raw_sha256": "e990795c53cb1137a7b01a240ffd0178954e035ccd30e5d4f34f71f5543823b6",
+      "gzip_sha256": "78c7dce168507c93742cf2b8faf533689706035fe517b3cfbe68859a5593df35"
+    },
+    "root-build-environment.json.gz": {
+      "raw_sha256": "d66216ac08a17e61515ba11933c1e3f8142b914919ccee51c541aea900358b22",
+      "gzip_sha256": "9865952788b5cc51781a63087d091fd018b3e136d7435949b68820a236791c0c"
+    },
+    "root-test.log.gz": {
+      "raw_sha256": "e77f320630c11373460cfa34e8be60fff604e0fc5ef527eb0f892646e632f971",
+      "gzip_sha256": "8b308e0fe546525cee7801d0d58754d6b20ce769678b78dffb1d4b4e99cfe0c0"
+    },
+    "root-clippy.log.gz": {
+      "raw_sha256": "33ef951d50b770d0595792b92cbae71e5e04fad0900910cd41da0aec13de3526",
+      "gzip_sha256": "5760b39ed7f1a172847708e7b23e3837f04e982112e3e44f9ceae19dca405c45"
+    },
+    "root-rustdoc.log.gz": {
+      "raw_sha256": "a3c2f565162071f9c634711f829dec6ca956b0063e5897dc34c96105c081ef4b",
+      "gzip_sha256": "2ecf17ba2bfe46e90a97512592644e331228bcd319450a2a6624b6bb3d7f9f2e"
+    },
+    "root-rustfmt.log.gz": {
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    "independent-review.txt.gz": {
+      "raw_sha256": "d4eeab77079ca0eda849c2db63e67489cde09094217d2794f015a41e5150f965",
+      "gzip_sha256": "1bee0e3620467fc8facea62aa5f007f697fc834f3f30a63945b83a0d234f9b33"
+    },
+    "root-diagnosis.json.gz": {
+      "raw_sha256": "9321b4398ce6c7bc00ffaadd1f6b53fffa2d3da882b7f0f5443716315fc30d16",
+      "gzip_sha256": "aad16ff1a13e8df97dec3c4189a7fadcaba10f2c58ad704711d3252db381eb92"
+    }
+  },
+  "scope": "Only Data Model OPC source-capture limit propagation, independent of Metadata feature and drawing-skip pending changes.",
+  "review_hash_note": "Review labels the 46913da... identifier patch hash; it is the SHA256 of complete data_model/package.rs source file."
+}

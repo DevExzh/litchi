@@ -397,14 +397,21 @@ mod tests {
             "<o:document-content xmlns:o=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" ",
             "xmlns:t=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\">",
             "<o:body><o:spreadsheet><t:label-ranges>",
-            "<t:label-range t:label-cell-range-address=\"Sheet1.A1:A2\" ",
-            "t:data-cell-range-address=\"Sheet1.B1:C2\" t:orientation=\"row\"></t:label-range>",
+            "<t:label-range t:label-cell-range-address=\"Sheet1.A1:Sheet1.A2\" ",
+            "t:data-cell-range-address=\"Sheet1.B1:Sheet1.C2\" t:orientation=\"row\"></t:label-range>",
             "</t:label-ranges></o:spreadsheet></o:body></o:document-content>"
         );
         let parsed = parse(xml).unwrap();
         assert_eq!(
             parsed,
-            vec![Range::new("Sheet1.A1:A2", "Sheet1.B1:C2", Orientation::Row).unwrap()]
+            vec![
+                Range::new(
+                    "Sheet1.A1:Sheet1.A2",
+                    "Sheet1.B1:Sheet1.C2",
+                    Orientation::Row
+                )
+                .unwrap()
+            ]
         );
         assert!(
             parse(&format!("{PREFIX}<table:label-ranges/>{SUFFIX}"))
@@ -433,18 +440,33 @@ mod tests {
 
     #[test]
     fn writer_escapes_addresses() {
-        let range = Range::new("'A&B'.A1:A2", "'A&B'.B1:B2", Orientation::Column).unwrap();
+        let range = Range::new(
+            "'A&B'.A1:'A&B'.A2",
+            "'A&B'.B1:'A&B'.B2",
+            Orientation::Column,
+        )
+        .unwrap();
         let mut xml = String::new();
         write(&mut xml, &[range]).unwrap();
         assert!(xml.contains("&amp;"));
         let parsed = parse(&format!("{PREFIX}{xml}{SUFFIX}")).unwrap();
-        assert_eq!(parsed[0].label_cell_range_address, "'A&B'.A1:A2");
+        assert_eq!(parsed[0].label_cell_range_address, "'A&B'.A1:'A&B'.A2");
     }
 
     #[test]
     fn round_trips_through_builder_and_mutable_packages() {
-        let first = Range::new("Sheet1.A1:A2", "Sheet1.B1:D2", Orientation::Row).unwrap();
-        let second = Range::new("Sheet1.A1:D1", "Sheet1.A2:D4", Orientation::Column).unwrap();
+        let first = Range::new(
+            "Sheet1.A1:Sheet1.A2",
+            "Sheet1.B1:Sheet1.D2",
+            Orientation::Row,
+        )
+        .unwrap();
+        let second = Range::new(
+            "Sheet1.A1:Sheet1.D1",
+            "Sheet1.A2:Sheet1.D4",
+            Orientation::Column,
+        )
+        .unwrap();
 
         let mut builder = Builder::new();
         builder.add_sheet("Sheet1").unwrap();

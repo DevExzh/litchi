@@ -1,0 +1,16 @@
+74e8a61744cf985d3003789c726e92be74e7d3baf20e6c20b39d5adbbe0a3a01  /var/tmp/litchi-docx-styles-effects-profile-target-5f4dd8954-20260912-a/release/docx-styles-effects-profile
+binary=/var/tmp/litchi-docx-styles-effects-profile-target-5f4dd8954-20260912-a/release/docx-styles-effects-profile
+source_commit=506e6f8e5fb94a14c390fc262b152c773e8990b1
+git_head=5f4dd8954acef1fea9e9d7de01c90b3f3f0c2721
+git_status_before_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+git_status_after_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+rustc=rustc 1.95.0 (59807616e 2026-04-14)
+cargo=cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+target=/var/tmp/litchi-docx-styles-effects-profile-target-5f4dd8954-20260912-a
+target_triple=x86_64-unknown-linux-gnu
+linker=default
+toolchain_sha256=e9a3db8e358dc8862e5a516a793976506d4d28d4aad8fedd761b45562e5021a6
+environment_sha256=9dc5497763d2f36da87877908c15ea689ed496abd17b73936c16886802fc58eb
+allocator=profile-harness::support::CountingAllocator
+rss=/usr/bin/time -v process maximum resident set size
+mode=profile processes=3 warmup=2 samples=20

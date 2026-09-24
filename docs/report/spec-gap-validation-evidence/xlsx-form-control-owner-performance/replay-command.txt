@@ -1,0 +1,23 @@
+# Run from a repository containing base commit
+repo_root=${LITCHI_FORM_OWNER_BASE_REPO:-$(git rev-parse --show-toplevel)}
+evidence_dir="$repo_root/docs/report/spec-gap-validation-evidence/xlsx-form-control-owner-performance"
+restore_root=$(mktemp -d "${TMPDIR:-/var/tmp}/litchi-form-owner-restored.XXXXXX")
+cleanup() {
+    python3 - "$restore_root" <<'PY'
+import shutil
+import sys
+shutil.rmtree(sys.argv[1], ignore_errors=True)
+PY
+}
+trap cleanup EXIT
+
+# Restore base + retained source delta + retained source lock, then verify the
+# restored files against source-root-gate.json and source-bundle.tar.
+"$evidence_dir/restore-source.sh" "$repo_root" "$restore_root"
+
+# The harness creates a fresh evidence_dir/runs/replay-* output directory by
+# default. It verifies source/harness/lock state before and after collection.
+TMPDIR=/var/tmp \
+LITCHI_FORM_OWNER_SOURCE_ROOT="$restore_root" \
+LITCHI_FORM_OWNER_FIXTURE_ROOT="$restore_root/crates/litchi-xlsx/tests/fixtures/form_control_properties" \
+"$evidence_dir/harness/run.sh"

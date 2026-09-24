@@ -54,6 +54,15 @@ pub enum Error {
         /// Found length
         found: usize,
     },
+    /// A format-owned resource exceeded its explicit finite caller limit.
+    LimitExceeded {
+        /// Resource whose caller ceiling was crossed.
+        resource: &'static str,
+        /// Observed or requested amount.
+        actual: usize,
+        /// Configured maximum.
+        maximum: usize,
+    },
     /// End of stream reached unexpectedly
     UnexpectedEndOfStream(String),
     /// Invalid formula
@@ -112,6 +121,22 @@ pub enum Error {
     Common(litchi_ooxml_common::Error),
     /// Deferred OPC package, source-freshness, or resource-limit error.
     Opc(litchi_opc::OpcError),
+    /// Cooperative cancellation or caller execution-budget refusal.
+    Execution(litchi_core::ExecutionError),
+    /// A source-checked Custom Data patch was applied to a different closure.
+    PatchConflict {
+        /// Human-readable closure name.
+        part: String,
+    },
+    /// The package contains a signature/edit policy that forbids this change.
+    Signed,
+    /// A recognized Custom Data storage still has inbound BIFF12 references.
+    CustomDataReferenced {
+        /// Decoded Custom Data UID.
+        id: String,
+        /// Number of recognized references.
+        connections: usize,
+    },
     /// Bounded, inert VBA parsing or authoring error.
     #[cfg(feature = "vba-inspection")]
     Vba(litchi_vba::Error),
@@ -153,6 +178,14 @@ impl fmt::Display for Error {
             Error::InvalidLength { expected, found } => {
                 write!(f, "Invalid length: expected {}, found {}", expected, found)
             },
+            Error::LimitExceeded {
+                resource,
+                actual,
+                maximum,
+            } => write!(
+                f,
+                "{resource} limit exceeded: actual {actual}, maximum {maximum}"
+            ),
             Error::UnexpectedEndOfStream(context) => {
                 write!(f, "Unexpected end of stream: {}", context)
             },
@@ -201,6 +234,13 @@ impl fmt::Display for Error {
             Error::Drawing(error) => write!(f, "DrawingML error: {error}"),
             Error::Common(error) => write!(f, "shared OOXML error: {error}"),
             Error::Opc(error) => write!(f, "OPC source error: {error}"),
+            Error::Execution(error) => write!(f, "execution policy error: {error}"),
+            Error::PatchConflict { part } => write!(f, "source patch conflict: {part}"),
+            Error::Signed => write!(f, "package signature/edit policy forbids this change"),
+            Error::CustomDataReferenced { id, connections } => write!(
+                f,
+                "Custom Data storage '{id}' is referenced by {connections} connection(s)"
+            ),
             #[cfg(feature = "vba-inspection")]
             Error::Vba(error) => write!(f, "VBA error: {error}"),
             Error::WideStringLength { expected, actual } => {
@@ -234,11 +274,13 @@ impl std::error::Error for Error {
             Error::Drawing(e) => Some(e),
             Error::Common(e) => Some(e),
             Error::Opc(e) => Some(e),
+            Error::Execution(e) => Some(e),
             #[cfg(feature = "vba-inspection")]
             Error::Vba(e) => Some(e),
             Error::InvalidRecordType(_)
             | Error::UnexpectedRecord { .. }
             | Error::InvalidLength { .. }
+            | Error::LimitExceeded { .. }
             | Error::UnexpectedEndOfStream(_)
             | Error::InvalidFormula(_)
             | Error::InvalidCellReference(_)
@@ -256,6 +298,9 @@ impl std::error::Error for Error {
             | Error::WideStringLength { .. }
             | Error::Unrecognized { .. }
             | Error::PasswordProtected => None,
+            Error::PatchConflict { .. } | Error::Signed | Error::CustomDataReferenced { .. } => {
+                None
+            },
         }
     }
 }
@@ -421,6 +466,12 @@ impl From<litchi_vba::Error> for Error {
 impl From<litchi_opc::error::OpcError> for Error {
     fn from(err: litchi_opc::error::OpcError) -> Self {
         Error::Opc(err)
+    }
+}
+
+impl From<litchi_core::ExecutionError> for Error {
+    fn from(error: litchi_core::ExecutionError) -> Self {
+        Self::Execution(error)
     }
 }
 

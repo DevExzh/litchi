@@ -1,0 +1,63 @@
+{
+  "source_commit": "17552b1b41796f8c0e3953017931f497b1837b3b",
+  "artifacts": [
+    {
+      "source": "/var/tmp/litchi-cold-verified-capture-17552-20260910/filesystem-cold-verified.json",
+      "artifact": "filesystem-cold-verified.json.gz",
+      "raw_sha256": "34ff59f665fd7a8ba42b6bc927565faba62b71c5a5c2241dfc469749cd651db6",
+      "gzip_sha256": "547cded4b98769ed45b09ec384927a567b290d776788a8c7c368bcb0d7db8586",
+      "raw_bytes": 73898
+    },
+    {
+      "source": "/var/tmp/litchi-cold-verified-capture-17552-20260910/root-capture.json",
+      "artifact": "root-capture.json.gz",
+      "raw_sha256": "c5912bc815a937862298b4719e54e919b29574388c9703ecf683c3205f94aca9",
+      "gzip_sha256": "f96604a534cf799f6201b5abe7ee71a905a0b75d10390224091d63b1d0a7d625",
+      "raw_bytes": 1158
+    },
+    {
+      "source": "/var/tmp/litchi-cold-verified-capture-17552-20260910/root-observation-verification.json",
+      "artifact": "root-observation-verification.json.gz",
+      "raw_sha256": "d0ce5f5417164111369cb5587e7f1888ba90636e422fbd14a57f865586b49a01",
+      "gzip_sha256": "730e8ec23dd6005330e1c765ce2ec1c00420644a01d46d4e3db22ae919fe8d01",
+      "raw_bytes": 835
+    },
+    {
+      "source": "/var/tmp/litchi-cold-verified-capture-17552-20260910/independent-review-receipt.json",
+      "artifact": "independent-review-receipt.json.gz",
+      "raw_sha256": "52da23023c66a3d2c5af250111dbdad7af1645400ecf2757dbf920c06cf0c2ad",
+      "gzip_sha256": "509780ef7411eef98054eb14d655dcd72784795d0642d8683b5e2172eea76c31",
+      "raw_bytes": 16155
+    },
+    {
+      "source": "/var/tmp/litchi-cold-verified-capture-17552-20260910/capture.log",
+      "artifact": "capture.log.gz",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "raw_bytes": 0
+    },
+    {
+      "source": "/var/tmp/litchi-cold-verified-build-17552-20260910/build-preparation.json",
+      "artifact": "build-preparation.json.gz",
+      "raw_sha256": "eaa5ae9dd110a38c90f51d9ba893b45d7f36ffec4f157e87bc46bf71d552cc93",
+      "gzip_sha256": "d7f1bca94cbcbb2770da21bbb8d8d2162455047dae4408c2b906c9069fa7827a",
+      "raw_bytes": 7925
+    },
+    {
+      "source": "/var/tmp/litchi-cold-verified-build-17552-20260910/BUILD_PREPARATION.md",
+      "artifact": "BUILD_PREPARATION.md.gz",
+      "raw_sha256": "f76e6e36eec7e800b50a8616f55996b88ed382d40272dfde2a25679ecf2b6384",
+      "gzip_sha256": "327b426171e0711d6c43cc8f9daa5f6579697c0bc913d55c49f1c72a5251de16",
+      "raw_bytes": 2612
+    },
+    {
+      "source": "/var/tmp/litchi-cold-verified-build-17552-20260910/build.log",
+      "artifact": "build.log.gz",
+      "raw_sha256": "82617be82f28de141c3e1e3bf90ddf12bc20830c4910b4517fe201b710f0070a",
+      "gzip_sha256": "4658676961b55bd7bdea406f3e813f7c8b2f440fcd9a2c0e0c2cc19f45417245",
+      "raw_bytes": 10251
+    }
+  ],
+  "capture_environment_note": "Root launcher explicitly set TMPDIR=/var/tmp/litchi-cold-verified-capture-17552-20260910/tmp in subprocess env; original argv-only receipt omitted that environment field. This additive note preserves the original receipt; environment was not independently captured at execution.",
+  "scope": "page-cache eligibility and process read-byte evidence; no matched latency comparison or optimization claim"
+}

@@ -32,8 +32,9 @@ mod model;
 mod reader;
 
 pub use model::{
-    Auto, Bounds, Chart, Common, Connector, Content, Diagram, Frame, Group, Ole, Picture,
-    Placeholder, Shape, Shapes, Span, Table, Unknown,
+    Auto, Bounds, Chart, Common, Connector, Content, Diagram, Frame, Group, Ole,
+    PLACEHOLDER_TYPE_EXTENSION_URI, Picture, Placeholder, PlaceholderTypeExtension, Shape, Shapes,
+    Span, Table, Unknown,
 };
 pub use reader::{Key, Limits, LookupError, Scene};
 
@@ -70,6 +71,7 @@ mod tests {
     const DML: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
     const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
     const STRICT_DML: &str = "http://purl.oclc.org/ooxml/drawingml/main";
+    const P232: &str = "http://schemas.microsoft.com/office/powerpoint/2023/02/main";
 
     #[test]
     fn indexes_transitional_shapes_without_copying_fragments() {
@@ -106,6 +108,256 @@ mod tests {
         let start = usize::try_from(span.start()).expect("u32 fits usize");
         assert_eq!(raw.as_ptr(), owner[start..].as_ptr());
         assert!(raw.starts_with(b"<q:sp>"));
+    }
+
+    #[test]
+    fn indexes_p232_placeholder_type_extensions_in_source_namespace_context() {
+        let xml = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}">
+                <p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/>
+                    <p:sp><p:nvSpPr><p:cNvPr id="2" name="Cameo"/><p:nvPr><p:ph type="obj"><p:extLst><p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}"><x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp>
+                    <p:sp><p:nvSpPr><p:cNvPr id="3" name="Future"/><p:nvPr><p:ph><p:extLst><p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}"><x:phTypeExt><x:type><x:unknown/></x:type></x:phTypeExt></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp>
+                </p:spTree></p:cSld></p:sld>"#
+        );
+        let scene = Scene::read(xml.as_bytes()).expect("p232 scene");
+        assert!(!scene.is_rewritten());
+        assert_eq!(scene.xml(), xml.as_bytes());
+        let cameo = scene
+            .get("Cameo")
+            .expect("lookup")
+            .expect("cameo shape")
+            .placeholder()
+            .expect("cameo placeholder");
+        assert_eq!(cameo.kind(), Some("obj"));
+        assert_eq!(
+            cameo.type_extension(),
+            Some(PlaceholderTypeExtension::Cameo)
+        );
+        let future = scene
+            .get("Future")
+            .expect("lookup")
+            .expect("future shape")
+            .placeholder()
+            .expect("future placeholder");
+        assert_eq!(
+            future.type_extension(),
+            Some(PlaceholderTypeExtension::Unknown)
+        );
+    }
+
+    #[test]
+    fn retains_opaque_extension_siblings_after_typed_p232_extension() {
+        let xml = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Cameo"/><p:nvPr><p:ph><p:extLst><p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}"><x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt></p:ext><p:ext uri="urn:opaque"><x:future/></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
+        );
+        let scene = Scene::read(xml.as_bytes()).expect("opaque extension sibling");
+        assert_eq!(
+            scene
+                .shape("Cameo")
+                .expect("shape")
+                .placeholder()
+                .expect("placeholder")
+                .type_extension(),
+            Some(PlaceholderTypeExtension::Cameo)
+        );
+    }
+
+    #[test]
+    fn accepts_schema_token_uri_whitespace_and_requires_one_opaque_child() {
+        let xml = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Cameo"/><p:nvPr><p:ph><p:extLst><p:ext uri=" \t{PLACEHOLDER_TYPE_EXTENSION_URI}
+ "><x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt></p:ext><p:ext uri="urn:opaque"><x:future/></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
+        )
+        .replace("\\t", "\t");
+        let scene = Scene::read(xml.as_bytes()).expect("schema token whitespace");
+        assert_eq!(
+            scene.xml(),
+            xml.as_bytes(),
+            "reader must retain raw URI bytes"
+        );
+        assert_eq!(
+            scene
+                .get("Cameo")
+                .expect("lookup")
+                .expect("shape")
+                .placeholder()
+                .expect("placeholder")
+                .type_extension(),
+            Some(PlaceholderTypeExtension::Cameo)
+        );
+
+        for payload in [
+            r#"<p:ext uri="urn:opaque"></p:ext>"#,
+            r#"<p:ext uri="urn:opaque"><x:first/><x:second/></p:ext>"#,
+        ] {
+            let malformed = format!(
+                r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst>{payload}</p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
+            );
+            assert!(Scene::read(malformed.as_bytes()).is_err(), "{payload}");
+        }
+    }
+
+    #[test]
+    fn accepts_external_p232_indentation_and_preserves_foreign_qname_opaque_content() {
+        let indented = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Indented"/><p:nvPr><p:ph type="obj"><p:extLst><p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}">
+  <x:phTypeExt>
+    <x:type>
+      <x:cameo/>
+    </x:type>
+  </x:phTypeExt>
+</p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
+        );
+        let scene = Scene::read(indented.as_bytes()).expect("external indented p232 scene");
+        assert_eq!(scene.xml(), indented.as_bytes());
+        assert_eq!(
+            scene
+                .get("Indented")
+                .expect("lookup")
+                .expect("shape")
+                .placeholder()
+                .expect("placeholder")
+                .type_extension(),
+            Some(PlaceholderTypeExtension::Cameo)
+        );
+
+        let opaque = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Opaque"/><p:nvPr><p:ph type="obj"><p:extLst><p:ext uri="urn:opaque">
+  <x:phTypeExt>
+    <x:type><x:unknown/></x:type>
+  </x:phTypeExt>
+</p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
+        );
+        let scene = Scene::read(opaque.as_bytes()).expect("opaque p232-shaped child");
+        assert_eq!(scene.xml(), opaque.as_bytes());
+        assert_eq!(
+            scene
+                .get("Opaque")
+                .expect("lookup")
+                .expect("shape")
+                .placeholder()
+                .expect("placeholder")
+                .type_extension(),
+            None
+        );
+    }
+
+    #[test]
+    fn mce_selects_p232_placeholder_extension_branch() {
+        let mc = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+        let xml = format!(
+            r#"<p:spTree xmlns:p="{PML}" xmlns:x="{P232}" xmlns:mc="{mc}">
+                <p:nvGrpSpPr/><p:grpSpPr/>
+                <mc:AlternateContent>
+                    <mc:Choice Requires="x"><p:sp><p:nvSpPr><p:cNvPr id="2" name="Cameo"/><p:nvPr><p:ph type="obj"><p:extLst><p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}"><x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></mc:Choice>
+                    <mc:Fallback><p:sp><p:nvSpPr><p:cNvPr id="3" name="Fallback"/><p:nvPr><p:ph type="obj"/></p:nvPr></p:nvSpPr></p:sp></mc:Fallback>
+                </mc:AlternateContent>
+            </p:spTree>"#
+        );
+        let scene = Scene::read(xml.as_bytes()).expect("p232 MCE scene");
+        assert!(scene.is_rewritten());
+        let placeholder = scene
+            .get("Cameo")
+            .expect("lookup")
+            .expect("active p232 shape")
+            .placeholder()
+            .expect("p232 placeholder");
+        assert_eq!(
+            placeholder.type_extension(),
+            Some(PlaceholderTypeExtension::Cameo)
+        );
+        assert!(scene.get("Fallback").expect("fallback lookup").is_none());
+    }
+
+    #[test]
+    fn rejects_malformed_p232_placeholder_type_extensions() {
+        let cases = [
+            r#"<x:phTypeExt xmlns:x="http://schemas.microsoft.com/office/powerpoint/2023/02/main"><x:type/></x:phTypeExt>"#,
+            r#"<x:phTypeExt xmlns:x="http://schemas.microsoft.com/office/powerpoint/2023/02/main"><x:type><x:cameo/><x:unknown/></x:type></x:phTypeExt>"#,
+            r#"<x:phTypeExt xmlns:x="http://schemas.microsoft.com/office/powerpoint/2023/02/main">junk<x:type><x:cameo/></x:type></x:phTypeExt>"#,
+            r#"<x:phTypeExt xmlns:x="http://schemas.microsoft.com/office/powerpoint/2023/02/main"><x:type><x:cameo/></x:type>junk</x:phTypeExt>"#,
+            r#"<x:phTypeExt xmlns:x="http://schemas.microsoft.com/office/powerpoint/2023/02/main"><x:type><x:cameo/></x:type><x:future/></x:phTypeExt>"#,
+            r#"<x:phTypeExt xmlns:x="http://schemas.microsoft.com/office/powerpoint/2023/02/main"><x:type>junk<x:cameo/></x:type></x:phTypeExt>"#,
+            r#"<x:phTypeExt xmlns:x="http://schemas.microsoft.com/office/powerpoint/2023/02/main"><x:type><![CDATA[junk]]><x:cameo/></x:type></x:phTypeExt>"#,
+            r#"<x:phTypeExt xmlns:x="http://schemas.microsoft.com/office/powerpoint/2023/02/main"><x:type>&amp;<x:cameo/></x:type></x:phTypeExt>"#,
+        ];
+        for extension in cases {
+            let xml = format!(
+                r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst><p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}">{extension}</p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
+            );
+            assert!(Scene::read(xml.as_bytes()).is_err(), "{extension}");
+        }
+    }
+
+    #[test]
+    fn rejects_p232_empty_token_attributes_text_owner_uri_and_duplicate_lists() {
+        let cases = [
+            (
+                "token attribute",
+                r#"<x:phTypeExt><x:type><x:cameo bad="1"/></x:type></x:phTypeExt>"#,
+            ),
+            (
+                "token text",
+                r#"<x:phTypeExt><x:type><x:cameo>text</x:cameo></x:type></x:phTypeExt>"#,
+            ),
+            (
+                "type attribute",
+                r#"<x:phTypeExt><x:type bad="1"><x:cameo/></x:type></x:phTypeExt>"#,
+            ),
+            (
+                "phTypeExt attribute",
+                r#"<x:phTypeExt bad="1"><x:type><x:cameo/></x:type></x:phTypeExt>"#,
+            ),
+            (
+                "owner extra child",
+                r#"<x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt><x:other/>"#,
+            ),
+            (
+                "owner text",
+                r#"junk<x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt>"#,
+            ),
+            (
+                "owner cdata",
+                r#"<![CDATA[junk]]><x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt>"#,
+            ),
+            (
+                "owner entity",
+                r#"&amp;<x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt>"#,
+            ),
+        ];
+        for (label, extension) in cases {
+            let xml = format!(
+                r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst><p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}">{extension}</p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
+            );
+            assert!(Scene::read(xml.as_bytes()).is_err(), "{label}");
+        }
+        let owner_uri = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst><p:ext uri="urn:wrong"><x:phTypeExt><x:type><x:cameo/></x:type></x:phTypeExt></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
+        );
+        let scene = Scene::read(owner_uri.as_bytes()).expect("foreign owner uri remains opaque");
+        assert_eq!(scene.xml(), owner_uri.as_bytes());
+        assert_eq!(
+            scene
+                .get("Broken")
+                .expect("lookup")
+                .expect("shape")
+                .placeholder()
+                .expect("placeholder")
+                .type_extension(),
+            None
+        );
+        let missing_owner_payload = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst><p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}"><x:future/></p:ext></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
+        );
+        assert!(Scene::read(missing_owner_payload.as_bytes()).is_err());
+        let empty_owner = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst><p:ext uri="{PLACEHOLDER_TYPE_EXTENSION_URI}"/></p:extLst></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
+        );
+        assert!(Scene::read(empty_owner.as_bytes()).is_err());
+        let duplicate_lists = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:x="{P232}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Broken"/><p:nvPr><p:ph><p:extLst/><p:extLst/></p:ph></p:nvPr></p:nvSpPr></p:sp></p:spTree></p:cSld></p:sld>"#
+        );
+        assert!(Scene::read(duplicate_lists.as_bytes()).is_err());
     }
 
     #[test]

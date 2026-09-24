@@ -21,6 +21,12 @@ pub const FMLA_ERROR: Kind = Kind(0x000B);
 // Shared string table
 pub const SST_ITEM: Kind = Kind(0x0013);
 
+// Worksheet binary index records ([MS-XLSB] 2.4.696, 2.4.698, 2.4.699).
+// These low record numbers are shared by worksheet and macro-sheet indexes.
+pub const INDEX_ROW_BLOCK: Kind = Kind(40);
+pub const INDEX_BLOCK: Kind = Kind(42);
+pub const INDEX_PART_END: Kind = Kind(277);
+
 // Format and style records
 pub const FONT: Kind = Kind(0x002B);
 pub const FMT: Kind = Kind(0x002C);
@@ -129,6 +135,39 @@ pub const CALC_PROP: Kind = Kind(0x009D);
 pub const BOOK_VIEW: Kind = Kind(0x009E);
 pub const BEGIN_SST: Kind = Kind(0x009F);
 pub const END_SST: Kind = Kind(0x00A0);
+
+// Volatile Dependencies part (MS-XLSB 2.4.299-302, 2.4.651-654,
+// and 2.4.859-864).
+pub const BEGIN_VOL_DEPS: Kind = Kind(514);
+pub const BEGIN_VOL_MAIN: Kind = Kind(518);
+pub const BEGIN_VOL_TOPIC: Kind = Kind(520);
+pub const BEGIN_VOL_TYPE: Kind = Kind(516);
+pub const VOL_SUBTOPIC: Kind = Kind(522);
+pub const VOL_REF: Kind = Kind(523);
+pub const VOL_NUM: Kind = Kind(524);
+pub const VOL_ERR: Kind = Kind(525);
+pub const VOL_STR: Kind = Kind(526);
+pub const VOL_BOOL: Kind = Kind(527);
+pub const END_VOL_DEPS: Kind = Kind(515);
+pub const END_VOL_MAIN: Kind = Kind(519);
+pub const END_VOL_TOPIC: Kind = Kind(521);
+pub const END_VOL_TYPE: Kind = Kind(517);
+
+// Spreadsheet Data Model workbook records (MS-XLSB 2.4.46, 2.4.116-120,
+// 2.4.402, 2.4.470-473, and 2.4.714-716).
+pub const BEGIN_DATA_MODEL: Kind = Kind(2121);
+pub const END_DATA_MODEL: Kind = Kind(2122);
+pub const BEGIN_MODEL_TABLES: Kind = Kind(2123);
+pub const END_MODEL_TABLES: Kind = Kind(2124);
+pub const MODEL_TABLE: Kind = Kind(2125);
+pub const BEGIN_MODEL_RELATIONSHIPS: Kind = Kind(2126);
+pub const END_MODEL_RELATIONSHIPS: Kind = Kind(2127);
+pub const MODEL_RELATIONSHIP: Kind = Kind(2128);
+pub const BEGIN_MODEL_TIME_GROUPINGS: Kind = Kind(2137);
+pub const END_MODEL_TIME_GROUPINGS: Kind = Kind(2138);
+pub const BEGIN_MODEL_TIME_GROUPING: Kind = Kind(2139);
+pub const END_MODEL_TIME_GROUPING: Kind = Kind(2140);
+pub const MODEL_TIME_GROUPING_CALC_COL: Kind = Kind(2141);
 
 // Filter records
 pub const BEGIN_A_FILTER: Kind = Kind(0x00A1);

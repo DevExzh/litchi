@@ -1,0 +1,38 @@
+{
+  "captured_at": "2026-09-13T13:09:19.721419+00:00",
+  "cpu": 2,
+  "scope": "Shared host, serial captures pinned to CPU2; no dedicated host or hard-latency guarantee.",
+  "rustc": {
+    "command": [
+      "rustc",
+      "-Vv"
+    ],
+    "status": 0,
+    "stdout": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+  },
+  "cargo": {
+    "command": [
+      "cargo",
+      "-V"
+    ],
+    "status": 0,
+    "stdout": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n"
+  },
+  "uname": {
+    "command": [
+      "uname",
+      "-a"
+    ],
+    "status": 0,
+    "stdout": "Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux\n"
+  },
+  "lscpu": {
+    "command": [
+      "lscpu"
+    ],
+    "status": 0,
+    "stdout": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           48 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  32\nOn-line CPU(s) list:                     0-31\nVendor ID:                               AuthenticAMD\nModel name:                              AMD EPYC 9R45\nCPU family:                              26\nModel:                                   2\nThread(s) per core:                      1\nCore(s) per socket:                      32\nSocket(s):                               1\nStepping:                                1\nBogoMIPS:                                5200.00\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch topoext perfctr_core ssbd perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 clzero xsaveerptr rdpru wbnoinvd arat avx512vbmi pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid movdiri movdir64b fsrm avx512_vp2intersect flush_l1d\nHypervisor vendor:                       KVM\nVirtualization type:                     full\nL1d cache:                               1.5 MiB (32 instances)\nL1i cache:                               1 MiB (32 instances)\nL2 cache:                                32 MiB (32 instances)\nL3 cache:                                128 MiB (4 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-31\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Mitigation; IBPB on VMEXIT only\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP disabled; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected\n"
+  },
+  "meminfo": "MemTotal:       129447068 kB\nMemFree:        12778816 kB\nMemAvailable:   114246020 kB\nBuffers:         3782396 kB\nCached:         89999612 kB\nSwapCached:            0 kB\nActive:         27672272 kB\nInactive:       77466092 kB\nActive(anon):    9290940 kB\nInactive(anon):  2550808 kB\nActive(file):   18381332 kB\nInactive(file): 74915284 kB\nUnevictable:       25476 kB\nMlocked:            8760 kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:             47432 kB\nWriteback:             4 kB\nAnonPages:      11382384 kB\nMapped:          1162392 kB\nShmem:            464796 kB\nKReclaimable:    9364548 kB\nSlab:           10646188 kB\nSReclaimable:    9364548 kB\nSUnreclaim:      1281640 kB\nKernelStack:       40976 kB\nPageTables:       200168 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    64723532 kB\nCommitted_AS:   23850712 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       59800 kB\nVmallocChunk:          0 kB\nPercpu:            34432 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:   2099200 kB\nFilePmdMapped:         0 kB\nCmaTotal:              0 kB\nCmaFree:          241908 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:      221612 kB\nDirectMap2M:    24557568 kB\nDirectMap1G:    106954752 kB\n",
+  "governor": null
+}

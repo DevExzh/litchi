@@ -1,0 +1,2 @@
+config workload=parse case=literal-single-doubled-quote-64k input_bytes=65542 repeat=8 warmups=3 iterations=15 expected_success=true
+result mean_ns=277281 p50_ns=274931 p95_ns=282821 p99_ns=282821 alloc_calls_p50=24 alloc_calls_max=24 dealloc_calls_p50=24 dealloc_calls_max=24 requested_bytes_p50=790064 requested_bytes_max=790064 released_bytes_p50=790064 released_bytes_max=790064 live_before_p50=68434 live_after_p50=68434 live_after_max=68434 peak_live_delta_p50=98758 peak_live_delta_max=98758 successes_p50=8 successes_max=8 checksum_p50=524344 checksum_max=524344

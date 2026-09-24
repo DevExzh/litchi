@@ -1,0 +1,73 @@
+{
+  "source_sha256": {
+    "crates/litchi-ods/docs/FEATURE_MATRIX.md": "f48c36b19181fe6c2d049551af5baa8c6a53fd23aa243c076e2f3f669e0990c1",
+    "crates/litchi-ods/src/authoring/mutable.rs": "6db6c271206abd0199b70fef7361c3ebd92d8ba52bce7000cd17310bfb8a50b5",
+    "crates/litchi-ods/src/facade/mod.rs": "4d8bff2bafb2e8944805d945cef6fe3230c17d7c7d1f981379de005e3a25012d",
+    "crates/litchi-ods/src/facade/source.rs": "6dd600a88146d0745540378955c22e94646fa1a4b598618d187d50fe80ef39ca",
+    "crates/litchi-ods/src/lib.rs": "0cbb8163ec05794b3ffaf6d3d993d0addcccfb59adfc1e40e80cf264329d3984",
+    "crates/litchi-ods/src/model/consolidation.rs": "54170b34bc9da9581c9d193dcbd9e46ef8f6198a45e1159c7ce56f84b761f94f",
+    "crates/litchi-ods/src/model/detective.rs": "e6868a05b7cddf22c33ea5f3cec1a0e876b437275f71b64fcb8abc35d26e5cb1",
+    "crates/litchi-ods/src/model/label_range.rs": "9e3ad66aeeb2fa7138fed63eb87331da0fc79fa0d0a94bc685545b705b8585f0",
+    "crates/litchi-ods/src/model/structure.rs": "1c69ddfddd955615e99574d7dbbb78d718874e573a45f0b2e703d29dcbe4c221",
+    "crates/litchi-ods/src/sheet_metadata/detective.rs": "73064ff64c05d627e89bfe37b231a701f21b422f33b7db921b0c574d9eba8d75",
+    "crates/litchi-ods/src/sheet_metadata/index.rs": "b5104b744e738602243a644c32ef5ca0101560af7883b635cc041dcb9f5c2e38",
+    "crates/litchi-ods/src/sheet_metadata/mod.rs": "57694910c10781679efd37df24888a6f3373cc42d2eb1dd13bce78349686e315",
+    "crates/litchi-ods/tests/ods_sheet_metadata_transactions.rs": "1cf6482d82e2ff668911fccf2be39eea9aefe55562dbdfb2a88ac376d0143b97",
+    "crates/litchi-ods/tests/sheet_metadata_context.rs": "a47e6bbfe095ae21483e43f28ccb23cd833138a23303385f79b605dc48457f58",
+    "crates/litchi-ods/tests/sheet_metadata_xml_conformance.rs": "d4685958bb710b04bd29e758d3d7b002bde67c8fd57ba182ea80d08545975ead"
+  },
+  "root_format_check": {
+    "toolchain": "1.95.0",
+    "command": [
+      "rustfmt",
+      "--edition",
+      "2024",
+      "--check",
+      "crates/litchi-ods/src/authoring/mutable.rs",
+      "crates/litchi-ods/src/facade/mod.rs",
+      "crates/litchi-ods/src/facade/source.rs",
+      "crates/litchi-ods/src/lib.rs",
+      "crates/litchi-ods/src/model/consolidation.rs",
+      "crates/litchi-ods/src/model/detective.rs",
+      "crates/litchi-ods/src/model/label_range.rs",
+      "crates/litchi-ods/src/model/structure.rs",
+      "crates/litchi-ods/src/sheet_metadata/detective.rs",
+      "crates/litchi-ods/src/sheet_metadata/index.rs",
+      "crates/litchi-ods/src/sheet_metadata/mod.rs",
+      "crates/litchi-ods/tests/ods_sheet_metadata_transactions.rs",
+      "crates/litchi-ods/tests/sheet_metadata_context.rs",
+      "crates/litchi-ods/tests/sheet_metadata_xml_conformance.rs"
+    ],
+    "exit": 0
+  },
+  "root_focused_tests": {
+    "command": "cargo test --locked -p litchi-ods --test ods_sheet_metadata_transactions --test sheet_metadata_context --test sheet_metadata_xml_conformance",
+    "exit": 0,
+    "passed": 56,
+    "failed": 0,
+    "targets": 3
+  },
+  "scope": "Root verified frozen source hashes against the isolated candidate, all-feature/all-target tests, doctests, Clippy, rustdoc, and format checks. Native owner-schema and semantic-preservation results are separate. Full workspace runtime coverage and broader performance targets remain open.",
+  "isolated_gate_exits": {
+    "full-tests": 0,
+    "doc-tests": 0,
+    "clippy": 0,
+    "rustdoc": 0,
+    "format": 0
+  },
+  "isolated_gate_logs": {
+    "full-tests": "full-tests-final-freeze-0159.log",
+    "doc-tests": "doctest-final-freeze-0200.log",
+    "clippy": "clippy-final-freeze-0200.log",
+    "rustdoc": "rustdoc-final-freeze-0200.log",
+    "format": "fmt-final-freeze-0200.log"
+  },
+  "tests": {
+    "passed": 703,
+    "failed": 0,
+    "ignored": 0,
+    "targets": 42
+  },
+  "performance_manifest_verified": "docs/report/spec-gap-validation-evidence/ods-sheet-metadata/final-corrected/source-hashes.sha256",
+  "performance_manifest_entries": 18
+}

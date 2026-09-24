@@ -1,0 +1,22 @@
+{
+  "status": "owned-build-artifacts-removed",
+  "root_lock_sha256_unchanged": "aa945c79965460e74a64063e1c45396eaae7a68e71072730e2bc426cded22f02",
+  "paths": [
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/.codex-tmp/ods-date-time-gates-6v44ua/baseline-checkout",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/.codex-tmp/ods-date-time-gates-6v44ua/checkout",
+      "removed": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/.codex-tmp/ods-date-time-gates-6v44ua/target",
+      "removed": true
+    }
+  ],
+  "capture_temporary_cleanup": "retained in performance/results/capture-summary.json and per-capture target-cleanup.json",
+  "raw_final_evidence_retained": true,
+  "owned_staging_directory_removed": true,
+  "owned_staging_directory": "/home/zhuhe/code/litchi-spec-gaps/.codex-tmp/ods-date-time-gates-6v44ua"
+}

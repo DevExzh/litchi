@@ -1,0 +1,7 @@
+commit=5347801fc2e8086d67fc6c140a023aeedd260c91
+commit_subject=perf(ods): binary search sheet metadata cell selectors
+commit_date=2026-09-13T02:34:29Z
+baseline_kind=read-only DDE API; transaction phases are unavailable at this commit
+fixture_update=office version 1.4; worksheet and cache table owners include required self-closing table:table-column; worksheet row has one empty cell; authored cache cells remain attribute-only
+rerun_utc=2026-09-13T03:52:22Z/2026-09-13T03:53:03Z
+schema_validation=fixtures/generated-shapes-schema-validation.json; all three generated shapes complete-content RNG valid

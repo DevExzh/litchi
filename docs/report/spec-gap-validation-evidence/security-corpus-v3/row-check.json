@@ -1,0 +1,11 @@
+{
+  "rows": 66,
+  "fixtures": 22,
+  "operations": {
+    "bounded_read": 22,
+    "validate": 22,
+    "preserve": 22
+  },
+  "timed_capture": false,
+  "sha256": "03d655e44b3182c30f7a928f38d7252826415f59063305eb8d8bfb32f93057d9"
+}

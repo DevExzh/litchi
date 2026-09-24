@@ -1,75 +1,104 @@
 //! ODF formula parsing and representation.
 //!
-//! This module provides support for `OpenFormula` (ODF 1.2) spreadsheet formulas.
-//! It handles parsing, validation, and representation of formulas in ODS files.
+//! The legacy tokenizer represents formulas stored in ODS files and recognizes
+//! the normative Part 4, chapter 6 function catalog without validating arity.
+//! Use [`expression`] for the strict, inert OpenFormula expression tree and
+//! [`evaluation`] for explicit, bounded scalar execution. Function recognition
+//! does not imply that a function can be evaluated.
 //!
 //! # Formula Syntax
 //!
 //! ODF uses `OpenFormula` syntax (similar to Excel but with some differences):
-//! - Cell references: `A1`, `$A$1` (absolute), `Sheet1.A1` (external)
-//! - Functions: `SUM(A1:A10)`, `IF(A1>0, "Positive", "Negative")`
+//! - Cell references: `[.A1]`, `[.$A$1]` (absolute), `[Sheet1.A1]` (sheet-qualified)
+//! - Functions: `SUM([.A1:.A10])`, `IF([.A1]>0;"Positive";"Negative")`
 //! - Operators: `+`, `-`, `*`, `/`, `^`, `&` (concatenation)
-//! - References: `.A1` (relative to current sheet), `[file.ods]Sheet.A1` (external file)
+//! - References: `[.A1]` (current sheet), `[$Inputs.$A$1]` (absolute sheet/cell)
 //!
 //! # References
 //!
-//! - `OpenFormula` 1.2 Specification
+//! - ODF 1.4 Part 4, `OpenFormula` Format
 //! - odfdo: `3rdparty/odfdo/src/odfdo/utils/formula.py`
-use litchi_core::{Error, Result};
-use phf::{Set, phf_set};
+use litchi_core::{Error, Resource, ResourceLimit, Result};
 use smallvec::SmallVec;
+use std::{borrow::Cow, convert::TryFrom, sync::Arc};
 
-// ============================================================================
-// FORMULA FUNCTION CATALOG
-// ============================================================================
+/// Bounded, read-only evaluation of scalar OpenFormula expressions.
+pub mod evaluation;
+/// Strict, inert OpenFormula 1.4 expression grammar and flat syntax tree.
+pub mod expression;
+mod functions;
+pub mod reference;
 
-/// Standard `OpenFormula` functions
-///
-/// This is a compile-time set of valid `OpenFormula` function names.
-/// Using phf for O(1) lookup.
-static FORMULA_FUNCTIONS: Set<&'static str> = phf_set! {
-    // Mathematical functions
-    "ABS", "ACOS", "ACOSH", "ACOT", "ACOTH", "ASIN", "ASINH", "ATAN", "ATAN2", "ATANH",
-    "CEILING", "COS", "COSH", "COT", "COTH", "DEGREES", "EXP", "FACT", "FLOOR",
-    "INT", "LN", "LOG", "LOG10", "MOD", "PI", "POWER", "PRODUCT", "QUOTIENT",
-    "RADIANS", "RAND", "ROUND", "ROUNDDOWN", "ROUNDUP", "SIGN", "SIN", "SINH",
-    "SQRT", "SUM", "SUMIF", "SUMIFS", "SUMSQ", "TAN", "TANH", "TRUNC",
-
-    // Statistical functions
-    "AVERAGE", "AVERAGEA", "AVERAGEIF", "AVERAGEIFS", "COUNT", "COUNTA", "COUNTBLANK",
-    "COUNTIF", "COUNTIFS", "MAX", "MAXA", "MEDIAN", "MIN", "MINA", "MODE",
-    "PERCENTILE", "PERCENTRANK", "QUARTILE", "RANK", "STDEV", "STDEVA", "STDEVP",
-    "STDEVPA", "VAR", "VARA", "VARP", "VARPA",
-
-    // Logical functions
-    "AND", "FALSE", "IF", "IFERROR", "IFNA", "NOT", "OR", "TRUE", "XOR",
-
-    // Text functions
-    "CHAR", "CODE", "CONCATENATE", "EXACT", "FIND", "FIXED", "LEFT", "LEN",
-    "LOWER", "MID", "PROPER", "REPLACE", "REPT", "RIGHT", "SEARCH", "SUBSTITUTE",
-    "T", "TEXT", "TRIM", "UPPER", "VALUE",
-
-    // Date and time functions
-    "DATE", "DATEVALUE", "DAY", "DAYS", "DAYS360", "HOUR", "MINUTE", "MONTH",
-    "NOW", "SECOND", "TIME", "TIMEVALUE", "TODAY", "WEEKDAY", "YEAR",
-
-    // Lookup and reference functions
-    "ADDRESS", "CHOOSE", "COLUMN", "COLUMNS", "HLOOKUP", "INDEX", "INDIRECT",
-    "LOOKUP", "MATCH", "OFFSET", "ROW", "ROWS", "VLOOKUP",
-
-    // Information functions
-    "CELL", "ERROR.TYPE", "INFO", "ISBLANK", "ISERR", "ISERROR", "ISEVEN",
-    "ISLOGICAL", "ISNA", "ISNONTEXT", "ISNUMBER", "ISODD", "ISREF", "ISTEXT",
-    "N", "NA", "TYPE",
-
-    // Financial functions
-    "DB", "DDB", "FV", "IPMT", "IRR", "MIRR", "NPER", "NPV", "PMT", "PPMT",
-    "PV", "RATE", "SLN", "SYD", "VDB",
-};
+use functions::{MAX_STANDARD_FUNCTION_NAME_BYTES, STANDARD_FORMULA_FUNCTIONS};
 
 // ============================================================================
 // FORMULA COMPONENTS
 // ============================================================================
+
+/// Default maximum UTF-8 byte length of one parsed formula.
+pub const DEFAULT_MAX_FORMULA_BYTES: usize = 1024 * 1024;
+/// Default maximum number of tokens emitted for one parsed formula.
+pub const DEFAULT_MAX_FORMULA_TOKENS: usize = 65_536;
+
+/// Finite parser limits for formulas and their token vectors.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FormulaLimits {
+    max_bytes: usize,
+    max_tokens: usize,
+    reference: reference::Limits,
+}
+
+impl Default for FormulaLimits {
+    fn default() -> Self {
+        Self {
+            max_bytes: DEFAULT_MAX_FORMULA_BYTES,
+            max_tokens: DEFAULT_MAX_FORMULA_TOKENS,
+            reference: reference::Limits::default(),
+        }
+    }
+}
+
+impl FormulaLimits {
+    /// Set the maximum UTF-8 byte length of a formula.
+    #[must_use]
+    pub const fn with_max_bytes(mut self, value: usize) -> Self {
+        self.max_bytes = value;
+        self
+    }
+
+    /// Set the maximum number of emitted tokens.
+    #[must_use]
+    pub const fn with_max_tokens(mut self, value: usize) -> Self {
+        self.max_tokens = value;
+        self
+    }
+
+    /// Set the finite limits used for every bracketed reference in this
+    /// formula.
+    #[must_use]
+    pub const fn with_reference_limits(mut self, value: reference::Limits) -> Self {
+        self.reference = value;
+        self
+    }
+
+    /// Return the maximum formula byte length.
+    #[must_use]
+    pub const fn max_bytes(self) -> usize {
+        self.max_bytes
+    }
+
+    /// Return the maximum token count.
+    #[must_use]
+    pub const fn max_tokens(self) -> usize {
+        self.max_tokens
+    }
+
+    /// Return the finite limits used for bracketed references.
+    #[must_use]
+    pub const fn reference_limits(self) -> reference::Limits {
+        self.reference
+    }
+}
 
 /// A cell reference in a formula
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -102,6 +131,11 @@ pub enum Token {
     CellRef(CellRef),
     /// Range reference (e.g., A1:B10)
     RangeRef(RangeRef),
+    /// Complete OpenFormula 1.4 bracketed reference metadata.
+    ///
+    /// The box keeps adding source, subtable, and whole-axis state from
+    /// inflating every token in an otherwise ordinary formula.
+    Reference(Box<reference::Reference>),
     /// Function call (e.g., SUM)
     Function(String),
     /// Number literal
@@ -118,7 +152,7 @@ pub enum Token {
     RParen,
     /// Comma (function argument separator)
     Comma,
-    /// Semicolon (array row separator)
+    /// Semicolon (function-parameter or inline-array-column separator)
     Semicolon,
 }
 
@@ -139,6 +173,13 @@ pub struct Formula {
 pub struct FormulaParser<'a> {
     input: &'a [u8],
     position: usize,
+    limits: FormulaLimits,
+    // The legacy sheet grammar scans `[A-Za-z0-9_ ]+` before deciding whether
+    // a dot follows. Keep the last immutable-input run so compact misses and
+    // adjacent cell-shaped names do not rescan the same suffix quadratically.
+    legacy_sheet_scan: Option<(usize, usize)>,
+    #[cfg(test)]
+    legacy_sheet_scan_work: usize,
 }
 
 impl<'a> FormulaParser<'a> {
@@ -148,6 +189,10 @@ impl<'a> FormulaParser<'a> {
         Self {
             input: input.as_bytes(),
             position: 0,
+            limits: FormulaLimits::default(),
+            legacy_sheet_scan: None,
+            #[cfg(test)]
+            legacy_sheet_scan_work: 0,
         }
     }
 
@@ -155,22 +200,41 @@ impl<'a> FormulaParser<'a> {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn parse(mut self) -> Result<Formula> {
-        let original = String::from_utf8_lossy(self.input).to_string();
-        let mut tokens = Vec::new();
+    pub fn parse(self) -> Result<Formula> {
+        self.parse_with_limits(&FormulaLimits::default())
+    }
 
+    /// Parse the formula with explicit finite byte and token limits.
+    pub fn parse_with_limits(mut self, limits: &FormulaLimits) -> Result<Formula> {
         // ODF stores formulas as `of:=...`, while the public codec also accepts
         // the shorter `=...` spelling.  Keep the original text in `Formula`,
         // but parse the body directly so stripping the prefix does not require
         // a normalized temporary string.
         let input = std::str::from_utf8(self.input)
             .map_err(|_error| Error::InvalidFormat("Invalid UTF-8 in formula".to_string()))?;
+        if input.len() > limits.max_bytes {
+            return Err(formula_limit_error(
+                Resource::InputBytes,
+                input.len(),
+                limits.max_bytes,
+            ));
+        }
+        self.limits = *limits;
+        let mut original = String::new();
+        original
+            .try_reserve_exact(input.len())
+            .map_err(|source| Error::Allocation {
+                resource: "formula text",
+                source,
+            })?;
+        original.push_str(input);
         let body = input.trim();
         let body = body
             .strip_prefix('=')
             .or_else(|| strip_open_formula_prefix(body))
             .unwrap_or(body);
         self.input = body.as_bytes();
+        let mut tokens = Vec::new();
 
         while !self.is_at_end() {
             self.skip_whitespace();
@@ -178,7 +242,17 @@ impl<'a> FormulaParser<'a> {
                 break;
             }
 
+            if tokens.len() >= self.limits.max_tokens {
+                return Err(formula_limit_error(
+                    Resource::Objects,
+                    tokens.len().saturating_add(1),
+                    self.limits.max_tokens,
+                ));
+            }
             let token = self.next_token()?;
+            if tokens.len() == tokens.capacity() {
+                reserve_token_slot(&mut tokens, self.limits.max_tokens)?;
+            }
             tokens.push(token);
         }
 
@@ -229,27 +303,108 @@ impl<'a> FormulaParser<'a> {
         }
     }
 
-    /// Parse a string literal
+    /// Parse an OpenFormula string literal (ODF 1.4 Part 4, §5.4).
     fn parse_string(&mut self) -> Result<Token> {
         self.advance(); // Skip opening quote
-        let mut result = String::new();
+        let content_start = self.position;
+        let mut cursor = content_start;
+        let mut escaped_quote_pairs = 0_usize;
 
-        while let Some(ch) = self.peek() {
-            if ch == b'"' {
-                self.advance();
-                // Check for escaped quote
-                if self.peek() == Some(b'"') {
-                    result.push('"');
-                    self.advance();
-                } else {
-                    break;
-                }
-            } else {
-                result.push(ch as char);
-                self.advance();
+        // First pass: find the real closing quote and count doubled-quote
+        // pairs. Formula input has already passed the outer UTF-8 validation,
+        // so no temporary decoded string is needed for this pass. Each pair
+        // removes one byte from the source span's decoded length.
+        let closing = loop {
+            let Some(ch) = self.input.get(cursor).copied() else {
+                return Err(Error::InvalidFormat(
+                    "Unterminated string literal".to_string(),
+                ));
+            };
+            if ch != b'"' {
+                cursor += 1;
+                continue;
             }
+
+            if self.input.get(cursor + 1) == Some(&b'"') {
+                escaped_quote_pairs = escaped_quote_pairs.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("Formula string literal length overflow".to_string())
+                })?;
+                cursor += 2;
+                continue;
+            }
+            break cursor;
+        };
+        // Part 4 §5.4 excludes U+0000 from the string grammar. Check the
+        // admitted content in one optimized slice operation, after the scan
+        // has established a complete literal and before allocating its value.
+        let content = &self.input[content_start..closing];
+        if content.contains(&0) {
+            return Err(Error::InvalidFormat(
+                "NUL is not allowed in string literal".to_string(),
+            ));
+        }
+        let decoded_bytes = (closing - content_start)
+            .checked_sub(escaped_quote_pairs)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Formula string literal length overflow".to_string())
+            })?;
+
+        // Reserve only the decoded payload after the complete syntax has been
+        // admitted. Empty literals keep String::new's zero-allocation state.
+        let mut result = String::new();
+        if decoded_bytes != 0 {
+            result
+                .try_reserve_exact(decoded_bytes)
+                .map_err(|source| Error::Allocation {
+                    resource: "formula string literal",
+                    source,
+                })?;
         }
 
+        // With no doubled quotes, the decoded and source spans have the same
+        // byte length. Reuse the first pass's result to avoid rescanning every
+        // byte of the common plain-literal case.
+        if escaped_quote_pairs == 0 {
+            let segment =
+                std::str::from_utf8(&self.input[content_start..closing]).map_err(|_error| {
+                    Error::InvalidFormat("Invalid UTF-8 in string literal".to_string())
+                })?;
+            result.push_str(segment);
+            self.position = closing + 1;
+            return Ok(Token::String(result));
+        }
+
+        // Second pass: copy complete UTF-8 spans and collapse doubled quotes.
+        // The exact reservation above means these pushes cannot grow the
+        // string; they only populate the admitted buffer.
+        let mut segment_start = content_start;
+        cursor = content_start;
+        while cursor < closing {
+            if self.input[cursor] == b'"' {
+                if segment_start < cursor {
+                    let segment = std::str::from_utf8(&self.input[segment_start..cursor]).map_err(
+                        |_error| {
+                            Error::InvalidFormat("Invalid UTF-8 in string literal".to_string())
+                        },
+                    )?;
+                    result.push_str(segment);
+                }
+                result.push('"');
+                cursor += 2;
+                segment_start = cursor;
+            } else {
+                cursor += 1;
+            }
+        }
+        if segment_start < closing {
+            let segment =
+                std::str::from_utf8(&self.input[segment_start..closing]).map_err(|_error| {
+                    Error::InvalidFormat("Invalid UTF-8 in string literal".to_string())
+                })?;
+            result.push_str(segment);
+        }
+
+        self.position = closing + 1;
         Ok(Token::String(result))
     }
 
@@ -308,27 +463,34 @@ impl<'a> FormulaParser<'a> {
 
     /// Parse identifier, cell reference, or function
     fn parse_identifier_or_ref(&mut self) -> Result<Token> {
+        // Scan the ordinary ASCII candidate once. A function name may also be
+        // a valid column-plus-row spelling (for example, `BIN2DEC` is column
+        // BIN, row 2, followed by `DEC`). The complete invocation therefore
+        // takes precedence over a cell parse, while a bare spelling still
+        // follows the legacy cell/name rules.
+        if let Some(token) = self.try_parse_compact_identifier_or_ref()? {
+            return match token {
+                Token::CellRef(cell_ref) => self.finish_cell_ref(cell_ref),
+                token => Ok(token),
+            };
+        }
+
         // Try to parse as cell reference first.
         // IMPORTANT: This parse is speculative; if it fails, we must rewind so that
         // the same input can be parsed as a function/name instead.
         if self.peek() == Some(b'.') || self.peek() == Some(b'$') || self.peek_is_letter() {
             let start_pos = self.position;
-            if let Ok(cell_ref) = self.try_parse_cell_ref() {
-                // Check if it's a range
-                self.skip_whitespace();
-                if self.peek() == Some(b':') {
-                    self.advance();
-                    let end = self.try_parse_cell_ref()?;
-                    return Ok(Token::RangeRef(RangeRef {
-                        start: cell_ref,
-                        end,
-                    }));
-                }
-                return Ok(Token::CellRef(cell_ref));
+            match self.try_parse_cell_ref() {
+                Ok(cell_ref) => return self.finish_cell_ref(cell_ref),
+                // Syntax failure is the expected speculative miss for names
+                // such as `SUM`. Allocation and typed resource failures are
+                // real failures and must not be hidden by the fallback name
+                // parser.
+                Err(error) if matches!(&error, Error::InvalidFormat(_)) => {
+                    self.position = start_pos;
+                },
+                Err(error) => return Err(error),
             }
-
-            // Rewind: not a valid cell ref (e.g., "SUM(" should be a function)
-            self.position = start_pos;
         }
 
         // Try to parse as function or named range
@@ -343,11 +505,14 @@ impl<'a> FormulaParser<'a> {
 
         let ident = std::str::from_utf8(&self.input[start..self.position])
             .map_err(|_error| Error::InvalidFormat("Invalid UTF-8 in identifier".to_string()))?
-            .to_uppercase();
+            .trim();
 
         // Check if it's a known function
-        if FORMULA_FUNCTIONS.contains(ident.as_str()) {
-            Ok(Token::Function(ident))
+        if let Some(function) = lookup_function(ident) {
+            Ok(Token::Function(copy_formula_component(
+                function,
+                "formula function name",
+            )?))
         } else if ident == "TRUE" {
             Ok(Token::Boolean(true))
         } else if ident == "FALSE" {
@@ -355,9 +520,145 @@ impl<'a> FormulaParser<'a> {
         } else {
             // Treat as cell reference or named range
             Err(Error::InvalidFormat(format!(
-                "Unknown identifier or invalid cell reference: {ident}"
+                "Unknown identifier or invalid cell reference: {}",
+                ident.to_uppercase()
             )))
         }
+    }
+
+    /// Finish a successfully parsed legacy cell and consume a possible range
+    /// endpoint. The first endpoint has already been admitted and copied, so
+    /// this keeps the common cell path free of a second identifier scan.
+    fn finish_cell_ref(&mut self, cell_ref: CellRef) -> Result<Token> {
+        self.skip_whitespace();
+        if self.peek() == Some(b':') {
+            self.advance();
+            let end = self.try_parse_cell_ref()?;
+            Ok(Token::RangeRef(RangeRef {
+                start: cell_ref,
+                end,
+            }))
+        } else {
+            Ok(Token::CellRef(cell_ref))
+        }
+    }
+
+    /// Scan an ASCII identifier/cell candidate once and classify the compact
+    /// forms that make up the common formula path.
+    ///
+    /// Spaced sheet names and malformed suffixes deliberately return `None` so
+    /// the established parser below can preserve their exact behavior. This
+    /// method restores `position` on a syntax miss, and defers fallible
+    /// component copies until after the row has been parsed.
+    fn try_parse_compact_identifier_or_ref(&mut self) -> Result<Option<Token>> {
+        if !self.peek_is_letter() {
+            return Ok(None);
+        }
+
+        let start = self.position;
+        while self
+            .input
+            .get(self.position)
+            .is_some_and(|ch| ch.is_ascii_alphanumeric() || *ch == b'_' || *ch == b'.')
+        {
+            self.advance();
+            // Keep the previous bounded-name fast rejection. Long inputs are
+            // handed to the established parser, which may still recognize a
+            // legacy cell with a large column or row component without asking
+            // the function catalog to normalize the whole spelling.
+            if self.position - start > MAX_STANDARD_FUNCTION_NAME_BYTES {
+                self.position = start;
+                return Ok(None);
+            }
+        }
+        let end = self.position;
+        if start == end {
+            return Ok(None);
+        }
+
+        // Function invocation takes precedence over the cell shape. Keep
+        // whitespace between the name and `(` unconsumed, as the old function
+        // lookahead did.
+        let mut lookahead = end;
+        while self
+            .input
+            .get(lookahead)
+            .is_some_and(|ch| ch.is_ascii_whitespace())
+        {
+            lookahead += 1;
+        }
+        if self.input.get(lookahead) == Some(&b'(') {
+            // The parser input was validated as UTF-8 before tokenization;
+            // this slice is ASCII by construction. Keep the defensive branch
+            // so this helper remains total if its caller is reused later.
+            let identifier = match std::str::from_utf8(&self.input[start..end]) {
+                Ok(identifier) => identifier,
+                Err(_) => {
+                    self.position = start;
+                    return Ok(None);
+                },
+            };
+            if let Some(function) = lookup_function(identifier) {
+                self.position = end;
+                return Ok(Some(Token::Function(copy_formula_component(
+                    function,
+                    "formula function name",
+                )?)));
+            }
+        }
+
+        let Some(parts) = parse_compact_cell_parts(&self.input[start..end]) else {
+            self.position = start;
+            return Ok(None);
+        };
+
+        // The legacy sheet parser permits literal spaces inside an unquoted
+        // sheet name. For example, `A1 Sheet.B2` is one sheet-qualified cell,
+        // while `A1 + Sheet.B2` is two cells. Hand the former back to that
+        // parser before copying the compact cell components. The check is
+        // limited to the legacy space character; tabs and other formula
+        // whitespace were never part of that sheet-name spelling.
+        if parts.sheet.is_none() && self.has_spaced_sheet_qualifier(end) {
+            self.position = start;
+            return Ok(None);
+        }
+
+        // All syntax, including checked row parsing, succeeded before these
+        // fallible copies. This prevents a failed speculative column/sheet
+        // allocation from being mistaken for an identifier fallback.
+        let sheet = parts
+            .sheet
+            .map(|(sheet_start, sheet_end)| {
+                let value =
+                    std::str::from_utf8(&self.input[start + sheet_start..start + sheet_end])
+                        .map_err(|_error| Error::InvalidFormat("Invalid sheet name".to_string()))?;
+                copy_formula_component(value, "formula sheet name")
+            })
+            .transpose()?;
+        let column =
+            std::str::from_utf8(&self.input[start + parts.column.0..start + parts.column.1])
+                .map_err(|_error| Error::InvalidFormat("Invalid column".to_string()))?;
+        let column = copy_upper_ascii(column, "formula column")?;
+
+        self.position = end;
+        Ok(Some(Token::CellRef(CellRef {
+            sheet,
+            column,
+            row: parts.row,
+            column_absolute: false,
+            row_absolute: false,
+        })))
+    }
+
+    /// Check whether a compact cell is followed by a legacy space-bearing
+    /// sheet locator. This is only called after a compact coordinate matched,
+    /// so it does no work on names, functions, or ordinary operator spacing.
+    fn has_spaced_sheet_qualifier(&mut self, end: usize) -> bool {
+        if self.input.get(end) != Some(&b' ') {
+            return false;
+        }
+        let position = self.legacy_sheet_scan_end(end);
+        self.input.get(position) == Some(&b'.')
     }
 
     /// Parse an ODF bracketed cell or range reference, such as `[.A1]` or
@@ -370,8 +671,15 @@ impl<'a> FormulaParser<'a> {
         while let Some(ch) = self.peek() {
             match ch {
                 b'\'' => {
-                    quoted = !quoted;
-                    self.advance();
+                    if quoted && self.input.get(self.position + 1) == Some(&b'\'') {
+                        // Apostrophes are escaped by doubling them in ODF
+                        // source and sheet names.  Keep a closing bracket in
+                        // those quoted spans from ending the reference body.
+                        self.position += 2;
+                    } else {
+                        quoted = !quoted;
+                        self.advance();
+                    }
                 },
                 b']' if !quoted => break,
                 _ => self.advance(),
@@ -389,12 +697,12 @@ impl<'a> FormulaParser<'a> {
         let reference = std::str::from_utf8(&self.input[start..end]).map_err(|_error| {
             Error::InvalidFormat("Invalid UTF-8 in cell reference".to_string())
         })?;
-        parse_open_formula_reference(reference)
+        parse_open_formula_reference(reference, &self.limits.reference)
     }
 
     /// Try to parse a cell reference
     fn try_parse_cell_ref(&mut self) -> Result<CellRef> {
-        let mut sheet = None;
+        let mut sheet_range = None;
 
         // Parse sheet name (if present)
         if self.peek() == Some(b'.') {
@@ -405,18 +713,11 @@ impl<'a> FormulaParser<'a> {
             // If there is no dot after the identifier chunk, this is a plain
             // cell reference like A1 and we must rewind.
             let start = self.position;
-            while let Some(ch) = self.peek() {
-                if ch.is_ascii_alphanumeric() || ch == b'_' || ch == b' ' {
-                    self.advance();
-                } else {
-                    break;
-                }
-            }
+            let sheet_end = self.legacy_sheet_scan_end(start);
+            self.position = sheet_end;
 
             if self.peek() == Some(b'.') {
-                let sheet_name = std::str::from_utf8(&self.input[start..self.position])
-                    .map_err(|_error| Error::InvalidFormat("Invalid sheet name".to_string()))?;
-                sheet = Some(sheet_name.to_string());
+                sheet_range = Some((start, sheet_end));
                 self.advance(); // Skip dot
             } else {
                 self.position = start;
@@ -447,9 +748,7 @@ impl<'a> FormulaParser<'a> {
             ));
         }
 
-        let column = std::str::from_utf8(&self.input[col_start..self.position])
-            .map_err(|_error| Error::InvalidFormat("Invalid column".to_string()))?
-            .to_uppercase();
+        let col_end = self.position;
 
         // Parse row (absolute or relative)
         let row_absolute = if self.peek() == Some(b'$') {
@@ -481,6 +780,21 @@ impl<'a> FormulaParser<'a> {
         let row = row_str
             .parse::<u32>()
             .map_err(|_error| Error::InvalidFormat("Invalid row number".to_string()))?;
+
+        // Defer component copies until all of the coordinate syntax, including
+        // checked row parsing, has succeeded. A speculative name parse can
+        // therefore backtrack only syntax errors and never hide an allocation
+        // failure from its caller.
+        let sheet = sheet_range
+            .map(|(start, end)| {
+                let sheet_name = std::str::from_utf8(&self.input[start..end])
+                    .map_err(|_error| Error::InvalidFormat("Invalid sheet name".to_string()))?;
+                copy_formula_component(sheet_name, "formula sheet name")
+            })
+            .transpose()?;
+        let column = std::str::from_utf8(&self.input[col_start..col_end])
+            .map_err(|_error| Error::InvalidFormat("Invalid column".to_string()))?;
+        let column = copy_upper_ascii(column, "formula column")?;
 
         Ok(CellRef {
             sheet,
@@ -521,6 +835,150 @@ impl<'a> FormulaParser<'a> {
             }
         }
     }
+
+    /// Return the end of the legacy unquoted sheet-name run beginning at
+    /// `start`. The input is immutable for a parser, so a cached run also
+    /// describes every suffix that starts inside it.
+    fn legacy_sheet_scan_end(&mut self, start: usize) -> usize {
+        if let Some((cached_start, cached_end)) = self.legacy_sheet_scan
+            && start >= cached_start
+            && start < cached_end
+        {
+            return cached_end;
+        }
+
+        let mut end = start;
+        while self
+            .input
+            .get(end)
+            .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_' || *byte == b' ')
+        {
+            #[cfg(test)]
+            {
+                self.legacy_sheet_scan_work += 1;
+            }
+            end += 1;
+        }
+        self.legacy_sheet_scan = Some((start, end));
+        end
+    }
+}
+
+#[derive(Clone, Copy)]
+struct CompactCellParts {
+    /// Offset range for an optional compact sheet name.
+    sheet: Option<(usize, usize)>,
+    /// Offset range for the column label.
+    column: (usize, usize),
+    /// Checked decimal row value.
+    row: u32,
+}
+
+/// Parse the compact, ASCII cell spelling from an already scanned candidate.
+///
+/// The returned ranges are offsets into `input`; no owned component is made
+/// until the caller has received a complete, checked coordinate. Returning
+/// `None` means a syntax miss, so the caller can preserve the legacy fallback
+/// for names, spaced sheet names, and malformed suffixes.
+fn parse_compact_cell_parts(input: &[u8]) -> Option<CompactCellParts> {
+    let coordinate_start = if let Some(dot) = input.iter().position(|byte| *byte == b'.') {
+        if dot == 0
+            || input[..dot]
+                .iter()
+                .any(|byte| !byte.is_ascii_alphanumeric() && *byte != b'_')
+        {
+            return None;
+        }
+        Some(dot + 1)
+    } else {
+        None
+    };
+    let coordinate_start = coordinate_start.unwrap_or(0);
+    let sheet_range = coordinate_start.checked_sub(1).map(|dot| (0, dot));
+
+    let mut position = coordinate_start;
+    let column_start = position;
+    while input
+        .get(position)
+        .is_some_and(|byte| byte.is_ascii_alphabetic())
+    {
+        position += 1;
+    }
+    if column_start == position {
+        return None;
+    }
+    let column_end = position;
+
+    let row_start = position;
+    while input
+        .get(position)
+        .is_some_and(|byte| byte.is_ascii_digit())
+    {
+        position += 1;
+    }
+    if row_start == position || position != input.len() {
+        return None;
+    }
+
+    let mut row = 0_u32;
+    for byte in &input[row_start..position] {
+        row = row.checked_mul(10)?.checked_add(u32::from(byte - b'0'))?;
+    }
+
+    Some(CompactCellParts {
+        sheet: sheet_range,
+        column: (column_start, column_end),
+        row,
+    })
+}
+
+// The catalog's longest canonical name is 19 ASCII bytes. Four bytes per
+// scalar is enough to bound the input that can be normalized without making
+// `is_valid_function` perform an unbounded Unicode uppercase allocation.
+const MAX_FUNCTION_INPUT_BYTES: usize = MAX_STANDARD_FUNCTION_NAME_BYTES * 4;
+
+fn lookup_function(name: &str) -> Option<&'static str> {
+    if name.is_empty() || name.len() > MAX_FUNCTION_INPUT_BYTES {
+        return None;
+    }
+
+    // Keep the common canonical spelling on the O(1) PHF path.
+    if let Some(function) = lookup_canonical_function(name) {
+        return Some(function);
+    }
+
+    let mut normalized = [0_u8; MAX_STANDARD_FUNCTION_NAME_BYTES];
+    let normalized_len = if name.is_ascii() {
+        if name.len() > MAX_STANDARD_FUNCTION_NAME_BYTES {
+            return None;
+        }
+        for (index, byte) in name.bytes().enumerate() {
+            normalized[index] = byte.to_ascii_uppercase();
+        }
+        name.len()
+    } else {
+        let mut normalized_len: usize = 0;
+        for character in name.chars() {
+            for uppercase in character.to_uppercase() {
+                let mut encoded = [0_u8; 4];
+                let encoded = uppercase.encode_utf8(&mut encoded).as_bytes();
+                let next_len = normalized_len.checked_add(encoded.len())?;
+                if next_len > normalized.len() {
+                    return None;
+                }
+                normalized[normalized_len..next_len].copy_from_slice(encoded);
+                normalized_len = next_len;
+            }
+        }
+        normalized_len
+    };
+
+    let normalized = std::str::from_utf8(&normalized[..normalized_len]).ok()?;
+    lookup_canonical_function(normalized)
+}
+
+fn lookup_canonical_function(name: &str) -> Option<&'static str> {
+    STANDARD_FORMULA_FUNCTIONS.get_key(name).copied()
 }
 
 fn strip_open_formula_prefix(value: &str) -> Option<&str> {
@@ -529,175 +987,148 @@ fn strip_open_formula_prefix(value: &str) -> Option<&str> {
         .then(|| &value[4..])
 }
 
-fn parse_open_formula_reference(value: &str) -> Result<Token> {
-    let value = value.trim();
-    let (start, end) = split_open_formula_range(value)
-        .ok_or_else(|| Error::InvalidFormat("Invalid ODF bracketed reference range".to_string()))?;
-    let start = parse_open_formula_cell_ref(start)?;
-    let Some(end) = end else {
-        return Ok(Token::CellRef(start));
-    };
-
-    Ok(Token::RangeRef(RangeRef {
-        start,
-        end: parse_open_formula_cell_ref(end)?,
-    }))
-}
-
-fn split_open_formula_range(value: &str) -> Option<(&str, Option<&str>)> {
-    if value.is_empty() {
-        return None;
+fn reserve_token_slot(tokens: &mut Vec<Token>, maximum: usize) -> Result<()> {
+    if tokens.len() >= maximum {
+        return Err(formula_limit_error(
+            Resource::Objects,
+            tokens.len().saturating_add(1),
+            maximum,
+        ));
     }
-
-    let mut quoted = false;
-    for (index, character) in value.char_indices() {
-        match character {
-            '\'' => quoted = !quoted,
-            ':' if !quoted => return Some((&value[..index], Some(&value[index + 1..]))),
-            _ => {},
-        }
-    }
-    (!quoted).then_some((value, None))
-}
-
-fn parse_open_formula_cell_ref(value: &str) -> Result<CellRef> {
-    let value = value.trim();
-    let (sheet, cell) = if let Some(cell) = value.strip_prefix('.') {
-        (None, cell)
-    } else {
-        let separator = value
-            .char_indices()
-            .rev()
-            .find_map(|(index, character)| (character == '.').then_some(index))
-            .ok_or_else(|| {
-                Error::InvalidFormat("ODF reference is missing its sheet separator".to_string())
+    if tokens.len() == tokens.capacity() {
+        let next_capacity = if tokens.capacity() == 0 {
+            4.min(maximum)
+        } else {
+            tokens
+                .capacity()
+                .checked_mul(2)
+                .ok_or_else(|| Error::InvalidFormat("formula token capacity overflow".to_string()))?
+                .min(maximum)
+        };
+        let additional = next_capacity
+            .checked_sub(tokens.len())
+            .ok_or_else(|| Error::InvalidFormat("formula token capacity overflow".to_string()))?;
+        tokens
+            .try_reserve_exact(additional)
+            .map_err(|source| Error::Allocation {
+                resource: "formula tokens",
+                source,
             })?;
-        let sheet = parse_open_formula_sheet_name(&value[..separator])?;
-        (Some(sheet), &value[separator + 1..])
-    };
+    }
+    Ok(())
+}
 
-    let (column, row, column_absolute, row_absolute) = parse_a1_cell_ref(cell)?;
-    Ok(CellRef {
-        sheet,
-        column,
-        row,
-        column_absolute,
-        row_absolute,
+fn formula_limit_error(resource: Resource, actual: usize, maximum: usize) -> Error {
+    let Some(observed) = u64::try_from(actual).ok() else {
+        return Error::InvalidFormat("formula limit exceeds u64".to_string());
+    };
+    let Some(limit) = u64::try_from(maximum).ok() else {
+        return Error::InvalidFormat("formula limit exceeds u64".to_string());
+    };
+    Error::ResourceLimit(ResourceLimit {
+        resource,
+        observed,
+        limit,
+        scope: Arc::from("ods-formula"),
     })
 }
 
-fn parse_open_formula_sheet_name(value: &str) -> Result<String> {
-    let value = value.trim().strip_prefix('$').unwrap_or(value.trim());
-    if value.is_empty() {
-        return Err(Error::InvalidFormat(
-            "ODF reference has an empty sheet name".to_string(),
-        ));
-    }
-
-    if value.starts_with('\'') || value.ends_with('\'') {
-        let value = value
-            .strip_prefix('\'')
-            .and_then(|value| value.strip_suffix('\''))
-            .ok_or_else(|| {
-                Error::InvalidFormat("ODF reference has an unterminated sheet name".to_string())
-            })?;
-        let mut sheet = String::with_capacity(value.len());
-        let mut characters = value.chars().peekable();
-        while let Some(character) = characters.next() {
-            if character == '\'' && characters.next() != Some('\'') {
-                return Err(Error::InvalidFormat(
-                    "ODF reference has an invalid escaped sheet name".to_string(),
-                ));
-            }
-            sheet.push(character);
-        }
-        if sheet.is_empty() {
-            return Err(Error::InvalidFormat(
-                "ODF reference has an empty sheet name".to_string(),
-            ));
-        }
-        Ok(sheet)
-    } else if value.contains('\'') {
-        Err(Error::InvalidFormat(
-            "ODF reference has an invalid sheet name".to_string(),
-        ))
-    } else {
-        Ok(value.to_string())
-    }
+#[inline]
+fn copy_formula_component(value: &str, resource: &'static str) -> Result<String> {
+    let mut result = String::new();
+    result
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    result.push_str(value);
+    Ok(result)
 }
 
-fn parse_a1_cell_ref(value: &str) -> Result<(String, u32, bool, bool)> {
-    let value = value.trim();
-    let bytes = value.as_bytes();
-    let mut position = 0;
-    let column_absolute = if bytes.get(position) == Some(&b'$') {
-        position += 1;
-        true
-    } else {
-        false
-    };
-    let column_start = position;
-    while bytes.get(position).is_some_and(u8::is_ascii_alphabetic) {
-        position += 1;
-    }
-    if column_start == position {
-        return Err(Error::InvalidFormat(
-            "ODF reference is missing its column".to_string(),
-        ));
-    }
-    let column = std::str::from_utf8(&bytes[column_start..position])
-        .map_err(|_error| Error::InvalidFormat("Invalid UTF-8 in ODF column".to_string()))?
-        .to_ascii_uppercase();
+fn copy_upper_ascii(value: &str, resource: &'static str) -> Result<String> {
+    let mut result = copy_formula_component(value, resource)?;
+    result.make_ascii_uppercase();
+    Ok(result)
+}
 
-    let row_absolute = if bytes.get(position) == Some(&b'$') {
-        position += 1;
-        true
-    } else {
-        false
-    };
-    let row_start = position;
-    while bytes.get(position).is_some_and(u8::is_ascii_digit) {
-        position += 1;
-    }
-    if row_start == position || position != bytes.len() {
-        return Err(Error::InvalidFormat(
-            "ODF reference has an invalid row".to_string(),
-        ));
-    }
-    let row = std::str::from_utf8(&bytes[row_start..position])
-        .map_err(|_error| Error::InvalidFormat("Invalid UTF-8 in ODF row".to_string()))?
-        .parse::<u32>()
-        .map_err(|_error| Error::InvalidFormat("Invalid ODF row number".to_string()))?;
-    if row == 0 {
-        return Err(Error::InvalidFormat(
-            "ODF references must use 1-based rows".to_string(),
-        ));
-    }
-
-    Ok((column, row, column_absolute, row_absolute))
+fn parse_open_formula_reference(value: &str, limits: &reference::Limits) -> Result<Token> {
+    let reference = reference::parse_body(value, limits)?;
+    Ok(reference.into_token())
 }
 
 // ============================================================================
 // FORMULA UTILITIES
 // ============================================================================
 
-/// Check if a string is a valid `OpenFormula` function name
+/// Query whether a name matches the case-insensitive ODF 1.4 Part 4 chapter 6
+/// function catalog.
+///
+/// Function names are compared case-insensitively. The lookup uses a bounded
+/// stack buffer, so a caller-controlled name cannot trigger an unbounded
+/// Unicode-uppercase allocation. Names outside the bounded normalization
+/// envelope are rejected. This query does not validate invocation syntax or
+/// function arity.
 #[inline]
-#[allow(dead_code)] // Will be used for future enhancements
 #[must_use]
 pub fn is_valid_function(name: &str) -> bool {
-    FORMULA_FUNCTIONS.contains(name.to_uppercase().as_str())
+    lookup_function(name).is_some()
 }
 
-/// Extract all cell references from a formula
+/// Extract legacy cell references from a formula.
+///
+/// References already represented by legacy tokens are borrowed.  A rich
+/// local cell or cell-range reference contributes an owned legacy projection
+/// when it has no subtable selector; this keeps quoted and absolute sheet
+/// cells visible to existing callers while making the unavoidable loss of
+/// those lexical markers explicit in the returned `CellRef`.  External,
+/// whole-axis, subtable, inherited, and invalidated references are skipped.
+/// Use [`extract_references`] for the complete reference family.
 #[must_use]
-pub fn extract_cell_refs(formula: &Formula) -> SmallVec<[&CellRef; 8]> {
+pub fn extract_cell_refs<'a>(formula: &'a Formula) -> SmallVec<[Cow<'a, CellRef>; 8]> {
     formula
         .tokens
         .iter()
         .filter_map(|token| match token {
-            Token::CellRef(cell_ref) => Some(cell_ref),
-            Token::RangeRef(range_ref) => Some(&range_ref.start), // Just start for simplicity
+            Token::CellRef(cell_ref) => Some(Cow::Borrowed(cell_ref)),
+            Token::RangeRef(range_ref) => Some(Cow::Borrowed(&range_ref.start)),
+            Token::Reference(reference) => reference.legacy_cell_ref().map(Cow::Owned),
+            Token::Function(_)
+            | Token::Number(_)
+            | Token::String(_)
+            | Token::Boolean(_)
+            | Token::Operator(_)
+            | Token::LParen
+            | Token::RParen
+            | Token::Comma
+            | Token::Semicolon => None,
+        })
+        .collect()
+}
+
+/// A borrowed reference occurrence in a parsed formula.
+///
+/// Legacy tokens remain available for compatible cell and range syntax. Rich
+/// bracketed references borrow their boxed [`reference::Reference`] without
+/// maintaining a second sidecar allocation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReferenceView<'a> {
+    /// A legacy-compatible cell reference, whether bracketed or unbracketed.
+    Cell(&'a CellRef),
+    /// A legacy-compatible cell range, whether bracketed or unbracketed.
+    Range(&'a RangeRef),
+    /// A complete bracketed OpenFormula reference.
+    Rich(&'a reference::Reference),
+}
+
+/// Extract all reference occurrences without discarding rich OpenFormula
+/// metadata.
+#[must_use]
+pub fn extract_references<'a>(formula: &'a Formula) -> SmallVec<[ReferenceView<'a>; 8]> {
+    formula
+        .tokens
+        .iter()
+        .filter_map(|token| match token {
+            Token::CellRef(reference) => Some(ReferenceView::Cell(reference)),
+            Token::RangeRef(reference) => Some(ReferenceView::Range(reference)),
+            Token::Reference(reference) => Some(ReferenceView::Rich(reference)),
             Token::Function(_)
             | Token::Number(_)
             | Token::String(_)
@@ -728,7 +1159,8 @@ pub fn extract_functions(formula: &Formula) -> SmallVec<[&str; 4]> {
             | Token::LParen
             | Token::RParen
             | Token::Comma
-            | Token::Semicolon => None,
+            | Token::Semicolon
+            | Token::Reference(_) => None,
         })
         .collect()
 }
@@ -760,6 +1192,30 @@ mod tests {
     }
 
     #[test]
+    fn test_function_calls_take_precedence_over_cell_reference_shape() {
+        let formula = FormulaParser::new("=BIN2DEC (\"101\")")
+            .parse()
+            .expect("test fixture or operation should succeed");
+        assert!(matches!(&formula.tokens[0], Token::Function(name) if name == "BIN2DEC"));
+        assert!(matches!(formula.tokens[1], Token::LParen));
+
+        let formula = FormulaParser::new("=BINOM.DIST.RANGE(A1;1;2)")
+            .parse()
+            .expect("test fixture or operation should succeed");
+        assert!(matches!(&formula.tokens[0], Token::Function(name) if name == "BINOM.DIST.RANGE"));
+
+        // Without an invocation parenthesis, the same spelling remains a
+        // valid cell reference (column LOG, row 10).
+        let formula = FormulaParser::new("=LOG10")
+            .parse()
+            .expect("test fixture or operation should succeed");
+        assert!(matches!(
+            &formula.tokens[0],
+            Token::CellRef(CellRef { column, row, .. }) if column == "LOG" && *row == 10
+        ));
+    }
+
+    #[test]
     fn test_parse_canonical_odf_formula_without_normalizing_the_input() {
         let formula = FormulaParser::new("of:=SUM([$Inputs.$A$1:.$B$2])")
             .parse()
@@ -769,17 +1225,33 @@ mod tests {
         assert!(matches!(&formula.tokens[0], Token::Function(name) if name == "SUM"));
         assert!(matches!(
             &formula.tokens[2],
-            Token::RangeRef(RangeRef { start, end })
-                if start.sheet.as_deref() == Some("Inputs")
-                    && start.column == "A"
-                    && start.row == 1
-                    && start.column_absolute
-                    && start.row_absolute
-                    && end.sheet.is_none()
-                    && end.column == "B"
-                    && end.row == 2
-                    && end.column_absolute
-                    && end.row_absolute
+            Token::Reference(reference)
+                if matches!(
+                    reference.as_ref(),
+                    reference::Reference::Local(reference::Address::Cells(start, end))
+                        if matches!(
+                            &start.sheet,
+                            reference::SheetSelector::Explicit(locator)
+                                if locator.sheet.name == "Inputs" && locator.sheet.absolute
+                        )
+                            && matches!(
+                                &start.value,
+                                reference::EndpointValue::Cell(cell)
+                                    if cell.column.label == "A"
+                                        && cell.row.number == 1
+                                        && cell.column.absolute
+                                        && cell.row.absolute
+                            )
+                            && matches!(end.sheet, reference::SheetSelector::Inherited)
+                            && matches!(
+                                &end.value,
+                                reference::EndpointValue::Cell(cell)
+                                    if cell.column.label == "B"
+                                        && cell.row.number == 2
+                                        && cell.column.absolute
+                                        && cell.row.absolute
+                            )
+                )
         ));
     }
 
@@ -791,8 +1263,21 @@ mod tests {
 
         assert!(matches!(
             &formula.tokens[0],
-            Token::CellRef(CellRef { sheet: Some(sheet), column, row, .. })
-                if sheet == "Bob's" && column == "A" && *row == 1
+            Token::Reference(reference)
+                if matches!(
+                    reference.as_ref(),
+                    reference::Reference::Local(reference::Address::Cell(endpoint))
+                        if matches!(
+                            &endpoint.sheet,
+                            reference::SheetSelector::Explicit(locator)
+                                if locator.sheet.name == "Bob's" && locator.sheet.quoted
+                        )
+                            && matches!(
+                                &endpoint.value,
+                                reference::EndpointValue::Cell(cell)
+                                    if cell.column.label == "A" && cell.row.number == 1
+                            )
+                )
         ));
     }
 
@@ -816,7 +1301,8 @@ mod tests {
             | Token::LParen
             | Token::RParen
             | Token::Comma
-            | Token::Semicolon => panic!("Expected cell reference"),
+            | Token::Semicolon
+            | Token::Reference(_) => panic!("Expected cell reference"),
         }
     }
 
@@ -828,6 +1314,51 @@ mod tests {
     }
 
     #[test]
+    fn test_function_lookup_is_bounded_and_case_insensitive_without_ascii_only_regression() {
+        assert!(is_valid_function("sum"));
+        assert!(is_valid_function("ſUM"));
+        assert!(is_valid_function("ıF"));
+        assert!(!is_valid_function(
+            &"A".repeat(MAX_FUNCTION_INPUT_BYTES + 1)
+        ));
+        assert!(!is_valid_function("not-a-function"));
+    }
+
+    #[test]
+    fn test_string_literals_preserve_utf8_and_require_a_closing_quote() {
+        let formula = FormulaParser::new("=UNICODE(\"α🌟\")")
+            .parse()
+            .expect("test fixture or operation should succeed");
+        assert!(matches!(
+            &formula.tokens[2],
+            Token::String(value) if value == "α🌟"
+        ));
+
+        let formula = FormulaParser::new("=\"a\"\"b\"")
+            .parse()
+            .expect("test fixture or operation should succeed");
+        assert!(matches!(&formula.tokens[0], Token::String(value) if value == "a\"b"));
+
+        let formula = FormulaParser::new("=\"\"+A1")
+            .parse()
+            .expect("empty string literals should retain token boundaries");
+        assert!(matches!(
+            &formula.tokens[0],
+            Token::String(value) if value.is_empty() && value.capacity() == 0
+        ));
+        assert!(matches!(formula.tokens[1], Token::Operator('+')));
+        assert!(matches!(formula.tokens[2], Token::CellRef(_)));
+
+        let error = FormulaParser::new("=\"a\0b\"").parse();
+        assert!(matches!(
+            error,
+            Err(Error::InvalidFormat(message)) if message.contains("NUL")
+        ));
+
+        assert!(FormulaParser::new("=\"unterminated").parse().is_err());
+    }
+
+    #[test]
     fn test_extract_cell_refs() {
         let parser = FormulaParser::new("=A1+B2+C3");
         let formula = parser
@@ -835,6 +1366,39 @@ mod tests {
             .expect("test fixture or operation should succeed");
         let refs = extract_cell_refs(&formula);
         assert!(refs.len() >= 2); // At least A1 and B2
+    }
+
+    #[test]
+    fn test_extract_cell_refs_projects_legacy_compatible_rich_cells() {
+        let formula = FormulaParser::new("=SUM(['Bob''s'.$A$1:.B2])")
+            .parse()
+            .expect("quoted rich cell range should parse");
+        let refs = extract_cell_refs(&formula);
+        assert!(matches!(
+            refs.as_slice(),
+            [Cow::Owned(CellRef {
+                sheet: Some(sheet),
+                column,
+                row: 1,
+                column_absolute: true,
+                row_absolute: true,
+            })] if sheet == "Bob's" && column == "A"
+        ));
+
+        let external = FormulaParser::new("=['file:///book.ods'#.A1]")
+            .parse()
+            .expect("external rich cell should parse");
+        assert!(extract_cell_refs(&external).is_empty());
+    }
+
+    #[test]
+    fn test_formula_limits_forward_reference_limits() {
+        let limits = FormulaLimits::default()
+            .with_reference_limits(reference::Limits::default().with_max_name_bytes(3));
+        let error = FormulaParser::new("of:=[Sheet.A1]")
+            .parse_with_limits(&limits)
+            .expect_err("formula reference name limit should be enforced");
+        assert!(matches!(error, Error::ResourceLimit(_)));
     }
 
     #[test]
@@ -867,8 +1431,130 @@ mod tests {
             | Token::LParen
             | Token::RParen
             | Token::Comma
-            | Token::Semicolon => panic!("Expected cell reference"),
+            | Token::Semicolon
+            | Token::Reference(_) => panic!("Expected cell reference"),
         }
+    }
+
+    #[test]
+    fn test_compact_cell_handoff_preserves_space_bearing_sheet_names() {
+        let formula = FormulaParser::new("=A1 Sheet.B2+A1 .C3")
+            .parse()
+            .expect("legacy space-bearing sheet names should parse");
+        assert!(matches!(
+            &formula.tokens[0],
+            Token::CellRef(CellRef {
+                sheet: Some(sheet),
+                column,
+                row: 2,
+                ..
+            }) if sheet == "A1 Sheet" && column == "B"
+        ));
+        assert!(matches!(formula.tokens[1], Token::Operator('+')));
+        assert!(matches!(
+            &formula.tokens[2],
+            Token::CellRef(CellRef {
+                sheet: Some(sheet),
+                column,
+                row: 3,
+                ..
+            }) if sheet == "A1 " && column == "C"
+        ));
+    }
+
+    #[test]
+    fn test_legacy_sheet_scan_cache_keeps_scan_work_linear() {
+        fn tokenize_and_measure(source: &str) -> (usize, usize) {
+            let mut parser = FormulaParser::new(source);
+            // Keep the original formula prefix out of this private tokenizer
+            // loop; parse_with_limits makes the same body transition.
+            parser.position = 1;
+            let mut token_count = 0;
+            while !parser.is_at_end() {
+                parser.skip_whitespace();
+                if parser.is_at_end() {
+                    break;
+                }
+                parser
+                    .next_token()
+                    .expect("the generated legacy sequence should tokenize");
+                token_count += 1;
+            }
+            (parser.legacy_sheet_scan_work, token_count)
+        }
+
+        const CELLS: usize = 1_024;
+
+        let mut spaced = String::from("=");
+        for index in 0..CELLS {
+            if index != 0 {
+                spaced.push(' ');
+            }
+            spaced.push_str("A1");
+        }
+        let (spaced_work, spaced_tokens) = tokenize_and_measure(&spaced);
+        assert_eq!(spaced_tokens, CELLS);
+        assert!(
+            spaced_work <= spaced.len(),
+            "spaced sequence rescanned too much input: {spaced_work} > {}",
+            spaced.len()
+        );
+
+        let contiguous = format!("={}", "A1".repeat(CELLS));
+        let (contiguous_work, contiguous_tokens) = tokenize_and_measure(&contiguous);
+        assert_eq!(contiguous_tokens, CELLS);
+        assert!(
+            contiguous_work <= contiguous.len(),
+            "contiguous compact misses rescanned too much input: {contiguous_work} > {}",
+            contiguous.len()
+        );
+
+        let mut ranges = String::from("=");
+        for index in 0..CELLS {
+            if index != 0 {
+                ranges.push(' ');
+            }
+            ranges.push_str("A1:A1");
+        }
+        let (range_work, range_tokens) = tokenize_and_measure(&ranges);
+        assert_eq!(range_tokens, CELLS);
+        assert!(
+            range_work <= ranges.len(),
+            "range endpoint scans rescanned too much input: {range_work} > {}",
+            ranges.len()
+        );
+
+        let absolute = format!("={}", "$A$1 ".repeat(CELLS));
+        let (absolute_work, absolute_tokens) = tokenize_and_measure(&absolute);
+        assert_eq!(absolute_tokens, CELLS);
+        assert_eq!(
+            absolute_work, 0,
+            "absolute cells should not enter sheet scans"
+        );
+
+        // The first compact A1 is rejected as a possible space-bearing sheet
+        // reference, then the legacy parser starts earlier than that cached
+        // suffix. It must rescan only once before later suffixes reuse the
+        // new cache endpoint.
+        let mut backward = String::from("=A1 ");
+        for index in 0..CELLS {
+            if index != 0 {
+                backward.push(' ');
+            }
+            backward.push_str("Alias");
+        }
+        backward.push_str(".B2");
+        let (backward_work, backward_tokens) = tokenize_and_measure(&backward);
+        assert_eq!(backward_tokens, 1);
+        assert!(
+            backward_work > backward.len(),
+            "backward compact-to-legacy handoff did not exercise its second bounded scan"
+        );
+        assert!(
+            backward_work <= backward.len() * 2,
+            "backward handoff exceeded two linear scans: {backward_work} > {}",
+            backward.len() * 2
+        );
     }
 
     #[test]
@@ -893,7 +1579,8 @@ mod tests {
             | Token::LParen
             | Token::RParen
             | Token::Comma
-            | Token::Semicolon => panic!("Expected range reference"),
+            | Token::Semicolon
+            | Token::Reference(_) => panic!("Expected range reference"),
         }
     }
 
@@ -916,7 +1603,8 @@ mod tests {
             | Token::LParen
             | Token::RParen
             | Token::Comma
-            | Token::Semicolon => panic!("Expected number token"),
+            | Token::Semicolon
+            | Token::Reference(_) => panic!("Expected number token"),
         }
     }
 
@@ -939,7 +1627,8 @@ mod tests {
             | Token::LParen
             | Token::RParen
             | Token::Comma
-            | Token::Semicolon => panic!("Expected string token: {:?}", formula.tokens),
+            | Token::Semicolon
+            | Token::Reference(_) => panic!("Expected string token: {:?}", formula.tokens),
         }
     }
 
@@ -1022,7 +1711,8 @@ mod tests {
                 | Token::LParen
                 | Token::RParen
                 | Token::Comma
-                | Token::Semicolon => None,
+                | Token::Semicolon
+                | Token::Reference(_) => None,
             })
             .collect();
         assert!(functions.contains(&"SUM"));
@@ -1051,7 +1741,8 @@ mod tests {
             | Token::LParen
             | Token::RParen
             | Token::Comma
-            | Token::Semicolon => panic!("Expected cell reference"),
+            | Token::Semicolon
+            | Token::Reference(_) => panic!("Expected cell reference"),
         }
     }
 
@@ -1197,6 +1888,17 @@ mod tests {
     }
 
     #[test]
+    fn test_every_part4_catalog_name_is_tokenized_as_a_function_call() {
+        assert_eq!(STANDARD_FORMULA_FUNCTIONS.len(), 393);
+        for name in STANDARD_FORMULA_FUNCTIONS.iter() {
+            let formula = FormulaParser::new(&format!("={name}()"))
+                .parse()
+                .expect("catalog function should parse as an invocation");
+            assert!(matches!(&formula.tokens[0], Token::Function(found) if found == *name));
+        }
+    }
+
+    #[test]
     fn test_whitespace_handling() {
         let parser = FormulaParser::new("=  A1  +  B1  ");
         let formula = parser
@@ -1227,7 +1929,8 @@ mod tests {
                 | Token::LParen
                 | Token::RParen
                 | Token::Comma
-                | Token::Semicolon => None,
+                | Token::Semicolon
+                | Token::Reference(_) => None,
             })
             .collect();
         assert!(funcs.contains(&"IF"));

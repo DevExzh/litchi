@@ -48,4 +48,5 @@ impl Seek for PanickingWriter {
 
 mod document;
 mod graph;
+mod revision_actions;
 mod settings;

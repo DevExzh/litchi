@@ -1,0 +1,13 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/tmp/litchi-ods-statistical-baseline-wgsj2_vy/docs/report/spec-gap-validation-evidence/ods-formula-statistical-reducers/performance/harness/Cargo.toml",
+    "--release"
+  ],
+  "cwd": "/tmp/litchi-ods-statistical-baseline-wgsj2_vy",
+  "target": "/var/tmp/litchi-ods-statistical-baseline-f7fe857007b7bcb65e0512c5b5caf9135fe74a5a-md0bdc60"
+}

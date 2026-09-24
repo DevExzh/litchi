@@ -1,0 +1,18 @@
+{
+  "verdict": "held",
+  "reviewer": "xlsb_custom_data_owner_final_review",
+  "package_sha256": "ff8a8cf44e697286024d655b73bee7a305ec4f90299b99a41bb1cb91a25547a1",
+  "correctness_blocker": "Positional semantic_entries_equal rejects valid UID-order-changing renames/inserts after sorted reload.",
+  "resource_blockers": [
+    "properties collection before storage cap",
+    "connection collection before cap",
+    "unbounded cardinality-only owner/data relationship vectors",
+    "template restoration copies complete current XML before temporary/output cap"
+  ],
+  "prior_findings_addressed": [
+    "scoped patch apply",
+    "lifetime-bound snapshot reservation",
+    "lowered rewrite output limits",
+    "shared inbound proof scan"
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "scope": "Test-only composed XLSB Data Model/connections graph boundary",
+  "commands": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "-p",
+        "litchi-xlsb",
+        "--test",
+        "data_model_connection_graph"
+      ],
+      "exit_code": 0,
+      "log": "check.log",
+      "sha256": "c07f84af3096f6a4212882acd68fda3f2dd16f57230715e232f3ad1fab70193e"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-xlsb",
+        "--test",
+        "data_model_connection_graph",
+        "--test",
+        "data_model"
+      ],
+      "exit_code": 0,
+      "log": "tests.log",
+      "sha256": "fe72b8e75edd486ec849ef83d5004cfbcf241b44db5a6262863a1edeab497c2c"
+    }
+  ],
+  "source_unchanged": true,
+  "source_files": 749,
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "suppression_variables": {
+    "RUSTFLAGS": "",
+    "CARGO_ENCODED_RUSTFLAGS": "",
+    "RUSTC_BOOTSTRAP": ""
+  },
+  "log_normalization": "Only trailing empty lines removed",
+  "passed": true,
+  "root_review": {
+    "verdict": "approved for test-only graph coverage",
+    "test_sha256": "9f56172bf5b8be8ffaf2cce964c7eea1bea2112d37d62d9e2fa42476c22e42f7",
+    "review_scope": "Public positive, rejected owner graph, case-insensitive binding and atomic refusal assertions; opaque synthetic payload scope is explicit",
+    "new_target_passed": 12,
+    "existing_data_model_target_passed": 17,
+    "format_and_diff_checks_passed": true
+  }
+}

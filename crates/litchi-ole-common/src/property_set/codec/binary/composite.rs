@@ -5,8 +5,8 @@ use super::super::super::model::{
     Value, checked_add, checked_mul, checked_u32, invalid, try_vec_with_capacity,
 };
 use super::wire::{
-    ValueReader, append_bytes, append_u16, append_u32, decode_ansi, decode_utf16, encode_ansi,
-    reserve_bytes,
+    ByteSink, ValueReader, append_ansi, append_bytes, append_u16, append_u32, decode_ansi,
+    decode_utf16, encoded_ansi_len, reserve_bytes,
 };
 use litchi_cfb::OleError;
 use litchi_cfb::consts::{VT_I4, VT_LPSTR, VT_LPWSTR, VT_VARIANT, VT_VECTOR};
@@ -15,8 +15,8 @@ pub(super) const HEADING_PAIRS_TYPE: u16 = VT_VECTOR | VT_VARIANT;
 pub(super) const DOC_PARTS_ANSI_TYPE: u16 = VT_VECTOR | VT_LPSTR;
 pub(super) const DOC_PARTS_UNICODE_TYPE: u16 = VT_VECTOR | VT_LPWSTR;
 
-pub(super) fn append_heading_pairs(
-    out: &mut Vec<u8>,
+pub(super) fn append_heading_pairs<S: ByteSink + ?Sized>(
+    out: &mut S,
     value: &HeadingPairs,
     codepage: u16,
 ) -> Result<(), OleError> {
@@ -37,8 +37,8 @@ pub(super) fn append_heading_pairs(
     Ok(())
 }
 
-pub(super) fn append_doc_parts(
-    out: &mut Vec<u8>,
+pub(super) fn append_doc_parts<S: ByteSink + ?Sized>(
+    out: &mut S,
     value: &DocParts,
     codepage: u16,
 ) -> Result<(), OleError> {
@@ -121,7 +121,11 @@ pub(super) fn parse_doc_parts(
     Ok(Value::DocParts(DocParts::new(encoding, values)?))
 }
 
-fn append_heading_string(out: &mut Vec<u8>, value: &str, codepage: u16) -> Result<(), OleError> {
+fn append_heading_string<S: ByteSink + ?Sized>(
+    out: &mut S,
+    value: &str,
+    codepage: u16,
+) -> Result<(), OleError> {
     if codepage == UNICODE_CODEPAGE {
         append_u16(out, VT_LPWSTR, "serialized heading string")?;
         append_u16(out, 0, "serialized heading string")?;
@@ -133,21 +137,28 @@ fn append_heading_string(out: &mut Vec<u8>, value: &str, codepage: u16) -> Resul
     }
 }
 
-fn append_unaligned_ansi(out: &mut Vec<u8>, value: &str, codepage: u16) -> Result<(), OleError> {
-    let bytes = encode_ansi(value, codepage)?;
-    let length = checked_add(bytes.len(), 1, "UnalignedLpstr length")?;
+fn append_unaligned_ansi<S: ByteSink + ?Sized>(
+    out: &mut S,
+    value: &str,
+    codepage: u16,
+) -> Result<(), OleError> {
+    let length = checked_add(
+        encoded_ansi_len(value, codepage)?,
+        1,
+        "UnalignedLpstr length",
+    )?;
     append_u32(
         out,
         checked_u32(length, "UnalignedLpstr length")?,
         "serialized UnalignedLpstr",
     )?;
     reserve_bytes(out, length, "serialized UnalignedLpstr")?;
-    out.extend_from_slice(&bytes);
-    out.push(0);
+    append_ansi(out, value, codepage, "serialized UnalignedLpstr")?;
+    out.push_zero("serialized UnalignedLpstr")?;
     Ok(())
 }
 
-fn append_lpwstr(out: &mut Vec<u8>, value: &str) -> Result<(), OleError> {
+fn append_lpwstr<S: ByteSink + ?Sized>(out: &mut S, value: &str) -> Result<(), OleError> {
     let units = checked_add(value.encode_utf16().count(), 1, "Lpwstr length")?;
     let byte_len = checked_mul(units, 2, "Lpwstr length")?;
     append_u32(
@@ -157,17 +168,18 @@ fn append_lpwstr(out: &mut Vec<u8>, value: &str) -> Result<(), OleError> {
     )?;
     reserve_bytes(out, byte_len, "serialized Lpwstr")?;
     for unit in value.encode_utf16() {
-        out.extend_from_slice(&unit.to_le_bytes());
+        append_bytes(out, &unit.to_le_bytes(), "serialized Lpwstr")?;
     }
-    out.extend_from_slice(&0u16.to_le_bytes());
+    append_bytes(out, &0u16.to_le_bytes(), "serialized Lpwstr")?;
     append_relative_padding(out, byte_len)
 }
 
-fn append_relative_padding(out: &mut Vec<u8>, value_len: usize) -> Result<(), OleError> {
+fn append_relative_padding<S: ByteSink + ?Sized>(
+    out: &mut S,
+    value_len: usize,
+) -> Result<(), OleError> {
     let padding = (4 - (value_len & 3)) & 3;
-    reserve_bytes(out, padding, "serialized composite string padding")?;
-    out.resize(out.len() + padding, 0);
-    Ok(())
+    out.append_zeroes(padding, "serialized composite string padding")
 }
 
 fn read_heading_string(reader: &mut ValueReader<'_>, codepage: u16) -> Result<String, OleError> {

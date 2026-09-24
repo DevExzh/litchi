@@ -1,0 +1,15 @@
+{
+  "base_commit": "8ef0057e5eca7c136c85c71c64b816bc3b520c37",
+  "source_root": "/tmp/litchi-ods-elementary",
+  "selected_files": {
+    "crates/litchi-ods/src/codec/formula/evaluation.rs": "0c40890eed31c691ee106ced38d188b2955c77fb0701d91a5b1041692598a0f9",
+    "crates/litchi-ods/src/codec/formula/evaluation/elementary.rs": "ebea50eb7e1ce17a325472c3992e9982638f6d902bb41a44367e1ed07a3f2742",
+    "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "734f41734c20f1961a2c46a624f6ff1766250f343e949c7b5b9469dd49c11867",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/scalar.rs": "20b9849af0be790cd5aef1061dcd669fd5314ffda777f0693dbecbc7fee3d638",
+    "crates/litchi-ods/tests/ods_formula_elementary_evaluation.rs": "66e6dd88b94feb02af3114ae8a631ecb578d70477d0a4084cc3d51f30070461d",
+    "crates/litchi-ods/tests/ods_formula_elementary_arrays.rs": "e7f3ebd3524f60e73d069d44ec2b159cde8c6014f3f7713535c4130aeff36243",
+    "crates/litchi-ods/tests/ods_formula_elementary_native.rs": "dfb0cef5388cc1b58aac960040dbbe5af57be3a47c8b3fe306b2ff6eae253458",
+    "docs/report/spec-gap-validation-evidence/ods-formula-elementary-math/native/cached-results.json": "7c1415ce12910e770208fdb9065f9baf980b5138c19d78d2d33e1e2f74237225",
+    "Cargo.lock": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3"
+  }
+}

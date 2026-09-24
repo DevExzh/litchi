@@ -4679,6 +4679,98 @@ mod tests {
         }
     }
 
+    fn fresh_generated_deflate_archive(name: &str, data: &[u8]) -> Vec<u8> {
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        let zip64 = generated_deflate_needs_zip64(data.len(), name.len()).unwrap();
+        let (mut file, config) = writer
+            .new_file(name)
+            .compression_method(CompressionMethod::Deflate)
+            .zip64(zip64)
+            .start()
+            .unwrap();
+        let encoder = DeflateEncoder::new(&mut file, Compression::default());
+        let mut data_writer = config.wrap(encoder);
+        data_writer.write_all(data).unwrap();
+        let (encoder, descriptor) = data_writer.finish().unwrap();
+        encoder.finish().unwrap();
+        file.finish(descriptor).unwrap();
+        writer.finish().unwrap()
+    }
+
+    fn generated_archive(prepared: &PreparedEntry) -> &[u8] {
+        let PreparedLocal::Shared { bytes, .. } = &prepared.local else {
+            panic!("generated Deflate entry should retain one archive buffer");
+        };
+        bytes
+    }
+
+    /// Carried over from the spec-gap branch's plan-wide Deflate workspace
+    /// (merge record 0759). The workspace itself was not merged: each member
+    /// keeps its own compressor (change 0618) so that parallel waves stay a
+    /// pure function of the member. The byte-identity oracle still applies,
+    /// here across 32 KiB output-buffer boundaries and empty members.
+    #[test]
+    fn reused_deflate_state_matches_fresh_streams_for_mixed_payloads() {
+        let mut payloads = vec![
+            Vec::new(),
+            vec![0x5a],
+            b"small repeated payload".repeat(17),
+            (0..256 * 1024)
+                .map(|index| u8::try_from(index % 251).unwrap())
+                .collect(),
+        ];
+        let mut state = 0x1234_5678_u32;
+        for length in [
+            32 * 1024 - 1,
+            32 * 1024,
+            32 * 1024 + 1,
+            64 * 1024 - 1,
+            64 * 1024,
+            64 * 1024 + 1,
+        ] {
+            let mut payload = Vec::with_capacity(length);
+            for _ in 0..length {
+                state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                payload.push((state >> 24) as u8);
+            }
+            payloads.push(payload);
+        }
+        // Exercise a member after a large member and the empty-stream path.
+        payloads.extend([Vec::new(), Vec::new()]);
+        for (index, payload) in payloads.iter().enumerate() {
+            let name = format!("mixed-{index}.bin");
+            let entry = RegeneratedEntry::new_shared(&name, Arc::new(payload.clone()))
+                .compression_method(CompressionMethod::Deflate);
+            let prepared = generated_entry(&entry).unwrap();
+            let fresh = fresh_generated_deflate_archive(&name, payload);
+            assert_eq!(
+                generated_archive(&prepared),
+                fresh.as_slice(),
+                "regenerated Deflate output changed for payload {index}"
+            );
+        }
+    }
+
+    /// Carried over from the spec-gap branch (merge record 0759), adapted to
+    /// the reusable encoder this branch uses.
+    #[test]
+    fn reused_deflate_empty_flush_before_finish_matches_fresh_stream() {
+        let mut reused = Vec::new();
+        let mut state = ReusableDeflateState::new();
+        state.begin_member();
+        {
+            let mut encoder = ReusedDeflateEncoder::new(&mut state, &mut reused);
+            encoder.flush().unwrap();
+            encoder.finish().unwrap();
+        }
+
+        let mut fresh = Vec::new();
+        let mut encoder = DeflateEncoder::new(&mut fresh, Compression::default());
+        encoder.flush().unwrap();
+        encoder.finish().unwrap();
+        assert_eq!(reused, fresh);
+    }
+
     #[test]
     fn regenerated_entry_can_retain_a_shared_payload() {
         let data = Arc::new(b"shared generated content".to_vec());

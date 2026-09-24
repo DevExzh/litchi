@@ -1,0 +1,30 @@
+{
+  "schema": "financial-scaled-development-validation-v1",
+  "scope": "Stable scaled-arithmetic development checkpoint; numerical review and performance acceptance pending.",
+  "commit": "6e1bd20e223f93ffa48f32dbb97a0d16fd8f049a",
+  "kernel_sha256": "e775800a66b9b964aa9e421e9a1ef176a0ad5e34451fc77a5f4f1a14a2a10eb7",
+  "lock_sha256": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3",
+  "command": "cargo test --locked --offline -p litchi-ods --lib --tests -- --quiet",
+  "exit_code": 0,
+  "passed": 1818,
+  "failed": 0,
+  "ignored": 0,
+  "test_groups": 132,
+  "log_sha256": "dd19b9e5c19672722ce8fe406c9327e5d6a28314343a0db589f792aa9d048e52",
+  "followup_checks": [
+    {
+      "command": "cargo clippy --locked --offline -p litchi-ods --all-targets -- -D warnings",
+      "commit": "bbae6d2296",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo test --locked --offline -p litchi-ods --test ods_formula_financial_evaluation ppmt_large_present_value_and_late_ipmt_match_decimal_profile -- --exact --quiet",
+      "exit_code": 101,
+      "failed_formula": "=IPMT(1e-10;2;10;1e308;1e308;0)",
+      "actual": "formula #NUM!",
+      "expected_binary64": "-8.000000000900001e297",
+      "cause": "Scaled payment term is converted to f64 before cancellation with the future value.",
+      "status": "Source fix pending; prior 1818-test pass did not include this ninth oracle row."
+    }
+  ]
+}

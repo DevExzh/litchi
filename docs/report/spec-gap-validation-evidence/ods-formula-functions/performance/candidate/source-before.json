@@ -1,0 +1,16 @@
+{
+  "Cargo.toml": "650c381d29558d9f818fa98fb0c1afcd412a83cd7edb846779ce89afb9c2e1c8",
+  "crates/litchi-core/Cargo.toml": "f269d5d26b041dca9d589342f3b0f3cdd796ea4c9afb72b09bf9b1933001d8ac",
+  "crates/litchi-core/src/lib.rs": "f7b841a25029ccd8cca3d91057264271b652beb1231f71fd4e82a53e627b1820",
+  "crates/litchi-ods/Cargo.toml": "8b0aa977a404eadf4b466f9aa1dcb871c3b5cf18a7462fa3fe11ace65278ace1",
+  "crates/litchi-ods/src/lib.rs": "0cbb8163ec05794b3ffaf6d3d993d0addcccfb59adfc1e40e80cf264329d3984",
+  "crates/litchi-ods/src/codec/mod.rs": "8938d81c7f0377ba330e57966c8dc6f4104cb4e81644e04081e6f12ed5a652fb",
+  "crates/litchi-ods/src/codec/formula.rs": "0c3108e95e4b5fd92e616917171ebd840f26e103a2076e27592a9a330f2bd647",
+  "crates/litchi-ods/src/codec/formula/functions.rs": "1d736271e9f9cf3743295f8895f184e32842640eaba48084dfafc9ca7333e2a1",
+  "crates/litchi-ods/tests/ods_formula_functions.rs": "0699ad88e3eb17f07c98f57178b4eea68d6cc39ec88d026fc80222efe63a1947",
+  "docs/report/spec-gap-validation-evidence/ods-formula-functions/performance/harness/new_names.py": "be710812630ee045edb1eec934a7570a1ee69f82baf98c203d57a95471f862b0",
+  "docs/report/spec-gap-validation-evidence/ods-formula-functions/performance/harness/run.py": "39a16f8dba6bf3070f2fceaa1bee64a88a512e20b86e83dc680e475c4a61185b",
+  "docs/report/spec-gap-validation-evidence/ods-formula-functions/performance/harness/Cargo.lock": "96d75f74e4cf3f1888e03d84b4fc09f30c7fcab25da16aee0ed3f7ded4fca6d9",
+  "docs/report/spec-gap-validation-evidence/ods-formula-functions/performance/harness/Cargo.toml": "b25815d04dcb70c28afdbd6db3d4d988f416f8ee4a1d6c9b3c5be90ca80546cb",
+  "docs/report/spec-gap-validation-evidence/ods-formula-functions/performance/harness/src/main.rs": "37f2f309d2a2a343a90eec63a3d83ee79661aa1aa57c290b19f1325dfcce3cb6"
+}

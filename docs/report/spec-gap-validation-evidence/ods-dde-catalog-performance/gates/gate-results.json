@@ -1,0 +1,87 @@
+[
+  {
+    "gate": "all-targets",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "-p",
+      "litchi-ods",
+      "--all-features",
+      "--all-targets"
+    ],
+    "exit_code": 0
+  },
+  {
+    "gate": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "-p",
+      "litchi-ods",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0
+  },
+  {
+    "gate": "rustdoc",
+    "command": [
+      "cargo",
+      "doc",
+      "--locked",
+      "--offline",
+      "-p",
+      "litchi-ods",
+      "--all-features",
+      "--no-deps"
+    ],
+    "exit_code": 0
+  },
+  {
+    "gate": "doctests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "-p",
+      "litchi-ods",
+      "--all-features",
+      "--doc"
+    ],
+    "exit_code": 0
+  },
+  {
+    "gate": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-ods",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  {
+    "gate": "api-authoring-runner-final",
+    "command": [
+      "cargo",
+      "run",
+      "--locked",
+      "--offline",
+      "--manifest-path",
+      "docs/report/spec-gap-validation-evidence/ods-dde-transactions/authoring-runner/Cargo.toml",
+      "--",
+      "/var/tmp/litchi-ods-catalog-root-tmp/api-content.xml"
+    ],
+    "exit_code": 0
+  }
+]

@@ -1,0 +1,14 @@
+diff --git a/crates/litchi-opc/src/phys_pkg.rs b/crates/litchi-opc/src/phys_pkg.rs
+index a33b6c2a5..ff436ec4a 100644
+--- a/crates/litchi-opc/src/phys_pkg.rs
++++ b/crates/litchi-opc/src/phys_pkg.rs
+@@ -9,8 +9,8 @@ use crate::error::{OpcError, Result};
+ use crate::limits::{ReadLimits, ReadResource};
+ use crate::packuri::{PackURI, PartNameConflict};
+ use soapberry_zip::CompressionMethod;
+-use soapberry_zip::office::{LazyArchiveReader, LimitResource};
+ use soapberry_zip::ZipArchive;
++use soapberry_zip::office::{LazyArchiveReader, LimitResource};
+ use std::collections::HashMap;
+ use std::io::{Cursor, Read, Write};
+ use std::path::Path;

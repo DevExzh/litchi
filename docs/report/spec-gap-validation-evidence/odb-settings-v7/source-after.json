@@ -1,0 +1,16 @@
+{
+  "crates/litchi-odb/docs/FEATURE_MATRIX.md": "82c6ed964073ce04e3b5ebdd05b6d97e72838e1e1319084e6b767cbefcfe9cf7",
+  "crates/litchi-odb/src/authoring/composition.rs": "d71d792f4e223fb7049b4d48613a1ab8ae6caea6746a0c3990295a69a6e02e14",
+  "crates/litchi-odb/src/authoring/durable.rs": "3daa67231db9978ac9d785b4316179f9137a47032544978a4ac0368c3604146d",
+  "crates/litchi-odb/src/authoring/transaction.rs": "18de85e4ce34c88761caaa855c0400ec231385492e1d897e0294118c3d9f3994",
+  "crates/litchi-odb/src/codec/content.rs": "366bb6affcebb62daf062add772f7c29e7794f5afc039d7dd00dcc92347979d9",
+  "crates/litchi-odb/src/facade/mod.rs": "3a0a721d7f7e1e369662d164ecdedea551b6c66505c3c81c255a322bd8297243",
+  "crates/litchi-odb/src/lib.rs": "71ce2808acc69a7438d33099aefd9765b9e8ee84b406109447de99614feeba98",
+  "crates/litchi-odb/src/model/catalog.rs": "5cd3a2558b36e5e2615c474b637545a5d351f2aa4970f063479c84342f7f89cc",
+  "crates/litchi-odb/src/model/connection.rs": "e8754f68cbd5a7580de61f48b712996556051958befdd5bb9b379eaf85de3e3d",
+  "crates/litchi-odb/src/model/mod.rs": "a4b9fd8eb33b1858ba409537f5b2ef5a443b956b8dc405852d242085b45c858d",
+  "crates/litchi-odb/src/model/settings.rs": "62bb41b354b671c56e587e6bde023dcb076da63140bc51d338a9653409686228",
+  "crates/litchi-odb/tests/schema_catalog.rs": "c2cbd3c8381b9994775a43d8ef1e9a53d839a41723ae51ae14d171e0978da1b7",
+  "crates/litchi-odb/tests/settings.rs": "2ce9ec5f2c051f7dba5e4cd708e0d7ef2da019e69c635cbd863fbb7413c5788f",
+  "Cargo.lock": "8248c6b7787a9726e9f99396a5de147bc2f68acf0afef44b710a6392f940bd88"
+}

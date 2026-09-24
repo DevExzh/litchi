@@ -1,0 +1,45 @@
+{
+  "baseline_target": {
+    "removed": true,
+    "target_dir": "/var/tmp/litchi-ods-order-statistics-baseline-d6c0485365644a5525b7302ba0b3666d43df1b1f-vvnj7lwz"
+  },
+  "baseline_worktree": {
+    "path": "/tmp/litchi-ods-order-statistics-baseline-27hf7v3x",
+    "removed": true
+  },
+  "candidate_frozen_root": {
+    "disposition": "root-owned frozen source tree retained for independent gate verification",
+    "path": "/tmp/litchi-ods-order-statistics",
+    "removed": false
+  },
+  "candidate_target": {
+    "removed": true,
+    "target_dir": "/var/tmp/litchi-ods-order-statistics-candidate-final-b48ywy5v"
+  },
+  "local_metadata_sanity_target": {
+    "path": "harness/target",
+    "removed": true
+  },
+  "local_python_cache": {
+    "path": "__pycache__",
+    "removed": true
+  },
+  "metadata_sanity_temporary_files": [
+    {
+      "path": "/tmp/order-statistics-profile-list.txt",
+      "removed": true
+    },
+    {
+      "path": "/tmp/order-statistics-metadata-build.log",
+      "removed": true
+    },
+    {
+      "path": "/tmp/order-statistics-metadata-list.txt",
+      "removed": true
+    },
+    {
+      "path": "/tmp/order-statistics-root-verify.json",
+      "removed": true
+    }
+  ]
+}

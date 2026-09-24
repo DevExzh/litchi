@@ -1,0 +1,18 @@
+{
+  "schema": "ods-formula-lookups-review-receipt-v1",
+  "status": "PASS",
+  "reviews": {
+    "semantic": {
+      "status": "PASS",
+      "path": "semantic-review.md",
+      "sha256": "83684273047193b1d59af63a1cc5c8d2648368e709836ac6a4c5e8ab7a69229f"
+    },
+    "resource": {
+      "status": "PASS",
+      "path": "resource-review.md",
+      "sha256": "f4acba8ee5c76beaee8660d2f31d0588d514d8b2f5a972e845549b503d37b03b"
+    }
+  },
+  "freeze_sha256": "53261588afdad7e1efd29ac91c0f393f41e8ddbe1032f91ca9d60dcb0c86fa60",
+  "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf"
+}

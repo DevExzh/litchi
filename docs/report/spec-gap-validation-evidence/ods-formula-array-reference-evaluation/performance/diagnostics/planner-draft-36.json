@@ -1,0 +1,6 @@
+{
+  "scope": "Explicit runtime-geometry kind stack: all62integration tests pass, including emptyintersection and4096intersection workloads; full review/gates separate",
+  "archive": "planner-draft-36.tar.gz",
+  "sha256": "9d3a695bf18daeed20c98ba3687e99248fc7fb9e6e0f4a7d5f213a5050ca2cd9",
+  "status": 0
+}

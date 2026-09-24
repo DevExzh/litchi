@@ -1,0 +1,164 @@
+{
+  "independent_audit": {
+    "accounting_unchanged_fields": [
+      "allocator_calls_p50",
+      "requested_bytes_p50",
+      "released_bytes_p50",
+      "peak_live_delta_p50",
+      "memory_retained_p50",
+      "work_p50",
+      "reference_reads_p50",
+      "output_bytes_p50"
+    ],
+    "baseline_rebuild_hashes": [
+      "e84dce1d55f72fc659bce4991a16c34c0cfbd01948c3c11fe6db8c59c69eb191",
+      "bcf68388a6c851a76dfeb40df3b68991310c2de7609bd711d4ab47116298d7be"
+    ],
+    "candidate_binary_equal_across_complete_captures": true,
+    "earlier_complete_review_triggers": 2,
+    "latest_complete_review_triggers": 8,
+    "path": "../../root-performance-audit.json",
+    "sha256": "02f78b8127b754f18e52ee9824c2d12361b03a8d6af589f3c55d78458de49d13",
+    "source_profile_and_lock_equal_across_complete_captures": true,
+    "status": "verified; performance review triggers retained",
+    "verified_complete_samples": 6900
+  },
+  "performance_review": {
+    "disposition": "Retain performance review triggers; accounting and source/profile invariants PASS. Do not infer RSS causality from unchanged allocator counters.",
+    "earlier_rss_delta_range_percent": [
+      -4.673913043478262,
+      5.14354066985645
+    ],
+    "earlier_rss_trigger_kib": 172,
+    "earlier_sumifs_parse_latency_bootstrap_95_percent": [
+      -1.9621,
+      10.9134
+    ],
+    "earlier_sumifs_parse_latency_percent": 7.716816767040546,
+    "latest_latency_delta_range_percent": [
+      -3.0467421810951523,
+      3.5643564356435675
+    ],
+    "latest_rss_delta_range_percent": [
+      -1.5572858731924377,
+      6.666666666666665
+    ],
+    "latest_rss_trigger_count": 8,
+    "latest_rss_trigger_range_kib": [
+      168,
+      212
+    ]
+  },
+  "reports": {
+    "capture_history_json": "capture-history.json",
+    "capture_history_markdown": "capture-history.md",
+    "latest_json": "performance-report-latest.json",
+    "latest_markdown": "performance-report-latest.md",
+    "preserved_prior_json": "performance-report.json",
+    "preserved_prior_markdown": "performance-report.md"
+  },
+  "retained_receipts": {
+    "attempt_rows_total_including_failed": 9901,
+    "complete_verified_samples": 6900,
+    "manifest_entries_before_refresh": 12954,
+    "manifest_entries_expected_after_refresh": 19880,
+    "manifest_path": "retained-files.json",
+    "partial_failed_rows": 1,
+    "partial_successful_rows": 3000,
+    "successful_rows_total": 9900
+  },
+  "schema_version": 1,
+  "scope": {
+    "baseline_records_per_complete_pair": 840,
+    "candidate_records_per_complete_pair": 2610,
+    "functions": 16,
+    "phases": [
+      "evaluate",
+      "parse-evaluate"
+    ],
+    "samples_per_group": 15,
+    "warmups": 3
+  },
+  "sessions": [
+    {
+      "kind": "initial setup/pre-timing attempt",
+      "reason": "The /tmp tmpfs had insufficient free space to create the baseline worktree.",
+      "retained_artifacts": [
+        "diagnostic-preflight-before-timing-20260920T062947Z",
+        "diagnostic-preflight-before-timing-20260920T063232Z",
+        "diagnostic-preflight-before-timing-20260920T063709Z",
+        "preflight-before-timing"
+      ],
+      "session_id": "21287",
+      "status": "failed before timing",
+      "timed_records": 0
+    },
+    {
+      "baseline_binary_sha256": "9ce7d9d3f88510f2d1fb058b51fe60cc62be6fdee447ae3c87422ebd7e48b2c3",
+      "baseline_records": 840,
+      "candidate_binary_sha256": "83859d3b2515b3b44083e69adf9896d6ccbfd97dd0b3ef829c1019876cb6722b",
+      "candidate_failed_records": 1,
+      "candidate_raw_attempts": 2161,
+      "candidate_successful_records": 2160,
+      "contract_sha256": "f227e861c55e3360d60d41a42ee7f101ba3c29bbc00d25d56cc01d80c3cd7923",
+      "failure": "Error: \"expected Number or Text, got Array(ArrayView { shape: Shape { rows: 1, columns: 1 }, cells: [Present(Error(Value))] })\"",
+      "fixed_harness_main_sha256": "91f0fe655ef43681fb4cf9124eb0ced00d7bfae5bf10486bdaf952798a7abe4d",
+      "kind": "retry with /var/tmp baseline worktree",
+      "old_harness_main_sha256": "191ce592a8e072860fcfca92fd177bebb6f41571d4273391b7e29d5b51e30806",
+      "retained_artifacts": [
+        "diagnostic-baseline-d623f3c2ecc0c837017f700174656f0e443759a5-20260920T063301Z",
+        "diagnostic-candidate-final-20260920T063331Z"
+      ],
+      "session_id": "71321",
+      "source_git_head": "d623f3c2ecc0c837017f700174656f0e443759a5",
+      "status": "partial; candidate stopped on first invalid-separator timed lane"
+    },
+    {
+      "baseline": "diagnostic-baseline-d623f3c2ecc0c837017f700174656f0e443759a5-20260920T063738Z",
+      "baseline_binary_sha256": "e84dce1d55f72fc659bce4991a16c34c0cfbd01948c3c11fe6db8c59c69eb191",
+      "baseline_records": 840,
+      "baseline_worktree_cleanup": true,
+      "candidate": "diagnostic-candidate-final-20260920T063808Z",
+      "candidate_binary_sha256": "c4075b8d9a2e8853f732c688c0bec791849094e69f48a006cd1a7fd343778bfc",
+      "candidate_records": 2610,
+      "candidate_worktree_cleanup": true,
+      "kind": "complete frozen-source capture",
+      "session_id": "85483",
+      "status": "complete"
+    },
+    {
+      "baseline": "baseline-d623f3c2ecc0c837017f700174656f0e443759a5",
+      "baseline_binary_sha256": "bcf68388a6c851a76dfeb40df3b68991310c2de7609bd711d4ab47116298d7be",
+      "baseline_records": 840,
+      "baseline_worktree_cleanup": true,
+      "candidate": "candidate-final",
+      "candidate_binary_sha256": "c4075b8d9a2e8853f732c688c0bec791849094e69f48a006cd1a7fd343778bfc",
+      "candidate_records": 2610,
+      "candidate_worktree_cleanup": true,
+      "kind": "root duplicate complete frozen-source capture",
+      "session_id": "87626",
+      "status": "complete; current retained result set"
+    }
+  ],
+  "source_freeze": {
+    "baseline_commit": "d623f3c2ecc0c837017f700174656f0e443759a5",
+    "candidate_binary_sha256": "c4075b8d9a2e8853f732c688c0bec791849094e69f48a006cd1a7fd343778bfc",
+    "candidate_freeze": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-value-inspection/gates/freeze.json",
+    "contract_sha256": "f227e861c55e3360d60d41a42ee7f101ba3c29bbc00d25d56cc01d80c3cd7923",
+    "profile_input_sha256": {
+      "PLAN.md": "1dc1d6e6d41635e92ec48ffdbc5660757fd0f8f6793e253ad0fe70ea05243ded",
+      "README.md": "af9ceed009f5ac2cbaff5c096adcd7d6458f9d3e2208afd0bda596ae33525137",
+      "case-matrix.json": "77d1be0ee2c325309bed9c4105d468019bd73e29ed581e2e12e2317b5245e3ea",
+      "harness/Cargo.lock": "82d017ae22f95e28fa64b735511387b5bf655824bed4588d8b61a2f6f2c1b482",
+      "harness/Cargo.toml": "3a2a6cf200fb68b3caac51041196e05e7cafd0c976747c5ed1705b2d3ef366ce",
+      "harness/src/main.rs": "91f0fe655ef43681fb4cf9124eb0ced00d7bfae5bf10486bdaf952798a7abe4d",
+      "run_profile.py": "3d1c499baed5850241458295bc29982484b260601a5a970201e14adce2bd6a35",
+      "summarize.py": "5f8ab493559814c31d1b7b217be21b6440009c2ed87787221f571ff19dfb87a2",
+      "verify.py": "291c6ad62cbe71afa561e60ec3decf06c3150e844589d7325382b03f165776f1"
+    },
+    "profile_inputs_stable": true,
+    "root_audit_path": "../../root-performance-audit.json",
+    "root_audit_sha256": "02f78b8127b754f18e52ee9824c2d12361b03a8d6af589f3c55d78458de49d13"
+  },
+  "status": "PASS with retained performance review triggers"
+}

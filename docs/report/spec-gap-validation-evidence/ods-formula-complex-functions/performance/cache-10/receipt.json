@@ -1,0 +1,12 @@
+{
+  "source_basis": "../../cache-10/source.tar.gz",
+  "baseline_basis": "../common-09/receipt.json",
+  "decision": "Discarded suffix-specific prototype: both cache-entry layouts are32bytes and measured memory counters do not improve",
+  "archives": {
+    "build.tar.gz": "2c56750e465677b80377297392d61229215c84df23d530bfab7cdaf3ea05d787",
+    "capture.tar.gz": "7ed06331ec6d7953761e94cf8641df41362c9d7c8b923793d177174f195fb381",
+    "layout.tar.gz": "60199040fcb6a4efe19019f7657c3915cf8c68bb02f5a06644300bebd05c9439"
+  },
+  "children": 162,
+  "deterministic_mismatches": 0
+}

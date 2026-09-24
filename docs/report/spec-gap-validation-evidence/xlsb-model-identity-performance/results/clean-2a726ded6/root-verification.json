@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "scope": "11-lane synthetic correctness smoke; no full-scale or native acceptance claim",
+  "source_commit": "2a726ded6feb79f36b23980ed89c350aafd3cb55",
+  "source_root": "/var/tmp/litchi-xlsb-identity-clean",
+  "source_inputs_checked": 4651,
+  "binary_sha256": "ee1f5c4df6ecc56567f58cf6073940317bba7559cea4f90026c705eec9119ccc",
+  "verifier_sha256": "bfce6ddc38735c0df6589df0074bd357fc3f42b24e0e7ef37b5d40c7a903e882",
+  "provenance_tests_passed": 9,
+  "correction": "Replay uses the corrected verifier that preserves package source kind and Git-checks every local Cargo input, beyond the original 17 explicit extras.",
+  "raw_receipts_modified": false
+}

@@ -1,0 +1,6 @@
+2e43fb0815a7a66064dd3e4ea1ded45d8c5113e97da4a93200f9d1753f5c94a6  docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/results/exploratory-before/source-preimage/crates/litchi-xlsx/src/drawing/source.rs
+dfa7156369b6173a5a0ffb740cd637372aa533e46c7b7948469f110585549c25  docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/results/exploratory-before/source-preimage/crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs
+a80d44514b17898da5c2d2a5c9484e0991b1b2682c650a706749bd6143f758b1  docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/results/exploratory-before/source-preimage/crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs
+52eb5b41856fa5cffa30b21451f97d61ef99247dea145236f9668cf531d9bee7  docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/results/exploratory-before/source-preimage/docs-harness/Cargo.lock
+ac757292987db580830d7346b18f8dbbfcde3c66ff553dacdd68f36019bd53b0  docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/results/exploratory-before/source-preimage/docs-harness/Cargo.toml
+9b070c7cbed68fd16a79ddffe694d97ae25d8722f2e5a4b23a41a40114275383  docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/results/exploratory-before/source-preimage/docs-harness/adapter.rs

@@ -1,0 +1,12 @@
+{
+  "PLAN.md": "8b9ea10d5af67a3a6193b58f7c32297bdbd3da998b7a05ef53e22fb7314aa469",
+  "README.md": "f335f5ca54a260d9320b5760eb641fc2c3a64cf5ee3b1f3ea4720166e32c90ef",
+  "harness/Cargo.lock": "357430e84cb901a12337693dfb8aa9b1f8783ced30300109dd10c3c41eeb73b9",
+  "harness/Cargo.toml": "79d138170a25d73c782445f92b09ce3e2897c9d7a45a7237f9931ddd117f2854",
+  "harness/src/main.rs": "6b71b4d98a168b4fd3d1bfc77dd39678fbcb07e124552f516995c6985ff8fc3a",
+  "preflight/README.md": "0f8185565fbe46aae15c0d85abb5a44bf2d3932c728843e054d275809583501b",
+  "preflight/commands.txt": "4839fc88e5e8f70052719bc18b8c570e1627951c80c977fdd7c4bca25d0458e9",
+  "run_profile.py": "ba038492520e0412dffa696d97ac46535596992f2c78b149fc08ed426fbb7c9b",
+  "summarize.py": "8f1dc420016fa0aeadc9f3a1cbb0a3099fdc0665a6877e0ee44af686dfadf0db",
+  "verify.py": "37a2071ff9fdd4be9542f710fa06eaa74aa5a0a0e5f0e6cede9aa70c13867c04"
+}

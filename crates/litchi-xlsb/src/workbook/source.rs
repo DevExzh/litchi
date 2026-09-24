@@ -4,14 +4,15 @@ use std::fmt;
 use std::io::{self, Cursor, Read, Write};
 use std::sync::{Arc, Mutex};
 
-use litchi_core::sheet::{Cell as SheetCell, Worksheet as SheetWorksheet};
+use litchi_core::sheet::{Cell as SheetCell, CellValue, Worksheet as SheetWorksheet};
 use litchi_core::{
     ExecutionContext, ReadAt, SequentialTextWriter, SourceVersion, TextObjectKind, TextOutputError,
     TextOutputOptions, TextOutputReport,
 };
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{
-    PackURI, PartView, ReadLimits, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits,
+    PackURI, PartData, PartView, ReadLimits, SourceBackedPackage, SourceCacheDiagnostics,
+    SourceCacheLimits,
 };
 use once_cell::sync::OnceCell;
 
@@ -120,6 +121,116 @@ pub struct SourceBackedWorkbook {
 pub struct SourceBackedWorksheet {
     inner: Arc<SourceInner>,
     catalog_position: usize,
+}
+
+/// Cached cell values accessed through a verified worksheet binary index.
+///
+/// Construction materializes the selected worksheet and index parts and checks
+/// their record framing. The handle retains those managed worksheet bytes;
+/// subsequent lookups do not construct a complete worksheet cell table.
+/// Formula results are the stored cache, without recalculation or formatting.
+#[derive(Clone)]
+pub struct SourceBackedIndexedWorksheet {
+    inner: Arc<SourceInner>,
+    worksheet: PartData,
+    index: Arc<crate::binary_index::WorksheetBinaryIndex>,
+    limits: crate::binary_index::Limits,
+}
+
+impl fmt::Debug for SourceBackedIndexedWorksheet {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SourceBackedIndexedWorksheet")
+            .field("worksheet_bytes", &self.worksheet.as_bytes().len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl SourceBackedIndexedWorksheet {
+    /// Read the stored scalar value at a zero-based row and column.
+    ///
+    /// An absent cell returns `None`; an explicit blank returns `Some(Empty)`.
+    /// Formula cells return their cached scalar without reading formula context
+    /// or evaluating it. Numeric values are raw numbers, without date or display
+    /// formatting. A shared-string lookup loads the workbook's shared-string
+    /// table on first use. Every call checks source freshness and cancellation.
+    /// The string ceiling bounds the returned shared-string value; loading the
+    /// shared-string table uses the workbook's existing ingress policy.
+    pub fn cached_value(&self, row: u32, column: u32) -> Result<Option<CellValue>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let record = self
+            .index
+            .lookup_record(self.worksheet.as_bytes(), row, column)?;
+        let value = match record {
+            Some((offset, payload)) => {
+                let value = crate::binary_index::decode_cached_value(
+                    crate::raw::Kind::new(offset.record_kind)?,
+                    payload,
+                    self.limits.raw,
+                )?;
+                Some(self.scalar_value(value)?)
+            },
+            None => None,
+        };
+        postflight_package(&self.inner.package)?;
+        Ok(value)
+    }
+
+    fn scalar_value(&self, value: crate::cell_values::Value) -> Result<CellValue> {
+        use crate::cell_values::{CellError, Value};
+
+        Ok(match value {
+            Value::Blank => CellValue::Empty,
+            Value::RkNumber(value) | Value::Number(value) | Value::FormulaNumberCache(value) => {
+                CellValue::Float(value)
+            },
+            Value::Boolean(value) | Value::FormulaBooleanCache(value) => CellValue::Bool(value),
+            Value::InlineString(value) | Value::FormulaStringCache(value) => {
+                CellValue::String(value)
+            },
+            Value::RichString(value) => CellValue::String(value.text),
+            Value::SharedStringIndex(index) => {
+                let strings = self.inner.shared_strings()?;
+                let index = usize::try_from(index).map_err(|_error| {
+                    Error::InvalidFormat("shared-string index exceeds platform size".to_string())
+                })?;
+                let string = strings.get(index).ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "indexed cell refers to a missing shared string".to_string(),
+                    )
+                })?;
+                let units = string.text.encode_utf16().count();
+                if units > self.limits.raw.string_units() {
+                    return Err(Error::LimitExceeded {
+                        resource: "indexed shared-string code units",
+                        actual: units,
+                        maximum: self.limits.raw.string_units(),
+                    });
+                }
+                let mut text = String::new();
+                text.try_reserve_exact(string.text.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "indexed shared-string value",
+                        source,
+                    })?;
+                text.push_str(&string.text);
+                CellValue::String(text)
+            },
+            Value::Error(error) | Value::FormulaErrorCache(error) => {
+                let text = match error {
+                    CellError::Null => "#NULL!",
+                    CellError::DivisionByZero => "#DIV/0!",
+                    CellError::Value => "#VALUE!",
+                    CellError::Reference => "#REF!",
+                    CellError::Name => "#NAME?",
+                    CellError::Number => "#NUM!",
+                    CellError::NotAvailable => "#N/A",
+                    CellError::GettingData => "#GETTING_DATA",
+                };
+                CellValue::Error(text.to_string())
+            },
+        })
+    }
 }
 
 /// A source-checked, immutable view of one bounded inert external-link model.
@@ -786,6 +897,30 @@ impl SourceBackedWorkbook {
         Ok(version)
     }
 
+    /// Read the workbook's optional theme without materializing worksheets.
+    ///
+    /// This loads the selected theme XML and returns an immutable metadata
+    /// view. Image relationships remain inert; their payloads are not read.
+    /// Source freshness and cancellation are checked around the operation.
+    /// Retain the returned view for repeated color and font queries.
+    pub fn theme(&self) -> Result<Option<crate::theme::View>> {
+        self.theme_with_limits(crate::theme::Limits::default())
+    }
+
+    /// Read the optional theme with explicit resource ceilings.
+    ///
+    /// The selected part's declared size is checked before payload loading;
+    /// decoded XML and publication bounds remain enforced by the theme owner.
+    pub fn theme_with_limits(
+        &self,
+        limits: crate::theme::Limits,
+    ) -> Result<Option<crate::theme::View>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let theme = crate::theme::read_source(&self.inner.package, limits);
+        postflight_package(&self.inner.package)?;
+        theme
+    }
+
     /// Inventory embedded-object and embedded-package relationships without
     /// materializing the OPC package or any payload bytes.
     ///
@@ -905,6 +1040,88 @@ impl SourceBackedWorkbook {
 }
 
 impl SourceBackedWorksheet {
+    /// Open this worksheet's binary index for stored scalar value lookups.
+    ///
+    /// Returns `None` when the worksheet has no index relationship. An invalid
+    /// or stale index is an error, rather than evidence that a cell is absent.
+    /// The selected worksheet and index parts are materialized and validated
+    /// once. Styles, formulas, drawings, and other sheets remain deferred.
+    ///
+    /// ```no_run
+    /// use litchi_xlsb::SourceBackedWorkbook;
+    ///
+    /// # fn read_one(path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    /// let workbook = SourceBackedWorkbook::from_reader(std::fs::File::open(path)?)?;
+    /// if let Some(sheet) = workbook.worksheet_by_name("Sheet1")?
+    ///     && let Some(values) = sheet.indexed_values()?
+    /// {
+    ///     let a1 = values.cached_value(0, 0)?;
+    ///     let b2 = values.cached_value(1, 1)?;
+    ///     // Reuse `values` for further lookups in this immutable source.
+    /// #   let _ = (a1, b2);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn indexed_values(&self) -> Result<Option<SourceBackedIndexedWorksheet>> {
+        self.indexed_values_with_limits(crate::binary_index::Limits::DEFAULT)
+    }
+
+    /// Open indexed values with explicit worksheet and index validation limits.
+    pub fn indexed_values_with_limits(
+        &self,
+        limits: crate::binary_index::Limits,
+    ) -> Result<Option<SourceBackedIndexedWorksheet>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let limits = limits.validate()?;
+        let metadata = self.metadata();
+        if !matches!(metadata.kind, SheetKind::Worksheet) {
+            return Err(Error::UnsupportedFeature(
+                "binary-index value lookup requires an XLSB worksheet".to_string(),
+            ));
+        }
+        let part = self.inner.package.part(&metadata.partname)?;
+        let Some(index_uri) = optional_related_part(
+            &part,
+            &["http://schemas.microsoft.com/office/2006/relationships/xlBinaryIndex"],
+            "worksheet binary index",
+        )?
+        else {
+            postflight_package(&self.inner.package)?;
+            return Ok(None);
+        };
+        let index_part = self.inner.package.part(&index_uri)?;
+        require_content_type(&index_part, "application/vnd.ms-excel.binIndexWs")?;
+        if !index_part.rels().is_empty() {
+            return Err(Error::InvalidRelationship(
+                "worksheet binary index part must not have relationships".to_string(),
+            ));
+        }
+        preflight_indexed_part(
+            &index_part,
+            limits
+                .source_bytes
+                .min(crate::binary_index::MAX_INDEX_STREAM_BYTES),
+            "binary-index bytes",
+        )?;
+        preflight_indexed_part(&part, limits.source_bytes, "indexed worksheet bytes")?;
+        let index_data = index_part.data()?;
+        let worksheet = part.data()?;
+        let _ = preflight_package(&self.inner.package)?;
+        let index = crate::binary_index::WorksheetBinaryIndex::from_parts(
+            index_data.as_bytes(),
+            worksheet.as_bytes(),
+            limits,
+        )?;
+        postflight_package(&self.inner.package)?;
+        Ok(Some(SourceBackedIndexedWorksheet {
+            inner: Arc::clone(&self.inner),
+            worksheet,
+            index: Arc::new(index),
+            limits,
+        }))
+    }
+
     /// Return this sheet's name after checking source freshness.
     pub fn name(&self) -> Result<&str> {
         let _ = preflight_package(&self.inner.package)?;
@@ -1392,7 +1609,7 @@ where
     Ok(counter.bytes)
 }
 
-fn count_cell_text(value: &litchi_core::sheet::CellValue) -> Result<usize> {
+fn count_cell_text(value: &CellValue) -> Result<usize> {
     use litchi_core::sheet::CellValue;
 
     match value {
@@ -1567,7 +1784,7 @@ where
     })
 }
 
-fn append_cell_text(output: &mut String, value: &litchi_core::sheet::CellValue) -> Result<()> {
+fn append_cell_text(output: &mut String, value: &CellValue) -> Result<()> {
     use litchi_core::sheet::CellValue;
 
     match value {
@@ -1628,6 +1845,23 @@ fn require_content_type(part: &PartView<'_>, expected: &str) -> Result<()> {
         return Err(Error::InvalidContentType {
             expected: expected.to_string(),
             got: part.content_type().to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn preflight_indexed_part(
+    part: &PartView<'_>,
+    maximum: usize,
+    resource: &'static str,
+) -> Result<()> {
+    let actual = usize::try_from(part.declared_uncompressed_size()?)
+        .map_err(|_error| Error::CapacityOverflow { resource })?;
+    if actual > maximum {
+        return Err(Error::LimitExceeded {
+            resource,
+            actual,
+            maximum,
         });
     }
     Ok(())

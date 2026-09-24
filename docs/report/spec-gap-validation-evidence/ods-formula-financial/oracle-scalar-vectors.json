@@ -1,0 +1,1531 @@
+{
+  "schema": "ods-formula-financial-scalar-oracle-v1",
+  "status": "draft independent Decimal corpus; scalar slice only",
+  "contract_sha256": "fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b",
+  "normative_source": {
+    "archive_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+    "part4_member_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+    "sections": "6.12.19-6.12.20, 6.12.23, 6.12.25, 6.12.28-6.12.29, 6.12.35-6.12.37, 6.12.41, 6.12.44 plus repository profiles"
+  },
+  "coverage": {
+    "covered_functions": [
+      "EFFECT",
+      "FV",
+      "IPMT",
+      "ISPMT",
+      "NOMINAL",
+      "NPER",
+      "PDURATION",
+      "PMT",
+      "PPMT",
+      "PV",
+      "RRI"
+    ],
+    "pending_functions": [
+      "CUMIPMT",
+      "CUMPRINC",
+      "FVSCHEDULE",
+      "IRR",
+      "MIRR",
+      "NPV",
+      "RATE",
+      "XIRR",
+      "XNPV"
+    ],
+    "claim": "This corpus covers eleven scalar non-iterative kernels only; it makes no all-twenty implementation or validation claim."
+  },
+  "precision": {
+    "decimal_digits": 100,
+    "rounding": "ROUND_HALF_EVEN during independent arithmetic",
+    "input_model": "formula literals are converted with IEEE-754 binary64 float() and Decimal.from_float before Decimal arithmetic",
+    "comparison": "per-vector absolute tolerance is zero; finite evaluator outputs use a 1e-12 relative tolerance without a unit-scale floor"
+  },
+  "profile": {
+    "integer_conversion": "declared Integer arguments truncate toward zero",
+    "number_controls": "Type and PayType declared Number arguments require exact converted 0 or 1",
+    "signed_integer_power": "finite negative-base integer powers are admitted where the equation has an integral exponent",
+    "rri_negative_ratio": "negative ratios are admitted only when the binary64 reciprocal of Nper is an exact positive integer; otherwise the result is #NUM!",
+    "ispmt": "Rate * Pv * (Period / Nper - 1)",
+    "ipmt_due": "Type=1 period one has zero interest; later due-period interest uses the selected 1 + Rate divisor",
+    "ppmt_boundary": "Period >= Nper is #NUM!"
+  },
+  "open_profile_questions": [],
+  "vector_count": 65,
+  "vectors": [
+    {
+      "id": "effect.basic",
+      "function": "EFFECT",
+      "formula": "=EFFECT(0.1;2)",
+      "args": [
+        "0.1",
+        "2"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "0.102500000000000005828670879282071844927786035025750052848911770339709274152406592861552780959755182",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "closed-form"
+      ],
+      "oracle_basis": "(1 + Rate / Payments)^Payments - 1"
+    },
+    {
+      "id": "effect.zero_rate",
+      "function": "EFFECT",
+      "formula": "=EFFECT(0;12)",
+      "args": [
+        "0",
+        "12"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "zero-rate",
+        "exact"
+      ],
+      "oracle_basis": "explicit zero-rate compounding branch"
+    },
+    {
+      "id": "effect.integer_truncates",
+      "function": "EFFECT",
+      "formula": "=EFFECT(0.1;2.9)",
+      "args": [
+        "0.1",
+        "2.9"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "0.102500000000000005828670879282071844927786035025750052848911770339709274152406592861552780959755182",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "integer-profile",
+        "truncation"
+      ],
+      "oracle_basis": "declared Integer Payments truncates toward zero before validation"
+    },
+    {
+      "id": "effect.negative_rate_num",
+      "function": "EFFECT",
+      "formula": "=EFFECT(-0.1;2)",
+      "args": [
+        "-0.1",
+        "2"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "domain-error"
+      ],
+      "oracle_basis": "source Rate >= 0 constraint"
+    },
+    {
+      "id": "effect.zero_payments_num",
+      "function": "EFFECT",
+      "formula": "=EFFECT(0.1;0)",
+      "args": [
+        "0.1",
+        "0"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "domain-error"
+      ],
+      "oracle_basis": "source Payments > 0 constraint"
+    },
+    {
+      "id": "fv.basic",
+      "function": "FV",
+      "formula": "=FV(0.1;1;-110)",
+      "args": [
+        "0.1",
+        "1",
+        "-110"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "110",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "default-arguments"
+      ],
+      "oracle_basis": "balance equation with Pv=0 and PayType=0 defaults"
+    },
+    {
+      "id": "fv.zero_rate",
+      "function": "FV",
+      "formula": "=FV(0;10;-10)",
+      "args": [
+        "0",
+        "10",
+        "-10"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "100",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "zero-rate",
+        "exact"
+      ],
+      "oracle_basis": "explicit zero-rate annuity branch"
+    },
+    {
+      "id": "fv.beginning_payment",
+      "function": "FV",
+      "formula": "=FV(0.1;1;-100;0;1)",
+      "args": [
+        "0.1",
+        "1",
+        "-100",
+        "0",
+        "1"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "110.00000000000000055511151231257827021181583404541015625",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "pay-type",
+        "annuity-due"
+      ],
+      "oracle_basis": "balance equation with due factor 1 + Rate * PayType"
+    },
+    {
+      "id": "fv.negative_base_integer_power",
+      "function": "FV",
+      "formula": "=FV(-2;2;0;100;0)",
+      "args": [
+        "-2",
+        "2",
+        "0",
+        "100",
+        "0"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-100",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "regression",
+        "negative-base",
+        "integer-power"
+      ],
+      "oracle_basis": "finite signed integer power (1 + Rate)^Nper"
+    },
+    {
+      "id": "fv.fractional_nper",
+      "function": "FV",
+      "formula": "=FV(0.1;0.5;-10)",
+      "args": [
+        "0.1",
+        "0.5",
+        "-10"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "4.880884817015154692840846073109009558058603802126508255053192651070361884662476482536585311694664205",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "fractional-number"
+      ],
+      "oracle_basis": "Number Nper remains fractional; positive-base real power"
+    },
+    {
+      "id": "fv.invalid_pay_type_num",
+      "function": "FV",
+      "formula": "=FV(0.1;2;0;0;0.5)",
+      "args": [
+        "0.1",
+        "2",
+        "0",
+        "0",
+        "0.5"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "control-error"
+      ],
+      "oracle_basis": "Number PayType admits only exact 0 or 1"
+    },
+    {
+      "id": "ipmt.ordinary_period_one",
+      "function": "IPMT",
+      "formula": "=IPMT(0.1;1;2;100)",
+      "args": [
+        "0.1",
+        "1",
+        "2",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-10.00000000000000055511151231257827021181583404541015625",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "ordinary-annuity"
+      ],
+      "oracle_basis": "selected amortization profile, Type=0 default"
+    },
+    {
+      "id": "ipmt.ordinary_period_two",
+      "function": "IPMT",
+      "formula": "=IPMT(0.1;2;2;100)",
+      "args": [
+        "0.1",
+        "2",
+        "2",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-5.238095238095238398598354801204905701865431178379820134892790811987155578753442624942423219429286122",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "ordinary-annuity",
+        "period-boundary"
+      ],
+      "oracle_basis": "selected amortization profile after the first payment"
+    },
+    {
+      "id": "ipmt.due_first_period_zero",
+      "function": "IPMT",
+      "formula": "=IPMT(0.1;1;2;100;0;1)",
+      "args": [
+        "0.1",
+        "1",
+        "2",
+        "100",
+        "0",
+        "1"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "pay-type",
+        "annuity-due",
+        "exact"
+      ],
+      "oracle_basis": "beginning payment occurs before first-period interest"
+    },
+    {
+      "id": "ipmt.due_after_period_one",
+      "function": "IPMT",
+      "formula": "=IPMT(0.1;2;2;100;0;1)",
+      "args": [
+        "0.1",
+        "2",
+        "2",
+        "100",
+        "0",
+        "1"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-4.761904761904762156513157511373364509950402867030336115107209188012844421246557375057576780570713874",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "regression",
+        "pay-type",
+        "annuity-due"
+      ],
+      "oracle_basis": "due-period interest uses the selected post-payment divisor 1 + Rate"
+    },
+    {
+      "id": "ipmt.zero_rate",
+      "function": "IPMT",
+      "formula": "=IPMT(0;1;10;100)",
+      "args": [
+        "0",
+        "1",
+        "10",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "zero-rate",
+        "exact"
+      ],
+      "oracle_basis": "interest component is zero at Rate=0"
+    },
+    {
+      "id": "ipmt.zero_nper_divzero",
+      "function": "IPMT",
+      "formula": "=IPMT(0.1;1;0;100)",
+      "args": [
+        "0.1",
+        "1",
+        "0",
+        "100"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#DIV/0!"
+      },
+      "tags": [
+        "domain-error"
+      ],
+      "oracle_basis": "selected zero-period divisor mapping"
+    },
+    {
+      "id": "ipmt.invalid_type_num",
+      "function": "IPMT",
+      "formula": "=IPMT(0.1;1;2;100;0;0.5)",
+      "args": [
+        "0.1",
+        "1",
+        "2",
+        "100",
+        "0",
+        "0.5"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "control-error"
+      ],
+      "oracle_basis": "Number Type admits only exact 0 or 1"
+    },
+    {
+      "id": "ispmt.period_one",
+      "function": "ISPMT",
+      "formula": "=ISPMT(0.1;1;2;100)",
+      "args": [
+        "0.1",
+        "1",
+        "2",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-5.000000000000000277555756156289135105907917022705078125",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "profile-regression"
+      ],
+      "oracle_basis": "conventional profile Rate * Pv * (Period / Nper - 1)"
+    },
+    {
+      "id": "ispmt.period_two",
+      "function": "ISPMT",
+      "formula": "=ISPMT(0.1;2;2;100)",
+      "args": [
+        "0.1",
+        "2",
+        "2",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "profile-regression",
+        "exact"
+      ],
+      "oracle_basis": "conventional profile at Period=Nper"
+    },
+    {
+      "id": "ispmt.period_zero",
+      "function": "ISPMT",
+      "formula": "=ISPMT(0.1;0;2;100)",
+      "args": [
+        "0.1",
+        "0",
+        "2",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-10.00000000000000055511151231257827021181583404541015625",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "profile-boundary"
+      ],
+      "oracle_basis": "conventional profile permits Number Period=0"
+    },
+    {
+      "id": "ispmt.zero_rate",
+      "function": "ISPMT",
+      "formula": "=ISPMT(0;1;2;100)",
+      "args": [
+        "0",
+        "1",
+        "2",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "zero-rate",
+        "exact"
+      ],
+      "oracle_basis": "conventional profile linear zero-rate result"
+    },
+    {
+      "id": "ispmt.zero_nper_divzero",
+      "function": "ISPMT",
+      "formula": "=ISPMT(0.1;1;0;100)",
+      "args": [
+        "0.1",
+        "1",
+        "0",
+        "100"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#DIV/0!"
+      },
+      "tags": [
+        "domain-error"
+      ],
+      "oracle_basis": "zero Nper denominator"
+    },
+    {
+      "id": "nominal.basic",
+      "function": "NOMINAL",
+      "formula": "=NOMINAL(0.1025;2)",
+      "args": [
+        "0.1025",
+        "2"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "0.099999999999999994184546061487275256395380664533045481458587066293116646765970870318136543500954732",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "closed-form"
+      ],
+      "oracle_basis": "inverse of EFFECT"
+    },
+    {
+      "id": "nominal.integer_truncates",
+      "function": "NOMINAL",
+      "formula": "=NOMINAL(0.1025;2.9)",
+      "args": [
+        "0.1025",
+        "2.9"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "0.099999999999999994184546061487275256395380664533045481458587066293116646765970870318136543500954732",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "integer-profile",
+        "truncation"
+      ],
+      "oracle_basis": "declared Integer CompoundingPeriods truncates toward zero"
+    },
+    {
+      "id": "nominal.one_period",
+      "function": "NOMINAL",
+      "formula": "=NOMINAL(0.1;1)",
+      "args": [
+        "0.1",
+        "1"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "0.1000000000000000055511151231257827021181583404541015625",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "exact",
+        "closed-form"
+      ],
+      "oracle_basis": "one-period inverse compounding"
+    },
+    {
+      "id": "nominal_zero_rate_num",
+      "function": "NOMINAL",
+      "formula": "=NOMINAL(0;2)",
+      "args": [
+        "0",
+        "2"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "domain-error"
+      ],
+      "oracle_basis": "source EffectiveRate > 0 constraint"
+    },
+    {
+      "id": "nper.basic",
+      "function": "NPER",
+      "formula": "=NPER(0.1;-110;100)",
+      "args": [
+        "0.1",
+        "-110",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "1.000000000000000005294784150141451687268949724521758255023920216678950576347992806212244717014131122",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "closed-form"
+      ],
+      "oracle_basis": "logarithmic balance-equation solution"
+    },
+    {
+      "id": "nper.zero_rate",
+      "function": "NPER",
+      "formula": "=NPER(0;-10;100)",
+      "args": [
+        "0",
+        "-10",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "10",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "zero-rate",
+        "exact"
+      ],
+      "oracle_basis": "explicit zero-rate balance branch"
+    },
+    {
+      "id": "nper.tiny_rate",
+      "function": "NPER",
+      "formula": "=NPER(1e-20;-10;100;0;0)",
+      "args": [
+        "1e-20",
+        "-10",
+        "100",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "10.00000000000000000054999999999999996987004929981526440453234886217571699277847560740806937794848453",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "regression",
+        "tiny-rate",
+        "stability"
+      ],
+      "oracle_basis": "unrounded logarithmic balance ratio at a tiny nonzero Rate"
+    },
+    {
+      "id": "nper.negative_rate",
+      "function": "NPER",
+      "formula": "=NPER(-0.1;-10;100)",
+      "args": [
+        "-0.1",
+        "-10",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "6.578813478960583661393815673928933815288427540477597738165169435338559613865577799037802707246547512",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "negative-rate-profile"
+      ],
+      "oracle_basis": "source/profile admits a finite negative Rate when the real log branch exists"
+    },
+    {
+      "id": "nper.beginning_payment",
+      "function": "NPER",
+      "formula": "=NPER(0.1;-110;100;0;1)",
+      "args": [
+        "0.1",
+        "-110",
+        "100",
+        "0",
+        "1"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "0.9050485946149977133390070127618637668605402279103615351720757346623409481542952207590471111429287665",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "pay-type",
+        "annuity-due"
+      ],
+      "oracle_basis": "balance equation with due factor"
+    },
+    {
+      "id": "nper.zero_denominator_divzero",
+      "function": "NPER",
+      "formula": "=NPER(0.125;-12.5;100)",
+      "args": [
+        "0.125",
+        "-12.5",
+        "100"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#DIV/0!"
+      },
+      "tags": [
+        "domain-error"
+      ],
+      "oracle_basis": "exactly representable binary64 Rate and Payment make the balance-equation denominator zero"
+    },
+    {
+      "id": "nper.invalid_pay_type_num",
+      "function": "NPER",
+      "formula": "=NPER(0.1;-110;100;0;1.9)",
+      "args": [
+        "0.1",
+        "-110",
+        "100",
+        "0",
+        "1.9"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "control-error"
+      ],
+      "oracle_basis": "Number PayType is not truncated; only exact 0 or 1 is admitted"
+    },
+    {
+      "id": "pduration.basic",
+      "function": "PDURATION",
+      "formula": "=PDURATION(0.1;100;121)",
+      "args": [
+        "0.1",
+        "100",
+        "121"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "1.999999999999999894104316997170972426931843112315027447622330089979203202530925166735249841648001335",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "closed-form"
+      ],
+      "oracle_basis": "(ln(Specified) - ln(Current)) / ln(1 + Rate)"
+    },
+    {
+      "id": "pduration.equal_values",
+      "function": "PDURATION",
+      "formula": "=PDURATION(0.1;100;100)",
+      "args": [
+        "0.1",
+        "100",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "exact",
+        "boundary"
+      ],
+      "oracle_basis": "equal values return zero before logarithm"
+    },
+    {
+      "id": "pduration.decrease",
+      "function": "PDURATION",
+      "formula": "=PDURATION(0.1;121;100)",
+      "args": [
+        "0.1",
+        "121",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-1.999999999999999894104316997170972426931843112315027447622330089979203202530925166735249841648001335",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "negative-result"
+      ],
+      "oracle_basis": "signed logarithmic duration"
+    },
+    {
+      "id": "pduration.invalid_rate_num",
+      "function": "PDURATION",
+      "formula": "=PDURATION(0;100;121)",
+      "args": [
+        "0",
+        "100",
+        "121"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "domain-error"
+      ],
+      "oracle_basis": "source Rate > 0 constraint"
+    },
+    {
+      "id": "pduration.invalid_current_num",
+      "function": "PDURATION",
+      "formula": "=PDURATION(0.1;0;121)",
+      "args": [
+        "0.1",
+        "0",
+        "121"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "domain-error"
+      ],
+      "oracle_basis": "source CurrentValue > 0 constraint"
+    },
+    {
+      "id": "pmt.basic",
+      "function": "PMT",
+      "formula": "=PMT(0.1;1;100)",
+      "args": [
+        "0.1",
+        "1",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-110.00000000000000055511151231257827021181583404541015625",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "default-arguments"
+      ],
+      "oracle_basis": "balance equation with Fv=0 and PayType=0 defaults"
+    },
+    {
+      "id": "pmt.zero_rate",
+      "function": "PMT",
+      "formula": "=PMT(0;10;100)",
+      "args": [
+        "0",
+        "10",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-10",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "zero-rate",
+        "exact"
+      ],
+      "oracle_basis": "explicit zero-rate payment branch"
+    },
+    {
+      "id": "pmt.beginning_payment",
+      "function": "PMT",
+      "formula": "=PMT(0.1;1;100;0;1)",
+      "args": [
+        "0.1",
+        "1",
+        "100",
+        "0",
+        "1"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-100",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "pay-type",
+        "annuity-due"
+      ],
+      "oracle_basis": "balance equation with due factor"
+    },
+    {
+      "id": "pmt.integer_nper_truncates",
+      "function": "PMT",
+      "formula": "=PMT(0.1;2.9;100)",
+      "args": [
+        "0.1",
+        "2.9",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-57.61904761904761947685493355689158795684063261189498819244639540599357778937672131247121160971464309",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "integer-profile",
+        "truncation"
+      ],
+      "oracle_basis": "declared Integer Nper truncates toward zero"
+    },
+    {
+      "id": "pmt.invalid_nper_num",
+      "function": "PMT",
+      "formula": "=PMT(0.1;0;100)",
+      "args": [
+        "0.1",
+        "0",
+        "100"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "domain-error"
+      ],
+      "oracle_basis": "source Nper > 0 constraint"
+    },
+    {
+      "id": "pmt.invalid_pay_type_num",
+      "function": "PMT",
+      "formula": "=PMT(0.1;1;100;0;0.5)",
+      "args": [
+        "0.1",
+        "1",
+        "100",
+        "0",
+        "0.5"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "control-error"
+      ],
+      "oracle_basis": "Number PayType admits only exact 0 or 1"
+    },
+    {
+      "id": "ppmt.basic",
+      "function": "PPMT",
+      "formula": "=PPMT(0.1;1;2;100)",
+      "args": [
+        "0.1",
+        "1",
+        "2",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-47.61904761904761892174342124431331774502479856648483194244639540599357778937672131247121160971464309",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "closed-form"
+      ],
+      "oracle_basis": "Payment - IPMT under the selected amortization profile"
+    },
+    {
+      "id": "ppmt.beginning_payment",
+      "function": "PPMT",
+      "formula": "=PPMT(0.1;1;2;100;0;1)",
+      "args": [
+        "0.1",
+        "1",
+        "2",
+        "100",
+        "0",
+        "1"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-52.38095238095238107825657875568668225497520143351516805755360459400642221062327868752878839028535694",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "pay-type",
+        "annuity-due"
+      ],
+      "oracle_basis": "Type=1 first-period interest is zero"
+    },
+    {
+      "id": "ppmt.period_equal_nper_num",
+      "function": "PPMT",
+      "formula": "=PPMT(0.1;2;2;100)",
+      "args": [
+        "0.1",
+        "2",
+        "2",
+        "100"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "regression",
+        "domain-error",
+        "period-boundary"
+      ],
+      "oracle_basis": "explicit PPMT precondition Period < Nper"
+    },
+    {
+      "id": "ppmt.period_integer_truncates",
+      "function": "PPMT",
+      "formula": "=PPMT(0.1;1.9;2.9;100)",
+      "args": [
+        "0.1",
+        "1.9",
+        "2.9",
+        "100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-47.61904761904761892174342124431331774502479856648483194244639540599357778937672131247121160971464309",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "integer-profile",
+        "truncation"
+      ],
+      "oracle_basis": "declared Integer Period and Nper truncate toward zero"
+    },
+    {
+      "id": "ppmt.zero_rate_num",
+      "function": "PPMT",
+      "formula": "=PPMT(0;1;2;100)",
+      "args": [
+        "0",
+        "1",
+        "2",
+        "100"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "domain-error"
+      ],
+      "oracle_basis": "source Rate > 0 constraint"
+    },
+    {
+      "id": "ppmt.invalid_type_num",
+      "function": "PPMT",
+      "formula": "=PPMT(0.1;1;2;100;0;0.5)",
+      "args": [
+        "0.1",
+        "1",
+        "2",
+        "100",
+        "0",
+        "0.5"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "control-error"
+      ],
+      "oracle_basis": "Number Type is not truncated; exact 0/1 only"
+    },
+    {
+      "id": "pv.basic",
+      "function": "PV",
+      "formula": "=PV(0.1;1;-110)",
+      "args": [
+        "0.1",
+        "1",
+        "-110"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "99.99999999999999949535317062492884780866982939638527063135013851196095541019433084935872868461345981",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "default-arguments"
+      ],
+      "oracle_basis": "balance equation with Fv=0 and PayType=0 defaults"
+    },
+    {
+      "id": "pv.zero_rate",
+      "function": "PV",
+      "formula": "=PV(0;10;-10)",
+      "args": [
+        "0",
+        "10",
+        "-10"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "100",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "zero-rate",
+        "exact"
+      ],
+      "oracle_basis": "explicit zero-rate present-value branch"
+    },
+    {
+      "id": "pv.beginning_payment",
+      "function": "PV",
+      "formula": "=PV(0.1;1;-100;0;1)",
+      "args": [
+        "0.1",
+        "1",
+        "-100",
+        "0",
+        "1"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "100",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "pay-type",
+        "annuity-due"
+      ],
+      "oracle_basis": "balance equation with due factor"
+    },
+    {
+      "id": "pv.rate_minus_one_divzero",
+      "function": "PV",
+      "formula": "=PV(-1;1;0;1)",
+      "args": [
+        "-1",
+        "1",
+        "0",
+        "1"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#DIV/0!"
+      },
+      "tags": [
+        "regression",
+        "domain-error"
+      ],
+      "oracle_basis": "zero growth factor is a direct PV divisor"
+    },
+    {
+      "id": "pv.invalid_pay_type_num",
+      "function": "PV",
+      "formula": "=PV(0.1;1;-100;0;1.9)",
+      "args": [
+        "0.1",
+        "1",
+        "-100",
+        "0",
+        "1.9"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "control-error"
+      ],
+      "oracle_basis": "Number PayType is not truncated; exact 0/1 only"
+    },
+    {
+      "id": "rri.basic",
+      "function": "RRI",
+      "formula": "=RRI(2;100;121)",
+      "args": [
+        "2",
+        "100",
+        "121"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "0.1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "baseline",
+        "closed-form"
+      ],
+      "oracle_basis": "(Fv / Pv)^(1 / Nper) - 1"
+    },
+    {
+      "id": "rri.one_period",
+      "function": "RRI",
+      "formula": "=RRI(1;100;110)",
+      "args": [
+        "1",
+        "100",
+        "110"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "0.1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "exact",
+        "closed-form"
+      ],
+      "oracle_basis": "one-period ratio"
+    },
+    {
+      "id": "rri.negative_ratio_integer_exponent",
+      "function": "RRI",
+      "formula": "=RRI(1;100;-100)",
+      "args": [
+        "1",
+        "100",
+        "-100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-2",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "regression",
+        "negative-base",
+        "integer-power"
+      ],
+      "oracle_basis": "negative ratio with exact integer reciprocal exponent"
+    },
+    {
+      "id": "rri.negative_ratio_even_power",
+      "function": "RRI",
+      "formula": "=RRI(0.5;100;-100)",
+      "args": [
+        "0.5",
+        "100",
+        "-100"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "negative-base",
+        "integer-power"
+      ],
+      "oracle_basis": "reciprocal exponent 2 gives a positive real root"
+    },
+    {
+      "id": "rri.negative_ratio_odd_root_refused",
+      "function": "RRI",
+      "formula": "=RRI(3;100;-800)",
+      "args": [
+        "3",
+        "100",
+        "-800"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "negative-base",
+        "domain-error",
+        "profile-regression"
+      ],
+      "oracle_basis": "the selected profile admits a negative ratio only when the binary64 reciprocal Nper is an exact integer"
+    },
+    {
+      "id": "rri.zero_future_minus_one",
+      "function": "RRI",
+      "formula": "=RRI(2;100;0)",
+      "args": [
+        "2",
+        "100",
+        "0"
+      ],
+      "expected": {
+        "kind": "number",
+        "value": "-1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "tags": [
+        "boundary",
+        "exact"
+      ],
+      "oracle_basis": "zero future value gives ratio limit -1"
+    },
+    {
+      "id": "rri.negative_ratio_fractional_num",
+      "function": "RRI",
+      "formula": "=RRI(2;100;-100)",
+      "args": [
+        "2",
+        "100",
+        "-100"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "domain-error",
+        "negative-base"
+      ],
+      "oracle_basis": "negative ratio with noninteger reciprocal exponent has no real result"
+    },
+    {
+      "id": "rri.zero_nper_num",
+      "function": "RRI",
+      "formula": "=RRI(0;100;121)",
+      "args": [
+        "0",
+        "100",
+        "121"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "domain-error"
+      ],
+      "oracle_basis": "source Nper > 0 constraint"
+    },
+    {
+      "id": "rri.zero_present_num",
+      "function": "RRI",
+      "formula": "=RRI(2;0;121)",
+      "args": [
+        "2",
+        "0",
+        "121"
+      ],
+      "expected": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "tags": [
+        "domain-error"
+      ],
+      "oracle_basis": "zero present value has no finite ratio"
+    }
+  ]
+}

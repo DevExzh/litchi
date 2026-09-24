@@ -1,0 +1,26 @@
+{
+  "allocation_order": {
+    "cfb": "source length, header counts, 512KiB directory, and 64MiB allocation-table ceilings are checked before CFB index allocation",
+    "crypto": "the 512KiB CFB directory and 64MiB allocation-table ceilings are applied through the explicit OOXML encryption profile before DataSpaces inspection or decryption",
+    "filesystem": "metadata length is admitted before Vec reservation and bounded chunk reads",
+    "opc": "ReadLimits apply an explicit total central-directory entry preflight, then bound the non-directory member index and part payload reads",
+    "zip": "a bounded Rust central-directory preflight counts every entry, including directories, before ArchiveReader or PreservationIndex ownership; ArchiveLimits::max_files remains the non-directory file limit"
+  },
+  "external_reference_resolution": false,
+  "host_code_execution": false,
+  "max_cfb_allocation_table_bytes": 67108864,
+  "max_cfb_directory_bytes": 524288,
+  "max_input_bytes": 67108864,
+  "max_materialized_bytes": 67108864,
+  "max_member_bytes": 67108864,
+  "max_members": 4096,
+  "max_opc_zip_total_entries": 4096,
+  "max_output_bytes": 67108864,
+  "max_relationships": 8192,
+  "max_zip_non_directory_entries": 4096,
+  "max_zip_total_entries": 4096,
+  "notes": "Rows are executable correctness operations. ZIP total-entry admission is explicit because ArchiveLimits::max_files excludes directory records. The zero-DataSpaces-block fixture must refuse strict spaces inspection while compatibility OOXML decryption accepts it. Timing is opt-in and intentionally not captured by this candidate.",
+  "profile_id": "security-corpus-bounded-read-v3",
+  "timed_captures_recorded": false,
+  "timed_operation_definitions": 3
+}

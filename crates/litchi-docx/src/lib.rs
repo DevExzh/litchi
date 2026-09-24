@@ -25,6 +25,7 @@ pub mod glossary;
 pub mod header_footer;
 pub mod hyperlink;
 pub mod image;
+pub mod ink;
 pub mod list;
 pub mod mail_merge;
 pub mod math;
@@ -61,6 +62,43 @@ pub mod variables;
 #[cfg(feature = "vba-inspection")]
 pub mod vba_project;
 pub mod web;
+/// Inert Office Add-in and persisted task-pane models, limits and graph patches.
+///
+/// These shared types are used by [`Package::task_panes`] and
+/// [`Package::plan_task_panes`]. DOCX web-output settings remain in [`web`].
+///
+/// ```
+/// use litchi_core::patch::{BlobLimits, Patch as DurablePatch, PatchLimits, Reversible};
+/// use litchi_docx::{Package, web_extensions as extensions};
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let mut package = Package::new()?;
+/// let reference = extensions::Reference::new("addin", "1.0", extensions::Store::Omex)?;
+/// let mut add_in = extensions::AddIn::new("addin-instance", reference)?;
+/// let mut functions = extensions::CustomFunctions::new();
+/// functions.set_background_app_data(Some(extensions::BackgroundAppData::new(
+///     3, "runtime-instance",
+/// )?));
+/// add_in.set_custom_functions(Some(functions))?;
+/// let mut panes = extensions::Panes::new();
+/// panes.push(extensions::Pane::new(add_in))?;
+/// let patch = package.plan_task_panes(panes, extensions::Conformance::Transitional)?;
+/// package.apply_task_panes_patch(&patch)?;
+/// package.apply_task_panes_patch(&patch.inverse())?;
+///
+/// // Choose finite wire limits for the expected document workload.
+/// let wire_limits = PatchLimits::new(
+///     BlobLimits::new(2, 1_048_576, 2_097_152),
+///     4_194_304, 1, 8, 1_024, 1_024,
+/// );
+/// let wire = patch.to_durable(wire_limits)?.to_deterministic_json()?;
+/// let durable = DurablePatch::<Reversible>::from_deterministic_json(&wire, wire_limits)?;
+/// package.apply_durable_task_panes_patch(&durable)?;
+/// package.apply_durable_task_panes_patch(&durable.inverse())?;
+/// # Ok(())
+/// # }
+/// ```
+pub use litchi_ooxml_common::web as web_extensions;
 pub mod writer;
 
 #[cfg(feature = "encryption")]

@@ -1642,6 +1642,51 @@ does not reproduce in a second matched sequence; control RSS itself varies
 still shows roughly five-percent slower payload-heavy PPT creation and small
 CFB-read penalties. All individual observations and limitations remain retained.
 
+## Evidence scope as of 2026-09-10
+
+The [0470 authority record](changes/0470-performance-authority-reconciliation.md)
+binds each published measurement to its source and keeps the full performance
+program open. The allocator publication proves its 201-row resource contract;
+its instrumented elapsed values are excluded from latency claims. The older
+normal report measures `1b3f2c2d`, and the three-repeat normal control measures
+`995bdaf09`. These code snapshots predate later feature changes. Documentation
+commits do not themselves invalidate a measurement; release evidence must match
+the measured production source and binary identities.
+
+The [accepted XLSX optimization](results/xlsx-plain-cell-tag-20260910/README.md)
+records 5.568% lower pooled normal p50, 20.559% fewer allocation calls and
+7.079% fewer allocated bytes for one dense-wide commit/save workload against
+historical base `995bdaf09`. Region peak increased by four bytes. The separate
+[paired scaling publication](results/paired-scaling-cf98-20260910/README.md)
+retains descriptive fixed-work and simulated-range evidence without a common
+Amdahl or production-wide scaling claim.
+
+The [provider/sink implementation](results/provider-sinks-validation-v3-20260910/README.md)
+is committed with four opt-in axes and unchanged default selection. Its
+correctness checks are available; measured provider captures remain pending.
+The [dated 264-row audit](results/performance-requirements-audit-20260910/README.md)
+retains its original counts (10 complete, 99 incomplete, 116 weak, 39 missing),
+not a current completion score. The authority record lists eight remaining
+work classes. ADR-0005 and ADR-0008 remain open for their full applicable
+latency, resource, I/O, corpus, native/readback, scaling and release evidence.
+
+## Historical full baseline publication (2026-09-10)
+
+The portable [full baseline publication](results/full-baseline-20260910/)
+records one descriptive control capture from historical source commit
+`1b3f2c2d`. It has 201 normal rows across 37 cases and 31 deterministic
+corpora, with zero normal filesystem rows, and a separate two-row `tmpfs`
+allocator smoke. The raw report remains immutable; its explicitly labelled
+derived report removes only 25 misaligned per-sample `operation_metrics`
+envelopes and leaves top-level elapsed timing and sink objects unchanged.
+
+The publication records the failed allocator V2 sidecar and the successful
+manual two-row V1-manifest rerun, the build-only lock overlay, exact commands,
+and host contention. `cold-requested` is not physical cache evidence. These
+artifacts are descriptive historical observations and make no causal,
+latency-improvement, scaling, native-producer, or production optimization
+claim. They do not represent the current feature HEAD.
+
 ## Current XLSX compaction allocation result (0469)
 
 [0469](changes/0469-xlsx-borrowed-compaction-events.md) removes temporary event
@@ -4371,10 +4416,13 @@ are validated afterward against typed XLSX and OPC/property oracles.
 
 Warm, cold-requested, and admitted cold-verified cache states are explicit.
 Cold verification proves initial page-cache state plus positive process
-`read_bytes` on a page-aligned, independently hashed source; it does not prove
-physical device I/O. This is harness correctness and reproducibility coverage,
-not retained before/after evidence. See
-[change 0260](changes/0260-xlsx-fresh-child-filesystem-roots.md).
+`read_bytes` on a page-aligned, independently hashed source and retains a
+strict post-operation per-file `fincore` observation outside the timer; it does
+not prove physical device I/O. A missing, malformed, size-mismatched, or
+provenance-changed post probe is ineligible and cannot fall back to another
+cache mode. This is harness correctness and reproducibility coverage, not a
+performance claim. See [change 0260](changes/0260-xlsx-fresh-child-filesystem-roots.md)
+and [change 0496](changes/0496-cold-verified-cache-post-observation.md).
 
 ## Latest retained XLSX vendor-extension correctness shape (change 0262)
 
@@ -5817,6 +5865,17 @@ states; sample provenance contains aligned source SHA-256/size and fincore
 method/fallback fields, while stderr contents and absolute paths are omitted.
 See
 [`0236`](changes/0236-cold-verified-filesystem-evidence.md).
+
+Change 0496 retains one strict post-operation `fincore` observation in the
+same fresh child, outside the timed interval, under additive `fincore_post`
+fields. It requires post size and full fincore provenance to match the
+pre-operation probe, records post residency/dirty/writeback counters without
+requiring them to be zero, and reports `ineligible_post_fincore` for missing,
+malformed, size-mismatched, or changed post evidence without falling back to a
+different cache mode. A private ext4 host probe confirmed the existing
+per-file `fadvise`/`fincore` path without global cache eviction; this is
+capability evidence only, with no workload or performance claim. See
+[`0496`](changes/0496-cold-verified-cache-post-observation.md).
 
 Source-backed OPC payload retention is now optionally charged to a caller's
 hierarchical `Budget`. The managed cache preserves pinned handles, reserves

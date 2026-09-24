@@ -1,0 +1,7 @@
+{
+  "scope": "Cache lookup patch transplanted onto archived draft27, profile diagnostics7651 applied; canonical kind-probe work excluded",
+  "result": "59 of60 integrationtests pass; finitecache regressionfixed, known computed-arrayoperand teststillfails",
+  "archive": "planner-cache-29.tar.gz",
+  "sha256": "8611c9ea31c32c673faacf52b0a92a8e099798accb819a408b5411b31c0def3d",
+  "status": 101
+}

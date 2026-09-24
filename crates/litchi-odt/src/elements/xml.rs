@@ -23,6 +23,50 @@ pub(crate) fn is_bound(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
     matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == expected)
 }
 
+/// Compare a namespace result produced by `ResolvedReader` with a canonical
+/// URI without decoding it a second time.
+///
+/// `ResolvedReader` has already applied XML attribute-value normalization to
+/// namespace declarations before adding them to its resolver.  Keeping this
+/// helper separate from the legacy `litchi_odf_common::namespace` helpers is
+/// deliberate: those helpers decode the lexical bytes returned by
+/// `quick_xml::NsReader`, which would turn an already-normalized URI back into
+/// an unnecessary allocation and could change the source-backed fast path.
+pub(crate) fn normalized_namespace_matches(
+    namespace: &ResolveResult<'_>,
+    expected: &[u8],
+    context: &str,
+) -> Result<bool> {
+    let Some(actual) = normalized_namespace_uri(namespace, context)? else {
+        return Ok(false);
+    };
+    Ok(actual == expected)
+}
+
+/// Return the already-normalized URI from a `ResolvedReader` result.
+pub(crate) fn normalized_namespace_uri<'borrow, 'namespace>(
+    namespace: &'borrow ResolveResult<'namespace>,
+    context: &str,
+) -> Result<Option<&'borrow [u8]>>
+where
+    'namespace: 'borrow,
+{
+    match namespace {
+        ResolveResult::Unbound => Ok(None),
+        ResolveResult::Unknown(_) => Err(Error::InvalidFormat(format!(
+            "{context}: the namespace prefix is not bound"
+        ))),
+        ResolveResult::Bound(Namespace(uri)) => {
+            if uri.as_ref() == crate::namespace::XMLNS_DECLARATION_NAMESPACE.as_bytes() {
+                return Err(Error::InvalidFormat(format!(
+                    "{context}: the XMLNS namespace URI is reserved for namespace declarations"
+                )));
+            }
+            Ok(Some(uri.as_ref()))
+        },
+    }
+}
+
 pub(crate) fn namespaced_attribute(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,

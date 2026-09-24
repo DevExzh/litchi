@@ -1,0 +1,10 @@
+{
+  "candidate": "/var/tmp/litchi-performance-full-baseline-pptx-fix-candidate-20260909",
+  "base": "1b3f2c2d0c059e8e59272775a97d0567e14e67f2",
+  "sources": {
+    "crates/litchi-pptx/src/presentation/source.rs": "04a47d44d0af1343f637a6957848a6e713b3c7805b1c1f6d5a46bbd6a2085ed1",
+    "crates/litchi-pptx/tests/source_backed_edit.rs": "1552e4ff1a55f5c5c4f57f9b292c914fe5f1b0c690ff47ad3aa316c4b4bb396e",
+    "tools/perf-baseline/src/pptx_native_image.rs": "2ef04581ebe135c27cb0f3cb11fa4988fb433e5893f95cf2fd24da1fa3f66489"
+  },
+  "excluded_already_committed": "tools/perf-baseline/Cargo.lock (23dc8248a)"
+}

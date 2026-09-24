@@ -1,6 +1,8 @@
 //! Spreadsheet consolidation declarations.
 
-use super::structure::{split_cell_range_addresses, validate_cell_range_addresses};
+use super::structure::{
+    split_cell_range_addresses, validate_cell_address, validate_cell_range_addresses,
+};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
@@ -357,92 +359,8 @@ pub fn write_consolidation(out: &mut String, consolidation: Option<&Options>) ->
     Ok(())
 }
 
-fn contains_unquoted(value: &str, needle: char) -> bool {
-    let mut quoted = false;
-    let mut chars = value.chars().peekable();
-    while let Some(character) = chars.next() {
-        if character == '\'' {
-            if quoted && chars.peek() == Some(&'\'') {
-                chars.next();
-            } else {
-                quoted = !quoted;
-            }
-        } else if character == needle && !quoted {
-            return true;
-        }
-    }
-    false
-}
-
 fn validate_target_cell_address(value: &str) -> Result<()> {
-    if value != value.trim() || contains_unquoted(value, ':') {
-        return Err(invalid_target(value));
-    }
-
-    let mut quoted = false;
-    let mut separator = None;
-    let mut chars = value.char_indices().peekable();
-    while let Some((index, character)) = chars.next() {
-        if character == '\'' {
-            if quoted && chars.peek().is_some_and(|(_, next)| *next == '\'') {
-                chars.next();
-            } else {
-                quoted = !quoted;
-            }
-        } else if character == '.' && !quoted && separator.replace(index).is_some() {
-            return Err(invalid_target(value));
-        }
-    }
-    if quoted {
-        return Err(invalid_target(value));
-    }
-
-    let separator = separator.ok_or_else(|| invalid_target(value))?;
-    let sheet = &value[..separator];
-    let cell = &value[separator + 1..];
-    if !valid_sheet_name(sheet) || !valid_cell_reference(cell) {
-        return Err(invalid_target(value));
-    }
-    Ok(())
-}
-
-fn valid_sheet_name(value: &str) -> bool {
-    let qualified = value.starts_with('$');
-    let value = value.strip_prefix('$').unwrap_or(value);
-    if value.is_empty() {
-        return !qualified;
-    }
-    if let Some(inner) = value
-        .strip_prefix('\'')
-        .and_then(|value| value.strip_suffix('\''))
-    {
-        if inner.is_empty() {
-            return false;
-        }
-        let mut chars = inner.chars().peekable();
-        while let Some(character) = chars.next() {
-            if character == '\'' && chars.next() != Some('\'') {
-                return false;
-            }
-        }
-        true
-    } else {
-        !value
-            .chars()
-            .any(|character| character == '.' || character == '\'' || character == ' ')
-    }
-}
-
-fn valid_cell_reference(value: &str) -> bool {
-    let value = value.strip_prefix('$').unwrap_or(value);
-    let column_length = value.bytes().take_while(u8::is_ascii_uppercase).count();
-    if column_length == 0 {
-        return false;
-    }
-    let row = value[column_length..]
-        .strip_prefix('$')
-        .unwrap_or(&value[column_length..]);
-    !row.is_empty() && row.bytes().all(|byte| byte.is_ascii_digit())
+    validate_cell_address(value).map_err(|_| invalid_target(value))
 }
 
 fn invalid_target(value: &str) -> Error {
@@ -487,7 +405,7 @@ mod tests {
             "<o:document-content xmlns:o=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" ",
             "xmlns:t=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\">",
             "<o:body><o:spreadsheet><t:consolidation t:function=\"vendor:median\" ",
-            "t:source-cell-range-addresses=\"'Q1 Sales'.A1:B2 Sheet2.C3:D4\" ",
+            "t:source-cell-range-addresses=\"'Q1 Sales'.A1:'Q1 Sales'.B2 Sheet2.C3:Sheet2.D4\" ",
             "t:target-cell-address=\"Summary.A1\" t:use-labels=\"both\" ",
             "t:link-to-source-data=\"1\"></t:consolidation>",
             "</o:spreadsheet></o:body></o:document-content>"
@@ -502,17 +420,17 @@ mod tests {
     #[test]
     fn rejects_invalid_structure_and_values() {
         for fragment in [
-            "<table:table><table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:A2\" table:target-cell-address=\"S.B1\"/></table:table>",
-            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:A2\" table:target-cell-address=\"S.B1\"/><table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:A2\" table:target-cell-address=\"S.B1\"/>",
-            "<table:consolidation table:source-cell-range-addresses=\"S.A1:A2\" table:target-cell-address=\"S.B1\"/>",
+            "<table:table><table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:S.A2\" table:target-cell-address=\"S.B1\"/></table:table>",
+            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:S.A2\" table:target-cell-address=\"S.B1\"/><table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:S.A2\" table:target-cell-address=\"S.B1\"/>",
+            "<table:consolidation table:source-cell-range-addresses=\"S.A1:S.A2\" table:target-cell-address=\"S.B1\"/>",
             "<table:consolidation table:function=\"sum\" table:target-cell-address=\"S.B1\"/>",
-            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:A2\"/>",
-            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:A2\" table:target-cell-address=\"S.B1:B2\"/>",
-            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:A2\" table:target-cell-address=\"B1\"/>",
-            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:A2\" table:target-cell-address=\"S.b1\"/>",
-            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:A2\" table:target-cell-address=\"S.B1\" table:use-labels=\"sideways\"/>",
-            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:A2\" table:target-cell-address=\"S.B1\" table:link-to-source-data=\"yes\"/>",
-            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:A2\" table:target-cell-address=\"S.B1\"><table:x/></table:consolidation>",
+            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:S.A2\"/>",
+            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:S.A2\" table:target-cell-address=\"S.B1:B2\"/>",
+            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:S.A2\" table:target-cell-address=\"B1\"/>",
+            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:S.A2\" table:target-cell-address=\"S.b1\"/>",
+            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:S.A2\" table:target-cell-address=\"S.B1\" table:use-labels=\"sideways\"/>",
+            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:S.A2\" table:target-cell-address=\"S.B1\" table:link-to-source-data=\"yes\"/>",
+            "<table:consolidation table:function=\"sum\" table:source-cell-range-addresses=\"S.A1:S.A2\" table:target-cell-address=\"S.B1\"><table:x/></table:consolidation>",
         ] {
             assert!(
                 parse_consolidation(&format!("{PREFIX}{fragment}{SUFFIX}")).is_err(),
@@ -525,7 +443,10 @@ mod tests {
     fn writer_round_trips_and_escapes() {
         let mut consolidation = Options::new(
             "vendor:&median",
-            vec!["'Q1 & Q2'.A1:B9".to_string(), "Sheet2.C1:D9".to_string()],
+            vec![
+                "'Q1 & Q2'.A1:'Q1 & Q2'.B9".to_string(),
+                "Sheet2.C1:Sheet2.D9".to_string(),
+            ],
             "Summary.A1",
         )
         .unwrap();
@@ -546,12 +467,19 @@ mod tests {
     fn round_trips_through_builder_and_mutable_packages() {
         let original = Options::new(
             "sum",
-            vec!["Sheet1.A1:B2".to_string(), "Sheet1.D1:E2".to_string()],
+            vec![
+                "Sheet1.A1:Sheet1.B2".to_string(),
+                "Sheet1.D1:Sheet1.E2".to_string(),
+            ],
             "Sheet1.G1",
         )
         .unwrap();
-        let replacement =
-            Options::new("average", vec!["Sheet1.A1:E2".to_string()], "Sheet1.G3").unwrap();
+        let replacement = Options::new(
+            "average",
+            vec!["Sheet1.A1:Sheet1.E2".to_string()],
+            "Sheet1.G3",
+        )
+        .unwrap();
 
         let mut builder = Builder::new();
         builder.add_sheet("Sheet1").unwrap();

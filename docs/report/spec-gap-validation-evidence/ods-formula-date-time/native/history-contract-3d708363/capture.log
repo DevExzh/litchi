@@ -1,0 +1,23 @@
+{
+  "converter": "LibreOffice 26.2.5.2 620(Build:2)",
+  "command": [
+    "/usr/bin/libreoffice",
+    "--headless",
+    "-env:UserInstallation=file://<temporary-profile>",
+    "--convert-to",
+    "ods",
+    "--outdir",
+    "<temporary-output>",
+    "date-time-native.fods"
+  ],
+  "locale": "C.UTF-8",
+  "input_sha256": "d6a929f51fe617c0e47f6c807a82eceaf87b30f68e57449946b4f68798e8b29f",
+  "recalculated_output_sha256": "64787d752ca7efe00d691039709219bb548817718d32d462be70c26ee2e32c62",
+  "content_xml_sha256": "f3333ae179b72ea975fcfba9d1cb22b60b9485c8cde9a73a4012737a2891bdc2",
+  "rows": 130,
+  "comparison_counts": {
+    "parity": 91,
+    "native-divergence": 33,
+    "host-observation": 6
+  }
+}

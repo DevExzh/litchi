@@ -1,0 +1,18 @@
+{
+  "completed_at": "2026-09-13T12:43:54.877718+00:00",
+  "removed_directories": [
+    "/var/tmp/ods-logical-worktree",
+    "/var/tmp/ods-logical-target",
+    "/var/tmp/ods-logical-tmp"
+  ],
+  "removed_obsolete_empty_files": 6,
+  "reclaimed_allocated_bytes": 1551687680,
+  "preservation_receipt": "/home/zhuhe/code/litchi-tmp-recovery-20260913/logical-cleanup-1245/preservation.json",
+  "preservation_archive_sha256": "f53444ef098da8d273ed62b346aa9026a9469edf1a9f587f5923d69e6099328e",
+  "unique_files_preserved": 725,
+  "all_removed_paths_absent": true,
+  "remaining_process_references": [],
+  "readable_usage_after": "338673664\t/tmp\n16502784\t/var/tmp\n",
+  "usage_scope": "Readable files only; system-owned private directories excluded.",
+  "worktrees_after": "worktree /home/zhuhe/code/litchi\nHEAD d3c62f19a7632114f9cce5d1ad350e237215582d\nbranch refs/heads/feat/office-format-completeness\n\nworktree /home/zhuhe/code/litchi-current-baseline-orchestration\nHEAD 654472a66acc748e27e1bba61a167380c8135db3\ndetached\n\nworktree /home/zhuhe/code/litchi-inline-images\nHEAD a555113f46660ed3f0e95cff719dae59982c9b95\ndetached\n\nworktree /home/zhuhe/code/litchi-spec-gaps\nHEAD 3f907e9e1abcde99b2ce94e88c1122bb79f77a8d\nbranch refs/heads/feat/spec-gap-implementation\n\n"
+}

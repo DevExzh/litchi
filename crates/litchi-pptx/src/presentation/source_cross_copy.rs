@@ -35,7 +35,6 @@ const MIN_SLIDE_ID: u32 = 256;
 const MAX_SLIDE_ID: u32 = 2_147_483_647;
 
 const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
-const STRICT_MCE_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/markup-compatibility/2006";
 const TRANSITIONAL_REL_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_REL_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships";
@@ -4996,7 +4995,7 @@ fn validate_xml_with_policy(
                         );
                     },
                 };
-                if value == MCE_NAMESPACE || value == STRICT_MCE_NAMESPACE {
+                if value == MCE_NAMESPACE {
                     return refusal(
                         SlideCopyRefusal::MarkupCompatibility,
                         format!("{context} contains MCE"),
@@ -5217,7 +5216,7 @@ fn validate_xml_with_policy(
                             format!("{context} contains an unresolved attribute namespace"),
                         );
                     }
-                    if matches!(attribute_namespace, ResolveResult::Bound(Namespace(value)) if value == MCE_NAMESPACE || value == STRICT_MCE_NAMESPACE)
+                    if matches!(attribute_namespace, ResolveResult::Bound(Namespace(value)) if value == MCE_NAMESPACE)
                     {
                         return refusal(
                             SlideCopyRefusal::MarkupCompatibility,
@@ -6045,6 +6044,18 @@ mod tests {
     use super::*;
     use litchi_core::{Budget, CancellationSource, ExecutionLimits, Limits};
     use std::num::{NonZeroU64, NonZeroUsize};
+
+    #[test]
+    fn foreign_markup_compatibility_wrapper_is_unknown_not_mce() {
+        let xml = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:foreign="http://purl.oclc.org/ooxml/markup-compatibility/2006"><p:cSld><p:spTree><foreign:wrapper><p:pic/></foreign:wrapper></p:spTree></p:cSld></p:sld>"#;
+        assert!(matches!(
+            validate_source_slide_xml(xml, "foreign MCE wrapper", None),
+            Err(Error::SlideCopyPlan {
+                kind: SlideCopyRefusal::UnknownSemanticSurface,
+                ..
+            })
+        ));
+    }
 
     #[test]
     fn prepared_payload_reuse_requires_exact_metadata_and_bytes() {

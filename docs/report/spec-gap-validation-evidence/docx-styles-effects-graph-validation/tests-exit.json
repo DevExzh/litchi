@@ -1,0 +1,15 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-docx",
+    "--lib",
+    "--test",
+    "styles_with_effects",
+    "--no-fail-fast"
+  ],
+  "exit_code": 0
+}

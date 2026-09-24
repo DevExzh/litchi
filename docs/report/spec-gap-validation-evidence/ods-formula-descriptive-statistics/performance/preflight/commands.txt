@@ -1,0 +1,4 @@
+# This profile-input file intentionally contains no execution receipt.
+# Each authorized capture writes its exact preflight commands and combined
+# stdout to results/<capture>/preflight.json and preflight.stdout.log.
+# The executable and package names are frozen by the harness manifest.

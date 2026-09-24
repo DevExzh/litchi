@@ -1,0 +1,73 @@
+[
+  {
+    "gate": "all-targets",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "-p",
+      "litchi-ods",
+      "--all-features",
+      "--all-targets"
+    ],
+    "exit_code": 0
+  },
+  {
+    "gate": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "-p",
+      "litchi-ods",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0
+  },
+  {
+    "gate": "rustdoc",
+    "command": [
+      "cargo",
+      "doc",
+      "--locked",
+      "--offline",
+      "-p",
+      "litchi-ods",
+      "--all-features",
+      "--no-deps"
+    ],
+    "exit_code": 0
+  },
+  {
+    "gate": "doctests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "-p",
+      "litchi-ods",
+      "--all-features",
+      "--doc"
+    ],
+    "exit_code": 0
+  },
+  {
+    "gate": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-ods",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0
+  }
+]

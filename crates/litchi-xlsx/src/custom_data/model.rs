@@ -1,14 +1,9 @@
-//! Package-neutral custom-data properties model.
+//! XLSX facade for the shared OOXML Custom Data values.
+//!
+//! Package graph state remains in `package.rs`; these names are re-exports so
+//! existing XLSX callers keep their imports while XLSB can consume the same
+//! common leaf without depending on this crate.
 
-/// One self-contained `x14:extLst` subtree, retained without interpretation.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExtensionList {
-    pub xml: Vec<u8>,
-}
-
-/// Typed properties for one embedded custom-data storage.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Properties {
-    pub id: String,
-    pub extension_list: Option<ExtensionList>,
-}
+pub use litchi_ooxml_common::custom_data::{
+    CustomData, CustomDataView, ExtensionList, Properties, RemovalDisposition, Store,
+};

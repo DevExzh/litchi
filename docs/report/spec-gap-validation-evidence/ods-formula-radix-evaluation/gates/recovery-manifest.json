@@ -1,0 +1,115 @@
+{
+  "archive_sha256": "08319730b82f9b727d3c96f1c7fabe98f672bdf3628e1134859c978925c91e1b",
+  "files": [
+    {
+      "path": "crates/litchi-opc/src/package.rs",
+      "sha256": "7050d3d77b44f402f6b063f7d2cb15eec3c39ce97b18b2154a6770d33a8362f5",
+      "bytes": 142744
+    },
+    {
+      "path": "crates/litchi-opc/src/source_backed.rs",
+      "sha256": "6803b21e606a03b8b51367e80bfe320c1e9f4564414fc2b8d6b14c48a3944bb6",
+      "bytes": 828163
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package.rs",
+      "sha256": "f5ae509a957e2c9c961ff0a796c63c093a26324ea45f6bc02dfc9f0130e36ce4",
+      "bytes": 36895
+    },
+    {
+      "path": "crates/litchi-xlsx/src/edit.rs",
+      "sha256": "e6b864d39e90e3372a26b9dd761595412347026a478eadee49b411e5ff28e3e2",
+      "bytes": 459
+    },
+    {
+      "path": "crates/litchi-xlsx/src/source_attributes.rs",
+      "sha256": "04423f3ae37af060675f4bffcf22b6ed1c443137da8f6b45dac7bcb9fa7049b6",
+      "bytes": 5399
+    },
+    {
+      "path": "crates/litchi-xlsx/src/lib.rs",
+      "sha256": "c36383131cdff8e0076439383b0286e92b1c6e3a7c8d8db62de920459d00517f",
+      "bytes": 17031
+    },
+    {
+      "path": "crates/litchi-xlsx/tests/drawing_svg_read.rs",
+      "sha256": "ff9f88a6e116e8911771c7188075b7d765d79dacf6d50fede3d4ba19e51be582",
+      "bytes": 34133
+    },
+    {
+      "path": "crates/litchi-xlsx/src/connections/codec.rs",
+      "sha256": "6cbee2a0da6c7e91b3a824bea871e5a7550bb1e86f3efbe5569de859fcac79cb",
+      "bytes": 161636
+    },
+    {
+      "path": "crates/litchi-xlsx/src/connections/embedded_data.rs",
+      "sha256": "2b77488a524981818714e9b2ced654bd78edd3ae5a2d9a0c0e29ca3e0b2e26c8",
+      "bytes": 22548
+    },
+    {
+      "path": "crates/litchi-xlsx/src/connections/package.rs",
+      "sha256": "55ec1361794046c07412458257777e2bc946975c0e6ebd98529bfe21b0b2c102",
+      "bytes": 36875
+    },
+    {
+      "path": "crates/litchi-xlsx/src/workbook/mod.rs",
+      "sha256": "320406eb6c68d306ace9d5e1805309ac1977b80566b8dd59d2cf0bd5ffa7da1f",
+      "bytes": 1806
+    },
+    {
+      "path": "crates/litchi-xlsx/src/form_control/mod.rs",
+      "sha256": "4dfa086c58654bd42ff9425bac03f871c99c4159f2a876b8793d0c920ba5dbec",
+      "bytes": 9470
+    },
+    {
+      "path": "crates/litchi-xlsx/src/form_control/owner.rs",
+      "sha256": "778c510def4174e196ae277ec92127337f49bb28b8834f9bbcdb4b889b60d5c4",
+      "bytes": 327734
+    },
+    {
+      "path": "crates/litchi-xlsx/src/custom_data/codec.rs",
+      "sha256": "c2dd5438ba805d17958f7277432fa28daabe47275c3a614e801758593f39faac",
+      "bytes": 2443
+    },
+    {
+      "path": "crates/litchi-xlsx/src/custom_data/package.rs",
+      "sha256": "c423112f8c4adff82755153aa736b7ac21ec8c33fd7ac33c864710b4b3cd4ff7",
+      "bytes": 98778
+    },
+    {
+      "path": "crates/litchi-xlsx/src/workbook/edit/validation.rs",
+      "sha256": "1e0628f82729e46eb412b19c5d8d035b1a44c2a44905a9c6dfc2b0ae88b00ae1",
+      "bytes": 11773
+    },
+    {
+      "path": "crates/litchi-xlsx/src/workbook/edit/codec.rs",
+      "sha256": "2f64977e1a0f6f39a7e2bb17ad61c27dee87251443c9b4104f91620a477e4899",
+      "bytes": 24672
+    },
+    {
+      "path": "crates/litchi-xlsx/src/workbook/edit/model.rs",
+      "sha256": "35a4b181b0a13b3179045054977ce721daaf23b5b5bdc3ac7e6e71fd5f025d62",
+      "bytes": 99840
+    },
+    {
+      "path": "crates/litchi-xlsx/src/workbook/edit/mod.rs",
+      "sha256": "6bc728f73027053ba8c31b735f4f9050afb711cd2eecdd9b8509c3eeafba8353",
+      "bytes": 2265
+    },
+    {
+      "path": "crates/litchi-xlsx/src/workbook/edit/semantic/worksheet.rs",
+      "sha256": "6a5b4d8ae0dfadb3e3fe770091908ec32df308d874bfc2cb0d6f2422ec55c9e5",
+      "bytes": 21117
+    },
+    {
+      "path": "crates/litchi-xlsx/src/workbook/edit/semantic/mod.rs",
+      "sha256": "810a2e5f08518507aef8cc70a94a3397f603c9a89e6ca6906271f11559785968",
+      "bytes": 431
+    },
+    {
+      "path": "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs",
+      "sha256": "77563a92797a72832558ef7cdf108899afe3061fb54f1e55df9bb3d43d47efbc",
+      "bytes": 160168
+    }
+  ]
+}

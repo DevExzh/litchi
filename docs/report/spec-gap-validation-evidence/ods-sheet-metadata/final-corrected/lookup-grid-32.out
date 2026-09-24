@@ -1,0 +1,2 @@
+config workload=Lookup sheets=1 rows=32 columns=32 source_bytes=85610 warmups=3 iterations=15
+result mean_ns=318513 p50_ns=320521 p95_ns=325301 p99_ns=325301 memory_delta_p50=0 memory_delta_max=0 memory_final_p50=1990540 memory_final_max=1990540 work_delta_p50=278528 work_delta_max=278528 work_final_p50=580858 work_final_max=580858 probes=15360

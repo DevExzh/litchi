@@ -1,0 +1,9 @@
+toolchain: cargo +1.95.0
+target: /var/tmp/litchi-xlsb-drawing-current-target-20260910
+environment: CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=2 RUSTUP_HOME=/tmp/litchi-spec-gap-rustup
+tests: cargo +1.95.0 test -p litchi-xlsb --all-features --all-targets --offline --locked --no-fail-fast
+doctests: cargo +1.95.0 test -p litchi-xlsb --all-features --doc --offline --locked --no-fail-fast
+clippy: cargo +1.95.0 clippy -p litchi-xlsb --all-features --all-targets --offline --locked -- -D warnings
+rustdoc: RUSTDOCFLAGS=-Dwarnings cargo +1.95.0 doc -p litchi-xlsb --all-features --no-deps --offline --locked
+format: cargo +1.95.0 fmt -p litchi-xlsb -- --check
+diff: git diff HEAD --check

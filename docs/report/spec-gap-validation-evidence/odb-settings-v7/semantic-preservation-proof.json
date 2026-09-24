@@ -1,0 +1,43 @@
+{
+  "candidate_frozen": true,
+  "candidate_root": "/var/tmp/litchi-odb-v7-integration-clean-20260910",
+  "created_utc": "2026-09-10T13:33:44.917234+00:00",
+  "integration_action": "Overlay the frozen 13 owned V7 ODB paths onto the root integration candidate or actual primary according to root policy; no non-ODB primary paths are included here.",
+  "primary_commit": "0194fde207b7c23f4106c8e7c6070d2df00daac6",
+  "primary_only_odb_paths": [],
+  "primary_only_work_would_be_lost_paths": [],
+  "primary_pending_odb_paths": [
+    "crates/litchi-odb/docs/FEATURE_MATRIX.md",
+    "crates/litchi-odb/src/authoring/composition.rs",
+    "crates/litchi-odb/src/authoring/durable.rs",
+    "crates/litchi-odb/src/authoring/transaction.rs",
+    "crates/litchi-odb/src/facade/mod.rs",
+    "crates/litchi-odb/src/lib.rs",
+    "crates/litchi-odb/src/model/catalog.rs",
+    "crates/litchi-odb/src/model/mod.rs",
+    "crates/litchi-odb/src/model/settings.rs",
+    "crates/litchi-odb/tests/settings.rs"
+  ],
+  "primary_root": "/home/zhuhe/code/litchi-spec-gaps",
+  "prior_wrong_primary_receipt": {
+    "manifest": "/var/tmp/litchi-odb-v7-integration-evidence-20260910/integration-manifest.json",
+    "preserved_as_history": true,
+    "sha256": "fbf57af50fc3dcd09c7cd42185997fdfca107873c413dc3dcbde07f533ee55b9"
+  },
+  "proofs": {
+    "all_primary_odb_pending_paths_are_owned_by_v7": true,
+    "all_v7_candidate_owned_paths_match_source": true,
+    "eff_to_0194_has_no_odb_tree_changes": true,
+    "exactly_ten_primary_odb_preimages_captured": true,
+    "intentional_test_replacements_recorded": true,
+    "no_primary_only_implementation_symbols_after_expected_test_replacement": true,
+    "no_primary_only_odb_work_would_be_lost": true,
+    "same_feature_replacements_for_pending_paths": true
+  },
+  "schema": "litchi.odb.v7.primary-spec-gaps-preservation-proof.v1",
+  "v7_owned_paths_not_pending": [
+    "crates/litchi-odb/src/codec/content.rs",
+    "crates/litchi-odb/src/model/connection.rs",
+    "crates/litchi-odb/tests/schema_catalog.rs"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "source_basis": "../../candidate-06/source.tar.gz",
+  "baseline_basis": "../../../ods-formula-array-reference-evaluation/performance/scalar-cell-specialized-analysis.md",
+  "archives": {
+    "build.tar.gz": "6e90acc69d6da9183ba83e6a3c689d0e721af652f2478b49d5c6736795ffac12",
+    "capture.tar.gz": "24727b2f6bca30f24350ebe7b22d1a6ffaf053452adadcab570ff2894e324e66"
+  },
+  "children": 162,
+  "deterministic_mismatches": 0
+}

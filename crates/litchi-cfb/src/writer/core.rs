@@ -57,7 +57,10 @@
 /// writer.save("output.ole")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-use super::super::consts::{DIFSECT, ENDOFCHAIN, FATSECT, MAXREGSECT, NOSTREAM, STGTY_ROOT};
+use super::super::consts::{
+    DIFSECT, ENDOFCHAIN, FATSECT, MAXREGSECT, NOSTREAM, RANGE_LOCK_SECTOR_V4, SECTOR_SIZE_V4,
+    STGTY_ROOT,
+};
 use super::super::directory_name::{MAX_DIRECTORY_NAME_CODE_UNITS, directory_name_data};
 use super::super::file::OleError;
 use super::difat::DifatBuilder;
@@ -65,8 +68,8 @@ use super::directory::DirectoryBuilder;
 use super::fat::FatBuilder;
 use super::header::HeaderBuilder;
 use super::layout::{
-    ModelInputs, Outcome, SectorLayoutFallback, SectorLayoutPolicy, SectorLayoutReport,
-    SourceLayout, StreamInput, plan_reuse,
+    ModelInputs, ModelMetadata, Outcome, SectorLayoutFallback, SectorLayoutPolicy,
+    SectorLayoutReport, SourceLayout, StreamInput, plan_reuse,
 };
 use super::minifat::MiniFatBuilder;
 use smallvec::SmallVec;
@@ -211,6 +214,7 @@ struct StoragePathMove {
 #[derive(Debug)]
 struct StreamPathMove {
     index: usize,
+    old: Vec<String>,
     new: Vec<String>,
     canonical: CanonicalPath,
 }
@@ -220,6 +224,13 @@ struct ClsidPathMove {
     old: Vec<String>,
     new: Vec<String>,
     clsid: [u8; 16],
+}
+
+#[derive(Debug)]
+struct MetadataPathMove {
+    old: Vec<String>,
+    new: Vec<String>,
+    metadata: DirectoryMetadata,
 }
 
 #[derive(Debug, Hash, PartialEq, Eq)]
@@ -284,6 +295,14 @@ struct WriteDirectoryEntry {
     stream_size: u64,
 }
 
+/// Raw state bits and FILETIME fields of one directory entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(super) struct DirectoryMetadata {
+    pub(super) state_bits: u32,
+    pub(super) creation_time: u64,
+    pub(super) modified_time: u64,
+}
+
 /// OLE file writer
 ///
 /// Provides methods to create and modify OLE2 structured storage files.
@@ -313,6 +332,20 @@ pub struct OleWriter {
     source_layout: Option<Box<SourceLayout>>,
     /// What the most recent serialization did with that layout.
     last_sector_layout: Option<SectorLayoutReport>,
+    /// Non-default state and FILETIME values assigned to storages.
+    storage_metadata: HashMap<Vec<String>, DirectoryMetadata>,
+    /// Raw state and FILETIME fields retained for streams from a lossless
+    /// source edit. Fresh streams omit this entry and serialize all zeroes.
+    stream_metadata: HashMap<Vec<String>, DirectoryMetadata>,
+    /// Whether the caller supplied any directory state or FILETIME value.
+    ///
+    /// Supplied metadata makes the writer's model authoritative for every
+    /// entry, as the from-scratch serializer publishes it: an entry without a
+    /// supplied value is written with the all-zero default. A reused source
+    /// layout carries the source's directory values instead, so it is
+    /// declined whenever they differ from this model. A caller that supplies
+    /// none keeps the source's values under a reused layout.
+    directory_metadata_supplied: bool,
 }
 
 impl OleWriter {
@@ -361,6 +394,9 @@ impl OleWriter {
             sector_layout_policy: SectorLayoutPolicy::default(),
             source_layout: None,
             last_sector_layout: None,
+            storage_metadata: HashMap::new(),
+            stream_metadata: HashMap::new(),
+            directory_metadata_supplied: false,
         };
 
         // Initialize with root entry
@@ -517,6 +553,18 @@ impl OleWriter {
         let root_class_id = self
             .root_clsid_set
             .then(|| self.entries.first().map_or([0u8; 16], |entry| entry.clsid));
+        let directory_metadata = self.directory_metadata_supplied.then(|| ModelMetadata {
+            root: self
+                .entries
+                .first()
+                .map_or_else(DirectoryMetadata::default, |root| DirectoryMetadata {
+                    state_bits: root.state_bits,
+                    creation_time: root.creation_time,
+                    modified_time: root.modified_time,
+                }),
+            storages: &self.storage_metadata,
+            streams: &self.stream_metadata,
+        });
         plan_reuse(
             source,
             &ModelInputs {
@@ -527,6 +575,7 @@ impl OleWriter {
                 storages: &storages,
                 storage_class_ids: &storage_class_ids,
                 root_class_id,
+                directory_metadata,
             },
         )
     }
@@ -557,6 +606,57 @@ impl OleWriter {
             self.entries[0].clsid = clsid;
             self.root_clsid_set = true;
         }
+    }
+
+    /// Sets the root storage's user-defined state bits.
+    pub fn set_root_state_bits(&mut self, state_bits: u32) {
+        if let Some(root) = self.entries.first_mut() {
+            root.state_bits = state_bits;
+        }
+        self.directory_metadata_supplied = true;
+    }
+
+    /// Sets the root storage's raw modification FILETIME.
+    pub fn set_root_modified_time(&mut self, modified_time: u64) {
+        if let Some(root) = self.entries.first_mut() {
+            root.modified_time = modified_time;
+        }
+        self.directory_metadata_supplied = true;
+    }
+
+    /// Sets the root storage's creation FILETIME for a fresh artifact.
+    ///
+    /// The CFB root directory entry has no creation timestamp. Existing
+    /// source values, including nonconforming ones, can be replayed through
+    /// [`Self::set_root_creation_time_from_source`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::InvalidData`] when `creation_time` is nonzero.
+    pub fn set_root_creation_time(&mut self, creation_time: u64) -> Result<(), OleError> {
+        if creation_time != 0 {
+            return Err(OleError::InvalidData(
+                "CFB fresh root creation time must be zero; use set_root_creation_time_from_source for source replay".to_string(),
+            ));
+        }
+        if let Some(root) = self.entries.first_mut() {
+            root.creation_time = 0;
+        }
+        self.directory_metadata_supplied = true;
+        Ok(())
+    }
+
+    /// Replays the exact root creation FILETIME captured from an existing
+    /// source package.
+    ///
+    /// This explicit source-preservation operation may retain a malformed
+    /// nonzero value. Fresh authoring should use
+    /// [`Self::set_root_creation_time`], which accepts only zero.
+    pub fn set_root_creation_time_from_source(&mut self, creation_time: u64) {
+        if let Some(root) = self.entries.first_mut() {
+            root.creation_time = creation_time;
+        }
+        self.directory_metadata_supplied = true;
     }
 
     /// Create a new stream at the specified path
@@ -651,6 +751,130 @@ impl OleWriter {
         Ok(())
     }
 
+    /// Creates or replaces a stream while assigning its raw directory fields.
+    ///
+    /// This is the source-replay form of [`Self::create_stream`]. The stream
+    /// path is admitted and the metadata is attached in one operation, so a
+    /// caller replaying a package does not perform a second metadata lookup or
+    /// canonicalization pass after creating each stream. It retains the exact
+    /// path matching behavior of [`Self::create_stream`]. Zero values are
+    /// deterministic and omit the metadata side table.
+    ///
+    /// # Errors
+    ///
+    /// Returns `OleError::InvalidData` if `path` is empty or contains an
+    /// invalid component, or an allocation error if the payload or a table
+    /// cannot grow.
+    pub fn create_stream_with_metadata(
+        &mut self,
+        path: &[&str],
+        data: &[u8],
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        if path.is_empty() {
+            return Err(OleError::InvalidData("Empty path".to_string()));
+        }
+        let mut owned_data = Vec::new();
+        owned_data
+            .try_reserve_exact(data.len())
+            .map_err(|source| OleError::allocation("stream payload", source))?;
+        owned_data.extend_from_slice(data);
+        self.put_payload_with_metadata(
+            path,
+            StreamPayload::Owned(owned_data),
+            DirectoryMetadata {
+                state_bits,
+                creation_time,
+                modified_time,
+            },
+        )
+    }
+
+    /// Creates or replaces a stream from a payload shared with its producer
+    /// while assigning its raw directory fields.
+    ///
+    /// This is to [`Self::create_stream_with_metadata`] what
+    /// [`Self::create_stream_shared`] is to [`Self::create_stream`]: the
+    /// writer retains the caller's allocation instead of copying it, and the
+    /// path matching and metadata semantics are otherwise identical.
+    ///
+    /// # Errors
+    ///
+    /// Returns `OleError::InvalidData` if `path` is empty or contains an
+    /// invalid component, or an allocation error if a table cannot grow.
+    pub fn create_stream_shared_with_metadata(
+        &mut self,
+        path: &[&str],
+        data: Arc<[u8]>,
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        if path.is_empty() {
+            return Err(OleError::InvalidData("Empty path".to_string()));
+        }
+        self.put_payload_with_metadata(
+            path,
+            StreamPayload::Shared(data),
+            DirectoryMetadata {
+                state_bits,
+                creation_time,
+                modified_time,
+            },
+        )
+    }
+
+    fn put_payload_with_metadata(
+        &mut self,
+        path: &[&str],
+        data: StreamPayload,
+        metadata: DirectoryMetadata,
+    ) -> Result<(), OleError> {
+        let owned_path = own_path(path, "stream path", "stream path component")?;
+
+        if let Some(position) = self
+            .streams
+            .iter()
+            .position(|(candidate, _)| candidate == &owned_path)
+        {
+            if metadata != DirectoryMetadata::default()
+                && !self.stream_metadata.contains_key(&owned_path)
+            {
+                self.stream_metadata
+                    .try_reserve(1)
+                    .map_err(|source| OleError::allocation("stream metadata table", source))?;
+            }
+            self.streams[position].1 = data;
+            if metadata == DirectoryMetadata::default() {
+                self.stream_metadata.remove(&owned_path);
+            } else {
+                self.stream_metadata.insert(owned_path, metadata);
+            }
+            self.directory_metadata_supplied = true;
+            return Ok(());
+        }
+
+        self.streams
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("stream table", source))?;
+        let metadata_path = if metadata == DirectoryMetadata::default() {
+            None
+        } else {
+            self.stream_metadata
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("stream metadata table", source))?;
+            Some(try_clone_path(&owned_path, "stream metadata path")?)
+        };
+        self.streams.push((owned_path, data));
+        if let Some(metadata_path) = metadata_path {
+            self.stream_metadata.insert(metadata_path, metadata);
+        }
+        self.directory_metadata_supplied = true;
+        Ok(())
+    }
+
     /// Update an existing stream
     ///
     /// This is an alias for `create_stream` since both create and update operations
@@ -678,6 +902,50 @@ impl OleWriter {
         })
     }
 
+    fn resolve_storage_path(&self, path: &[&str]) -> Result<Vec<String>, OleError> {
+        let requested = own_path(path, "storage path", "storage path component")?;
+        if self.storages.contains(&requested) {
+            return Ok(requested);
+        }
+        let canonical = canonical_cfb_path(&requested)?;
+        let mut resolved = None;
+        for candidate in &self.storages {
+            if canonical_cfb_path(candidate)? == canonical {
+                if resolved.is_some() {
+                    return Err(OleError::InvalidData(
+                        "CFB writer contains ambiguous storage paths".to_string(),
+                    ));
+                }
+                resolved = Some(try_clone_path(candidate, "storage path resolution")?);
+            }
+        }
+        resolved.ok_or_else(|| {
+            OleError::InvalidData(format!("CFB storage path {requested:?} does not exist"))
+        })
+    }
+
+    fn resolve_stream_path(&self, path: &[&str]) -> Result<Vec<String>, OleError> {
+        let requested = own_path(path, "stream path", "stream path component")?;
+        if self.stream_position(path).is_some() {
+            return Ok(requested);
+        }
+        let canonical = canonical_cfb_path(&requested)?;
+        let mut resolved = None;
+        for (candidate, _) in &self.streams {
+            if canonical_cfb_path(candidate)? == canonical {
+                if resolved.is_some() {
+                    return Err(OleError::InvalidData(
+                        "CFB writer contains ambiguous stream paths".to_string(),
+                    ));
+                }
+                resolved = Some(try_clone_path(candidate, "stream path resolution")?);
+            }
+        }
+        resolved.ok_or_else(|| {
+            OleError::InvalidData(format!("CFB stream path {requested:?} does not exist"))
+        })
+    }
+
     /// Delete a stream
     ///
     /// # Arguments
@@ -697,6 +965,7 @@ impl OleWriter {
 
         if let Some(pos) = self.streams.iter().position(|(p, _)| p == &owned_path) {
             self.streams.remove(pos);
+            self.stream_metadata.remove(&owned_path);
             Ok(())
         } else {
             Err(OleError::StreamNotFound)
@@ -748,7 +1017,7 @@ impl OleWriter {
     /// Returns `OleError::InvalidData` if `path` contains an invalid component
     /// or does not identify a previously created storage.
     pub fn set_storage_clsid(&mut self, path: &[&str], clsid: [u8; 16]) -> Result<(), OleError> {
-        let owned_path = own_path(path, "storage path", "storage path component")?;
+        let owned_path = self.resolve_storage_path(path)?;
         if !self.storages.contains(&owned_path) {
             return Err(OleError::InvalidData(format!(
                 "CFB storage path {owned_path:?} does not exist"
@@ -762,6 +1031,191 @@ impl OleWriter {
         )?;
         self.storage_clsids.insert(owned_path, clsid);
         Ok(())
+    }
+
+    /// Sets the raw state and FILETIME fields for an existing storage.
+    ///
+    /// Values are retained as unsigned wire values.  No clock lookup or time
+    /// zone conversion is performed.  Newly created storages retain the
+    /// deterministic all-zero defaults until this method is called.
+    pub fn set_storage_metadata(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let owned_path = self.resolve_storage_path(path)?;
+        if !self.storages.contains(&owned_path) {
+            return Err(OleError::InvalidData(format!(
+                "CFB storage path {owned_path:?} does not exist"
+            )));
+        }
+        let metadata = DirectoryMetadata {
+            state_bits,
+            creation_time,
+            modified_time,
+        };
+        if metadata == DirectoryMetadata::default() {
+            self.storage_metadata.remove(&owned_path);
+        } else {
+            reserve_hash_map_entry(
+                &mut self.storage_metadata,
+                &owned_path,
+                1,
+                "storage metadata table",
+            )?;
+            self.storage_metadata.insert(owned_path, metadata);
+        }
+        self.directory_metadata_supplied = true;
+        Ok(())
+    }
+
+    /// Sets only the state bits for an existing storage.
+    pub fn set_storage_state_bits(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+    ) -> Result<(), OleError> {
+        let metadata = self.storage_metadata_for(path)?;
+        self.set_storage_metadata(
+            path,
+            state_bits,
+            metadata.creation_time,
+            metadata.modified_time,
+        )
+    }
+
+    /// Sets only the creation FILETIME for an existing storage.
+    pub fn set_storage_creation_time(
+        &mut self,
+        path: &[&str],
+        creation_time: u64,
+    ) -> Result<(), OleError> {
+        let metadata = self.storage_metadata_for(path)?;
+        self.set_storage_metadata(
+            path,
+            metadata.state_bits,
+            creation_time,
+            metadata.modified_time,
+        )
+    }
+
+    /// Sets only the modification FILETIME for an existing storage.
+    pub fn set_storage_modified_time(
+        &mut self,
+        path: &[&str],
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let metadata = self.storage_metadata_for(path)?;
+        self.set_storage_metadata(
+            path,
+            metadata.state_bits,
+            metadata.creation_time,
+            modified_time,
+        )
+    }
+
+    /// Sets the raw state and FILETIME fields for an existing stream.
+    ///
+    /// New streams default to all zeroes. This setter is intended for
+    /// source-preserving rewrites and therefore retains legacy producer values
+    /// exactly, even when a producer wrote nonzero stream timestamp fields.
+    pub fn set_stream_metadata(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let owned_path = self.resolve_stream_path(path)?;
+        let metadata = DirectoryMetadata {
+            state_bits,
+            creation_time,
+            modified_time,
+        };
+        if metadata == DirectoryMetadata::default() {
+            self.stream_metadata.remove(&owned_path);
+        } else {
+            reserve_hash_map_entry(
+                &mut self.stream_metadata,
+                &owned_path,
+                1,
+                "stream metadata table",
+            )?;
+            self.stream_metadata.insert(owned_path, metadata);
+        }
+        self.directory_metadata_supplied = true;
+        Ok(())
+    }
+
+    /// Sets raw state bits for an existing stream. CFB producers normally
+    /// write zero state bits for streams, but source values are retained.
+    pub fn set_stream_state_bits(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+    ) -> Result<(), OleError> {
+        let metadata = self.stream_metadata_for(path)?;
+        self.set_stream_metadata(
+            path,
+            state_bits,
+            metadata.creation_time,
+            metadata.modified_time,
+        )
+    }
+
+    /// Sets only the creation FILETIME for an existing stream.
+    pub fn set_stream_creation_time(
+        &mut self,
+        path: &[&str],
+        creation_time: u64,
+    ) -> Result<(), OleError> {
+        let metadata = self.stream_metadata_for(path)?;
+        self.set_stream_metadata(
+            path,
+            metadata.state_bits,
+            creation_time,
+            metadata.modified_time,
+        )
+    }
+
+    /// Sets only the modification FILETIME for an existing stream.
+    pub fn set_stream_modified_time(
+        &mut self,
+        path: &[&str],
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let metadata = self.stream_metadata_for(path)?;
+        self.set_stream_metadata(
+            path,
+            metadata.state_bits,
+            metadata.creation_time,
+            modified_time,
+        )
+    }
+
+    fn stream_metadata_for(&self, path: &[&str]) -> Result<DirectoryMetadata, OleError> {
+        let owned_path = self.resolve_stream_path(path)?;
+        Ok(self
+            .stream_metadata
+            .get(&owned_path)
+            .copied()
+            .unwrap_or_default())
+    }
+
+    fn storage_metadata_for(&self, path: &[&str]) -> Result<DirectoryMetadata, OleError> {
+        let owned_path = self.resolve_storage_path(path)?;
+        if !self.storages.contains(&owned_path) {
+            return Err(OleError::InvalidData(format!(
+                "CFB storage path {owned_path:?} does not exist"
+            )));
+        }
+        Ok(self
+            .storage_metadata
+            .get(&owned_path)
+            .copied()
+            .unwrap_or_default())
     }
 
     /// Delete a storage and all its contents
@@ -802,6 +1256,10 @@ impl OleWriter {
         self.storages
             .retain(|candidate| !candidate.starts_with(owned_path.as_slice()));
         self.storage_clsids
+            .retain(|candidate, _| !candidate.starts_with(owned_path.as_slice()));
+        self.storage_metadata
+            .retain(|candidate, _| !candidate.starts_with(owned_path.as_slice()));
+        self.stream_metadata
             .retain(|candidate, _| !candidate.starts_with(owned_path.as_slice()));
 
         Ok(())
@@ -1010,6 +1468,7 @@ impl OleWriter {
             {
                 stream_moves.push(StreamPathMove {
                     index: entry.index,
+                    old: try_clone_path(entry.path, "stream move source path")?,
                     canonical: canonical_cfb_path(&new)?,
                     new,
                 });
@@ -1026,6 +1485,34 @@ impl OleWriter {
                     old: try_clone_path(&path_move.old, "storage CLSID source path")?,
                     new: try_clone_path(&path_move.new, "storage CLSID destination path")?,
                     clsid: *clsid,
+                });
+            }
+        }
+
+        let mut metadata_moves = Vec::new();
+        metadata_moves
+            .try_reserve_exact(storage_moves.len())
+            .map_err(|error| OleError::allocation("storage metadata move plan", error))?;
+        for path_move in &storage_moves {
+            if let Some(metadata) = self.storage_metadata.get(&path_move.old) {
+                metadata_moves.push(MetadataPathMove {
+                    old: try_clone_path(&path_move.old, "storage metadata source path")?,
+                    new: try_clone_path(&path_move.new, "storage metadata destination path")?,
+                    metadata: *metadata,
+                });
+            }
+        }
+
+        let mut stream_metadata_moves = Vec::new();
+        stream_metadata_moves
+            .try_reserve_exact(stream_descendants)
+            .map_err(|error| OleError::allocation("stream metadata move plan", error))?;
+        for path_move in &stream_moves {
+            if let Some(metadata) = self.stream_metadata.get(&path_move.old) {
+                stream_metadata_moves.push(MetadataPathMove {
+                    old: try_clone_path(&path_move.old, "stream metadata source path")?,
+                    new: try_clone_path(&path_move.new, "stream metadata destination path")?,
+                    metadata: *metadata,
                 });
             }
         }
@@ -1085,6 +1572,26 @@ impl OleWriter {
         }
         for path_move in clsid_moves {
             let replaced = self.storage_clsids.insert(path_move.new, path_move.clsid);
+            debug_assert!(replaced.is_none());
+        }
+        for path_move in &metadata_moves {
+            let removed = self.storage_metadata.remove(&path_move.old);
+            debug_assert_eq!(removed, Some(path_move.metadata));
+        }
+        for path_move in metadata_moves {
+            let replaced = self
+                .storage_metadata
+                .insert(path_move.new, path_move.metadata);
+            debug_assert!(replaced.is_none());
+        }
+        for path_move in &stream_metadata_moves {
+            let removed = self.stream_metadata.remove(&path_move.old);
+            debug_assert_eq!(removed, Some(path_move.metadata));
+        }
+        for path_move in stream_metadata_moves {
+            let replaced = self
+                .stream_metadata
+                .insert(path_move.new, path_move.metadata);
             debug_assert!(replaced.is_none());
         }
 
@@ -1222,6 +1729,14 @@ impl OleWriter {
         if !self.entries.is_empty() && self.root_clsid_set {
             directory.set_root_clsid(self.entries[0].clsid);
         }
+        if let Some(root) = self.entries.first() {
+            directory.set_root_state_bits(root.state_bits);
+            // `OleWriter` can replay a captured source root explicitly. The
+            // ordinary public setter only admits zero, while this publication
+            // path preserves the value selected by that source operation.
+            directory.set_root_creation_time_from_source(root.creation_time);
+            directory.set_root_modified_time(root.modified_time);
+        }
 
         // Pre-create storages declared explicitly by the caller. `storages` and
         // `storage_clsids` are hash tables whose iteration order Rust seeds per
@@ -1259,6 +1774,14 @@ impl OleWriter {
         for (storage_path, clsid) in ordered_clsids {
             directory.set_storage_clsid(storage_path, *clsid)?;
         }
+        for (storage_path, metadata) in &self.storage_metadata {
+            directory.set_storage_metadata(
+                storage_path,
+                metadata.state_bits,
+                metadata.creation_time,
+                metadata.modified_time,
+            )?;
+        }
 
         // Add large streams to directory using full path
         for plan in &large_streams {
@@ -1266,7 +1789,15 @@ impl OleWriter {
             let size = u64::try_from(data.len()).map_err(|_err| {
                 OleError::InvalidData("CFB stream size does not fit u64".to_string())
             })?;
-            let _sid = directory.add_stream_path(path, plan.start_sector, size)?;
+            let sid = directory.add_stream_path(path, plan.start_sector, size)?;
+            if let Some(metadata) = self.stream_metadata.get(path) {
+                directory.set_stream_metadata_sid(
+                    sid,
+                    metadata.state_bits,
+                    metadata.creation_time,
+                    metadata.modified_time,
+                )?;
+            }
         }
 
         // Add small streams to directory (using MiniFAT) with full path
@@ -1275,7 +1806,15 @@ impl OleWriter {
             let size = u64::try_from(data.len()).map_err(|_err| {
                 OleError::InvalidData("CFB stream size does not fit u64".to_string())
             })?;
-            let _sid = directory.add_stream_path(path, plan.start_sector, size)?;
+            let sid = directory.add_stream_path(path, plan.start_sector, size)?;
+            if let Some(metadata) = self.stream_metadata.get(path) {
+                directory.set_stream_metadata_sid(
+                    sid,
+                    metadata.state_bits,
+                    metadata.creation_time,
+                    metadata.modified_time,
+                )?;
+            }
         }
 
         // Generate directory stream
@@ -1318,6 +1857,7 @@ impl OleWriter {
         } else {
             ENDOFCHAIN
         };
+        fat.finalize_range_lock()?;
         validate_output_size(self.sector_size, fat.total_sectors())?;
 
         // Prepare FAT sector data now that reservations are included
@@ -1341,7 +1881,7 @@ impl OleWriter {
         header_builder.set_minifat(minifat_start_sector, num_minifat_sectors);
 
         // Handle DIFAT if needed (> 109 FAT sectors)
-        let fat_sector_ids = sector_ids(fat_start_sector, num_fat_sectors, "FAT sector IDs")?;
+        let fat_sector_ids = fat.allocation_sector_ids(fat_start_sector, num_fat_sectors)?;
 
         let (num_difat_sectors, difat_sectors) = if num_fat_sectors > 109 {
             let mut difat = DifatBuilder::new(self.sector_size)?;
@@ -1379,13 +1919,24 @@ impl OleWriter {
         writer.seek(SeekFrom::Start(0))?;
         writer.write_all(&header)?;
 
+        // Clear the reserved hole even when the caller reuses a nonzero sink.
+        if let Some(lock) = fat.range_lock_sector()
+            && lock < fat.total_sectors()
+        {
+            writer.seek(SeekFrom::Start(sector_offset(lock, self.sector_size)?))?;
+            writer.write_all(&[0; SECTOR_SIZE_V4])?;
+        }
+
         // Write ministream data (if any)
         if !minifat.is_empty() && ministream_start != ENDOFCHAIN {
-            let position = sector_offset(ministream_start, self.sector_size)?;
-            writer.seek(SeekFrom::Start(position))?;
-
             let ministream_data = minifat.ministream_data();
-            write_sector_aligned(writer, ministream_data, self.sector_size)?;
+            write_chain_aligned(
+                writer,
+                ministream_data,
+                ministream_start,
+                fat.fat(),
+                self.sector_size,
+            )?;
         }
 
         // Write large stream data sectors
@@ -1395,24 +1946,25 @@ impl OleWriter {
             }
             let data = &self.streams[plan.index].1;
 
-            // Calculate file position for this sector
-            let position = sector_offset(plan.start_sector, self.sector_size)?;
-            writer.seek(SeekFrom::Start(position))?;
-
-            // Write the retained payload allocation, then at most one sector of
-            // zero padding from a fixed stack buffer.
-            write_sector_aligned(writer, data, self.sector_size)?;
+            write_chain_aligned(writer, data, plan.start_sector, fat.fat(), self.sector_size)?;
         }
 
         // Write directory stream
-        let dir_position = sector_offset(dir_start_sector, self.sector_size)?;
-        writer.seek(SeekFrom::Start(dir_position))?;
-        write_sector_aligned(writer, &dir_stream, self.sector_size)?;
+        write_chain_aligned(
+            writer,
+            &dir_stream,
+            dir_start_sector,
+            fat.fat(),
+            self.sector_size,
+        )?;
 
         // Write MiniFAT sectors (if any)
         if minifat_start_sector != ENDOFCHAIN {
-            for (index, minifat_sector_data) in minifat_sectors.iter().enumerate() {
-                let current_sector = sector_at(minifat_start_sector, index)?;
+            let minifat_ids =
+                fat.allocation_sector_ids(minifat_start_sector, num_minifat_sectors)?;
+            for (current_sector, minifat_sector_data) in
+                minifat_ids.into_iter().zip(minifat_sectors.iter())
+            {
                 let position = sector_offset(current_sector, self.sector_size)?;
                 writer.seek(SeekFrom::Start(position))?;
                 writer.write_all(minifat_sector_data)?;
@@ -1420,8 +1972,9 @@ impl OleWriter {
         }
 
         // Write FAT sectors
-        for (i, fat_sector_data) in fat_sectors_data.iter().enumerate() {
-            let sector_id = sector_at(fat_start_sector, i)?;
+        let fat_sector_ids = fat.allocation_sector_ids(fat_start_sector, num_fat_sectors)?;
+        for (sector_id, fat_sector_data) in fat_sector_ids.into_iter().zip(fat_sectors_data.iter())
+        {
             let position = sector_offset(sector_id, self.sector_size)?;
             writer.seek(SeekFrom::Start(position))?;
             writer.write_all(fat_sector_data)?;
@@ -1429,8 +1982,10 @@ impl OleWriter {
 
         // Write DIFAT sectors (if any)
         if !difat_sectors.is_empty() {
-            for (index, difat_sector_data) in difat_sectors.iter().enumerate() {
-                let current_sector = sector_at(difat_start_sector, index)?;
+            let difat_ids = fat.allocation_sector_ids(difat_start_sector, num_difat_sectors)?;
+            for (current_sector, difat_sector_data) in
+                difat_ids.into_iter().zip(difat_sectors.iter())
+            {
                 let position = sector_offset(current_sector, self.sector_size)?;
                 writer.seek(SeekFrom::Start(position))?;
                 writer.write_all(difat_sector_data)?;
@@ -1830,11 +2385,15 @@ pub(super) fn plan_validation_declines(error: &OleError) -> bool {
             // one means the planned view describes more than the plan built,
             // such as a directory chain its FAT runs past the planned
             // directory image: a plan defect, not a caller's resource limit.
-            // Only those two plan-derived resources decline; any other limit
+            // The allocation-table ceiling is writer-owned too: `for_writer`
+            // sets it to the reader's hard maximum, which a plan of at most
+            // 109 FAT sectors and no DIFAT can exceed only by describing
+            // tables it did not build.
+            // Only those plan-derived resources decline; any other limit
             // stays on the error path, so a future caller-set limit cannot be
             // mistaken for a plan defect.
             | OleError::LimitExceeded {
-                resource: "input bytes" | "directory bytes",
+                resource: "input bytes" | "directory bytes" | "allocation table bytes",
                 ..
             }
     )
@@ -1842,7 +2401,9 @@ pub(super) fn plan_validation_declines(error: &OleError) -> bool {
 
 pub(super) fn validate_output_size(sector_size: usize, sector_count: u32) -> Result<(), OleError> {
     let sector_size_u64 = checked_sector_size(sector_size)?;
-    if sector_count > MAXREGSECT {
+    // MS-CFB 2.9 caps the complete file at MAXREGSECT sectors, including
+    // its header. The count here covers only sectors following the header.
+    if sector_count >= MAXREGSECT {
         return Err(OleError::InvalidData(
             "CFB output exceeds MAXREGSECT".to_string(),
         ));
@@ -1886,10 +2447,20 @@ fn allocation_table_sector_counts(used: u32, sector_size: usize) -> Result<(u32,
     let mut fat = 0u32;
     let mut difat = 0u32;
     for _ in 0..32 {
-        let total = used
+        let mut total = used
             .checked_add(fat)
             .and_then(|value| value.checked_add(difat))
             .ok_or_else(|| OleError::InvalidData("CFB sector count overflows u32".to_string()))?;
+        // `used` already includes any hole crossed by payload allocations.
+        // Metadata can be the first allocation to cross it, adding one FAT entry.
+        if sector_size == SECTOR_SIZE_V4
+            && used <= RANGE_LOCK_SECTOR_V4
+            && total > RANGE_LOCK_SECTOR_V4
+        {
+            total = total.checked_add(1).ok_or_else(|| {
+                OleError::InvalidData("CFB range-lock sector overflows u32".to_string())
+            })?;
+        }
         if total > MAXREGSECT {
             return Err(OleError::InvalidData(
                 "CFB sector count exceeds MAXREGSECT".to_string(),
@@ -1906,41 +2477,6 @@ fn allocation_table_sector_counts(used: u32, sector_size: usize) -> Result<(u32,
     Err(OleError::InvalidData(
         "CFB FAT/DIFAT planning did not converge".to_string(),
     ))
-}
-
-fn sector_ids(start: u32, count: u32, resource: &'static str) -> Result<Vec<u32>, OleError> {
-    if count == 0 {
-        return Ok(Vec::new());
-    }
-    let end = start
-        .checked_add(count)
-        .ok_or_else(|| OleError::InvalidData(format!("CFB {resource} range overflows u32")))?;
-    if start >= MAXREGSECT || end > MAXREGSECT {
-        return Err(OleError::InvalidData(format!(
-            "CFB {resource} range exceeds MAXREGSECT"
-        )));
-    }
-    let count_usize = usize::try_from(count)
-        .map_err(|_err| OleError::InvalidData(format!("CFB {resource} count exceeds usize")))?;
-    let mut ids = Vec::new();
-    ids.try_reserve_exact(count_usize)
-        .map_err(|source| OleError::allocation(resource, source))?;
-    ids.extend(start..end);
-    Ok(ids)
-}
-
-fn sector_at(start: u32, index: usize) -> Result<u32, OleError> {
-    let index_u32 = u32::try_from(index)
-        .map_err(|_err| OleError::InvalidData("CFB sector offset exceeds u32".to_string()))?;
-    let sector = start
-        .checked_add(index_u32)
-        .ok_or_else(|| OleError::InvalidData("CFB sector index overflows u32".to_string()))?;
-    if sector >= MAXREGSECT {
-        return Err(OleError::InvalidData(
-            "CFB sector index exceeds MAXREGSECT".to_string(),
-        ));
-    }
-    Ok(sector)
 }
 
 fn sector_offset(sector: u32, sector_size: usize) -> Result<u64, OleError> {
@@ -1963,6 +2499,68 @@ fn checked_sector_size(sector_size: usize) -> Result<u64, OleError> {
     }
     u64::try_from(sector_size)
         .map_err(|_err| OleError::InvalidData("CFB sector size does not fit u64".to_string()))
+}
+
+/// Write a payload through the exact FAT chain assigned by the allocator.
+///
+/// Version 4 files reserve one physical sector for the range lock.  A chain
+/// that crosses that fixed hole is therefore not physically contiguous even
+/// though its logical allocation was requested as one stream.
+fn write_chain_aligned<W: Write + Seek>(
+    writer: &mut W,
+    data: &[u8],
+    start_sector: u32,
+    fat: &[u32],
+    sector_size: usize,
+) -> Result<(), OleError> {
+    if data.is_empty() {
+        return Ok(());
+    }
+    checked_sector_size(sector_size)?;
+    let mut current = start_sector;
+    let mut offset = 0usize;
+    while offset < data.len() {
+        let run_start = current;
+        let mut run_end = offset;
+        loop {
+            if current == RANGE_LOCK_SECTOR_V4 && sector_size == 4096 {
+                return Err(OleError::InvalidData(
+                    "CFB stream chain points to the range-lock sector".to_string(),
+                ));
+            }
+            let current_index = usize::try_from(current).map_err(|_err| {
+                OleError::InvalidData("CFB FAT sector index does not fit usize".to_string())
+            })?;
+            let next = *fat.get(current_index).ok_or_else(|| {
+                OleError::InvalidData("CFB stream chain exceeds the FAT".to_string())
+            })?;
+            run_end += (data.len() - run_end).min(sector_size);
+            if run_end == data.len() {
+                if next != ENDOFCHAIN {
+                    return Err(OleError::InvalidData(
+                        "CFB stream chain continues beyond its payload".to_string(),
+                    ));
+                }
+                break;
+            }
+            if next >= MAXREGSECT {
+                return Err(OleError::InvalidData(
+                    "CFB stream chain ends before its payload".to_string(),
+                ));
+            }
+            let contiguous = current.checked_add(1) == Some(next);
+            current = next;
+            if !contiguous {
+                break;
+            }
+        }
+        // Keep ordinary payloads in one write. Only an actual physical hole
+        // splits the contiguous run; FAT traversal does not fragment sink I/O.
+        writer.seek(SeekFrom::Start(sector_offset(run_start, sector_size)?))?;
+        write_sector_aligned(writer, &data[offset..run_end], sector_size)?;
+        offset = run_end;
+    }
+    Ok(())
 }
 
 fn write_sector_aligned<W: Write>(
@@ -2038,7 +2636,28 @@ mod tests {
     )]
     use super::*;
     use crate::consts::MAGIC;
+    use crate::file::OleFile;
     use std::error::Error as _;
+    use std::io::Cursor;
+
+    #[test]
+    fn metadata_crossing_range_lock_expands_fat_capacity() {
+        // Without the reserved hole, 512 FAT sectors appear to fit exactly.
+        // The metadata allocations cross the hole and need a 513th FAT sector.
+        let used = 512 * 1024 - 512 - 1;
+        assert_eq!(
+            allocation_table_sector_counts(used - 1, 4096).unwrap(),
+            (512, 1)
+        );
+        assert_eq!(
+            allocation_table_sector_counts(used, 4096).unwrap(),
+            (513, 1)
+        );
+        assert_eq!(
+            allocation_table_sector_counts(used + 1, 4096).unwrap(),
+            (513, 1)
+        );
+    }
 
     #[test]
     fn test_create_writer() {
@@ -2067,7 +2686,7 @@ mod tests {
             .expect("move stream payload");
         assert_eq!(writer.streams[0].1.as_ptr(), pointer);
 
-        let mut output = io::Cursor::new(Vec::new());
+        let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).expect("write owned stream");
         assert_eq!(writer.streams[0].1.as_ptr(), pointer);
     }
@@ -2076,7 +2695,7 @@ mod tests {
     fn serialization_normalizes_the_sink_position() {
         let mut writer = OleWriter::new();
         writer.create_stream(&["Test"], b"payload").unwrap();
-        let mut output = io::Cursor::new(Vec::new());
+        let mut output = Cursor::new(Vec::new());
         output.set_position(17);
 
         writer.write_to(&mut output).unwrap();
@@ -2165,6 +2784,88 @@ mod tests {
     }
 
     #[test]
+    fn chain_publication_coalesces_contiguous_sectors_and_splits_at_the_lock() {
+        #[derive(Default)]
+        struct Sink {
+            position: u64,
+            writes: Vec<(u64, Vec<u8>)>,
+            seeks: usize,
+        }
+        impl Write for Sink {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                self.writes.push((self.position, bytes.to_vec()));
+                self.position += bytes.len() as u64;
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        impl Seek for Sink {
+            fn seek(&mut self, from: SeekFrom) -> io::Result<u64> {
+                let SeekFrom::Start(position) = from else {
+                    panic!("absolute seeks only")
+                };
+                self.position = position;
+                self.seeks += 1;
+                Ok(position)
+            }
+        }
+        for sector_size in [512, 4096] {
+            let mut allocator = FatBuilder::new_with_size(sector_size).unwrap();
+            let data = vec![0xA5; 64 * 1024];
+            let start = allocator.allocate_chain(data.len()).unwrap();
+            let mut sink = Sink::default();
+            write_chain_aligned(&mut sink, &data, start, allocator.fat(), sector_size).unwrap();
+            assert_eq!(sink.seeks, 1);
+            assert_eq!(sink.writes, vec![(sector_size as u64, data)]);
+        }
+        let lock = RANGE_LOCK_SECTOR_V4;
+        let mut fat = vec![crate::consts::FREESECT; lock as usize + 2];
+        fat[lock as usize - 1] = lock + 1;
+        fat[lock as usize + 1] = ENDOFCHAIN;
+        let data = vec![0x5A; 2 * 4096];
+        let mut sink = Sink::default();
+        write_chain_aligned(&mut sink, &data, lock - 1, &fat, 4096).unwrap();
+        assert_eq!(sink.seeks, 2);
+        assert_eq!(sink.writes.len(), 2);
+        assert_eq!(
+            sink.writes[0],
+            (u64::from(lock) * 4096, data[..4096].to_vec())
+        );
+        assert_eq!(
+            sink.writes[1],
+            (u64::from(lock + 2) * 4096, data[4096..].to_vec())
+        );
+    }
+
+    #[test]
+    fn explicit_storage_order_is_deterministic_across_writer_instances() {
+        let mut expected = None;
+        for reverse in [false, true].into_iter().cycle().take(16) {
+            let mut writer = OleWriter::new();
+            let mut paths = [["Pool", "Alpha"], ["Pool", "Beta"], ["Other", "Child"]];
+            if reverse {
+                paths.reverse();
+            }
+            for path in paths {
+                writer.create_storage(&path).unwrap();
+            }
+            writer
+                .create_stream(&["Pool", "Alpha", "Payload"], b"stable")
+                .unwrap();
+            let mut output = Cursor::new(Vec::new());
+            writer.write_to(&mut output).unwrap();
+            let bytes = output.into_inner();
+            if let Some(expected) = &expected {
+                assert!(bytes == *expected, "storage emission must be deterministic");
+            } else {
+                expected = Some(bytes);
+            }
+        }
+    }
+
+    #[test]
     fn delete_storage_removes_descendants_and_clsids_without_prefix_collisions() {
         let mut writer = OleWriter::new();
         writer.create_storage(&["Root"]).unwrap();
@@ -2204,6 +2905,22 @@ mod tests {
         writer
             .create_stream(&["RootSibling", "Preserved"], b"preserved")
             .unwrap();
+        writer
+            .set_storage_metadata(
+                &["Root", "Nested"],
+                0x1122_3344,
+                0x5566_7788_99AA_BBCC,
+                0xDDEE_FF00_0102_0304,
+            )
+            .unwrap();
+        writer
+            .set_stream_metadata(
+                &["Root", "Nested", "Removed"],
+                0x5566_7788,
+                0x0102_0304_0506_0708,
+                0x1112_1314_1516_1718,
+            )
+            .unwrap();
 
         writer.delete_storage(&["Root"]).unwrap();
 
@@ -2234,10 +2951,29 @@ mod tests {
                 .iter()
                 .all(|(path, _)| !path.starts_with(root.as_slice()))
         );
+        assert!(writer.storage_metadata.is_empty());
+        assert!(writer.stream_metadata.is_empty());
         assert!(writer.streams.iter().any(|(path, data)| {
             path == &["RootSibling".to_string(), "Preserved".to_string()]
                 && data.bytes() == b"preserved"
         }));
+
+        writer.create_storage(&["Root", "Nested"]).unwrap();
+        writer
+            .create_stream(&["Root", "Nested", "Fresh"], b"fresh")
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let ole = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+        let fresh = ole
+            .list_directory_entries(&["Root", "Nested"])
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.name == "Fresh")
+            .unwrap();
+        assert_eq!(fresh.state_bits, 0);
+        assert_eq!(fresh.creation_time, 0);
+        assert_eq!(fresh.modified_time, 0);
     }
 
     #[test]
@@ -2287,11 +3023,37 @@ mod tests {
         let second = vec![0x42; 97];
         let mut writer = OleWriter::new();
         writer.create_storage(&["Source"]).unwrap();
+        writer.create_storage(&["Source", "Nested"]).unwrap();
+        writer
+            .set_storage_metadata(
+                &["Source", "Nested"],
+                0xCAFE_BABE,
+                0x0102_0304_0506_0708,
+                0x1112_1314_1516_1718,
+            )
+            .unwrap();
+        writer
+            .set_storage_state_bits(&["source", "nested"], 0xFACE_CAFE)
+            .unwrap();
         writer
             .create_stream_owned(&["Source", "First"], first)
             .unwrap();
         writer
             .create_stream_owned(&["Source", "Second"], second)
+            .unwrap();
+        writer
+            .set_stream_metadata(
+                &["Source", "First"],
+                0xDEAD_BEEF,
+                0x2122_2324_2526_2728,
+                0x3132_3334_3536_3738,
+            )
+            .unwrap();
+        writer
+            .set_stream_modified_time(&["source", "first"], 0x4142_4344_4546_4748)
+            .unwrap();
+        writer
+            .set_stream_state_bits(&["Source", "Second"], 0xABCD_1234)
             .unwrap();
 
         let before = writer
@@ -2305,7 +3067,7 @@ mod tests {
                 )
             })
             .collect::<Vec<_>>();
-        writer.move_storage(&["Source"], &["Renamed"]).unwrap();
+        writer.move_storage(&["source"], &["Renamed"]).unwrap();
         let after = writer
             .streams
             .iter()
@@ -2325,6 +3087,54 @@ mod tests {
                 .iter()
                 .all(|(path, _)| path.first().is_some_and(|name| name == "Renamed"))
         );
+        let renamed_nested = vec!["Renamed".to_string(), "Nested".to_string()];
+        let renamed_first = vec!["Renamed".to_string(), "First".to_string()];
+        let renamed_second = vec!["Renamed".to_string(), "Second".to_string()];
+        assert_eq!(
+            writer.storage_metadata.get(&renamed_nested),
+            Some(&DirectoryMetadata {
+                state_bits: 0xFACE_CAFE,
+                creation_time: 0x0102_0304_0506_0708,
+                modified_time: 0x1112_1314_1516_1718,
+            })
+        );
+        assert_eq!(
+            writer.stream_metadata.get(&renamed_first),
+            Some(&DirectoryMetadata {
+                state_bits: 0xDEAD_BEEF,
+                creation_time: 0x2122_2324_2526_2728,
+                modified_time: 0x4142_4344_4546_4748,
+            })
+        );
+        assert_eq!(
+            writer.stream_metadata.get(&renamed_second),
+            Some(&DirectoryMetadata {
+                state_bits: 0xABCD_1234,
+                creation_time: 0,
+                modified_time: 0,
+            })
+        );
+
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let ole = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+        let nested = ole
+            .list_directory_entries(&["Renamed"])
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.name == "Nested")
+            .unwrap();
+        assert_eq!(nested.state_bits, 0xFACE_CAFE);
+        assert_eq!(nested.creation_time, 0x0102_0304_0506_0708);
+        assert_eq!(nested.modified_time, 0x1112_1314_1516_1718);
+        let first = ole
+            .list_directory_entries(&["Renamed"])
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.name == "First")
+            .unwrap();
+        assert_eq!(first.creation_time, 0x2122_2324_2526_2728);
+        assert_eq!(first.modified_time, 0x4142_4344_4546_4748);
     }
 
     #[test]
@@ -2352,20 +3162,18 @@ mod tests {
     }
 
     #[test]
+    fn version_four_size_limit_includes_the_header_sector() {
+        assert!(validate_output_size(4096, MAXREGSECT - 1).is_ok());
+        assert!(validate_output_size(4096, MAXREGSECT).is_err());
+        assert!(validate_output_size(4096, MAXREGSECT + 1).is_err());
+    }
+
+    #[test]
     fn allocation_table_planning_is_checked_and_converges() {
         assert_eq!(allocation_table_sector_counts(1, 512).unwrap(), (1, 0));
         assert_eq!(allocation_table_sector_counts(128, 512).unwrap(), (2, 0));
         assert!(allocation_table_sector_counts(MAXREGSECT, 512).is_err());
         assert!(allocation_table_sector_counts(1, 0).is_err());
-    }
-
-    #[test]
-    fn sector_id_ranges_use_maxregsect_as_an_exclusive_end() {
-        assert_eq!(
-            sector_ids(MAXREGSECT - 1, 1, "test IDs").unwrap(),
-            [MAXREGSECT - 1]
-        );
-        assert!(sector_ids(MAXREGSECT, 1, "test IDs").is_err());
     }
 
     #[test]

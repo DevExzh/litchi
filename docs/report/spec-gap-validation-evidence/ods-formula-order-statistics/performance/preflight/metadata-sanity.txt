@@ -1,0 +1,15 @@
+Metadata-only harness rename sanity (fresh, untimed)
+Date (UTC): 2026-09-19T20:32:02Z
+
+Build command:
+cargo build --locked --offline --manifest-path docs/report/spec-gap-validation-evidence/ods-formula-order-statistics/performance/harness/Cargo.toml --release
+Build exit code: 0
+
+List command:
+docs/report/spec-gap-validation-evidence/ods-formula-order-statistics/performance/harness/target/release/ods-formula-order-statistics-performance --list
+List exit code: 0
+Listed case count: 122
+List stdout SHA-256: 9a5e7de87ff571829ee79c6d195d75791768b08a5b18101e9a8980aad07a7cd4
+
+Built binary SHA-256: 303b15fc5776165c150e444027925b88d59184a443437df112b54b9246220d09
+Binary name: ods-formula-order-statistics-performance

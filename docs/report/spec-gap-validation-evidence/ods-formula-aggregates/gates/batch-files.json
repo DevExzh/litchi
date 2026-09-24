@@ -1,0 +1,13 @@
+[
+  "crates/litchi-ods/src/codec/formula/evaluation.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/aggregate.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/numerics.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value/aggregate.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value/database.rs",
+  "crates/litchi-ods/tests/ods_formula_aggregate_evaluation.rs",
+  "crates/litchi-ods/tests/ods_formula_aggregate_arrays.rs",
+  "crates/litchi-ods/tests/ods_formula_aggregate_native.rs",
+  "crates/litchi-ods/tests/ods_formula_aggregate_oracle.rs",
+  "crates/litchi-ods/tests/ods_formula_evaluation.rs"
+]

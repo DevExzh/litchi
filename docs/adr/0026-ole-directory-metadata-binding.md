@@ -15,7 +15,8 @@ links become `Option<Sid>`.
 
 The projection covers directory identity, object kind, class identifier,
 red-black-tree sibling/child links, starting sector, parsed stream size, and
-MiniFAT placement. It does not activate an OLE class, interpret an object
+MiniFAT placement, state bits, and creation/modification timestamps. It does not
+activate an OLE class, interpret an object
 payload, or duplicate CFB sector/tree validation already owned by
 `litchi-cfb`.
 
@@ -45,7 +46,17 @@ while property-set names and values remain owned by the existing
 and semantic codec. Shared toolbar and envelope vocabulary remains under
 [MS-OSHARED](../../3rdparty/specs/[MS-OSHARED]/2%20Structures/2.3%20Common%20Objects.md).
 
-State bits and timestamps are intentionally not fabricated: the current
-`litchi-cfb::DirectoryEntry` API does not expose those raw fields. Adding
-activation, host classification, or format-specific `CompObj`/`ObjInfo`
-semantics belongs in a later owner-layer migration.
+Captured source metadata may retain nonconforming timestamps and stale storage
+starting-sector fields for source-preserving replay. Typed metadata edits require
+zero root creation time, zero stream timestamps, and zero storage starting
+sector. The full directory catalog must begin with SID-zero `Root Entry`, whose
+name cannot be changed.
+
+Extracting a nested storage creates a fresh standalone root: the selected
+storage retains its captured metadata on `Object::storage()`, while only its
+CLSID transfers to the new root. Replacing an object preserves the existing
+target storage state and timestamps; adding an object uses fresh zero defaults.
+Only a captured compound-file root can replay source root metadata.
+
+Activation, host classification, and format-specific `CompObj`/`ObjInfo`
+semantics belong to their respective owner layers.

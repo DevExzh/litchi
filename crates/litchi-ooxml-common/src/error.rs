@@ -15,6 +15,10 @@ pub enum Error {
     #[error("OPC error: {0}")]
     Opc(#[from] litchi_opc::error::OpcError),
 
+    /// A bounded durable semantic patch failed decoding or validation.
+    #[error("invalid durable OOXML patch: {0}")]
+    Patch(#[from] litchi_core::patch::PatchError),
+
     /// XML syntax or encoding is invalid.
     #[error("invalid OOXML XML: {0}")]
     Xml(String),

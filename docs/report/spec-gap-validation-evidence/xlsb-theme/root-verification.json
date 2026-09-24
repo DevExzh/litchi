@@ -1,0 +1,117 @@
+{
+  "baseline_commit": "ee03a2f888e4f5702d6cb961eb12dcb1a669e845",
+  "groups": {
+    "62815/change_inverse": {
+      "median_allocated_bytes": 835810.0,
+      "median_peak_extra_requested_live_bytes": 169985.0,
+      "median_process_p50_ns": 833513
+    },
+    "62815/eager_cold": {
+      "median_allocated_bytes": 581859.0,
+      "median_peak_extra_requested_live_bytes": 169985.0,
+      "median_process_p50_ns": 201170
+    },
+    "62815/eager_warm": {
+      "median_allocated_bytes": 0.0,
+      "median_peak_extra_requested_live_bytes": 0.0,
+      "median_process_p50_ns": 50
+    },
+    "62815/noop": {
+      "median_allocated_bytes": 653330.0,
+      "median_peak_extra_requested_live_bytes": 169985.0,
+      "median_process_p50_ns": 405282
+    },
+    "62815/source_cold": {
+      "median_allocated_bytes": 727961.0,
+      "median_peak_extra_requested_live_bytes": 146492.0,
+      "median_process_p50_ns": 153241
+    },
+    "62815/source_warm": {
+      "median_allocated_bytes": 0.0,
+      "median_peak_extra_requested_live_bytes": 0.0,
+      "median_process_p50_ns": 60
+    },
+    "testVarious/change_inverse": {
+      "median_allocated_bytes": 2254609.0,
+      "median_peak_extra_requested_live_bytes": 295275.0,
+      "median_process_p50_ns": 2151278
+    },
+    "testVarious/eager_cold": {
+      "median_allocated_bytes": 1902142.0,
+      "median_peak_extra_requested_live_bytes": 295275.0,
+      "median_process_p50_ns": 1390536
+    },
+    "testVarious/eager_warm": {
+      "median_allocated_bytes": 0.0,
+      "median_peak_extra_requested_live_bytes": 0.0,
+      "median_process_p50_ns": 60
+    },
+    "testVarious/noop": {
+      "median_allocated_bytes": 2001499.0,
+      "median_peak_extra_requested_live_bytes": 295275.0,
+      "median_process_p50_ns": 1641696
+    },
+    "testVarious/source_cold": {
+      "median_allocated_bytes": 989061.0,
+      "median_peak_extra_requested_live_bytes": 162952.0,
+      "median_process_p50_ns": 216141
+    },
+    "testVarious/source_warm": {
+      "median_allocated_bytes": 0.0,
+      "median_peak_extra_requested_live_bytes": 0.0,
+      "median_process_p50_ns": 60
+    },
+    "theme-control-1048576/change_inverse": {
+      "median_allocated_bytes": 4347203.0,
+      "median_peak_extra_requested_live_bytes": 2382570.0,
+      "median_process_p50_ns": 13493319
+    },
+    "theme-control-1048576/eager_cold": {
+      "median_allocated_bytes": 2946160.0,
+      "median_peak_extra_requested_live_bytes": 1341572.0,
+      "median_process_p50_ns": 3824854
+    },
+    "theme-control-1048576/eager_warm": {
+      "median_allocated_bytes": 0.0,
+      "median_peak_extra_requested_live_bytes": 0.0,
+      "median_process_p50_ns": 60
+    },
+    "theme-control-1048576/noop": {
+      "median_allocated_bytes": 3045517.0,
+      "median_peak_extra_requested_live_bytes": 1341572.0,
+      "median_process_p50_ns": 6930515
+    },
+    "theme-control-1048576/source_cold": {
+      "median_allocated_bytes": 2035358.0,
+      "median_peak_extra_requested_live_bytes": 1183203.0,
+      "median_process_p50_ns": 2652330
+    },
+    "theme-control-1048576/source_warm": {
+      "median_allocated_bytes": 0.0,
+      "median_peak_extra_requested_live_bytes": 0.0,
+      "median_process_p50_ns": 60
+    }
+  },
+  "independent_xml_oracle": "name, palette/font names, Latin faces, Accent1; exact raw input/theme digests",
+  "release_binary_sha256": "4fbc0fbf90031cb362e91f1716568fc2044de791a3feb6a582a7428c4e8d78d6",
+  "reports_verified": 54,
+  "tests": {
+    "theme-all-features-all-targets-incremental0.log": {
+      "ignored": 1,
+      "passed": 1060
+    },
+    "theme-all-features-doctests-incremental0.log": {
+      "ignored": 11,
+      "passed": 11
+    },
+    "theme-pptx-consumer-integration.log": {
+      "ignored": 0,
+      "passed": 2
+    },
+    "theme-pptx-consumer-unit.log": {
+      "ignored": 0,
+      "passed": 3
+    }
+  },
+  "timed_samples_verified": 1620
+}

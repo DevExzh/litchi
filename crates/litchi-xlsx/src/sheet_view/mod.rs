@@ -5,6 +5,7 @@ mod model;
 #[cfg(test)]
 mod tests;
 
+pub use crate::data_type_icons::ShowDataTypeIcons;
 pub use codec::parse_worksheet_views;
 pub use model::{
     Collection, Entry, Extension, PivotArea, PivotAreaType, PivotSelection, PivotSelectionAxis,

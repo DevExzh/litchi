@@ -1,0 +1,8 @@
+{
+  "verdict": "held",
+  "codec_sha256": "74e2358822d23d01412768635eb5fd9cf41e4bcd368e63c7721703bd1256e699",
+  "reviewer": "custom_data_common_final_review",
+  "remaining_blocker": "is_extension_element admits Strict SML ext; pinned X14 CT_DatastoreItem imports Transitional CT_ExtensionList.",
+  "focused_tests": 21,
+  "host_followup": "XLSX owner Limits must propagate explicit XML/UID limits; outside shared codec capture."
+}

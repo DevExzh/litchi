@@ -10,11 +10,16 @@ use quick_xml::{
 use std::collections::HashSet;
 
 use super::semantic::{Axis, Region, Style, Template};
-use super::validation::{MAX_AGGREGATE_BYTES, MAX_EXTENSION_DEPTH, MAX_TEMPLATES, MAX_VALUE_BYTES};
+use super::validation::{
+    MAX_AGGREGATE_BYTES, MAX_EXTENSION_DEPTH, MAX_TEMPLATES, MAX_VALUE_BYTES, MAX_XML_DEPTH,
+    validate_style_name_ref,
+};
 
 const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+const TABLE_NS_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const TEXT_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const MAX_XML_BYTES: usize = 256 * 1024 * 1024;
 
 impl Template {
     /// Append deterministic ODF XML for this template to an existing buffer.
@@ -22,47 +27,68 @@ impl Template {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn write_xml(&self, output: &mut String) -> Result<()> {
+        self.write_xml_with_prefix(output, "table", true)
+    }
+
+    pub(crate) fn write_xml_with_prefix(
+        &self,
+        output: &mut String,
+        source_prefix: &str,
+        declare_namespace: bool,
+    ) -> Result<()> {
         self.validate()?;
-        output.push_str("<table:table-template table:name=\"");
+        let prefix = if source_prefix.is_empty() {
+            "table"
+        } else {
+            source_prefix
+        };
+        output.push('<');
+        output.push_str(prefix);
+        output.push_str(":table-template ");
+        if declare_namespace {
+            output.push_str("xmlns:");
+            output.push_str(prefix);
+            output.push_str("=\"");
+            output.push_str(TABLE_NS_STR);
+            output.push_str("\" ");
+        }
+        output.push_str(prefix);
+        output.push_str(":name=\"");
         output.push_str(&escape_xml(&self.name));
         output.push('"');
         write_axis_attribute(
             output,
+            prefix,
             "first-row-start-column",
             self.first_row_start_column,
         );
-        write_axis_attribute(output, "first-row-end-column", self.first_row_end_column);
-        write_axis_attribute(output, "last-row-start-column", self.last_row_start_column);
-        write_axis_attribute(output, "last-row-end-column", self.last_row_end_column);
-        write_bool_attribute(output, "use-first-row-styles", self.use_first_row_styles);
-        write_bool_attribute(output, "use-last-row-styles", self.use_last_row_styles);
-        write_bool_attribute(
+        write_axis_attribute(
             output,
-            "use-first-column-styles",
-            self.use_first_column_styles,
+            prefix,
+            "first-row-end-column",
+            self.first_row_end_column,
         );
-        write_bool_attribute(
+        write_axis_attribute(
             output,
-            "use-last-column-styles",
-            self.use_last_column_styles,
+            prefix,
+            "last-row-start-column",
+            self.last_row_start_column,
         );
-        write_bool_attribute(
+        write_axis_attribute(
             output,
-            "use-banding-rows-styles",
-            self.use_banding_rows_styles,
-        );
-        write_bool_attribute(
-            output,
-            "use-banding-columns-styles",
-            self.use_banding_columns_styles,
+            prefix,
+            "last-row-end-column",
+            self.last_row_end_column,
         );
         output.push('>');
         for region in Region::ALL {
             if let Some(style) = self.region(region) {
-                write_region(output, region.name(), style);
+                write_region(output, prefix, region.name(), style);
             }
         }
-        output.push_str("</table:table-template>");
+        output.push_str("</");
+        output.push_str(prefix);
+        output.push_str(":table-template>");
         Ok(())
     }
 
@@ -77,9 +103,11 @@ impl Template {
     }
 }
 
-fn write_axis_attribute(output: &mut String, name: &str, value: Option<Axis>) {
+fn write_axis_attribute(output: &mut String, prefix: &str, name: &str, value: Option<Axis>) {
     let Some(value) = value else { return };
-    output.push_str(" table:");
+    output.push(' ');
+    output.push_str(prefix);
+    output.push(':');
     output.push_str(name);
     output.push_str("=\"");
     output.push_str(match value {
@@ -89,21 +117,20 @@ fn write_axis_attribute(output: &mut String, name: &str, value: Option<Axis>) {
     output.push('"');
 }
 
-fn write_bool_attribute(output: &mut String, name: &str, value: Option<bool>) {
-    let Some(value) = value else { return };
-    output.push_str(" table:");
+fn write_region(output: &mut String, prefix: &str, name: &str, style: &Style) {
+    output.push('<');
+    output.push_str(prefix);
+    output.push(':');
     output.push_str(name);
-    output.push_str(if value { "=\"true\"" } else { "=\"false\"" });
-}
-
-fn write_region(output: &mut String, name: &str, style: &Style) {
-    output.push_str("<table:");
-    output.push_str(name);
-    output.push_str(" table:style-name=\"");
+    output.push(' ');
+    output.push_str(prefix);
+    output.push_str(":style-name=\"");
     output.push_str(&escape_xml(&style.style_name));
     output.push('"');
     if let Some(paragraph) = &style.paragraph_style_name {
-        output.push_str(" table:paragraph-style-name=\"");
+        output.push(' ');
+        output.push_str(prefix);
+        output.push_str(":paragraph-style-name=\"");
         output.push_str(&escape_xml(paragraph));
         output.push('"');
     }
@@ -154,6 +181,11 @@ fn parse_part(
     names: &mut HashSet<String>,
     aggregate: &mut usize,
 ) -> Result<()> {
+    if xml.len() > MAX_XML_BYTES {
+        return Err(Error::InvalidFormat(
+            "ODS styles.xml exceeds the table-template size limit".to_string(),
+        ));
+    }
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
@@ -172,16 +204,18 @@ fn parse_part(
 
         if let Event::Start(element) = &event
             && namespace == Namespace::Office
-            && matches!(
-                element.local_name().as_ref(),
-                b"styles" | b"automatic-styles"
-            )
+            && element.local_name().as_ref() == b"styles"
         {
             styles_depth = Some(depth);
         }
         let direct_style_child = styles_depth.is_some_and(|value| depth == value + 1);
 
         match event {
+            Event::Start(_) if depth >= MAX_XML_DEPTH => {
+                return Err(Error::InvalidFormat(format!(
+                    "table-template XML exceeds depth {MAX_XML_DEPTH}"
+                )));
+            },
             Event::Start(element) if element.local_name().as_ref() == b"table-template" => {
                 ensure_template_name(namespace, direct_style_child)?;
                 if templates.len() >= MAX_TEMPLATES {
@@ -189,12 +223,29 @@ fn parse_part(
                         "document exceeds {MAX_TEMPLATES} table templates"
                     )));
                 }
+                templates
+                    .try_reserve(1)
+                    .map_err(|_| invalid("table-template catalog allocation failed"))?;
+                names
+                    .try_reserve(1)
+                    .map_err(|_| invalid("table-template name index allocation failed"))?;
                 let template = parse_template(&mut reader, &element, aggregate)?;
                 insert_template(templates, names, template)?;
                 consumed = true;
             },
             Event::Empty(element) if element.local_name().as_ref() == b"table-template" => {
                 ensure_template_name(namespace, direct_style_child)?;
+                if templates.len() >= MAX_TEMPLATES {
+                    return Err(Error::InvalidFormat(format!(
+                        "document exceeds {MAX_TEMPLATES} table templates"
+                    )));
+                }
+                templates
+                    .try_reserve(1)
+                    .map_err(|_| invalid("table-template catalog allocation failed"))?;
+                names
+                    .try_reserve(1)
+                    .map_err(|_| invalid("table-template name index allocation failed"))?;
                 let template = parse_empty_template(&reader, &element, aggregate)?;
                 insert_template(templates, names, template)?;
             },
@@ -378,6 +429,7 @@ struct TemplateRegions {
     even_columns: Option<Style>,
     odd_columns: Option<Style>,
     background: Option<Style>,
+    last_order: Option<usize>,
 }
 
 impl TemplateRegions {
@@ -404,6 +456,18 @@ impl TemplateRegions {
                 "duplicate table-template region '{local}'"
             )));
         }
+        let order = Region::ALL
+            .iter()
+            .position(|region| region.name() == local)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("unknown table-template region '{local}'"))
+            })?;
+        if self.last_order.is_some_and(|last| order < last) {
+            return Err(Error::InvalidFormat(
+                "table-template regions are out of schema order".to_string(),
+            ));
+        }
+        self.last_order = Some(order);
         Ok(())
     }
 }
@@ -418,10 +482,14 @@ fn build_template(attributes: &[Attribute], regions: TemplateRegions) -> Result<
     }
     let template = Template {
         name,
-        first_row_start_column: parse_axis_attribute(attributes, "first-row-start-column")?,
-        first_row_end_column: parse_axis_attribute(attributes, "first-row-end-column")?,
-        last_row_start_column: parse_axis_attribute(attributes, "last-row-start-column")?,
-        last_row_end_column: parse_axis_attribute(attributes, "last-row-end-column")?,
+        first_row_start_column: parse_axis_attribute(attributes, "first-row-start-column")?
+            .or(Some(Axis::Row)),
+        first_row_end_column: parse_axis_attribute(attributes, "first-row-end-column")?
+            .or(Some(Axis::Column)),
+        last_row_start_column: parse_axis_attribute(attributes, "last-row-start-column")?
+            .or(Some(Axis::Row)),
+        last_row_end_column: parse_axis_attribute(attributes, "last-row-end-column")?
+            .or(Some(Axis::Column)),
         use_first_row_styles: parse_bool_attribute(attributes, "use-first-row-styles")?,
         use_last_row_styles: parse_bool_attribute(attributes, "use-last-row-styles")?,
         use_first_column_styles: parse_bool_attribute(attributes, "use-first-column-styles")?,
@@ -465,10 +533,9 @@ fn parse_region_attributes(
     let style_name = attribute(&attributes, Namespace::Table, "style-name")
         .ok_or_else(|| Error::InvalidFormat("table-template region requires style-name".into()))?
         .to_string();
-    if style_name.is_empty() {
-        return Err(Error::InvalidFormat(
-            "table-template style name must not be empty".to_string(),
-        ));
+    validate_style_name_ref(style_name.as_str(), "table-template style name")?;
+    if let Some(paragraph) = attribute(&attributes, Namespace::Table, "paragraph-style-name") {
+        validate_style_name_ref(paragraph, "table-template paragraph style name")?;
     }
     Ok(Style {
         style_name,
@@ -560,6 +627,18 @@ fn reject_template_attributes(attributes: &[Attribute]) -> Result<()> {
     Ok(())
 }
 
+fn parse_bool_attribute(attributes: &[Attribute], local: &str) -> Result<Option<bool>> {
+    attribute(attributes, Namespace::Table, local)
+        .map(|value| match value {
+            "true" | "1" => Ok(true),
+            "false" | "0" => Ok(false),
+            _ => Err(Error::InvalidFormat(format!(
+                "invalid table-template boolean '{value}'"
+            ))),
+        })
+        .transpose()
+}
+
 fn required_attribute_either<'a>(attributes: &'a [Attribute], local: &str) -> Result<&'a str> {
     let table = attribute(attributes, Namespace::Table, local);
     let legacy = attribute(attributes, Namespace::Text, local);
@@ -592,18 +671,6 @@ fn parse_axis_attribute(attributes: &[Attribute], local: &str) -> Result<Option<
             "column" => Ok(Axis::Column),
             _ => Err(Error::InvalidFormat(format!(
                 "invalid table-template axis '{value}'"
-            ))),
-        })
-        .transpose()
-}
-
-fn parse_bool_attribute(attributes: &[Attribute], local: &str) -> Result<Option<bool>> {
-    attribute(attributes, Namespace::Table, local)
-        .map(|value| match value {
-            "true" | "1" => Ok(true),
-            "false" | "0" => Ok(false),
-            _ => Err(Error::InvalidFormat(format!(
-                "invalid table-template boolean '{value}'"
             ))),
         })
         .transpose()
@@ -753,4 +820,8 @@ fn decode_name(value: &[u8]) -> Result<String> {
 
 fn xml_error(error: quick_xml::Error) -> Error {
     Error::InvalidFormat(format!("invalid table-template XML: {error}"))
+}
+
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidFormat(message.into())
 }

@@ -823,6 +823,25 @@ impl Document {
         crate::form::parse_form_parts(&parts)
     }
 
+    /// Inspect in-content RDFa declarations and inline `text:meta` values.
+    ///
+    /// The returned model is lazy with respect to package access: only the
+    /// retained `content.xml` and optional `styles.xml` projections are
+    /// parsed. RDFa values and inline metadata remain inert strings/content;
+    /// no CURIE, datatype, link, or external resource is resolved.
+    pub fn in_content_metadata(&self) -> Result<crate::ContentMetadata> {
+        let mut parts = vec![(self.content.xml_content(), crate::MetadataPart::Content)];
+        if let Some(styles) = self.styles.as_ref().map(Styles::xml_content) {
+            parts.push((styles, crate::MetadataPart::Styles));
+        }
+        crate::content_metadata::parse_parts(&parts)
+    }
+
+    /// Inspect inert XForms model declarations in `office:forms`.
+    pub fn xforms_models(&self) -> Result<Vec<crate::xforms::Model>> {
+        crate::xforms::parse_models(self.content.xml_content())
+    }
+
     pub fn rdf_graphs(&self) -> Result<Vec<crate::rdf::Graph>> {
         crate::rdf::graphs(&self.package)
     }

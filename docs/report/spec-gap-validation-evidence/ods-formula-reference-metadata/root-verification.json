@@ -1,0 +1,132 @@
+{
+  "checks": {
+    "gates": {
+      "commands": 7,
+      "receipt": {
+        "changed_paths": [
+          "Cargo.lock",
+          "crates/litchi-ods/docs/FEATURE_MATRIX.md",
+          "crates/litchi-ods/src/codec/formula/evaluation.rs",
+          "crates/litchi-ods/src/codec/formula/evaluation/reference_metadata.rs",
+          "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+          "crates/litchi-ods/src/codec/formula/evaluation/value/aggregate.rs",
+          "crates/litchi-ods/src/codec/formula/evaluation/value/complex.rs",
+          "crates/litchi-ods/src/codec/formula/evaluation/value/conditional.rs",
+          "crates/litchi-ods/src/codec/formula/evaluation/value/criteria.rs",
+          "crates/litchi-ods/src/codec/formula/evaluation/value/database.rs",
+          "crates/litchi-ods/src/codec/formula/evaluation/value/descriptive.rs",
+          "crates/litchi-ods/src/codec/formula/evaluation/value/matrix.rs",
+          "crates/litchi-ods/src/codec/formula/evaluation/value/order.rs",
+          "crates/litchi-ods/src/codec/formula/evaluation/value/owned.rs",
+          "crates/litchi-ods/src/codec/formula/evaluation/value/paired.rs",
+          "crates/litchi-ods/src/codec/formula/evaluation/value/reference_metadata.rs",
+          "crates/litchi-ods/src/codec/formula/evaluation/value/references.rs",
+          "crates/litchi-ods/src/codec/formula/evaluation/value/statistical.rs",
+          "crates/litchi-ods/tests/ods_formula_reference_metadata_evaluation.rs",
+          "crates/litchi-ods/tests/ods_formula_reference_metadata_limits.rs",
+          "crates/litchi-ods/tests/ods_formula_reference_metadata_oracle.rs",
+          "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/baseline.json",
+          "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/contract.md",
+          "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/integration-plan.md",
+          "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/native/README.md",
+          "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/native/native-results.json",
+          "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/native/provenance.json",
+          "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/native/recalculated.ods",
+          "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/native/reference-metadata-native.fods",
+          "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/native/reproduce.py",
+          "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/reference-metadata-goldens.json",
+          "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/reference_metadata_oracle.py"
+        ],
+        "focused": {
+          "ods_formula_reference_metadata_evaluation": 19,
+          "ods_formula_reference_metadata_limits": 12,
+          "ods_formula_reference_metadata_oracle": 1
+        },
+        "gates": 7,
+        "status": "ok",
+        "totals": {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 1655
+        },
+        "verified": true
+      },
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1655
+      }
+    },
+    "locks": {
+      "ambient": "aa945c79965460e74a64063e1c45396eaae7a68e71072730e2bc426cded22f02",
+      "gate": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3"
+    },
+    "native": {
+      "functions": 8,
+      "results_sha256": "46a26bc7fd72883d8c4bc9d357b13b2fc1c37219e67ecf991c6481db3c8d2c91",
+      "rows": 32,
+      "stale_links": []
+    },
+    "oracle": {
+      "contract_sha256": "87f20c419139bf721221d06c8714edd900ae7a57cbedecf070878e4f6cf64d8a",
+      "functions": 8,
+      "goldens": "reference-metadata-goldens.json",
+      "goldens_sha256": "b5c3e55a13be348c426e7df609cbc07e94e033f6ba762ba28ec8e5973702f241",
+      "observations": 91,
+      "script": "reference_metadata_oracle.py",
+      "script_sha256": "bde7fb9a08251eebdefe5071494bb55d3d9a56fb2421ab0e2a2517159410844d"
+    },
+    "performance": {
+      "review_triggers": 1,
+      "samples": 4920,
+      "status": "ok"
+    },
+    "reviews": {
+      "contract_sha256": "87f20c419139bf721221d06c8714edd900ae7a57cbedecf070878e4f6cf64d8a",
+      "freeze_sha256": "b4a0f0c9665e10f67fafa1b179bfbfdd8be2c65e6ec897bac86db1b2afc9330a",
+      "resource_sha256": "5f2329ffcfccc8ecce0e7a1b4a5c44537b66c29b77cfd8488d10d42383e53a40",
+      "semantic_sha256": "e9ac76dd4407852ef7cd0609aabfb1139e78c43e29cb2561346a05d0a375c7c4",
+      "status": "PASS"
+    },
+    "source_closure": {
+      "base_commit": "049c09cdde3978593149079c4257df047a3fa419",
+      "changed_paths": [
+        "Cargo.lock",
+        "crates/litchi-ods/docs/FEATURE_MATRIX.md",
+        "crates/litchi-ods/src/codec/formula/evaluation.rs",
+        "crates/litchi-ods/src/codec/formula/evaluation/reference_metadata.rs",
+        "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+        "crates/litchi-ods/src/codec/formula/evaluation/value/aggregate.rs",
+        "crates/litchi-ods/src/codec/formula/evaluation/value/complex.rs",
+        "crates/litchi-ods/src/codec/formula/evaluation/value/conditional.rs",
+        "crates/litchi-ods/src/codec/formula/evaluation/value/criteria.rs",
+        "crates/litchi-ods/src/codec/formula/evaluation/value/database.rs",
+        "crates/litchi-ods/src/codec/formula/evaluation/value/descriptive.rs",
+        "crates/litchi-ods/src/codec/formula/evaluation/value/matrix.rs",
+        "crates/litchi-ods/src/codec/formula/evaluation/value/order.rs",
+        "crates/litchi-ods/src/codec/formula/evaluation/value/owned.rs",
+        "crates/litchi-ods/src/codec/formula/evaluation/value/paired.rs",
+        "crates/litchi-ods/src/codec/formula/evaluation/value/reference_metadata.rs",
+        "crates/litchi-ods/src/codec/formula/evaluation/value/references.rs",
+        "crates/litchi-ods/src/codec/formula/evaluation/value/statistical.rs",
+        "crates/litchi-ods/tests/ods_formula_reference_metadata_evaluation.rs",
+        "crates/litchi-ods/tests/ods_formula_reference_metadata_limits.rs",
+        "crates/litchi-ods/tests/ods_formula_reference_metadata_oracle.rs",
+        "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/baseline.json",
+        "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/contract.md",
+        "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/integration-plan.md",
+        "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/native/README.md",
+        "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/native/native-results.json",
+        "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/native/provenance.json",
+        "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/native/recalculated.ods",
+        "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/native/reference-metadata-native.fods",
+        "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/native/reproduce.py",
+        "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/reference-metadata-goldens.json",
+        "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/reference_metadata_oracle.py"
+      ],
+      "selected_files": 52
+    }
+  },
+  "status": "ok",
+  "verified": true
+}

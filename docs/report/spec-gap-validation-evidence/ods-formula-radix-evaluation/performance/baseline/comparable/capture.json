@@ -1,0 +1,25 @@
+{
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-radix-evaluation/performance/radix-harness/run.py",
+    "--binary",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-radix-evaluation/performance/baseline/ods-formula-radix-evaluation-profile",
+    "--output",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-radix-evaluation/performance/baseline/comparable",
+    "--revision",
+    "baseline",
+    "--group",
+    "comparable",
+    "--phase",
+    "all",
+    "--warmups",
+    "3",
+    "--iterations",
+    "15"
+  ],
+  "started_at": "2026-09-13T13:57:11.206010+00:00",
+  "finished_at": "2026-09-13T13:57:12.615972+00:00",
+  "status": 0,
+  "binary_sha256": "8437de6ad6b53d4883960f2b20fdb7e13b6af80822fd740934f42525ce015733",
+  "raw_sha256": "c94c1e177fb3b2787b33aec6a042780f46ee5d01ba292881ae0812afcbf58f74"
+}

@@ -1,0 +1,10 @@
+{
+  "verified": true,
+  "tests": 822,
+  "targets": 49,
+  "performance_lanes": 72,
+  "annotation_experiment_lanes": 16,
+  "followup_lanes": 4,
+  "utc": "2026-09-13T08:39:43.346508+00:00",
+  "command": "python3 docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/verify.py"
+}

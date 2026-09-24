@@ -1,0 +1,37 @@
+{
+  "source_manifest_sha256": "e124b3a954078f8735ef098d221981fa460faaa73c189ded039fcf28fc669bca",
+  "logs": {
+    "tests": {
+      "path": "litchi-doc-annotation-root-tests-v2.log.gz",
+      "raw_sha256": "a050615656505019c83c1d384f7e8327c8ccdf794a8556605e5413c6a117ae28",
+      "exit_code": 0
+    },
+    "clippy": {
+      "path": "litchi-doc-annotation-root-clippy-v2.log.gz",
+      "raw_sha256": "346df56584ad2a327f718062f92a76516f76219454916c919a91bb50b1af55d1",
+      "exit_code": 0
+    },
+    "rustdoc": {
+      "path": "litchi-doc-annotation-root-rustdoc-v2.log.gz",
+      "raw_sha256": "2799de12dc1398acef2fe536495da818fe70629b2187023ceb7d67176198e0ff",
+      "exit_code": 0
+    }
+  },
+  "ordinary_tests_passed": 1240,
+  "doctests_passed": 14,
+  "ordinary_tests_ignored": 2,
+  "doctests_ignored": 12,
+  "commands": [
+    "cargo +1.95.0 test -p litchi-doc --all-features --no-fail-fast",
+    "cargo +1.95.0 clippy -p litchi-doc --all-features --all-targets -- -D warnings",
+    "RUSTDOCFLAGS='-D warnings' cargo +1.95.0 doc -p litchi-doc --all-features --no-deps"
+  ],
+  "environment": {
+    "affinity": "8-31",
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-doc-annotation-root-v2-target-195",
+    "CARGO_BUILD_JOBS": "4"
+  },
+  "scoped_rustfmt_and_diff": "pass"
+}

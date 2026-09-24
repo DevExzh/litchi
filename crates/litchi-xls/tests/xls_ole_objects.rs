@@ -1,6 +1,6 @@
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_xls::ole_object::Limits;
-use litchi_xls::{Editor, FtCmo, FtPictFmla, FtPioGrbit, ObjSubrecord, OleObjectRecord};
+use litchi_xls::{Editor, FtCf, FtCmo, FtPictFmla, FtPioGrbit, ObjSubrecord, OleObjectRecord};
 use std::io::Cursor;
 
 fn record(kind: u16, body: &[u8]) -> Vec<u8> {
@@ -19,16 +19,21 @@ fn object(id: u16, storage: u32, unknown: u8) -> OleObjectRecord {
                 flags: 0,
                 reserved: [0; 12],
             }),
-            ObjSubrecord::ClipboardFormat(vec![2, 0]),
+            ObjSubrecord::PictureFormat(FtCf {
+                format: FtCf::ENHANCED_METAFILE,
+            }),
             ObjSubrecord::PictureFlags(FtPioGrbit { raw: 0 }),
             ObjSubrecord::Unknown {
                 kind: 0x7777,
                 data: vec![unknown],
             },
             ObjSubrecord::PictureFormula(FtPictFmla {
-                formula: vec![1, 2, 3],
+                formula: vec![
+                    0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00,
+                    0x00,
+                ],
                 storage_position: Some(storage),
-                control_buffer_size: Some(0),
+                control_buffer_size: None,
             }),
             ObjSubrecord::End,
         ],

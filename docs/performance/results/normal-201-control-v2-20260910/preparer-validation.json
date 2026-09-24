@@ -1,0 +1,53 @@
+{
+  "commands": [
+    "mkdir extracted && tar -xzf publication-bundle.tar.gz -C extracted",
+    "PYTHONDONTWRITEBYTECODE=1 LC_ALL=C python3 extracted/normal-201-control-v2-20260910/verify.py --root extracted/normal-201-control-v2-20260910",
+    "PYTHONDONTWRITEBYTECODE=1 LC_ALL=C python3 extracted/normal-201-control-v2-20260910/verify.py --root extracted/normal-201-control-v2-20260910 --binary /path/to/litchi-perf-baseline"
+  ],
+  "external_binary": {
+    "bytes": 58873640,
+    "embedded": false,
+    "sha256": "12c814245830fcd37adc31d049f19537de1399bfcb25854b3a0d6d44ae5ebb0d"
+  },
+  "extracted_verifier_runs": [
+    {
+      "binary_check": "skipped",
+      "path": "preparer-verifier-no-binary.json",
+      "sha256": "8e10f49c9c7f29aab82a86e4b4db32f438f85849356623f17d801b46531cf0b2",
+      "status": "passed"
+    },
+    {
+      "binary_check": "verified",
+      "path": "preparer-verifier-with-binary.json",
+      "sha256": "3f958fcf290bf98447db453f8bc99892d69be7d94fe86d00af7c87e158c3e5f9",
+      "status": "passed"
+    }
+  ],
+  "inner_archive": {
+    "bytes": 398806,
+    "embedded_binary": false,
+    "embedded_target": false,
+    "inner_root": "normal-201-control-v2-20260910",
+    "member_count": 79,
+    "path": "publication-bundle.tar.gz",
+    "sha256": "a3599c7eec70c97dba9a7455fc524509c7ebb45925a930473f4bd3f39865d4d3"
+  },
+  "inner_artifact_receipt_sha256": "b0a0d996869dbe482057d2c2363727531f71da0a6389cc01186a0afbb6885827",
+  "measured_source_commit": "995bdaf09352297bde17e6ed7d986360f8c10134",
+  "measured_source_tree": "7f02507971d036c174273bff0ad643c8338d6227",
+  "notes": "This receipt records packaging-agent extraction checks. It does not claim root validation or a new build/timed workload.",
+  "performed_by": "xlsb_data_model_fix",
+  "publication_base_commit": "fdd2b80dfa9efc246a5983a3fec64de25e5c4f63",
+  "publication_scope": "normal uninstrumented control; three fresh process repeats; 201 rows and 31 corpora; not ABBA or paired optimization",
+  "result_keys_sha256": "f0fd76293959e72211e06e51b0a2b41f371423fda34c55144077193d262b1670",
+  "root_final_receipt_pending": true,
+  "root_validation_claim": false,
+  "schema": "litchi-normal-201-control-publication-preparer-validation-v2",
+  "status": "passed",
+  "verifier_properties": {
+    "fresh_corrected_v2_analyzer_executed": true,
+    "harness_percentiles_recomputed": true,
+    "raw_samples_recomputed": 603,
+    "timed_workload_executed": false
+  }
+}

@@ -1,0 +1,101 @@
+diff --git a/crates/litchi-xlsx/src/form_control/owner.rs b/crates/litchi-xlsx/src/form_control/owner.rs
+index 5ee687c00..541c1a3ca 100644
+--- a/crates/litchi-xlsx/src/form_control/owner.rs
++++ b/crates/litchi-xlsx/src/form_control/owner.rs
+@@ -3840,6 +3840,19 @@ fn validate_namespace_bindings(
+     limits: &OwnerLimits,
+     execution: Option<&OwnerExecution>,
+ ) -> OwnerResult<()> {
++    validate_namespace_bindings_and_count_events::<false>(xml, limits, execution).map(|_| ())
++}
++
++/// Validate namespace declarations while counting the XML events consumed by
++/// the MCE selector.  The selector historically admitted the same source
++/// through a namespace pass and a second event-count pass.  Keep the two
++/// execution-work charges for that caller so its work/cancellation limits and
++/// failure boundaries remain unchanged, but read each XML event only once.
++fn validate_namespace_bindings_and_count_events<const PRESERVE_DUPLICATE_WORK_CHARGE: bool>(
++    xml: &[u8],
++    limits: &OwnerLimits,
++    execution: Option<&OwnerExecution>,
++) -> OwnerResult<usize> {
+     let mut reader = NsReader::from_reader(xml);
+     reader.config_mut().trim_text(false);
+     reader.config_mut().check_end_names = true;
+@@ -3866,10 +3879,19 @@ fn validate_namespace_bindings(
+             Event::Start(element) | Event::Empty(element) => {
+                 validate_namespace_declarations(&element)?;
+             },
+-            Event::Eof => return Ok(()),
++            Event::Eof => break,
+             _ => {},
+         }
+     }
++    if PRESERVE_DUPLICATE_WORK_CHARGE {
++        if let Some(execution) = execution {
++            for _ in 0..events {
++                execution.check()?;
++                execution.work(1)?;
++            }
++        }
++    }
++    Ok(events)
+ }
+ 
+ fn validate_namespace_declarations(element: &BytesStart<'_>) -> OwnerResult<()> {
+@@ -3913,8 +3935,8 @@ fn select_mce(
+     source: Option<&RetainedPayload>,
+     mut execution: Option<&mut OwnerExecution>,
+ ) -> OwnerResult<MceSelection> {
+-    validate_namespace_bindings(xml, limits, execution.as_deref())?;
+-    let mce_events = count_mce_events(xml, limits, subject, execution.as_deref())?;
++    let mce_events =
++        validate_namespace_bindings_and_count_events::<true>(xml, limits, execution.as_deref())?;
+     if let Some(execution) = execution.as_deref_mut() {
+         execution.reserve(litchi_core::Resource::Objects, mce_events)?;
+         execution.work(1)?;
+@@ -3980,44 +4002,6 @@ fn select_mce(
+     }
+ }
+ 
+-fn count_mce_events(
+-    xml: &[u8],
+-    limits: &OwnerLimits,
+-    subject: &str,
+-    execution: Option<&OwnerExecution>,
+-) -> OwnerResult<usize> {
+-    let mut reader = NsReader::from_reader(xml);
+-    reader.config_mut().trim_text(false);
+-    reader.config_mut().check_end_names = true;
+-    let mut events = 0usize;
+-    loop {
+-        if let Some(execution) = execution {
+-            execution.check()?;
+-            execution.work(1)?;
+-        }
+-        events = events
+-            .checked_add(1)
+-            .ok_or_else(|| owner_invalid("MCE event count overflow"))?;
+-        if events > limits.max_mce_events {
+-            let resource = match subject {
+-                "worksheet" => "worksheet MCE events",
+-                "drawing" => "drawing MCE events",
+-                _ => "MCE events",
+-            };
+-            return Err(owner_limit(resource, events, limits.max_mce_events));
+-        }
+-        if matches!(
+-            reader
+-                .read_event()
+-                .map_err(|error| owner_invalid(error.to_string()))?,
+-            Event::Eof
+-        ) {
+-            break;
+-        }
+-    }
+-    Ok(events)
+-}
+-
+ fn mce_to_owner_error(
+     subject: &str,
+     error: litchi_ooxml_common::mce::Error,

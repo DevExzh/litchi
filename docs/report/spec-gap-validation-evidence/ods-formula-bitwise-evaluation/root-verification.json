@@ -1,0 +1,21 @@
+{
+  "status": 0,
+  "verified_at": "2026-09-13T13:22:59.098853+00:00",
+  "tests": 903,
+  "targets": 54,
+  "doctests": 2,
+  "source_inputs": 212,
+  "profiles": {
+    "baseline/comparable": 117,
+    "candidate/comparable": 117,
+    "candidate/bitwise": 93
+  },
+  "before_outline": {
+    "abab_rows": 248,
+    "counter_captures": 5
+  },
+  "final_abab_rows": 368,
+  "counter_captures": 7,
+  "reclaimed_allocated_bytes": 1546616832,
+  "artifacts": 5242
+}

@@ -1,0 +1,87 @@
+{
+  "base": "75d705536d76eac81f228c08dcea7da0dc7f93e2",
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "commands": [
+    {
+      "name": "tests",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "--all-features",
+        "--no-fail-fast"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": ""
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": ""
+    },
+    {
+      "name": "rustdoc",
+      "argv": [
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "--all-features",
+        "--no-deps"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": "-D warnings"
+    },
+    {
+      "name": "format",
+      "argv": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-drawingml",
+        "--check"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": ""
+    },
+    {
+      "name": "diff",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": ""
+    }
+  ],
+  "source_unchanged": true,
+  "test_totals_including_doctests": {
+    "passed": 201,
+    "failed": 0,
+    "ignored": 0
+  },
+  "logs": {
+    "clippy.log": "f88e164e65f39bc277f39f60ed63bf8cffed02fc8b8b2ac612c683d7097bdc57",
+    "diff.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rustdoc.log": "99d19cdf3db53d59fa5e03005a3c488bef7005e07aced04312887200284a4651",
+    "tests.log": "6eea21e991dd4c06903bd115c73def674bc0a1cbb973132b232ccd4c04d1d70d"
+  },
+  "passed": true
+}

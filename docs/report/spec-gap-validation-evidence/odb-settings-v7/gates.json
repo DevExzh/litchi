@@ -1,0 +1,65 @@
+[
+  {
+    "name": "test",
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-odb",
+      "--all-features",
+      "--locked",
+      "--offline",
+      "--no-fail-fast"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 16.229002475738525,
+    "log_sha256": "7e34eb24d364c6c6bd962f98b49f7f9abb0b43137d02ac757be47cea14cf65c9"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "-p",
+      "litchi-odb",
+      "--all-targets",
+      "--all-features",
+      "--locked",
+      "--offline",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 9.289676189422607,
+    "log_sha256": "6129a528702055e0445270eb273fee1a58177e36c8e570b1b3389d0d071781df"
+  },
+  {
+    "name": "rustdoc",
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "doc",
+      "-p",
+      "litchi-odb",
+      "--all-features",
+      "--no-deps",
+      "--locked",
+      "--offline"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.7319114208221436,
+    "log_sha256": "07612213d7eeea46682e47c8640f81b7f3d5ac9457c575de41939a03de2898a4"
+  }
+]

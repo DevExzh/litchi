@@ -4,6 +4,8 @@
     clippy::shadow_reuse,
     reason = "serialization helpers deliberately rebind a working value as the output is assembled"
 )]
+use std::ops::Range;
+
 use super::super::{
     Border, BorderStyle, Cell, CellStoryEvent, Field, FieldOwner, FloatingTablePosition,
     MAX_TABLE_CELLS_PER_ROW, MAX_TABLE_NESTING_DEPTH, NavigationEntry, Revision, RevisionType, Row,
@@ -38,6 +40,8 @@ impl<W: Write> RtfWriter<W> {
             ));
         }
         for row in table.rows() {
+            row.validate_paragraph_frames()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
             self.write_table_row(
                 row,
                 table.direction(),
@@ -94,6 +98,8 @@ impl<W: Write> RtfWriter<W> {
             ));
         }
         for row in table.rows() {
+            row.validate_paragraph_frames()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
             row.geometry()
                 .validate()
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
@@ -218,6 +224,63 @@ impl<W: Write> RtfWriter<W> {
                 "RTF table nesting depth cannot be represented",
             )
         })?;
+        if !cell.paragraphs().is_empty() {
+            let mut paragraph_index = 0usize;
+            let mut paragraph_started = false;
+            let mut offset = 0usize;
+            for event in cell.story_events() {
+                let position = match *event {
+                    CellStoryEvent::NestedTable(index) => {
+                        cell.nested_tables()
+                            .get(index)
+                            .ok_or_else(invalid_story_reference)?
+                            .text_offset
+                    },
+                    CellStoryEvent::Drawing(StoryDrawing::Shape(index)) => {
+                        cell.shapes()
+                            .get(index)
+                            .ok_or_else(invalid_story_reference)?
+                            .position
+                    },
+                    CellStoryEvent::Drawing(StoryDrawing::ShapeGroup(index)) => {
+                        cell.shape_groups()
+                            .get(index)
+                            .ok_or_else(invalid_story_reference)?
+                            .position
+                    },
+                    CellStoryEvent::Field(field) => field.position,
+                    CellStoryEvent::PageBreak(page_break) => page_break.position,
+                    CellStoryEvent::ColumnBreak(column_break) => column_break.position,
+                    CellStoryEvent::NavigationEntry(reference)
+                    | CellStoryEvent::RevisionStart(reference)
+                    | CellStoryEvent::RevisionEnd(reference)
+                    | CellStoryEvent::RevisionDeletion(reference) => reference.position,
+                };
+                self.write_cell_text_with_paragraph_frames(
+                    cell,
+                    offset..position,
+                    &mut paragraph_index,
+                    &mut paragraph_started,
+                )?;
+                self.write_cell_story_event(
+                    cell,
+                    *event,
+                    depth,
+                    field_owner_depth,
+                    fields,
+                    navigation_entries,
+                    revisions,
+                )?;
+                offset = position;
+            }
+            self.write_cell_text_with_paragraph_frames(
+                cell,
+                offset..cell.text().len(),
+                &mut paragraph_index,
+                &mut paragraph_started,
+            )?;
+            return Ok(());
+        }
         let mut offset = 0usize;
         for event in cell.story_events() {
             let position = match *event {
@@ -375,6 +438,229 @@ impl<W: Write> RtfWriter<W> {
             )
         })?;
         self.write_text(remainder)
+    }
+
+    fn write_cell_text_with_paragraph_frames(
+        &mut self,
+        cell: &Cell<'_>,
+        range: Range<usize>,
+        paragraph_index: &mut usize,
+        paragraph_started: &mut bool,
+    ) -> io::Result<()> {
+        let text = cell.text();
+        if range.start > range.end
+            || range.end > text.len()
+            || !text.is_char_boundary(range.start)
+            || !text.is_char_boundary(range.end)
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF table-cell event splits or leaves its story text",
+            ));
+        }
+        let mut cursor = range.start;
+        loop {
+            let paragraph = cell.paragraphs().get(*paragraph_index).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF table-cell paragraph metadata is incomplete",
+                )
+            })?;
+            if cursor < paragraph.text_range().start || cursor > paragraph.text_range().end {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF table-cell paragraph metadata does not cover its story text",
+                ));
+            }
+            if !*paragraph_started && cursor == paragraph.text_range().start {
+                if let Some(frame) = paragraph.frame() {
+                    self.write_paragraph_frame(frame, None)?;
+                    self.write_str(" ")?;
+                }
+                *paragraph_started = true;
+            }
+            if cursor == range.end {
+                break;
+            }
+            let paragraph_end = paragraph.text_range().end.min(range.end);
+            let fragment = text.get(cursor..paragraph_end).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF table-cell paragraph span is not on UTF-8 boundaries",
+                )
+            })?;
+            self.write_cell_text_fragment(fragment)?;
+            cursor = paragraph_end;
+            if cursor == paragraph.text_range().end {
+                if paragraph.has_paragraph_break() && range.end > cursor {
+                    self.write_control_word("par", None)?;
+                    self.write_str(" ")?;
+                    cursor = cursor.saturating_add(1);
+                    *paragraph_index = paragraph_index.saturating_add(1);
+                    *paragraph_started = false;
+                    continue;
+                }
+                if !paragraph.has_paragraph_break() && range.end > cursor {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "RTF table-cell paragraph metadata leaves its story text",
+                    ));
+                }
+            }
+            if cursor == range.end {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    fn write_cell_text_fragment(&mut self, fragment: &str) -> io::Result<()> {
+        let mut start = 0usize;
+        for (offset, character) in fragment.char_indices() {
+            if character != '\n' {
+                continue;
+            }
+            self.write_text(fragment.get(start..offset).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF table-cell text span is not on UTF-8 boundaries",
+                )
+            })?)?;
+            self.write_control_word("line", None)?;
+            self.write_str(" ")?;
+            start = offset.saturating_add(character.len_utf8());
+        }
+        self.write_text(fragment.get(start..).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF table-cell text span is not on UTF-8 boundaries",
+            )
+        })?)
+    }
+
+    fn write_cell_story_event(
+        &mut self,
+        cell: &Cell<'_>,
+        event: CellStoryEvent,
+        depth: usize,
+        field_owner_depth: u8,
+        fields: &[Field<'_>],
+        navigation_entries: &[NavigationEntry<'_>],
+        revisions: &[Revision<'_>],
+    ) -> io::Result<()> {
+        match event {
+            CellStoryEvent::NestedTable(index) => {
+                let nested = cell
+                    .nested_tables()
+                    .get(index)
+                    .ok_or_else(invalid_story_reference)?;
+                let nested_depth = depth.checked_add(1).ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "RTF table nesting depth overflow",
+                    )
+                })?;
+                self.write_nested_table(
+                    &nested.table,
+                    nested_depth,
+                    fields,
+                    navigation_entries,
+                    revisions,
+                )?;
+            },
+            CellStoryEvent::Drawing(StoryDrawing::Shape(index)) => {
+                let shape = cell
+                    .shapes()
+                    .get(index)
+                    .ok_or_else(invalid_story_reference)?;
+                self.write_root_shape(shape)?;
+            },
+            CellStoryEvent::Drawing(StoryDrawing::ShapeGroup(index)) => {
+                let group = cell
+                    .shape_groups()
+                    .get(index)
+                    .ok_or_else(invalid_story_reference)?;
+                self.write_shape_group(group, true)?;
+            },
+            CellStoryEvent::Field(reference) => {
+                let field = fields
+                    .get(reference.field_index)
+                    .filter(|field| {
+                        field.owner == FieldOwner::TableCell(field_owner_depth)
+                            && field.position == reference.position
+                            && field.range_end == reference.position
+                    })
+                    .ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "RTF table-cell story has an invalid generic-field owner or reference",
+                        )
+                    })?;
+                self.write_field_with_fields(field, fields, 0)?;
+            },
+            CellStoryEvent::PageBreak(_) => self.write_str("\\page ")?,
+            CellStoryEvent::ColumnBreak(_) => self.write_str("\\column ")?,
+            CellStoryEvent::NavigationEntry(reference) => {
+                let entry = navigation_entries
+                    .get(reference.index)
+                    .filter(|entry| entry.position() == reference.position)
+                    .ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "RTF table-cell navigation reference is invalid",
+                        )
+                    })?;
+                self.write_navigation_entry(entry)?;
+            },
+            CellStoryEvent::RevisionStart(reference) => {
+                let revision = revisions
+                    .get(reference.index)
+                    .filter(|revision| {
+                        revision.revision_type == RevisionType::Insertion
+                            && revision.position == reference.position
+                            && cell.text().get(revision.position..revision.range_end)
+                                == Some(revision.content.as_ref())
+                    })
+                    .ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "RTF table-cell insertion revision reference is invalid",
+                        )
+                    })?;
+                self.write_revision_start(revision)?;
+            },
+            CellStoryEvent::RevisionEnd(reference) => {
+                revisions
+                    .get(reference.index)
+                    .filter(|revision| {
+                        revision.revision_type == RevisionType::Insertion
+                            && revision.range_end == reference.position
+                    })
+                    .ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "RTF table-cell revision end reference is invalid",
+                        )
+                    })?;
+                self.write_str("}")?;
+            },
+            CellStoryEvent::RevisionDeletion(reference) => {
+                let revision = revisions
+                    .get(reference.index)
+                    .filter(|revision| {
+                        revision.revision_type == RevisionType::Deletion
+                            && revision.position == reference.position
+                    })
+                    .ok_or_else(|| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "RTF table-cell deletion revision reference is invalid",
+                        )
+                    })?;
+                self.write_revision(revision)?;
+            },
+        }
+        Ok(())
     }
 
     pub(in super::super) fn write_nested_table(

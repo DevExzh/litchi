@@ -940,6 +940,197 @@ impl ParagraphDropCap {
     }
 }
 
+/// Largest absolute twip value retained by positioned paragraph frames.
+pub const MAX_PARAGRAPH_FRAME_TWIPS: i32 = 10_000_000;
+
+/// Horizontal reference frame for a positioned paragraph object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParagraphFrameHorizontalReference {
+    /// The text column containing the paragraph (`\phcol`).
+    #[default]
+    Column,
+    /// The page margin (`\phmrg`).
+    Margin,
+    /// The physical page (`\phpg`).
+    Page,
+}
+
+/// Horizontal position selector for a positioned paragraph object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParagraphFrameHorizontalPosition {
+    /// Left edge (`\posxl`).
+    #[default]
+    Left,
+    /// Offset from the left edge (`\posxN`).
+    Offset(i32),
+    /// Offset that may be negative (`\posnegxN`).
+    NegativeOffset(i32),
+    /// Center (`\posxc`).
+    Center,
+    /// Inside edge (`\posxi`).
+    Inside,
+    /// Outside edge (`\posxo`).
+    Outside,
+    /// Right edge (`\posxr`).
+    Right,
+}
+
+/// Vertical reference frame for a positioned paragraph object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParagraphFrameVerticalReference {
+    /// The paragraph margin (`\pvmrg`).
+    #[default]
+    Margin,
+    /// The physical page (`\pvpg`).
+    Page,
+    /// The upper-left corner of the next unframed paragraph in the RTF stream
+    /// (`\pvpara`).
+    Paragraph,
+}
+
+/// Vertical position selector for a positioned paragraph object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParagraphFrameVerticalPosition {
+    /// Offset from the top (`\posyN`).
+    Offset(i32),
+    /// Offset that may be negative (`\posnegyN`).
+    NegativeOffset(i32),
+    /// Inline with the paragraph (`\posyil`).
+    Inline,
+    /// Top (`\posyt`).
+    Top,
+    /// Center (`\posyc`).
+    Center,
+    /// Bottom (`\posyb`).
+    Bottom,
+    /// Inside edge (`\posyin`).
+    Inside,
+    /// Outside edge (`\posyout`).
+    Outside,
+}
+
+impl Default for ParagraphFrameVerticalPosition {
+    fn default() -> Self {
+        Self::Offset(0)
+    }
+}
+
+/// Text wrapping around a positioned paragraph object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParagraphFrameWrap {
+    /// The reader chooses its default wrap (`\wrapdefault`).
+    #[default]
+    Default,
+    /// Wrap around the frame (`\wraparound`).
+    Around,
+    /// Tight wrapping (`\wraptight`).
+    Tight,
+    /// Through wrapping (`\wrapthrough`).
+    Through,
+}
+
+/// Text flow direction inside a positioned paragraph object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParagraphFrameTextFlow {
+    /// Left-to-right, top-to-bottom (`\frmtxlrtb`).
+    #[default]
+    LeftToRightTopToBottom,
+    /// Top-to-bottom, right-to-left (`\frmtxtbrl`).
+    TopToBottomRightToLeft,
+    /// Bottom-to-top, left-to-right (`\frmtxbtlr`).
+    BottomToTopLeftToRight,
+    /// Vertical left-to-right, top-to-bottom (`\frmtxlrtbv`).
+    LeftToRightTopToBottomVertical,
+    /// Vertical top-to-bottom, right-to-left (`\frmtxtbrlv`).
+    TopToBottomRightToLeftVertical,
+}
+
+/// Typed positioned paragraph frame controls from RTF 1.9.1.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ParagraphFrame {
+    /// Optional frame width in twips (`\abswN`).
+    pub width_twips: Option<u32>,
+    /// Optional frame height in twips (`\abshN`); negative means exact.
+    pub height_twips: Option<i32>,
+    /// Horizontal reference frame.
+    pub horizontal_reference: ParagraphFrameHorizontalReference,
+    /// Horizontal position selector.
+    pub horizontal_position: ParagraphFrameHorizontalPosition,
+    /// Vertical reference frame.
+    pub vertical_reference: ParagraphFrameVerticalReference,
+    /// Vertical position selector.
+    pub vertical_position: ParagraphFrameVerticalPosition,
+    /// Explicit absolute anchoring lock (`\abslockN`).
+    pub anchor_locked: Option<bool>,
+    /// Suppress text wrapping (`\nowrap`).
+    pub no_wrap: bool,
+    /// Distance from the frame to the main text flow in all directions
+    /// (`\dxfrtextN`).
+    pub horizontal_text_distance_twips: Option<u32>,
+    /// Horizontal frame-text offset (`\dfrmtxtxN`).
+    pub horizontal_text_offset_twips: Option<u32>,
+    /// Vertical frame-text offset (`\dfrmtxtyN`).
+    pub vertical_text_offset_twips: Option<u32>,
+    /// Wrap mode.
+    pub wrap: ParagraphFrameWrap,
+    /// Let surrounding text flow underneath the frame (`\overlay`).
+    pub overlay: bool,
+    /// Explicit no-overlap selector (`\absnoovrlpN`).
+    pub no_overlap: Option<bool>,
+    /// Text flow direction.
+    pub text_flow: ParagraphFrameTextFlow,
+}
+
+impl ParagraphFrame {
+    /// Validate all bounded frame values before serialization.
+    pub fn validate(self) -> RtfResult<()> {
+        if self
+            .width_twips
+            .is_some_and(|value| value as i64 > i64::from(MAX_PARAGRAPH_FRAME_TWIPS))
+            || self
+                .height_twips
+                .is_some_and(|value| value.unsigned_abs() > MAX_PARAGRAPH_FRAME_TWIPS as u32)
+            || self
+                .horizontal_text_distance_twips
+                .is_some_and(|value| value as i64 > i64::from(MAX_PARAGRAPH_FRAME_TWIPS))
+            || self
+                .horizontal_text_offset_twips
+                .is_some_and(|value| value as i64 > i64::from(MAX_PARAGRAPH_FRAME_TWIPS))
+            || self
+                .vertical_text_offset_twips
+                .is_some_and(|value| value as i64 > i64::from(MAX_PARAGRAPH_FRAME_TWIPS))
+        {
+            return Err(RtfError::InvalidStructure(
+                "RTF paragraph frame distance exceeds the safety limit".to_string(),
+            ));
+        }
+        let check_signed_offset = |value: i32| {
+            value
+                .checked_abs()
+                .is_some_and(|absolute| absolute <= MAX_PARAGRAPH_FRAME_TWIPS)
+        };
+        let check_unsigned_offset = |value: i32| (0..=MAX_PARAGRAPH_FRAME_TWIPS).contains(&value);
+        if matches!(
+            self.horizontal_position,
+            ParagraphFrameHorizontalPosition::Offset(value) if !check_unsigned_offset(value)
+        ) || matches!(
+            self.horizontal_position,
+            ParagraphFrameHorizontalPosition::NegativeOffset(value) if !check_signed_offset(value)
+        ) || matches!(
+            self.vertical_position,
+            ParagraphFrameVerticalPosition::Offset(value) if !check_unsigned_offset(value)
+        ) || matches!(
+            self.vertical_position,
+            ParagraphFrameVerticalPosition::NegativeOffset(value) if !check_signed_offset(value)
+        ) {
+            return Err(RtfError::InvalidStructure(
+                "RTF paragraph frame position is outside the safety limit".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Author and packed DTTM timestamp attached to a structural revision
 /// marker such as `\prauthN`/`\prdateN` or `\srauthN`/`\srdateN`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -1022,6 +1213,8 @@ pub struct Paragraph {
     pub no_auto_tab_indent: bool,
     /// Complete drop-cap settings from `\\dropcapliN` and `\\dropcaptN`.
     pub drop_cap: Option<ParagraphDropCap>,
+    /// Positioned paragraph object/frame controls.
+    pub frame: Option<ParagraphFrame>,
     /// Line-breaking and automatic-spacing policy.
     pub line_breaking: ParagraphLineBreaking,
     /// List override index (`\lsN`) applied to this paragraph

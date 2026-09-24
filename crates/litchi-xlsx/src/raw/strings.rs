@@ -874,7 +874,7 @@ pub(crate) fn encode_spreadsheet_text(value: &str) -> String {
     encoded
 }
 
-fn spreadsheet_escape_at(bytes: &[u8], index: usize) -> Option<(u16, usize)> {
+pub(crate) fn spreadsheet_escape_at(bytes: &[u8], index: usize) -> Option<(u16, usize)> {
     let escape = bytes.get(index..index.checked_add(7)?)?;
     if escape[0] != b'_' || escape[1] != b'x' || escape[6] != b'_' {
         return None;

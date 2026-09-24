@@ -12,6 +12,7 @@ from pathlib import Path
 from tools import perf_compare
 from tools.validate_crud_coverage_index import (
     ValidationError,
+    _selector_registry_names,
     _validate_identity_artifact,
     validate_index,
     validate_paths,
@@ -19,10 +20,18 @@ from tools.validate_crud_coverage_index import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-INDEX_PATH = ROOT / "docs/performance/crud-coverage-index-v1.json"
+INDEX_PATH = ROOT / "docs/performance/crud-coverage-index-v2.json"
+HISTORICAL_INDEX_PATH = ROOT / "docs/performance/crud-coverage-index-v1.json"
 CATALOG_PATH = ROOT / "docs/performance/results/perf-corpus-manifest-v2.json"
 SELECTOR_PATH = ROOT / "tools/perf-baseline/src/lib.rs"
 CHECKLIST_PATH = ROOT / "docs/CRUD_Scenario_Checklist.md"
+EXPECTED_SELECTOR_COUNT = 533
+EXPECTED_SELECTOR_NAMES_SHA256 = (
+    "fcbd9d80c9c32e6e98c80b44d5a3253e0252efff4bad16304e9517c0e108c1ec"
+)
+EXPECTED_HISTORICAL_INDEX_SHA256 = (
+    "1a8a22039e9cd88431c2800913d1a86777373e44217881fc6ad5cce8e597a8b5"
+)
 EXPECTED_CATALOG_SHA256 = (
     "f03c9f56846f3c7a22d012189e40126dd65be50efbfd24275c3f9ab40854e41a"
 )
@@ -158,6 +167,112 @@ class CrudCoverageIndexTests(unittest.TestCase):
 
     def test_checked_index_has_all_fifteen_categories_and_real_selectors(self) -> None:
         self.assertEqual(self.validate(self.index), (15, 33))
+
+    def test_current_selector_registry_is_exactly_bound(self) -> None:
+        registry = self.index["selector_registry"]
+        self.assertEqual(registry["selector_count"], EXPECTED_SELECTOR_COUNT)
+        self.assertEqual(registry["minimum_selectable_cases"], EXPECTED_SELECTOR_COUNT)
+        self.assertEqual(len(registry["selector_names"]), EXPECTED_SELECTOR_COUNT)
+        self.assertEqual(
+            registry["selector_names_sha256"], EXPECTED_SELECTOR_NAMES_SHA256
+        )
+        mapped = registry["coverage"]["mapped"]
+        excluded = registry["coverage"]["excluded"]
+        accounted = {entry["selector"] for entry in mapped}
+        accounted.update(entry["selector"] for entry in excluded)
+        self.assertEqual(accounted, set(registry["selector_names"]))
+        self.assertEqual(len(mapped), 33)
+        self.assertEqual(len(excluded), EXPECTED_SELECTOR_COUNT - 33)
+
+    def test_selector_parser_ignores_nested_comments_and_string_literals(self) -> None:
+        noise = (
+            '/* outer /* Self::Fake => "fake", */ */\n'
+            'const _NOISE_ESCAPED: &str = "Self::Fake => \\\"fake\\\",";\n'
+            'const _NOISE_RAW: &str = r###"Self::Raw => "raw", /* nested */"###;\n'
+        )
+        selector_source = self.selector_source.replace(
+            "enum Case {", noise + "enum Case {", 1
+        )
+        self.assertEqual(
+            _selector_registry_names(selector_source),
+            self.index["selector_registry"]["selector_names"],
+        )
+        self.assertEqual(
+            self.validate(self.index, selector_source=selector_source),
+            (15, 33),
+        )
+
+    def test_selector_parser_rejects_commented_arm_and_wildcard_substitution(self) -> None:
+        selector_source = self.selector_source.replace(
+            '            Self::ZipIndex => "zip_index",',
+            '            // Self::ZipIndex => "zip_index",',
+            1,
+        )
+        selector_source = selector_source.replace(
+            '            Self::OdsFileSourceCellBatchSweep => "ods_file_source_cell_batch_sweep",',
+            '            Self::OdsFileSourceCellBatchSweep => "ods_file_source_cell_batch_sweep",\n'
+            '            _ => "wrong_zip_index",',
+            1,
+        )
+        with self.assertRaisesRegex(ValidationError, "Case::name arm"):
+            self.validate(self.index, selector_source=selector_source)
+
+    def test_selector_parser_rejects_missing_and_expression_arms(self) -> None:
+        missing_arm_source = self.selector_source.replace(
+            '            Self::ZipIndex => "zip_index",\n',
+            "",
+            1,
+        )
+        with self.assertRaisesRegex(ValidationError, "duplicate or missing arms"):
+            _selector_registry_names(missing_arm_source)
+
+        expression_arm_source = self.selector_source.replace(
+            '            Self::ZipIndex => "zip_index",',
+            '            Self::ZipIndex => selector_name(),',
+            1,
+        )
+        with self.assertRaisesRegex(ValidationError, "must return a string literal"):
+            _selector_registry_names(expression_arm_source)
+
+    def test_historical_v1_snapshot_remains_byte_stable_and_valid(self) -> None:
+        self.assertEqual(
+            hashlib.sha256(HISTORICAL_INDEX_PATH.read_bytes()).hexdigest(),
+            EXPECTED_HISTORICAL_INDEX_SHA256,
+        )
+        historical = json.loads(HISTORICAL_INDEX_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(self.validate(historical), (15, 33))
+
+    def test_selector_registry_digest_rejects_reordered_names(self) -> None:
+        index = copy.deepcopy(self.index)
+        names = index["selector_registry"]["selector_names"]
+        names[0], names[1] = names[1], names[0]
+        with self.assertRaisesRegex(ValidationError, "selector_names"):
+            self.validate(index)
+
+    def test_selector_registry_coverage_must_account_for_every_name(self) -> None:
+        index = copy.deepcopy(self.index)
+        index["selector_registry"]["coverage"]["excluded"].pop()
+        with self.assertRaisesRegex(ValidationError, "every selector"):
+            self.validate(index)
+
+    def test_selector_registry_mapping_must_match_category_status(self) -> None:
+        index = copy.deepcopy(self.index)
+        index["selector_registry"]["coverage"]["mapped"][0]["status"] = (
+            "correctness-only"
+            if index["selector_registry"]["coverage"]["mapped"][0]["status"]
+            == "measured"
+            else "measured"
+        )
+        with self.assertRaisesRegex(ValidationError, "mapped bindings"):
+            self.validate(index)
+
+    def test_selector_registry_exclusion_reason_is_explicit(self) -> None:
+        index = copy.deepcopy(self.index)
+        index["selector_registry"]["coverage"]["excluded"][0]["reason"] = (
+            "not-yet-reviewed"
+        )
+        with self.assertRaises(ValidationError):
+            self.validate(index)
 
     def test_checked_catalog_hash_matches_regenerated_catalog(self) -> None:
         checked_catalog = self.index["checked_catalog"]
@@ -453,6 +568,7 @@ class CrudCoverageIndexTests(unittest.TestCase):
             self.validate(index)
 
     def test_unrelated_iwork_selector_in_registry_is_allowed(self) -> None:
+        historical = json.loads(HISTORICAL_INDEX_PATH.read_text(encoding="utf-8"))
         marker = "\n}\n\nimpl Case"
         selector_source = self.selector_source.replace(
             marker,
@@ -464,9 +580,13 @@ class CrudCoverageIndexTests(unittest.TestCase):
             'Self::XlsxFullCellScan => "xlsx_full_cell_scan",\n            Self::FutureIworkCase => "future_iwork_case",',
             1,
         )
-        self.assertEqual(self.validate(self.index, selector_source=selector_source), (15, 33))
+        self.assertEqual(
+            self.validate(historical, selector_source=selector_source),
+            (15, 33),
+        )
 
     def test_referenced_iwork_selector_is_rejected(self) -> None:
+        historical = json.loads(HISTORICAL_INDEX_PATH.read_text(encoding="utf-8"))
         marker = "\n}\n\nimpl Case"
         selector_source = self.selector_source.replace(
             marker,
@@ -478,7 +598,7 @@ class CrudCoverageIndexTests(unittest.TestCase):
             'Self::XlsxFullCellScan => "xlsx_full_cell_scan",\n            Self::FutureIworkCase => "future_iwork_case",',
             1,
         )
-        index = copy.deepcopy(self.index)
+        index = copy.deepcopy(historical)
         index["categories"][0]["scenarios"][0]["selector"] = "future_iwork_case"
         with self.assertRaises(ValidationError):
             self.validate(index, selector_source=selector_source)
@@ -508,7 +628,7 @@ class CrudCoverageIndexTests(unittest.TestCase):
     def test_duplicate_json_keys_are_rejected_by_validate_paths(self) -> None:
         original = INDEX_PATH.read_text(encoding="utf-8")
         duplicate = original.replace(
-            '"schema_version": 1,', '"schema_version": 1,\n  "schema_version": 1,', 1
+            '"schema_version": 2,', '"schema_version": 2,\n  "schema_version": 2,', 1
         )
         with tempfile.TemporaryDirectory() as directory:
             index_path = Path(directory) / "index.json"

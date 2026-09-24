@@ -1,0 +1,18 @@
+{
+  "commit": "b8e5d5fe257fd95747c69a3c44a53cedd96f77ed",
+  "functions": [
+    "AVEDEV",
+    "DEVSQ",
+    "GEOMEAN",
+    "HARMEAN",
+    "KURT",
+    "SKEW",
+    "SKEWP"
+  ],
+  "unrelated_tracked_changes": [
+    "crates/litchi-opc/src/package.rs",
+    "crates/litchi-xlsx/tests/drawing_svg_read.rs",
+    "docs/report/spec-gap-validation-evidence/ink-action-edit-performance/report.md"
+  ],
+  "gate_lock_source": "../ods-formula-order-statistics/gates/Cargo.lock"
+}

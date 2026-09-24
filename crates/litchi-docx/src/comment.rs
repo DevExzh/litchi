@@ -205,7 +205,22 @@ impl Comment {
     ///
     /// A vector of comments
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Vec<Comment>> {
-        let source = litchi_ooxml_common::mce::process_part_arc(part)?;
+        // Preserve the Word 2023 tracked-change timestamp while selecting
+        // active MCE content in comments.xml.  The generic baseline has no
+        // knowledge of this DOCX extension and would drop an ignorable
+        // `w16du:dateUtc` attribute.
+        let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
+        capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
+        let source = match litchi_ooxml_common::mce::process_markup_compatibility(
+            part.blob(),
+            &capabilities,
+            &litchi_ooxml_common::mce::Limits::default(),
+        )?
+        .xml
+        {
+            std::borrow::Cow::Borrowed(_) => part.blob_arc(),
+            std::borrow::Cow::Owned(value) => Arc::new(value),
+        };
         let mut comments = Vec::new();
         scan_word_element_ranges(
             source.as_slice(),
@@ -336,6 +351,25 @@ mod tests {
         assert_eq!(comments[1].id(), 2);
         assert_eq!(comments[1].author(), "");
         assert_eq!(comments[1].text().unwrap(), "");
+    }
+
+    #[test]
+    fn word_2023_revision_utc_is_retained_in_comment_mce_projection() {
+        let word = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+        let mce = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+        let date_utc = crate::revision::WORD_2023_DATE_UTC_NAMESPACE;
+        let xml = format!(
+            r#"<w:comments xmlns:w="{word}" xmlns:mc="{mce}" xmlns:du="{date_utc}" mc:Ignorable="du"><w:comment w:id="1" w:author="Alice"><w:p><w:ins w:id="7" w:author="Bob" du:dateUtc="2026-07-17T00:00:00Z"><w:r><w:t>added</w:t></w:r></w:ins></w:p></w:comment></w:comments>"#
+        );
+        let comments = Comment::extract_from_part(&comments_part(xml.as_bytes())).unwrap();
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].text().unwrap(), "added");
+        assert!(
+            comments[0]
+                .xml_bytes()
+                .windows(b"du:dateUtc".len())
+                .any(|window| window == b"du:dateUtc")
+        );
     }
 
     #[test]

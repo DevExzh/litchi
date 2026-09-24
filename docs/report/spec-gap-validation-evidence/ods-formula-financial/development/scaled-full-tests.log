@@ -1,0 +1,799 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/.codex-tmp/ods-financial-development/crates/litchi-ods)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.97s
+     Running unittests src/lib.rs (target/debug/deps/litchi_ods-4ceceaf3cd58f559)
+
+running 503 tests
+....................................................................................... 87/503
+....................................................................................... 174/503
+....................................................................................... 261/503
+....................................................................................... 348/503
+....................................................................................... 435/503
+....................................................................
+test result: ok. 503 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.31s
+
+     Running tests/advanced_document_transactions.rs (target/debug/deps/advanced_document_transactions-9f42129fe9271452)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.28s
+
+     Running tests/content_validation_inventory.rs (target/debug/deps/content_validation_inventory-2fff9e93ddcc6753)
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/content_validation_transactions.rs (target/debug/deps/content_validation_transactions-f100a142f6569cea)
+
+running 14 tests
+..............
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/data_style_replacement_preservation.rs (target/debug/deps/data_style_replacement_preservation-a6088682cc240dce)
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/data_style_vocabulary.rs (target/debug/deps/data_style_vocabulary-3833c2576d0da8a8)
+
+running 47 tests
+...............................................
+test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/deferred_flat_spreadsheet.rs (target/debug/deps/deferred_flat_spreadsheet-f8692747b77c640a)
+
+running 13 tests
+.............
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/deferred_ods_corpus.rs (target/debug/deps/deferred_ods_corpus-44b3cb9032406b0c)
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/deferred_ods_hardening.rs (target/debug/deps/deferred_ods_hardening-aa50809c87cb6930)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.94s
+
+     Running tests/definition_transactions.rs (target/debug/deps/definition_transactions-b77a42c43d227c6d)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/document_transactions.rs (target/debug/deps/document_transactions-8fd13166e11ad7f3)
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/facade_round_trip.rs (target/debug/deps/facade_round_trip-cadaa551f4194af3)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/grid_padding.rs (target/debug/deps/grid_padding-4ff01a4fd314820b)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/logical_row_transactions.rs (target/debug/deps/logical_row_transactions-701fcba7cb654038)
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/metadata_settings_facade.rs (target/debug/deps/metadata_settings_facade-a89ddd00f868ebd2)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/named_definitions.rs (target/debug/deps/named_definitions-23a591e184c8930e)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/native_data_style_replacement.rs (target/debug/deps/native_data_style_replacement-de52acebf97987c5)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/ods_dde_facades.rs (target/debug/deps/ods_dde_facades-19942e9c45ef5142)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_dde_transactions.rs (target/debug/deps/ods_dde_transactions-641d9c0d20e998c0)
+
+running 35 tests
+...................................
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+     Running tests/ods_formula_aggregate_arrays.rs (target/debug/deps/ods_formula_aggregate_arrays-6e7a97fa037e18ae)
+
+running 13 tests
+.............
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_aggregate_evaluation.rs (target/debug/deps/ods_formula_aggregate_evaluation-3d1cbc40ef2e9b99)
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_aggregate_native.rs (target/debug/deps/ods_formula_aggregate_native-6222be286605a6b6)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_aggregate_oracle.rs (target/debug/deps/ods_formula_aggregate_oracle-a0b77ff07ca9999a)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_formula_array_reference_evaluation.rs (target/debug/deps/ods_formula_array_reference_evaluation-fbdf9934736b92f5)
+
+running 66 tests
+..................................................................
+test result: ok. 66 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/ods_formula_bitwise_evaluation.rs (target/debug/deps/ods_formula_bitwise_evaluation-6d7ffb888d919f55)
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_byte_text_evaluation.rs (target/debug/deps/ods_formula_byte_text_evaluation-0174a57c477e9c04)
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_byte_text_limits.rs (target/debug/deps/ods_formula_byte_text_limits-de21b47d47383730)
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_byte_text_oracle.rs (target/debug/deps/ods_formula_byte_text_oracle-cf6a2bb629e34d88)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/ods_formula_complex_arrays.rs (target/debug/deps/ods_formula_complex_arrays-49a1cfb7482a0b0e)
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_complex_evaluation.rs (target/debug/deps/ods_formula_complex_evaluation-064837f7e67b98b8)
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_complex_limits.rs (target/debug/deps/ods_formula_complex_limits-6fd9c6f7e00a405b)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_conditional_evaluation.rs (target/debug/deps/ods_formula_conditional_evaluation-bc05ad2019d3b201)
+
+running 22 tests
+......................
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_conditional_limits.rs (target/debug/deps/ods_formula_conditional_limits-0a38c459ff08f77d)
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_conditional_native.rs (target/debug/deps/ods_formula_conditional_native-442b7bb7961b6e15)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running tests/ods_formula_conditional_oracle.rs (target/debug/deps/ods_formula_conditional_oracle-575782e4e6582024)
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_formula_criterion_text_profile.rs (target/debug/deps/ods_formula_criterion_text_profile-e5a2ce0d7fec5d0a)
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_database_evaluation.rs (target/debug/deps/ods_formula_database_evaluation-b5c6cf1a0c1cd534)
+
+running 20 tests
+....................
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_database_limits.rs (target/debug/deps/ods_formula_database_limits-fc7af64c534db92d)
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_database_numerics.rs (target/debug/deps/ods_formula_database_numerics-b6801ca00c31897e)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_date_time_evaluation.rs (target/debug/deps/ods_formula_date_time_evaluation-6ff1c53a36170e59)
+
+running 22 tests
+......................
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_date_time_limits.rs (target/debug/deps/ods_formula_date_time_limits-eee2ac8806d7afe7)
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_date_time_oracle.rs (target/debug/deps/ods_formula_date_time_oracle-3b9e0240fd94ec45)
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_descriptive_evaluation.rs (target/debug/deps/ods_formula_descriptive_evaluation-d6f7fefc0551aa78)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_descriptive_limits.rs (target/debug/deps/ods_formula_descriptive_limits-586fa5bb6760f943)
+
+running 18 tests
+..................
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/ods_formula_descriptive_native.rs (target/debug/deps/ods_formula_descriptive_native-acf949c5794b97a3)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_formula_descriptive_oracle.rs (target/debug/deps/ods_formula_descriptive_oracle-058cf0e35e9a6cf3)
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/ods_formula_discrete_math.rs (target/debug/deps/ods_formula_discrete_math-97e7011f64117c99)
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_discrete_math_arrays.rs (target/debug/deps/ods_formula_discrete_math_arrays-f052d41e05a140a3)
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_discrete_native.rs (target/debug/deps/ods_formula_discrete_native-2756ff531d0044a3)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_discrete_oracle.rs (target/debug/deps/ods_formula_discrete_oracle-771dba63b4777fbc)
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/ods_formula_dispersion_evaluation.rs (target/debug/deps/ods_formula_dispersion_evaluation-e5c613b60d53fee1)
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_dispersion_limits.rs (target/debug/deps/ods_formula_dispersion_limits-e67157c429e129c5)
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_dispersion_native.rs (target/debug/deps/ods_formula_dispersion_native-022afdb1fb0ef502)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_formula_dispersion_oracle.rs (target/debug/deps/ods_formula_dispersion_oracle-a4a7457f6e6b32ff)
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/ods_formula_elementary_arrays.rs (target/debug/deps/ods_formula_elementary_arrays-5a150c4c0502ef64)
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_elementary_evaluation.rs (target/debug/deps/ods_formula_elementary_evaluation-772d422e4256966d)
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_elementary_native.rs (target/debug/deps/ods_formula_elementary_native-9b81cd5c40b405c8)
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_evaluation.rs (target/debug/deps/ods_formula_evaluation-479ec6790f54d112)
+
+running 24 tests
+........................
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_formula_expressions.rs (target/debug/deps/ods_formula_expressions-8bce9165b28fb651)
+
+running 14 tests
+............
+running 1 test
+.test hard_depth_cap_is_checked_in_a_subprocess_before_stack_overflow ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+.
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_financial_evaluation.rs (target/debug/deps/ods_formula_financial_evaluation-8dff535efe13a9ed)
+
+running 16 tests
+................
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/ods_formula_financial_limits.rs (target/debug/deps/ods_formula_financial_limits-13298b6ed7155d87)
+
+running 23 tests
+.......................
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_financial_oracle.rs (target/debug/deps/ods_formula_financial_oracle-d2aafee7aa7e40c0)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_formula_financial_roots_oracle.rs (target/debug/deps/ods_formula_financial_roots_oracle-bb170988be8a7132)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_formula_functions.rs (target/debug/deps/ods_formula_functions-3166822ed594879c)
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_inspection_evaluation.rs (target/debug/deps/ods_formula_inspection_evaluation-4d0e65702cc965ce)
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_inspection_limits.rs (target/debug/deps/ods_formula_inspection_limits-de2dd654b2e20c77)
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_inspection_oracle.rs (target/debug/deps/ods_formula_inspection_oracle-1bdfba0ff18b13a9)
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_logical_evaluation.rs (target/debug/deps/ods_formula_logical_evaluation-b2282e02929563de)
+
+running 15 tests
+...............
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_lookup_evaluation.rs (target/debug/deps/ods_formula_lookup_evaluation-99c55dcada7aaaf9)
+
+running 34 tests
+..................................
+test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_lookup_limits.rs (target/debug/deps/ods_formula_lookup_limits-4aaeae3ec230172c)
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_lookup_oracle.rs (target/debug/deps/ods_formula_lookup_oracle-921a34cde4dd47ef)
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_matrix_evaluation.rs (target/debug/deps/ods_formula_matrix_evaluation-b6d8935ecd8b9be4)
+
+running 24 tests
+........................
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_matrix_limits.rs (target/debug/deps/ods_formula_matrix_limits-78bf278c015b7de3)
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_order_evaluation.rs (target/debug/deps/ods_formula_order_evaluation-8cf4c88a679ed7c5)
+
+running 17 tests
+.................
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_order_limits.rs (target/debug/deps/ods_formula_order_limits-0410af37dc8ac779)
+
+running 16 tests
+................
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_formula_order_native.rs (target/debug/deps/ods_formula_order_native-2fda94b0a34c53d4)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_formula_order_oracle.rs (target/debug/deps/ods_formula_order_oracle-7db7bfd567398bb2)
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/ods_formula_owned_values.rs (target/debug/deps/ods_formula_owned_values-3be1ad894d3cc6ce)
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_paired_evaluation.rs (target/debug/deps/ods_formula_paired_evaluation-1e7de178618bbe5e)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_paired_limits.rs (target/debug/deps/ods_formula_paired_limits-e21fd150e5539db7)
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/ods_formula_paired_native.rs (target/debug/deps/ods_formula_paired_native-9e8417ec1d5b86e1)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_formula_paired_oracle.rs (target/debug/deps/ods_formula_paired_oracle-f8f32ec74b8a5d10)
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_formula_radix_evaluation.rs (target/debug/deps/ods_formula_radix_evaluation-27b062d4a78a499b)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_reference_metadata_evaluation.rs (target/debug/deps/ods_formula_reference_metadata_evaluation-1042eb8b16deb6a4)
+
+running 19 tests
+...................
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_reference_metadata_limits.rs (target/debug/deps/ods_formula_reference_metadata_limits-81e14c09afcb7fac)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_reference_metadata_oracle.rs (target/debug/deps/ods_formula_reference_metadata_oracle-a1661228bd054397)
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_references.rs (target/debug/deps/ods_formula_references-d5d7e1fdb199bf44)
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_formula_roman_evaluation.rs (target/debug/deps/ods_formula_roman_evaluation-5a57206d9d64b459)
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+
+     Running tests/ods_formula_rounding_arrays.rs (target/debug/deps/ods_formula_rounding_arrays-d59d5a29d816551c)
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_rounding_evaluation.rs (target/debug/deps/ods_formula_rounding_evaluation-77dc553840ed6123)
+
+running 19 tests
+...................
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_scan_regression.rs (target/debug/deps/ods_formula_scan_regression-733dffae2b48b0e7)
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_statistical_evaluation.rs (target/debug/deps/ods_formula_statistical_evaluation-3a0a8c216618f989)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_statistical_limits.rs (target/debug/deps/ods_formula_statistical_limits-17bf506b8ecb287d)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_statistical_native.rs (target/debug/deps/ods_formula_statistical_native-59adbadac54325c5)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_statistical_oracle.rs (target/debug/deps/ods_formula_statistical_oracle-4573731d6bda0717)
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/ods_formula_string_regression.rs (target/debug/deps/ods_formula_string_regression-e5c37806f3a72288)
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_text_evaluation.rs (target/debug/deps/ods_formula_text_evaluation-027819b0771d9657)
+
+running 13 tests
+.............
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/ods_formula_text_limits.rs (target/debug/deps/ods_formula_text_limits-9c5fdff7a91970be)
+
+running 12 tests
+............
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_text_native.rs (target/debug/deps/ods_formula_text_native-266b26c793631649)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_formula_text_oracle.rs (target/debug/deps/ods_formula_text_oracle-4bd76c7ba6f2194c)
+
+running 26 tests
+..........................
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_formula_tokenizer_regression.rs (target/debug/deps/ods_formula_tokenizer_regression-8a285fa46fc20752)
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_trigonometry_arrays.rs (target/debug/deps/ods_formula_trigonometry_arrays-0906858fd5ff6232)
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_trigonometry_evaluation.rs (target/debug/deps/ods_formula_trigonometry_evaluation-c2e370007831c91d)
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_trigonometry_native.rs (target/debug/deps/ods_formula_trigonometry_native-e40bb1b57aa73d17)
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_metadata_transactions.rs (target/debug/deps/ods_metadata_transactions-ff3a046e112103c0)
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_sheet_metadata_transactions.rs (target/debug/deps/ods_sheet_metadata_transactions-d251c047b45d5e81)
+
+running 37 tests
+.....................................
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ods_worksheet_formula_resolver.rs (target/debug/deps/ods_worksheet_formula_resolver-90a450feeafa25b6)
+
+running 16 tests
+................
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/publication_diagnostics.rs (target/debug/deps/publication_diagnostics-df13225157b126af)
+
+running 2 tests
+..
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/rdf_transactions.rs (target/debug/deps/rdf_transactions-3af7ef64fff2cacb)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/scenario_transactions.rs (target/debug/deps/scenario_transactions-260c8c58935ea6df)
+
+running 16 tests
+................
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/sequential_text.rs (target/debug/deps/sequential_text-294ad870ed7a44f6)
+
+running 16 tests
+................
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/sheet_copy_transactions.rs (target/debug/deps/sheet_copy_transactions-4185ddf7615095a1)
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+     Running tests/sheet_metadata_context.rs (target/debug/deps/sheet_metadata_context-f8c3f315f80dea76)
+
+running 8 tests
+........
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/sheet_metadata_selector_search.rs (target/debug/deps/sheet_metadata_selector_search-1def015906f16dc2)
+
+running 7 tests
+.......
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests/sheet_metadata_xml_conformance.rs (target/debug/deps/sheet_metadata_xml_conformance-5887c6a02e0c1182)
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/sheet_move_transactions.rs (target/debug/deps/sheet_move_transactions-8dc43a9447abb820)
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/sheet_transfer_transactions.rs (target/debug/deps/sheet_transfer_transactions-6b120d71467aa484)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/source_catalog.rs (target/debug/deps/source_catalog-8e10285fb1e3d855)
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s
+
+     Running tests/source_cell_transactions.rs (target/debug/deps/source_cell_transactions-3bb2cf859c4d806e)
+
+running 16 tests
+................
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/source_feature_inventory.rs (target/debug/deps/source_feature_inventory-57afb2867908c004)
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_features.rs (target/debug/deps/source_features-712892b4b79635ed)
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_hyperlink_transactions.rs (target/debug/deps/source_hyperlink_transactions-414fb5b28b34aa37)
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/streaming_creation.rs (target/debug/deps/streaming_creation-bff461dd46e0f06b)
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/streaming_text_spans.rs (target/debug/deps/streaming_text_spans-302a0bd8fca9d51d)
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/tracked_changes.rs (target/debug/deps/tracked_changes-772e1adfb2187c67)
+
+running 27 tests
+...........................
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+
+     Running tests/tracked_changes_limits.rs (target/debug/deps/tracked_changes_limits-8bfd44959bfe953a)
+
+running 9 tests
+.........
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/worksheet_cell_batch.rs (target/debug/deps/worksheet_cell_batch-66b286b0056a44f9)
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/worksheet_facade.rs (target/debug/deps/worksheet_facade-ed4050b468e657aa)
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/worksheet_hyperlinks.rs (target/debug/deps/worksheet_hyperlinks-766ee65e68eeba84)
+
+running 10 tests
+..........
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/worksheet_transactions.rs (target/debug/deps/worksheet_transactions-1732aa06709e4b8f)
+
+running 11 tests
+...........
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/xml_references.rs (target/debug/deps/xml_references-431683726ef870dd)
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

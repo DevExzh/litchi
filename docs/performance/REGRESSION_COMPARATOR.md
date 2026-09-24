@@ -7,8 +7,8 @@ to accept an optimization.
 
 The checked policy is
 [`perf-regression-policy-v1.json`](perf-regression-policy-v1.json). Policy
-schema 2 pins the release Linux tool identity, all 36 default case names and
-the required count of 198 case/corpus records, the default
+schema 2 pins the release Linux tool identity, all 37 default case names and
+the required count of 201 case/corpus records, the default
 corpus/writer/semantic shape selections, range settings, warmup count and
 filesystem flags, a 15-sample minimum, build identity fields, and explicit
 upper regression thresholds:
@@ -124,31 +124,33 @@ Filesystem allocator mode additionally requires cache-state keyed rows and
 raw per-child allocator samples; operation allocator mode has neither of
 those filesystem-only evidence surfaces.
 
-The policy also requires a SHA-256 digest of all 198 exact `(case, canonical
+The policy also requires a SHA-256 digest of all 201 exact `(case, canonical
 corpus JSON)` keys. Keys are sorted, then hashed as UTF-8 case name, a zero
 byte, compact canonical corpus JSON, and a newline. This prevents a reference
 and candidate from silently agreeing on the same replacement corpus. The
 allocator policy extends that identity with a zero byte and `cache_state`
 before the newline so warm and cold filesystem rows cannot collide. The
 checked default manifest digest is
-`3b57c3b5aef77f5149d520fd885194d1fd8734460b28bff9d317d1cd840c246f`.
+`f0fd76293959e72211e06e51b0a2b41f371423fda34c55144077193d262b1670`.
 
 The digest was derived from the current harness's default `Case::DEFAULT`
 selection and a fresh deterministic one-sample, zero-warmup report (the
 sample count is irrelevant to this identity-only calculation). The emitted
-198 keys decompose into:
+201 keys decompose into:
 
 | harness branch | cases | corpus selection per case | records |
 | --- | ---: | --- | ---: |
 | ZIP/OPC and CFB/OLE2 substrate | 18 | 4 archive shapes × 2 payload kinds | 144 |
 | fresh DOC/XLS/PPT writers | 3 | 3 writer shapes | 9 |
 | XLSX semantic matrix | 15 | 3 XLSX shapes | 45 |
-| total | 36 | — | 198 |
+| ODP existing-package append lifecycle | 1 | 3 semantic shapes | 3 |
+| total | 37 | — | 201 |
 
 The archive shapes are `tiny`, `many-small`, `few-large`, and `wide-root`; the
 payload kinds are `compressible` and `incompressible`; writer shapes are
 `tiny`, `large`, and `payload-heavy`; and XLSX shapes are `tiny`, `medium`,
-and `dense-wide`. The exact identity-only manifest is recorded in
+and `dense-wide`. The ODP lifecycle uses semantic shapes `tiny`, `medium`,
+and `large`. The exact identity-only manifest is recorded in
 [`perf-regression-default-manifest-v1.json`](results/perf-regression-default-manifest-v1.json);
 it contains no latency samples, resource counters, or output measurements.
 
@@ -174,8 +176,10 @@ be written.
 
 The harness can emit a schema-2 corpus catalog sidecar with
 `--corpus-manifest PATH`.  The report keeps schema 1 and receives only an
-optional `corpus_catalog` reference, so the existing 198-key identity digest
-and all older reports remain compatible.  The catalog's
+optional `corpus_catalog` reference. Adding this sidecar does not change the
+case/corpus key digest. The checked matrix now has 201 keys because it includes
+the three ODP lifecycle records; historical 198-row reports require their
+matching historical policy and cannot pass the current policy. The catalog's
 `content_set_sha256` identifies the exact corpus/member set; its
 `catalog_sha256` additionally covers generator, producer, security, malformed
 input, limits, and provenance metadata.  See
@@ -202,7 +206,7 @@ from tools.perf_compare import report_result_key_manifest_sha256
 report = json.loads(
     Path("target/perf/reference/container-baseline.json").read_text()
 )
-print(report_result_key_manifest_sha256(report, 198))
+print(report_result_key_manifest_sha256(report, 201))
 PY
 python3 tools/perf_compare.py \
   --policy docs/performance/perf-regression-policy-v1.json \

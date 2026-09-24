@@ -1,0 +1,52 @@
+{
+  "actor": "root",
+  "primary_head_at_preflight": "0201c716e6005ad26712895db409b807cdbca5b0",
+  "measured_base": "995bdaf09352297bde17e6ed7d986360f8c10134",
+  "candidate_source_paths": [
+    {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs",
+      "primary_preimage_sha256": "5d29da7fdbaf8e261f817cbb9e5bd8008550ed9b7db340edbbdd1779084a6c8e",
+      "candidate_sha256": "c814117adfe9a045852def61455b56133f0ab960478af68ed60f54c03968f976"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs",
+      "primary_preimage_sha256": "0880c6590963951ce8c801b4986ba72d981acaaba901d653cd86c8f6f2fc8a03",
+      "candidate_sha256": "88549673fdcda62bdc622b0b398941f585d482edffae3fda18626202dc0a32f9"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs",
+      "primary_preimage_sha256": "4e4ded73ce2a74d1ca59c63dd505b4bc2e55572e73bf86191268f364cd55f472",
+      "candidate_sha256": "12fbe9b4babdd902edde29477342c2a6e7f79eea437a519df86c35f66321d3b5"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs",
+      "primary_preimage_sha256": "4cbaa5054d9cbe8edda87329535a3954e72a86910475fb7325e51fd32d747756",
+      "candidate_sha256": "99170f7ff09c5b96d108c92cc638380e04257ae30f1656cf0dcd92d1f8f60996"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/raw/worksheet/edit/codec/wire.rs",
+      "primary_preimage_sha256": "6fd04c3e60272d97b9c42cc8602fd0fd2e07434dd38a8eb81eaf1caa78231f6a",
+      "candidate_sha256": "86418ecd5c0517d6c5dd000c1e126db51426b3231d0a96d1bf31bc80459c707f"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/workbook/edit/tests/cells.rs",
+      "primary_preimage_sha256": "5cf55d0f10707c0be20d07a46c0381b3035eea10deabb9413dffb6c8905b7648",
+      "candidate_sha256": "c2b530f259880b45de2099025e645e267a6ef97cebb360815fd76b60e60850da"
+    }
+  ],
+  "archive_sha256": "5f7d8c77501f1ba520c5c0c1bc1e5ddab7c6ceb65851072fa8726f950690205f",
+  "safe_extract_members": 73,
+  "verifier_exit_code": 0,
+  "raw_verifier_log_sha256": "c3950cca3fa7c70a0c7eb3d0726e57c49f3a62abb0d1fbb977d3468f42a6c225",
+  "root_gate_exit_codes": {
+    "tests": 0,
+    "clippy": 0,
+    "rustdoc": 0,
+    "rustfmt": 0
+  },
+  "test_counts": {
+    "ordinary": 1396,
+    "doctests": 2
+  },
+  "patch_sha256": "4d74c82f40c7697691e954bfa31648c159c89288daf2ec737a621c054f031af7"
+}

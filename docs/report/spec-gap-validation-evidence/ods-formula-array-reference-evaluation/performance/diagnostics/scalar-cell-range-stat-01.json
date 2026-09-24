@@ -1,0 +1,11 @@
+{
+  "archive": "scalar-cell-range-stat-01.tar.gz",
+  "sha256": "4e0a5304defe07892d3b2468fef7dea0a443df087adcdf322526fefed2c3a4dd",
+  "description": "One sequential perf-stat comparison of reference-range-1 after paired capture02 identified p50 regression. CPU6,2warmups5iterations,100000repeat; counters cover whole harness process including warmups/setup. Diagnostic, not replacement for paired corpus.",
+  "before_elf": "0416017dc236eb55acbd79b0a7efae7131924642ac9ba03aaef7763669b6e1da",
+  "after_elf": "e3afee412defa04c25e79586e986eac89164316646f4bcb9536f2d7d80015187",
+  "statuses": [
+    0,
+    0
+  ]
+}

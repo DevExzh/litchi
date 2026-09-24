@@ -1,0 +1,13 @@
+diff --git a/tools/perf-baseline/Cargo.lock b/tools/perf-baseline/Cargo.lock
+index 03edc3b3d..5936f9977 100644
+--- a/tools/perf-baseline/Cargo.lock
++++ b/tools/perf-baseline/Cargo.lock
+@@ -1182,6 +1182,8 @@ dependencies = [
+  "memchr",
+  "quick-xml",
+  "ryu",
++ "serde_json",
++ "sha2 0.11.0",
+  "thiserror",
+  "unicode-normalization",
+  "url",

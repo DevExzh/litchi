@@ -1,0 +1,2 @@
+config workload=parse case=coverage-source-iri-1k input_bytes=1036 repeat=1000 warmups=3 iterations=15 expected_success=true
+result mean_ns=4856262 p50_ns=4863453 p95_ns=4955013 p99_ns=4955013 alloc_calls_p50=5000 alloc_calls_max=5000 dealloc_calls_p50=5000 dealloc_calls_max=5000 requested_bytes_p50=2733000 requested_bytes_max=2733000 released_bytes_p50=2733000 released_bytes_max=2733000 live_before_p50=4952 live_after_p50=4952 live_after_max=4952 peak_live_delta_p50=2733 peak_live_delta_max=2733 successes_p50=1000 successes_max=1000 checksum_p50=1037000 checksum_max=1037000

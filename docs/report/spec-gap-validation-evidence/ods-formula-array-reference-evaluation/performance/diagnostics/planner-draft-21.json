@@ -1,0 +1,11 @@
+{
+  "scope": "diagnostic live draft, not final acceptance",
+  "result": "57 of 58 integration tests pass; finite out-of-shape cache still Objects33 >32",
+  "archive": "planner-draft-21.tar.gz",
+  "sha256": "df8eb8d00f4679847d7c81679b50ea5f296e7e002f871ed6b44bbfce322e9612",
+  "sources": {
+    "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "0f91af60dd15bc7abe6da8ee89c6a12de912b6766e7fd2a37f10a56c01f0b4a4",
+    "crates/litchi-ods/tests/ods_formula_array_reference_evaluation.rs": "9e037f026946b540bb994b16d40ccc57290866293df9ca351c55d4eb89d13ed0"
+  },
+  "status": 101
+}

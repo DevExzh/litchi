@@ -24,7 +24,8 @@ use litchi_core::{
 };
 use litchi_odf_common::{
     core::{
-        SourceBackedPackage, SourcePackageLimits, private::ContentDocumentValidator,
+        SourceBackedPackage, SourceContentPublicationError, SourceContentPublicationOptions,
+        SourceContentPublicationReport, SourcePackageLimits, private::ContentDocumentValidator,
         validate_content_part,
     },
     package::{is_media_path, resolve_package_path},
@@ -255,8 +256,9 @@ impl SourceBackedSpreadsheet {
             let crate::open_parse::OpenOutputs {
                 location: _location,
                 definitions,
-                sheets,
+                mut sheets,
             } = outputs;
+            crate::worksheet::codec::apply_table_metadata(&content_xml, &mut sheets)?;
             Ok((
                 content_xml,
                 styles_xml,
@@ -355,12 +357,112 @@ impl SourceBackedSpreadsheet {
         Ok(value)
     }
 
+    pub(crate) fn content_xml_arc(&self) -> Result<Arc<str>> {
+        self.check_source()?;
+        let value = Arc::clone(&self.content_xml);
+        self.check_source()?;
+        Ok(value)
+    }
+
+    pub(crate) fn sheet_metadata_signed(&self) -> Result<bool> {
+        self.check_source()?;
+        let signed = self
+            .package
+            .files()?
+            .into_iter()
+            .any(|path| litchi_odf_common::core::package::is_signature_owner_path(&path));
+        self.check_source()?;
+        Ok(signed)
+    }
+
+    pub(crate) fn write_sheet_metadata_content<W: Write>(
+        &self,
+        writer: W,
+        replacement: &[u8],
+        options: SourceContentPublicationOptions,
+    ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
+        if let Err(error) = self.check_source() {
+            return Err(match error {
+                Error::SourceChanged { expected, observed } => {
+                    SourceContentPublicationError::SourceChanged {
+                        expected,
+                        observed,
+                        progress:
+                            litchi_odf_common::core::SourceContentPublicationProgress::Untouched,
+                    }
+                },
+                other => SourceContentPublicationError::Core(other),
+            });
+        }
+        self.package
+            .write_content_xml_to_stream_with_options(writer, replacement, options)
+    }
+
     /// Borrow the optional validated `styles.xml` snapshot.
     pub fn styles_xml(&self) -> Result<Option<&str>> {
         self.check_source()?;
         let value = self.styles_xml.as_deref();
         self.check_source()?;
         Ok(value)
+    }
+
+    /// Capture the source-bound standalone table-template catalog.
+    pub fn table_templates(&self) -> Result<crate::styles::table_template::Snapshot> {
+        self.check_source()?;
+        let result =
+            crate::styles::table_template::Snapshot::from_source(self.styles_xml.as_deref());
+        prefer_current(self.source.as_ref(), self.source_version, result)
+    }
+
+    /// Capture inert DDE metadata bound to this live source owner.
+    ///
+    /// The returned snapshot supports exact-source edits and sequential package
+    /// publication. DDE declarations and cached data are never refreshed.
+    pub fn dde(&self) -> Result<crate::dde::SourceSnapshot<'_>> {
+        crate::dde::SourceSnapshot::from_owner(
+            self,
+            crate::dde::Limits::default(),
+            &crate::dde::default_context(),
+            false,
+        )
+    }
+
+    /// Capture source-bound DDE metadata under explicit limits and context.
+    pub fn dde_with(
+        &self,
+        limits: crate::dde::Limits,
+        context: &litchi_core::ExecutionContext,
+    ) -> Result<crate::dde::SourceSnapshot<'_>> {
+        crate::dde::SourceSnapshot::from_owner(self, limits, context, true)
+    }
+
+    /// Begin an inert DDE metadata edit against this live source.
+    pub fn edit_dde(&self) -> Result<crate::dde::SourceEdit<'_>> {
+        self.dde()?.edit()
+    }
+
+    /// Apply a DDE patch against this owner's current metadata snapshot.
+    ///
+    /// The patch must belong to this live owner and match its exact source XML.
+    pub fn apply_dde_patch<'source>(
+        &'source self,
+        patch: &crate::dde::SourcePatch<'source>,
+    ) -> Result<crate::dde::SourceCommit<'source>> {
+        patch.apply(&self.dde()?)
+    }
+
+    /// Capture source-bound, inert scenario declarations without applying
+    /// values, evaluating formulas, or refreshing external data.
+    pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
+        self.check_source()?;
+        let result = crate::scenario::Snapshot::parse(&self.content_xml);
+        prefer_current(
+            self.source.as_ref(),
+            self.source_version,
+            result.map_err(|error| {
+                Error::InvalidFormat(format!("ODS scenario metadata inspection failed: {error}"))
+            }),
+        )
     }
 
     /// Return compact cross-format metadata projected from `meta.xml`.

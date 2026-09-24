@@ -1,0 +1,9 @@
+{
+  "actor": "root",
+  "head_before": "556c61ef355bac77a1dcef0870209c68bf3290e9",
+  "verified_primary_preimages": 18,
+  "verified_candidate_finals": 18,
+  "paths_changed_by_reconciliation": 6,
+  "equivalent_primary_only_hunk": "Edit::join iter().next().is_some() replaced with !is_empty(), strictClippy validated.",
+  "patch_sha256": "fea3273bf1b9b274a51d87e0295e48f0e4cc380385f5b43dd3cd4c46b08bec2b"
+}

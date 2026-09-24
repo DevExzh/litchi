@@ -501,6 +501,7 @@ fn transfer_graph_transition(
             | crate::document::Operation::ReplaceSimpleFieldText { .. }
             | crate::document::Operation::ReplaceComplexFieldText { .. }
             | crate::document::Operation::ReplaceRevisionText { .. }
+            | crate::document::Operation::ApplyRevision { .. }
             | crate::document::Operation::ReplaceContentControlText { .. }
             | crate::document::Operation::ReplaceNestedContentControlText { .. }
             | crate::document::Operation::ReplaceNestedContentControlHyperlinkText { .. }

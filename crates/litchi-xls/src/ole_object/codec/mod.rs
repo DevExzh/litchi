@@ -5,3 +5,4 @@ mod control;
 mod obj;
 
 pub(crate) use biff::{ranges, u32_at};
+pub(crate) use obj::parse_subrecords;

@@ -1,0 +1,82 @@
+{
+  "status": "native observation retained; independent normative contract/profile receipt; production support pending",
+  "scope": {
+    "functions": [
+      "AREAS",
+      "COLUMN",
+      "COLUMNS",
+      "ISREF",
+      "ROW",
+      "ROWS",
+      "SHEET",
+      "SHEETS"
+    ],
+    "formula_rows": 32
+  },
+  "fixture": {
+    "input": "reference-metadata-native.fods",
+    "input_sha256": "eaf3f0bf89a81d2ac248cbfc892d0549554aa07d1ab8f794bc7ff115e0ad3d0d",
+    "recalculated_output": "recalculated.ods",
+    "recalculated_output_sha256": "3c918770e52491a7ad57c91c06c12fe3c220da24f26890613a92a162ed66b7fc",
+    "recalculated_content_xml_sha256": "e841a7e0d3c17342e2648bc0c0fc7544ef7f23d42d1fcf9193509ccc9f1ff28b",
+    "native_results": "native-results.json",
+    "native_results_sha256": "46a26bc7fd72883d8c4bc9d357b13b2fc1c37219e67ecf991c6481db3c8d2c91",
+    "authorship": "Repository-local fixture authored for this evidence receipt; no downloaded or upstream fixture content.",
+    "hidden_sheet_encoding": "table-family automatic style with table:display=false applied to the Hidden table"
+  },
+  "converter": {
+    "executable": "/usr/bin/libreoffice",
+    "version": "LibreOffice 26.2.5.2 620(Build:2)",
+    "command": "libreoffice --headless -env:UserInstallation=file://<temporary-profile> --convert-to ods --outdir <temporary-output> reference-metadata-native.fods",
+    "filter": "calc8",
+    "locale": {
+      "LANG": "C.UTF-8",
+      "LC_ALL": "C.UTF-8",
+      "LC_CTYPE": "C.UTF-8",
+      "LC_NUMERIC": "C.UTF-8"
+    },
+    "fresh_profile": true,
+    "recalculated": true,
+    "temporary_profile_removed_by_reproduce": true
+  },
+  "normative_source": {
+    "contract": "contract.md",
+    "archive": "3rdparty/specs/OpenDocument-v1.4-os.zip",
+    "archive_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+    "member": "part4-formula/OpenDocument-v1.4-os-part4-formula.html",
+    "member_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+    "sections": [
+      "6.13.2 AREAS",
+      "6.13.4 COLUMN",
+      "6.13.5 COLUMNS",
+      "6.13.24 ISREF",
+      "6.13.29 ROW",
+      "6.13.30 ROWS",
+      "6.13.31 SHEET",
+      "6.13.32 SHEETS"
+    ],
+    "contract_sha256": "87f20c419139bf721221d06c8714edd900ae7a57cbedecf070878e4f6cf64d8a"
+  },
+  "interpretation": {
+    "profile": "Local workbook metadata with four ordered sheets; Hidden is encoded with a table-family automatic style table:display=false and remains included in order/count.",
+    "cell_reads": "Every retained metadata observation is geometry/type-only and expects zero resolver cell reads.",
+    "reference_list": "AREAS and ISREF admit ordered ReferenceList; dimension/axis/sheet functions refuse it at the pseudotype boundary.",
+    "three_dimensional": "AREAS counts one logical record; dimensions use one rectangle; SHEET selects first sheet; SHEETS counts inclusive sheet span.",
+    "column_row_scalar": "Explicit scalar COLUMN/ROW references retain their complete generated axis and publish its first element; omitted calls use the fixed current position.",
+    "native_differences": "LibreOffice emits Err:504 for the four multi-entry ReferenceList refusal rows; the receipt does not translate that token into the normative #VALUE! spelling. Native scalar axis rows happen to publish the first element but remain compatibility observations."
+  },
+  "reproduction": {
+    "script": "reproduce.py",
+    "verification": "Checks fixture/result hashes, input formula sequence, fresh-profile content.xml hash, and exact typed output sequence; temporary profile/output are removed on exit."
+  },
+  "independent_oracle": {
+    "script": "../reference_metadata_oracle.py",
+    "goldens": "../reference-metadata-goldens.json",
+    "script_sha256": "00b3e1b5db99bfa1a8d58fc2866e4a586cbbab843df36214e7ca06dfca7ddde9",
+    "goldens_sha256": "b75548f94c5f1eff963b2ae0d520a8b3fe4ec4a1319c47f00a6c35e005171f53",
+    "functions": 8,
+    "observations": 84,
+    "verification": "python3 reference_metadata_oracle.py --check",
+    "rust_consumer_test": "crates/litchi-ods/tests/ods_formula_reference_metadata_oracle.rs"
+  }
+}

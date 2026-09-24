@@ -1,0 +1,44 @@
+{
+  "kind": "primary-v1-preservation-binding",
+  "revision": "v3",
+  "date_utc": "2026-09-10",
+  "primary_root": "/home/zhuhe/code/litchi-spec-gaps",
+  "primary_head_observed": "52519031b4c877032553bf5d4ea4393f3e0e60d1",
+  "primary_head_at_v3_overlay_base": "5953a2ed1a036179042b55f96a4ee333e554b659",
+  "base_reference": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/source-manifest-v2.json",
+  "base_reference_sha256": "1f6fa02220f2a730399d53d5c84b456adbfc622dca018c525ffbc0d605120563",
+  "owned_paths": [
+    {
+      "relative_path": "crates/litchi-opc/fuzz/Cargo.toml",
+      "path": "/home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc/fuzz/Cargo.toml",
+      "bytes": 588,
+      "sha256": "e30d40781c458aee1f1f876b92fba7f3a1114001f334ef38381c7ddd2a8b8d26"
+    },
+    {
+      "relative_path": "crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+      "path": "/home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+      "bytes": 165,
+      "sha256": "8ab521491d73022eee117c604ef96dd76e834866d55b6784693188947258ba18"
+    },
+    {
+      "relative_path": "crates/litchi-opc/fuzz/fuzz_targets/opc_harness.rs",
+      "path": "/home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc/fuzz/fuzz_targets/opc_harness.rs",
+      "bytes": 10148,
+      "sha256": "750397855f35ae4d316e5841f696d3dbba45ec45d63527491bb684dde94acf79"
+    },
+    {
+      "relative_path": "crates/litchi-opc/fuzz/fuzz_targets/smoke_opc.rs",
+      "path": "/home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc/fuzz/fuzz_targets/smoke_opc.rs",
+      "bytes": 5443,
+      "sha256": "990cc510aab67c191809ebf3719e931008ef7192c7aebd87d77b1a714077cbca"
+    }
+  ],
+  "status": [
+    "M crates/litchi-opc/fuzz/Cargo.toml",
+    " M crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+    "?? crates/litchi-opc/fuzz/fuzz_targets/opc_harness.rs",
+    "?? crates/litchi-opc/fuzz/fuzz_targets/smoke_opc.rs"
+  ],
+  "primary_worktree_touched_by_this_task": false,
+  "comparison_basis": "The four observed primary hashes are byte-for-byte equal to the primary bindings recorded in source-manifest-v2.json; this task only read the primary tree."
+}

@@ -1,0 +1,15 @@
+{
+  "completed_at": "2026-09-13T13:19:55.301845+00:00",
+  "removed_directories": [
+    "/home/zhuhe/code/litchi-bitwise-worktree",
+    "/home/zhuhe/code/litchi-bitwise-target",
+    "/home/zhuhe/code/litchi-bitwise-tmp"
+  ],
+  "reclaimed_allocated_bytes": 1546616832,
+  "preservation_receipt": "/home/zhuhe/code/litchi-tmp-recovery-20260913/bitwise-cleanup/preservation.json",
+  "preservation_archive_sha256": "23e27c7b7291d535437fe79ffe2e1e010840fbc405a35bfc1ea2da764ed61b95",
+  "unique_files_preserved": 22,
+  "all_removed_paths_absent": true,
+  "remaining_process_references": [],
+  "worktrees_after": "worktree /home/zhuhe/code/litchi\nHEAD 3210f07ac7a9daa2686e781645f6539a156a26ce\nbranch refs/heads/feat/office-format-completeness\n\nworktree /home/zhuhe/code/litchi-current-baseline-orchestration\nHEAD 654472a66acc748e27e1bba61a167380c8135db3\ndetached\n\nworktree /home/zhuhe/code/litchi-inline-images\nHEAD a555113f46660ed3f0e95cff719dae59982c9b95\ndetached\n\nworktree /home/zhuhe/code/litchi-spec-gaps\nHEAD c32455df83ea67f840a6d4f8da8953f113b590f4\nbranch refs/heads/feat/spec-gap-implementation\n\n"
+}

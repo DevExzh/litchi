@@ -19,6 +19,8 @@ use super::invalid;
 use super::model::{
     Collection, Entry, Extension, PivotArea, PivotAreaType, PivotSelection, PivotSelectionAxis,
 };
+use crate::data_type_icons::ShowDataTypeIcons;
+use crate::data_type_icons::{SHOW_DATA_TYPE_ICONS_NAMESPACE, Target, codec::observe_event};
 
 const MAX_VIEWS: usize = 1024;
 const MAX_SELECTION_RANGES: usize = 32_767;
@@ -53,6 +55,9 @@ struct Capture {
     bytes: usize,
     writer: Writer<Vec<u8>>,
     payload: CapturePayload,
+    target_value: Option<ShowDataTypeIcons>,
+    target_seen: bool,
+    target_open_depth: Option<usize>,
 }
 struct SheetViewCapture {
     bytes: usize,
@@ -94,8 +99,9 @@ struct PivotBuilder {
 
 /// Parse the worksheet's single `sheetViews` collection without resolving UI state or relationships.
 pub fn parse_worksheet_views(xml: &[u8]) -> Result<Option<Collection>> {
-    let processed =
-        process_markup_compatibility(xml, &Capabilities::default(), &Limits::default())?;
+    let mut capabilities = Capabilities::default();
+    capabilities.understand_namespace(SHOW_DATA_TYPE_ICONS_NAMESPACE);
+    let processed = process_markup_compatibility(xml, &capabilities, &Limits::default())?;
     let mut reader = NsReader::from_reader(processed.xml.as_ref());
     reader.config_mut().trim_text(false);
     let mut parser = Parser {
@@ -124,14 +130,15 @@ pub fn parse_worksheet_views(xml: &[u8]) -> Result<Option<Collection>> {
                 return Err(invalid("custom XML entities are rejected"));
             }
         }
+        let resolver = reader.resolver().clone();
         if parser.sheet_view_capture.is_some() && !matches!(&event, Event::Eof) {
             parser.capture_sheet_view_event(event.clone())?;
         }
         if parser.capture.is_some() {
+            parser.observe_capture_event(&event, &resolver, decoder)?;
             parser.capture_event(event)?;
             continue;
         }
-        let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => parser.start(&namespace, &element, decoder, &resolver)?,
@@ -216,6 +223,9 @@ impl Parser {
                     bytes,
                     writer,
                     payload: CapturePayload::PivotArea(area),
+                    target_value: None,
+                    target_seen: false,
+                    target_open_depth: None,
                 });
                 self.stack.push(Context::PivotArea);
             },
@@ -230,6 +240,9 @@ impl Parser {
                     bytes,
                     writer,
                     payload: CapturePayload::Extension(owner, extension),
+                    target_value: None,
+                    target_seen: false,
+                    target_open_depth: None,
                 });
                 self.stack.push(Context::Extension);
             },
@@ -302,7 +315,7 @@ impl Parser {
                     .map_err(xml_error)?;
                 extension.markup = writer.into_inner();
                 self.retain(extension.markup.len(), MAX_RETAINED_MARKUP)?;
-                self.add_extension(owner, extension)?;
+                self.add_extension(owner, extension, None)?;
             },
             (Context::Leaf, _, _) => {
                 return Err(invalid(
@@ -556,20 +569,68 @@ impl Parser {
             });
         Ok(())
     }
-    fn add_extension(&mut self, owner: Owner, extension: Extension) -> Result<()> {
+    fn observe_capture_event(
+        &mut self,
+        event: &Event<'_>,
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+    ) -> Result<()> {
+        let Some(capture) = self.capture.as_mut() else {
+            return Ok(());
+        };
+        let CapturePayload::Extension(owner, _) = &capture.payload else {
+            return Ok(());
+        };
+        let value = observe_event(
+            event,
+            resolver,
+            decoder,
+            Target::Worksheet,
+            capture.depth,
+            &mut capture.target_seen,
+            &mut capture.target_open_depth,
+        )?;
+        if let Some(value) = value {
+            if !matches!(owner, Owner::View) {
+                return Err(invalid(
+                    "showDataTypeIcons is only valid under a sheetView extension",
+                ));
+            }
+            capture.target_value = Some(value);
+        }
+        Ok(())
+    }
+
+    fn add_extension(
+        &mut self,
+        owner: Owner,
+        extension: Extension,
+        icon: Option<ShowDataTypeIcons>,
+    ) -> Result<()> {
         match owner {
-            Owner::Collection => self
-                .collection
-                .as_mut()
-                .ok_or_else(|| invalid("extension outside sheetViews"))?
-                .extensions
-                .push(extension),
-            Owner::View => self
-                .current_view
-                .as_mut()
-                .ok_or_else(|| invalid("extension outside sheetView"))?
-                .extensions
-                .push(extension),
+            Owner::Collection => {
+                if icon.is_some() {
+                    return Err(invalid(
+                        "showDataTypeIcons is only valid under a sheetView extension",
+                    ));
+                }
+                self.collection
+                    .as_mut()
+                    .ok_or_else(|| invalid("extension outside sheetViews"))?
+                    .extensions
+                    .push(extension);
+            },
+            Owner::View => {
+                let view = self
+                    .current_view
+                    .as_mut()
+                    .ok_or_else(|| invalid("extension outside sheetView"))?;
+                if icon.is_some() && view.show_data_type_icons.is_some() {
+                    return Err(invalid("duplicate showDataTypeIcons payload"));
+                }
+                view.show_data_type_icons = icon;
+                view.extensions.push(extension);
+            },
         }
         Ok(())
     }
@@ -635,7 +696,7 @@ impl Parser {
             CapturePayload::Extension(owner, mut extension) => {
                 extension.markup = markup;
                 self.retain(extension.markup.len(), MAX_RETAINED_MARKUP)?;
-                self.add_extension(owner, extension)?;
+                self.add_extension(owner, extension, capture.target_value)?;
             },
         }
         Ok(())
@@ -706,6 +767,7 @@ fn parse_view(element: &BytesStart<'_>, decoder: Decoder) -> Result<Entry> {
         view,
         pivot_selections: Vec::new(),
         extensions: Vec::new(),
+        show_data_type_icons: None,
         retained_xml: Vec::new(),
     })
 }

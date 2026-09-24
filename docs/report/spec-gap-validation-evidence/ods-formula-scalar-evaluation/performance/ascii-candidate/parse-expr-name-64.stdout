@@ -1,0 +1,2 @@
+config workload=expression case=expr-name-64 input_bytes=65 repeat=256 warmups=3 iterations=15 expected_success=true
+result mean_ns=41018 p50_ns=39251 p95_ns=65581 p99_ns=65581 alloc_calls_p50=512 alloc_calls_max=512 dealloc_calls_p50=512 dealloc_calls_max=512 requested_bytes_p50=114944 requested_bytes_max=114944 released_bytes_p50=114944 released_bytes_max=114944 live_before_p50=2957 live_after_p50=2957 live_after_max=2957 peak_live_delta_p50=449 peak_live_delta_max=449 successes_p50=256 successes_max=256 checksum_p50=16896 checksum_max=16896

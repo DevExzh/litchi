@@ -28,6 +28,8 @@ pub(super) fn compose_part(
             uri: uri.clone(),
             before,
             after: Arc::new(after),
+            before_source: None,
+            after_source: None,
         });
     }
     Ok(())
@@ -56,6 +58,8 @@ pub(super) fn compose_part_optional(
             uri: uri.clone(),
             before,
             after: Arc::new(after),
+            before_source: None,
+            after_source: None,
         });
     }
     Ok(())
@@ -273,10 +277,16 @@ pub(super) fn create_sheets(
             page_setup,
             print_options,
             hyperlinks,
+            form_control_scalars,
         } = actions;
         if !hyperlinks.is_empty() {
             return Err(Error::Unsupported {
                 feature: "hyperlink actions on newly created worksheets",
+            });
+        }
+        if !form_control_scalars.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "form-control scalar actions on newly created worksheets",
             });
         }
         let change_start = changes.len();

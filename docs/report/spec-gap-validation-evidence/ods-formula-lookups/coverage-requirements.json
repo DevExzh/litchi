@@ -1,0 +1,2444 @@
+{
+  "status": "PASS",
+  "normative": "OpenDocument 1.4 Part 4 section 6.14",
+  "functions": {
+    "ADDRESS": {
+      "requirements": [
+        "all four absolute modes",
+        "A1 and R1C1 text",
+        "optional quoted sheet and apostrophe escaping",
+        "scalar and matrix parameter conversion",
+        "text/storage/work limits"
+      ],
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "address_formats_all_absolute_modes_and_r1c1_without_origin_shift"
+            ],
+            "requirements": [
+              "all four absolute modes"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "address.a1.default",
+              "address.a1.row_absolute",
+              "address.a1.column_absolute",
+              "address.a1.relative",
+              "address.r1c1.default",
+              "address.r1c1.row_absolute",
+              "address.r1c1.column_absolute",
+              "address.r1c1.relative"
+            ],
+            "requirements": [
+              "all four absolute modes"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "address_formats_all_absolute_modes_and_r1c1_without_origin_shift"
+            ],
+            "requirements": [
+              "A1 and R1C1 text"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "address.a1.default",
+              "address.r1c1.default"
+            ],
+            "requirements": [
+              "A1 and R1C1 text"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "address_formats_all_absolute_modes_and_r1c1_without_origin_shift"
+            ],
+            "requirements": [
+              "optional quoted sheet and apostrophe escaping"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "address.quoted_sheet_a1",
+              "address.apostrophe_escape_a1",
+              "address.quoted_sheet_r1c1"
+            ],
+            "requirements": [
+              "optional quoted sheet and apostrophe escaping"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "address_formats_all_absolute_modes_and_r1c1_without_origin_shift"
+            ],
+            "requirements": [
+              "scalar and matrix parameter conversion"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "address.finite_numeric_text_integer_conversion",
+              "address.logical_integer_conversion",
+              "address.matrix_row_parameter"
+            ],
+            "requirements": [
+              "scalar and matrix parameter conversion"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "resource",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_limits.rs",
+            "sha256": "16a9ff3fdf0bb3c65148f68e91ca1ae2455c26c5ba6cbda03377554efccf9899",
+            "identifiers": [
+              "address_text_and_lookup_work_limits_release_memory"
+            ],
+            "requirements": [
+              "text/storage/work limits"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "address.malformed_numeric_text_is_value_error"
+            ],
+            "requirements": [
+              "text/storage/work limits"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          }
+        ]
+      }
+    },
+    "CHOOSE": {
+      "requirements": [
+        "only selected expression evaluated",
+        "scalar and matrix index policy",
+        "selected reference/list/source identity",
+        "shape probing does not evaluate unselected branches",
+        "typed failures not caught"
+      ],
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "choose_evaluates_only_the_selected_value"
+            ],
+            "requirements": [
+              "only selected expression evaluated"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "choose.unselected_missing_sheet_is_lazy"
+            ],
+            "requirements": [
+              "only selected expression evaluated"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "choose_lifts_matrix_indices_and_preserves_selected_identity",
+              "sequential_choose_shape_probes_release_depth"
+            ],
+            "requirements": [
+              "scalar and matrix index policy"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "choose.matrix_index_selection",
+              "choose.fractional_index_truncates"
+            ],
+            "requirements": [
+              "scalar and matrix index policy"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "choose_evaluates_only_the_selected_value",
+              "choose_lifts_matrix_indices_and_preserves_selected_identity"
+            ],
+            "requirements": [
+              "selected reference/list/source identity"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "choose.selected_reference_identity",
+              "choose.selected_reference_matrix_mode_preserves_descriptor",
+              "choose.selected_reference_list_identity"
+            ],
+            "requirements": [
+              "selected reference/list/source identity"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "choose_lifts_matrix_indices_and_preserves_selected_identity",
+              "sequential_choose_shape_probes_release_depth"
+            ],
+            "requirements": [
+              "shape probing does not evaluate unselected branches"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "choose.unselected_missing_sheet_is_lazy"
+            ],
+            "requirements": [
+              "shape probing does not evaluate unselected branches"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "resource",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_limits.rs",
+            "sha256": "16a9ff3fdf0bb3c65148f68e91ca1ae2455c26c5ba6cbda03377554efccf9899",
+            "identifiers": [
+              "typed_provider_failures_escape_formula_error_handlers_without_retry"
+            ],
+            "requirements": [
+              "typed failures not caught"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "choose.selected_formula_error_identity"
+            ],
+            "requirements": [
+              "typed failures not caught"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          }
+        ]
+      }
+    },
+    "HLOOKUP": {
+      "requirements": [
+        "ForceArray data with complete shape",
+        "exact first match in left-to-right order",
+        "sorted approximate last duplicate",
+        "result row bounds before reads",
+        "only selected result cell read"
+      ],
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "lookup_uses_tall_and_wide_array_orientation_and_last_approximate_duplicate"
+            ],
+            "requirements": [
+              "ForceArray data with complete shape"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "hlookup.matrix_key_iteration",
+              "hlookup.matrix_index_iteration"
+            ],
+            "requirements": [
+              "ForceArray data with complete shape"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "horizontal_and_vertical_lookup_exact_and_approximate_modes"
+            ],
+            "requirements": [
+              "exact first match in left-to-right order"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "hlookup.exact_first_duplicate",
+              "hlookup.reference_exact_first_duplicate"
+            ],
+            "requirements": [
+              "exact first match in left-to-right order"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "horizontal_and_vertical_lookup_exact_and_approximate_modes"
+            ],
+            "requirements": [
+              "sorted approximate last duplicate"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "hlookup.approximate_last_duplicate",
+              "hlookup.reference_approximate_duplicate_last"
+            ],
+            "requirements": [
+              "sorted approximate last duplicate"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "table_lookup_reads_search_prefix_and_selected_result_only",
+              "lookup_invalid_selectors_precede_reference_key_reads"
+            ],
+            "requirements": [
+              "result row bounds before reads"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "hlookup.selector_bounds_before_reads"
+            ],
+            "requirements": [
+              "result row bounds before reads"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "table_lookup_reads_search_prefix_and_selected_result_only"
+            ],
+            "requirements": [
+              "only selected result cell read"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "hlookup.reference_exact_first_duplicate"
+            ],
+            "requirements": [
+              "only selected result cell read"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          }
+        ]
+      }
+    },
+    "INDEX": {
+      "requirements": [
+        "Array and ReferenceList data",
+        "logical record area selector including duplicates",
+        "zero/omitted row and column slices",
+        "3D descriptor preservation",
+        "reference identity in metadata/reducers/operators",
+        "derived result owned conversion"
+      ],
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "index_selects_array_cells_and_missing_row_or_column_returns_vectors",
+              "index_selects_one_union_record_and_clears_list_identity"
+            ],
+            "requirements": [
+              "Array and ReferenceList data"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "index.array_explicit_row_column",
+              "index.reference_list_second_record"
+            ],
+            "requirements": [
+              "Array and ReferenceList data"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "index_selects_one_union_record_and_clears_list_identity"
+            ],
+            "requirements": [
+              "logical record area selector including duplicates"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "index.reference_list_second_record",
+              "index.reference_list_duplicate_record_identity"
+            ],
+            "requirements": [
+              "logical record area selector including duplicates"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "index_selects_array_cells_and_missing_row_or_column_returns_vectors"
+            ],
+            "requirements": [
+              "zero/omitted row and column slices"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "index.array_zero_row_column_slice",
+              "index.array_zero_column_row_slice",
+              "index.array_both_zero_returns_complete_array"
+            ],
+            "requirements": [
+              "zero/omitted row and column slices"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "index_and_offset_return_derived_reference_descriptors_without_reads"
+            ],
+            "requirements": [
+              "3D descriptor preservation"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "index.three_dimensional_record_preserved",
+              "index.three_dimensional_full_area_preserved"
+            ],
+            "requirements": [
+              "3D descriptor preservation"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "index_and_offset_return_derived_reference_descriptors_without_reads",
+              "selected_derived_references_keep_matrix_shape_without_unsliced_branch_probes"
+            ],
+            "requirements": [
+              "reference identity in metadata/reducers/operators"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "index.reference_slice_clears_owner"
+            ],
+            "requirements": [
+              "reference identity in metadata/reducers/operators"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "derived_reference_owned_roundtrip_drops_synthetic_lexical_owner"
+            ],
+            "requirements": [
+              "derived result owned conversion"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "index.reference_slice_clears_owner"
+            ],
+            "requirements": [
+              "derived result owned conversion"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          }
+        ]
+      }
+    },
+    "INDIRECT": {
+      "requirements": [
+        "A1 cells/ranges/whole axes/3D",
+        "dot and exclamation sheet separators",
+        "R1C1 absolute and relative coordinates",
+        "first-element selector semantics for array inputs",
+        "temporary parse storage charged",
+        "source references inert",
+        "derived result owned conversion"
+      ],
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "indirect_keeps_a1_and_explicit_r1c1_references_first_class"
+            ],
+            "requirements": [
+              "A1 cells/ranges/whole axes/3D"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "indirect.a1_current_sheet",
+              "indirect.a1_range_descriptor",
+              "indirect.whole_column_descriptor",
+              "indirect.whole_row_descriptor",
+              "indirect.three_dimensional_descriptor"
+            ],
+            "requirements": [
+              "A1 cells/ranges/whole axes/3D"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "indirect_keeps_a1_and_explicit_r1c1_references_first_class"
+            ],
+            "requirements": [
+              "dot and exclamation sheet separators"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "indirect.dot_sheet_separator",
+              "indirect.exclamation_sheet_separator"
+            ],
+            "requirements": [
+              "dot and exclamation sheet separators"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "indirect_keeps_a1_and_explicit_r1c1_references_first_class"
+            ],
+            "requirements": [
+              "R1C1 absolute and relative coordinates"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "indirect.r1c1_absolute",
+              "indirect.r1c1_relative_to_caller",
+              "indirect.r1c1_absolute_descriptor",
+              "indirect.r1c1_relative_descriptor"
+            ],
+            "requirements": [
+              "R1C1 absolute and relative coordinates"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "projected_scalar_selectors_use_first_element_but_munit_stays_position_sensitive"
+            ],
+            "requirements": [
+              "first-element selector semantics for array inputs"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "indirect.array_text_uses_first_element_in_scalar_mode"
+            ],
+            "requirements": [
+              "first-element selector semantics for array inputs"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "resource",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_limits.rs",
+            "sha256": "16a9ff3fdf0bb3c65148f68e91ca1ae2455c26c5ba6cbda03377554efccf9899",
+            "identifiers": [
+              "address_text_and_lookup_work_limits_release_memory"
+            ],
+            "requirements": [
+              "temporary parse storage charged"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "indirect.malformed_text_is_reference_error"
+            ],
+            "requirements": [
+              "temporary parse storage charged"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "indirect_keeps_a1_and_explicit_r1c1_references_first_class"
+            ],
+            "requirements": [
+              "source references inert"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "indirect.a1_range_descriptor",
+              "indirect.three_dimensional_descriptor"
+            ],
+            "requirements": [
+              "source references inert"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "projected_indirect_growth_does_not_replay_its_text_selector"
+            ],
+            "requirements": [
+              "derived result owned conversion"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "indirect.a1_range_descriptor",
+              "indirect.r1c1_relative_descriptor"
+            ],
+            "requirements": [
+              "derived result owned conversion"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          }
+        ]
+      }
+    },
+    "LOOKUP": {
+      "requirements": [
+        "tall/square and wide orientation",
+        "largest less-than-or-equal and last duplicate",
+        "result vector shape validation",
+        "short reference result extension and sheet edge refusal",
+        "short Array result out-of-bounds error",
+        "text/number mismatch barrier"
+      ],
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "lookup_uses_tall_and_wide_array_orientation_and_last_approximate_duplicate"
+            ],
+            "requirements": [
+              "tall/square and wide orientation"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "lookup.tall_orientation",
+              "lookup.wide_orientation"
+            ],
+            "requirements": [
+              "tall/square and wide orientation"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "lookup_uses_tall_and_wide_array_orientation_and_last_approximate_duplicate"
+            ],
+            "requirements": [
+              "largest less-than-or-equal and last duplicate"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "lookup.approximate_largest_less_equal",
+              "lookup.long_reference_result_keeps_selected_duplicate"
+            ],
+            "requirements": [
+              "largest less-than-or-equal and last duplicate"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "lookup_uses_tall_and_wide_array_orientation_and_last_approximate_duplicate"
+            ],
+            "requirements": [
+              "result vector shape validation"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "lookup.result_must_be_vector"
+            ],
+            "requirements": [
+              "result vector shape validation"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "lookup_extends_short_references_only_after_an_out_of_range_match"
+            ],
+            "requirements": [
+              "short reference result extension and sheet edge refusal"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "lookup.short_reference_result_extends_for_needed_match",
+              "lookup.reference_extension_sheet_bound_is_na"
+            ],
+            "requirements": [
+              "short reference result extension and sheet edge refusal"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "lookup_uses_tall_and_wide_array_orientation_and_last_approximate_duplicate"
+            ],
+            "requirements": [
+              "short Array result out-of-bounds error"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "lookup.short_array_result_is_na_only_when_selected"
+            ],
+            "requirements": [
+              "short Array result out-of-bounds error"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "approximate_search_crosses_numeric_and_text_midpoints"
+            ],
+            "requirements": [
+              "text/number mismatch barrier"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "lookup.approximate_largest_less_equal"
+            ],
+            "requirements": [
+              "text/number mismatch barrier"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          }
+        ]
+      }
+    },
+    "MATCH": {
+      "requirements": [
+        "vector shape validation",
+        "exact first match",
+        "ascending and descending last duplicate",
+        "case-insensitive Unicode text",
+        "type order and mismatch barriers",
+        "bounded sorted search reads"
+      ],
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "lookup_search_data_rejects_scalars_lists_and_three_dimensional_references",
+              "lookup_invalid_selectors_precede_reference_key_reads"
+            ],
+            "requirements": [
+              "vector shape validation"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "match.scalar_data_refusal",
+              "match.two_dimensional_data_refusal",
+              "match.reference_list_data_refusal"
+            ],
+            "requirements": [
+              "vector shape validation"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "match_exact_returns_first_duplicate_and_approximate_returns_last"
+            ],
+            "requirements": [
+              "exact first match"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "match.exact_first_duplicate"
+            ],
+            "requirements": [
+              "exact first match"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "match_exact_returns_first_duplicate_and_approximate_returns_last"
+            ],
+            "requirements": [
+              "ascending and descending last duplicate"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "match.approximate_ascending",
+              "match.descending_last_duplicate"
+            ],
+            "requirements": [
+              "ascending and descending last duplicate"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "search_comparison_is_type_preserving_casefolded_and_not_normalized"
+            ],
+            "requirements": [
+              "case-insensitive Unicode text"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "match.exact_text_casefold",
+              "match.exact_text_sharp_s_expansion",
+              "match.exact_text_sigma_final_sigma",
+              "match.exact_text_dotted_i_no_normalization"
+            ],
+            "requirements": [
+              "case-insensitive Unicode text"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "approximate_search_crosses_numeric_and_text_midpoints"
+            ],
+            "requirements": [
+              "type order and mismatch barriers"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "match.number_text_barrier",
+              "match.ascending_mixed_type_midpoint",
+              "match.descending_mixed_type_midpoint"
+            ],
+            "requirements": [
+              "type order and mismatch barriers"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "table_lookup_reads_search_prefix_and_selected_result_only"
+            ],
+            "requirements": [
+              "bounded sorted search reads"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "match.approximate_reference_reads_are_bounded"
+            ],
+            "requirements": [
+              "bounded sorted search reads"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          }
+        ]
+      }
+    },
+    "OFFSET": {
+      "requirements": [
+        "checked signed row/column offsets",
+        "omitted dimensions default; actual Empty dimensions are invalid",
+        "strictly positive dimensions",
+        "3D extents validated on every plane",
+        "list admission rule",
+        "zero-read descriptor construction",
+        "derived result owned conversion"
+      ],
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "index_and_offset_return_derived_reference_descriptors_without_reads",
+              "offset_preserves_formula_errors_and_rejects_source_references_as_typed_capability"
+            ],
+            "requirements": [
+              "checked signed row/column offsets"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "offset.checked_positive_shift",
+              "offset.negative_shift",
+              "offset.out_of_sheet_is_reference_error"
+            ],
+            "requirements": [
+              "checked signed row/column offsets"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "index_and_offset_return_derived_reference_descriptors_without_reads"
+            ],
+            "requirements": [
+              "omitted dimensions default; actual Empty dimensions are invalid"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "offset.missing_dimensions_use_original_shape",
+              "offset.actual_empty_height_is_not_omitted"
+            ],
+            "requirements": [
+              "omitted dimensions default; actual Empty dimensions are invalid"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "offset_preserves_formula_errors_and_rejects_source_references_as_typed_capability"
+            ],
+            "requirements": [
+              "strictly positive dimensions"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "offset.explicit_positive_dimensions",
+              "offset.zero_height_is_value_error"
+            ],
+            "requirements": [
+              "strictly positive dimensions"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "index_and_offset_return_derived_reference_descriptors_without_reads"
+            ],
+            "requirements": [
+              "3D extents validated on every plane"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "offset.three_dimensional_planes_preserved"
+            ],
+            "requirements": [
+              "3D extents validated on every plane"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "offset_preserves_formula_errors_and_rejects_source_references_as_typed_capability"
+            ],
+            "requirements": [
+              "list admission rule"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "offset.reference_list_is_value_error_before_reads"
+            ],
+            "requirements": [
+              "list admission rule"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "resource",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_limits.rs",
+            "sha256": "16a9ff3fdf0bb3c65148f68e91ca1ae2455c26c5ba6cbda03377554efccf9899",
+            "identifiers": [
+              "descriptor_results_and_refusals_are_read_free"
+            ],
+            "requirements": [
+              "zero-read descriptor construction"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "index_and_offset_return_derived_reference_descriptors_without_reads"
+            ],
+            "requirements": [
+              "zero-read descriptor construction"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "offset.checked_positive_shift"
+            ],
+            "requirements": [
+              "zero-read descriptor construction"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "derived_reference_owned_roundtrip_drops_synthetic_lexical_owner"
+            ],
+            "requirements": [
+              "derived result owned conversion"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "offset.checked_positive_shift"
+            ],
+            "requirements": [
+              "derived result owned conversion"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          }
+        ]
+      }
+    },
+    "VLOOKUP": {
+      "requirements": [
+        "ForceArray data with complete shape",
+        "exact first match in top-to-bottom order",
+        "sorted approximate last duplicate",
+        "result column bounds before reads",
+        "only selected result cell read"
+      ],
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "lookup_uses_tall_and_wide_array_orientation_and_last_approximate_duplicate",
+              "lookup_mixed_lifted_controls_keep_valid_coordinates"
+            ],
+            "requirements": [
+              "ForceArray data with complete shape"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "vlookup.matrix_key_iteration",
+              "vlookup.matrix_index_iteration"
+            ],
+            "requirements": [
+              "ForceArray data with complete shape"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "horizontal_and_vertical_lookup_exact_and_approximate_modes"
+            ],
+            "requirements": [
+              "exact first match in top-to-bottom order"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "vlookup.exact_first_duplicate",
+              "vlookup.reference_exact_first_duplicate"
+            ],
+            "requirements": [
+              "exact first match in top-to-bottom order"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "horizontal_and_vertical_lookup_exact_and_approximate_modes"
+            ],
+            "requirements": [
+              "sorted approximate last duplicate"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "vlookup.approximate_last_duplicate",
+              "vlookup.reference_approximate_duplicate_last"
+            ],
+            "requirements": [
+              "sorted approximate last duplicate"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "table_lookup_reads_search_prefix_and_selected_result_only",
+              "lookup_invalid_selectors_precede_reference_key_reads",
+              "lookup_mixed_lifted_controls_keep_valid_coordinates"
+            ],
+            "requirements": [
+              "result column bounds before reads"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "vlookup.selector_bounds_before_reads"
+            ],
+            "requirements": [
+              "result column bounds before reads"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "table_lookup_reads_search_prefix_and_selected_result_only",
+              "lookup_mixed_lifted_controls_keep_valid_coordinates"
+            ],
+            "requirements": [
+              "only selected result cell read"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "vlookup.reference_result_empty_is_preserved",
+              "vlookup.reference_result_error_is_preserved"
+            ],
+            "requirements": [
+              "only selected result cell read"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "cross_cutting": [
+    "formula errors versus typed provider failures",
+    "cancellation before and after resolver calls",
+    "source-version fence before and after evaluation",
+    "all memory reservations released on failure",
+    "projection-sensitive MUNIT descendants",
+    "reference lists never implicitly materialized as arrays",
+    "no package or formula-cache mutation",
+    "independent oracle and native compatibility record",
+    "frozen seven-gate receipts",
+    "matched performance controls and scaling with retained raw attempts",
+    "invalid lookup selectors precede reference-key reads",
+    "sequential computed CHOOSE probe depth and memory release",
+    "position-sensitive computed CHOOSE selector cache exclusion"
+  ],
+  "schema": "ods-formula-lookups-coverage-v1",
+  "cross_cutting_evidence": [
+    {
+      "requirement": "formula errors versus typed provider failures",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "resource",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_limits.rs",
+            "sha256": "16a9ff3fdf0bb3c65148f68e91ca1ae2455c26c5ba6cbda03377554efccf9899",
+            "identifiers": [
+              "typed_provider_failures_escape_formula_error_handlers_without_retry",
+              "typed_failure_after_formula_error_supersedes_retained_search_error"
+            ],
+            "requirements": [
+              "formula errors versus typed provider failures"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          },
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "match.visited_formula_error_propagates",
+              "match.formula_error_scans_suffix_before_returning_error"
+            ],
+            "requirements": [
+              "formula errors versus typed provider failures"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "lookup_formula_error_keys_win_before_shape_refusals"
+            ],
+            "requirements": [
+              "formula errors versus typed provider failures"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "requirement": "cancellation before and after resolver calls",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "resource",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_limits.rs",
+            "sha256": "16a9ff3fdf0bb3c65148f68e91ca1ae2455c26c5ba6cbda03377554efccf9899",
+            "identifiers": [
+              "cancellation_and_source_fences_supersede_lookup_values"
+            ],
+            "requirements": [
+              "cancellation before and after resolver calls"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "requirement": "source-version fence before and after evaluation",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "resource",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_limits.rs",
+            "sha256": "16a9ff3fdf0bb3c65148f68e91ca1ae2455c26c5ba6cbda03377554efccf9899",
+            "identifiers": [
+              "cancellation_and_source_fences_supersede_lookup_values"
+            ],
+            "requirements": [
+              "source-version fence before and after evaluation"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "requirement": "all memory reservations released on failure",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "resource",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_limits.rs",
+            "sha256": "16a9ff3fdf0bb3c65148f68e91ca1ae2455c26c5ba6cbda03377554efccf9899",
+            "identifiers": [
+              "address_text_and_lookup_work_limits_release_memory",
+              "owned_derived_reference_storage_limit_is_atomic"
+            ],
+            "requirements": [
+              "all memory reservations released on failure"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "requirement": "projection-sensitive MUNIT descendants",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "projected_scalar_selectors_use_first_element_but_munit_stays_position_sensitive",
+              "projected_lookup_cache_reuses_direct_search_but_keeps_munit_position_sensitive"
+            ],
+            "requirements": [
+              "projection-sensitive MUNIT descendants"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "requirement": "reference lists never implicitly materialized as arrays",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "choose_lifts_matrix_indices_and_preserves_selected_identity",
+              "lookup_search_data_rejects_scalars_lists_and_three_dimensional_references",
+              "index_selects_one_union_record_and_clears_list_identity"
+            ],
+            "requirements": [
+              "reference lists never implicitly materialized as arrays"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "requirement": "no package or formula-cache mutation",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "projected_lookup_cache_reuses_direct_search_but_keeps_munit_position_sensitive"
+            ],
+            "requirements": [
+              "no package or formula-cache mutation"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "requirement": "independent oracle and native compatibility record",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "oracle",
+            "root": "evidence",
+            "path": "lookup_oracle.py",
+            "sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+            "identifiers": [
+              "address.a1.default",
+              "match.exact_first_duplicate",
+              "offset.checked_positive_shift"
+            ],
+            "requirements": [
+              "independent oracle and native compatibility record"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "lookup-goldens.json",
+              "sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758"
+            }
+          },
+          {
+            "kind": "native",
+            "root": "evidence",
+            "path": "native/provenance.json",
+            "sha256": "54016597ba078082a40a9df001502b598840dc7f2bfa650f58a37aa4112491f6",
+            "identifiers": [
+              "address.a1_default",
+              "match.exact",
+              "offset.derived"
+            ],
+            "requirements": [
+              "independent oracle and native compatibility record"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "native/native-results.json",
+              "sha256": "ecb3f972895a260f95fdfc0285e881d4cea872c701e3ec0752901cfcede4fbb1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "requirement": "frozen seven-gate receipts",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "gate",
+            "root": "evidence",
+            "path": "gates/verify.py",
+            "sha256": "93c0e54abfbc3e26f1cf7ea0194968e8160c856fca5363e478224801f15cfc19",
+            "identifiers": [
+              "ods-tests",
+              "clippy",
+              "rustdoc",
+              "format",
+              "batch-format",
+              "boundaries",
+              "diff-check"
+            ],
+            "requirements": [
+              "frozen seven-gate receipts"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/results.json",
+              "sha256": "284149e608bc64da65347e012974d06acb46d35e2882d09f6615b6a867116237"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "requirement": "matched performance controls and scaling with retained raw attempts",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "performance",
+            "root": "evidence",
+            "path": "performance/case-matrix.json",
+            "sha256": "ad7aa513794af1fd2132d634f352007c0a1196c92e2e3ba7e106e73feb26440d",
+            "identifiers": [
+              "lookup-match-exact-8-end",
+              "lookup-match-exact-256-end",
+              "lookup-vlookup-approx-256-mid"
+            ],
+            "requirements": [
+              "matched performance controls and scaling with retained raw attempts"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "performance/results/performance-report.json",
+              "sha256": "de3e92c17d9df32378f99aaa18f297b277a390082630d54be041db7f23bc9952"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "requirement": "invalid lookup selectors precede reference-key reads",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "lookup_invalid_selectors_precede_reference_key_reads"
+            ],
+            "requirements": [
+              "invalid lookup selectors precede reference-key reads"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "requirement": "sequential computed CHOOSE probe depth and memory release",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "sequential_choose_shape_probes_release_depth"
+            ],
+            "requirements": [
+              "sequential computed CHOOSE probe depth and memory release"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "requirement": "position-sensitive computed CHOOSE selector cache exclusion",
+      "evidence": {
+        "schema": "ods-formula-lookups-coverage-v1",
+        "status": "PASS",
+        "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+        "bindings": [
+          {
+            "kind": "focused_test",
+            "root": "repo",
+            "path": "crates/litchi-ods/tests/ods_formula_lookup_evaluation.rs",
+            "sha256": "5537e8820144cc587c6f13c794b3d02edc12fdf0b0c988c26e3919f77faa0965",
+            "identifiers": [
+              "sequential_choose_shape_probes_release_depth"
+            ],
+            "requirements": [
+              "position-sensitive computed CHOOSE selector cache exclusion"
+            ],
+            "receipt": {
+              "root": "evidence",
+              "path": "gates/ods-tests.log",
+              "sha256": "06d32c62a38ca43a4b0349d428de13b128857bccb45a6c6383b6bcdf22a14922"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "status": "pass",
+  "candidate_only": true,
+  "pre_correction_source": true,
+  "correctness_records": 8,
+  "receipt_records": 560,
+  "iterations_per_fixture": 7,
+  "required_lanes": [
+    "eager_cheap_clone",
+    "eager_many_query",
+    "eager_owner_projection",
+    "eager_package_open",
+    "eager_single_query",
+    "source_cheap_clone",
+    "source_many_query",
+    "source_owner_projection",
+    "source_package_open",
+    "source_single_query"
+  ],
+  "query_clone_zero_allocation_invariant": true,
+  "source_phase_read_counters_present": true,
+  "allocator_live_accounting": true,
+  "synthetic_unrelated_member": {
+    "median_native_source_package_open_read_bytes": 3049,
+    "median_synthetic_source_package_open_read_bytes": 3044,
+    "median_native_source_projection_read_bytes": 3071,
+    "median_synthetic_source_projection_read_bytes": 2830,
+    "median_native_eager_package_open_requested_bytes": 615111,
+    "median_synthetic_eager_package_open_requested_bytes": 1662216,
+    "median_native_eager_projection_requested_bytes": 2546875,
+    "median_synthetic_eager_projection_requested_bytes": 2546875,
+    "interpretation": "recorded scoped observations only; no baseline or speedup claim"
+  },
+  "speedup_claim": false,
+  "baseline_claim": false
+}

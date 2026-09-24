@@ -1,0 +1,5 @@
+{
+  "source_manifest": "candidate/source-sha256.json",
+  "harness_manifest": "candidate/harness-sha256.txt",
+  "binary_provenance": "candidate/binary-provenance.json"
+}

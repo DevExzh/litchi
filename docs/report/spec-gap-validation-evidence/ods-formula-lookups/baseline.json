@@ -1,0 +1,28 @@
+{
+  "commit": "635fd2e1348b621426b50909cbd5765c91837306",
+  "scope": [
+    "ADDRESS",
+    "CHOOSE",
+    "HLOOKUP",
+    "INDEX",
+    "INDIRECT",
+    "LOOKUP",
+    "MATCH",
+    "OFFSET",
+    "VLOOKUP"
+  ],
+  "gate_lock_source": "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/gates/Cargo.lock",
+  "gate_lock_sha256": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3",
+  "ambient_lock_sha256": "aa945c79965460e74a64063e1c45396eaae7a68e71072730e2bc426cded22f02",
+  "unrelated_tracked_changes": [
+    "crates/litchi-opc/src/package.rs",
+    "crates/litchi-xlsx/tests/drawing_svg_read.rs",
+    "docs/report/spec-gap-validation-evidence/ink-action-edit-performance/report.md"
+  ],
+  "unrelated_worktree_sha256": {
+    "crates/litchi-opc/src/package.rs": "be04752891cffd090e6994b7efbd1089e41c65438073c49f20c894807ba31e24",
+    "crates/litchi-xlsx/tests/drawing_svg_read.rs": "b9b27daa3f6f8ddc1c9e468f1048c461bf82697e44d8a597a543671c61a51ccf",
+    "docs/report/spec-gap-validation-evidence/ink-action-edit-performance/report.md": "cdd406bbc5578dc6dccb1583b6d5a167cce75402e0caa7f2b88a8c1208a63719"
+  },
+  "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf"
+}

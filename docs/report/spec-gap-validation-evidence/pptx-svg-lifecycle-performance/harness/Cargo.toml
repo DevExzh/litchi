@@ -1,0 +1,18 @@
+[package]
+name = "litchi-pptx-svg-lifecycle-profile"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "pptx-svg-lifecycle-profile"
+path = "main.rs"
+
+[dependencies]
+litchi-core = { path = "../../../../../crates/litchi-core" }
+litchi-opc = { path = "../../../../../crates/litchi-opc" }
+litchi-pptx = { path = "../../../../../crates/litchi-pptx" }
+soapberry-zip = { path = "../../../../../crates/soapberry-zip" }

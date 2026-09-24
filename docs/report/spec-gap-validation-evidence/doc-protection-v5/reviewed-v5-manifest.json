@@ -1,0 +1,469 @@
+{
+  "schema": "litchi-doc-protection-validation-v5",
+  "candidate": "/var/tmp/litchi-doc-protection-validation-v5-20260910",
+  "base_commit": "42cce54f0e04dafd49c996876e1a569594238101",
+  "created_utc": "2026-09-10T09:54:41.423432+00:00",
+  "primary": "/home/zhuhe/code/litchi-spec-gaps",
+  "primary_touched": false,
+  "staged_or_committed": false,
+  "historical_candidate": "/var/tmp/litchi-doc-protection-validation-v4b-20260910",
+  "excluded_paths": [
+    {
+      "path": "crates/litchi-keynote/src/document.rs",
+      "reason": "inherited dirty Keynote change from V4b; deliberately excluded from V5 freeze"
+    }
+  ],
+  "owned_file_count": 44,
+  "owned_files": [
+    {
+      "path": "crates/litchi-doc/src/body_text.rs",
+      "status": " M",
+      "bytes": 219662,
+      "sha256": "6a5a7fa3de9fe5635e081a1cbc58c2e8cc2a6fb6525d6376f86adf7360a78cea",
+      "base_present": true,
+      "base_bytes": 211706,
+      "base_sha256": "785490bc607882f750d9bbff3b3d6f86f77be5ac3f624bc8dca2cd6ae7ea5ef6"
+    },
+    {
+      "path": "crates/litchi-doc/src/body_text/source.rs",
+      "status": " M",
+      "bytes": 113747,
+      "sha256": "138dc9c725200b24756552f7a481739ee83dbf4672fd5cbfbe1f53e28155c254",
+      "base_present": true,
+      "base_bytes": 97072,
+      "base_sha256": "718d407124be38dbf5f50083f2bde54be1f3fa2624a305d5c2c1d94458bf97e1"
+    },
+    {
+      "path": "crates/litchi-doc/src/document/tests.rs",
+      "status": " M",
+      "bytes": 10690,
+      "sha256": "2ad40a7e8615a4b0eb57d1a709d8032b3cb557281574ca9a8fdd6d18f1ba3f37",
+      "base_present": true,
+      "base_bytes": 10688,
+      "base_sha256": "fd8f8d65dab6fb979c3a55a6c6dcdf690d1a566ef101af395c7b50b33197a4f9"
+    },
+    {
+      "path": "crates/litchi-doc/src/embedded_object/model/editor.rs",
+      "status": " M",
+      "bytes": 1728,
+      "sha256": "a24cb30ece99b4b9146fb7ec605f80af62a8147e2e368b7352b1912a34847311",
+      "base_present": true,
+      "base_bytes": 1527,
+      "base_sha256": "45a280e5c2097b2cd76b8ac58b8b218ed54bcf1b863e4ea9bbfee9f8c49d463a"
+    },
+    {
+      "path": "crates/litchi-doc/src/embedded_object/tests.rs",
+      "status": " M",
+      "bytes": 33589,
+      "sha256": "3908b775de870bd43c6f2aee81bc66f00c6a075e0f28f423144dbb4ce5ea590e",
+      "base_present": true,
+      "base_bytes": 28884,
+      "base_sha256": "ba8ae340fbfbe7e3663c548e75ce0682d7cf63815e8b6585da2a1fe5b56347f0"
+    },
+    {
+      "path": "crates/litchi-doc/src/embedded_object/transaction/commit.rs",
+      "status": " M",
+      "bytes": 4479,
+      "sha256": "74d6ae1aad586e4e234f52492b5c216465900d1128615c3021fddc5d42cf7832",
+      "base_present": true,
+      "base_bytes": 4379,
+      "base_sha256": "3ea4bd6fdb7a8b7ba8bef55c37f6ce99ee7fd0edcdf6cbb40f2f0462d1c2e128"
+    },
+    {
+      "path": "crates/litchi-doc/src/embedded_object/transaction/edit.rs",
+      "status": " M",
+      "bytes": 14294,
+      "sha256": "0c62f5c9589344aadd949d32d00a9f8089fe744673808a4d461713015ea4c951",
+      "base_present": true,
+      "base_bytes": 14179,
+      "base_sha256": "033316ae4ae2e0a2e1729c80b468c5aa5d83dccecfdeed78085d27a4ded7682d"
+    },
+    {
+      "path": "crates/litchi-doc/src/embedded_object/transaction/open.rs",
+      "status": " M",
+      "bytes": 2869,
+      "sha256": "dbcb3a969395bf8a5e0bef31180d1b096b922ff45477b4e198d4319aeac36336",
+      "base_present": true,
+      "base_bytes": 2376,
+      "base_sha256": "8e12d3d0869420f963c7347779e4e79d349b8a01f22a36cc7ececbecf0e8ff3c"
+    },
+    {
+      "path": "crates/litchi-doc/src/embedded_object/transaction/patch.rs",
+      "status": " M",
+      "bytes": 4164,
+      "sha256": "2527132ac3cf5624384f3fe1a6c07568261dc3c9a2e827ed604aa0343f759555",
+      "base_present": true,
+      "base_bytes": 3983,
+      "base_sha256": "6783119c2628b3f3843752986d07dc6794f40a217515779e562309a3d9f5072b"
+    },
+    {
+      "path": "crates/litchi-doc/src/embedded_object/transaction/snapshot.rs",
+      "status": " M",
+      "bytes": 13367,
+      "sha256": "453abb5706adb9c50b81b665ed1b5e916a0d317db1420de17a61783f5e3859b2",
+      "base_present": true,
+      "base_bytes": 12648,
+      "base_sha256": "2c96f296758c0e0f080ee70c68affe4e3ebc436d21501b91b571035695a44b4d"
+    },
+    {
+      "path": "crates/litchi-doc/src/lib.rs",
+      "status": " M",
+      "bytes": 19565,
+      "sha256": "4f4c916e6d24a74742a01ec2da0b4bbac7feb46025dc3bdad0d974a0b9365e5c",
+      "base_present": true,
+      "base_bytes": 19429,
+      "base_sha256": "7870a5684519d43ea243f6ddc2bbe26df613a925af32fa210ffbf1d1c8699b09"
+    },
+    {
+      "path": "crates/litchi-doc/src/package/model.rs",
+      "status": " M",
+      "bytes": 18003,
+      "sha256": "7bc48acd1634d338f5799cebc9cf6ad0e314c908413c1f9af9343996996c5926",
+      "base_present": true,
+      "base_bytes": 17448,
+      "base_sha256": "24c8c30d8ad961de84af47f2e5a537f4262a4d9d54062498ff129832ecc4b5d9"
+    },
+    {
+      "path": "crates/litchi-doc/src/package/property_set.rs",
+      "status": " M",
+      "bytes": 35629,
+      "sha256": "30d88c30f1ec63d27aa08b5b7d2fdf16bdd675d8e58e03f6656d327b55afbae9",
+      "base_present": true,
+      "base_bytes": 24617,
+      "base_sha256": "0b12a7f3b756db68886ff364a96f445970a06a0c22249d6471519663eebf6501"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/annotation_bookmarks/package.rs",
+      "status": " M",
+      "bytes": 11564,
+      "sha256": "be61b1c96ca8187a265d22833d9d26025dddddc24c1cc2013c39fe8af2347ab2",
+      "base_present": true,
+      "base_bytes": 10311,
+      "base_sha256": "22852f67439867cf07abf0a81e906df354ead19b071ab7c8fc7155dae8fdd2e9"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/annotation_bookmarks/tests.rs",
+      "status": " M",
+      "bytes": 11431,
+      "sha256": "d679a3b22e867074969ddf3e9645070490c45376bf9c9e5dc375a327928db3a6",
+      "base_present": true,
+      "base_bytes": 7257,
+      "base_sha256": "563f93b6f5c52a0d126beea8b44b6f25f8cdafa9fa97c41bc77c0c39b31bab6e"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/captions/package.rs",
+      "status": " M",
+      "bytes": 13328,
+      "sha256": "f005de7373cd5ef35f2699520f636fa55663794354b3f39e20cd844e2c0a6026",
+      "base_present": true,
+      "base_bytes": 12072,
+      "base_sha256": "9e9253c715de0079c3169b28fa396012bc74a8259bf91583389bfeef813348bf"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/command_bars/package.rs",
+      "status": " M",
+      "bytes": 12825,
+      "sha256": "d5ab3b3b425c4b6a2f4f041feb5d5e82e3dc7aed94080a831076d4d8c37d86b0",
+      "base_present": true,
+      "base_bytes": 11569,
+      "base_sha256": "e11ab5d694a6d7e9e1d721d87103dce8d198648747915fcb081ec99d78af6556"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/command_bars/tests.rs",
+      "status": " M",
+      "bytes": 20321,
+      "sha256": "0d85006d10e96838b24e018f10b611a5e47055950016d163558d523eb4c19839",
+      "base_present": true,
+      "base_bytes": 19077,
+      "base_sha256": "8f4c405f51ca264ead218c994b171edecc53b4354d13006e45f2f0f572e76ae3"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/envelope/package.rs",
+      "status": " M",
+      "bytes": 12684,
+      "sha256": "46875f6d1e6daf39c0f091feca351d5cb0da4936a30242e8674ca263afecf667",
+      "base_present": true,
+      "base_bytes": 11430,
+      "base_sha256": "356217783282963498ad20a160770b4a12db8e0fdd0986700c75cae828e2ab20"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/envelope/tests.rs",
+      "status": " M",
+      "bytes": 13977,
+      "sha256": "88b6e65cacb6cfd249185b8b0d03ddceb1a872195815d63b434377f8d3477f58",
+      "base_present": true,
+      "base_bytes": 12651,
+      "base_sha256": "094bc40e03aec94a75b809806639e001290d34b4b17de31a3c9ad217048841ce"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/protection/mod.rs",
+      "status": " M",
+      "bytes": 786,
+      "sha256": "fcaff35dc186ba16d2b1d475d909001703da63fbbeb5f42ec2386930162b108e",
+      "base_present": true,
+      "base_bytes": 433,
+      "base_sha256": "f796f7c5ff4b4329bbd7a5cf92de3623f56b6d527c406b920cf8c3ea8b127fc0"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/protection/policy.rs",
+      "status": "??",
+      "bytes": 16496,
+      "sha256": "c52ca8d3e4b1dca87783a5e057d308e0955ffe0661254e727dae59a9b5ac5507",
+      "base_present": false
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/protection/tests.rs",
+      "status": " M",
+      "bytes": 23910,
+      "sha256": "68bdc7a8c13d7b6f41669b9c461af678340e3747c62d54cd4b63ac76544a6684",
+      "base_present": true,
+      "base_bytes": 11241,
+      "base_sha256": "eb1013e392355b047a63a8cfda111b6c48a714ff9e60e594050465d021657bcd"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/route_slip/package.rs",
+      "status": " M",
+      "bytes": 13808,
+      "sha256": "1535ef4f0b54f703004523287b9b7e1ca7aca6623a3c15476766e01bbd91c9a3",
+      "base_present": true,
+      "base_bytes": 12554,
+      "base_sha256": "e15c37670b4cdb60dccb344db6058977da1a415c9b619b857efa9fa900c40f33"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/route_slip/tests.rs",
+      "status": " M",
+      "bytes": 10353,
+      "sha256": "01ba82e46ac5a656c3cac568cd1c7223f63a4716c149101688d7f783bb1ce8fe",
+      "base_present": true,
+      "base_bytes": 9021,
+      "base_sha256": "388eb3a430404b360c7974a6367b53f0249e5a73bcfb4e40755d24b29031af05"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/smart_tags/package.rs",
+      "status": " M",
+      "bytes": 3467,
+      "sha256": "aec115a3be1137242c8c1afb23965699b5955b8942529a57b1c607c96f271d0a",
+      "base_present": true,
+      "base_bytes": 2545,
+      "base_sha256": "75c7c57fba7a6c2bbef4ad1835a46d83d91355fa72ee5cca4a80408220a8683a"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/smart_tags/tests.rs",
+      "status": " M",
+      "bytes": 11897,
+      "sha256": "d99e5efc137645835a64572dc1baa6f6c1f8f75b6a609875842307e52a9cafda",
+      "base_present": true,
+      "base_bytes": 7893,
+      "base_sha256": "4687e98c75cc446bd33ffbb04371677e6b4af570c1b071712e9daa27af855afb"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/smart_tags/transaction.rs",
+      "status": " M",
+      "bytes": 23403,
+      "sha256": "748a1b37eac714f4377ad813410c04e83a08da066b8d8490a8dbe4f2b9e2a31a",
+      "base_present": true,
+      "base_bytes": 20332,
+      "base_sha256": "8d5922f2ec8d18a09e822eb3a85a972b0dba5b88b7375708ddccb4cf0c42719b"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/subdocuments/package.rs",
+      "status": " M",
+      "bytes": 14584,
+      "sha256": "036169779c8b9ac3dac2a04fb673be4131a5d444c9d846345784550753fc7d28",
+      "base_present": true,
+      "base_bytes": 13330,
+      "base_sha256": "7e761ff9c32c4377015757045e3bd1b51fa9ab75f4d1905b8d286c2272644aa0"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/subdocuments/tests.rs",
+      "status": " M",
+      "bytes": 22770,
+      "sha256": "5b919334112cf6a5d4f66b6de6dcb87bf742a28b11d60268e349b0821fb4d8ce",
+      "base_present": true,
+      "base_bytes": 22101,
+      "base_sha256": "793fb651dbae5e29da6b794a557b4af754c7c25770ebfd24f24159c07e5f3a5c"
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/subdocuments/validation.rs",
+      "status": " M",
+      "bytes": 6953,
+      "sha256": "b2a14bdfe0366d95688c53237a98cc77f9c015e47fb975e0ae0965837af0a694",
+      "base_present": true,
+      "base_bytes": 8447,
+      "base_sha256": "0314ef40f3903932da72dd61667cfaef1a1fe2740a10efe8c6a5a6d03438262c"
+    },
+    {
+      "path": "crates/litchi-doc/src/tracked_revision/codec.rs",
+      "status": " M",
+      "bytes": 45003,
+      "sha256": "12a163c8222096116581c374598f89bd1e39fb5c1bf394e18ea07a918917d0b4",
+      "base_present": true,
+      "base_bytes": 45577,
+      "base_sha256": "5dca1d141bc0850e8056b7e9bf4f41184b599e65291146576ddd7ebf8278e66d"
+    },
+    {
+      "path": "crates/litchi-doc/src/tracked_revision/package.rs",
+      "status": " M",
+      "bytes": 141636,
+      "sha256": "6e6706632eced07282c8e91025f108ed589c7a4cf0408ba58486558d01bf550e",
+      "base_present": true,
+      "base_bytes": 137578,
+      "base_sha256": "12f9e06750d6f40cfc94a98d25db42309b846791dc600f882daa421553a63405"
+    },
+    {
+      "path": "crates/litchi-doc/src/tracked_revision/tests.rs",
+      "status": " M",
+      "bytes": 13095,
+      "sha256": "475e6d33774df3ad0b1e115266cd2c01b76632a82a16fba4fc7ca009f42b5ef1",
+      "base_present": true,
+      "base_bytes": 6334,
+      "base_sha256": "8f0aab32176d4806c4c83b25b474a085b0f336d5e14cf4391f57375fde835684"
+    },
+    {
+      "path": "crates/litchi-doc/src/tracked_revision/transaction/edit.rs",
+      "status": " M",
+      "bytes": 5256,
+      "sha256": "e18244c113863e19b9a6690a5e64fae77edb25d04a1fa5fe57a411bbe291a2b5",
+      "base_present": true,
+      "base_bytes": 5209,
+      "base_sha256": "7051205857179d4d65c54c8e11dc460a328fb5ec9478f932d9f23cc900d2f554"
+    },
+    {
+      "path": "crates/litchi-doc/src/tracked_revision/transaction/patch.rs",
+      "status": " M",
+      "bytes": 2322,
+      "sha256": "e9e16be2c8b6990f1f01e71c810aff793e3af9a06887621e6b9a1e0743e87601",
+      "base_present": true,
+      "base_bytes": 2187,
+      "base_sha256": "9f8baf8350c1c18b31f77163176cc6bc58bd6beb29c12888aaa136e2ce8db4a1"
+    },
+    {
+      "path": "crates/litchi-doc/src/tracked_revision/transaction/snapshot.rs",
+      "status": " M",
+      "bytes": 4747,
+      "sha256": "49a5768cbb9d30ea68bb1719b921487a37c6afde86234b93a344a0f17412f374",
+      "base_present": true,
+      "base_bytes": 3656,
+      "base_sha256": "ba65f62efe0e121146d838338dc47dce2084e26981c737bce5f13e92595b0185"
+    },
+    {
+      "path": "crates/litchi-doc/src/writer/dop.rs",
+      "status": " M",
+      "bytes": 2157,
+      "sha256": "71e77a94bc0667f36f2ae529e0fb6c251282f796299efee8a5d1b5e424075cc1",
+      "base_present": true,
+      "base_bytes": 1761,
+      "base_sha256": "78ece416dc8b0c1a31dfe27dcc550d9b9d7130a655a62e5723eb086ead7346c2"
+    },
+    {
+      "path": "crates/litchi-doc/tests/binary_digital_signatures.rs",
+      "status": " M",
+      "bytes": 5902,
+      "sha256": "9452644dcd51b5d26d229c2b11a63937e4d53486a03888332059195125b01437",
+      "base_present": true,
+      "base_bytes": 4877,
+      "base_sha256": "0140523577ab054176daa9507fc774ae162a7ec23573f68e2d499f7089bfd440"
+    },
+    {
+      "path": "crates/litchi-doc/tests/common/mod.rs",
+      "status": "??",
+      "bytes": 7608,
+      "sha256": "8a303c286b42f90ebebfb205d0cbb37437497255b4d0a301d203774f32e0bb59",
+      "base_present": false
+    },
+    {
+      "path": "crates/litchi-doc/tests/doc_body_transaction.rs",
+      "status": " M",
+      "bytes": 16820,
+      "sha256": "39c1092d141afe2a4b00b2e1110312a20cf750ec587aab8443caedc0ed1016f2",
+      "base_present": true,
+      "base_bytes": 16513,
+      "base_sha256": "3de729ee1fd1b3562cc169fe96f623ecc1ca431a56be3e43f6670556f473b9a9"
+    },
+    {
+      "path": "crates/litchi-doc/tests/doc_captions.rs",
+      "status": " M",
+      "bytes": 7157,
+      "sha256": "330e3a9d14248ee1ea43c9d1707d2787d12dac3a0f2ba8221b981764a433914d",
+      "base_present": true,
+      "base_bytes": 6402,
+      "base_sha256": "e75be2ef4e0a59087dee63adf4fe347546b62250fba165a4f652607af58e50c6"
+    },
+    {
+      "path": "crates/litchi-doc/tests/doc_embedded_object_writer.rs",
+      "status": " M",
+      "bytes": 6580,
+      "sha256": "b2918c9a991c19aeefef806f1df1dd177fed1dfd3139c697e4990c66d1be7105",
+      "base_present": true,
+      "base_bytes": 5631,
+      "base_sha256": "092fd25c4798a460d915d1219b66a7090b51d6d9ff12b22daaaf202f77ea62f7"
+    },
+    {
+      "path": "crates/litchi-doc/tests/user_defined_hyperlinks.rs",
+      "status": " M",
+      "bytes": 17919,
+      "sha256": "f5ac5ac73edf53bd0cdc50bf8f9d087e4760b51972d0cfe9428bf5321cad990a",
+      "base_present": true,
+      "base_bytes": 17057,
+      "base_sha256": "daf03d6bbbf6490737312464209e438ee659edbb7fa332acee0f94857a7fec17"
+    }
+  ],
+  "normative_fixes": [
+    "MS-DOC effective nFib 0x0101 requires cbRgFcLcb=0x88, cswNew=2, and a 594-byte Dop2002; no zero-cswNew/500-byte compatibility exception remains.",
+    "body Patch::apply checks destination protection before changed-result publication while preserving exact no-op source identity.",
+    "writer Word 2002 FIB output now emits a complete 594-byte DOP when factoid preservation is disabled.",
+    "test fixture normalization inserts the larger DOP and shifts later table pointers rather than overwriting adjacent metadata."
+  ],
+  "validation": {
+    "lib": {
+      "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup RUSTUP_TOOLCHAIN=1.95.0 TMPDIR=/var/tmp/litchi-doc-protection-v5-tmp CARGO_TARGET_DIR=/var/tmp/litchi-doc-protection-v5-target taskset -c 8-31 cargo test -p litchi-doc --lib --no-fail-fast --quiet",
+      "result": "1051 passed, 0 failed, 2 ignored",
+      "log": {
+        "path": "/var/tmp/litchi-doc-protection-v5-lib-final.log",
+        "bytes": 1292,
+        "sha256": "2719c90461c928ae3ab88a4df9ea216e3acade0f90a118c4cf9fdade026b1bb9"
+      }
+    },
+    "integration": {
+      "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup RUSTUP_TOOLCHAIN=1.95.0 TMPDIR=/var/tmp/litchi-doc-protection-v5-tmp CARGO_TARGET_DIR=/var/tmp/litchi-doc-protection-v5-target taskset -c 8-31 cargo test -p litchi-doc --tests --no-fail-fast --quiet",
+      "result": "44 test targets; 1242 passed, 0 failed, 2 ignored",
+      "log": {
+        "path": "/var/tmp/litchi-doc-protection-v5-tests-final.log",
+        "bytes": 6345,
+        "sha256": "7389425d45ccf5f99bda7c0db4bdf48f4de37d3d679f9610f2199fe372fd5800"
+      }
+    },
+    "clippy": {
+      "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup RUSTUP_TOOLCHAIN=1.95.0 TMPDIR=/var/tmp/litchi-doc-protection-v5-tmp CARGO_TARGET_DIR=/var/tmp/litchi-doc-protection-v5-target taskset -c 8-31 cargo clippy -p litchi-doc --all-targets --all-features -- -D warnings",
+      "result": "passed",
+      "log": {
+        "path": "/var/tmp/litchi-doc-protection-v5-clippy-final.log",
+        "bytes": 177,
+        "sha256": "80e03ba8914969deddf01df7701d01c1af4c6f78a609029a97779bee32d6898c"
+      }
+    },
+    "rustdoc": {
+      "command": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup RUSTUP_TOOLCHAIN=1.95.0 TMPDIR=/var/tmp/litchi-doc-protection-v5-tmp CARGO_TARGET_DIR=/var/tmp/litchi-doc-protection-v5-target RUSTDOCFLAGS=-D warnings taskset -c 8-31 cargo doc -p litchi-doc --all-features --no-deps",
+      "result": "passed",
+      "log": {
+        "path": "/var/tmp/litchi-doc-protection-v5-rustdoc-final.log",
+        "bytes": 257,
+        "sha256": "a1491bce10aa8f8cae20a6f492f34acc0df9fb7dbae7acbb0f5a4b0ee009e9d0"
+      }
+    },
+    "selective_fmt": {
+      "command": "rustfmt --edition 2024 --check on all 44 owned Rust paths; git diff --check",
+      "result": "passed"
+    },
+    "workspace_fmt": {
+      "command": "cargo fmt --all -- --check",
+      "result": "baseline failure only in excluded crates/litchi-keynote/src/document.rs at line 592; no owned path diff",
+      "log": {
+        "path": "/var/tmp/litchi-doc-protection-v5-fmt-all.log",
+        "bytes": 819,
+        "sha256": "33cb156aa28998aaa15ead7a177ecb89261883d501663c4edf045f36a28f70bb"
+      }
+    }
+  },
+  "replay_notes": "Use candidate path with the exact commands above; do not use the primary shared target. The workspace formatter note is retained because V5 intentionally excludes inherited Keynote source."
+}

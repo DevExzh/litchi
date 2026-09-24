@@ -1,0 +1,107 @@
+{
+  "passed": true,
+  "source_unchanged": true,
+  "compile_first_receipt_sha256": "9c73eab1fe4d28fbd948fd2d1e6ab15d44f6fbda34c01d28884b1688925b74b9",
+  "source_files_checked": 26,
+  "source_fixture": "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/source.pptx",
+  "source_fixture_sha256": "62d4a7ee57f5f9cd87eb70d8d93f84f58f86525dad90d3ccfec4fa7f91941bce",
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "run",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/harness/Cargo.toml",
+        "--",
+        "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/source.pptx",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs"
+      ],
+      "exit_code": 0,
+      "output": "docs/report/spec-gap-validation-evidence/svg-strict-namespace/raw-results/harness.log"
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/validate_schema.py",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-source.xml",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-attached.xml",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-detached.xml",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/direct-transitional-valid.xml",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/direct-strict-invalid.xml"
+      ],
+      "exit_code": 0,
+      "output": "docs/report/spec-gap-validation-evidence/svg-strict-namespace/raw-results/schema-validation.json"
+    }
+  ],
+  "inputs": {
+    "gates/source-hashes.json": "a92448ad9cbf5174637e7956a55a8d7e8ceef006d7663504ea034c771da949e4",
+    "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/source.pptx": "62d4a7ee57f5f9cd87eb70d8d93f84f58f86525dad90d3ccfec4fa7f91941bce"
+  },
+  "generated_outputs": {
+    "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/direct-strict-invalid.xml": "768890e5a57e3d0867317a2810392411dc87d90f1be7ee02ed0c53d159107b9b",
+    "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/direct-transitional-valid.xml": "0cd6a1992c60095be6a37b74babd46e324b7bf140ab9156710e629a9a1ba9123",
+    "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-attached.pptx": "f5e91681f1dcb7ca2a809cdbdd9c3f3e2ff5f880017d02ce4bd00c0835972c6c",
+    "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-attached.rels.xml": "5d2c1f8105a11b490e9c050a4b8137b258295e1ce2c47e091a85f61bdfa6e54a",
+    "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-attached.xml": "9f19321517077475c310ea613deb000a105fd963a8793a4b01c006db32be3894",
+    "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-detached.pptx": "1cc0a4a814d196625c435e0350f7e1f713540eb793bfc40e9e18d28145beb1ee",
+    "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-detached.rels.xml": "d892dc1b29cd68162a5de8492ca4db45505ebdc7388c8b39a3c21bac0bbb804c",
+    "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-detached.xml": "834eab5f9254eacbe576d34632356220a40ca353eef80bed4ee13aa4c39e957d",
+    "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-source.pptx": "1cc0a4a814d196625c435e0350f7e1f713540eb793bfc40e9e18d28145beb1ee",
+    "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-source.rels.xml": "d892dc1b29cd68162a5de8492ca4db45505ebdc7388c8b39a3c21bac0bbb804c",
+    "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-source.xml": "834eab5f9254eacbe576d34632356220a40ca353eef80bed4ee13aa4c39e957d",
+    "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/xlsx-mixed-strict.xml": "bbf330c74da578bf78b565388c713c5001ef506b4876283f1d8117d6ad96c9f7"
+  },
+  "raw_results": {
+    "docs/report/spec-gap-validation-evidence/svg-strict-namespace/raw-results/harness.log": "6b268a60d6335bb28d721a313736218adbf2dc80bde6632d08657a8938c42899",
+    "docs/report/spec-gap-validation-evidence/svg-strict-namespace/raw-results/schema-validation.json": "fa2cfdc83f48a5dae37bfd393ad3d163c82ce473aff7c88bacc4464ad59c2a26",
+    "docs/report/spec-gap-validation-evidence/svg-strict-namespace/raw-results/tool-provenance.json": "9a8ad7484db6bbbda4cab7ddd4860b4faff9cc7b7a8420b1c04417ac10d16c9c"
+  },
+  "schema_summary": {
+    "strict_slide_reports": 3,
+    "direct_controls": [
+      {
+        "path": "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/direct-transitional-valid.xml",
+        "schema_valid": true
+      },
+      {
+        "path": "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/direct-strict-invalid.xml",
+        "schema_valid": false
+      }
+    ],
+    "xlsx_mixed_namespace": {
+      "kind": "strict-native-xlsx-mixed-namespace-drawing",
+      "path": "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/xlsx-mixed-strict.xml",
+      "sha256": "bbf330c74da578bf78b565388c713c5001ef506b4876283f1d8117d6ad96c9f7",
+      "bytes": 2816,
+      "core_strict_xsd_valid": true,
+      "anchor_counts": {
+        "twoCellAnchor": 2,
+        "oneCellAnchor": 0,
+        "absoluteAnchor": 0
+      },
+      "svg_owners": [
+        {
+          "attributes": {
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed": "rId2"
+          },
+          "relationship_attribute_namespace": {
+            "embed": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            "link": null
+          }
+        },
+        {
+          "attributes": {
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed": "rId2"
+          },
+          "relationship_attribute_namespace": {
+            "embed": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            "link": null
+          }
+        }
+      ]
+    }
+  },
+  "scope": "Bounded Strict OOXML core plus Transitional MS-ODRAWXML SVG child namespace proof and ordinary downstream PPTX lifecycle"
+}

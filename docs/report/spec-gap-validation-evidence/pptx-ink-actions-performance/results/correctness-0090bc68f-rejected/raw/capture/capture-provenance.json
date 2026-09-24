@@ -1,0 +1,57 @@
+{
+  "binary": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/target/release/pptx-ink-actions-performance",
+  "binary_sha256": "54463a17367957e8ee6c7a9acfcce27943ba4b480b8cc1196e3da4ae652c004f",
+  "build_exit_code": 0,
+  "build_succeeded": true,
+  "capture_head": "0090bc68f949a5b80342bc3be696b7609a1c3325",
+  "cargo_lock_sha256": "3c773b848134c52df596034ffbbe8688dde9924fb741dee8bc8bce0eaa772f2e",
+  "cargo_version_exit_code": 0,
+  "committed_inputs_exit_code": 0,
+  "expected_capture_head": "0090bc68f949a5b80342bc3be696b7609a1c3325",
+  "failures": [
+    "matrix-correctness: exit 1",
+    "skipped lanes because matrix-correctness failed"
+  ],
+  "head_check": {
+    "actual": "0090bc68f949a5b80342bc3be696b7609a1c3325",
+    "verified_expected": "0090bc68f949a5b80342bc3be696b7609a1c3325"
+  },
+  "helper": {
+    "git_blob": "ad7e43e8c2c362c1b9e1938806f59b9fb3ab1dea",
+    "path": "crates/litchi-pptx/tests/pptx_ink_actions.rs",
+    "sha256": "bec6baafcf735d778216fb54fe6299312707e912dcaed5f89de988f7112bb58e"
+  },
+  "host_probe_exit_code": 0,
+  "lanes_executed": 0,
+  "lanes_requested": 42,
+  "matrix_exit_code": 1,
+  "metadata_after_exit_code": 0,
+  "metadata_after_sha256": "00792a0b2d5ef313ea5e74494070c7734f581b7aa07aeacde6a0ee8b6b7b7f99",
+  "metadata_before_exit_code": 0,
+  "metadata_before_sha256": "00792a0b2d5ef313ea5e74494070c7734f581b7aa07aeacde6a0ee8b6b7b7f99",
+  "preflight_ok": true,
+  "production_source_baseline_commit": "2a2ffa1cae4e6b7070082768ce84483e5d411dc8",
+  "rustc_version_exit_code": 0,
+  "rustfmt_version_exit_code": 0,
+  "samples": 1,
+  "scenario_gate_order": [
+    "host-probe",
+    "matrix-correctness",
+    "lanes"
+  ],
+  "schema": "pptx-ink-actions-correctness-capture-provenance-v1",
+  "semantic_owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+  "semantic_owner_design": {
+    "git_blob": "597400950b1027c47cd6e4cbbedd23915bc0980e",
+    "path": "docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md",
+    "sha256": "30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d"
+  },
+  "source_manifest_after_exit_code": 0,
+  "source_manifest_after_sha256": "7d4a39a6992c325dbd83c2c02af2609124d06b18c62c875da38c6b326dc199c0",
+  "source_manifest_before_exit_code": 0,
+  "source_manifest_before_sha256": "7d4a39a6992c325dbd83c2c02af2609124d06b18c62c875da38c6b326dc199c0",
+  "target": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/target",
+  "timed_performance_claim": false,
+  "usr_bin_time": false,
+  "warmup": 1
+}

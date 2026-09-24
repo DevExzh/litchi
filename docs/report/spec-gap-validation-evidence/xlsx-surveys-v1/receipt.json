@@ -1,0 +1,46 @@
+{
+  "base_commit": "5ffc03ebe1bb3ec885210edbb36f0f90e44619e3",
+  "toolchain": "1.95.0",
+  "sources": {
+    "crates/litchi-xlsx/src/survey.rs": "62502b977885a0ac731a648de7d332e37074cbc5cf6389243a8055d84b448c11",
+    "crates/litchi-xlsx/src/survey/source.rs": "08529bc8d7c99b8f5a99d23cca67a00ee4ae1d72d9074920e30415f07bcbff45",
+    "crates/litchi-xlsx/src/survey/source/properties.rs": "418a7b659a3953d96c7c1a9c9ecd84f6a74ffce4dc35356527985b90f6902344",
+    "crates/litchi-xlsx/src/survey/source/questions.rs": "62550d406a920ef6a524df6c52b6866ef695df5d0cddfe64d3664c75cb28077f",
+    "crates/litchi-xlsx/src/source_attributes.rs": "138a32d47243cd1f2bd13b510beb881a055d7f5961cda83210566d4e25449d81",
+    "crates/litchi-xlsx/src/lib.rs": "7d02582efed4afac7ed6ee4dea8652058c87b933cf0836875aba6a64118ce9a8",
+    "crates/litchi-xlsx/src/package.rs": "ea8648944c06da6513571284afbc5d791f4b944086067950ca59ab855336d131",
+    "crates/litchi-xlsx/docs/FEATURE_MATRIX.md": "9c5968d96624a736988f7fa990a164cd83971599877d1253781bf5dca8993995"
+  },
+  "cargo_lock_sha256": "b5a7e7c78d8211439da193dfc56967df23321e53d96e44350b54769efb01d83a",
+  "commands": [
+    "cargo +1.95.0 test --offline -p litchi-xlsx --all-features",
+    "cargo +1.95.0 clippy --offline --locked -p litchi-xlsx --all-targets --all-features -- -D warnings",
+    "rustfmt --edition 2024 --config skip_children=true --check <seven Rust paths>",
+    "git diff --check"
+  ],
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  },
+  "results": {
+    "unit_integration_passed": 1311,
+    "doctests_passed": 2,
+    "failed": 0,
+    "ignored": 0,
+    "clippy": "pass",
+    "format": "pass",
+    "whitespace": "pass"
+  },
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "b0e2807ce9d8ab3bb42e87c4a4578ca82726a858c8e4072f2b84937933612911",
+      "raw_sha256": "94c0b1a45d46a9d92d9b4e3090683db876c470331f9deb69989dcb91f127590b"
+    },
+    "clippy.log.gz": {
+      "sha256": "2546626bda055506c2679d00362afd1f8439e5e458932079b4d1d603aba82dae",
+      "raw_sha256": "cb6185747cb245645e56aa46810b2a02a13e2a0e97967f30a859fd62a7cd4d0b"
+    }
+  }
+}

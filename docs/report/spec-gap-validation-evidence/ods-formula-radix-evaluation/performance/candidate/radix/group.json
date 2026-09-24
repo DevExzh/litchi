@@ -1,0 +1,229 @@
+{
+  "group": "radix",
+  "revision": "candidate",
+  "candidate_only": true,
+  "phase_selection": "all",
+  "phases": [
+    "parse",
+    "evaluate",
+    "parse-evaluate"
+  ],
+  "case_count": 53,
+  "cases": [
+    {
+      "case": "radix-base",
+      "repeat": 128
+    },
+    {
+      "case": "radix-bin2dec",
+      "repeat": 128
+    },
+    {
+      "case": "radix-bin2hex",
+      "repeat": 128
+    },
+    {
+      "case": "radix-bin2oct",
+      "repeat": 128
+    },
+    {
+      "case": "radix-dec2bin",
+      "repeat": 128
+    },
+    {
+      "case": "radix-dec2hex",
+      "repeat": 128
+    },
+    {
+      "case": "radix-dec2oct",
+      "repeat": 128
+    },
+    {
+      "case": "radix-decimal",
+      "repeat": 128
+    },
+    {
+      "case": "radix-hex2bin",
+      "repeat": 128
+    },
+    {
+      "case": "radix-hex2dec",
+      "repeat": 128
+    },
+    {
+      "case": "radix-hex2oct",
+      "repeat": 128
+    },
+    {
+      "case": "radix-oct2bin",
+      "repeat": 128
+    },
+    {
+      "case": "radix-oct2dec",
+      "repeat": 128
+    },
+    {
+      "case": "radix-oct2hex",
+      "repeat": 128
+    },
+    {
+      "case": "radix-decimal-space",
+      "repeat": 128
+    },
+    {
+      "case": "radix-decimal-tab",
+      "repeat": 128
+    },
+    {
+      "case": "radix-decimal-prefix",
+      "repeat": 128
+    },
+    {
+      "case": "radix-decimal-h",
+      "repeat": 128
+    },
+    {
+      "case": "radix-decimal-b",
+      "repeat": 128
+    },
+    {
+      "case": "radix-base-truncate",
+      "repeat": 128
+    },
+    {
+      "case": "radix-error-fraction",
+      "repeat": 128
+    },
+    {
+      "case": "radix-error-invalid-digit",
+      "repeat": 128
+    },
+    {
+      "case": "radix-error-radix-low",
+      "repeat": 128
+    },
+    {
+      "case": "radix-error-radix-high",
+      "repeat": 128
+    },
+    {
+      "case": "radix-error-empty",
+      "repeat": 128
+    },
+    {
+      "case": "radix-error-arity",
+      "repeat": 128
+    },
+    {
+      "case": "radix-error-text-number",
+      "repeat": 128
+    },
+    {
+      "case": "radix-refusal-work",
+      "repeat": 128
+    },
+    {
+      "case": "radix-refusal-memory",
+      "repeat": 128
+    },
+    {
+      "case": "radix-refusal-stack",
+      "repeat": 128
+    },
+    {
+      "case": "radix-refusal-cancelled",
+      "repeat": 128
+    },
+    {
+      "case": "radix-base-input-64",
+      "repeat": 64
+    },
+    {
+      "case": "radix-base-input-256",
+      "repeat": 32
+    },
+    {
+      "case": "radix-base-input-1024",
+      "repeat": 8
+    },
+    {
+      "case": "radix-base-input-4096",
+      "repeat": 2
+    },
+    {
+      "case": "radix-decimal-input-64",
+      "repeat": 64
+    },
+    {
+      "case": "radix-decimal-input-256",
+      "repeat": 32
+    },
+    {
+      "case": "radix-decimal-input-1024",
+      "repeat": 8
+    },
+    {
+      "case": "radix-decimal-input-4096",
+      "repeat": 2
+    },
+    {
+      "case": "radix-dec2hex-padding-64",
+      "repeat": 64
+    },
+    {
+      "case": "radix-dec2hex-padding-256",
+      "repeat": 32
+    },
+    {
+      "case": "radix-dec2hex-padding-1024",
+      "repeat": 8
+    },
+    {
+      "case": "radix-dec2hex-padding-4096",
+      "repeat": 2
+    },
+    {
+      "case": "radix-base-padding-64",
+      "repeat": 64
+    },
+    {
+      "case": "radix-base-padding-256",
+      "repeat": 32
+    },
+    {
+      "case": "radix-base-padding-1024",
+      "repeat": 8
+    },
+    {
+      "case": "radix-base-padding-4096",
+      "repeat": 2
+    },
+    {
+      "case": "radix-max-base",
+      "repeat": 128
+    },
+    {
+      "case": "radix-max-decimal",
+      "repeat": 128
+    },
+    {
+      "case": "radix-big-base",
+      "repeat": 128
+    },
+    {
+      "case": "radix-error-large-dec2bin",
+      "repeat": 128
+    },
+    {
+      "case": "radix-error-large-dec2hex",
+      "repeat": 128
+    },
+    {
+      "case": "radix-big-decimal",
+      "repeat": 128
+    }
+  ],
+  "warmups": 3,
+  "iterations": 15,
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-radix-evaluation/performance/candidate/ods-formula-radix-evaluation-profile"
+}

@@ -1,0 +1,17 @@
+{
+  "status": 0,
+  "tests": 879,
+  "targets": 52,
+  "doctests": 2,
+  "profile_rows": {
+    "baseline": 24,
+    "ascii-candidate": 24,
+    "ast-candidate": 24,
+    "evaluation-candidate": 105,
+    "ascii-candidate-abab": 24,
+    "ast-abab": 16
+  },
+  "source_files": 210,
+  "artifacts": 980,
+  "counter_captures": 3
+}

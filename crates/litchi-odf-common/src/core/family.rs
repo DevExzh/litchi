@@ -11,6 +11,7 @@ use quick_xml::reader::Reader;
 use std::{fs, path::Path, sync::Arc};
 
 const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
+const MAX_STYLES_BYTES: usize = 256 * 1024 * 1024;
 
 /// A packaged ODF detection result that retains the validated archive index.
 ///
@@ -405,19 +406,51 @@ impl Package {
             )));
         }
 
+        let declared_content_size = archive
+            .package()?
+            .member_materialized_size("content.xml")?
+            .ok_or_else(|| {
+                Error::InvalidFormat("content.xml disappeared from the package".into())
+            })?;
+        if declared_content_size > MAX_CONTENT_BYTES as u64 {
+            return Err(Error::InvalidFormat(
+                "ODF content.xml exceeds the family limit".into(),
+            ));
+        }
         let content_bytes = archive.get_file("content.xml")?;
+        if content_bytes.len() > MAX_CONTENT_BYTES {
+            return Err(Error::InvalidFormat(
+                "ODF content.xml exceeds the family limit".into(),
+            ));
+        }
         let content_xml = std::str::from_utf8(&content_bytes).map_err(|error| {
             Error::InvalidFormat(format!("{family_name} content.xml is not UTF-8: {error}"))
         })?;
         validate_content_part(content_xml, body_marker, family_name)?;
         let content = Content::from_bytes(&content_bytes)?;
 
-        let styles = archive
-            .has_file("styles.xml")?
-            .then(|| archive.get_file("styles.xml"))
-            .transpose()?
-            .map(|bytes| Styles::from_bytes(&bytes))
-            .transpose()?;
+        let styles = if archive.has_file("styles.xml")? {
+            let declared_size = archive
+                .package()?
+                .member_materialized_size("styles.xml")?
+                .ok_or_else(|| {
+                    Error::InvalidFormat("styles.xml disappeared from the package".into())
+                })?;
+            if declared_size > MAX_STYLES_BYTES as u64 {
+                return Err(Error::InvalidFormat(
+                    "ODF styles.xml exceeds the family limit".into(),
+                ));
+            }
+            let bytes = archive.get_file("styles.xml")?;
+            if bytes.len() > MAX_STYLES_BYTES {
+                return Err(Error::InvalidFormat(
+                    "ODF styles.xml exceeds the family limit".into(),
+                ));
+            }
+            Some(Styles::from_bytes(&bytes)?)
+        } else {
+            None
+        };
         let metadata = archive
             .has_file("meta.xml")?
             .then(|| archive.get_file("meta.xml"))

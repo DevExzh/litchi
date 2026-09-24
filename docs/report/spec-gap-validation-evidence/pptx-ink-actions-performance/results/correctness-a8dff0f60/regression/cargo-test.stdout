@@ -1,0 +1,11 @@
+
+running 6 tests
+test adapter::tests::inconsistent_pointer_observations_are_not_accepted_as_topology ... ok
+test adapter::tests::inverse_uses_working_package_outside_retained_baseline ... ok
+test adapter::tests::refused_limit_lane_keeps_valid_source_baseline_reopenable ... ok
+test adapter::tests::repeated_inbound_edges_do_not_make_distinct_targets_shared ... ok
+test adapter::tests::retained_prepared_metadata_is_charged_before_baseline_snapshot ... ok
+test adapter::tests::stale_content_type_checks_unmutated_source_baseline ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

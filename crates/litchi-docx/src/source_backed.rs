@@ -9,6 +9,8 @@
 //! while raw-copying every unselected ZIP member.
 
 mod document_policy;
+mod ink;
+mod svg_lifecycle;
 
 #[cfg(test)]
 mod paragraph_index_tests;
@@ -27,6 +29,17 @@ pub use story_text::{
     GlossaryBatchSnapshot, GlossarySelector, GlossarySelectorKind, Limits as StoryTextLimits,
     Patch as StoryTextPatch, Publication as StoryTextPublication, Selector as StorySelector,
     Snapshot as StoryTextSnapshot,
+};
+pub use svg_lifecycle::{
+    PictureSelector, PictureSelector as SvgPictureSelector, RasterResourceSourceView,
+    RasterResourceView, SourceBackedSvgAttachmentBatchCommit, SourceBackedSvgAttachmentBatchEdit,
+    SourceBackedSvgAttachmentBatchPatch, SourceBackedSvgAttachmentBatchPublication,
+    SourceBackedSvgAttachmentBatchSnapshot, SourceBackedSvgAttachmentCommit,
+    SourceBackedSvgAttachmentEdit, SourceBackedSvgAttachmentPatch,
+    SourceBackedSvgAttachmentPublication, SourceBackedSvgAttachmentReplacement,
+    SourceBackedSvgAttachmentSnapshot, SourceSvgAttachment, SourceSvgPictureSourceView,
+    SourceSvgPictureView, SvgAttachmentCommitDiagnostics, SvgInput, SvgPictureOwnerState,
+    SvgPictureView, SvgResourceSourceView, SvgResourceView,
 };
 
 pub use tail_append::{
@@ -846,6 +859,7 @@ impl Package {
                 let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
                 capabilities
                     .understand_namespace(crate::paragraph::extensions::WORD_2010_NAMESPACE);
+                capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
                 litchi_ooxml_common::mce::process_markup_compatibility(
                     data.as_bytes(),
                     &capabilities,
@@ -1734,12 +1748,14 @@ impl Package {
         let body_ranges = body_block_ranges(data.as_bytes())?;
         let body_len = body_ranges
             .iter()
-            .filter(|(kind, start, _)| *kind == ALT_CHUNK_BLOCK_KIND && chunks.contains_key(start))
+            .filter(|(kind, start, _, _)| {
+                *kind == ALT_CHUNK_BLOCK_KIND && chunks.contains_key(start)
+            })
             .count();
         let AltChunkSelector::Index(index) = selector;
         let chunk = body_ranges
             .into_iter()
-            .filter_map(|(kind, start, _)| {
+            .filter_map(|(kind, start, _, _)| {
                 (kind == ALT_CHUNK_BLOCK_KIND)
                     .then_some(chunks.get(&start))
                     .flatten()
@@ -3114,6 +3130,28 @@ impl Document {
         let result = crate::paragraph::extract_word_text(self.xml.as_bytes());
         self.check_execution()?;
         result
+    }
+
+    /// Read recognized tracked revisions throughout the visible main document.
+    /// Includes body-final section properties and table-grid/row metadata that
+    /// paragraph-only traversal cannot visit. Unknown markup remains in source.
+    ///
+    /// # Errors
+    /// Returns malformed metadata, XML, or revision resource-limit errors.
+    pub fn revisions(&self) -> Result<SmallVec<[crate::revision::Revision; 4]>> {
+        self.revisions_with_limits(crate::revision::Limits::default())
+    }
+
+    /// Read tracked revision metadata with explicit parser and retention limits.
+    ///
+    /// # Errors
+    /// Returns malformed metadata, XML, or revision resource-limit errors.
+    pub fn revisions_with_limits(
+        &self,
+        limits: crate::revision::Limits,
+    ) -> Result<SmallVec<[crate::revision::Revision; 4]>> {
+        self.check_execution()?;
+        crate::revision::parse_revisions_with_limits(self.xml.as_bytes(), &[], limits)
     }
 
     /// Count visible paragraphs in the pinned document.

@@ -1,0 +1,34 @@
+{
+  "candidate": "/var/tmp/litchi-docx-ink-validation-20260909",
+  "source_manifest": "/var/tmp/litchi-docx-ink-validation-20260910-v3-manifest.json",
+  "source_manifest_sha256": "53dc72db0a6d735ecfb78629036b313f3be25b591fad3144e86cb97fb3062812",
+  "source_files_verified": 8,
+  "unit_integration": {
+    "passed": 1666,
+    "ignored": 1
+  },
+  "doctests": {
+    "passed": 77,
+    "ignored": 31
+  },
+  "logs": {
+    "tests": {
+      "path": "/var/tmp/litchi-docx-ink-root-tests-v3.log",
+      "sha256": "1e205bffd1158d2416817e11997e1305a719fa5044118f99eeae494dfac3042b",
+      "exit_code": 0
+    },
+    "clippy": {
+      "path": "/var/tmp/litchi-docx-ink-root-clippy-v3.log",
+      "sha256": "6f0a6b431141af3d97a35e545ed976416f6f72710801ab02765e2c09d71a17b9",
+      "exit_code": 0
+    },
+    "rustdoc": {
+      "path": "/var/tmp/litchi-docx-ink-root-rustdoc-v3.log",
+      "sha256": "ce30efd716438251dd195bb5dc3e47a59d1142811a43f4946a98266313231768",
+      "exit_code": 0
+    }
+  },
+  "pinned_format_diff_hashes": "passed",
+  "independent_review": "crypto_profile_fix: clear; all8hashes and diff verified; ignored link selection fixed",
+  "publication": "not published"
+}

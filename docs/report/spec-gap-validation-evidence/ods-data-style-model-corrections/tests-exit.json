@@ -1,0 +1,12 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-ods",
+    "--lib"
+  ],
+  "exit_code": 0
+}

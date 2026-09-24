@@ -1,0 +1,64 @@
+{
+  "base_commit": "ed370d7060f695454f6d1183ceb3724447238756",
+  "sources": {
+    "crates/litchi-cfb/src/directory_name.rs": "1adaddb678160cdc633dde5cebc98b4fc594aba26484b07ee792760125e8bcf5",
+    "crates/litchi-cfb/src/lib.rs": "99bca993975a34b0865ff13cc576cffc49fd8fb32fac8d066ac24e8b27ba1eeb",
+    "crates/litchi-ole-common/README.md": "7d3f5df4ecc6441b9d186b17063f49a2599b1a976c204c8b70687192368b2db9",
+    "crates/litchi-ole-common/src/property_set/codec.rs": "26501f6b6263ead6fd0fc0271892af1da27c6d9f9926e1d84cd2ca8f14d21581",
+    "crates/litchi-ole-common/src/property_set/codec/binary/composite.rs": "422c30aeb69445484baa5a974a08e5c57ec2bfded778d52d15b58dc2c32b4932",
+    "crates/litchi-ole-common/src/property_set/codec/binary/mod.rs": "40792d953cb519c4af9300191e0b178cc5c8d6e4054cb36434e52197e0f76c64",
+    "crates/litchi-ole-common/src/property_set/codec/binary/semantic.rs": "05af94949316adb14c703c208e40b38b7ef925bcfc23348d66455abc4a0dbbd8",
+    "crates/litchi-ole-common/src/property_set/codec/binary/tests.rs": "90e07d91ca0fb5b9c7f35978087122a9e30b615514ddea46105d018ff9337b29",
+    "crates/litchi-ole-common/src/property_set/codec/binary/validation.rs": "8e42bb483e857d0dc8d83c9691b5c8db707775b44161212b71c2a32b58caad29",
+    "crates/litchi-ole-common/src/property_set/codec/binary/wire.rs": "3e53dba677499ec3d815ab9ef1be1287e8daca0c6e53fc53005606c811f5738f",
+    "crates/litchi-ole-common/src/property_set/codec/semantic.rs": "e2b5304dd4256ea66c5012cffc210c5bfac0b219dc464433dd0a488952660a55",
+    "crates/litchi-ole-common/src/property_set/mod.rs": "b1e8b9ba7c73380cd292357e41b9849270104f060a964f519ed3cf6cf03a7f7c",
+    "crates/litchi-ole-common/src/property_set/model.rs": "df4569ca3581165dee5e38c7d4fb57ec64999706b96987a233c4a7e7294effd4",
+    "crates/litchi-ole-common/src/property_set/non_simple/codec.rs": "e0ea6f57ef4f6b1cf9698a9972a619f61f7581dd4659752eb18befb450b05bd0",
+    "crates/litchi-ole-common/src/property_set/non_simple/mod.rs": "9b66a0c4af4de2d6637b5502132c2dfd5c1a5b8ae1a5cdd12977b3e23b314c82",
+    "crates/litchi-ole-common/src/property_set/non_simple/model.rs": "0be3c11b6521f865544e9f24335e0923061bbe21ad050cc0a7ab22dc4950280e",
+    "crates/litchi-ole-common/src/property_set/non_simple/tests.rs": "c8eb1bb3a429e4ee6abef4619059d9b65ff4b0fb0139d03a06c78ad6cac082cc",
+    "crates/litchi-ole-common/src/property_set/non_simple/transaction.rs": "0da6bd7df2c892c3fe250e55b7984edb1e219a06873016ceddd283dab8b179f9",
+    "crates/litchi-ole-common/src/property_set/tests.rs": "3d23a4286ea7ce6b34ca623a83eb7fb1908be196a557f26cc75731e5e61eff6f"
+  },
+  "toolchain": "1.95.0",
+  "commands": [
+    "cargo +1.95.0 test --offline --locked -p litchi-cfb -p litchi-ole-common --all-features",
+    "cargo +1.95.0 clippy --offline --locked -p litchi-cfb -p litchi-ole-common --all-targets --all-features -- -D warnings",
+    "rustfmt --edition 2024 --config skip_children=true --check <eighteen Rust source paths>",
+    "git diff --check"
+  ],
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  },
+  "tests": {
+    "passed": 568,
+    "failed": 0,
+    "ignored": 1,
+    "litchi_cfb_passed": 324,
+    "litchi_ole_common_passed": 244
+  },
+  "doctests": {
+    "passed": 14,
+    "failed": 0,
+    "ignored": 1
+  },
+  "clippy": "pass",
+  "format": "pass",
+  "whitespace": "pass",
+  "cargo_lock_sha256": "b5a7e7c78d8211439da193dfc56967df23321e53d96e44350b54769efb01d83a",
+  "independent_review": "crypto_native_vectors: final local MS-OLEPS, Unicode key, opaque-indirect closure, allocation/wire preflight and exact CFB output planner review clear. Requested 0/4095/4096 physical-stream regression subsequently added and passed root gates.",
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "28526bd7f2c291eadf6251684aec58e466745b44dbfa97c39630296e9f7d88e7",
+      "raw_sha256": "a6fff4bafc897ba3013a94f811c2b8e0f9fb9d8b25883e69b22fca33c41385b9"
+    },
+    "clippy.log.gz": {
+      "sha256": "63b2f1d4b01263a7175178d67145ebfba991fd3f517e9751d3876202d3c0cbcf",
+      "raw_sha256": "0b57847f09ac5f7e128bedaff3a455b0400b80fdaf61aacb7925c371a5c3ab50"
+    }
+  }
+}

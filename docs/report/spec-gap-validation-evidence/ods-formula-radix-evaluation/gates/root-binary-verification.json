@@ -1,0 +1,30 @@
+{
+  "verified_at": "2026-09-13T14:00:59.986697+00:00",
+  "binaries": {
+    "baseline": {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-radix-evaluation/performance/baseline/ods-formula-radix-evaluation-profile",
+      "sha256": "8437de6ad6b53d4883960f2b20fdb7e13b6af80822fd740934f42525ce015733",
+      "bytes": 1266984
+    },
+    "candidate": {
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-radix-evaluation/performance/candidate/ods-formula-radix-evaluation-profile",
+      "sha256": "5012e67ac4edbd037d07835c51eef6c0860c2953cad52abede7098d68e6e5e7a",
+      "bytes": 1295328
+    }
+  },
+  "removed_binaries": [
+    {
+      "variant": "baseline",
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-radix-evaluation/performance/baseline/ods-formula-radix-evaluation-profile",
+      "sha256": "8437de6ad6b53d4883960f2b20fdb7e13b6af80822fd740934f42525ce015733",
+      "bytes": 1266984
+    },
+    {
+      "variant": "candidate",
+      "path": "docs/report/spec-gap-validation-evidence/ods-formula-radix-evaluation/performance/candidate/ods-formula-radix-evaluation-profile",
+      "sha256": "5012e67ac4edbd037d07835c51eef6c0860c2953cad52abede7098d68e6e5e7a",
+      "bytes": 1295328
+    }
+  ],
+  "removed_after_verification_at": "2026-09-13T14:02:51.904431+00:00"
+}

@@ -3,6 +3,7 @@
 pub(crate) mod annotation;
 pub(crate) mod bookmark;
 pub(crate) mod editable_region;
+pub(crate) mod move_bookmark;
 pub(crate) mod note_options;
 pub(crate) mod note_separator;
 pub(crate) mod protection_range;
@@ -15,3 +16,4 @@ pub use annotation::{
     Annotation, AnnotationType as AnnotationKind, Revision, RevisionAuthor,
     RevisionType as RevisionKind,
 };
+pub use move_bookmark::{MoveBookmark, MoveBookmarkKind};

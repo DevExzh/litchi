@@ -5,8 +5,8 @@
     reason = "builder-style helpers deliberately rebind a working value as it is refined"
 )]
 use crate::types::{
-    Alignment, Formatting as RawFormat, Paragraph as RawParagraph, StyleBlock, TextDirection,
-    UnderlineStyle,
+    Alignment, Formatting as RawFormat, Paragraph as RawParagraph, ParagraphFrame, StyleBlock,
+    TextDirection, UnderlineStyle,
 };
 use std::fmt;
 use std::iter::FusedIterator;
@@ -803,6 +803,19 @@ impl<'a> ParagraphFormat<'a> {
     #[must_use]
     pub const fn outline_level(self) -> Option<u8> {
         self.raw.outline_level
+    }
+
+    /// Positioned paragraph frame controls, when this paragraph has a frame.
+    #[must_use]
+    pub const fn frame(self) -> Option<ParagraphFrame> {
+        self.raw.frame
+    }
+
+    /// Alias for [`Self::frame`] that makes the positioned-object semantics
+    /// explicit at call sites.
+    #[must_use]
+    pub const fn positioned_frame(self) -> Option<ParagraphFrame> {
+        self.raw.frame
     }
 }
 

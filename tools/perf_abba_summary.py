@@ -859,6 +859,7 @@ _COLD_VERIFIED_STATUS_VALUES = frozenset(
         "ineligible_proc_io_unavailable",
         "ineligible_read_bytes_backwards",
         "ineligible_read_bytes_zero",
+        "ineligible_post_fincore",
         "ineligible_prepared_query_control",
         "ineligible_source_alignment_unavailable",
         "ineligible_source_write_failed",
@@ -888,9 +889,28 @@ _COLD_VERIFIED_SAMPLE_KEYS = frozenset(
         "fincore_version_stderr_bytes",
         "fincore_method",
         "fincore_fallback",
+        "fincore_post",
         "read_bytes_before",
         "read_bytes_after",
         "read_bytes_delta",
+    }
+)
+_COLD_VERIFIED_POST_SAMPLE_KEYS = frozenset(
+    {
+        "status",
+        "size_bytes",
+        "resident_bytes",
+        "dirty_bytes",
+        "writeback_bytes",
+        "fincore_tool",
+        "fincore_sha256",
+        "fincore_version",
+        "fincore_stderr_sha256",
+        "fincore_stderr_bytes",
+        "fincore_version_stderr_sha256",
+        "fincore_version_stderr_bytes",
+        "fincore_method",
+        "fincore_fallback",
     }
 )
 
@@ -1833,6 +1853,55 @@ def _filesystem_measurement_shape(value: Any) -> Any:
     )
 
 
+def _validate_cold_verified_post_sample(value: Any, location: str) -> dict[str, Any]:
+    sample = _require_object(value, location)
+    unknown = set(sample) - _COLD_VERIFIED_POST_SAMPLE_KEYS
+    if unknown:
+        raise AbbaSummaryInputError(
+            f"{location} has unknown keys: {sorted(unknown)}"
+        )
+    status = sample.get("status")
+    if not isinstance(status, str) or status not in _COLD_VERIFIED_STATUS_VALUES:
+        raise AbbaSummaryInputError(
+            f"{location}.status must be one of {sorted(_COLD_VERIFIED_STATUS_VALUES)}"
+        )
+    for field, item in sample.items():
+        if field in {
+            "fincore_sha256",
+            "fincore_stderr_sha256",
+            "fincore_version_stderr_sha256",
+        }:
+            _validate_output_sha256(item, f"{location}.{field}")
+        elif field == "status":
+            continue
+        elif isinstance(item, bool) or not isinstance(item, (int, str)):
+            raise AbbaSummaryInputError(
+                f"{location}.{field} must be an integer or string"
+            )
+        elif isinstance(item, int):
+            _u64(item, f"{location}.{field}")
+        elif not item:
+            raise AbbaSummaryInputError(f"{location}.{field} must not be empty")
+    if status == "eligible":
+        required = {
+            "size_bytes",
+            "resident_bytes",
+            "dirty_bytes",
+            "writeback_bytes",
+            "fincore_tool",
+            "fincore_sha256",
+            "fincore_version",
+            "fincore_method",
+            "fincore_fallback",
+        }
+        missing = required - set(sample)
+        if missing:
+            raise AbbaSummaryInputError(
+                f"{location} eligible post observation is missing required keys: {sorted(missing)}"
+            )
+    return sample
+
+
 def _validate_cold_verified_sample(value: Any, location: str) -> dict[str, Any]:
     sample = _require_object(value, location)
     unknown = set(sample) - _COLD_VERIFIED_SAMPLE_KEYS
@@ -1855,6 +1924,8 @@ def _validate_cold_verified_sample(value: Any, location: str) -> dict[str, Any]:
             _validate_output_sha256(item, f"{location}.{field}")
         elif field in {"fsync_completed"}:
             _required_bool(item, location, field)
+        elif field == "fincore_post":
+            _validate_cold_verified_post_sample(item, f"{location}.fincore_post")
         elif field != "status":
             if isinstance(item, bool) or not isinstance(item, (int, str)):
                 raise AbbaSummaryInputError(

@@ -105,12 +105,16 @@
     reason = "names and dense flag structures intentionally follow BIFF12 records and existing public API vocabulary"
 )]
 
+pub mod binary_index;
 pub mod calc;
+pub mod calculation_chain;
 pub mod cell_values;
 pub mod cell_watches;
 pub mod chart;
 pub mod comments;
 pub mod conditional_formatting;
+pub mod custom_data;
+pub mod data_model;
 pub mod data_validation;
 pub mod date_utils;
 pub mod external_link;
@@ -128,8 +132,11 @@ pub mod sheet;
 pub mod slicer;
 pub mod sparkline;
 pub mod styles;
+pub mod theme;
 pub mod timeline;
+pub mod volatile_dependencies;
 pub mod workbook;
+pub(crate) mod worksheet_index;
 pub mod xml_maps;
 
 /// OPC resource limits and diagnostics used by XLSB package and workbook ingress.
@@ -138,11 +145,20 @@ pub mod writer;
 
 pub use raw::Error;
 
+pub use custom_data::{
+    Commit as CustomDataCommit, CustomData, CustomDataView, ExtensionList,
+    Limits as CustomDataLimits, Part as CustomDataPart, Patch as CustomDataPatch, Properties,
+    RemovalDisposition, Snapshot as CustomDataSnapshot, Storage, StorageId, StorageSelector,
+    StorageSelectorInput, Transaction as CustomDataTransaction, parse_properties,
+    validate_workbook_root, write_properties,
+};
+
 pub use package::scenarios;
 pub use package::{Cell, FormulaOpacityReason, FormulaResolutionStatus, Package};
 pub use sheet::Worksheet;
 pub use workbook::{
-    SourceBackedExternalLink, SourceBackedWorkbook, SourceBackedWorksheet, Workbook,
+    SourceBackedExternalLink, SourceBackedIndexedWorksheet, SourceBackedWorkbook,
+    SourceBackedWorksheet, Workbook,
 };
 
 pub use pivot_view::Part;

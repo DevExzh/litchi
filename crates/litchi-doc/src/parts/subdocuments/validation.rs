@@ -14,7 +14,7 @@ pub(super) const PLCF_WKB: usize = 54;
 pub(super) const STTB_FNM: usize = 72;
 
 /// Validate the FIB/table boundary before package publication.
-pub(super) fn package_fib(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<()> {
+pub(super) fn package_fib(fib: &FileInformationBlock, _table_stream: &[u8]) -> Result<()> {
     if fib.version() < WORD_97_NFIB {
         return Err(PackageError::UnsupportedVersion {
             nfib: fib.version(),
@@ -27,16 +27,6 @@ pub(super) fn package_fib(fib: &FileInformationBlock, table_stream: &[u8]) -> Re
         ));
     }
     package_fib_shape(fib)?;
-    if document_protected(fib, table_stream)? {
-        return Err(corrupted(
-            "protected DOC packages cannot be edited by the subdocument owner",
-        ));
-    }
-    if crate::parts::protection::Ranges::parse(fib, table_stream)?.is_some() {
-        return Err(corrupted(
-            "DOC range-level protection is not bypassed by the subdocument owner",
-        ));
-    }
     Ok(())
 }
 
@@ -76,33 +66,6 @@ fn package_fib_shape(fib: &FileInformationBlock) -> Result<()> {
         ));
     }
     Ok(())
-}
-
-fn document_protected(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<bool> {
-    // DOP is FibRgFcLcb97 pair 31. These are the protection indicators used
-    // by the existing revision owner; this owner never authenticates or
-    // bypasses any of them.
-    const DOP: usize = 31;
-    let Some((offset, length)) = fib.get_table_pointer(DOP) else {
-        return Ok(false);
-    };
-    if length == 0 {
-        return Ok(false);
-    }
-    let start = usize::try_from(offset).map_err(|_| corrupted("DOP offset exceeds usize"))?;
-    let length = usize::try_from(length).map_err(|_| corrupted("DOP length exceeds usize"))?;
-    let end = start
-        .checked_add(length)
-        .ok_or_else(|| corrupted("DOP range overflows"))?;
-    let dop = table_stream
-        .get(start..end)
-        .ok_or_else(|| corrupted("DOP extends beyond the table stream"))?;
-    if dop.len() < 84 {
-        return Err(corrupted("DOP is truncated before its protection fields"));
-    }
-    Ok(dop[6] & 0x10 != 0
-        || dop[7] & (0x02 | 0x20 | 0x40) != 0
-        || dop[78..82].iter().any(|byte| *byte != 0))
 }
 
 pub(super) fn collection(value: &Collection, main_document_chars: u32) -> Result<()> {

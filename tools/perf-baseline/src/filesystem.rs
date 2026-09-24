@@ -838,6 +838,8 @@ enum Operation {
     OpcSourceOpen,
     OpcEagerSave,
     OpcSourceSave,
+    ProviderFileReadAt,
+    ProviderAtomicSave,
     CfbOverlaySave,
     CfbOwnedOverlaySave,
     PptxEagerOpen,
@@ -880,6 +882,8 @@ impl Operation {
             "opc_file_source_open" => Some(Self::OpcSourceOpen),
             "opc_file_eager_one_part_atomic_save" => Some(Self::OpcEagerSave),
             "opc_file_source_one_part_atomic_save" => Some(Self::OpcSourceSave),
+            "provider_file_read_at" => Some(Self::ProviderFileReadAt),
+            "provider_atomic_save" => Some(Self::ProviderAtomicSave),
             "cfb_file_same_length_overlay_atomic_save" => Some(Self::CfbOverlaySave),
             "cfb_file_owned_same_length_overlay_atomic_save" => Some(Self::CfbOwnedOverlaySave),
             "pptx_file_eager_open" => Some(Self::PptxEagerOpen),
@@ -943,6 +947,8 @@ impl Operation {
             Self::OpcSourceOpen => super::Case::OpcFileSourceOpen,
             Self::OpcEagerSave => super::Case::OpcFileEagerOnePartAtomicSave,
             Self::OpcSourceSave => super::Case::OpcFileSourceOnePartAtomicSave,
+            Self::ProviderFileReadAt => super::Case::ProviderFileReadAt,
+            Self::ProviderAtomicSave => super::Case::ProviderAtomicSave,
             Self::CfbOverlaySave => super::Case::CfbFileSameLengthOverlayAtomicSave,
             Self::CfbOwnedOverlaySave => super::Case::CfbFileOwnedSameLengthOverlayAtomicSave,
             Self::PptxEagerOpen => super::Case::PptxFileEagerOpen,
@@ -1002,6 +1008,7 @@ impl Operation {
             self,
             Self::OpcEagerSave
                 | Self::OpcSourceSave
+                | Self::ProviderAtomicSave
                 | Self::CfbOverlaySave
                 | Self::CfbOwnedOverlaySave
         )
@@ -1009,6 +1016,10 @@ impl Operation {
 
     const fn is_cfb(self) -> bool {
         matches!(self, Self::CfbOverlaySave | Self::CfbOwnedOverlaySave)
+    }
+
+    const fn is_provider_axis(self) -> bool {
+        matches!(self, Self::ProviderFileReadAt | Self::ProviderAtomicSave)
     }
 
     const fn is_cfb_owned(self) -> bool {
@@ -1320,7 +1331,7 @@ pub(crate) fn run_selected(
             )?;
             if matches!(
                 operation,
-                Operation::OpcEagerSave | Operation::OpcSourceSave
+                Operation::OpcEagerSave | Operation::OpcSourceSave | Operation::ProviderAtomicSave
             ) {
                 let current = run
                     .evidence
@@ -2258,6 +2269,21 @@ fn filesystem_result(
     let mut result = super::result(case, corpus, elapsed, None);
     result.cache_state = Some(cache_state);
     result.output_sha256 = output_sha256;
+    if operation_for_case(case).is_some_and(|operation| operation.is_provider_axis()) {
+        let operation = operation_for_case(case)
+            .ok_or("provider filesystem case did not map to an operation")?;
+        let provider_axis = filesystem_provider_axis_summary(
+            operation,
+            cache_state,
+            corpus,
+            samples,
+            &result.elapsed_ns.sample_order,
+        )?;
+        result.source = Some(Box::new(super::SourceSummary {
+            provider_axis: Some(provider_axis),
+            ..super::SourceSummary::default()
+        }));
+    }
     result.operation_metrics = Some(crate::operation_metrics::aggregate(
         samples,
         cache_state,
@@ -2266,9 +2292,115 @@ fn filesystem_result(
     Ok(result)
 }
 
+fn operation_for_case(case: super::Case) -> Option<Operation> {
+    Operation::parse(case.name())
+}
+
+fn filesystem_provider_axis_summary(
+    operation: Operation,
+    cache_state: &'static str,
+    corpus: &super::Corpus,
+    samples: &[SampleEvidence],
+    sample_order: &[usize],
+) -> Result<super::ProviderAxisSummary, Box<dyn Error>> {
+    let selected = samples
+        .iter()
+        .filter(|sample| sample.cache_state == cache_state)
+        .collect::<Vec<_>>();
+    if selected.is_empty() {
+        return Err("provider filesystem result has no samples for its cache state".into());
+    }
+    let process_metrics = selected
+        .iter()
+        .map(|sample| sample.process_metrics)
+        .collect::<Option<Vec<_>>>();
+    let logical_read_calls = selected
+        .iter()
+        .map(|sample| sample.logical_read_calls)
+        .collect::<Vec<_>>();
+    let logical_read_requested_bytes = selected
+        .iter()
+        .map(|sample| sample.logical_read_requested_bytes)
+        .collect::<Vec<_>>();
+    let logical_read_returned_bytes = selected
+        .iter()
+        .map(|sample| sample.logical_read_bytes)
+        .collect::<Vec<_>>();
+    let request_sizes = selected
+        .iter()
+        .map(|sample| sample.logical_read_request_sizes.clone())
+        .collect::<Vec<_>>();
+    let (storage_read_bytes, storage_write_bytes) =
+        process_metrics.map_or((None, None), |deltas| {
+            let reads = deltas.iter().map(|delta| delta.read_bytes).collect();
+            let writes = deltas.iter().map(|delta| delta.write_bytes).collect();
+            (Some(reads), Some(writes))
+        });
+    let (axis, implementation, timing_scope, decompressed_bytes_scope, correctness_oracle) =
+        match operation {
+            Operation::ProviderFileReadAt => (
+                "filesystem_read_at",
+                "SourceBackedPackage::from_read_at(FileSource)",
+                "timed child SourceBackedPackage open; source hash, package identity, and decompressed target payload oracle are outside elapsed_ns",
+                "known target payload bytes from the post-timing decompression oracle",
+                "source-backed OPC part count, main relationship, target payload bytes, and source SHA-256 verified after every sample",
+            ),
+            Operation::ProviderAtomicSave => (
+                "filesystem_atomic_save",
+                "SourceBackedPackage::write_part_overlay_to_stream + litchi_opc::atomic::replace_with",
+                "timed child source-backed overlay publication including the atomic destination replacement",
+                "not_applicable: overlay publication copies compressed source members and does not decompress a Part payload",
+                "atomic output SHA-256, changed target payload, untouched parts, and source SHA-256 verified after every sample",
+            ),
+            _ => return Err("non-provider operation passed to filesystem provider summary".into()),
+        };
+    let decompressed_bytes = if operation == Operation::ProviderFileReadAt {
+        Some(vec![
+            u64::try_from(corpus.target_payload.len())?;
+            selected.len()
+        ])
+    } else {
+        None
+    };
+    if sample_order.len() != selected.len() {
+        return Err("provider filesystem sample order has the wrong length".into());
+    }
+    let mut provider = super::ProviderAxisSummary {
+        axis,
+        implementation,
+        timing_scope,
+        sample_order: sample_order.to_vec(),
+        simulation_config: None,
+        logical_counter_scope: "FileSource positional ReadAt calls and returned bytes observed inside the timed child",
+        physical_counter_scope: "/proc/self/io read_bytes/write_bytes deltas from the isolated child when available; process-level kernel accounting can include child/probe overhead and is not exact device-I/O or request attribution; zero is a valid cached-I/O observation and None means procfs unavailable",
+        request_distribution_scope: "logical positional ReadAt request lengths and buckets; physical request boundaries are not exposed by this API",
+        copied_bytes_scope: "not_measured: rchar/wchar are read-like/write-like syscall bytes, not memory-copy events",
+        decompressed_bytes_scope,
+        logical_read_calls: Some(logical_read_calls),
+        logical_read_requested_bytes: Some(logical_read_requested_bytes),
+        logical_read_returned_bytes: Some(logical_read_returned_bytes),
+        physical_request_count: None,
+        physical_requested_bytes: None,
+        physical_returned_bytes: None,
+        request_sizes: Some(request_sizes),
+        copied_bytes: None,
+        decompressed_bytes,
+        storage_read_bytes,
+        storage_write_bytes,
+        sink_accepted_bytes: None,
+        sink_write_calls: None,
+        sink_write_sizes: None,
+        sink_write_size_buckets: None,
+        correctness_oracle,
+        correctness_verified: vec![true; selected.len()],
+    };
+    super::reorder_provider_axis_summary(&mut provider, sample_order)?;
+    Ok(provider)
+}
+
 fn expected_digest(operation: Operation, corpus: &super::Corpus) -> Result<String, Box<dyn Error>> {
     match operation {
-        Operation::OpcEagerSave | Operation::OpcSourceSave => {
+        Operation::OpcEagerSave | Operation::OpcSourceSave | Operation::ProviderAtomicSave => {
             let replacement = filesystem_opc_replacement()?;
             Ok(super::sha256_hex(&super::expected_opc_overlay_output(
                 corpus,
@@ -2280,6 +2412,7 @@ fn expected_digest(operation: Operation, corpus: &super::Corpus) -> Result<Strin
         },
         Operation::OpcEagerOpen
         | Operation::OpcSourceOpen
+        | Operation::ProviderFileReadAt
         | Operation::PptxEagerOpen
         | Operation::PptxSourceOpen
         | Operation::PptxEagerListSlides
@@ -2337,7 +2470,7 @@ fn expected_digest_for_source(
                 .set_blob(filesystem_opc_replacement()?);
             Ok(super::sha256_hex(&PackageWriter::to_bytes(&package)?))
         },
-        Operation::OpcSourceSave => {
+        Operation::OpcSourceSave | Operation::ProviderAtomicSave => {
             let target_uri =
                 PackURI::new(format!("/{}", super::entry_name(OPC_FILE_TARGET_INDEX)))?;
             let package = SourceBackedPackage::from_read_at(Arc::new(FileSource::open(source)?))?;
@@ -2484,7 +2617,7 @@ where
     }
     let opc_replacement = matches!(
         operation,
-        Operation::OpcEagerSave | Operation::OpcSourceSave
+        Operation::OpcEagerSave | Operation::OpcSourceSave | Operation::ProviderAtomicSave
     )
     .then(filesystem_opc_replacement)
     .transpose()?;
@@ -2562,7 +2695,7 @@ where
     let counter_result = (|| -> Result<Option<Arc<CountingReadAt>>, Box<dyn Error>> {
         Ok(match operation {
             Operation::OpcEagerOpen => run_opc_eager_open(&source, &mut details)?,
-            Operation::OpcSourceOpen => {
+            Operation::OpcSourceOpen | Operation::ProviderFileReadAt => {
                 let (counter, package) = run_opc_source_open(&source)?;
                 deferred_source_open_package = Some(package);
                 counter
@@ -2575,7 +2708,7 @@ where
                     .ok_or("missing OPC replacement")?,
                 &mut details,
             )?,
-            Operation::OpcSourceSave => run_opc_source_save(
+            Operation::OpcSourceSave | Operation::ProviderAtomicSave => run_opc_source_save(
                 &source,
                 &destination,
                 opc_replacement
@@ -2648,8 +2781,13 @@ where
     let counter = counter_result?;
     let after = process_metrics::Snapshot::read().ok();
     let process_delta = before.zip(after).map(|(before, after)| after.delta(before));
-    let cold_verified = cold_verified_preparation
-        .map(|preparation| cold_verified::complete(preparation, before, after));
+    let cold_verified = cold_verified_preparation.map(|preparation| {
+        cold_verified::complete(
+            cold_verified::observe_post(preparation, &source),
+            before,
+            after,
+        )
+    });
     let snapshot =
         counter.map_or_else(|| Ok(ReadMetrics::default()), |counter| counter.snapshot())?;
 
@@ -2669,7 +2807,11 @@ where
         details.opc_materialized_parts = Some(package.try_cache_diagnostics()?.successful_loads);
         std::hint::black_box(package);
     }
-    let logical_read_counter_scope = if operation.is_cfb_owned() {
+    let logical_read_counter_scope = if operation == Operation::ProviderFileReadAt {
+        "timed_filesystem_positional_read_at_provider_axis"
+    } else if operation == Operation::ProviderAtomicSave {
+        "timed_filesystem_positional_read_at_atomic_save_provider_axis"
+    } else if operation.is_cfb_owned() {
         "not_applicable_immutable_owned_slice"
     } else if matches!(operation, Operation::OpcEagerOpen | Operation::OpcEagerSave) {
         "not_applicable_eager_opc"
@@ -5668,7 +5810,7 @@ fn verify_child_output(
             let package = OpcPackage::from_bytes(&fs::read(source)?)?;
             verify_opc_package(&package, corpus)
         },
-        Operation::OpcSourceOpen => {
+        Operation::OpcSourceOpen | Operation::ProviderFileReadAt => {
             let file_source = FileSource::open(source)?;
             let package = SourceBackedPackage::from_read_at(Arc::new(file_source))?;
             if package.iter_parts().count() != corpus.manifest.entry_count {
@@ -5683,7 +5825,7 @@ fn verify_child_output(
             }
             Ok(())
         },
-        Operation::OpcEagerSave | Operation::OpcSourceSave => {
+        Operation::OpcEagerSave | Operation::OpcSourceSave | Operation::ProviderAtomicSave => {
             let output = fs::read(destination)?;
             let replacement = filesystem_opc_replacement()?;
             super::verify_opc_overlay_output(corpus, &output, &replacement)
@@ -6603,14 +6745,19 @@ mod tests {
         process::Command,
         sync::{Arc, Barrier, atomic::Ordering},
         thread,
+        time::{SystemTime, UNIX_EPOCH},
     };
 
     use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 
+    use crate::{build_opc_corpus, expected_opc_overlay_output, sha256_hex};
+
     use super::{
-        CacheSelection, ChildMode, ColdAdvice, CountingReadAt, Operation, ReadPattern,
-        ReadPatternState, ReadSizeBuckets, XlsxRepeatStoreScenario, checked_atomic_add,
-        checked_atomic_sub, xlsx_semantic_sha256,
+        CacheSelection, ChildMode, ColdAdvice, CountingReadAt, OPC_FILE_EXPECTED_OUTPUT_SHA256,
+        OPC_FILE_PAYLOAD, OPC_FILE_SHAPE, OPC_FILE_SOURCE_SHA256, Operation, OperationDetails,
+        ReadPattern, ReadPatternState, ReadSizeBuckets, XlsxRepeatStoreScenario,
+        checked_atomic_add, checked_atomic_sub, filesystem_opc_replacement, run_opc_source_open,
+        run_opc_source_save, verify_child_output, write_synced, xlsx_semantic_sha256,
     };
 
     struct OverReturningSource;
@@ -6689,6 +6836,8 @@ mod tests {
             "opc_file_source_open",
             "opc_file_eager_one_part_atomic_save",
             "opc_file_source_one_part_atomic_save",
+            "provider_file_read_at",
+            "provider_atomic_save",
             "cfb_file_same_length_overlay_atomic_save",
             "cfb_file_owned_same_length_overlay_atomic_save",
             "pptx_file_eager_open",
@@ -6735,6 +6884,90 @@ mod tests {
             operation.case().name(),
             "cfb_file_owned_same_length_overlay_atomic_save"
         );
+    }
+
+    #[test]
+    fn provider_filesystem_operations_use_real_positional_and_atomic_paths() {
+        let read_at = Operation::parse("provider_file_read_at").expect("provider ReadAt parses");
+        assert!(read_at.is_provider_axis());
+        assert!(!read_at.is_save());
+        assert_eq!(read_at.case().name(), "provider_file_read_at");
+
+        let atomic = Operation::parse("provider_atomic_save").expect("provider save parses");
+        assert!(atomic.is_provider_axis());
+        assert!(atomic.is_save());
+        assert_eq!(atomic.case().name(), "provider_atomic_save");
+    }
+
+    #[test]
+    fn provider_filesystem_oracles_verify_real_read_at_and_atomic_save() {
+        let corpus = build_opc_corpus(OPC_FILE_SHAPE, OPC_FILE_PAYLOAD).unwrap();
+        assert_eq!(sha256_hex(&corpus.archive), OPC_FILE_SOURCE_SHA256);
+
+        let root = env::temp_dir().join(format!(
+            "litchi-provider-oracle-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir(&root).unwrap();
+        let source = root.join("source.opc");
+        let destination = root.join("destination.opc");
+        write_synced(&source, &corpus.archive).unwrap();
+        write_synced(&destination, &corpus.archive).unwrap();
+
+        let (counter, package) = run_opc_source_open(&source).unwrap();
+        let counter = counter.expect("source-backed open returns its positional counter");
+        let metrics = counter.snapshot().unwrap();
+        assert!(metrics.calls > 0);
+        assert!(metrics.requested_bytes > 0);
+        assert_eq!(package.iter_parts().count(), corpus.manifest.entry_count);
+        verify_child_output(
+            Operation::ProviderFileReadAt,
+            &source,
+            &destination,
+            &corpus,
+            false,
+            None,
+        )
+        .unwrap();
+
+        let replacement = filesystem_opc_replacement().unwrap();
+        let mut details = OperationDetails::default();
+        let save_counter = run_opc_source_save(&source, &destination, &replacement, &mut details)
+            .unwrap()
+            .expect("source-backed save returns its positional counter");
+        let save_metrics = save_counter.snapshot().unwrap();
+        assert!(save_metrics.calls > 0);
+        assert!(save_metrics.requested_bytes > 0);
+        assert_eq!(details.opc_materialized_parts, Some(0));
+        verify_child_output(
+            Operation::ProviderAtomicSave,
+            &source,
+            &destination,
+            &corpus,
+            false,
+            None,
+        )
+        .unwrap();
+
+        let source_bytes = fs::read(&source).unwrap();
+        let destination_bytes = fs::read(&destination).unwrap();
+        assert_eq!(source_bytes, corpus.archive);
+        assert_eq!(sha256_hex(&source_bytes), OPC_FILE_SOURCE_SHA256);
+        assert_eq!(
+            sha256_hex(&destination_bytes),
+            OPC_FILE_EXPECTED_OUTPUT_SHA256
+        );
+        assert_eq!(
+            destination_bytes,
+            expected_opc_overlay_output(&corpus, &replacement).unwrap()
+        );
+        assert_ne!(destination_bytes, source_bytes);
+
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

@@ -1,0 +1,13 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/tmp/litchi-ods-discrete-baseline-2c5q65o6/docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/performance/harness/Cargo.toml",
+    "--release"
+  ],
+  "cwd": "/tmp/litchi-ods-discrete-baseline-2c5q65o6",
+  "target": "/var/tmp/litchi-ods-discrete-baseline-782339a2c-2ckmkbmm"
+}

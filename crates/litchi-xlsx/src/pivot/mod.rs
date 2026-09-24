@@ -7,16 +7,49 @@
 use std::collections::HashMap;
 
 pub mod cache;
+pub use server_formats::cached_unique_names;
 pub mod chart;
 pub mod fields;
 pub mod filters;
 pub mod reader;
+pub mod server_formats;
 pub mod styles;
 pub mod writer;
 
 pub use reader::{
     read_pivot_cache_definition, read_pivot_cache_records, read_pivot_table_definition,
     read_pivot_tables,
+};
+pub use server_formats::cached_unique_names::{
+    CacheSelector as PivotCacheSelector, CachedUniqueName, CachedUniqueNames,
+    Commit as CachedUniqueNamesCommit, DiagnosticStatus as CachedUniqueNamesDiagnosticStatus,
+    FieldSelector as PivotCacheFieldSelector, Patch as CachedUniqueNamesPatch,
+    PivotCacheEditHandle as PivotCacheEdit, PivotCacheFieldHandle, PivotCacheHandle, PivotCacheId,
+    Snapshot as CachedUniqueNamesSnapshot, Transaction as CachedUniqueNamesTransaction,
+    WorkbookCommit as CachedUniqueNamesWorkbookCommit,
+    WorkbookPatch as CachedUniqueNamesWorkbookPatch,
+    WorkbookTransaction as CachedUniqueNamesWorkbookTransaction,
+};
+pub use server_formats::table_data::{
+    Commit as PivotTableDataCommit, Patch as PivotTableDataPatch, PivotCellAddress, PivotCellType,
+    PivotCellValueEdit, PivotRowView, PivotTableDataDiagnostic, PivotTableDataLimits,
+    PivotTableDataView, PivotValueAttributeEdit, PivotValueCellExtraEdit, PivotValueCellExtraView,
+    PivotValueCellView, Snapshot as PivotTableDataSnapshot,
+    Transaction as PivotTableDataTransaction, WorkbookCommit as PivotTableDataWorkbookCommit,
+    WorkbookPatch as PivotTableDataWorkbookPatch, WorkbookTransaction as PivotTableDataEdit,
+    edit as edit_pivot_table_data, edit_with_limits as edit_pivot_table_data_with_limits,
+    load as load_pivot_table_data, load_with_limits as load_pivot_table_data_with_limits,
+};
+pub use server_formats::{
+    AttributeEdit as PivotServerFormatAttributeEdit, Commit as PivotServerFormatsCommit,
+    Patch as PivotServerFormatsPatch, PivotTableSelector, PivotTableServerFormats, PivotTableView,
+    ServerFormat, ServerFormatEdit, Snapshot as PivotServerFormatsSnapshot,
+    Transaction as PivotServerFormatsTransaction,
+    WorkbookCommit as PivotTableServerFormatsWorkbookCommit,
+    WorkbookPatch as PivotTableServerFormatsWorkbookPatch,
+    WorkbookTransaction as PivotTableServerFormatsEdit,
+    apply_patch as apply_pivot_server_formats_patch, edit as edit_pivot_server_formats,
+    load as load_pivot_server_formats,
 };
 pub use writer::{write_pivot_cache_definition, write_pivot_cache_records, write_pivot_table};
 

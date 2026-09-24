@@ -1,0 +1,21 @@
+{
+  "removed_paths": {
+    "/tmp/litchi-ods-statistical-reducers": true,
+    "/tmp/litchi-ods-statistical-reducers-target": true,
+    "/tmp/litchi-ods-statistical-build.log": true,
+    "/tmp/litchi-ods-statistical-integration.log": true,
+    "/tmp/litchi-ods-statistical-root-verification.json": true,
+    "/var/tmp/litchi-ods-statistical-baseline-f7fe857007b7bcb65e0512c5b5caf9135fe74a5a-md0bdc60": true,
+    "/var/tmp/litchi-ods-statistical-candidate-final-zyt0w5ta": true,
+    "/tmp/litchi-ods-statistical-harness-target": true,
+    "/tmp/litchi-ods-statistical-profile-target-v1": true,
+    "/tmp/litchi-ods-statistical-profile-target-v2": true,
+    "/tmp/litchi-ods-statistical-baseline-preflight": true,
+    "/tmp/litchi-ods-statistical-baseline-target": true,
+    "/tmp/litchi-ods-statistical-baseline-wgsj2_vy": true,
+    "/tmp/ods-formula-statistical-reducers-performance-input-freeze.json": true
+  },
+  "retained_evidence_has_no_target_or_python_cache": true,
+  "shared_default_target_preserved": true,
+  "native_reproduction_temporary_tree_cleaned": true
+}

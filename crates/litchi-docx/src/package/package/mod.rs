@@ -12,5 +12,7 @@ mod merge;
 mod parts;
 mod settings;
 mod story_edit;
+mod styles_with_effects;
+mod task_panes;
 mod transfer;
 mod validation;

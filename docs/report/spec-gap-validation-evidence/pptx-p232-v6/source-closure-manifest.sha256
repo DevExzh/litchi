@@ -1,0 +1,16 @@
+e701213f2360b9bb79e050ef298b050b09ae8e56de96dc9744b828e860376fa2  /var/tmp/litchi-pptx-p232-v6-integration-clean-20260910/crates/litchi-pptx/docs/FEATURE_MATRIX.md
+c04602b06eb8dfcdca71efe6d84596c0dae5fb23b6179f43529260551f08fe4b  /var/tmp/litchi-pptx-p232-v6-integration-clean-20260910/crates/litchi-pptx/src/lib.rs
+86bdd208caa508d07a7046fde551918d163975d807cebf066ce271a7f0314684  /var/tmp/litchi-pptx-p232-v6-integration-clean-20260910/crates/litchi-pptx/src/master_layout/codec.rs
+6efcf4ad7e5dadb0e197e6153c874f212e6fc4d68fa121b571304c7b49be12d9  /var/tmp/litchi-pptx-p232-v6-integration-clean-20260910/crates/litchi-pptx/src/master_layout/mod.rs
+757012a0ed9985e0a9b68bad3e5b682a9d1126cc03fc9d78bc00dbfd226493d2  /var/tmp/litchi-pptx-p232-v6-integration-clean-20260910/crates/litchi-pptx/src/master_layout/model.rs
+efe1251d4a75d8921074384eabfd14126d06370bf070972fe61a20028d50f775  /var/tmp/litchi-pptx-p232-v6-integration-clean-20260910/crates/litchi-pptx/src/master_layout/package.rs
+c3c532ab6ad1d1260859dc5c0a95a7def194a77fdcbe298d3e1bb873765b1d60  /var/tmp/litchi-pptx-p232-v6-integration-clean-20260910/crates/litchi-pptx/src/master_layout/placeholder.rs
+eb5352cbc8862d77274a003a38088554b288890e07638ff012aea35581f51cf3  /var/tmp/litchi-pptx-p232-v6-integration-clean-20260910/crates/litchi-pptx/src/master_layout/tests.rs
+5e80fbfe149713b27038eb3993aa5ec4595efc44fba9d4bd41c57ca8505088be  /var/tmp/litchi-pptx-p232-v6-integration-clean-20260910/crates/litchi-pptx/src/package/model.rs
+a561e225821403bd9a2f382e7a0ff494ce2ffca73112089f190c23d9cdf91649  /var/tmp/litchi-pptx-p232-v6-integration-clean-20260910/crates/litchi-pptx/src/shape/mod.rs
+61869b9a34968a808f47b90eb7ee061782a07adb6867d2d84e6efe4a1690d40d  /var/tmp/litchi-pptx-p232-v6-integration-clean-20260910/crates/litchi-pptx/src/shape/model.rs
+848f95510c58ae55ce6f20674384d50b706ae19b0f9aa4d77d5c94a42b61af75  /var/tmp/litchi-pptx-p232-v6-integration-clean-20260910/crates/litchi-pptx/src/shape/reader.rs
+33d3298302be9443d94fa7e95a41734483118cdfcb1df49574238fa48098b4bc  /home/zhuhe/code/litchi/3rdparty/specs/[MS-PPTX]/2 Structures/2.22 http---schemas.microsoft.com-office-powerpoint-2023-02-main.md
+c4462056a55f4b050d5ade865e3145f0849802eee8b837ce2f1e48b71305629a  /home/zhuhe/code/litchi/3rdparty/specs/[MS-PPTX]/5 Appendix A - Full XML Schemas/5.20 http---schemas.microsoft.com-office-powerpoint-2023-02-main Schema.md
+b2bb8d5b1cc65ed74999d6be002dd0ad045cdb5562fd7a3472cb6d0ca25adf41  /var/tmp/litchi-pptx-p232-v6-evidence-20260910/candidate-p232-v6.patch
+37e5f902253a76d85737ed3fce350d9a9cb12fa3644c5018e650200a44b4b63f  /var/tmp/litchi-pptx-p232-v6-integration-evidence-20260910/candidate-p232-v6-integration.patch

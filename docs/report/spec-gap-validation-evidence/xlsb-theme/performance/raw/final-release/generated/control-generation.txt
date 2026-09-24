@@ -1,0 +1,4 @@
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/performance/raw/final-release/generated/theme-control-1048576.xlsb
+theme_name=xl/theme/theme1.xml
+comment_bytes=1048576
+theme_bytes=1056966

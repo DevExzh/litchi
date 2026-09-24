@@ -1,0 +1,48 @@
+{
+  "base_commit": "f8a4a2683cea0ee5e661a51af392d13b4bcf9806",
+  "matrix_reconciled_against": "e7f39166bbce03d63eb23452d8a34cf58c269da0",
+  "sources": {
+    "crates/litchi-ppt/src/picture_bullets.rs": "941be3253cc2536e69c5a0bd5573a889b6ed403a0eb25433289da54af30d7173",
+    "crates/litchi-ppt/src/lib.rs": "9a659354cc750b08e767df00b680d1312b41b25d24855b60362ee788e1c1a737",
+    "crates/litchi-ppt/docs/FEATURE_MATRIX.md": "4c3c18a9df1ec57957007b8651d3197e875036d0d687b5e5c602ee2ceca516ab"
+  },
+  "toolchain": "1.95.0",
+  "commands": [
+    "cargo +1.95.0 test --offline --locked -p litchi-ppt --all-features",
+    "cargo +1.95.0 clippy --offline --locked -p litchi-ppt --all-targets --all-features -- -D warnings",
+    "rustfmt --edition 2024 --config skip_children=true --check crates/litchi-ppt/src/picture_bullets.rs crates/litchi-ppt/src/lib.rs",
+    "git diff --check"
+  ],
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  },
+  "tests": {
+    "passed": 1229,
+    "failed": 0,
+    "ignored": 3
+  },
+  "doctests": {
+    "passed": 14,
+    "failed": 0,
+    "ignored": 8
+  },
+  "clippy": "pass",
+  "format": "pass",
+  "whitespace": "pass",
+  "cargo_lock_sha256": "37718061c1a24826a91b5904c2a1f7b30593037d243f3fba5b4af814e7b3a40f",
+  "independent_review": "xlsx_survey_fix: final source, shape-owned reference regression and absent-collection identity no-op cleared; earlier grammar/ownership/reference/preservation review remains clear",
+  "coverage": "Synthetic grammar, COW sharing, limits, package transactions, shape/document reference closure, protected-source refusal, save/reopen and inverse. No native producer acceptance or measured performance claim.",
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "2179d5f59e28e4bfeac20f3554983977b29c2d0096b494d6a510c2f06ca1a5c8",
+      "raw_sha256": "52a9af7e5e0cfc23dbc5b9e13dde2c65c34cef5fb4537d324ca9d5168c14a1e1"
+    },
+    "clippy.log.gz": {
+      "sha256": "e30b59bc9db7044bbafc976b03e1b9da2e406d25ca20b332ba6334c78a3f837c",
+      "raw_sha256": "f211d01fbfc8ef03778a22c674db49ce758898940898a034cd3027e263fe5a0f"
+    }
+  }
+}

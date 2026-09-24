@@ -1,0 +1,21 @@
+{
+  "scope": "Shared SVG default namespace undeclaration correction only",
+  "verdict": "APPROVED",
+  "reviewer": "svg_namespace_review",
+  "source_sha256": {
+    "crates/litchi-drawingml/src/svg_blip.rs": "5c1356e53014af620ac2a5d9c9998096700515ffc7fe4e219c89f13e37e39a26",
+    "crates/litchi-drawingml/tests/svg_blip.rs": "3dfcf6b8cb7714f6c541a508b408e9c7c98f8c978cc2b276c67fa64ed90e11f4"
+  },
+  "validation": {
+    "command": "cargo test --locked -p litchi-drawingml --test svg_blip",
+    "root_and_reviewer_passed": 8,
+    "failed": 0,
+    "log": "svg-namespace-focused.log",
+    "log_sha256": "11dedee55b8948c13e7fdd7ed6c9021746e4bbc6c283416872191064607d3e2e",
+    "log_normalization": "Removed trailing empty output line only."
+  },
+  "limitations": [
+    "Not final PPTX lifecycle approval",
+    "No native application acceptance or performance claim"
+  ]
+}

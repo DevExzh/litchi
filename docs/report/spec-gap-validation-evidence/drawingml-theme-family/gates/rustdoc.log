@@ -1,0 +1,5 @@
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-ooxml-common)
+ Documenting litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.87s
+   Generated /home/zhuhe/code/litchi-spec-gaps/target/doc/litchi_drawingml/index.html

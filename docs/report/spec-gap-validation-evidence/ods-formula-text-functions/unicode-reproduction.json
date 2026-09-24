@@ -1,0 +1,17 @@
+{
+  "mapping_counts": {
+    "CASE_FOLD": 1585,
+    "LOWERCASE": 1488,
+    "UPPERCASE": 1580
+  },
+  "output_sha256": "336584ece56ee00e9e68a0c2165b5396ac1f007d5ad671f1fe8eba30aac877b6",
+  "ranges": {
+    "CASED": 158,
+    "CASE_IGNORABLE": 464,
+    "CLEAN_REMOVED": 737,
+    "LETTER": 684
+  },
+  "unicode_version": "17.0.0",
+  "verified": true,
+  "temporary_tree_cleaned": true
+}

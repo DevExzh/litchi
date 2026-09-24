@@ -1,0 +1,8 @@
+    Blocking waiting for file lock on build directory
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsb)
+    Checking litchi-theme-family-hardening-probe v0.0.0 (/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.95s

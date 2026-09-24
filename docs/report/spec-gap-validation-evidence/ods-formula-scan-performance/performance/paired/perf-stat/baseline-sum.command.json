@@ -1,0 +1,28 @@
+{
+  "label": "baseline-sum",
+  "side": "baseline",
+  "lane": "sum",
+  "case": "parse-sum-unbracketed",
+  "repeat": 1000,
+  "warmups": 3,
+  "iterations": 15,
+  "cpu_pin": "2",
+  "events": [
+    "cycles",
+    "instructions",
+    "branches",
+    "branch-misses",
+    "cache-misses"
+  ],
+  "binary": "docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/baseline/ods-formula-reference-profile",
+  "binary_sha256": "421a788fe9c2199bc4b224f4bcc05bb19c15c0ea6d0b61bf56ffe45f764bd274",
+  "command": "/usr/bin/perf stat --no-big-num -x, -e cycles,instructions,branches,branch-misses,cache-misses -- taskset -c 2 docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/baseline/ods-formula-reference-profile --workload parse --case parse-sum-unbracketed --warmups 3 --iterations 15 --repeat 1000",
+  "status": 0,
+  "started_at": "2026-09-13T08:34:00Z",
+  "finished_at": "2026-09-13T08:34:00Z",
+  "elapsed_seconds": 0.07847476005554199,
+  "stdout": "baseline-sum.stdout",
+  "stderr": "baseline-sum.stderr",
+  "stdout_sha256": "a72675e72c873cc59612c31e572653bbb1e7a91c7985eeaaf784b69b3150dcc2",
+  "stderr_sha256": "5f8023935ce80d501062a6eccde362600a149ca4ae60a7e37c52d07aea67ace3"
+}

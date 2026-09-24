@@ -1,0 +1,16 @@
+Cargo.toml
+crates/litchi-core/Cargo.toml
+crates/litchi-core/src/lib.rs
+crates/litchi-ods/Cargo.toml
+crates/litchi-ods/src/lib.rs
+crates/litchi-ods/src/model/mod.rs
+crates/litchi-ods/src/model/dde.rs
+crates/litchi-ods/src/model/dde/lexical.rs
+crates/litchi-ods/src/model/dde/source_backed.rs
+crates/litchi-ods/src/model/dde/transaction.rs
+crates/litchi-ods/src/facade/mod.rs
+crates/litchi-ods/src/facade/source.rs
+crates/litchi-ods/src/authoring/mutable.rs
+docs/report/spec-gap-validation-evidence/ods-dde-catalog-performance/candidate/harness/Cargo.toml
+docs/report/spec-gap-validation-evidence/ods-dde-catalog-performance/candidate/harness/Cargo.lock
+docs/report/spec-gap-validation-evidence/ods-dde-catalog-performance/candidate/harness/src/main.rs
