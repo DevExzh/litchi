@@ -1,5 +1,7 @@
 //! Source-preserving main-document snapshots, edits, and reversible patches.
 
+#[cfg(test)]
+mod attribute_tests;
 mod durable;
 #[cfg(test)]
 mod publication_proof_tests;
@@ -13,6 +15,7 @@ use litchi_core::xml::ReaderOrigin;
 use litchi_core::{ExecutionContext, Position, Reservation, Resource, SourceVersion};
 use litchi_ooxml_common::private::{BindingTracker, split_qualified_name};
 use litchi_ooxml_common::properties::time::DateTime;
+use litchi_ooxml_common::xml::attributes::first_wins;
 use litchi_opc::{PackURI, PartData, SourceLineage, SourceXmlPart};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, PrefixDeclaration, ResolveResult};
@@ -8795,8 +8798,7 @@ fn complex_field_marker(xml: &[u8]) -> Result<Option<ComplexFieldMarker>, Refusa
                     b"fldChar",
                     &fragment_prefix,
                 ) {
-                    let value = element
-                        .attributes()
+                    let value = first_wins(&element)
                         .filter_map(Result::ok)
                         .find(|attribute| attribute.key.local_name().as_ref() == b"fldCharType")
                         .ok_or(Refusal::ComplexContent)?

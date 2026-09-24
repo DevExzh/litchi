@@ -30,6 +30,7 @@ use crate::error::{Error, Result};
 use crate::namespace::is_wordprocessing_namespace;
 use litchi_core::unit::EMUS_PER_INCH;
 use litchi_drawingml::geom::Preset;
+use litchi_ooxml_common::xml::attributes::first_wins;
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -367,10 +368,11 @@ fn number_attribute(element: &BytesStart<'_>, name: &[u8], default: i64) -> Resu
 /// The inventory historically treats numeric whitespace and `DrawingML` tokens
 /// as authored: invalid numbers fall back to their element defaults and invalid
 /// UTF-8 in descriptive metadata is ignored. Unknown/inert extension
-/// attributes are never normalized or interpreted.
+/// attributes are never normalized or interpreted. A repeated attribute name
+/// keeps its first occurrence.
 fn inert_attribute(element: &BytesStart<'_>, name: &[u8]) -> Option<String> {
     let mut value = None;
-    for attribute in element.attributes().flatten() {
+    for attribute in first_wins(element).flatten() {
         if attribute.key.as_ref() == name
             && let Ok(decoded) = std::str::from_utf8(&attribute.value)
         {

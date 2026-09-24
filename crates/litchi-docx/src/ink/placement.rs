@@ -17,6 +17,7 @@
 use std::ops::Range;
 
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::first_wins;
 use litchi_opc::OwnedXmlPart;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -1216,8 +1217,7 @@ fn classify_mce(namespace: &ResolveResult<'_>, element: &BytesStart<'_>) -> MceK
 }
 
 fn choice_requires_supported(element: &BytesStart<'_>, resolver: &NamespaceResolver) -> bool {
-    let Some(attribute) = element
-        .attributes()
+    let Some(attribute) = first_wins(element)
         .filter_map(|attribute| attribute.ok())
         .find(|attribute| {
             attribute.key.local_name().as_ref() == b"Requires"
@@ -2075,5 +2075,50 @@ mod tests {
         assert!(output.contains("z:id=\"secondReplacement\""));
         assert!(output.contains("style=\"width:10pt\""));
         assert!(output.contains("style=\"width:20pt\""));
+    }
+
+    /// ` n00000=""` to ` n19999=""`, then 20,000 repeats of the last name: a
+    /// tag quick-xml's checked iterator reads in `O(n²)` when every item is read.
+    fn repeated_attributes() -> String {
+        let mut attributes = String::new();
+        for index in 0..20_000 {
+            attributes.push_str(&format!(" n{index:05}=\"\""));
+        }
+        for _ in 0..20_000 {
+            attributes.push_str(" n19999=\"\"");
+        }
+        attributes
+    }
+
+    fn choice_supported(attributes: &str) -> bool {
+        let xml = format!(
+            r#"<mc:Choice xmlns:mc="{MC}" xmlns:wpi="{WORDPROCESSING_INK_STR}" xmlns:ext="urn:external"{attributes}/>"#,
+            WORDPROCESSING_INK_STR = std::str::from_utf8(WORDPROCESSING_INK).unwrap(),
+        );
+        let mut reader = NsReader::from_reader(xml.as_bytes());
+        loop {
+            match reader.read_event().unwrap() {
+                Event::Empty(element) => {
+                    return choice_requires_supported(&element, reader.resolver());
+                },
+                Event::Eof => panic!("the fixture has a start tag"),
+                _ => {},
+            }
+        }
+    }
+
+    #[test]
+    fn repeated_choice_requirements_keep_their_first_value() {
+        // `choice_requires_supported` resolves each token as a qualified
+        // name, so the supported fixture is `wpi:ink` rather than `wpi`.
+        assert!(choice_supported(r#" Requires="wpi:ink""#));
+        assert!(!choice_supported(r#" Requires="ext:x""#));
+        assert!(choice_supported(r#" Requires="wpi:ink" Requires="ext:x""#));
+        assert!(!choice_supported(r#" Requires="ext:x" Requires="wpi:ink""#));
+        let names = repeated_attributes();
+        assert!(choice_supported(&format!(
+            r#"{names} Requires="wpi:ink" Requires="ext:x""#
+        )));
+        assert!(!choice_supported(&names));
     }
 }

@@ -222,3 +222,47 @@ fn parses_nested_textbox_text_in_source_order() {
     assert_eq!(drawing.text(), "Hello World");
     assert!(!drawing.is_inline());
 }
+
+/// ` n00000=""` to ` n19999=""`, then 20,000 repeats of the last name: a tag
+/// quick-xml's checked iterator reads in `O(n²)` when every item is read.
+fn repeated_attributes() -> String {
+    let mut attributes = String::new();
+    for index in 0..20_000 {
+        attributes.push_str(&format!(" n{index:05}=\"\""));
+    }
+    for _ in 0..20_000 {
+        attributes.push_str(" n19999=\"\"");
+    }
+    attributes
+}
+
+fn inventory(extent: &str, doc_pr: &str) -> Object {
+    let xml = format!(
+        r#"<w:p><w:r><w:drawing><wp:inline><wp:extent{extent}/><wp:docPr{doc_pr}/></wp:inline></w:drawing></w:r></w:p>"#
+    );
+    let mut drawings = parse(xml.as_bytes()).unwrap();
+    assert_eq!(drawings.len(), 1);
+    drawings.remove(0)
+}
+
+#[test]
+fn repeated_inventory_attributes_keep_their_first_value() {
+    let single = inventory(r#" cx="1000" cy="2000""#, r#" name="first" descr="kept""#);
+    assert_eq!((single.width_emu(), single.height_emu()), (1000, 2000));
+    assert_eq!((single.name(), single.description()), ("first", "kept"));
+
+    let repeated = inventory(
+        r#" cx="1000" cy="2000" cx="3000" cy="4000""#,
+        r#" name="first" descr="kept" name="second" descr="dropped""#,
+    );
+    assert_eq!((repeated.width_emu(), repeated.height_emu()), (1000, 2000));
+    assert_eq!((repeated.name(), repeated.description()), ("first", "kept"));
+
+    let names = repeated_attributes();
+    let hostile = inventory(
+        &format!(r#" cx="1000"{names} cy="2000" cx="3000""#),
+        &format!(r#" name="first"{names} descr="kept" name="second""#),
+    );
+    assert_eq!((hostile.width_emu(), hostile.height_emu()), (1000, 2000));
+    assert_eq!((hostile.name(), hostile.description()), ("first", "kept"));
+}

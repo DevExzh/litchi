@@ -637,3 +637,91 @@ fn relationship_projection_groups_hyperlink_runs_without_exposing_rids() {
     ));
     assert!(matches!(resolved[2], Inline::Unknown(_)));
 }
+
+/// ` n00000=""` to ` n19999=""`, then 20,000 repeats of the last name: a tag
+/// quick-xml's checked iterator reads in `O(n²)` when every item is read.
+fn repeated_attributes() -> String {
+    let mut attributes = String::new();
+    for index in 0..20_000 {
+        attributes.push_str(&format!(" n{index:05}=\"\""));
+    }
+    for _ in 0..20_000 {
+        attributes.push_str(" n19999=\"\"");
+    }
+    attributes
+}
+
+type RunSummary = (
+    Option<bool>,
+    Option<bool>,
+    Option<bool>,
+    Option<VerticalPosition>,
+    Option<String>,
+    Option<u32>,
+);
+
+fn run_properties(properties: &str) -> RunSummary {
+    let run = Run::new(
+        format!(
+            r#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:rPr>{properties}</w:rPr></w:r>"#
+        )
+        .into_bytes(),
+    );
+    (
+        run.bold().unwrap(),
+        run.italic().unwrap(),
+        run.strikethrough().unwrap(),
+        run.vertical_position().unwrap(),
+        run.font_name().unwrap(),
+        run.font_size().unwrap(),
+    )
+}
+
+#[test]
+fn repeated_run_property_attributes_keep_their_first_value() {
+    let expected = (
+        Some(false),
+        Some(true),
+        Some(false),
+        Some(VerticalPosition::Subscript),
+        Some("Kept".to_owned()),
+        Some(24),
+    );
+    assert_eq!(
+        run_properties(
+            r#"<w:rFonts w:ascii="Kept"/><w:b w:val="0"/><w:i w:val="1"/><w:strike w:val="false"/><w:sz w:val="24"/><w:vertAlign w:val="subscript"/>"#
+        ),
+        expected
+    );
+    assert_eq!(
+        run_properties(
+            r#"<w:rFonts w:ascii="Kept" w:ascii="Dropped"/><w:b w:val="0" w:val="1"/><w:i w:val="1" w:val="0"/><w:strike w:val="false" w:val="true"/><w:sz w:val="24" w:val="48"/><w:vertAlign w:val="subscript" w:val="superscript"/>"#
+        ),
+        expected
+    );
+    // A first value that is not a vertical position still wins over a later
+    // repeat that is one.
+    assert_eq!(
+        run_properties(r#"<w:vertAlign w:val="baseline" w:val="superscript"/>"#).3,
+        None
+    );
+
+    let names = repeated_attributes();
+    assert_eq!(
+        run_properties(&format!(
+            r#"<w:rFonts{names} w:ascii="Kept" w:ascii="Dropped"/><w:b{names} w:val="0" w:val="1"/><w:i{names} w:val="1"/><w:strike{names} w:val="false"/><w:sz{names} w:val="24" w:val="48"/><w:vertAlign{names} w:val="subscript" w:val="superscript"/>"#
+        )),
+        expected
+    );
+}
+
+#[test]
+fn run_property_lookups_without_a_value_read_every_repeated_name() {
+    let names = repeated_attributes();
+    assert_eq!(
+        run_properties(&format!(
+            r#"<w:rFonts{names}/><w:b{names}/><w:i{names}/><w:strike{names}/><w:sz{names}/><w:vertAlign{names}/>"#
+        )),
+        (Some(true), Some(true), Some(true), None, None, None)
+    );
+}

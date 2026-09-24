@@ -25,6 +25,7 @@
 /// Styles - document styles and formatting definitions.
 use crate::error::{Error, Result};
 use crate::numbering::Paragraph;
+use litchi_ooxml_common::xml::attributes::first_wins;
 use litchi_opc::part::Part;
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
@@ -325,8 +326,8 @@ impl<'a> Styles<'a> {
                     // Start a new style
                     let mut builder = StyleBuilder::default();
 
-                    // Parse attributes
-                    for attr in e.attributes().flatten() {
+                    // Parse attributes; a repeated name keeps its first value.
+                    for attr in first_wins(&e).flatten() {
                         match attr.key.local_name().as_ref() {
                             b"type" => {
                                 if let Ok(value) = attr.decoded_and_normalized_value(
@@ -427,7 +428,7 @@ impl<'a> Styles<'a> {
                         },
                         b"name" => {
                             // Parse name attribute
-                            for attr in e.attributes().flatten() {
+                            for attr in first_wins(&e).flatten() {
                                 if attr.key.local_name().as_ref() == b"val"
                                     && let Ok(value) = attr.decoded_and_normalized_value(
                                         XmlVersion::Implicit1_0,
@@ -440,7 +441,7 @@ impl<'a> Styles<'a> {
                         },
                         b"basedOn" => {
                             // Parse basedOn attribute
-                            for attr in e.attributes().flatten() {
+                            for attr in first_wins(&e).flatten() {
                                 if attr.key.local_name().as_ref() == b"val"
                                     && let Ok(value) = attr.decoded_and_normalized_value(
                                         XmlVersion::Implicit1_0,
@@ -453,7 +454,7 @@ impl<'a> Styles<'a> {
                         },
                         b"uiPriority" => {
                             // Parse UI priority
-                            for attr in e.attributes().flatten() {
+                            for attr in first_wins(&e).flatten() {
                                 if attr.key.local_name().as_ref() == b"val"
                                     && let Ok(value) = attr.decoded_and_normalized_value(
                                         XmlVersion::Implicit1_0,
@@ -769,5 +770,79 @@ mod tests {
         with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Bad"><w:pPr><w:outlineLvl w:val="9"/></w:pPr></w:style></w:styles>"#, |styles| {
             assert!(styles.len().is_err());
         });
+    }
+
+    /// ` n00000=""` to ` n19999=""`, then 20,000 repeats of the last name: a
+    /// tag quick-xml's checked iterator reads in `O(n²)` when every item is read.
+    fn repeated_attributes() -> String {
+        let mut attributes = String::new();
+        for index in 0..20_000 {
+            attributes.push_str(&format!(" n{index:05}=\"\""));
+        }
+        for _ in 0..20_000 {
+            attributes.push_str(" n19999=\"\"");
+        }
+        attributes
+    }
+
+    type Summary = (
+        String,
+        Type,
+        bool,
+        bool,
+        Option<String>,
+        Option<String>,
+        Option<i32>,
+    );
+
+    fn only_style(style: &str) -> Summary {
+        let xml = format!(
+            r#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{style}</w:styles>"#
+        );
+        with_styles(xml.as_bytes(), |styles| {
+            assert_eq!(styles.len().unwrap(), 1);
+            let style = styles.iter().unwrap().next().unwrap();
+            (
+                style.style_id().to_owned(),
+                style.style_type(),
+                style.is_default(),
+                style.is_custom(),
+                style.name().map(ToOwned::to_owned),
+                style.based_on().map(ToOwned::to_owned),
+                style.priority(),
+            )
+        })
+    }
+
+    #[test]
+    fn repeated_style_attributes_keep_their_first_value() {
+        let expected = (
+            "First".to_owned(),
+            Type::Character,
+            true,
+            true,
+            Some("Kept".to_owned()),
+            Some("Base".to_owned()),
+            Some(5),
+        );
+        assert_eq!(
+            only_style(
+                r#"<w:style w:type="character" w:styleId="First" w:default="1" w:customStyle="1"><w:name w:val="Kept"/><w:basedOn w:val="Base"/><w:uiPriority w:val="5"/></w:style>"#
+            ),
+            expected
+        );
+        assert_eq!(
+            only_style(
+                r#"<w:style w:type="character" w:styleId="First" w:default="1" w:customStyle="1" w:type="table" w:styleId="Second" w:default="0" w:customStyle="0"><w:name w:val="Kept" w:val="Dropped"/><w:basedOn w:val="Base" w:val="Other"/><w:uiPriority w:val="5" w:val="9"/></w:style>"#
+            ),
+            expected
+        );
+        let names = repeated_attributes();
+        assert_eq!(
+            only_style(&format!(
+                r#"<w:style w:type="character" w:styleId="First"{names} w:default="1" w:customStyle="1" w:styleId="Second"><w:name w:val="Kept"{names} w:val="Dropped"/><w:basedOn{names} w:val="Base"/><w:uiPriority{names} w:val="5" w:val="9"/></w:style>"#
+            )),
+            expected
+        );
     }
 }

@@ -490,3 +490,26 @@ fn parses_poi_and_libreoffice_numbering_fixtures() {
         );
     }
 }
+
+#[test]
+fn ignorable_prefix_lists_refuse_a_repeated_prefix_at_any_length() {
+    let is_refusal = |result: Result<Vec<Vec<u8>>>| matches!(result, Err(Error::InvalidFormat(message)) if message == "invalid or duplicate numbering mc:Ignorable prefix");
+    assert_eq!(
+        validation::parse_ignorable(" w12  w14 ").unwrap(),
+        [b"w12".to_vec(), b"w14".to_vec()]
+    );
+    assert!(is_refusal(validation::parse_ignorable("w12 w14 w12")));
+    assert!(is_refusal(validation::parse_ignorable("w12 w!4")));
+
+    // Each distinct prefix is checked against all the prefixes before it.
+    let distinct = (0..50_000)
+        .map(|index| format!("p{index}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let prefixes = validation::parse_ignorable(&distinct).unwrap();
+    assert_eq!(prefixes.len(), 50_000);
+    assert_eq!(prefixes[49_999], b"p49999");
+    assert!(is_refusal(validation::parse_ignorable(&format!(
+        "{distinct} p0"
+    ))));
+}
