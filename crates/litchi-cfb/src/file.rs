@@ -15,6 +15,15 @@ use zerocopy_derive::FromBytes as DeriveFromBytes;
 
 const BITSET_WORD_BITS: usize = u64::BITS as usize;
 
+/// A reusable chain map is restored sector by sector only when the chain is
+/// shorter than an eighth (one over this ratio) of the table's words, and by
+/// clearing the table's words otherwise. Restoring every shorter chain
+/// sector by sector ran more instructions on small tables than the bulk clear
+/// it replaced (record 0767). The ratio keeps small tables, which most files
+/// have, on the bulk clear, and still bounds every restoration by eight word
+/// writes per sector of its chain.
+const CLEAR_BY_SECTOR_RATIO: usize = 8;
+
 /// Upper bound, in bytes, on the scratch buffer the FAT and MiniFAT loaders
 /// use to batch physically contiguous sector reads.
 ///
@@ -81,14 +90,6 @@ impl CheckedBitSet {
         Ok(())
     }
 
-    /// Clears `bit` if the set has a word for it.
-    #[inline]
-    fn remove(&mut self, bit: usize) {
-        if let Some(value) = self.words.get_mut(bit / BITSET_WORD_BITS) {
-            *value &= !(1u64 << (bit % BITSET_WORD_BITS));
-        }
-    }
-
     /// Covers the first `bit_len` bits for a chain walk over a table of that
     /// length, as a reusable map whose every bit is clear between walks.
     ///
@@ -112,17 +113,25 @@ impl CheckedBitSet {
     }
 
     /// Restores the all-clear invariant after a walk over a table of
-    /// `bit_len` entries that set exactly the bits of `recorded`: clears those
-    /// bits, or the words covering the table, whichever writes fewer words.
-    /// A walk therefore costs time proportional to its chain, never more than
-    /// the table's words.
+    /// `bit_len` entries that set exactly the bits of `recorded`.
+    ///
+    /// Every set bit is then a recorded one, so zeroing the whole word that
+    /// holds a recorded bit is exact: its other set bits are recorded too. A
+    /// chain shorter than an eighth of the table's words is restored that
+    /// way, one store per recorded sector; any other chain, and every short
+    /// table, clears the table's words, which is cheaper there. A walk
+    /// therefore costs at most eight word writes per sector of its chain, and
+    /// never more than the table's words.
     #[inline]
     fn clear_walk(&mut self, recorded: &[u32], bit_len: usize) {
         let word_count = bit_len.div_ceil(BITSET_WORD_BITS);
-        if recorded.len() < word_count {
+        if recorded.len().saturating_mul(CLEAR_BY_SECTOR_RATIO) < word_count {
             for &sector in recorded {
-                if let Ok(index) = usize::try_from(sector) {
-                    self.remove(index);
+                if let Some(word) = usize::try_from(sector)
+                    .ok()
+                    .and_then(|index| self.words.get_mut(index / BITSET_WORD_BITS))
+                {
+                    *word = 0;
                 }
             }
             visited_map_work::record(recorded.len());
@@ -3895,11 +3904,13 @@ fn collect_sector_chain_exact(
 /// stream. The buffers are deliberately private to that validation path.
 ///
 /// The visited map keeps every bit clear between collections. A collection
-/// marks exactly the sectors it records, so it is restored by clearing those
-/// bits or the table's words, whichever is fewer; a failed collection clears
-/// the table's words. Validating every stream against one table therefore
-/// costs time proportional to the chains, where clearing a table-sized map
-/// for each stream cost the stream count times the table.
+/// marks exactly the sectors it records, so it is restored by zeroing the
+/// words of those sectors when the chain is short against the table, and by
+/// clearing the table's words otherwise (see `CheckedBitSet::clear_walk`); a
+/// failed collection clears the table's words. Validating every stream
+/// against one table therefore costs time proportional to the chains, where
+/// clearing a table-sized map for each stream cost the stream count times
+/// the table.
 #[derive(Debug, Default)]
 struct SectorChainScratch {
     sectors: Vec<u32>,
@@ -4033,10 +4044,12 @@ impl SectorChainScratch {
 ///
 /// The visited map keeps every bit clear between collections. A successful
 /// walk marks exactly the sectors it records, so the map is restored by
-/// clearing those bits or the table's words, whichever is fewer; a failed walk
-/// clears the table's words. Collecting chains against one table therefore
-/// costs time proportional to the chains, where `collect_sector_chain`
-/// allocates and clears a table-sized map for each.
+/// zeroing the words of those sectors when the chain is short against the
+/// table, and by clearing the table's words otherwise (see
+/// `CheckedBitSet::clear_walk`); a failed walk clears the table's words.
+/// Collecting chains against one table therefore costs time proportional to
+/// the chains, where `collect_sector_chain` allocates and clears a
+/// table-sized map for each.
 #[derive(Debug, Default)]
 struct EndChainScratch {
     sectors: Vec<u32>,
