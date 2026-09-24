@@ -118,6 +118,12 @@ impl ChpxFkpBuilder {
             if n == 0 {
                 n = 1;
             }
+            // The estimate charges each CHPX its even-rounded size, but the
+            // first CHPX placed below the count byte can need one byte more,
+            // so a page filled to the estimate could overwrite its last BX.
+            while n > 1 && !Self::page_fits(&self.entries[start..start + n]) {
+                n -= 1;
+            }
 
             let end = (start + n).min(self.entries.len());
             let page = Self::build_page(&self.entries[start..end])?;
@@ -129,6 +135,28 @@ impl ChpxFkpBuilder {
         }
 
         Ok(FkpPages { pages, ranges })
+    }
+
+    /// Whether [`Self::build_page`] places every CHPX of `entries` after the
+    /// page's FC and BX arrays.
+    ///
+    /// `build_page` stores the CHPXs downward from the count byte at offset
+    /// 511 and aligns each start to an even offset, which is where a BX
+    /// (offset / 2) must point.
+    fn page_fits(entries: &[ChpxEntry]) -> bool {
+        let property_start = (entries.len() + 1) * 4 + entries.len();
+        let mut data_offset = 511usize;
+        for entry in entries
+            .iter()
+            .rev()
+            .filter(|entry| !entry.grpprl.is_empty())
+        {
+            let Some(chpx_start) = data_offset.checked_sub(1 + entry.grpprl.len().min(255)) else {
+                return false;
+            };
+            data_offset = chpx_start - chpx_start % 2;
+        }
+        data_offset >= property_start
     }
 
     /// Build a single 512-byte CHPX FKP page from a slice of entries.
@@ -255,6 +283,12 @@ impl PapxFkpBuilder {
             if n == 0 {
                 n = 1;
             }
+            // As for CHPX pages: the first PAPX placed below the count byte
+            // takes one byte more than its even-rounded estimate, so a page
+            // filled to the estimate could overwrite its last BX entry.
+            while n > 1 && !Self::page_fits(&self.entries[start..start + n]) {
+                n -= 1;
+            }
 
             let end = (start + n).min(self.entries.len());
             let page = Self::build_page(&self.entries[start..end])?;
@@ -266,6 +300,22 @@ impl PapxFkpBuilder {
         }
 
         Ok(FkpPages { pages, ranges })
+    }
+
+    /// Whether [`Self::build_page`] places every PAPX of `entries` after the
+    /// page's FC and BX arrays.
+    fn page_fits(entries: &[PapxEntry]) -> bool {
+        let property_start = (entries.len() + 1) * 4 + entries.len() * BX_SIZE;
+        let mut grpprl_offset = 511usize;
+        for entry in entries {
+            let len = 2 + entry.grpprl.len();
+            let extra = if (len % 2) > 0 { 1 } else { 2 };
+            let Some(papx_start) = grpprl_offset.checked_sub(len + extra) else {
+                return false;
+            };
+            grpprl_offset = papx_start - papx_start % 2;
+        }
+        grpprl_offset >= property_start
     }
 
     /// Build a single 512-byte PAPX FKP page from a slice of entries.
@@ -460,6 +510,72 @@ mod tests {
             !pages.pages.is_empty(),
             "Should produce at least one FKP page"
         );
+    }
+
+    /// Three CHPXs whose even-rounded estimate fills the page exactly while the
+    /// odd-sized last CHPX needs one more byte when placed below the count byte.
+    #[test]
+    fn chpx_page_filled_to_the_estimate_never_overwrites_its_bx_array() {
+        let mut builder = ChpxFkpBuilder::new();
+        for (index, size) in [255usize, 200, 33].into_iter().enumerate() {
+            let fc = u32::try_from(index).unwrap() * 10;
+            builder.add_entry(fc, fc + 10, vec![0xA5; size]);
+        }
+        let pages = builder.generate_pages().unwrap();
+        assert_eq!(
+            pages.pages.len(),
+            2,
+            "the overflowing CHPX moves to a new page"
+        );
+        let mut entries = Vec::new();
+        for page in &pages.pages {
+            let parsed = crate::parts::fkp::ChpxFkp::parse(page, &[]).expect("valid CHPX FKP");
+            entries.extend(parsed.entries().iter().map(|entry| entry.grpprl.len()));
+        }
+        assert_eq!(entries, [255, 200, 33]);
+        assert_eq!(pages.ranges, [(0, 20), (20, 30)]);
+    }
+
+    /// A page whose estimate and exact placement both fit is unchanged.
+    #[test]
+    fn chpx_page_below_the_estimate_keeps_its_single_page_layout() {
+        let mut builder = ChpxFkpBuilder::new();
+        for (index, size) in [255usize, 200, 32].into_iter().enumerate() {
+            let fc = u32::try_from(index).unwrap() * 10;
+            builder.add_entry(fc, fc + 10, vec![0xA5; size]);
+        }
+        let pages = builder.generate_pages().unwrap();
+        assert_eq!(pages.pages.len(), 1);
+        let parsed = crate::parts::fkp::ChpxFkp::parse(&pages.pages[0], &[]).unwrap();
+        assert_eq!(parsed.count(), 3);
+    }
+
+    /// Three PAPXs whose even-rounded estimate is one byte short of the page
+    /// because the first placement below the count byte is realigned.
+    #[test]
+    fn papx_page_filled_to_the_estimate_never_overwrites_its_bx_array() {
+        let mut builder = PapxFkpBuilder::new();
+        for index in 0..3u32 {
+            builder.add_entry(index * 10, index * 10 + 10, vec![0x5A; 148]);
+        }
+        let pages = builder.generate_pages().unwrap();
+        assert_eq!(
+            pages.pages.len(),
+            2,
+            "the overflowing PAPX moves to a new page"
+        );
+        let mut count = 0;
+        for page in &pages.pages {
+            let parsed = crate::parts::fkp::PapxFkp::parse(page, &[]).expect("valid PAPX FKP");
+            for index in 0..parsed.count() {
+                let entry = parsed.entry(index).unwrap();
+                assert_eq!(entry.grpprl.len(), 150);
+                assert_eq!(&entry.grpprl[2..], &[0x5A; 148]);
+                count += 1;
+            }
+        }
+        assert_eq!(count, 3);
+        assert_eq!(pages.ranges, [(0, 20), (20, 30)]);
     }
 
     #[test]

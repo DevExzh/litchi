@@ -545,6 +545,12 @@ pub(super) fn build_papx_pages(runs: &[PapxRun]) -> Result<Vec<BuiltPapxPage>> {
             count += 1;
             used += data;
         }
+        // The storage estimate is even, but the first PAPX placed below the
+        // count byte at offset 511 is realigned one byte lower, so a page
+        // filled to the estimate could overwrite its last BX entry.
+        while count > 0 && !papx_page_fits(&runs[start..start + count]) {
+            count -= 1;
+        }
         if count == 0 {
             return Err(corrupted("one PAPX run cannot fit in an FKP"));
         }
@@ -563,6 +569,21 @@ pub(super) fn build_papx_pages(runs: &[PapxRun]) -> Result<Vec<BuiltPapxPage>> {
         start += count;
     }
     Ok(pages)
+}
+
+/// Whether [`build_papx_page`] places every PAPX of `runs` after the page's FC
+/// and BX arrays.
+fn papx_page_fits(runs: &[PapxRun]) -> bool {
+    let property_start = (runs.len() + 1) * 4 + runs.len() * 13;
+    let mut cursor = 511usize;
+    for run in runs.iter().rev() {
+        let prefix = if run.grpprl.len() % 2 == 0 { 2 } else { 1 };
+        let Some(papx_start) = cursor.checked_sub(prefix + run.grpprl.len()) else {
+            return false;
+        };
+        cursor = papx_start & !1;
+    }
+    cursor >= property_start
 }
 
 pub(super) fn papx_storage_size(len: usize) -> Result<usize> {
@@ -1292,6 +1313,47 @@ mod papx_cache_tests {
         let parsed = PapxFkp::parse(&pages[0].bytes, &[]).unwrap();
         assert_eq!(parsed.entry(0).unwrap().grpprl, first);
         assert_eq!(parsed.entry(1).unwrap().grpprl, second);
+    }
+
+    fn opaque_papx_run(start: u32, len: usize) -> PapxRun {
+        PapxRun::new(
+            start,
+            start + 10,
+            vec![0x5A; len],
+            false,
+            ParagraphHeight {
+                info_field: 0,
+                reserved: 0,
+                dxa_col: 0,
+                dym_line_or_height: 0,
+            },
+        )
+    }
+
+    /// Three 150-byte PAPXs fill the page to the even storage estimate, but
+    /// the first placement below the count byte is realigned one byte lower.
+    #[test]
+    fn papx_pages_filled_to_the_estimate_never_overwrite_their_bx_array() {
+        let runs = [0, 10, 20].map(|start| opaque_papx_run(start, 150));
+        let pages = build_papx_pages(&runs).unwrap();
+        assert_eq!(pages.len(), 2, "the overflowing PAPX moves to a new page");
+        let mut parsed_runs = 0;
+        for page in &pages {
+            let parsed = PapxFkp::parse(&page.bytes, &[]).expect("valid PAPX FKP");
+            for index in 0..parsed.count() {
+                assert_eq!(parsed.entry(index).unwrap().grpprl, vec![0x5A; 150]);
+                parsed_runs += 1;
+            }
+        }
+        assert_eq!(parsed_runs, 3);
+        assert_eq!((pages[0].start, pages[0].end), (0, 20));
+        assert_eq!((pages[1].start, pages[1].end), (20, 30));
+
+        // A single PAPX that only the estimate admits is a typed refusal,
+        // not a page whose PAPX overlaps its BX entry.
+        assert!(build_papx_pages(&[opaque_papx_run(0, 488)]).is_err());
+        let fitting = build_papx_pages(&[opaque_papx_run(0, 486)]).unwrap();
+        assert!(PapxFkp::parse(&fitting[0].bytes, &[]).is_some());
     }
 
     #[test]
