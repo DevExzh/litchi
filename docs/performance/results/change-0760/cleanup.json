@@ -63,6 +63,11 @@
         "what": "the review round's gate logs (summarized in gates.txt) and TMPDIR"
       }
     ],
-    "no_binaries_measured": "the review round measured nothing, so it has no binary digests"
+    "no_binaries_measured": "the review round measured nothing, so it has no binary digests",
+    "size_before_removal": {
+      "targets/0760/review": "31G",
+      "scratch/0760 contents": "276K"
+    },
+    "verified": "2026-09-24, after commit 7737e9d734: listing targets/0760* reports no such file, scratch/0760 is empty, no ~/.debug entry names a 0760 path, and git worktree list shows only this change's implementation worktree"
   }
 }
