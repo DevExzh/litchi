@@ -1720,7 +1720,10 @@ impl OpcPackage {
                 continue;
             }
             let target = relationship.target_partname()?;
-            let existing = self.get_part(&target).is_ok()
+            // Existence is a question about names: decoding the target here
+            // would report a present part whose payload fails to decode as
+            // missing (ADR 0030).
+            let existing = self.part_metadata(&target).is_some()
                 || new_names
                     .binary_search_by(|name| {
                         cmp_ascii_case_insensitive(name.as_str(), target.as_str())
