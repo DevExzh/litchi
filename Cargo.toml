@@ -63,7 +63,11 @@ needless_return = "allow"
 aes           = "0.9"
 aes-gcm       = { version = "0.11", features = ["alloc"] }
 aho-corasick  = "1.1"
-allsorts      = "0.17"
+# allsorts' default `flate2_zlib` feature would turn on flate2's C zlib
+# backend, which flate2 prefers over `zlib-rs`: every build that enabled font
+# subsetting would then deflate with C zlib and publish different bytes. Keep
+# one Deflate backend, the workspace's `zlib-rs`, for every feature set.
+allsorts      = { version = "0.17", default-features = false, features = ["flate2_zlib-rs"] }
 argon2        = "0.5"
 atoi_simd     = "0.18"
 base64        = "0.22"
