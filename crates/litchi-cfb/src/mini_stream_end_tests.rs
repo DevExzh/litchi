@@ -866,3 +866,143 @@ fn root_sizes_around_each_fixture_mini_stream_end_follow_the_byte_bound() {
         );
     }
 }
+
+/// Record 0767's byte-level fault lane, as a regression test of the
+/// agreement it found missing: seeded faults in FAT and MiniFAT links and in
+/// stream and root directory entries (start sectors and sizes, including the
+/// root size one byte or one mini sector off). Whatever a faulted copy's
+/// open admits, every reader returns every stream it lists.
+#[test]
+fn every_stream_of_an_admitted_faulted_file_reads_through_every_reader() {
+    let mut rng = Rng::new(0x0769_0002);
+    let mut inputs: Vec<(String, Vec<u8>)> = Vec::new();
+    for sector_size in [SECTOR_SIZE_V3, SECTOR_SIZE_V4] {
+        let streams: Vec<(String, Vec<u8>)> = (0..24)
+            .map(|stream| {
+                let len = [1, 63, 64, 65, 100, 700, 4095, 5_000][stream % 8] + stream;
+                (format!("S{stream:02}"), payload(len, stream))
+            })
+            .collect();
+        inputs.push((
+            format!("written/{sector_size}"),
+            written(sector_size, &streams),
+        ));
+        // Every mini stream a whole number of mini sectors, so a root one
+        // byte short cuts the last stream's last sector.
+        let whole: Vec<(String, Vec<u8>)> = (0..12)
+            .map(|stream| {
+                let len = 64 * (1 + stream % 5);
+                (format!("W{stream:02}"), payload(len, stream))
+            })
+            .collect();
+        inputs.push((format!("whole/{sector_size}"), written(sector_size, &whole)));
+    }
+    for (label, bytes) in compound_files("test-data/ole").into_iter().step_by(9) {
+        inputs.push((label, bytes));
+    }
+    let (mut admitted, mut refused) = (0usize, 0usize);
+    for (label, clean) in &inputs {
+        let layout = Layout::of(clean);
+        let sector_size = layout.sector_size;
+        let fat_sectors: Vec<usize> = (0..index(read_u32(clean, 0x2C)).min(109))
+            .map(|slot| index(read_u32(clean, 0x4C + 4 * slot)))
+            .collect();
+        let fat_entry = |entry: usize| {
+            let per_sector = sector_size / 4;
+            (fat_sectors[entry / per_sector] + 1) * sector_size + entry % per_sector * 4
+        };
+        let fat_len = fat_sectors.len() * sector_size / 4;
+        let minifat_len = OleFile::open(Cursor::new(clean.as_slice()))
+            .unwrap()
+            .minifat
+            .len();
+        let entries: Vec<usize> = (0..)
+            .map(|sid| layout.entry_offset(sid))
+            .take_while(|&at| at + DIRENTRY_SIZE <= clean.len() && clean[at + 0x42] != 0)
+            .collect();
+        let streams: Vec<usize> = entries
+            .iter()
+            .copied()
+            .filter(|&at| matches!(clean[at + 0x42], STGTY_STREAM | STGTY_ROOT))
+            .collect();
+        for case in 0..60 {
+            let mut bytes = clean.clone();
+            for _ in 0..1 + rng.below(3) {
+                let link = |rng: &mut Rng, len: usize| match rng.below(8) {
+                    0 => ENDOFCHAIN,
+                    1 => FREESECT,
+                    2 => [FATSECT, DIFSECT][rng.below(2)],
+                    3 => u32::try_from(len + rng.below(64)).unwrap(),
+                    _ => u32::try_from(rng.below(len)).unwrap(),
+                };
+                match rng.below(11) {
+                    0..=2 if fat_len > 0 => {
+                        let at = fat_entry(rng.below(fat_len));
+                        let value = link(&mut rng, fat_len);
+                        write_u32(&mut bytes, at, value);
+                    },
+                    3 | 4 if minifat_len > 0 => {
+                        let at =
+                            layout.minifat_offset(u32::try_from(rng.below(minifat_len)).unwrap());
+                        let value = link(&mut rng, minifat_len);
+                        write_u32(&mut bytes, at, value);
+                    },
+                    // The root size, around the mini stream's last sector.
+                    5 => {
+                        let at = layout.entry_offset(0) + 0x78;
+                        let size = u64::from(read_u32(&bytes, at));
+                        let size = match rng.below(4) {
+                            0 => size.saturating_sub(1),
+                            1 => size.saturating_sub(63),
+                            2 => size + 1,
+                            _ => size.saturating_sub(u64::try_from(rng.below(128)).unwrap()),
+                        };
+                        bytes[at..at + 8].copy_from_slice(&size.to_le_bytes());
+                    },
+                    _ => {
+                        let at = streams[rng.below(streams.len())];
+                        let other = streams[rng.below(streams.len())];
+                        let size = u64::from(read_u32(&bytes, at + 0x78));
+                        let (start, size) = match rng.below(10) {
+                            0 => (read_u32(&bytes, other + 0x74), size),
+                            1 => (
+                                read_u32(&bytes, other + 0x74),
+                                u64::from(read_u32(&bytes, other + 0x78)),
+                            ),
+                            2 => (read_u32(&bytes, at + 0x74), size + 1),
+                            3 => (read_u32(&bytes, at + 0x74), size.saturating_sub(1)),
+                            4 => (read_u32(&bytes, at + 0x74), size + MINI_U64),
+                            5 => (read_u32(&bytes, at + 0x74), size.saturating_sub(MINI_U64)),
+                            6 => (read_u32(&bytes, at + 0x74), [0, 4095, 4096][rng.below(3)]),
+                            7 => ([ENDOFCHAIN, FREESECT][rng.below(2)], size),
+                            _ => (
+                                read_u32(&bytes, at + 0x74),
+                                size + u64::try_from(rng.below(128)).unwrap(),
+                            ),
+                        };
+                        write_u32(&mut bytes, at + 0x74, start);
+                        bytes[at + 0x78..at + 0x80].copy_from_slice(&size.to_le_bytes());
+                    },
+                }
+            }
+            let label = format!("{label}, case {case}");
+            let Ok(mut file) = OleFile::open(Cursor::new(bytes.as_slice())) else {
+                refused += 1;
+                assert!(shared(&bytes).is_err(), "{label}: the opens disagree");
+                continue;
+            };
+            admitted += 1;
+            let mut contents = Vec::new();
+            for path in file.list_streams() {
+                let refs: Vec<&str> = path.iter().map(String::as_str).collect();
+                let data = file.open_stream(&refs).unwrap_or_else(|error| {
+                    panic!("{label}: {path:?} is admitted by the open but not read: {error}")
+                });
+                contents.push((path, data));
+            }
+            assert_every_reader_returns(&label, &bytes, &contents);
+        }
+    }
+    eprintln!("0769 faulted copies: {admitted} admitted, {refused} refused");
+    assert!(admitted >= 60 && refused >= 300, "{admitted} / {refused}");
+}
