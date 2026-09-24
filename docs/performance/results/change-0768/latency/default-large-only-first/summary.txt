@@ -1,0 +1,4 @@
+run 1 leg A: p50 652218 ns, 55770 page faults, 7225537351 instructions (sequential A then B, default glibc)
+run 1 leg B: p50 831109 ns, 73525 page faults, 7323843243 instructions (sequential A then B, default glibc)
+run 2 leg A: p50 646793 ns, 55767 page faults, 7222894653 instructions (sequential A then B, default glibc)
+run 2 leg B: p50 846334 ns, 73529 page faults, 7325988908 instructions (sequential A then B, default glibc)

@@ -1,0 +1,80 @@
+{
+ "probe_docnohf_format": {
+  "method": "callgrind --toggle-collect=*timed_format*, warmups 0",
+  "lifecycles": 8,
+  "ir_total": {
+   "A": 12999642,
+   "B": 12951734
+  },
+  "ir_per_lifecycle": {
+   "A": 1624955.25,
+   "B": 1618966.75
+  },
+  "after_over_before": 0.9963146677423886
+ },
+ "probe_docfloat_format": {
+  "method": "callgrind --toggle-collect=*timed_format*, warmups 0",
+  "lifecycles": 4,
+  "ir_total": {
+   "A": 88374045,
+   "B": 87636597
+  },
+  "ir_per_lifecycle": {
+   "A": 22093511.25,
+   "B": 21909149.25
+  },
+  "after_over_before": 0.9916553780015388
+ },
+ "harness_doc_semantic_one_edit_save/tiny": {
+  "method": "callgrind full collection; inclusive Ir of the four timed body_text calls over one process with --samples 8 --warmup 0 (includes identical preflight calls)",
+  "legs": {
+   "A": {
+    "litchi_doc::body_text::Snapshot::edit": 1204031,
+    "litchi_doc::body_text::Edit::replace_paragraph": 2693330,
+    "litchi_doc::body_text::Edit::commit": 2323570,
+    "litchi_doc::body_text::Snapshot::finish": 160866,
+    "litchi_doc::parts::protection::policy::classify": 144694,
+    "litchi_doc::writer::fkp::ChpxFkpBuilder::generate_pages": 7078,
+    "timed_sum": 6381797,
+    "program_total": 3572412028
+   },
+   "B": {
+    "litchi_doc::body_text::Snapshot::edit": 1183809,
+    "litchi_doc::body_text::Edit::replace_paragraph": 2696117,
+    "litchi_doc::body_text::Edit::commit": 2307884,
+    "litchi_doc::body_text::Snapshot::finish": 159101,
+    "litchi_doc::parts::protection::policy::classify": 27966,
+    "litchi_doc::writer::fkp::ChpxFkpBuilder::generate_pages": 7541,
+    "timed_sum": 6346911,
+    "program_total": 3571645832
+   }
+  },
+  "timed_sum_after_over_before": 0.994533514619785
+ },
+ "harness_doc_semantic_one_edit_save/large": {
+  "method": "callgrind full collection; inclusive Ir of the four timed body_text calls over one process with --samples 2 --warmup 0 (includes identical preflight calls)",
+  "legs": {
+   "A": {
+    "litchi_doc::body_text::Snapshot::edit": 4887109,
+    "litchi_doc::body_text::Edit::replace_paragraph": 12837416,
+    "litchi_doc::body_text::Edit::commit": 26882042,
+    "litchi_doc::body_text::Snapshot::finish": 329986,
+    "litchi_doc::parts::protection::policy::classify": 42223,
+    "litchi_doc::writer::fkp::ChpxFkpBuilder::generate_pages": 82814,
+    "timed_sum": 44936553,
+    "program_total": 3700540806
+   },
+   "B": {
+    "litchi_doc::body_text::Snapshot::edit": 4892962,
+    "litchi_doc::body_text::Edit::replace_paragraph": 12901210,
+    "litchi_doc::body_text::Edit::commit": 26932937,
+    "litchi_doc::body_text::Snapshot::finish": 329645,
+    "litchi_doc::parts::protection::policy::classify": 8058,
+    "litchi_doc::writer::fkp::ChpxFkpBuilder::generate_pages": 97688,
+    "timed_sum": 45056754,
+    "program_total": 3701256706
+   }
+  },
+  "timed_sum_after_over_before": 1.002674904770733
+ }
+}

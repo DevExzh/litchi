@@ -1,0 +1,40 @@
+# Gates for change 0768, run on ac63852fc3 (the three code commits; the record
+# commit adds only documentation). Worktree
+# /home/zhuhe/code/litchi-worktrees/0768-doc-protection-classification,
+# CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0768,
+# CARGO_BUILD_JOBS=6, TMPDIR under the scratch directory, Rust 1.95.0
+# (rust-toolchain.toml), lockfile = the post-0759 root Cargo.lock
+# (sha256 6932fcc0995ea550ef973d9636cf386c3be8bb9c5070ea23e39d91accefb99ba).
+
+cargo fmt --all --check                                                   exit 0
+cargo check -p litchi-doc --all-targets --locked --offline                exit 0
+cargo check -p litchi --all-targets --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+                                                                          exit 0
+cargo clippy -p litchi-doc --lib --no-deps --locked --offline -- -D warnings
+                                                                          exit 0
+cargo clippy -p litchi-doc --all-targets --no-deps --locked --offline -- -D warnings
+                                                                          exit 0
+RUSTDOCFLAGS="-D warnings" cargo doc -p litchi-doc --no-deps --locked --offline
+                                                                          exit 0
+cargo test -p litchi-doc --locked --offline                               exit 0
+    1306 passed, 0 failed, 13 ignored (1085 library tests + integration and doc tests)
+cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+                                                                          exit 0
+    382 passed, 0 failed, 7 ignored
+python3 tools/check_crate_boundaries.py                                   exit 0
+python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+                                                                          exit 0  (10 claims validated)
+python3 tools/non_iwork_gate.py verify                                    exit 1  KNOWN at base:
+    "workspace package inventory mismatch (unexpected: litchi-xldm)"; the base
+    worktree at 1d1044e3ac fails identically (exit 1, same message).
+
+# Not run: the harness tests and the coverage validator (the harness is not
+# changed); workspace-wide --all-targets (iWork crates excluded by the
+# briefing); facade clippy (not touched; its two known unit_arg lints are at base).
+
+# Intermediate commit states, each built and tested with `cargo test -p litchi-doc`:
+#   a4767ba8a5 (classifier only)            1297 passed, 0 failed
+#   6b340fe0e9 (+ Selsf)                    1301 passed, 0 failed
+#   ac63852fc3 (+ FKP)                      1306 passed, 0 failed
+# The FKP real-file regression test fails on 6b340fe0e9's code
+# ("saved-by-table.doc output should reopen: Corrupted file: malformed CHPX FKP").

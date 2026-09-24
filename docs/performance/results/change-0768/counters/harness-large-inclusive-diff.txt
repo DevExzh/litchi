@@ -1,0 +1,33 @@
+# Inclusive Ir, harness doc_semantic_one_edit_save --writer-shape large --samples 2 --warmup 0,
+# full callgrind collection; before (A) -> after (B); the 30 largest absolute differences.
+# Most of each process is current_executable_identity (SHA-256 of the harness binary).
+              0       5,719,955    +5,719,955  0x0000000007fca680
+      4,650,114               0    -4,650,114  0x0000000007fcc680
+              0       2,329,464    +2,329,464  litchi_ole_common::object::editor::Editor::put_streams_shared_with_rendered
+    132,133,501     133,504,709    +1,371,208  litchi_perf_baseline::run_semantic_doc
+    132,133,517     133,504,725    +1,371,208  litchi_perf_baseline::run_case_with_config
+     31,462,080      32,524,386    +1,062,306  __memcpy_avx_unaligned_erms
+      5,186,524       6,247,392    +1,060,868  realloc
+      5,216,261       6,277,129    +1,060,868  __rustc::__rust_realloc
+      5,214,925       6,275,793    +1,060,868  __rustc::__rdl_realloc
+      5,090,021       6,150,809    +1,060,788  _int_realloc
+      7,674,562       8,712,276    +1,037,714  alloc::raw_vec::RawVecInner<A>::finish_grow
+      6,423,240       7,425,433    +1,002,193  alloc::raw_vec::RawVec<T,A>::grow_one
+     55,132,376      55,939,846      +807,470  litchi_perf_baseline::verify_semantic_doc
+  3,699,771,354   3,700,487,532      +716,178  litchi_perf_baseline::run
+  3,699,776,127   3,700,492,255      +716,128  std::rt::lang_start::{{closure}}
+  3,699,776,109   3,700,492,237      +716,128  litchi_perf_baseline::main
+  3,699,776,113   3,700,492,241      +716,128  std::sys::backtrace::__rust_begin_short_backtrace
+  3,699,891,204   3,700,607,236      +716,032  __libc_start_main@@GLIBC_2.34
+  3,699,891,216   3,700,607,248      +716,032  (below main)
+  3,699,888,994   3,700,605,026      +716,032  main
+  3,699,888,983   3,700,605,015      +716,032  std::rt::lang_start_internal
+  3,700,540,806   3,701,256,706      +715,900  PROGRAM TOTALS
+  3,700,540,806   3,701,256,706      +715,900  0x0000000000023cc0
+  3,554,164,750   3,553,501,676      -663,074  litchi_perf_baseline::current_executable_identity
+  3,563,335,992   3,562,672,964      -663,028  sha2::sha256::soft::unroll::compress
+  3,563,342,317   3,562,679,295      -663,022  sha2::sha256::compress256
+     68,140,988      68,714,285      +573,297  litchi_doc::body_text::Snapshot::open_bounded_with_policy
+     53,066,238      53,616,994      +550,756  litchi_doc::package::codec::<impl litchi_doc::package::model::Package<R>>::validate_ole_file
+     41,585,525      42,108,948      +523,423  litchi_doc::body_text::Snapshot::from_bytes
+     26,195,008      26,655,626      +460,618  litchi_doc::parts::pap_bin_table::PapBinTable::parse

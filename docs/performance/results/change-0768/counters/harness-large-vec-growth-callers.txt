@@ -1,0 +1,15 @@
+# Callers of RawVec::grow_one, harness large (same run as harness-large-inclusive-diff.txt).
+# Same call sites and call counts in both legs; glibc realloc does more work in B
+# because the heap layout differs (grow in place versus copy).
+    407,424 (34x) ->     877,706 (34x)  litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_paragraphs
+    974,884 (30x) ->   1,358,773 (30x)  litchi_doc::parts::pap_bin_table::PapBinTable::parse
+  1,260,027 (40x) ->   1,333,258 (40x)  litchi_doc::parts::chp_bin_table::ChpBinTable::parse
+    216,248 (136x) ->     238,560 (136x)  litchi_doc::tracked_revision::codec::parse_papx
+    262,266 (145x) ->     282,746 (145x)  litchi_doc::tracked_revision::codec::parse_chpx
+     50,636 (15x) ->      67,039 (15x)  alloc::vec::Vec<T,A>::push_mut
+     65,944 (33x) ->      80,455 (33x)  litchi_doc::tracked_revision::package::RevisionEditor::rewrite_chpx
+    155,356 (87x) ->     164,356 (87x)  litchi_doc::parts::piece_table::PieceTable::parse
+     12,581 (24x) ->      10,772 (24x)  litchi_doc::tracked_revision::codec::delete_piece_range
+     63,838 (40x) ->      64,406 (40x)  litchi_doc::body_text::source_paragraphs
+     12,107 (51x) ->      12,382 (51x)  litchi_cfb::file::OleFile<R>::list_directory_entries
+      2,305 (8x) ->       2,307 (8x)  litchi_doc::writer::fkp::ChpxFkpBuilder::generate_pages

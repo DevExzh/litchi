@@ -1,0 +1,13 @@
+# 0768 measured binaries (staged copies used for every run)
+2057bb7ca7ccbce701cb9c0df7ac81283d119f3e8916148a6909bcb8b2221a1a  bin/A/harness
+039246c06cfce2221bb0e189cf8c4079d3093a36c1b3c825a7272d1f1dd28ef1  bin/B/harness
+7af263310a7983e741827216c14570bf1cf77047dfb4c945ccfe9e59cba09bfa  bin/A/probe
+d246d11bf25cd370816a4ba6f11c4d8c2f42f8ce04572a637b004dff11f52c13  bin/B/probe
+# superseded probe builds (default toolchain 1.98.1, first ABBA run discarded unanalyzed)
+855ba1b8131a0db103a911ab55380471b3fe8548dadd72aff34a617406e12862  bin/A/probe (1.98.1)
+ddb67ead5ff6460eefcaa8dccda25cb24e98e092b3f1537245bb8833797734ef  bin/B/probe (1.98.1)
+# fixtures
+41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d  fixtures/FloatingPictures.doc
+45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48  fixtures/NoHeadFoot.doc
+# probe lockfile shared by both legs
+5cfa82635a1abf7dfcbfae86ca7ea6b2c200a5ac3d3fb9eea46cb448ec363c2b  probe-after/Cargo.lock
