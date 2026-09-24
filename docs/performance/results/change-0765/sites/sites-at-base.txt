@@ -1,0 +1,430 @@
+crates/litchi-xlsx/src/auto_filter/package.rs:359:    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache.rs:259:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache.rs:262:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/data_validation/package.rs:198:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/package/printer_settings.rs:260:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/package/printer_settings.rs:265:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/calculation_properties/rewriter.rs:1218:    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/conditional_formatting/codec.rs:308:        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source| {
+crates/litchi-xlsx/src/conditional_formatting/codec.rs:312:        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source| {
+crates/litchi-xlsx/src/conditional_formatting/codec.rs:501:        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source| {
+crates/litchi-xlsx/src/conditional_formatting/codec.rs:505:        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source| {
+crates/litchi-xlsx/src/chain/codec.rs:751:    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/ole_objects/codec.rs:619:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/ole_objects/codec.rs:640:                let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/ole_objects/codec.rs:649:                    start_end: usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/ole_objects/codec.rs:1291:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/chart_sheet/package/operations.rs:2253:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/connections/codec.rs:528:        let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/connections/codec.rs:531:                let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/connections/codec.rs:572:        let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/connections/codec.rs:575:                let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/connections/codec.rs:4915:        let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/connections/codec.rs:4918:                let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/row_visibility/rewrite.rs:172:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/row_visibility/rewrite.rs:178:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/style/theme.rs:209:            let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/style/theme.rs:217:            let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/raw/properties_edit.rs:681:    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/edit/drawing_transfer.rs:1055:    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/conditional_formatting/package.rs:791:    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:646:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:649:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1326:            usize::try_from(reader.buffer_position()).map_err(|_| limit("rewrite position"))?;
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1329:            usize::try_from(reader.buffer_position()).map_err(|_| limit("rewrite position"))?;
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1419:            usize::try_from(reader.buffer_position()).map_err(|_| limit("rewrite position"))?;
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1422:            usize::try_from(reader.buffer_position()).map_err(|_| limit("rewrite position"))?;
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1474:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1477:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1679:        let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1681:        let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/survey.rs:1589:        let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/survey.rs:1624:                    let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/survey.rs:1720:        if reader.buffer_position() as usize - start > maximum {
+crates/litchi-xlsx/src/survey.rs:1757:        let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/workbook/data_model/package.rs:642:        let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/workbook/data_model/package.rs:645:                let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/raw/reference_edit.rs:662:    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/raw/worksheet/codec.rs:378:            let event_start = reader.buffer_position();
+crates/litchi-xlsx/src/raw/worksheet/codec.rs:392:                        reader.buffer_position(),
+crates/litchi-xlsx/src/raw/worksheet/codec.rs:1480:        let Ok(event_start) = usize::try_from(reader.buffer_position()) else {
+crates/litchi-xlsx/src/raw/worksheet/codec.rs:1487:        let Ok(event_end) = usize::try_from(reader.buffer_position()) else {
+crates/litchi-xlsx/src/workbook/data_model/removal.rs:301:            let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/workbook/data_model/removal.rs:303:            let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/raw/worksheet_property.rs:169:    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/raw/worksheet/lane.rs:271:        let at = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/page_breaks/codec.rs:867:    usize::try_from(reader.buffer_position()).map_err(|error| {
+crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs:321:            let reader_start = reader.buffer_position();
+crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs:360:                            reader.buffer_position(),
+crates/litchi-xlsx/src/raw/worksheet/edit/codec/wire.rs:178:    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/raw/compact.rs:197:        let event_start = reader.buffer_position();
+crates/litchi-xlsx/src/raw/compact.rs:232:                                        reader.buffer_position(),
+crates/litchi-xlsx/src/raw/catalog_edit/codec.rs:758:    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache/crud.rs:984:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache/crud.rs:1019:                let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache/crud.rs:1032:                    let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/active_x/codec/xml.rs:283:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/active_x/codec/xml.rs:338:                    let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/hyperlinks/codec.rs:889:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache/views.rs:131:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache/views.rs:136:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/raw/sheet_view_edit.rs:664:    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/timelines/package.rs:533:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/timelines/package.rs:588:            let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/sheet_protection/codec.rs:1117:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/survey/source.rs:339:        let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/survey/source.rs:341:        let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/form_control/scalar_edit.rs:1222:        let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/form_control/scalar_edit.rs:1226:        let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/form_control/scalar_edit.rs:1365:        let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/form_control/scalar_edit.rs:1370:        let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/data_type_icons/codec.rs:591:        let start = reader.buffer_position() as usize + owner.start;
+crates/litchi-xlsx/src/data_type_icons/codec.rs:595:        let end = reader.buffer_position() as usize + owner.start;
+crates/litchi-xlsx/src/data_type_icons/codec.rs:696:        let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/data_type_icons/codec.rs:700:        let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/slicer_cache/package.rs:363:        let offset = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache/package.rs:393:                    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache/package.rs:408:                        usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/survey/source/properties.rs:185:        let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/survey/source/properties.rs:187:        let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/form_control/codec.rs:2226:    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/drawing/source.rs:3024:                let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/drawing/source.rs:3618:    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/survey/source/questions.rs:121:        let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/survey/source/questions.rs:123:        let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5166:    let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5170:    let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5193:        let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5197:        let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5271:        let start = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5275:        let end = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/rich_values/refresh_intervals/codec.rs:105:        let start = checked_position(reader.buffer_position(), xml.len())?;
+crates/litchi-xlsx/src/rich_values/refresh_intervals/codec.rs:109:        let end = checked_position(reader.buffer_position(), xml.len())?;
+crates/litchi-xlsx/src/xml_maps/codec.rs:58:        let start = usize::try_from(reader.buffer_position()).ok()?;
+crates/litchi-xlsx/src/xml_maps/codec.rs:60:        let end = usize::try_from(reader.buffer_position()).ok()?;
+crates/litchi-pptx/src/comments/collaboration/codec.rs:2266:    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/raw/web.rs:405:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/raw/web.rs:445:                    let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/raw/web.rs:464:                            ..usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/form_control/owner.rs:5168:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/form_control/owner.rs:5173:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/transition/reader.rs:976:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/comments/codec.rs:387:        let before = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/comments/codec.rs:393:        let after = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/media_parts/package.rs:232:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs:810:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/model3d/codec.rs:292:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/table/style/codec.rs:769:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/table/shape.rs:263:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/table/shape.rs:299:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/smart_tags/codec.rs:355:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/smart_tags/codec.rs:358:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/change_tracking/codec.rs:711:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/shape/reader.rs:1491:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/changes/codec.rs:271:        let start = reader.buffer_position() as usize;
+crates/litchi-pptx/src/presentation_properties/metadata/changes/codec.rs:593:        let end = reader.buffer_position() as usize;
+crates/litchi-pptx/src/presentation_properties/metadata/structure/codec.rs:982:        let before = reader.buffer_position() as usize;
+crates/litchi-pptx/src/presentation_properties/metadata/structure/codec.rs:1007:                    end: reader.buffer_position() as usize,
+crates/litchi-pptx/src/presentation_properties/metadata/structure/codec.rs:1031:                    end: reader.buffer_position() as usize,
+crates/litchi-pptx/src/presentation_properties/metadata/slide_patch/codec.rs:86:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/slide_patch/codec.rs:140:                        usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/laser/package.rs:125:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/laser/package.rs:181:                        usize::try_from(reader.buffer_position()).map_err(|_err| {
+crates/litchi-pptx/src/tag/shape/validation.rs:195:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/color_map/codec.rs:418:    usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/pivot/server_formats/mod.rs:5308:        let before = reader.buffer_position() as usize;
+crates/litchi-xlsx/src/pivot/server_formats/mod.rs:5312:        let after = reader.buffer_position() as usize;
+crates/litchi-pptx/src/presentation_properties/metadata/designer_tags/codec.rs:786:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/revision/codec.rs:269:        let start = reader.buffer_position() as usize;
+crates/litchi-pptx/src/presentation_properties/metadata/events/codec.rs:655:        let before = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/events/codec.rs:662:        let after = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/modern_comments/wire/xml.rs:51:        let start = reader.buffer_position() as usize;
+crates/litchi-pptx/src/modern_comments/wire/xml.rs:89:                    xml: xml[start..reader.buffer_position() as usize].to_vec(),
+crates/litchi-pptx/src/modern_comments/wire/xml.rs:107:                let end = reader.buffer_position() as usize;
+crates/litchi-pptx/src/modern_comments/codec/comments/parser.rs:92:        let start_offset = reader.buffer_position() as usize;
+crates/litchi-pptx/src/modern_comments/codec/comments/parser.rs:147:                        reader.buffer_position() as usize,
+crates/litchi-pptx/src/modern_comments/codec/comments/parser.rs:169:                    reader.buffer_position() as usize,
+crates/litchi-pptx/src/shape/text.rs:235:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/shape/text.rs:331:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/shape/text.rs:572:            let event_start = usize::try_from(reader.buffer_position()).map_err(|_error| {
+crates/litchi-pptx/src/shape/text.rs:654:            let event_end = usize::try_from(reader.buffer_position()).map_err(|_error| {
+crates/litchi-pptx/src/presentation/source.rs:4759:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/shape/designer/p202.rs:455:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/tag/package/validation.rs:470:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/opened/xml.rs:1783:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/tracks/tracks_info.rs:676:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/animations/codec/xml/parser/wire.rs:43:        let event_start = reader.buffer_position();
+crates/litchi-pptx/src/animations/codec/xml/parser/wire.rs:313:                            ..reader.buffer_position(),
+crates/litchi-pptx/src/animations/codec/xml/parser/wire.rs:394:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/animations/codec/xml/parser/wire.rs:403:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/custom_show/wire.rs:457:        let before = reader.buffer_position() as usize;
+crates/litchi-pptx/src/presentation_properties/metadata/custom_show/wire.rs:518:                    reader.buffer_position() as usize,
+crates/litchi-pptx/src/presentation_properties/metadata/custom_show/wire.rs:539:                    reader.buffer_position() as usize,
+crates/litchi-pptx/src/presentation/transition.rs:1974:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/codec.rs:499:        let before = reader.buffer_position() as usize;
+crates/litchi-pptx/src/master_layout/codec.rs:520:                        end: reader.buffer_position() as usize,
+crates/litchi-pptx/src/master_layout/codec.rs:533:                        end: reader.buffer_position() as usize,
+crates/litchi-pptx/src/master_layout/codec.rs:594:                return Ok(reader.buffer_position() as usize);
+crates/litchi-pptx/src/master_layout/codec.rs:616:        let before = reader.buffer_position() as usize;
+crates/litchi-pptx/src/master_layout/codec.rs:628:                        end: reader.buffer_position() as usize,
+crates/litchi-pptx/src/master_layout/codec.rs:654:                                        end: reader.buffer_position() as usize,
+crates/litchi-pptx/src/modern_comments/codec.rs:53:            let start = reader.buffer_position() as usize;
+crates/litchi-pptx/src/modern_comments/codec.rs:106:                            reader.buffer_position() as usize,
+crates/litchi-pptx/src/modern_comments/codec.rs:127:                        reader.buffer_position() as usize,
+crates/litchi-pptx/src/shape/zoom/codec.rs:147:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/shape/zoom/codec.rs:156:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/shape/zoom/codec.rs:830:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/shape/zoom/codec.rs:839:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs:1274:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs:1279:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs:1517:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs:1524:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs:1584:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs:1591:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source_cross_copy.rs:2558:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source_cross_copy.rs:2568:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source_cross_copy.rs:3332:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source_cross_copy.rs:3337:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/embedded/ink/package.rs:175:        let before = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/embedded/content_parts/codec.rs:1042:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/shape/designer/codec.rs:667:    usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/sanitize.rs:923:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/embedded/ole/slide/codec.rs:154:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/placeholder.rs:1391:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/placeholder.rs:1394:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/placeholder.rs:1518:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/placeholder.rs:1521:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/placeholder.rs:1730:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/placeholder.rs:1733:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/embedded/ink_actions/codec.rs:1210:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle/owner.rs:410:                let end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle/owner.rs:1137:                let end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle/owner.rs:1640:    let position = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/shape/designer/properties.rs:1017:    usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/run_effects/codec/mod.rs:59:        let start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/run_effects/codec/mod.rs:124:                        usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/run_effects/codec/mod.rs:138:                let end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-pptx/src/presentation/embedded/controls/slide/codec.rs:706:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/shape/classification/codec.rs:653:    usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/revision/conflict/codec.rs:1367:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/readonly_recommended/codec.rs:690:    usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/font/package.rs:632:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/font/package.rs:642:                let end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/font/package.rs:806:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/font/package.rs:889:                        end: usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/font/package.rs:904:                    let end = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/source_backed/paragraph_copy.rs:1597:            usize::try_from(reader.buffer_position()).map_err(|_error| Error::InvalidDurable)?;
+crates/litchi-docx/src/source_backed/paragraph_copy.rs:1653:                        end: usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/source_backed/paragraph_copy.rs:1682:                        end: usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/modern_comments/wire/changes.rs:342:        let start = reader.buffer_position() as usize;
+crates/litchi-pptx/src/modern_comments/wire/changes.rs:358:                    let end = reader.buffer_position() as usize;
+crates/litchi-pptx/src/modern_comments/wire/changes.rs:372:                    let end = reader.buffer_position() as usize;
+crates/litchi-pptx/src/presentation_properties/metadata/guides/codec.rs:183:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/guides/codec.rs:241:                        end: reader.buffer_position() as usize,
+crates/litchi-pptx/src/presentation_properties/metadata/guides/codec.rs:252:                        end: reader.buffer_position() as usize,
+crates/litchi-pptx/src/presentation_properties/metadata/guides/codec.rs:269:                        end: reader.buffer_position() as usize,
+crates/litchi-pptx/src/presentation_properties/metadata/guides/codec.rs:284:                let end = usize::try_from(reader.buffer_position())
+crates/litchi-pptx/src/presentation/embedded/ole/authoring.rs:139:        let before = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/paragraph/codec/inlines.rs:40:                usize::try_from(reader.buffer_position()).map_err(|_conversion_error| {
+crates/litchi-docx/src/paragraph/codec/inlines.rs:50:                usize::try_from(reader.buffer_position()).map_err(|_conversion_error| {
+crates/litchi-docx/src/namespace.rs:466:        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/namespace.rs:573:        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/revision/authoring.rs:3097:    usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/run_symbols/codec.rs:403:    usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/paragraph/model.rs:211:                    usize::try_from(owner_reader.buffer_position()).map_err(|_| {
+crates/litchi-docx/src/paragraph/model.rs:222:                let event_end = usize::try_from(owner_reader.buffer_position()).map_err(|_| {
+crates/litchi-docx/src/writer/doc.rs:27:/// in `Reader::buffer_position`, so a caller that mixes reported offsets with
+crates/litchi-docx/src/settings/extensions/codec.rs:952:    usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/alt/codec.rs:115:        let event_start = u32::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/alt/codec/document_scan.rs:177:        let raw_start = reader.buffer_position();
+crates/litchi-docx/src/alt/codec/document_scan.rs:214:                let event_end = match usize::try_from(reader.buffer_position()) {
+crates/litchi-docx/src/package/package/story_edit.rs:263:        let before = usize::try_from(reader.buffer_position()).map_err(|_error| {
+crates/litchi-docx/src/package/package/story_edit.rs:277:                        usize::try_from(reader.buffer_position()).map_err(|_error| {
+crates/litchi-docx/src/variables/codec.rs:455:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/variables/codec.rs:461:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/math.rs:271:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/math.rs:315:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/parts/document_part.rs:643:        let start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/parts/document_part.rs:650:        let end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/mail_merge/transaction.rs:486:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/mail_merge/transaction.rs:492:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/paragraph/codec/run_contents.rs:59:                usize::try_from(reader.buffer_position()).map_err(|_conversion_error| {
+crates/litchi-docx/src/paragraph/codec/run_contents.rs:69:                usize::try_from(reader.buffer_position()).map_err(|_conversion_error| {
+crates/litchi-docx/src/paragraph/collapsed/codec.rs:425:    usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/paragraph/package.rs:92:        let start = usize::try_from(reader.buffer_position()).map_err(|_conversion_error| {
+crates/litchi-docx/src/paragraph/package.rs:99:        let end = usize::try_from(reader.buffer_position()).map_err(|_conversion_error| {
+crates/litchi-docx/src/numbering/codec.rs:1560:    usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/font/open_type/codec.rs:751:    usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/source_backed/story_text.rs:2642:    let position = reader.buffer_position();
+crates/litchi-xlsb/src/theme.rs:1219:        let start = usize::try_from(reader.buffer_position()).map_err(|_error| {
+crates/litchi-xlsb/src/theme.rs:1227:        let end = usize::try_from(reader.buffer_position()).map_err(|_error| {
+crates/litchi-xlsb/src/theme.rs:1362:        let start = usize::try_from(reader.buffer_position()).map_err(|_error| {
+crates/litchi-xlsb/src/theme.rs:1370:        let end = usize::try_from(reader.buffer_position()).map_err(|_error| {
+crates/litchi-docx/src/writer/doc/codec.rs:410:        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/writer/doc/codec.rs:442:        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/section/layout.rs:1629:    usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/section/layout.rs:1634:    usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/content_control/snapshot.rs:1107:    usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/settings/document/codec.rs:1028:        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/settings/document/codec.rs:1035:        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/document/transaction.rs:4016:        let error_position = path.first().map_or(0, |position| position.get());
+crates/litchi-docx/src/document/transaction.rs:4018:            select_hyperlink_owner(&self.projected, owner, b"p", hyperlink, error_position)?;
+crates/litchi-docx/src/document/transaction.rs:4023:            error_position,
+crates/litchi-docx/src/document/transaction.rs:4279:        let error_position = path_arc.first().map_or(0, |address| address.table.get());
+crates/litchi-docx/src/document/transaction.rs:4281:            select_hyperlink_owner(&self.projected, owner, b"p", hyperlink, error_position)?;
+crates/litchi-docx/src/document/transaction.rs:4286:            error_position,
+crates/litchi-docx/src/document/transaction.rs:4975:        error_position: usize,
+crates/litchi-docx/src/document/transaction.rs:4983:            position: error_position,
+crates/litchi-docx/src/document/transaction.rs:4990:                position: error_position,
+crates/litchi-docx/src/document/transaction.rs:5949:        let event_start = usize::try_from(reader.buffer_position()).ok()?;
+crates/litchi-docx/src/document/transaction.rs:5951:        let event_end = usize::try_from(reader.buffer_position()).ok()?;
+crates/litchi-docx/src/document/transaction.rs:6220:    // not include those bytes in `buffer_position()`. Layout ranges address
+crates/litchi-docx/src/document/transaction.rs:6231:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/document/transaction.rs:6264:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/document/transaction.rs:6563:    // not include those bytes in `buffer_position()`. Layout ranges address
+crates/litchi-docx/src/document/transaction.rs:6574:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/document/transaction.rs:6583:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/document/transaction.rs:7201:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/document/transaction.rs:7207:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/document/transaction.rs:8220:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/document/transaction.rs:8230:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/document/transaction.rs:8884:        let start = usize::try_from(reader.buffer_position()).map_err(|_error| missing)?;
+crates/litchi-docx/src/document/transaction.rs:8887:        let end = usize::try_from(reader.buffer_position()).map_err(|_error| missing)?;
+crates/litchi-docx/src/document/transaction.rs:9102:    error_position: usize,
+crates/litchi-docx/src/document/transaction.rs:9106:            position: error_position,
+crates/litchi-docx/src/document/transaction.rs:9114:            position: error_position,
+crates/litchi-docx/src/document/transaction.rs:9146:    error_position: usize,
+crates/litchi-docx/src/document/transaction.rs:9162:        position: error_position,
+crates/litchi-docx/src/document/transaction.rs:9175:            position: error_position,
+crates/litchi-docx/src/document/transaction.rs:9191:    error_position: usize,
+crates/litchi-docx/src/document/transaction.rs:9202:        position: error_position,
+crates/litchi-docx/src/document/transaction.rs:9207:    select_single_control_content(snapshot, control_start, control_end, error_position)
+crates/litchi-docx/src/document/transaction.rs:9215:    error_position: usize,
+crates/litchi-docx/src/document/transaction.rs:9226:        position: error_position,
+crates/litchi-docx/src/document/transaction.rs:9240:    error_position: usize,
+crates/litchi-docx/src/document/transaction.rs:9243:        select_hyperlink_owner(snapshot, owner, root_name, hyperlink, error_position)?;
+crates/litchi-docx/src/document/transaction.rs:9250:        position: error_position,
+crates/litchi-docx/src/ink/codec.rs:156:        let event_position = reader.buffer_position();
+crates/litchi-docx/src/ink/codec.rs:344:        let event_position = reader.buffer_position();
+crates/litchi-docx/src/ink/host.rs:373:        let event_position = position(reader.buffer_position())?;
+crates/litchi-docx/src/ink/host.rs:746:        let event_position = position(reader.buffer_position())?;
+crates/litchi-docx/src/paragraph/codec/runs.rs:52:                usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/paragraph/codec/runs.rs:109:            let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/paragraph/codec/runs.rs:184:                usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/paragraph/codec/runs.rs:234:            let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/section/inventory.rs:1572:    usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/section/codec.rs:1285:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/section/codec.rs:1290:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/section/codec.rs:1558:    usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/section/footnote_columns/package.rs:202:    usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/writer/section/codec/xml.rs:894:                return usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/writer/section/codec/xml.rs:1152:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/writer/section/codec/xml.rs:1170:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/writer/section/codec/xml.rs:2488:                break usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/writer/section/codec/xml.rs:2507:        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/writer/section/codec/xml.rs:2530:    let final_position = usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/paragraph/codec/editing.rs:123:        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/paragraph/codec/editing.rs:132:        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-xlsb/src/cell_values/drawing_transfer.rs:1793:    usize::try_from(reader.buffer_position()).map_err(|error| {
+crates/litchi-docx/src/writer/doc/fusion_tests_0722.rs:257:        let event_start = u32::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/writer/doc/fusion_tests_0722.rs:624:        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/writer/doc/fusion_tests_0722.rs:706:        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/writer/doc/package.rs:112:        // first event and never counts it in `buffer_position`, so every
+crates/litchi-docx/src/writer/doc/package.rs:160:                usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/writer/doc/package.rs:205:            let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+crates/litchi-docx/src/section/footnote_columns/codec.rs:1105:    usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/ink/placement.rs:226:        let event_end = position(reader.buffer_position())?;
+crates/litchi-docx/src/ink/placement.rs:453:        let event_end = position(reader.buffer_position())?;
+crates/litchi-docx/src/ink/placement.rs:823:        let event_end = position(reader.buffer_position())?;
+crates/litchi-docx/src/ink/placement.rs:1041:        let event_position = position(reader.buffer_position())?;
+crates/litchi-docx/src/ink/placement.rs:1700:    // `NsReader::buffer_position()` is sampled after `read_event()`, so this
+crates/litchi-docx/src/drawing/source.rs:3031:    usize::try_from(reader.buffer_position())
+crates/litchi-docx/src/web/codec/rewrite.rs:75:            let event_start = reader.buffer_position() as usize;
+crates/litchi-docx/src/web/codec/rewrite.rs:81:            let event_end = reader.buffer_position() as usize;
+crates/litchi-docx/src/ink/package.rs:1651:    usize::try_from(reader.buffer_position())
+crates/litchi-ooxml-common/src/xml.rs:207:        let event_start = usize::try_from(reader.buffer_position()).map_err(|error| {
+crates/litchi-ooxml-common/src/xml.rs:293:        let event_end = usize::try_from(reader.buffer_position()).map_err(|error| {
+crates/litchi-ooxml-common/src/xml.rs:488:            let event_start = usize::try_from(reader.buffer_position()).map_err(|error| {
+crates/litchi-ooxml-common/src/xml.rs:547:            let event_end = usize::try_from(reader.buffer_position()).map_err(|error| {
+crates/litchi-ooxml-common/src/mce/fragment.rs:268:                return usize::try_from(reader.buffer_position())
+crates/litchi-ooxml-common/src/mce/fragment.rs:306:        let position = usize::try_from(reader.buffer_position())
+crates/litchi-ooxml-common/src/mce/fragment.rs:351:                let end = usize::try_from(reader.buffer_position())
+crates/litchi-xlsb/src/host/drawing_write.rs:288:        let position = usize::try_from(reader.buffer_position()).map_err(|error| {
+crates/litchi-ooxml-common/src/mce/tests.rs:2540:            let start = usize::try_from(reader.buffer_position()).expect("position");
+crates/litchi-ooxml-common/src/mce/tests.rs:2542:            let end = usize::try_from(reader.buffer_position()).expect("position");
+crates/litchi-ooxml-common/src/web/codec/xml.rs:395:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-ooxml-common/src/web/codec/xml.rs:398:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-ooxml-common/src/web/model/custom_functions.rs:965:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-ooxml-common/src/web/model/custom_functions.rs:1013:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-opc/src/xml_splice/owned/sequence.rs:76:            let start = reader.buffer_position() as usize;
+crates/litchi-opc/src/xml_splice/owned/sequence.rs:80:            let end = reader.buffer_position() as usize;
+crates/litchi-opc/src/package/relationships.rs:747:        let start = reader.buffer_position() as usize;
+crates/litchi-opc/src/package/relationships.rs:749:        let end = reader.buffer_position() as usize;
+crates/litchi-opc/src/package/relationships.rs:957:            let start = reader.buffer_position() as usize;
+crates/litchi-opc/src/package/relationships.rs:959:            let end = reader.buffer_position() as usize;
+crates/litchi-opc/src/package/relationships.rs:1075:            let start = reader.buffer_position() as usize;
+crates/litchi-opc/src/package/relationships.rs:1077:            let end = reader.buffer_position() as usize;
+crates/litchi-ooxml-common/src/custom_data/codec.rs:1773:    usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/chart/edit/codec.rs:81:            let end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/theme/codec.rs:792:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/theme/codec.rs:797:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/theme/codec.rs:902:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/theme/codec.rs:907:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions.rs:2371:    usize::try_from(reader.buffer_position())
+crates/litchi-ooxml-common/src/web/package/transaction.rs:602:        usize::try_from(reader.buffer_position()).map_err(|error| Error::Xml(error.to_string()))?;
+crates/litchi-ooxml-common/src/web/package/transaction.rs:609:        usize::try_from(reader.buffer_position()).map_err(|error| Error::Xml(error.to_string()))?;
+crates/litchi-opc/src/xml_splice/owned.rs:203:            let start = reader.buffer_position() as usize;
+crates/litchi-opc/src/xml_splice/owned.rs:207:            let end = reader.buffer_position() as usize;
+crates/litchi-opc/src/xml_splice/owned.rs:496:            let start = usize::try_from(reader.buffer_position())
+crates/litchi-opc/src/xml_splice/owned.rs:501:            let end = usize::try_from(reader.buffer_position())
+crates/litchi-opc/src/xml_splice/owned.rs:591:            let start = usize::try_from(reader.buffer_position())
+crates/litchi-opc/src/xml_splice/owned.rs:596:            let end = usize::try_from(reader.buffer_position())
+crates/litchi-ooxml-common/src/mce/alternative/codec.rs:413:    usize::try_from(reader.buffer_position()).map_err(|error| {
+crates/litchi-drawingml/src/ink/codec.rs:1302:    usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/svg_blip.rs:2676:        usize::try_from(reader.buffer_position())
+crates/litchi-crypto/src/labels.rs:174:    if !matches!(declaration, Event::Decl(_)) || reader.buffer_position() == 0 {
+crates/litchi-crypto/src/labels.rs:202:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-crypto/src/labels.rs:334:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-crypto/src/labels.rs:347:                let end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/chart/extension/formatcode2.rs:1840:    usize::try_from(reader.buffer_position())
+crates/litchi-opc/src/package/content_types.rs:380:        let start = reader.buffer_position() as usize;
+crates/litchi-opc/src/package/content_types.rs:382:        let end = reader.buffer_position() as usize;
+crates/litchi-opc/src/package/content_types.rs:545:        let start = reader.buffer_position() as usize;
+crates/litchi-opc/src/package/content_types.rs:547:        let end = reader.buffer_position() as usize;
+crates/litchi-drawingml/src/model3d/codec/xml.rs:40:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:47:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:148:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:155:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:283:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:289:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:386:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:392:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:670:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:676:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:715:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:768:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/theme/family/codec.rs:1153:    usize::try_from(reader.buffer_position())
+crates/litchi-opc/src/source_backed/content_types_plan.rs:311:            let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-opc/src/source_backed/content_types_plan.rs:448:            let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-opc/src/xml_splice/owned/elements.rs:113:            let start = reader.buffer_position() as usize;
+crates/litchi-opc/src/xml_splice/owned/elements.rs:117:            let end = reader.buffer_position() as usize;
+crates/litchi-ole-common/src/custom_xml/codec.rs:305:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-ole-common/src/custom_xml/codec.rs:311:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-formula/src/omml/parser.rs:87:                    let position = reader.buffer_position();
+crates/litchi-drawingml/src/ink/actions_edit.rs:3689:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions_edit.rs:3694:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions_edit.rs:4847:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions_edit.rs:4852:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions_edit.rs:5236:        let start = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions_edit.rs:5241:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions_edit.rs:5739:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions_edit.rs:5772:        let end = usize::try_from(reader.buffer_position())
+crates/litchi-opc/src/source_backed.rs:1251:        let event_start = usize::try_from(reader.buffer_position())
+crates/litchi-opc/src/source_backed.rs:1263:        let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
+crates/litchi-xldm/src/identity.rs:2098:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-xldm/src/identity.rs:2237:        let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-drawingml/src/theme/family/part.rs:2483:    usize::try_from(reader.buffer_position())
+crates/xml-minifier/src/audit.rs:1214:        let start_u64 = reader.buffer_position();
+crates/xml-minifier/src/audit.rs:1226:        let end_u64 = reader.buffer_position();
+crates/xml-minifier/src/audit.rs:1727:    // quick-xml excludes the leading UTF-8 BOM from buffer_position(),
+crates/xml-minifier/src/audit.rs:2905:    match usize::try_from(reader.buffer_position()) {

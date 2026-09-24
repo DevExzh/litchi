@@ -1,0 +1,27 @@
+{
+  "change": "0765",
+  "date": "2026-09-24",
+  "recorded_before_removal": {
+    "binary_digests": "binaries.sha256 (both ABBA harness binaries)",
+    "evidence_copied": [
+      "abba/raw", "abba/confirm", "abba scripts and analyses",
+      "census", "sites", "base-failures", "marks.txt", "gates.txt and run_gates.sh"
+    ]
+  },
+  "removed_during_the_disk_incident": [
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0765/debug", "size": "225G", "what": "incremental test and check builds of the branch; removed when the shared disk filled, before the coordinator's CARGO_INCREMENTAL=0 note"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0765-before", "size": "6.5G", "what": "before-leg release build of the harness; its binary digest was already in binaries.sha256"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0765-extra", "size": "not measured", "what": "a second, partial build directory stopped by the full disk"}
+  ],
+  "removed": [
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0765", "size": "84G", "what": "non-incremental gate builds (debug 83G, release harness 1.1G, doc 396M)"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/0765-before-src-equal-length-0", "size": "12G", "what": "detached base worktree at 1d1044e3ac with the branch worktree's path length; used for the before leg and the base-failure runs; removed with git worktree remove --force"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/scratch/0765/*", "size": "136M", "what": "the two harness binaries at equal-length paths (131M), build, test and gate logs, the first gate run's logs, base test logs, rewrite helper scripts, survey file lists, probe sources, working copies of the differential tests, and the pre-metadata Cargo.lock copy"}
+  ],
+  "kept": [
+    "/home/zhuhe/code/litchi-worktrees/0765-bom-prefixed-part-editing (branch perf/0765-bom-prefixed-part-editing, not pushed), with its gitignored root Cargo.lock"
+  ],
+  "not_used": [
+    "/tmp: builds and tests ran with TMPDIR under the scratch directory"
+  ]
+}

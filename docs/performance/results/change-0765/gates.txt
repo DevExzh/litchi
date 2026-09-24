@@ -1,0 +1,54 @@
+HEAD 67edd9b7edc717f82d1d498dee10db66c9b35e79
+fmt	exit=0	cargo fmt --all --check
+check-touched	exit=0	cargo check -p litchi-core -p litchi-opc -p litchi-ooxml-common -p litchi-drawingml -p litchi-xlsx -p litchi-pptx -p litchi-docx -p litchi-xlsb -p litchi-crypto -p litchi-formula -p litchi-xldm -p litchi-ole-common -p litchi-spreadsheet-drawing -p litchi-doc -p litchi-xls -p litchi-ppt --all-targets --locked --offline
+check-facade	exit=0	cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked --offline
+clippy-lib	exit=0	cargo clippy -p litchi-core -p litchi-opc -p litchi-ooxml-common -p litchi-drawingml -p litchi-xlsx -p litchi-pptx -p litchi-docx -p litchi-xlsb -p litchi-crypto -p litchi-formula -p litchi-xldm -p litchi-ole-common --lib --no-deps --locked --offline -- -D warnings
+clippy-all-targets-litchi-core	exit=0	cargo clippy -p litchi-core --all-targets --no-deps --locked --offline -- -D warnings
+clippy-all-targets-litchi-opc	exit=0	cargo clippy -p litchi-opc --all-targets --no-deps --locked --offline -- -D warnings
+clippy-all-targets-litchi-ooxml-common	exit=0	cargo clippy -p litchi-ooxml-common --all-targets --no-deps --locked --offline -- -D warnings
+clippy-all-targets-litchi-drawingml	exit=0	cargo clippy -p litchi-drawingml --all-targets --no-deps --locked --offline -- -D warnings
+clippy-all-targets-litchi-xlsx	exit=0	cargo clippy -p litchi-xlsx --all-targets --no-deps --locked --offline -- -D warnings
+clippy-all-targets-litchi-pptx	exit=101	cargo clippy -p litchi-pptx --all-targets --no-deps --locked --offline -- -D warnings
+clippy-all-targets-litchi-docx	exit=0	cargo clippy -p litchi-docx --all-targets --no-deps --locked --offline -- -D warnings
+clippy-all-targets-litchi-xlsb	exit=101	cargo clippy -p litchi-xlsb --all-targets --no-deps --locked --offline -- -D warnings
+clippy-all-targets-litchi-crypto	exit=0	cargo clippy -p litchi-crypto --all-targets --no-deps --locked --offline -- -D warnings
+clippy-all-targets-litchi-formula	exit=0	cargo clippy -p litchi-formula --all-targets --no-deps --locked --offline -- -D warnings
+clippy-all-targets-litchi-xldm	exit=0	cargo clippy -p litchi-xldm --all-targets --no-deps --locked --offline -- -D warnings
+clippy-all-targets-litchi-ole-common	exit=0	cargo clippy -p litchi-ole-common --all-targets --no-deps --locked --offline -- -D warnings
+test-touched	exit=0	cargo test -p litchi-core -p litchi-opc -p litchi-ooxml-common -p litchi-drawingml -p litchi-xlsx -p litchi-pptx -p litchi-docx -p litchi-xlsb -p litchi-crypto -p litchi-formula -p litchi-xldm -p litchi-ole-common -p litchi-spreadsheet-drawing -p litchi-doc -p litchi-xls -p litchi-ppt --locked --offline
+test-facade	exit=0	cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+doc	exit=0	env RUSTDOCFLAGS=-D warnings cargo doc -p litchi-core -p litchi-opc -p litchi-ooxml-common -p litchi-drawingml -p litchi-xlsx -p litchi-pptx -p litchi-docx -p litchi-xlsb -p litchi-crypto -p litchi-formula -p litchi-xldm -p litchi-ole-common --no-deps --locked --offline
+crate-boundaries	exit=0	python3 tools/check_crate_boundaries.py
+non-iwork	exit=1	python3 tools/non_iwork_gate.py verify
+perf-claims	exit=0	python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+done
+
+# Totals
+test-touched: passed 12873 failed 0 ignored 89
+test-facade: passed 382 failed 0 ignored 7
+
+# clippy-all-targets-litchi-pptx (pre-existing; opened/tests.rs untouched by this change)
+error: called `.err().expect()` on a `Result` value
+   --> crates/litchi-pptx/src/opened/tests.rs:464:14
+error: called `.err().expect()` on a `Result` value
+   --> crates/litchi-pptx/src/opened/tests.rs:538:10
+error: called `.err().expect()` on a `Result` value
+   --> crates/litchi-pptx/src/opened/tests.rs:557:10
+error: could not compile `litchi-pptx` (lib test) due to 3 previous errors
+
+# clippy-all-targets-litchi-xlsb (pre-existing; test files untouched by this change)
+error: used `expect()` on a `Result` value
+   --> crates/litchi-xlsb/src/comments/threaded/tests/mod.rs:271:21
+   --> crates/litchi-xlsb/src/lib.rs:14:5
+error: used `expect()` on a `Result` value
+   --> crates/litchi-xlsb/src/comments/threaded/tests/mod.rs:276:21
+error: used `expect()` on a `Result` value
+   --> crates/litchi-xlsb/src/comments/threaded/tests/mod.rs:384:21
+error: used `expect()` on a `Result` value
+   --> crates/litchi-xlsb/src/shared_workbook/tests.rs:180:21
+error: could not compile `litchi-xlsb` (lib test) due to 4 previous errors
+
+# non-iwork (known failure at this base)
+non-iWork release gate: workspace package inventory mismatch (unexpected: litchi-xldm)
+
+# A first gate run on 2a2c4a9791 lost test-touched, test-facade and doc at 17:37, when the shared disk filled: the test log ends mid-line and the other two logs are empty (0 bytes), because nothing could be written. Every other step had the same exit code as this run. The target directory was deleted and all gates re-run from a clean, non-incremental build on 67edd9b7ed.

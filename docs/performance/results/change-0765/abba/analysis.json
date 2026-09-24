@@ -1,0 +1,462 @@
+{
+ "method": "Change 0765 control ABBA analysis.\n\nFor every (group, case, shape): per-process p50/p95/mean and sample count, the\nmedian of the process p50s per arm, paired after/before p50 ratios over the\nadjacent ABBA pairs (A1,B1) (A2,B2) (A3,B3) (A4,B4), a percentile bootstrap\n95% CI of the mean paired p50 ratio (20,000 resamples, seed 765), same-arm\ndrift, whole-process user-space instructions and cycles from `perf stat`\n(including untimed corpus construction) with their paired ratios, output and\ncorpus identity, and >5% regression flags on any paired p50 ratio.",
+ "groups": {
+  "docx": {
+   "environment": {
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "git_revision": "1d1044e3aca5437079fabdf458082a527842d997",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "20",
+    "storage_identifier": null
+   },
+   "entries": [
+    {
+     "case": "docx_semantic_one_edit_save",
+     "shape": "large",
+     "processes": {
+      "A1": {
+       "p50": 5584814,
+       "p95": 5740951,
+       "mean": 5594569.330000001,
+       "samples": 100,
+       "output_sha256": null,
+       "accepted_bytes": 37338,
+       "archive_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+       "instructions_u": 41583569200,
+       "cycles_u": 9351627649
+      },
+      "A2": {
+       "p50": 5538979,
+       "p95": 5804861,
+       "mean": 5567760.010000002,
+       "samples": 100,
+       "output_sha256": null,
+       "accepted_bytes": 37338,
+       "archive_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+       "instructions_u": 41565411460,
+       "cycles_u": 9488471426
+      },
+      "A3": {
+       "p50": 5611284,
+       "p95": 5948091,
+       "mean": 5651993.88,
+       "samples": 100,
+       "output_sha256": null,
+       "accepted_bytes": 37338,
+       "archive_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+       "instructions_u": 41564641712,
+       "cycles_u": 9528541516
+      },
+      "A4": {
+       "p50": 5633974,
+       "p95": 5846960,
+       "mean": 5643747.749999998,
+       "samples": 100,
+       "output_sha256": null,
+       "accepted_bytes": 37338,
+       "archive_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+       "instructions_u": 41571174082,
+       "cycles_u": 9571726652
+      },
+      "B1": {
+       "p50": 5604334,
+       "p95": 5709370,
+       "mean": 5616046.65,
+       "samples": 100,
+       "output_sha256": null,
+       "accepted_bytes": 37338,
+       "archive_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+       "instructions_u": 41623197879,
+       "cycles_u": 9437782713
+      },
+      "B2": {
+       "p50": 5567759,
+       "p95": 5711110,
+       "mean": 5589845.459999997,
+       "samples": 100,
+       "output_sha256": null,
+       "accepted_bytes": 37338,
+       "archive_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+       "instructions_u": 41621699197,
+       "cycles_u": 9425916883
+      },
+      "B3": {
+       "p50": 5618594,
+       "p95": 5756930,
+       "mean": 5635577.259999998,
+       "samples": 100,
+       "output_sha256": null,
+       "accepted_bytes": 37338,
+       "archive_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+       "instructions_u": 41592388997,
+       "cycles_u": 9543633609
+      },
+      "B4": {
+       "p50": 5701734,
+       "p95": 5891390,
+       "mean": 5723912.579999998,
+       "samples": 100,
+       "output_sha256": null,
+       "accepted_bytes": 37338,
+       "archive_sha256": "07605d4f86fc014e91744fa1189ec84190e580df3812265151ceff5b8565b895",
+       "instructions_u": 41626837876,
+       "cycles_u": 9691053461
+      }
+     },
+     "before_median_p50_ns": 5598049.0,
+     "after_median_p50_ns": 5611464.0,
+     "paired_p50_ratios": [
+      1.0034951924988011,
+      1.0051959034327445,
+      1.0013027321375998,
+      1.012027034558555
+     ],
+     "paired_mean_ratios": [
+      1.0038389585923675,
+      1.0039666670187524,
+      0.9970954285605133,
+      1.0142041837358873
+     ],
+     "mean_paired_p50_ratio": 1.005505215656925,
+     "bootstrap95_mean_paired_p50_ratio": [
+      1.002276024961386,
+      1.0098940740436164
+     ],
+     "before_p50_drift": 0.017150272640499287,
+     "after_p50_drift": 0.02406264351599985,
+     "paired_process_instruction_ratios": [
+      1.0009529888790787,
+      1.0013541965548487,
+      1.0006675694498286,
+      1.0013389998052544
+     ],
+     "paired_process_cycle_ratios": [
+      1.009212841575147,
+      0.9934073108099805,
+      1.0015838827982917,
+      1.0124665918008708
+     ],
+     "outputs_identical": true,
+     "corpus_identical": true
+    }
+   ]
+  },
+  "pptx": {
+   "environment": {
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "git_revision": "1d1044e3aca5437079fabdf458082a527842d997",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "20",
+    "storage_identifier": null
+   },
+   "entries": [
+    {
+     "case": "pptx_semantic_one_edit_save",
+     "shape": "large",
+     "processes": {
+      "A1": {
+       "p50": 44536405,
+       "p95": 45289429,
+       "mean": 44643681.175000004,
+       "samples": 40,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+       "instructions_u": 109598876248,
+       "cycles_u": 26853352598
+      },
+      "A2": {
+       "p50": 45441373,
+       "p95": 49450012,
+       "mean": 46433820.375,
+       "samples": 40,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+       "instructions_u": 109601840056,
+       "cycles_u": 27325625782
+      },
+      "A3": {
+       "p50": 45715583,
+       "p95": 46179466,
+       "mean": 45705665.35000001,
+       "samples": 40,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+       "instructions_u": 109598615130,
+       "cycles_u": 27513322951
+      },
+      "A4": {
+       "p50": 45578415,
+       "p95": 46185246,
+       "mean": 45551234.17500001,
+       "samples": 40,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+       "instructions_u": 109601556340,
+       "cycles_u": 27585132338
+      },
+      "B1": {
+       "p50": 46299165,
+       "p95": 46934639,
+       "mean": 46082606.824999996,
+       "samples": 40,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+       "instructions_u": 109712453000,
+       "cycles_u": 27761387691
+      },
+      "B2": {
+       "p50": 45465701,
+       "p95": 46168456,
+       "mean": 45529914.62500001,
+       "samples": 40,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+       "instructions_u": 109710470916,
+       "cycles_u": 27684613656
+      },
+      "B3": {
+       "p50": 46245478,
+       "p95": 47815107,
+       "mean": 46569751.550000004,
+       "samples": 40,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+       "instructions_u": 109709794162,
+       "cycles_u": 28246717039
+      },
+      "B4": {
+       "p50": 46182968,
+       "p95": 46596800,
+       "mean": 46226905.62499998,
+       "samples": 40,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+       "instructions_u": 109708619788,
+       "cycles_u": 27983541083
+      }
+     },
+     "before_median_p50_ns": 45509894.0,
+     "after_median_p50_ns": 46214223.0,
+     "paired_p50_ratios": [
+      1.039580204104934,
+      1.0005353711473464,
+      1.0115911241906288,
+      1.0132640198216634
+     ],
+     "paired_mean_ratios": [
+      1.032231339623619,
+      0.9805334615437619,
+      1.018905450634688,
+      1.0148332193899325
+     ],
+     "mean_paired_p50_ratio": 1.016242679816143,
+     "bootstrap95_mean_paired_p50_ratio": [
+      1.0037175333159256,
+      1.0325829341263577
+     ],
+     "before_p50_drift": 0.02647672168420412,
+     "after_p50_drift": 0.018331708995315,
+     "paired_process_instruction_ratios": [
+      1.001036294858927,
+      1.0009911408416545,
+      1.0010144200441595,
+      1.000976842406032
+     ],
+     "paired_process_cycle_ratios": [
+      1.0338145894329644,
+      1.0131374072405133,
+      1.0266559618882147,
+      1.014442879596092
+     ],
+     "outputs_identical": true,
+     "corpus_identical": true
+    }
+   ]
+  },
+  "xlsx": {
+   "environment": {
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "git_revision": "1d1044e3aca5437079fabdf458082a527842d997",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1012-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "20",
+    "storage_identifier": null
+   },
+   "entries": [
+    {
+     "case": "xlsx_first_cell",
+     "shape": "dense-wide",
+     "processes": {
+      "A1": {
+       "p50": 7775993,
+       "p95": 7935675,
+       "mean": 7803223.650000002,
+       "samples": 60,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+       "instructions_u": 19812293177,
+       "cycles_u": 5318837231
+      },
+      "A2": {
+       "p50": 8158175,
+       "p95": 8391437,
+       "mean": 8175405.2,
+       "samples": 60,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+       "instructions_u": 19812227421,
+       "cycles_u": 5389874006
+      },
+      "A3": {
+       "p50": 7846204,
+       "p95": 7994265,
+       "mean": 7861609.95,
+       "samples": 60,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+       "instructions_u": 19812307757,
+       "cycles_u": 5243519954
+      },
+      "A4": {
+       "p50": 7856124,
+       "p95": 7936254,
+       "mean": 7868722.05,
+       "samples": 60,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+       "instructions_u": 19814123975,
+       "cycles_u": 5156042241
+      },
+      "B1": {
+       "p50": 7756183,
+       "p95": 7831084,
+       "mean": 7759808.999999999,
+       "samples": 60,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+       "instructions_u": 19877719785,
+       "cycles_u": 5206997851
+      },
+      "B2": {
+       "p50": 7787738,
+       "p95": 8019345,
+       "mean": 7812043.983333333,
+       "samples": 60,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+       "instructions_u": 19875769931,
+       "cycles_u": 5191428221
+      },
+      "B3": {
+       "p50": 7802983,
+       "p95": 8092115,
+       "mean": 7854585.266666666,
+       "samples": 60,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+       "instructions_u": 19877247695,
+       "cycles_u": 5150624989
+      },
+      "B4": {
+       "p50": 7744018,
+       "p95": 7810543,
+       "mean": 7753719.166666668,
+       "samples": 60,
+       "output_sha256": null,
+       "accepted_bytes": null,
+       "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+       "instructions_u": 19877097472,
+       "cycles_u": 5167064928
+      }
+     },
+     "before_median_p50_ns": 7851164.0,
+     "after_median_p50_ns": 7771960.5,
+     "paired_p50_ratios": [
+      0.9974524154021229,
+      0.9545931534932751,
+      0.9944914763878177,
+      0.9857301132212272
+     ],
+     "paired_mean_ratios": [
+      0.9944363186360802,
+      0.9555543477323097,
+      0.9991064574078323,
+      0.9853848080282195
+     ],
+     "mean_paired_p50_ratio": 0.9830667896261107,
+     "bootstrap95_mean_paired_p50_ratio": [
+      0.9645677342169108,
+      0.9959719458949703
+     ],
+     "before_p50_drift": 0.04914896399726687,
+     "after_p50_drift": 0.0076142643263483745,
+     "paired_process_instruction_ratios": [
+      1.0033023238357865,
+      1.0032072370586989,
+      1.0032777573817495,
+      1.0031782125255426
+     ],
+     "paired_process_cycle_ratios": [
+      0.9789729643636842,
+      0.9631817395399057,
+      0.9822838540112476,
+      1.0021378193747812
+     ],
+     "outputs_identical": true,
+     "corpus_identical": true
+    }
+   ]
+  }
+ },
+ "regression_flags_over_5pct": []
+}

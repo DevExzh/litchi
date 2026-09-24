@@ -1,0 +1,395 @@
+site	disposition	code
+crates/litchi-core/src/xml/origin.rs:6	comment	//! input, and it does not count those three bytes: `buffer_position()` and
+crates/litchi-opc/src/source_backed/content_types_plan.rs:316	origin	.offset(reader.buffer_position())
+crates/litchi-opc/src/source_backed/content_types_plan.rs:454	origin	.offset(reader.buffer_position())
+crates/litchi-opc/src/package/content_types.rs:728	origin	origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-opc/src/package/relationships.rs:1608	origin	.offset(reader.buffer_position())
+crates/litchi-opc/src/source_backed.rs:1256	origin	.offset(reader.buffer_position())
+crates/litchi-opc/src/source_backed.rs:1268	origin	let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-opc/src/xml_splice/owned.rs:753	origin	.offset(reader.buffer_position())
+crates/litchi-opc/tests/reader_origin_contract.rs:29	test	let start = origin.offset(reader.buffer_position()).unwrap();
+crates/litchi-opc/tests/reader_origin_contract.rs:31	test	let end = origin.offset(reader.buffer_position()).unwrap();
+crates/litchi-opc/tests/reader_origin_contract.rs:61	test	assert_eq!(reader.buffer_position(), 0);
+crates/litchi-opc/tests/reader_origin_contract.rs:129	test	let start = origin.offset(namespaced.buffer_position()).unwrap();
+crates/litchi-opc/tests/reader_origin_contract.rs:131	test	let end = origin.offset(namespaced.buffer_position()).unwrap();
+crates/litchi-opc/tests/reader_origin_contract.rs:132	test	let buffered_start = origin.offset(buffered.buffer_position()).unwrap();
+crates/litchi-opc/tests/reader_origin_contract.rs:134	test	let buffered_end = origin.offset(buffered.buffer_position()).unwrap();
+crates/litchi-opc/tests/reader_origin_contract.rs:160	test	assert_eq!(reader.buffer_position(), 3);
+crates/litchi-ooxml-common/src/xml.rs:215	origin	.offset(reader.buffer_position())
+crates/litchi-ooxml-common/src/xml.rs:301	origin	.offset(reader.buffer_position())
+crates/litchi-ooxml-common/src/xml.rs:497	origin	.offset(reader.buffer_position())
+crates/litchi-ooxml-common/src/xml.rs:556	origin	.offset(reader.buffer_position())
+crates/litchi-ooxml-common/src/mce/tests.rs:2541	test	let start = origin.offset(reader.buffer_position()).expect("position");
+crates/litchi-ooxml-common/src/mce/tests.rs:2543	test	let end = origin.offset(reader.buffer_position()).expect("position");
+crates/litchi-ooxml-common/src/mce/fragment.rs:271	origin	.offset(reader.buffer_position())
+crates/litchi-ooxml-common/src/mce/fragment.rs:311	origin	.offset(reader.buffer_position())
+crates/litchi-ooxml-common/src/mce/fragment.rs:358	origin	.offset(reader.buffer_position())
+crates/litchi-ooxml-common/src/mce/alternative/codec.rs:418	origin	.offset(reader.buffer_position())
+crates/litchi-ooxml-common/src/custom_data/codec.rs:1779	origin	.offset(reader.buffer_position())
+crates/litchi-ooxml-common/src/web/package/transaction.rs:605	origin	.offset(reader.buffer_position())
+crates/litchi-ooxml-common/src/web/package/transaction.rs:613	origin	.offset(reader.buffer_position())
+crates/litchi-ooxml-common/src/web/codec/xml.rs:400	origin	.offset(reader.buffer_position())
+crates/litchi-ooxml-common/src/web/codec/xml.rs:404	origin	.offset(reader.buffer_position())
+crates/litchi-ooxml-common/src/web/model/custom_functions.rs:968	origin	.offset(reader.buffer_position())
+crates/litchi-ooxml-common/src/web/model/custom_functions.rs:1017	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:43	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:51	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:154	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:162	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:292	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:299	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:398	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:405	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:685	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:692	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:733	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/model3d/codec/xml.rs:788	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/svg_blip.rs:2691	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/chart/edit/codec.rs:86	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/chart/extension/formatcode2.rs:1845	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/theme/codec.rs:795	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/theme/codec.rs:801	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/theme/codec.rs:908	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/theme/codec.rs:914	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/theme/family/codec.rs:1160	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/theme/family/part.rs:2493	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/ink/codec.rs:1309	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions.rs:2375	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions_edit.rs:3692	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions_edit.rs:3698	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions_edit.rs:4853	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions_edit.rs:4859	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions_edit.rs:5245	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions_edit.rs:5251	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions_edit.rs:5751	origin	.offset(reader.buffer_position())
+crates/litchi-drawingml/src/ink/actions_edit.rs:5786	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/chart_sheet/package/operations.rs:2256	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/data_validation/package.rs:201	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/conditional_formatting/codec.rs:311	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/conditional_formatting/codec.rs:315	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/conditional_formatting/codec.rs:505	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/conditional_formatting/codec.rs:509	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/conditional_formatting/package.rs:794	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/chain/codec.rs:763	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/calculation_properties/rewriter.rs:1221	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/connections/codec.rs:529	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/connections/codec.rs:578	origin	origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-xlsx/src/connections/codec.rs:4930	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/auto_filter/package.rs:362	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/package/printer_settings.rs:263	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/package/printer_settings.rs:269	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/style/theme.rs:214	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/style/theme.rs:223	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/ole_objects/codec.rs:622	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/ole_objects/codec.rs:644	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/ole_objects/codec.rs:654	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/ole_objects/codec.rs:1298	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/row_visibility/rewrite.rs:175	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/row_visibility/rewrite.rs:182	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5169	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5175	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5201	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5207	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5284	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:5290	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/edit/drawing_transfer.rs:1061	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:649	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:653	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1331	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1335	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1427	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1431	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1486	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1490	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1694	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/codec.rs:1698	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/package.rs:645	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/package.rs:650	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/removal.rs:304	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/workbook/data_model/removal.rs:308	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/raw/sheet_view_edit.rs:667	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/raw/web.rs:408	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/raw/web.rs:449	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/raw/web.rs:469	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/raw/compact.rs:204	intentional: raw reader positions handed to lane::Entry::locate, which converts them through the input origin	let event_start = reader.buffer_position();
+crates/litchi-xlsx/src/raw/compact.rs:239	intentional: raw reader positions handed to lane::Entry::locate, which converts them through the input origin	reader.buffer_position(),
+crates/litchi-xlsx/src/raw/properties_edit.rs:684	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/raw/reference_edit.rs:665	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/raw/worksheet/codec.rs:379	intentional: raw reader positions handed to lane::Entry::locate (origin applied inside)	let event_start = reader.buffer_position();
+crates/litchi-xlsx/src/raw/worksheet/codec.rs:393	intentional: raw reader positions handed to lane::Entry::locate (origin applied inside)	reader.buffer_position(),
+crates/litchi-xlsx/src/raw/worksheet/codec.rs:1484	origin	let Some(event_start) = origin.offset(reader.buffer_position()) else {
+crates/litchi-xlsx/src/raw/worksheet/codec.rs:1491	origin	let Some(event_end) = origin.offset(reader.buffer_position()) else {
+crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs:335	intentional: raw reader positions handed to lane::Entry::locate (origin applied inside)	let reader_start = reader.buffer_position();
+crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs:374	intentional: raw reader positions handed to lane::Entry::locate (origin applied inside)	reader.buffer_position(),
+crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/facts.rs:813	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/raw/worksheet/edit/codec/wire.rs:182	intentional: wire::position: reader position; the scanner shift adds ReaderOrigin::skipped()	usize::try_from(reader.buffer_position())
+crates/litchi-xlsx/src/raw/worksheet/lane.rs:274	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/raw/worksheet/lane.rs:1117	test	assert_eq!(reader.buffer_position(), 14);
+crates/litchi-xlsx/src/raw/catalog_edit/codec.rs:761	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/raw/worksheet_property.rs:172	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/data_type_icons/codec.rs:594	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/data_type_icons/codec.rs:601	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/data_type_icons/codec.rs:706	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/data_type_icons/codec.rs:712	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/active_x/codec/xml.rs:286	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/active_x/codec/xml.rs:342	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/page_breaks/codec.rs:870	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/hyperlinks/codec.rs:892	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/timelines/package.rs:536	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/timelines/package.rs:592	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/sheet_protection/codec.rs:1120	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache/package.rs:366	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache/package.rs:397	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache/package.rs:413	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache/views.rs:134	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache/views.rs:140	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache/crud.rs:987	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache/crud.rs:1023	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache/crud.rs:1037	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/form_control/codec.rs:2229	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/form_control/scalar_edit.rs:1224	origin	let Some(start) = origin.offset(reader.buffer_position()) else {
+crates/litchi-xlsx/src/form_control/scalar_edit.rs:1230	origin	let Some(end) = origin.offset(reader.buffer_position()) else {
+crates/litchi-xlsx/src/form_control/scalar_edit.rs:1373	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/form_control/scalar_edit.rs:1380	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/form_control/owner.rs:5173	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/form_control/owner.rs:5179	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/survey.rs:1592	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/survey.rs:1629	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/survey.rs:1729	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/xml_maps/codec.rs:62	origin	let start = origin.offset(reader.buffer_position())?;
+crates/litchi-xlsx/src/xml_maps/codec.rs:64	origin	let end = origin.offset(reader.buffer_position())?;
+crates/litchi-xlsx/src/slicer_cache.rs:262	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/slicer_cache.rs:266	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/survey/source/questions.rs:124	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/survey/source/questions.rs:128	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/survey/source/properties.rs:188	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/survey/source/properties.rs:192	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/survey/source.rs:342	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/survey/source.rs:346	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/smart_tags/codec.rs:358	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/smart_tags/codec.rs:362	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/drawing/source.rs:3616	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/rich_values/refresh_intervals/codec.rs:107	origin	let start = checked_position(origin, reader.buffer_position(), xml.len())?;
+crates/litchi-xlsx/src/rich_values/refresh_intervals/codec.rs:111	origin	let end = checked_position(origin, reader.buffer_position(), xml.len())?;
+crates/litchi-xlsx/src/pivot/server_formats/mod.rs:5311	origin	.offset(reader.buffer_position())
+crates/litchi-xlsx/src/pivot/server_formats/mod.rs:5317	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/comments/codec.rs:390	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/comments/codec.rs:397	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/comments/collaboration/codec.rs:2269	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/transition/reader.rs:979	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/model3d/codec.rs:295	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/media_parts/package.rs:235	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/opened/xml.rs:1794	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/table/style/codec.rs:772	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/table/shape.rs:266	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/table/shape.rs:303	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/laser/package.rs:128	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/laser/package.rs:184	origin	origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-pptx/src/tag/package/validation.rs:475	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/tag/shape/validation.rs:201	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/animations/codec/xml/parser/wire.rs:52	origin	let event_start = offset(reader.buffer_position())?;
+crates/litchi-pptx/src/animations/codec/xml/parser/wire.rs:322	origin	..offset(reader.buffer_position())?,
+crates/litchi-pptx/src/animations/codec/xml/parser/wire.rs:404	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/animations/codec/xml/parser/wire.rs:414	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/codec.rs:502	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/codec.rs:525	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/codec.rs:540	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/codec.rs:604	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/codec.rs:629	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/codec.rs:643	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/codec.rs:670	origin	end: origin.offset(reader.buffer_position()).ok_or_else(
+crates/litchi-pptx/src/master_layout/placeholder.rs:1394	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/placeholder.rs:1398	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/placeholder.rs:1524	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/placeholder.rs:1528	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/placeholder.rs:1739	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/master_layout/placeholder.rs:1743	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/readonly_recommended/codec.rs:693	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/revision/codec.rs:272	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/changes/codec.rs:274	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/changes/codec.rs:598	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/structure/codec.rs:985	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/structure/codec.rs:1012	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/structure/codec.rs:1038	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/slide_patch/codec.rs:89	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/slide_patch/codec.rs:144	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/events/codec.rs:658	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/events/codec.rs:666	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/color_map/codec.rs:421	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/guides/codec.rs:186	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/guides/codec.rs:244	origin	end: origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-pptx/src/presentation_properties/metadata/guides/codec.rs:257	origin	end: origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-pptx/src/presentation_properties/metadata/guides/codec.rs:276	origin	end: origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-pptx/src/presentation_properties/metadata/guides/codec.rs:294	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/tracks/tracks_info.rs:679	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/designer_tags/codec.rs:789	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/custom_show/wire.rs:460	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/custom_show/wire.rs:523	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation_properties/metadata/custom_show/wire.rs:546	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/modern_comments/codec.rs:56	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/modern_comments/codec.rs:111	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/modern_comments/codec.rs:134	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/modern_comments/codec/comments/parser.rs:95	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/modern_comments/codec/comments/parser.rs:152	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/modern_comments/codec/comments/parser.rs:176	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/modern_comments/wire/xml.rs:54	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/modern_comments/wire/xml.rs:95	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/modern_comments/wire/xml.rs:116	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/modern_comments/wire/changes.rs:345	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/modern_comments/wire/changes.rs:363	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/modern_comments/wire/changes.rs:379	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/change_tracking/codec.rs:714	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/shape/reader.rs:1496	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/shape/text.rs:241	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/shape/text.rs:338	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/shape/text.rs:581	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/shape/text.rs:663	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/shape/classification/codec.rs:656	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/shape/designer/codec.rs:670	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/shape/designer/properties.rs:1020	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/shape/designer/p202.rs:458	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/shape/zoom/codec.rs:150	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/shape/zoom/codec.rs:160	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/shape/zoom/codec.rs:836	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/shape/zoom/codec.rs:846	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs:1275	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs:1281	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs:1516	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs:1522	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs:1577	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs:1583	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle/owner.rs:413	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle/owner.rs:1138	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source/svg_lifecycle/owner.rs:1642	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source_cross_copy.rs:2561	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source_cross_copy.rs:2572	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source_cross_copy.rs:3338	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source_cross_copy.rs:3344	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/embedded/content_parts/codec.rs:1047	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/embedded/ole/slide/codec.rs:157	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/embedded/ole/authoring.rs:142	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/embedded/controls/slide/codec.rs:710	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/embedded/ink_actions/codec.rs:1213	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/embedded/ink/package.rs:178	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/source.rs:4762	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/presentation/transition.rs:1981	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/font/package.rs:635	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/font/package.rs:646	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/font/package.rs:812	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/font/package.rs:896	origin	.offset(reader.buffer_position())
+crates/litchi-pptx/src/font/package.rs:912	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/revision/conflict/codec.rs:1371	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/revision/authoring.rs:3100	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/source_backed/story_text.rs:2645	origin	let position = reader.buffer_position();
+crates/litchi-docx/src/source_backed/paragraph_copy.rs:1599	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/source_backed/paragraph_copy.rs:1657	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/source_backed/paragraph_copy.rs:1687	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/sanitize.rs:926	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/run_effects/codec/mod.rs:62	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/run_effects/codec/mod.rs:125	origin	let end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/run_effects/codec/mod.rs:139	origin	let end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/namespace.rs:468	origin	let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/namespace.rs:575	origin	let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/content_control/snapshot.rs:1111	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/package/package/story_edit.rs:266	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/package/package/story_edit.rs:279	origin	origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/alt/codec.rs:120	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/alt/codec/document_scan.rs:181	origin	let raw_start = origin.offset(reader.buffer_position());
+crates/litchi-docx/src/alt/codec/document_scan.rs:218	origin	let event_end = match origin.offset(reader.buffer_position()) {
+crates/litchi-docx/src/variables/codec.rs:458	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/variables/codec.rs:465	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/mail_merge/transaction.rs:489	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/mail_merge/transaction.rs:496	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/run_symbols/codec.rs:406	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/paragraph/package.rs:94	origin	let start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/paragraph/package.rs:101	origin	let end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/paragraph/codec/inlines.rs:41	origin	let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/paragraph/codec/inlines.rs:50	origin	let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/paragraph/codec/editing.rs:125	origin	let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/paragraph/codec/editing.rs:134	origin	let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/paragraph/codec/runs.rs:53	origin	let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/paragraph/codec/runs.rs:110	origin	let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/paragraph/codec/runs.rs:185	origin	let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/paragraph/codec/runs.rs:235	origin	let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/paragraph/codec/run_contents.rs:61	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/paragraph/codec/run_contents.rs:70	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/paragraph/model.rs:214	origin	.offset(owner_reader.buffer_position())
+crates/litchi-docx/src/paragraph/model.rs:227	origin	.offset(owner_reader.buffer_position())
+crates/litchi-docx/src/paragraph/collapsed/codec.rs:428	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/numbering/codec.rs:1563	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/writer/doc/codec.rs:412	origin	let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/writer/doc/codec.rs:444	origin	let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/writer/doc/package.rs:161	origin	let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/writer/doc/package.rs:206	origin	let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/writer/doc/fusion_tests_0722.rs:260	test	.offset(reader.buffer_position())
+crates/litchi-docx/src/writer/doc/fusion_tests_0722.rs:628	test	let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/writer/doc/fusion_tests_0722.rs:710	test	let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/writer/section/codec/xml.rs:896	origin	return origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/writer/section/codec/xml.rs:1156	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/writer/section/codec/xml.rs:1175	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/writer/section/codec/xml.rs:2494	origin	break origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/writer/section/codec/xml.rs:2514	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/writer/section/codec/xml.rs:2537	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/parts/document_part.rs:647	origin	let start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/parts/document_part.rs:654	origin	let end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/settings/extensions/codec.rs:956	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/settings/document/codec.rs:1031	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/settings/document/codec.rs:1038	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/document/transaction.rs:5954	origin	let event_start = origin.offset(reader.buffer_position())?;
+crates/litchi-docx/src/document/transaction.rs:5956	origin	let event_end = origin.offset(reader.buffer_position())?;
+crates/litchi-docx/src/document/transaction.rs:6225	comment	// not include those bytes in `buffer_position()`. Layout ranges address
+crates/litchi-docx/src/document/transaction.rs:6235	origin	let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/document/transaction.rs:6265	origin	let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/document/transaction.rs:6561	comment	// not include those bytes in `buffer_position()`. Layout ranges address
+crates/litchi-docx/src/document/transaction.rs:6571	origin	let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/document/transaction.rs:6577	origin	let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+crates/litchi-docx/src/document/transaction.rs:7194	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/document/transaction.rs:7201	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/document/transaction.rs:8216	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/document/transaction.rs:8227	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/document/transaction.rs:8882	origin	let start = origin.offset(reader.buffer_position()).ok_or(missing)?;
+crates/litchi-docx/src/document/transaction.rs:8885	origin	let end = origin.offset(reader.buffer_position()).ok_or(missing)?;
+crates/litchi-docx/src/ink/codec.rs:157	origin (helper): element_offset converts with ReaderOrigin::of(xml)	let event_position = reader.buffer_position();
+crates/litchi-docx/src/ink/codec.rs:345	origin (helper): element_offset converts with ReaderOrigin::of(xml)	let event_position = reader.buffer_position();
+crates/litchi-docx/src/ink/package.rs:1655	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/ink/placement.rs:228	origin	let event_end = position(origin, reader.buffer_position())?;
+crates/litchi-docx/src/ink/placement.rs:456	origin	let event_end = position(origin, reader.buffer_position())?;
+crates/litchi-docx/src/ink/placement.rs:827	origin	let event_end = position(origin, reader.buffer_position())?;
+crates/litchi-docx/src/ink/placement.rs:1046	origin	let event_position = position(origin, reader.buffer_position())?;
+crates/litchi-docx/src/ink/placement.rs:1705	comment	// `NsReader::buffer_position()` is sampled after `read_event()`, so this
+crates/litchi-docx/src/ink/host.rs:375	origin	let event_position = position(origin, reader.buffer_position())?;
+crates/litchi-docx/src/ink/host.rs:749	origin	let event_position = position(origin, reader.buffer_position())?;
+crates/litchi-docx/src/web/codec/rewrite.rs:74	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/web/codec/rewrite.rs:82	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/section/footnote_columns/codec.rs:1108	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/section/footnote_columns/package.rs:205	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/section/codec.rs:1289	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/section/codec.rs:1295	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/section/codec.rs:1564	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/section/layout.rs:1632	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/section/layout.rs:1638	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/section/inventory.rs:1575	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/math.rs:274	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/math.rs:319	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/drawing/source.rs:3034	origin	.offset(reader.buffer_position())
+crates/litchi-docx/src/font/open_type/codec.rs:754	origin	.offset(reader.buffer_position())
+crates/litchi-xlsb/src/theme.rs:1222	origin	.offset(reader.buffer_position())
+crates/litchi-xlsb/src/theme.rs:1230	origin	.offset(reader.buffer_position())
+crates/litchi-xlsb/src/theme.rs:1366	origin	.offset(reader.buffer_position())
+crates/litchi-xlsb/src/theme.rs:1374	origin	.offset(reader.buffer_position())
+crates/litchi-xlsb/src/cell_values/drawing_transfer.rs:1798	origin	.offset(reader.buffer_position())
+crates/litchi-xlsb/src/host/drawing_write.rs:293	origin	.offset(reader.buffer_position())
+crates/litchi-crypto/src/labels.rs:178	intentional: declaration check in reader coordinates (position after the declaration is nonzero)	if !matches!(declaration, Event::Decl(_)) || reader.buffer_position() == 0 {
+crates/litchi-crypto/src/labels.rs:207	origin	.offset(reader.buffer_position())
+crates/litchi-crypto/src/labels.rs:342	origin	.offset(reader.buffer_position())
+crates/litchi-crypto/src/labels.rs:356	origin	.offset(reader.buffer_position())
+crates/litchi-formula/src/omml/parser.rs:92	origin	let position = reader.buffer_position().saturating_add(origin);
+crates/litchi-xldm/src/identity.rs:2115	origin (local rule): checked_add(reader_origin(source)); crate has no litchi-core dependency	let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-xldm/src/identity.rs:2257	origin (local rule): checked_add(reader_origin(source)); crate has no litchi-core dependency	let event_end = usize::try_from(reader.buffer_position())
+crates/litchi-xldm/src/identity.rs:5773	origin (helper)	let first_event_bytes = usize::try_from(reader.buffer_position()).expect("fits");
+crates/litchi-ole-common/src/custom_xml/codec.rs:308	origin	.offset(reader.buffer_position())
+crates/litchi-ole-common/src/custom_xml/codec.rs:315	origin	.offset(reader.buffer_position())
+crates/xml-minifier/src/audit.rs:1214	intentional: 0677 audit: marker offsets already applied (not changed here)	let start_u64 = reader.buffer_position();
+crates/xml-minifier/src/audit.rs:1226	intentional: 0677 audit: marker offsets already applied (not changed here)	let end_u64 = reader.buffer_position();
+crates/xml-minifier/src/audit.rs:1727	comment	// quick-xml excludes the leading UTF-8 BOM from buffer_position(),
+crates/xml-minifier/src/audit.rs:2905	intentional: 0677 audit: marker offsets already applied (not changed here)	match usize::try_from(reader.buffer_position()) {
