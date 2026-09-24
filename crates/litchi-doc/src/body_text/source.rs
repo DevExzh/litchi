@@ -8,11 +8,10 @@
 //! exactly the same UTF-16 width.  Publication is then a checked equal-length
 //! splice in the existing `WordDocument` stream.
 
+use crate::package::Error as PackageError;
 use crate::parts::{
-    document_properties::DocumentProperties,
     fib::FileInformationBlock,
-    protection::Ranges,
-    protection::{EditProtection, ProtectionPolicy},
+    protection::{EditProtection, ProtectionPolicy, classify_with},
 };
 use crate::{sprm::parse_sprms, sprm_operations as ops};
 use litchi_cfb::{
@@ -34,6 +33,9 @@ const TABLE_1: &str = "1Table";
 const FIB_MAGIC_WORD97: u16 = 0xA5EC;
 const FIB_MAGIC_WORD95: u16 = 0xA5DC;
 const WORD97_NFIB: u16 = 0x00C1;
+/// `FibBase.nFib` of Word 97's shell template, read as Word 97 (MS-DOC
+/// Appendix A note <11>).
+const WORD97_SHELL_TEMPLATE_NFIB: u16 = 0x00C0;
 const FIB_BASE_PREFIX: usize = 154;
 const FIB_POINTER_COUNT: usize = 152;
 const FIB_POINTERS: usize = 154;
@@ -48,22 +50,17 @@ const FIB_NFIB: usize = 2;
 const FIB_FLAG_ENCRYPTED: u16 = 0x0100;
 const FIB_FLAG_TABLE_1: u16 = 0x0200;
 const FIB_FLAG_OBFUSCATED: u16 = 0x8000;
-const FIB_NFIB_WORD2000: u16 = 0x00D9;
-const FIB_NFIB_WORD2002: u16 = 0x0101;
-const FIB_NFIB_WORD2003: u16 = 0x010C;
-const FIB_NFIB_WORD2007: u16 = 0x0112;
 
 const PLCFBTE_CHPX: usize = 12;
 const PLCFBTE_PAPX: usize = 13;
 const PLCFFLD_MOM: usize = 16;
-const DOP: usize = 31;
 const CLX: usize = 33;
 const STTBFRMARK: usize = 51;
 const DGG_INFO: usize = 50;
-const PROTECTION_POINTERS: [usize; 4] = [141, 142, 143, 144];
 
-const DOP_MINIMUM: usize = 84;
-const DOP_PROTECTION_EXTENSION: usize = 616;
+/// `DopBase` byte holding `fRevMarking` (0x80).
+const DOP_REVISION_MARKING_BYTE: usize = 5;
+const DOP_REVISION_MARKING: u8 = 0x80;
 const FKP_PAGE_BYTES: usize = 512;
 const FKP_PAGE_MASK: u32 = 0x003F_FFFF;
 const MAX_FKP_RUNS: usize = 101;
@@ -1443,7 +1440,6 @@ struct Pointer {
 
 struct Fib {
     flags: u16,
-    effective_nfib: u16,
     ccp_text: u32,
     ccp_macro: u32,
     fc_min: u32,
@@ -1480,7 +1476,7 @@ fn read_fib(shared: &SharedOleFile, limits: SourceLimits) -> Result<(String, Fib
         )));
     }
     let nfib = read_u16(&prefix, FIB_NFIB, "FIB nFib")?;
-    if nfib < WORD97_NFIB {
+    if nfib < WORD97_NFIB && nfib != WORD97_SHELL_TEMPLATE_NFIB {
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     if read_u16(&prefix, FIB_CSW, "FIB csw")? != 0x000E {
@@ -1528,44 +1524,10 @@ fn read_fib(shared: &SharedOleFile, limits: SourceLimits) -> Result<(String, Fib
     let mut csw_bytes = [0u8; 2];
     shared.read_stream_range(&[WORD_DOCUMENT], csw_offset, &mut csw_bytes)?;
     let csw_new = u16::from_le_bytes(csw_bytes);
-    let (effective_nfib, expected_count, expected_csw_new) = if csw_new == 0 {
-        (
-            nfib,
-            expected_fib_pointer_count(nfib)?,
-            expected_fib_csw_new(nfib)?,
-        )
-    } else {
-        let n_fib_new_offset = csw_offset
-            .checked_add(2)
-            .ok_or_else(|| Error::InvalidData("FIB nFibNew offset overflows".into()))?;
-        let n_fib_new_end = n_fib_new_offset
-            .checked_add(2)
-            .ok_or_else(|| Error::Limit("FIB nFibNew range overflows".into()))?;
-        if n_fib_new_end > word_len {
-            return Err(Error::InvalidData(
-                "FIB nFibNew field exceeds WordDocument".into(),
-            ));
-        }
-        let mut n_fib_new_bytes = [0u8; 2];
-        shared.read_stream_range(&[WORD_DOCUMENT], n_fib_new_offset, &mut n_fib_new_bytes)?;
-        let n_fib_new = u16::from_le_bytes(n_fib_new_bytes);
-        (
-            n_fib_new,
-            expected_fib_pointer_count(n_fib_new)?,
-            expected_fib_csw_new(n_fib_new)?,
-        )
-    };
-    if count != expected_count {
-        return Err(Error::InvalidData(format!(
-            "FIB cbRgFcLcb {count} does not match effective nFib 0x{effective_nfib:04X} ({expected_count})"
-        )));
-    }
-    let csw_new_accepted = csw_new == expected_csw_new;
-    if !csw_new_accepted {
-        return Err(Error::InvalidData(format!(
-            "FIB cswNew {csw_new} does not match effective nFib 0x{effective_nfib:04X} ({expected_csw_new})"
-        )));
-    }
+    // The FIB generation, cbRgFcLcb and FibRgCswNew are checked by the shared
+    // protection classifier, which reports a shape it cannot prove as
+    // EditProtection::Unknown; this reader only needs the complete FIB's
+    // extent, which bounds fcMin below.
     let fib_extension_bytes = usize::from(csw_new)
         .checked_mul(2)
         .ok_or_else(|| Error::Limit("FIB FibRgCswNew size overflows usize".into()))?;
@@ -1573,6 +1535,12 @@ fn read_fib(shared: &SharedOleFile, limits: SourceLimits) -> Result<(String, Fib
         .checked_add(2)
         .and_then(|length| length.checked_add(fib_extension_bytes))
         .ok_or_else(|| Error::Limit("complete FIB size overflows usize".into()))?;
+    if fib_extent > limits.max_fib_bytes {
+        return Err(Error::Limit(format!(
+            "complete FIB length {fib_extent} exceeds {}",
+            limits.max_fib_bytes
+        )));
+    }
     if u64::try_from(fib_extent)
         .map_err(|_error| Error::Limit("complete FIB size does not fit u64".into()))?
         > word_len
@@ -1581,7 +1549,9 @@ fn read_fib(shared: &SharedOleFile, limits: SourceLimits) -> Result<(String, Fib
             "FIB FibRgCswNew extension exceeds WordDocument".into(),
         ));
     }
-    let mut data = try_zeroed(fib_len, "DOC FIB")?;
+    // The complete FIB, including cswNew and FibRgCswNew, which the shared
+    // protection classifier reads.
+    let mut data = try_zeroed(fib_extent, "DOC FIB")?;
     shared.read_stream_range(&[WORD_DOCUMENT], 0, &mut data)?;
     let mut pointers = Vec::new();
     pointers
@@ -1637,7 +1607,6 @@ fn read_fib(shared: &SharedOleFile, limits: SourceLimits) -> Result<(String, Fib
         table_name,
         Fib {
             flags,
-            effective_nfib,
             ccp_text,
             ccp_macro,
             fc_min,
@@ -1646,26 +1615,6 @@ fn read_fib(shared: &SharedOleFile, limits: SourceLimits) -> Result<(String, Fib
             raw: data,
         },
     ))
-}
-
-fn expected_fib_pointer_count(nfib: u16) -> Result<usize> {
-    match nfib {
-        WORD97_NFIB => Ok(0x005D),
-        FIB_NFIB_WORD2000 => Ok(0x006C),
-        FIB_NFIB_WORD2002 => Ok(0x0088),
-        FIB_NFIB_WORD2003 => Ok(0x00A4),
-        FIB_NFIB_WORD2007 => Ok(0x00B7),
-        _ => Err(Error::Refused(Refusal::UnsupportedSource)),
-    }
-}
-
-fn expected_fib_csw_new(nfib: u16) -> Result<u16> {
-    match nfib {
-        WORD97_NFIB => Ok(0),
-        FIB_NFIB_WORD2000 | FIB_NFIB_WORD2002 | FIB_NFIB_WORD2003 => Ok(2),
-        FIB_NFIB_WORD2007 => Ok(5),
-        _ => Err(Error::Refused(Refusal::UnsupportedSource)),
-    }
 }
 
 fn reject_fib_policy(
@@ -1698,40 +1647,83 @@ fn reject_fib_policy(
     {
         return Err(Error::Refused(Refusal::Revision));
     }
-    let has_ranges = PROTECTION_POINTERS.iter().copied().any(|index| {
-        fib.pointer(index)
-            .is_some_and(|pointer| pointer.length != 0)
-    });
-    let Some(pointer) = fib.pointer(DOP) else {
-        return Err(Error::Refused(Refusal::AmbiguousTopology));
-    };
-    if pointer.length == 0 {
-        return Err(Error::Refused(Refusal::AmbiguousTopology));
+    let (protection, revision_marking) =
+        classify_source_protection(shared, table_name, fib, limits)?;
+    // This owner publishes untracked text, so it refuses a document whose
+    // revision marking is on, unless the document's own protection is active,
+    // which an explicit capability must then authorize.
+    if revision_marking && matches!(protection, EditProtection::None | EditProtection::Ranges) {
+        return Err(Error::Refused(Refusal::Revision));
     }
-    let dop = read_table_range(
-        shared,
-        table_name,
-        pointer,
-        limits.max_table_bytes,
-        "DOC DOP",
-    )?;
-    let document = match classify_dop_for_generation(&dop, fib.effective_nfib) {
-        DopClassification::None => false,
-        DopClassification::Protected => true,
-        DopClassification::Revision => return Err(Error::Refused(Refusal::Revision)),
-        DopClassification::Unrecognized => return Ok(EditProtection::Unrecognized),
-    };
-    let ranges = match classify_ranges(shared, table_name, fib, limits, has_ranges)? {
-        RangeClassification::None => false,
-        RangeClassification::Protected => true,
-        RangeClassification::Unrecognized => return Ok(EditProtection::Unrecognized),
-    };
-    Ok(match (document, ranges) {
-        (false, false) => EditProtection::None,
-        (true, false) => EditProtection::Document,
-        (false, true) => EditProtection::Ranges,
-        (true, true) => EditProtection::DocumentAndRanges,
-    })
+    Ok(protection)
+}
+
+/// A source error carried through the shared protection classifier.
+struct ClassifierError(Error);
+
+impl From<PackageError> for ClassifierError {
+    fn from(error: PackageError) -> Self {
+        Self(Error::InvalidData(format!(
+            "DOC protection metadata is invalid: {error}"
+        )))
+    }
+}
+
+impl From<Error> for ClassifierError {
+    fn from(error: Error) -> Self {
+        Self(error)
+    }
+}
+
+/// Classifies protection with the shared MS-DOC classifier
+/// ([`crate::parts::protection::classify_with`]), which [`Snapshot::protection`]
+/// and the tracked-revision editor also use, reading only the DOP and, when a
+/// range-protection pointer declares data, the table stream through this
+/// owner's bounded readers. Also returns whether the DOP's `fRevMarking` is set.
+///
+/// [`Snapshot::protection`]: crate::package::property_set::Snapshot::protection
+fn classify_source_protection(
+    shared: &SharedOleFile,
+    table_name: &str,
+    fib: &Fib,
+    limits: SourceLimits,
+) -> Result<(EditProtection, bool)> {
+    let parsed_fib = FileInformationBlock::parse(&fib.raw)
+        .map_err(|error| Error::InvalidData(format!("FIB protection view is invalid: {error}")))?;
+    let mut revision_marking = false;
+    let protection = classify_with(
+        &parsed_fib,
+        |offset, length| -> std::result::Result<Option<Vec<u8>>, ClassifierError> {
+            let dop = read_table_range_within(
+                shared,
+                table_name,
+                Pointer {
+                    offset: u64::from(offset),
+                    length: u64::from(length),
+                },
+                limits.max_table_bytes,
+                "DOC DOP",
+            )?;
+            revision_marking = dop.as_ref().is_some_and(|dop| {
+                dop.get(DOP_REVISION_MARKING_BYTE)
+                    .is_some_and(|flags| flags & DOP_REVISION_MARKING != 0)
+            });
+            Ok(dop)
+        },
+        || -> std::result::Result<Vec<u8>, ClassifierError> {
+            let table_length = shared.stream_len(&[table_name]).map_err(Error::from)?;
+            if table_length > limits.max_table_bytes as u64 {
+                return Err(Error::Limit(format!(
+                    "protection table stream length {table_length} exceeds {}",
+                    limits.max_table_bytes
+                ))
+                .into());
+            }
+            Ok(shared.open_stream(&[table_name]).map_err(Error::from)?)
+        },
+    )
+    .map_err(|ClassifierError(error)| error)?;
+    Ok((protection, revision_marking))
 }
 
 fn authorize_changed_source(source: &SourceSnapshot) -> Result<()> {
@@ -1748,114 +1740,6 @@ fn authorize_changed_source(source: &SourceSnapshot) -> Result<()> {
         EditProtection::Document | EditProtection::Ranges | EditProtection::DocumentAndRanges => {},
     }
     Ok(())
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum DopClassification {
-    None,
-    Protected,
-    Revision,
-    Unrecognized,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum RangeClassification {
-    None,
-    Protected,
-    Unrecognized,
-}
-
-fn classify_ranges(
-    shared: &SharedOleFile,
-    table_name: &str,
-    fib: &Fib,
-    limits: SourceLimits,
-    has_ranges: bool,
-) -> Result<RangeClassification> {
-    if !has_ranges {
-        return Ok(RangeClassification::None);
-    }
-    let table_length = shared.stream_len(&[table_name])?;
-    if table_length > limits.max_table_bytes as u64 {
-        return Err(Error::Limit(format!(
-            "protection table stream length {table_length} exceeds {}",
-            limits.max_table_bytes
-        )));
-    }
-    let table = shared.open_stream(&[table_name])?;
-    let parsed_fib = FileInformationBlock::parse(&fib.raw)
-        .map_err(|error| Error::InvalidData(format!("FIB protection view is invalid: {error}")))?;
-    match Ranges::parse(&parsed_fib, &table) {
-        Ok(Some(ranges)) if !ranges.ranges().is_empty() => Ok(RangeClassification::Protected),
-        Ok(Some(_)) => Ok(RangeClassification::None),
-        Ok(None) | Err(_) => Ok(RangeClassification::Unrecognized),
-    }
-}
-
-fn classify_dop_for_generation(dop: &[u8], effective_nfib: u16) -> DopClassification {
-    if !dop_length_matches_generation(effective_nfib, dop.len()) || dop.len() < DOP_MINIMUM {
-        return DopClassification::Unrecognized;
-    }
-    let properties = match DocumentProperties::parse_bytes(dop) {
-        Ok(properties) => properties,
-        Err(_) => return DopClassification::Unrecognized,
-    };
-    if properties.versioned().is_err() {
-        return DopClassification::Unrecognized;
-    }
-    let base_protection = properties.base().protection();
-    let protected = base_protection.comments_or_read_only
-        || base_protection.form_fields
-        || base_protection.tracked_revisions
-        || properties.base().protection_key() != 0;
-    if protected {
-        return DopClassification::Protected;
-    }
-    // Dop2003.fEnforceDocProt and iDocProtCur are at DOP offsets 598..600
-    // (the 594-byte Dop2002 prefix plus the first protection word). Mode 7
-    // explicitly means that no editing restrictions are active.
-    if dop.len() >= DOP_PROTECTION_EXTENSION {
-        let protection = u16::from_le_bytes([dop[598], dop[599]]);
-        if protection & 0x0008 != 0 && (protection >> 4) & 0x0007 != 7 {
-            return DopClassification::Protected;
-        }
-    }
-    if dop[5] & 0x80 != 0 {
-        return DopClassification::Revision;
-    }
-    DopClassification::None
-}
-
-#[cfg(test)]
-fn classify_dop(dop: &[u8]) -> Option<Refusal> {
-    // This test-only convenience infers the most permissive modern generation
-    // for an exact DOP size. Production classification always supplies the
-    // effective FIB generation and therefore performs the cross-check.
-    let generation = match dop.len() {
-        500 => WORD97_NFIB,
-        544 => FIB_NFIB_WORD2000,
-        594 => FIB_NFIB_WORD2002,
-        616 => FIB_NFIB_WORD2003,
-        674 | 690 | 694 => FIB_NFIB_WORD2007,
-        _ => FIB_NFIB_WORD2002,
-    };
-    match classify_dop_for_generation(dop, generation) {
-        DopClassification::None => None,
-        DopClassification::Protected => Some(Refusal::Protected),
-        DopClassification::Revision => Some(Refusal::Revision),
-        DopClassification::Unrecognized => Some(Refusal::UnknownProtection),
-    }
-}
-
-fn dop_length_matches_generation(nfib: u16, length: usize) -> bool {
-    match nfib {
-        WORD97_NFIB => length == 500,
-        FIB_NFIB_WORD2000 => length == 544,
-        FIB_NFIB_WORD2002 => length == 594,
-        FIB_NFIB_WORD2003 => length == 616,
-        FIB_NFIB_WORD2007 => matches!(length, 674 | 690 | 694),
-        _ => false,
-    }
 }
 
 fn reject_container_components(shared: &SharedOleFile) -> Result<()> {
@@ -2414,6 +2298,26 @@ fn read_table_range(
     Ok(data)
 }
 
+/// Like [`read_table_range`], but returns `None` when the range does not lie
+/// inside the table stream, which the protection classifier reports itself.
+fn read_table_range_within(
+    shared: &SharedOleFile,
+    table_name: &str,
+    pointer: Pointer,
+    maximum: usize,
+    resource: &'static str,
+) -> Result<Option<Vec<u8>>> {
+    let table_length = shared.stream_len(&[table_name])?;
+    if pointer
+        .offset
+        .checked_add(pointer.length)
+        .is_none_or(|end| end > table_length)
+    {
+        return Ok(None);
+    }
+    read_table_range(shared, table_name, pointer, maximum, resource).map(Some)
+}
+
 fn ensure_source_identity(
     source: &Arc<dyn ReadAt>,
     expected_version: SourceVersion,
@@ -2679,85 +2583,65 @@ mod tests {
         atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     };
 
-    fn normalize_word2002_fib(word: &mut [u8]) {
-        let count = usize::from(u16::from_le_bytes(
-            word[FIB_POINTER_COUNT..FIB_POINTER_COUNT + 2]
-                .try_into()
-                .expect("FIB pointer count"),
-        ));
-        let pointer_end = FIB_POINTERS
-            .checked_add(count.checked_mul(8).expect("FIB pointer array"))
-            .expect("FIB pointer array");
-        let csw_new = u16::from_le_bytes(
-            word[pointer_end..pointer_end + 2]
-                .try_into()
-                .expect("FIB cswNew"),
-        );
-        let base_nfib = u16::from_le_bytes(word[FIB_NFIB..FIB_NFIB + 2].try_into().unwrap());
-        if count == 136 && base_nfib == FIB_NFIB_WORD2002 && csw_new == 0 {
-            word[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
-            word[pointer_end + 2..pointer_end + 4]
-                .copy_from_slice(&FIB_NFIB_WORD2002.to_le_bytes());
-        }
-    }
-
-    fn fixture_with_strict_word2002_fib(name: &str) -> Vec<u8> {
+    /// A `test-data/ole/doc` fixture as checked in.
+    fn fixture(name: &str) -> Vec<u8> {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/ole/doc")
             .join(name);
-        let bytes = std::fs::read(path).expect("DOC fixture");
-        let mut package = ObjectEditor::open(
-            bytes,
+        std::fs::read(path).expect("DOC fixture")
+    }
+
+    fn object_editor(bytes: &[u8]) -> ObjectEditor {
+        ObjectEditor::open(
+            bytes.to_vec(),
             Targets::default(),
             crate::tracked_revision::Limits::default(),
         )
-        .expect("fixture object editor");
-        let word_path = ["WordDocument".to_string()];
+        .expect("fixture object editor")
+    }
+
+    /// `bytes` with its `WordDocument` and selected table stream edited.
+    fn with_streams(bytes: &[u8], edit: impl FnOnce(&mut Vec<u8>, &mut Vec<u8>)) -> Vec<u8> {
+        edit_streams(object_editor(bytes), edit)
+    }
+
+    /// The package opened in `package` with its `WordDocument` and selected
+    /// table stream edited.
+    fn edit_streams(
+        mut package: ObjectEditor,
+        edit: impl FnOnce(&mut Vec<u8>, &mut Vec<u8>),
+    ) -> Vec<u8> {
+        let word_path = [WORD_DOCUMENT.to_string()];
         let mut word = package.stream(&word_path).expect("WordDocument").to_vec();
-        normalize_word2002_fib(&mut word);
-        package.put_stream(&word_path, word).expect("WordDocument");
-        package.finish().expect("fixture publication")
-    }
-
-    fn fixture_with_valid_word97_dop(name: &str) -> Vec<u8> {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../test-data/ole/doc")
-            .join(name);
-        let bytes = std::fs::read(path).expect("DOC fixture");
-        let mut package = ObjectEditor::open(
-            bytes,
-            Targets::default(),
-            crate::tracked_revision::Limits::default(),
-        )
-        .expect("fixture object editor");
-        let word_path = ["WordDocument".to_string()];
-        let word = package.stream(&word_path).expect("WordDocument");
-        let fib = FileInformationBlock::parse(word).expect("FIB");
-        let table_name = if fib.which_table_stream() {
-            "1Table"
+        let flags = u16::from_le_bytes([word[FIB_FLAGS], word[FIB_FLAGS + 1]]);
+        let table_path = [if flags & FIB_FLAG_TABLE_1 != 0 {
+            TABLE_1
         } else {
-            "0Table"
-        };
-        let table_path = [table_name.to_string()];
-        let mut word = word.to_vec();
-        normalize_word2002_fib(&mut word);
-        let fib = FileInformationBlock::parse(&word).expect("normalized FIB");
+            TABLE_0
+        }
+        .to_string()];
         let mut table = package.stream(&table_path).expect("table stream").to_vec();
-        let (offset, length) = fib.get_table_pointer(DOP).expect("DOP pointer");
-        let offset = usize::try_from(offset).expect("DOP offset");
-        let length = usize::try_from(length).expect("DOP length");
-        let mut dop = DocumentProperties::word97_writer_bytes(false, false, false);
-        dop.resize(594, 0);
-        assert!(length >= dop.len());
-        table[offset..offset + dop.len()].copy_from_slice(&dop);
-        let pointer = FIB_POINTERS + DOP * 8;
-        word[pointer + 4..pointer + 8]
-            .copy_from_slice(&u32::try_from(dop.len()).expect("DOP length").to_le_bytes());
+        edit(&mut word, &mut table);
         package.put_stream(&word_path, word).expect("WordDocument");
         package
             .put_stream(&table_path, table)
             .expect("table stream");
         package.finish().expect("fixture publication")
+    }
+
+    /// The table-stream range of the DOP (FIB pointer 31).
+    fn dop_range(word: &[u8]) -> std::ops::Range<usize> {
+        let pointer = FIB_POINTERS + 31 * 8;
+        let offset = u32::from_le_bytes(word[pointer..pointer + 4].try_into().unwrap());
+        let length = u32::from_le_bytes(word[pointer + 4..pointer + 8].try_into().unwrap());
+        offset as usize..offset as usize + length as usize
+    }
+
+    /// The fixture `name` with its DOP edited.
+    fn with_dop(name: &str, edit: impl FnOnce(&mut [u8])) -> Vec<u8> {
+        with_streams(&fixture(name), |word, table| {
+            edit(&mut table[dop_range(word)]);
+        })
     }
 
     #[test]
@@ -2803,7 +2687,7 @@ mod tests {
 
     #[test]
     fn ordinary_fixture_has_a_source_backed_paragraph() {
-        let bytes = fixture_with_strict_word2002_fib("documentProperties.doc");
+        let bytes = fixture("documentProperties.doc");
         let source = SourceSnapshot::from_bytes(bytes).expect("source-backed DOC fixture");
         let paragraph = source.paragraph(Position::new(0)).expect("first paragraph");
         assert!(!paragraph.text().is_empty());
@@ -2811,7 +2695,7 @@ mod tests {
 
     #[test]
     fn owned_bytes_open_reuses_the_validated_cfb_index() {
-        let bytes = fixture_with_strict_word2002_fib("documentProperties.doc");
+        let bytes = fixture("documentProperties.doc");
 
         let generic_counter = Arc::new(CountingSource::new(&bytes));
         let generic_source: Arc<dyn ReadAt> = generic_counter.clone();
@@ -2832,7 +2716,7 @@ mod tests {
 
     #[test]
     fn fixture_replacement_is_reversible_and_same_width() {
-        let bytes = fixture_with_valid_word97_dop("documentProperties.doc");
+        let bytes = fixture("documentProperties.doc");
         let source = SourceSnapshot::from_bytes_with_policy(bytes, fixture_edit_policy())
             .expect("source-backed DOC fixture");
         let original_fingerprint = source.fingerprint();
@@ -2877,7 +2761,7 @@ mod tests {
 
     #[test]
     fn exact_noop_keeps_snapshot_and_artifact_identity() {
-        let bytes = fixture_with_strict_word2002_fib("documentProperties.doc");
+        let bytes = fixture("documentProperties.doc");
         let original = bytes.clone();
         let source = SourceSnapshot::from_bytes(bytes).expect("source-backed DOC fixture");
         let commit = source
@@ -2896,7 +2780,7 @@ mod tests {
 
     #[test]
     fn length_change_and_partial_sink_are_typed_failures() {
-        let bytes = fixture_with_strict_word2002_fib("documentProperties.doc");
+        let bytes = fixture("documentProperties.doc");
         let source = SourceSnapshot::from_bytes(bytes).expect("source-backed DOC fixture");
         let mut transaction = source
             .edit_paragraph(Position::new(0))
@@ -2919,7 +2803,7 @@ mod tests {
 
     #[test]
     fn piece_relative_payload_readback_uses_a_later_paragraph() {
-        let bytes = fixture_with_valid_word97_dop("lists-margins.doc");
+        let bytes = fixture("lists-margins.doc");
         let source = SourceSnapshot::from_bytes_with_policy(bytes, fixture_edit_policy())
             .expect("source-backed DOC fixture");
         let mut transaction = source
@@ -2951,7 +2835,7 @@ mod tests {
 
     #[test]
     fn fib_limit_below_fixed_prefix_is_rejected_before_open() {
-        let bytes = fixture_with_strict_word2002_fib("documentProperties.doc");
+        let bytes = fixture("documentProperties.doc");
         let limits = SourceLimits::default().with_max_fib_bytes(FIB_BASE_PREFIX - 1);
         assert!(matches!(
             SourceSnapshot::open_with_limits(Arc::new(OwnedSource::new(bytes)), limits),
@@ -3036,76 +2920,453 @@ mod tests {
         ));
     }
 
+    /// A same-width replacement of paragraph 0 that changes its first ASCII
+    /// letter.
+    fn same_width_edit(source: &SourceSnapshot) -> String {
+        let mut replacement = source
+            .paragraph(Position::new(0))
+            .expect("first paragraph")
+            .text()
+            .to_owned();
+        let (offset, character) = replacement
+            .char_indices()
+            .find(|(_, value)| value.is_ascii_alphabetic())
+            .expect("an ASCII letter");
+        let next = if character == 'a' { 'b' } else { 'a' };
+        replacement.replace_range(offset..offset + character.len_utf8(), &next.to_string());
+        replacement
+    }
+
+    /// Commits `replacement` as paragraph 0 of `bytes` under `policy`.
+    fn commit_first_paragraph(
+        bytes: Vec<u8>,
+        policy: ProtectionPolicy,
+        replacement: &str,
+    ) -> Result<Commit> {
+        let mut transaction = SourceSnapshot::from_bytes_with_policy(bytes, policy)?
+            .edit_paragraph(Position::new(0))?;
+        transaction.set_text(replacement.to_owned())?;
+        transaction.commit()
+    }
+
     #[test]
-    fn dop_protection_bit_40_is_not_misclassified_as_revision() {
-        let mut dop = DocumentProperties::word97_writer_bytes(false, false, false);
-        dop[7] = 0x40;
-        dop[5] |= 0x80;
-        assert_eq!(classify_dop(&dop), Some(Refusal::Protected));
+    fn a_libreoffice_fib_and_dop_as_checked_in_are_editable() {
+        // nFib 0x0101 with a zero cswNew and a 610-byte DOP (change 0768).
+        let bytes = fixture("documentProperties.doc");
+        let source = SourceSnapshot::from_bytes(bytes.clone()).expect("LibreOffice DOC");
+        assert_eq!(source.inner.protection, EditProtection::None);
+        let replacement = same_width_edit(&source);
+        commit_first_paragraph(bytes, ProtectionPolicy::default(), &replacement)
+            .expect("unprotected same-width edit");
+    }
+
+    #[test]
+    fn locked_tracked_changes_are_document_protection_not_a_revision_refusal() {
+        // fLockRev, with the fRevMarking it requires, restricts editing: it is
+        // document protection, which an explicit capability can authorize,
+        // rather than this owner's refusal of revision marking.
+        let bytes = with_dop("documentProperties.doc", |dop| {
+            dop[7] |= 0x40;
+            dop[5] |= 0x80;
+        });
+        let source = SourceSnapshot::from_bytes(bytes.clone()).expect("locked DOC");
+        assert_eq!(source.inner.protection, EditProtection::Document);
+        let replacement = same_width_edit(&source);
+        assert!(matches!(
+            commit_first_paragraph(bytes.clone(), ProtectionPolicy::default(), &replacement),
+            Err(Error::Refused(Refusal::Protected))
+        ));
+        commit_first_paragraph(bytes, fixture_edit_policy(), &replacement)
+            .expect("authorized protected edit");
+
+        // Revision marking alone is refused at open.
+        let marking = with_dop("documentProperties.doc", |dop| dop[5] |= 0x80);
+        assert!(matches!(
+            SourceSnapshot::from_bytes(marking),
+            Err(Error::Refused(Refusal::Revision))
+        ));
     }
 
     #[test]
     fn dop2003_enforced_restriction_is_protected_but_unrestricted_mode_is_not() {
-        let mut dop = valid_dop2003();
-        dop[598..600].copy_from_slice(&(0x0008_u16 | (3 << 4)).to_le_bytes());
-        assert_eq!(classify_dop(&dop), Some(Refusal::Protected));
-
-        dop[598..600].copy_from_slice(&(0x0008_u16 | (7 << 4)).to_le_bytes());
-        assert_eq!(classify_dop(&dop), None);
-    }
-
-    #[test]
-    fn unsupported_dop_lengths_fail_closed_in_both_policy_paths() {
-        for length in 595..=615 {
+        // The 610-byte DOP reaches the Dop2003 enforcement byte 598.
+        for (flags, expected) in [
+            (0x08 | 3 << 4, EditProtection::Document),
+            (0x08 | 7 << 4, EditProtection::None),
+            (3 << 4, EditProtection::None),
+        ] {
+            let bytes = with_dop("documentProperties.doc", |dop| {
+                dop[598] = (dop[598] & 0x87) | flags;
+            });
             assert_eq!(
-                classify_dop(&vec![0; length]),
-                Some(Refusal::UnknownProtection)
+                SourceSnapshot::from_bytes(bytes)
+                    .expect("DOC fixture")
+                    .inner
+                    .protection,
+                expected,
+                "{flags:#04x}"
             );
         }
-        assert_eq!(
-            classify_dop(&vec![0; 617]),
-            Some(Refusal::UnknownProtection)
-        );
     }
 
     #[test]
     fn malformed_protection_is_readable_but_rejected_even_with_explicit_policy() {
-        let bytes = fixture_with_strict_word2002_fib("documentProperties.doc");
-        let source = SourceSnapshot::from_bytes(bytes.clone()).expect("malformed DOC fixture");
-        let original = source.paragraph(Position::new(0)).expect("first paragraph");
-        let mut replacement = original.text().to_owned();
-        let Some((offset, character)) = replacement
-            .char_indices()
-            .find(|(_, value)| value.is_ascii_alphabetic())
-        else {
-            return;
-        };
-        let next = if character == 'a' { 'b' } else { 'a' };
-        replacement.replace_range(offset..offset + character.len_utf8(), &next.to_string());
-        let mut denied = source
-            .edit_paragraph(Position::new(0))
-            .expect("protected paragraph is readable");
-        denied.set_text(replacement.clone()).expect("same width");
-        assert!(matches!(
-            denied.commit(),
-            Err(Error::Refused(Refusal::UnknownProtection))
-        ));
-
-        let mut allowed = SourceSnapshot::from_bytes_with_policy(bytes, fixture_edit_policy())
-            .expect("authorized malformed DOC fixture")
-            .edit_paragraph(Position::new(0))
-            .expect("first paragraph");
-        allowed.set_text(replacement).expect("same width");
-        assert!(matches!(
-            allowed.commit(),
-            Err(Error::Refused(Refusal::UnknownProtection))
-        ));
+        // fLockAtn together with fLockRev breaks an MS-DOC requirement (2.7.2),
+        // and a DOP of 83 bytes cannot hold DopBase.
+        let malformed_fields = with_dop("documentProperties.doc", |dop| {
+            dop[6] |= 0x10;
+            dop[7] |= 0x40;
+            dop[5] |= 0x80;
+        });
+        let short_dop = with_streams(&fixture("documentProperties.doc"), |word, _| {
+            let pointer = FIB_POINTERS + 31 * 8 + 4;
+            word[pointer..pointer + 4].copy_from_slice(&83u32.to_le_bytes());
+        });
+        for bytes in [malformed_fields, short_dop] {
+            let source = SourceSnapshot::from_bytes(bytes.clone()).expect("malformed DOC fixture");
+            assert_eq!(source.inner.protection, EditProtection::Unrecognized);
+            let replacement = same_width_edit(&source);
+            for policy in [ProtectionPolicy::default(), fixture_edit_policy()] {
+                assert!(matches!(
+                    commit_first_paragraph(bytes.clone(), policy, &replacement),
+                    Err(Error::Refused(Refusal::UnknownProtection))
+                ));
+            }
+        }
     }
 
-    fn valid_dop2003() -> Vec<u8> {
-        let mut dop = DocumentProperties::writer_bytes(false, false, false, true);
-        dop.resize(DOP_PROTECTION_EXTENSION, 0);
-        dop
+    /// The source's own protection verdict: its bounded FIB and table readers
+    /// feeding the shared classifier, before its other admission refusals
+    /// (fields, drawings and so on).
+    fn source_protection(bytes: &[u8]) -> Result<EditProtection> {
+        let limits = SourceLimits::default();
+        let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes.to_vec()));
+        let shared = SharedOleFile::open_with_limits(
+            source,
+            SharedOleFileLimits::new(limits.max_input_bytes)?,
+        )?;
+        let (table_name, fib) = read_fib(&shared, limits)?;
+        classify_source_protection(&shared, &table_name, &fib, limits)
+            .map(|(protection, _)| protection)
+    }
+
+    /// The verdict of `Snapshot::protection`, which the tracked-revision
+    /// editor shares.
+    fn shared_protection(bytes: &[u8]) -> Option<EditProtection> {
+        crate::package::property_set::Snapshot::from_bytes(bytes.to_vec())
+            .ok()
+            .map(|snapshot| snapshot.protection())
+    }
+
+    fn doc_files(directory: &std::path::Path, output: &mut Vec<std::path::PathBuf>) {
+        for entry in std::fs::read_dir(directory).expect("test-data directory") {
+            let path = entry.expect("test-data entry").path();
+            if path.is_dir() {
+                doc_files(&path, output);
+            } else if path
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("doc"))
+            {
+                output.push(path);
+            }
+        }
+    }
+
+    /// Change 0768 review: the positional source classifies protection with
+    /// the shared classifier, so the two entry points agree on every DOC in
+    /// `test-data`. The source refuses encrypted and pre-Word 97 sources before
+    /// it reads protection; the shared verdict for those is `Unknown`.
+    #[test]
+    fn source_protection_agrees_with_the_shared_classifier_on_every_doc_fixture() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
+        let mut files = Vec::new();
+        doc_files(&root, &mut files);
+        files.sort();
+        assert_eq!(files.len(), 57);
+        let mut compared = 0;
+        for path in &files {
+            let bytes = std::fs::read(path).expect("DOC fixture");
+            let name = path.strip_prefix(&root).expect("fixture path").display();
+            match (shared_protection(&bytes), source_protection(&bytes)) {
+                (shared, Ok(source)) => {
+                    assert_eq!(shared, Some(source), "{name}");
+                    compared += 1;
+                },
+                (
+                    Some(EditProtection::Unknown),
+                    Err(Error::Refused(Refusal::Encrypted | Refusal::UnsupportedSource)),
+                )
+                | (None, Err(_)) => {},
+                (shared, Err(error)) => panic!("{name}: shared {shared:?}, source: {error}"),
+            }
+        }
+        assert_eq!(compared, 49);
+    }
+
+    /// The change 0768 review's DOP mutations: every `DopBase` lock, the
+    /// password hash, their MS-DOC combinations, `Dop2003` modes 0 to 7 with
+    /// and without enforcement, and bits beside them that are not protection.
+    fn crafted_dop_mutations() -> Vec<(String, fn(&mut [u8], u8) -> bool, u8)> {
+        fn dop_base(dop: &mut [u8], which: u8) -> bool {
+            match which {
+                0 => {},
+                1 => dop[6] |= 0x10,
+                2 => dop[7] |= 0x02,
+                3 => {
+                    dop[7] |= 0x40;
+                    dop[5] |= 0x80;
+                },
+                4 => {
+                    dop[7] |= 0x40;
+                    dop[5] &= !0x80;
+                },
+                5 => dop[78..82].copy_from_slice(&0x1234_5678u32.to_le_bytes()),
+                6 => dop[78..82].copy_from_slice(&0x8000_0000u32.to_le_bytes()),
+                7 => {
+                    dop[7] |= 0x02;
+                    dop[6] |= 0x10;
+                },
+                8 => {
+                    dop[7] |= 0x42;
+                    dop[5] |= 0x80;
+                },
+                9 => {
+                    dop[6] |= 0x10;
+                    dop[7] |= 0x40;
+                    dop[5] |= 0x80;
+                },
+                10 => {
+                    dop[5] |= 0x20;
+                    dop[7] &= !0x02;
+                },
+                11 => {
+                    dop[5] |= 0x20;
+                    dop[7] |= 0x02;
+                },
+                12 => dop[7] |= 0x20,
+                _ => unreachable!("DopBase mutation"),
+            }
+            true
+        }
+        fn dop2002(dop: &mut [u8], which: u8) -> bool {
+            if dop.len() <= 594 {
+                return false;
+            }
+            match which {
+                0 => {
+                    dop[594] |= 0x01;
+                    dop[6] |= 0x10;
+                },
+                1 => dop[594] |= 0x22,
+                2 => {
+                    dop[594] |= 0x40;
+                    dop[6] |= 0x10;
+                },
+                _ => unreachable!("Dop2002 mutation"),
+            }
+            true
+        }
+        fn enforced(dop: &mut [u8], mode: u8) -> bool {
+            if dop.len() <= 598 {
+                return false;
+            }
+            dop[598] = (dop[598] & 0x87) | 0x08 | mode << 4;
+            true
+        }
+        fn unenforced(dop: &mut [u8], mode: u8) -> bool {
+            if dop.len() <= 598 {
+                return false;
+            }
+            dop[598] = (dop[598] & 0x87) | mode << 4;
+            true
+        }
+        let base: fn(&mut [u8], u8) -> bool = dop_base;
+        let dop2002_bits: fn(&mut [u8], u8) -> bool = dop2002;
+        let mut mutations: Vec<(String, fn(&mut [u8], u8) -> bool, u8)> = (0..13)
+            .map(|which| (format!("dop-base-{which}"), base, which))
+            .collect();
+        mutations.extend((0..3).map(|which| (format!("dop2002-{which}"), dop2002_bits, which)));
+        for mode in 0..8 {
+            mutations.push((format!("enforced-{mode}"), enforced, mode));
+            mutations.push((format!("unenforced-{mode}"), unenforced, mode));
+        }
+        mutations
+    }
+
+    /// The change 0768 review's FIB variants, applied to `WordDocument`;
+    /// `false` when a variant does not apply to this FIB.
+    fn crafted_fib_variant(word: &mut [u8], variant: &str) -> bool {
+        let count = usize::from(u16::from_le_bytes([word[152], word[153]]));
+        let pointer_end = FIB_POINTERS + count * 8;
+        let csw_new = u16::from_le_bytes([word[pointer_end], word[pointer_end + 1]]);
+        match variant {
+            "as-is" => {},
+            "nfib-c0" => word[2..4].copy_from_slice(&0x00C0u16.to_le_bytes()),
+            "nfib-c2" => word[2..4].copy_from_slice(&0x00C2u16.to_le_bytes()),
+            "nfib-c3" => word[2..4].copy_from_slice(&0x00C3u16.to_le_bytes()),
+            "cswnew-0" => word[pointer_end..pointer_end + 2].fill(0),
+            "cswnew-0-nfibnew" => {
+                if csw_new == 0 {
+                    return false;
+                }
+                let n_fib_new = [word[pointer_end + 2], word[pointer_end + 3]];
+                word[2..4].copy_from_slice(&n_fib_new);
+                word[pointer_end..pointer_end + 2].fill(0);
+            },
+            "cswnew-wrong" => {
+                let wrong: u16 = if csw_new == 2 { 5 } else { 2 };
+                word[pointer_end..pointer_end + 2].copy_from_slice(&wrong.to_le_bytes());
+            },
+            // fEncrypted is bit 8 of the FIB flags.
+            "encrypted" => word[FIB_FLAGS + 1] |= 0x01,
+            _ => unreachable!("FIB variant"),
+        }
+        true
+    }
+
+    /// Every crafted document for one fixture: DOP mutations under each FIB
+    /// variant, the DOP length sweep with and without enforcement at byte 598,
+    /// and malformed range-protection pointers.
+    fn crafted_documents(name: &str) -> Vec<(String, Vec<u8>)> {
+        // Neither classifier reads a stream other than WordDocument and the
+        // table stream, so the others are dropped once to keep each crafted
+        // compound file small.
+        let mut stripped = object_editor(&fixture(name));
+        let others = litchi_cfb::OleFile::open(io::Cursor::new(fixture(name)))
+            .expect("fixture CFB")
+            .list_directory_entries(&[])
+            .expect("fixture root")
+            .into_iter()
+            .filter(|entry| {
+                entry.entry_type == STGTY_STREAM
+                    && ![WORD_DOCUMENT, TABLE_0, TABLE_1].contains(&entry.name.as_str())
+            })
+            .map(|entry| vec![entry.name.clone()])
+            .collect::<Vec<_>>();
+        stripped
+            .remove_streams(others.iter().map(Vec::as_slice))
+            .expect("stream removal");
+        let opened = object_editor(&stripped.finish().expect("stripped fixture"));
+        let word = opened
+            .stream(&[WORD_DOCUMENT.to_string()])
+            .expect("WordDocument")
+            .to_vec();
+        let mut documents = Vec::new();
+        for variant in [
+            "as-is",
+            "nfib-c0",
+            "nfib-c2",
+            "nfib-c3",
+            "cswnew-0",
+            "cswnew-0-nfibnew",
+            "cswnew-wrong",
+            "encrypted",
+        ] {
+            let full = matches!(
+                variant,
+                "as-is" | "nfib-c0" | "nfib-c2" | "cswnew-0-nfibnew"
+            );
+            for (label, mutate, argument) in crafted_dop_mutations() {
+                if !full && label != "dop-base-0" && label != "dop-base-1" {
+                    continue;
+                }
+                let mut applies = true;
+                let document = edit_streams(opened.clone(), |word, table| {
+                    applies = crafted_fib_variant(word, variant)
+                        && mutate(&mut table[dop_range(word)], argument);
+                });
+                if applies {
+                    documents.push((format!("{name} {variant} {label}"), document));
+                }
+            }
+        }
+        for length in [
+            83usize, 84, 499, 500, 543, 544, 593, 594, 595, 597, 598, 599, 600, 601, 609, 610, 615,
+            616, 617, 673, 674, 675, 689, 690, 691, 693, 694, 695,
+        ] {
+            for enforce in [false, true] {
+                let document = edit_streams(opened.clone(), |word, table| {
+                    let range = dop_range(word);
+                    let end = range.start + length.max(600);
+                    if end > table.len() {
+                        table.resize(end, 0);
+                    }
+                    let byte = &mut table[range.start + 598];
+                    if enforce {
+                        *byte = (*byte & 0x87) | 0x08 | 3 << 4;
+                    } else if range.len() <= 598 {
+                        *byte &= !0x08;
+                    }
+                    let pointer = FIB_POINTERS + 31 * 8 + 4;
+                    word[pointer..pointer + 4]
+                        .copy_from_slice(&u32::try_from(length).unwrap().to_le_bytes());
+                });
+                documents.push((
+                    format!("{name} lcbDop {length} enforce {enforce}"),
+                    document,
+                ));
+            }
+        }
+        let count = usize::from(u16::from_le_bytes([word[152], word[153]]));
+        if count > 144 {
+            for index in 141..=144usize {
+                let document = edit_streams(opened.clone(), |word, _| {
+                    let pointer = FIB_POINTERS + index * 8;
+                    word[pointer..pointer + 4].fill(0);
+                    word[pointer + 4..pointer + 8].copy_from_slice(&12u32.to_le_bytes());
+                });
+                documents.push((format!("{name} range pointer {index}"), document));
+            }
+        }
+        documents
+    }
+
+    /// Asserts that the source and the shared classifier give the same
+    /// verdict for every document [`crafted_documents`] builds from `name`,
+    /// and returns how many documents there were and how many both classified.
+    /// The source refuses an encrypted FIB before it reads protection, and a
+    /// FIB whose shape the classifier cannot prove may also break this reader's
+    /// own structure checks.
+    fn crafted_protection_agreement(name: &str) -> (usize, usize) {
+        let mut cases = 0;
+        let mut compared = 0;
+        for (label, bytes) in crafted_documents(name) {
+            cases += 1;
+            match (shared_protection(&bytes), source_protection(&bytes)) {
+                (shared, Ok(source)) => {
+                    assert_eq!(shared, Some(source), "{label}");
+                    compared += 1;
+                },
+                (_, Err(Error::Refused(Refusal::Encrypted))) if label.contains(" encrypted ") => {},
+                (Some(EditProtection::Unknown), Err(Error::InvalidData(_))) => {},
+                (shared, Err(error)) => panic!("{label}: shared {shared:?}, source: {error}"),
+            }
+        }
+        (cases, compared)
+    }
+
+    /// Change 0768 review: the reviewer's 1,730 crafted protection records,
+    /// one test per fixture.
+    macro_rules! crafted_protection_agreement_tests {
+        ($($test:ident: $name:literal => $cases:literal, $compared:literal;)*) => {$(
+            #[test]
+            fn $test() {
+                assert_eq!(crafted_protection_agreement($name), ($cases, $compared));
+            }
+        )*};
+    }
+
+    crafted_protection_agreement_tests! {
+        crafted_protection_agrees_on_a_word97_fib: "tdf71749_with_footnote.doc" => 103, 101;
+        crafted_protection_agrees_on_a_second_word97_fib: "HeaderFooterProblematic.doc" => 103, 101;
+        crafted_protection_agrees_on_a_word2003_fib: "FloatingPictures.doc" => 196, 194;
+        crafted_protection_agrees_on_a_second_word2003_fib: "testPictures.doc" => 196, 194;
+        crafted_protection_agrees_on_a_674_byte_dop: "NoHeadFoot.doc" => 196, 194;
+        crafted_protection_agrees_on_a_690_byte_dop: "Lists.doc" => 196, 194;
+        crafted_protection_agrees_on_a_694_byte_dop: "cjklist30.doc" => 196, 194;
+        crafted_protection_agrees_on_a_libreoffice_fib: "picture.doc" => 160, 158;
+        crafted_protection_agrees_on_a_libreoffice_fib_with_cswnew: "footnote.doc" => 192, 190;
+        crafted_protection_agrees_on_a_bidi_word97_fib: "duplicate-style-names.doc" => 192, 188;
     }
 
     fn fixture_edit_policy() -> ProtectionPolicy {
@@ -3120,7 +3381,7 @@ mod tests {
 
     #[test]
     fn stable_token_mutation_is_rejected_before_paragraph_and_commit_access() {
-        let bytes = fixture_with_strict_word2002_fib("documentProperties.doc");
+        let bytes = fixture("documentProperties.doc");
         let hostile = Arc::new(StableMutationSource {
             bytes: Mutex::new(bytes),
             armed: AtomicBool::new(false),
@@ -3137,7 +3398,7 @@ mod tests {
         ));
         assert!(hostile.fired.load(Ordering::SeqCst));
 
-        let bytes = fixture_with_strict_word2002_fib("documentProperties.doc");
+        let bytes = fixture("documentProperties.doc");
         let hostile = Arc::new(StableMutationSource {
             bytes: Mutex::new(bytes),
             armed: AtomicBool::new(false),
@@ -3291,7 +3552,7 @@ mod tests {
     /// conforming (`cswNew` 2 with `nFibNew`), which strict FIB admission
     /// requires; the same-length `WordDocument` patch keeps the CFB layout.
     fn documentproperties_bytes() -> Vec<u8> {
-        fixture_with_strict_word2002_fib("documentProperties.doc")
+        fixture("documentProperties.doc")
     }
 
     /// Change 0589: the source-identity fence still refuses a stable-token

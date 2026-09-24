@@ -5,6 +5,7 @@ use crate::parts::fib::FileInformationBlock;
 use litchi_ole_common::object::Patch as ObjectPatch;
 
 use super::Ranges;
+use super::codec::{PLCF_BKF_PROT, PLCF_BKL_PROT, STTB_PROT_USER, STTBF_BKMK_PROT};
 
 const DOP_POINTER: usize = 31;
 const FIB_CSW: usize = 32;
@@ -269,6 +270,35 @@ impl PackagePatch {
 /// Classifies document and range-level protection from a selected Word FIB
 /// and table stream.
 pub(crate) fn classify(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<EditProtection> {
+    classify_with(
+        fib,
+        |offset, length| Ok(table_range(table_stream, offset, length)),
+        || Ok(table_stream),
+    )
+}
+
+/// Classifies protection exactly as [`classify`] does, reading the table
+/// stream through the caller.
+///
+/// `read_dop(offset, length)` returns the DOP's bytes, or `None` when that
+/// range does not lie inside the table stream. `read_table` returns the whole
+/// table stream; it is called only when a range-protection pointer (indexes
+/// 141 to 144) declares data, because [`Ranges::parse`] finds no range
+/// protection without reading the stream otherwise. A bounded reader, such as
+/// the positional body-text source, can therefore classify without loading a
+/// table stream that has no range-protection tables. A failure of either
+/// closure is returned as it is; a classification failure other than a
+/// malformed record is converted into `E`.
+pub(crate) fn classify_with<E, D, T>(
+    fib: &FileInformationBlock,
+    read_dop: impl FnOnce(u32, u32) -> std::result::Result<Option<D>, E>,
+    read_table: impl FnOnce() -> std::result::Result<T, E>,
+) -> std::result::Result<EditProtection, E>
+where
+    E: From<PackageError>,
+    D: AsRef<[u8]>,
+    T: AsRef<[u8]>,
+{
     // A missing or truncated counted FIB must never be interpreted as an
     // unprotected document.  In particular, get_table_pointer(DOP) returns
     // None when cbRgFcLcb stops before that pair, which otherwise creates a
@@ -277,21 +307,31 @@ pub(crate) fn classify(fib: &FileInformationBlock, table_stream: &[u8]) -> Resul
         Ok(value) => value,
         Err(_) => return Ok(EditProtection::Unknown),
     };
-    let Some((_, dop_length)) = fib.get_table_pointer(DOP_POINTER) else {
+    let Some((dop_offset, dop_length)) = fib.get_table_pointer(DOP_POINTER) else {
         return Ok(EditProtection::Unknown);
     };
     if dop_length == 0 {
         return Ok(EditProtection::Unknown);
     }
-    let document = match document_protected(fib, table_stream, effective_nfib) {
+    let Some(dop) = read_dop(dop_offset, dop_length)? else {
+        // A DOP outside the table stream cannot be read, so it cannot be
+        // proven unprotected.
+        return Ok(EditProtection::Unrecognized);
+    };
+    let document = match document_protected(dop.as_ref(), effective_nfib) {
         Ok(document) => document,
         Err(PackageError::Corrupted(_)) => return Ok(EditProtection::Unrecognized),
-        Err(error) => return Err(error),
+        Err(error) => return Err(error.into()),
     };
-    let ranges = match Ranges::parse(fib, table_stream) {
-        Ok(value) => value.is_some_and(|value| !value.ranges().is_empty()),
-        Err(PackageError::Corrupted(_)) => return Ok(EditProtection::Unrecognized),
-        Err(error) => return Err(error),
+    let ranges = if declares_range_protection(fib) {
+        let table_stream = read_table()?;
+        match Ranges::parse(fib, table_stream.as_ref()) {
+            Ok(value) => value.is_some_and(|value| !value.ranges().is_empty()),
+            Err(PackageError::Corrupted(_)) => return Ok(EditProtection::Unrecognized),
+            Err(error) => return Err(error.into()),
+        }
+    } else {
+        false
     };
     Ok(match (document, ranges) {
         (false, false) => EditProtection::None,
@@ -301,27 +341,31 @@ pub(crate) fn classify(fib: &FileInformationBlock, table_stream: &[u8]) -> Resul
     })
 }
 
-fn document_protected(
-    fib: &FileInformationBlock,
-    table_stream: &[u8],
-    effective_nfib: u16,
-) -> Result<bool> {
-    let (offset, length) = fib
-        .get_table_pointer(DOP_POINTER)
-        .ok_or_else(|| PackageError::Corrupted("DOP pointer is absent from the FIB".into()))?;
-    if length == 0 {
-        return Err(PackageError::Corrupted("lcbDop is zero".into()));
-    }
-    let start = usize::try_from(offset)
-        .map_err(|_| PackageError::Corrupted("DOP offset exceeds usize".into()))?;
-    let length = usize::try_from(length)
-        .map_err(|_| PackageError::Corrupted("DOP length exceeds usize".into()))?;
-    let end = start
-        .checked_add(length)
-        .ok_or_else(|| PackageError::Corrupted("DOP range overflows".into()))?;
-    let dop = table_stream
-        .get(start..end)
-        .ok_or_else(|| PackageError::Corrupted("DOP extends beyond the table stream".into()))?;
+/// The bytes at `offset..offset + length` of `table_stream`, or `None` when
+/// that range does not lie inside it.
+fn table_range(table_stream: &[u8], offset: u32, length: u32) -> Option<&[u8]> {
+    let start = usize::try_from(offset).ok()?;
+    let end = start.checked_add(usize::try_from(length).ok()?)?;
+    table_stream.get(start..end)
+}
+
+/// Whether any range-protection pointer declares data. When none does,
+/// [`Ranges::parse`] returns `Ok(None)` without reading the table stream.
+fn declares_range_protection(fib: &FileInformationBlock) -> bool {
+    [
+        STTBF_BKMK_PROT,
+        PLCF_BKF_PROT,
+        PLCF_BKL_PROT,
+        STTB_PROT_USER,
+    ]
+    .into_iter()
+    .any(|index| {
+        fib.get_table_pointer(index)
+            .is_some_and(|(_, length)| length != 0)
+    })
+}
+
+fn document_protected(dop: &[u8], effective_nfib: u16) -> Result<bool> {
     if !dop_holds_generation_protection_fields(effective_nfib, dop.len()) {
         return Err(PackageError::Corrupted(format!(
             "DOP length {} cannot hold the protection fields of effective nFib 0x{effective_nfib:04X}",
