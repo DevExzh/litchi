@@ -1,0 +1,1 @@
+cargo +1.95.0 build --release --locked --offline --target-dir /tmp/litchi-xlsb-theme-target-20260910 --jobs 2 -p litchi-xlsb --example theme_profile

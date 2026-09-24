@@ -1,0 +1,6 @@
+{
+  "scope": "60 integration tests: 57 pass; finite cache Objects33>32, IF(TRUE()) nested InvalidExpression, array-valued reference operand wrongly succeeds with Array1x4",
+  "archive": "planner-handler-24.tar.gz",
+  "sha256": "a9f8ef2f73bbb8d91385b9924c0e9e0fcbd75832d9dfde0bfc429df7edbc30e2",
+  "status": 101
+}

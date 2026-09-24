@@ -1,0 +1,47 @@
+{
+  "scope": "Independent root verification of bounded smoke; not full profiling or production approval",
+  "checks": {
+    "sample_semantics": 17,
+    "approved_production_source_hashes": 5,
+    "source_inputs_unchanged": true,
+    "binary_receipts_match_build_provenance": true
+  },
+  "binary_sha256": "6847e5d17414dc4ca65e40abcd0e591df77806f95a4dad2519780fb5e84d6e5c",
+  "limitations": [
+    "One warm-up and one sample per lane.",
+    "No per-lane timing/RSS/stderr receipts in smoke; repeated profile remains required."
+  ],
+  "receipt_sha256": {
+    "results/smoke/README.md": "f17e2fb0c839ed0d1cd1b98a50b32e4e21e0f7bfe64402c0a9c0e7a38185cc86",
+    "results/smoke/add_small_8.json": "93b8af3b6dd8c5eec6f6620e94ced84f999aa4ff47134dfa23e18b9d3f508126",
+    "results/smoke/binary-after.sha256": "24ba835ebdec9a5ad905bac013543d7c38b61aa4fe1f050cf5b724ef426f84e1",
+    "results/smoke/binary.sha256": "24ba835ebdec9a5ad905bac013543d7c38b61aa4fe1f050cf5b724ef426f84e1",
+    "results/smoke/build-provenance.txt": "0ebcb8096b30d1c9778d02b23705083185a1f210f423f057c2c411d0cae6b9ae",
+    "results/smoke/build.log": "a37840bc4534dcf2810077978a5838fbf18e4d988abba8a388fb8cf13592a376",
+    "results/smoke/cap_refusal_small_8.json": "6d52068632516f7ab63f5ddbc0ff042d11b6f6052938b14db741cac62a6eeff1",
+    "results/smoke/clear_batch_near_1024.json": "e2a0d0226dbadaebf5c00ca8a7d4e03cebd377c0c8aea1de0e37834e45c7266c",
+    "results/smoke/clear_batch_scaled_128.json": "842175c15e49228124cb26fa2410755a4326494f7c88ae0e8246433c0238dfc2",
+    "results/smoke/commands.txt": "9883ed0286c070542f780f28cf4cf7c7751d1c5d1556f82dfbfd7808f9b0bd5e",
+    "results/smoke/draft_opaque_64.json": "66c298fa4743ec7e9d169460425fa985969e3f142ffba945204ccee73169cf8f",
+    "results/smoke/insert_batch_near_1024.json": "dab8df169d687064cf44dcf41917c33af6bc7e0e9242039543d15e57beb542f8",
+    "results/smoke/insert_batch_scaled_128.json": "f77f502845a70f6018e69a1030ada41bef9b3f9a6e3ae58ec2ff91261984f62b",
+    "results/smoke/move_batch_near_1024.json": "4e5e562933ba129dcd0e6098dcf3495e0829e59ec6e12a83a3d547e51bb10342",
+    "results/smoke/move_batch_scaled_128.json": "bc2747a441bd3fe3e28c72c8d72bede074c41be22da64827fc7ba6d79745a5bb",
+    "results/smoke/no_op_small_8.json": "80aae3d2e0e1edc8d60dc8911f0ba599620c3df0932556d919cb6534a206ca51",
+    "results/smoke/remove_batch_near_1024.json": "876325e8e2e39328afed33ddb19f996d56fe0d8ffaa22ebe35924a35e0586457",
+    "results/smoke/remove_batch_scaled_128.json": "7338fc127c003f03b7fc4da9ef4fc416e288006ebb7102645e14808b828289ed",
+    "results/smoke/scalar_batch_near_1024.json": "dc8e1ea4870e1baaca1ff95a364871474fc632f9dec36ab5284dc2748d2d8549",
+    "results/smoke/scalar_batch_scaled_128.json": "4a3efe751c26e86f2cda32e7b4da8f56b34b12f593b82a8e28027c52757b6f63",
+    "results/smoke/scalar_coalesce_near_1024.json": "3e9c657ec0b96f39109f797808e0f9c34d1bee7eabd68b22b6974c0478cdb8b1",
+    "results/smoke/scalar_coalesce_scaled_128.json": "22f0158dfd2e03d9a79a4b728db9ac5608dcca5e08f8149f9d8eabba1da1c852",
+    "results/smoke/scalar_edit_scaled_128.json": "62018721b2459af1ac54bbc90863378b6c7bc6d60bc9ba552bedc39f1e9f0c33",
+    "results/smoke/source-inputs-after.txt": "bc14ccceacdac5847a7c0e8bb2aeba5a1a994767a7f4219ee1d12f92a18887c4",
+    "results/smoke/source-inputs-before.txt": "bc14ccceacdac5847a7c0e8bb2aeba5a1a994767a7f4219ee1d12f92a18887c4",
+    "results/smoke/source-provenance.txt": "d3ee9dc36551fd2e004c843d16a135f18fc9207206600c5dc0b3bef26b64777f"
+  },
+  "independent_review": "Bounded scaffold/source integrity approved; full performance acceptance pending.",
+  "post_smoke_runner_changes": [
+    "Made run_profile.sh and smoke.sh executable; no measured harness or production bytes changed.",
+    "Smoke validation now selects explicit requested lane names. Replayed all17 receipts with malformed unrelated JSON preserved in a disposable directory; passed."
+  ]
+}

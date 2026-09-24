@@ -34,6 +34,7 @@ pub fn is_protected_component(name: &str) -> bool {
 pub(crate) fn reject_protected_container<R: Read + Seek>(
     ole: &OleFile<R>,
     operation: &'static str,
+    max_entries: usize,
 ) -> Result<(), OleError> {
     let mut pending = Vec::<Vec<String>>::new();
     pending
@@ -44,23 +45,38 @@ pub(crate) fn reject_protected_container<R: Read + Seek>(
         })?;
     pending.push(Vec::new());
 
+    // The CFB parser has already retained a validated directory index.  Use
+    // its finite slot count as a hard upper bound even when a format owner
+    // does not provide a tighter object/package budget.
+    let max_entries = max_entries.min(ole.directory_entry_count());
+    let mut discovered = 0usize;
     while let Some(path) = pending.pop() {
+        let remaining = max_entries.saturating_sub(discovered);
         let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
-        for entry in ole.list_directory_entries(&refs)? {
+        ole.visit_directory_entry_refs(&refs, remaining, |entry| {
+            discovered = discovered.saturating_add(1);
             if is_protected_component(&entry.name) {
                 return Err(OleError::InvalidFormat(format!(
                     "signed, encrypted, or DRM containers are not eligible for {operation}"
                 )));
             }
             if entry.entry_type == STORAGE_ENTRY {
-                let mut child = path.clone();
+                let mut child = clone_path(&path)?;
                 child
                     .try_reserve(1)
                     .map_err(|source| OleError::Allocation {
                         resource: "protected-container path",
                         source,
                     })?;
-                child.push(entry.name.clone());
+                let mut name = String::new();
+                name.try_reserve_exact(entry.name.len()).map_err(|source| {
+                    OleError::Allocation {
+                        resource: "protected-container path component",
+                        source,
+                    }
+                })?;
+                name.push_str(&entry.name);
+                child.push(name);
                 pending
                     .try_reserve(1)
                     .map_err(|source| OleError::Allocation {
@@ -69,9 +85,32 @@ pub(crate) fn reject_protected_container<R: Read + Seek>(
                     })?;
                 pending.push(child);
             }
-        }
+            Ok(())
+        })?;
     }
     Ok(())
+}
+
+fn clone_path(path: &[String]) -> Result<Vec<String>, OleError> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(path.len())
+        .map_err(|source| OleError::Allocation {
+            resource: "protected-container path",
+            source,
+        })?;
+    for component in path {
+        let mut value = String::new();
+        value
+            .try_reserve_exact(component.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "protected-container path component",
+                source,
+            })?;
+        value.push_str(component);
+        output.push(value);
+    }
+    Ok(output)
 }
 
 pub(crate) fn reject_protected_shared_container(

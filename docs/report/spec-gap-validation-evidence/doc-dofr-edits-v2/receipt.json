@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "base_commit": "463ab2a5989bba49ffd95277dc29422a363de7f8",
+  "candidate": "/var/tmp/litchi-doc-dofr-publication-validation-20260909",
+  "recorded_at": "2026-09-10T02:21:02.130040+00:00",
+  "scope": "DOC RgDofr same-length transaction and body/tracked-revision publication",
+  "source_manifest": "source-manifest.json",
+  "source_manifest_sha256": "64877cb8066e1a265d0dca97914d98892325eeecf44874bdfe47dbfbcbf3a9ea",
+  "sources": {
+    "crates/litchi-doc/docs/FEATURE_MATRIX.md": "c092462f5d94d24061f94f079e50ba9aefa95083baac552de4a23e8c694ad2a1",
+    "crates/litchi-doc/src/body_text.rs": "16626a70fe53f4829733400d765204b07dd28554f33fe4e6e562678ae61ff489",
+    "crates/litchi-doc/src/lib.rs": "9e18981319d01536e3fe29b68473f37059802e0de96623645ec80ab0e5dd9b46",
+    "crates/litchi-doc/src/parts/dofr.rs": "07d3bdd3578478c4f7cbe018517a42f155af7405b43fdd2fb6b90aedb5c8cd29",
+    "crates/litchi-doc/src/tracked_revision/package.rs": "548eab6642dd5fadce55f00e0f14e1707e55cf82a84eaff20333295f7e4d04c1",
+    "crates/litchi-doc/tests/dofr_edits.rs": "72bc1212643bd2f41cde5392d7f42ec3a8f14dafd012180124e8a2c51b2d303b"
+  },
+  "toolchain": "1.95.0",
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-doc-dofr-publication-root-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  },
+  "commands": [
+    {
+      "name": "tests",
+      "command": "cargo +1.95.0 test -p litchi-doc --all-features",
+      "log": "tests.log.gz",
+      "exit_code": 0,
+      "unit_and_integration_passed": 1223,
+      "unit_and_integration_failed": 0,
+      "unit_and_integration_ignored": 2,
+      "doctests_passed": 14,
+      "doctests_failed": 0,
+      "doctests_ignored": 12,
+      "reproduction_command": "cargo +1.95.0 test --offline --locked --all-features -p litchi-doc"
+    },
+    {
+      "name": "clippy",
+      "command": "cargo +1.95.0 clippy -p litchi-doc --all-features --all-targets -- -D warnings",
+      "log": "clippy.log.gz",
+      "exit_code": 0,
+      "reproduction_command": "cargo +1.95.0 clippy --offline --locked --all-features --all-targets -p litchi-doc -- -D warnings"
+    },
+    {
+      "name": "rustdoc",
+      "command": "RUSTDOCFLAGS=\"-D warnings\" cargo +1.95.0 doc -p litchi-doc --all-features --no-deps",
+      "log": "rustdoc.log.gz",
+      "exit_code": 0,
+      "reproduction_command": "RUSTDOCFLAGS=\"-D warnings\" cargo +1.95.0 doc --offline --locked --all-features -p litchi-doc --no-deps"
+    },
+    {
+      "name": "rustfmt",
+      "command": "rustup run 1.95.0 rustfmt --check --edition 2024 --config skip_children=true <the five Rust paths in source-manifest.json>",
+      "exit_code": 0
+    },
+    {
+      "name": "whitespace",
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "gates": {
+    "tests": "pass",
+    "clippy": "pass",
+    "rustdoc": "pass",
+    "rustfmt": "pass",
+    "git_diff_check": "pass",
+    "dedicated_target": true,
+    "source_hashes_verified": true
+  },
+  "limits": {
+    "source_bound": "Facade DOFR publication requires the patch owner to match the complete immutable DOC source by Arc identity or exact complete-source bytes; low-level DofrArray/DofrPatch APIs remain component-scoped.",
+    "same_length": "Record replacements must exactly match the selected record length and reparse before commit; no record insertion/deletion or FIB range relocation is supported.",
+    "signed_source": "Changed publication is refused for PIDDSI DigitalSignature, recognized StwUser Sign/SigAgile/SigV3, and conservatively malformed selected StwUser metadata; exact byte no-ops remain allowed.",
+    "auxiliary_three_way": "Any patch carrying the auxiliary RgDofr-change marker is refused by body semantic three-way planning, including DOFR-vs-text and DOFR-vs-DOFR histories; no opaque auxiliary merge is attempted."
+  },
+  "logs": {
+    "tests.log.gz": {
+      "archive_sha256": "e615257f0aa0ab4f510e3f941510c080d9ede68cafb51e7c14ac7c792af8b1a4",
+      "raw_sha256": "100f7af42d370ca8af33ceaf946ca9924a68aa6c4ac79b8e81bc5489e46dcf8f",
+      "raw_bytes": 120671,
+      "archive": "tests.log.gz",
+      "source": "/var/tmp/litchi-doc-dofr-publication-tests-v1.log",
+      "exit_code": 0
+    },
+    "clippy.log.gz": {
+      "archive_sha256": "f76abf706a7d008632ed0e60f5ed4f7c43ea7162fb21d20f4d7d52f33f71703e",
+      "raw_sha256": "21bc8eb81162ef4ac009dd6ab7af782c94ac43f65d3bc901a8cec91a8dfe95e3",
+      "raw_bytes": 4350,
+      "archive": "clippy.log.gz",
+      "source": "/var/tmp/litchi-doc-dofr-publication-clippy-v1.log",
+      "exit_code": 0
+    },
+    "rustdoc.log.gz": {
+      "archive_sha256": "db268d01685b15ab096ea6ee0d763e3d2d3e0e7b6513e1b39d41d20211b7f333",
+      "raw_sha256": "6a5b6fd60d491795a6df51dbe915d42c60f3d4091388d0ecf62e21a9220cc29b",
+      "raw_bytes": 1290,
+      "archive": "rustdoc.log.gz",
+      "source": "/var/tmp/litchi-doc-dofr-publication-rustdoc-v1.log",
+      "exit_code": 0
+    }
+  },
+  "cargo_lock": {
+    "archive": "Cargo.lock.gz",
+    "archive_sha256": "95904abdd367f785e35c09c34dc0cb669fb9cd2dbebbb005b6c889937894f71e",
+    "raw_sha256": "6a8d6057727a1dde3cd3b423ef69d3096ebd1d381626bc73f9c867304ade2033",
+    "raw_bytes": 138692
+  },
+  "provenance": {
+    "root_gate_receipt": "/var/tmp/litchi-dofr-root-final-gates-20260910.json",
+    "root_gate_receipt_sha256": "f264687f393b7d2fe6020147354dc57a65b69a78130f41898aca2808f78c1447",
+    "feature_delta_source": "/var/tmp/litchi-doc-dofr-final-validation-20260909",
+    "feature_delta_source_base": "1b3f2c2d0c059e8e59272775a97d0567e14e67f2"
+  }
+}

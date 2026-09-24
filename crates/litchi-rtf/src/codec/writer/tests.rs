@@ -22,31 +22,33 @@ fn write_body_story_for_test(
     {
         let mut writer = RtfWriter::new(&mut output);
         writer.write_blocks_with_markup(
-            &[],
-            &[],
+            &[], // blocks
+            &[], // body boundaries
             &bookmarks,
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
+            &[], // move bookmarks
+            &[], // custom XML tags
+            &[], // SmartTags
+            &[], // math zones
+            &[], // protection ranges
+            &[], // editable regions
+            &[], // annotations
+            &[], // notes
+            &[], // revisions
+            &[], // navigation entries
+            &[], // generated list markers
             shapes,
-            &[],
+            &[], // shape groups
             drawing_order,
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
+            &[], // picture compatibility records
+            &[], // pictures
+            &[], // objects
+            &[], // legacy text boxes
+            &[], // legacy drawings
+            &[], // form fields
+            &[], // fields
+            &[], // sections
             story_events,
-            &[],
+            &[], // opaque nodes
         )?;
     }
     Ok(output)

@@ -4,7 +4,10 @@ use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::core::{
     PackageWriter, XmlSourcePart, XmlSplicePublication, family::Package,
 };
-use std::{path::Path, sync::Arc};
+use std::{
+    path::Path,
+    sync::{Arc, Mutex, OnceLock},
+};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.text-web";
 // The common package shell requires a cheap marker before this family applies
@@ -35,6 +38,8 @@ struct State {
     resources: Vec<crate::resource::Resource>,
     resource_sites: Vec<crate::codec::ReplacementSite>,
     styles: Vec<crate::style::Style>,
+    structures: OnceLock<Arc<crate::codec::BodyStructures>>,
+    structures_gate: Mutex<()>,
     text_close: usize,
 }
 
@@ -204,6 +209,8 @@ impl Snapshot {
             resources: projection.resources,
             resource_sites,
             styles,
+            structures: OnceLock::new(),
+            structures_gate: Mutex::new(()),
             text_close: projection.text_close,
         })))
     }
@@ -251,8 +258,52 @@ impl Snapshot {
         &self.0.bookmarks
     }
 
+    fn structures(&self) -> Result<&crate::codec::BodyStructures> {
+        if let Some(structures) = self.0.structures.get() {
+            return Ok(structures);
+        }
+        let _gate =
+            self.0.structures_gate.lock().map_err(|_| {
+                Error::Other("OTH structure projection lock was poisoned".to_string())
+            })?;
+        if let Some(structures) = self.0.structures.get() {
+            return Ok(structures);
+        }
+        let structures = Arc::new(crate::codec::project_structures(self.content_xml())?);
+        let _ = self.0.structures.set(structures);
+        self.0
+            .structures
+            .get()
+            .map(Arc::as_ref)
+            .ok_or_else(|| Error::Other("OTH structure projection was not initialized".to_string()))
+    }
+
+    pub(crate) fn annotations(&self) -> Result<&[crate::annotation::Annotation]> {
+        Ok(&self.structures()?.annotations)
+    }
+
+    pub(crate) fn changes(&self) -> Result<&[crate::change::Change]> {
+        Ok(&self.structures()?.changes)
+    }
+
+    pub(crate) fn change_tracking(&self) -> Result<Option<&crate::change::ChangeTracking>> {
+        Ok(self.structures()?.change_tracking.as_ref())
+    }
+
+    pub(crate) fn frames(&self) -> Result<&[crate::frame::Frame]> {
+        Ok(&self.structures()?.frames)
+    }
+
+    pub(crate) fn indexes(&self) -> Result<&[crate::index::Index]> {
+        Ok(&self.structures()?.indexes)
+    }
+
     pub(crate) fn lists(&self) -> &[crate::list::List] {
         &self.0.lists
+    }
+
+    pub(crate) fn notes(&self) -> Result<&[crate::note::Note]> {
+        Ok(&self.structures()?.notes)
     }
 
     pub(crate) fn list_site(&self, index: usize) -> Option<&crate::codec::ReplacementSite> {
@@ -261,6 +312,14 @@ impl Snapshot {
 
     pub(crate) fn resources(&self) -> &[crate::resource::Resource] {
         &self.0.resources
+    }
+
+    pub(crate) fn rubies(&self) -> Result<&[crate::ruby::Ruby]> {
+        Ok(&self.structures()?.rubies)
+    }
+
+    pub(crate) fn sections(&self) -> Result<&[crate::section::Section]> {
+        Ok(&self.structures()?.sections)
     }
 
     pub(crate) fn resource_site(&self, index: usize) -> Option<&crate::codec::ReplacementSite> {
@@ -295,6 +354,10 @@ impl Snapshot {
 
     pub(crate) fn styles(&self) -> &[crate::style::Style] {
         &self.0.styles
+    }
+
+    pub(crate) fn tables(&self) -> Result<&[crate::table::Table]> {
+        Ok(&self.structures()?.tables)
     }
 
     pub(crate) fn order(&self) -> &[crate::codec::BlockOrder] {

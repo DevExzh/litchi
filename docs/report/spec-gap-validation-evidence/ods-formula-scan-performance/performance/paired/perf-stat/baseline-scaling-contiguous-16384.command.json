@@ -1,0 +1,28 @@
+{
+  "label": "baseline-scaling-contiguous-16384",
+  "side": "baseline",
+  "lane": "scaling-contiguous-16384",
+  "case": "scaling-contiguous-a1-16384",
+  "repeat": 1,
+  "warmups": 3,
+  "iterations": 15,
+  "cpu_pin": "2",
+  "events": [
+    "cycles",
+    "instructions",
+    "branches",
+    "branch-misses",
+    "cache-misses"
+  ],
+  "binary": "docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/baseline/ods-formula-reference-profile",
+  "binary_sha256": "421a788fe9c2199bc4b224f4bcc05bb19c15c0ea6d0b61bf56ffe45f764bd274",
+  "command": "/usr/bin/perf stat --no-big-num -x, -e cycles,instructions,branches,branch-misses,cache-misses -- taskset -c 2 docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/baseline/ods-formula-reference-profile --workload parse --case scaling-contiguous-a1-16384 --warmups 3 --iterations 15 --repeat 1",
+  "status": 0,
+  "started_at": "2026-09-13T08:34:04Z",
+  "finished_at": "2026-09-13T08:34:06Z",
+  "elapsed_seconds": 1.9371237754821777,
+  "stdout": "baseline-scaling-contiguous-16384.stdout",
+  "stderr": "baseline-scaling-contiguous-16384.stderr",
+  "stdout_sha256": "06cfb495dec0bbaac672aa98f44e62372207345bbda7a697998ecf923d468274",
+  "stderr_sha256": "6e0a66a95b4d982d9f9598322bd98b460e093afd5a5608726fd974878145ea90"
+}

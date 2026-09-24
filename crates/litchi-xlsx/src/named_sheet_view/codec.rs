@@ -26,13 +26,16 @@ use super::{
     MAX_FRAGMENT_DEPTH, MAX_FRAGMENT_NODES, MAX_MARKUP_BYTES, MAX_NAMESPACE_DECLARATIONS,
     MAX_PART_BYTES, MAX_RETAINED_BYTES, MAX_VIEWS, NSV, RICH, STRICT, X14, invalid, xml_error,
 };
+use crate::data_type_icons::{
+    SHOW_DATA_TYPE_ICONS_NAMESPACE, ShowDataTypeIcons, Target, codec::observe_event,
+};
 
 pub fn parse_named_sheet_views(xml: &[u8]) -> Result<Views> {
     if xml.len() > MAX_PART_BYTES {
         return Err(invalid("Named Sheet Views part exceeds size limit"));
     }
     let mut caps = Capabilities::default();
-    for ns in [NSV, X14, RICH] {
+    for ns in [NSV, X14, RICH, SHOW_DATA_TYPE_ICONS_NAMESPACE.as_bytes()] {
         caps.understand_namespace(String::from_utf8_lossy(ns).into_owned());
     }
     let limits = Limits {
@@ -56,11 +59,12 @@ pub fn parse_named_sheet_views(xml: &[u8]) -> Result<Views> {
                 return Err(invalid("custom XML entities are rejected"));
             }
         }
+        let resolver = reader.resolver().clone();
         if parser.capture.is_some() {
+            parser.observe_capture_event(&event, &resolver, decoder)?;
             parser.capture_event(event)?;
             continue;
         }
-        let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(e) => parser.start(&namespace, &e, decoder, &resolver)?,
@@ -510,6 +514,9 @@ struct Capture {
     depth: usize,
     writer: Writer<Vec<u8>>,
     payload: Payload,
+    target_value: Option<ShowDataTypeIcons>,
+    target_seen: bool,
+    target_open_depth: Option<usize>,
 }
 #[derive(Default)]
 struct Parser {
@@ -771,6 +778,7 @@ impl Parser {
                 id,
                 filters: Vec::new(),
                 extensions: Vec::new(),
+                show_data_type_icons_custom_sheet_view: None,
             },
             phase: 0,
         });
@@ -1073,6 +1081,9 @@ impl Parser {
             depth: 1,
             writer,
             payload,
+            target_value: None,
+            target_seen: false,
+            target_open_depth: None,
         });
         Ok(())
     }
@@ -1086,7 +1097,38 @@ impl Parser {
         writer
             .write_event(Event::Empty(retained_root(e, r)))
             .map_err(xml_error)?;
-        self.attach(payload, writer.into_inner())
+        self.attach(payload, writer.into_inner(), None)
+    }
+    fn observe_capture_event(
+        &mut self,
+        event: &Event<'_>,
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+    ) -> Result<()> {
+        let Some(capture) = self.capture.as_mut() else {
+            return Ok(());
+        };
+        let Payload::Extension(owner, _) = &capture.payload else {
+            return Ok(());
+        };
+        let value = observe_event(
+            event,
+            resolver,
+            decoder,
+            Target::CustomSheetView,
+            capture.depth,
+            &mut capture.target_seen,
+            &mut capture.target_open_depth,
+        )?;
+        if let Some(value) = value {
+            if !matches!(owner, ExtOwner::View) {
+                return Err(invalid(
+                    "showDataTypeIconsCustomSheetView is only valid under namedSheetView",
+                ));
+            }
+            capture.target_value = Some(value);
+        }
+        Ok(())
     }
     fn capture_event(&mut self, event: Event<'static>) -> Result<()> {
         let capture = self.capture.as_mut().unwrap_or_else(|| {
@@ -1116,11 +1158,20 @@ impl Parser {
                 )
             });
             self.stack.pop();
-            self.attach(capture.payload, capture.writer.into_inner())?;
+            self.attach(
+                capture.payload,
+                capture.writer.into_inner(),
+                capture.target_value,
+            )?;
         }
         Ok(())
     }
-    fn attach(&mut self, payload: Payload, markup: Vec<u8>) -> Result<()> {
+    fn attach(
+        &mut self,
+        payload: Payload,
+        markup: Vec<u8>,
+        icon: Option<ShowDataTypeIcons>,
+    ) -> Result<()> {
         if markup.len() > MAX_MARKUP_BYTES {
             return Err(invalid(
                 "retained Named Sheet Views element exceeds size limit",
@@ -1176,50 +1227,80 @@ impl Parser {
             Payload::Extension(owner, mut x) => {
                 x.markup = Markup(markup);
                 match owner {
-                    ExtOwner::Root => self
-                        .root
-                        .as_mut()
-                        .unwrap_or_else(|| {
-                            crate::error::panic_missing_invariant(
-                                "required value was checked before extraction",
-                            )
-                        })
-                        .extensions
-                        .push(x),
-                    ExtOwner::View => self
-                        .view
-                        .as_mut()
-                        .unwrap_or_else(|| {
-                            crate::error::panic_missing_invariant(
-                                "required value was checked before extraction",
-                            )
-                        })
-                        .value
-                        .extensions
-                        .push(x),
-                    ExtOwner::Filter => self
-                        .filter
-                        .as_mut()
-                        .unwrap_or_else(|| {
-                            crate::error::panic_missing_invariant(
-                                "required value was checked before extraction",
-                            )
-                        })
-                        .value
-                        .extensions
-                        .push(x),
-                    ExtOwner::Column => self
-                        .column
-                        .as_mut()
-                        .unwrap_or_else(|| {
-                            crate::error::panic_missing_invariant(
-                                "required value was checked before extraction",
-                            )
-                        })
-                        .value
-                        .extensions
-                        .push(x),
+                    ExtOwner::Root => {
+                        if icon.is_some() {
+                            return Err(invalid(
+                                "showDataTypeIconsCustomSheetView is only valid under namedSheetView",
+                            ));
+                        }
+                        self.root
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .extensions
+                            .push(x);
+                    },
+                    ExtOwner::View => {
+                        let view = &mut self
+                            .view
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .value;
+                        if icon.is_some() && view.show_data_type_icons_custom_sheet_view.is_some() {
+                            return Err(invalid(
+                                "duplicate showDataTypeIconsCustomSheetView payload",
+                            ));
+                        }
+                        view.show_data_type_icons_custom_sheet_view = icon;
+                        view.extensions.push(x);
+                    },
+                    ExtOwner::Filter => {
+                        if icon.is_some() {
+                            return Err(invalid(
+                                "showDataTypeIconsCustomSheetView is only valid under namedSheetView",
+                            ));
+                        }
+                        self.filter
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .value
+                            .extensions
+                            .push(x);
+                    },
+                    ExtOwner::Column => {
+                        if icon.is_some() {
+                            return Err(invalid(
+                                "showDataTypeIconsCustomSheetView is only valid under namedSheetView",
+                            ));
+                        }
+                        self.column
+                            .as_mut()
+                            .unwrap_or_else(|| {
+                                crate::error::panic_missing_invariant(
+                                    "required value was checked before extraction",
+                                )
+                            })
+                            .value
+                            .extensions
+                            .push(x);
+                    },
                     ExtOwner::SortRules => {
+                        if icon.is_some() {
+                            return Err(invalid(
+                                "showDataTypeIconsCustomSheetView is only valid under namedSheetView",
+                            ));
+                        }
                         self.sort_rules
                             .as_mut()
                             .unwrap_or_else(|| {

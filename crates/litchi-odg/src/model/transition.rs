@@ -470,6 +470,13 @@ fn is_ncname_char(character: char) -> bool {
 }
 
 fn is_xsd_duration(value: &str) -> bool {
+    // ODF 1.4 Part 3 §20.237 assigns presentation:duration the `duration`
+    // datatype from §18.2.  The local OpenDocument-v1.4 specification bundle
+    // is `3rdparty/specs/OpenDocument-v1.4-os.zip`, member
+    // `part3-schema/OpenDocument-v1.4-os-part3-schema.html`, which points to
+    // XML Schema 1.0 Second Edition §3.2.6.1: seconds are
+    // `[0-9]+(\.[0-9]+)?`, and this datatype has no timezone suffix.
+    // See https://www.w3.org/TR/2004/REC-xmlschema-2-20041028/#duration.
     let bytes = value.as_bytes();
     let mut index = usize::from(bytes.first() == Some(&b'-'));
     if bytes.get(index) != Some(&b'P') {
@@ -515,17 +522,21 @@ fn consume_seconds(bytes: &[u8], index: &mut usize) -> bool {
     while bytes.get(*index).is_some_and(u8::is_ascii_digit) {
         *index += 1;
     }
-    let whole = *index != start;
-    let mut fraction = false;
+    if *index == start {
+        return false;
+    }
     if bytes.get(*index) == Some(&b'.') {
         *index += 1;
         let fraction_start = *index;
         while bytes.get(*index).is_some_and(u8::is_ascii_digit) {
             *index += 1;
         }
-        fraction = *index != fraction_start;
+        if *index == fraction_start {
+            *index = start;
+            return false;
+        }
     }
-    if (whole || fraction) && bytes.get(*index) == Some(&b'S') {
+    if bytes.get(*index) == Some(&b'S') {
         *index += 1;
         true
     } else {
@@ -553,8 +564,10 @@ mod tests {
         value.set_duration(Some("PT2.5S")).unwrap();
         assert!(value.set_direction(Some("sideways")).is_err());
         assert!(value.set_fade_color(Some("red")).is_err());
-        assert!(value.set_duration(Some("PT1.S")).is_ok());
-        assert!(value.set_duration(Some("PT.5S")).is_ok());
+        assert!(value.set_duration(Some("PT1.S")).is_err());
+        assert!(value.set_duration(Some("PT.5S")).is_err());
+        assert!(value.set_duration(Some("PT5.S")).is_err());
+        assert!(value.set_duration(Some("PT0.5S")).is_ok());
         assert!(value.set_duration(Some("PT1S+05:30")).is_err());
         assert!(value.set_duration(Some("PT1SZ")).is_err());
         assert!(value.set_style(Some("missing")).is_err());

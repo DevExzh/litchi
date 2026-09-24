@@ -1,0 +1,22 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "8-31",
+    "rustup",
+    "run",
+    "1.95.0",
+    "cargo",
+    "run",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3/crates/litchi-opc/fuzz/Cargo.toml",
+    "--release",
+    "--bin",
+    "smoke_opc"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 18.350459098815918,
+  "log_sha256": "88a6510501286dd1416a431fa1c26c3cf98d14a61bb002d1271164d18f1ce906"
+}

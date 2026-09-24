@@ -1,0 +1,98 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+error[E0308]: mismatched types
+   --> crates/litchi-ods/src/codec/formula/evaluation/value/database.rs:149:58
+    |
+149 |         match select_field(evaluator, &database.headers, &field)? {
+    |               ------------                               ^^^^^^ expected `&RuntimeValue<'_>`, found `&usize`
+    |               |
+    |               arguments to this function are incorrect
+    |
+    = note: expected reference `&RuntimeValue<'_>`
+               found reference `&usize`
+note: function defined here
+   --> crates/litchi-ods/src/codec/formula/evaluation/value/database.rs:685:4
+    |
+685 | fn select_field<'source, 'scalar, 'exec, 'position, R>(
+    |    ^^^^^^^^^^^^
+...
+688 |     value: &RuntimeValue<'_>,
+    |     ------------------------
+
+error[E0277]: `?` couldn't convert the error to `EvaluationFailure`
+    --> crates/litchi-ods/src/codec/formula/evaluation/value/database.rs:471:11
+     |
+ 469 |           let clause_count = body_rows.checked_mul(columns).ok_or_else(|| {
+     |  ___________________________________________________________-
+ 470 | |             evaluator.local_limit(Resource::Objects, u64::MAX, evaluator.limits.max_array_cells)
+ 471 | |         })?;
+     | |          -^ the trait `From<litchi_core::ResourceLimit>` is not implemented for `EvaluationFailure`
+     | |__________|
+     |            this can't be annotated with `?` because it has type `Result<_, litchi_core::ResourceLimit>`
+     |
+note: `EvaluationFailure` needs to implement `From<litchi_core::ResourceLimit>`
+    --> crates/litchi-ods/src/codec/formula/evaluation.rs:404:1
+     |
+ 404 | pub enum EvaluationFailure {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+help: the trait `From<litchi_core::ResourceLimit>` is not implemented for `EvaluationFailure`
+      but trait `From<ExecutionError>` is implemented for it
+    --> crates/litchi-ods/src/codec/formula/evaluation.rs:1962:1
+     |
+1962 | impl From<ExecutionError> for EvaluationFailure {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for that trait implementation, expected `ExecutionError`, found `litchi_core::ResourceLimit`
+
+error[E0560]: struct `ColumnSet` has no field named `reservation`
+   --> crates/litchi-ods/src/codec/formula/evaluation/value/database.rs:543:13
+    |
+543 |             reservation,
+    |             ^^^^^^^^^^^ unknown field
+    |
+help: a field with a similar name exists
+    |
+543 |             _reservation,
+    |             +
+
+error[E0308]: mismatched types
+   --> crates/litchi-ods/src/codec/formula/evaluation/value/database.rs:679:16
+    |
+679 |             Ok(found.ok_or(ScalarError::Value))
+    |             -- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<Option<usize>, ScalarError>`, found `Result<usize, ScalarError>`
+    |             |
+    |             arguments to this enum variant are incorrect
+    |
+    = note: expected enum `std::result::Result<Option<usize>, _>`
+               found enum `std::result::Result<usize, _>`
+help: the type constructed contains `std::result::Result<usize, ScalarError>` due to the type of the argument passed
+   --> crates/litchi-ods/src/codec/formula/evaluation/value/database.rs:679:13
+    |
+679 |             Ok(found.ok_or(ScalarError::Value))
+    |             ^^^-------------------------------^
+    |                |
+    |                this argument influences the type of `Ok`
+note: tuple variant defined here
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:561:4
+
+error[E0631]: type mismatch in function arguments
+    --> crates/litchi-ods/src/codec/formula/evaluation/value/database.rs:1178:67
+     |
+1178 |             match fast_float2::parse::<f64, _>(value).ok().filter(f64::is_finite) {
+     |                                                            ------ ^^^^^^^^^^^^^^
+     |                                                            |      |
+     |                                                            |      expected due to this
+     |                                                            |      found signature defined here
+     |                                                            required by a bound introduced by this call
+     |
+     = note: expected function signature `for<'a> fn(&'a _) -> _`
+                found function signature `fn(_) -> _`
+note: required by a bound in `Option::<T>::filter`
+    --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:1578:4
+help: consider wrapping the function in a closure
+     |
+1178 |             match fast_float2::parse::<f64, _>(value).ok().filter(|arg0: &f64| f64::is_finite(*arg0)) {
+     |                                                                   ++++++++++++               +++++++
+
+Some errors have detailed explanations: E0277, E0308, E0560, E0631.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `litchi-ods` (lib) due to 5 previous errors

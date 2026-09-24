@@ -1152,7 +1152,7 @@ impl SourceBackedPackage {
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
         let audit_xml = xml_minifier::audit::package::is_xml_part(
             partname.as_str(),
-            &self.parts[target].content_type,
+            self.parts[target].content_type.as_str(),
         );
         let target_entry = self.parts[target].entry_id;
         let source_version = self.source.version();
@@ -1300,7 +1300,7 @@ impl SourceBackedPackage {
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
         let audit_xml = xml_minifier::audit::package::is_xml_part(
             partname.as_str(),
-            &self.parts[target].content_type,
+            self.parts[target].content_type.as_str(),
         );
         let target_entry = self.parts[target].entry_id;
         let source_version = self.source.version();

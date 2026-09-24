@@ -1,0 +1,9 @@
+toolchain=1.95.0
+rustc=rustc 1.95.0 (59807616e 2026-04-14)
+cargo=cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+target_dir=/tmp/litchi-xlsb-theme-target-20260910
+CARGO_PROFILE_DEV_DEBUG=0
+CARGO_PROFILE_TEST_DEBUG=0
+CARGO_INCREMENTAL=0
+CARGO_BUILD_JOBS=2
+RUSTUP_HOME=/tmp/litchi-spec-gap-rustup

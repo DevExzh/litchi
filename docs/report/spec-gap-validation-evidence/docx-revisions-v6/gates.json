@@ -1,0 +1,59 @@
+[
+  {
+    "gate": "test",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-docx",
+      "--all-features",
+      "--no-fail-fast"
+    ],
+    "log": "/var/tmp/litchi-docx-revision-root-integration-v6-20260910-test.log",
+    "sha256": "7d64702d98fc784e933335af918ebfa91cd7803ac55fb2947f2907cb01b1d833"
+  },
+  {
+    "gate": "clippy",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "-p",
+      "litchi-docx",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "log": "/var/tmp/litchi-docx-revision-root-integration-v6-20260910-clippy.log",
+    "sha256": "ed3369d36a01b59827569e84ffc1c62425a608bd5f001eb6d21a920c96600cd9"
+  },
+  {
+    "gate": "rustdoc",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "doc",
+      "-p",
+      "litchi-docx",
+      "--all-features",
+      "--no-deps"
+    ],
+    "log": "/var/tmp/litchi-docx-revision-root-integration-v6-20260910-rustdoc.log",
+    "sha256": "22e58f4a16ae63bd5b58596a0348311e29d6a639aea6e806318c60000e8f14ec"
+  }
+]

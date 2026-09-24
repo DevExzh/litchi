@@ -1,0 +1,44 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+error[E0599]: no method named `with_scalar` found for struct `litchi_ods::codec::formula::evaluation::value::Limits` in the current scope
+   --> crates/litchi-ods/tests/ods_formula_matrix_limits.rs:210:36
+    |
+210 |     let limits = Limits::default().with_scalar(EvaluationLimits::default().with_max_steps(0));
+    |                                    ^^^^^^^^^^^ method not found in `litchi_ods::codec::formula::evaluation::value::Limits`
+
+error[E0618]: expected function, found `ExecutionContext`
+   --> crates/litchi-ods/tests/ods_formula_matrix_limits.rs:221:46
+    |
+116 | fn execution(scope: &str) -> (Budget, CancellationSource, ExecutionContext) {
+    | --------------------------------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+...
+209 |     let (budget, _cancellation, execution) = execution("ods-formula-matrix-work-limit");
+    |                                 --------- `execution` has type `ExecutionContext`
+...
+221 |     let (budget, _cancellation, execution) = execution("ods-formula-matrix-storage-limit");
+    |                                              ^^^^^^^^^------------------------------------
+    |                                              |
+    |                                              call expression requires function
+
+error[E0599]: no method named `with_scalar` found for struct `litchi_ods::codec::formula::evaluation::value::Limits` in the current scope
+   --> crates/litchi-ods/tests/ods_formula_matrix_limits.rs:223:27
+    |
+223 |         Limits::default().with_scalar(EvaluationLimits::default().with_max_storage_bytes(0));
+    |                           ^^^^^^^^^^^ method not found in `litchi_ods::codec::formula::evaluation::value::Limits`
+
+error[E0618]: expected function, found `ExecutionContext`
+   --> crates/litchi-ods/tests/ods_formula_matrix_limits.rs:349:46
+    |
+116 | fn execution(scope: &str) -> (Budget, CancellationSource, ExecutionContext) {
+    | --------------------------------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+...
+339 |     let (budget, _cancellation, execution) = execution("ods-formula-matrix-munit-unselected");
+    |                                 --------- `execution` has type `ExecutionContext`
+...
+349 |     let (budget, _cancellation, execution) = execution("ods-formula-matrix-munit-selected");
+    |                                              ^^^^^^^^^-------------------------------------
+    |                                              |
+    |                                              call expression requires function
+
+Some errors have detailed explanations: E0599, E0618.
+For more information about an error, try `rustc --explain E0599`.
+error: could not compile `litchi-ods` (test "ods_formula_matrix_limits") due to 4 previous errors

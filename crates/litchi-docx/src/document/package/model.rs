@@ -268,6 +268,26 @@ impl<'a> Document<'a> {
         Ok(self.part.paragraphs()?.into_iter().collect())
     }
 
+    /// Read recognized tracked revisions throughout the visible main document.
+    /// Includes table metadata and body-final section properties, in source order.
+    ///
+    /// # Errors
+    /// Returns malformed metadata, XML, or revision resource-limit errors.
+    pub fn revisions(&self) -> Result<smallvec::SmallVec<[crate::revision::Revision; 4]>> {
+        self.part.revisions()
+    }
+
+    /// Read document revisions with explicit parser and retention limits.
+    ///
+    /// # Errors
+    /// Returns malformed metadata, XML, or revision resource-limit errors.
+    pub fn revisions_with_limits(
+        &self,
+        limits: crate::revision::Limits,
+    ) -> Result<smallvec::SmallVec<[crate::revision::Revision; 4]>> {
+        self.part.revisions_with_limits(limits)
+    }
+
     /// Get all tables in the document.
     ///
     /// Returns a vector of `Table` objects representing all `<w:tbl>`

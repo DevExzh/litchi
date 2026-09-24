@@ -1,0 +1,13 @@
+{
+  "utc": "2026-09-13T07:25:02.720141+00:00",
+  "binary": "/var/tmp/litchi-ods-formula-references-target-20260913/release/ods-formula-reference-profile",
+  "binary_sha256": "fc61266859129715710064d74bdc3e56f5eaab945f6f8988b16d113da7722355",
+  "group": "comparable",
+  "rows": 12,
+  "all_process_status_zero": true,
+  "expected_outcomes_match": true,
+  "raw_sha256": "68fa6a4132d885112bbc874ee8ca67fff6364f0acb9acc41a9db008885853f3d",
+  "paired_sequence": "baseline-then-candidate-final-reserve-guard",
+  "sequence_index": 0,
+  "sequence_start_utc": "2026-09-13T07:25:02.589470+00:00"
+}

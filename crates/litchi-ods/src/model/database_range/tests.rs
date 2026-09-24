@@ -4,9 +4,9 @@ use super::*;
 
 #[test]
 fn new_range_has_an_ergonomic_validated_baseline() {
-    let range = Range::new("Sheet1.A1:B2");
+    let range = Range::new("Sheet1.A1:Sheet1.B2");
     assert!(range.validate().is_ok());
-    assert_eq!(range.target_range_address, "Sheet1.A1:B2");
+    assert_eq!(range.target_range_address, "Sheet1.A1:Sheet1.B2");
 }
 
 #[test]
@@ -43,171 +43,201 @@ fn validation_rejects_duplicate_names_and_same_group_nesting() {
     assert!(validate_database_range_collection(&[first, second]).is_err());
 }
 
-#[cfg(any())]
-mod legacy_end_to_end {
-    use super::validation::validate_filter_expression;
-    use super::*;
-    use crate::{Builder, MutableSpreadsheet, Spreadsheet};
+#[test]
+fn validation_rejects_multiple_unnamed_ranges() {
+    let first = Range::new("Sheet1.A1");
+    let second = Range::new("Sheet1.B1");
+    assert!(validate_database_range_collection(&[first.clone(), second]).is_err());
 
-    #[test]
-    fn parses_and_writes_complete_database_range_metadata() {
-        let xml = r##"<o:spreadsheet xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:name="Data &amp; More" t:is-selection="false" t:on-update-keep-styles="true" t:on-update-keep-size="false" t:has-persistent-data="true" t:orientation="column" t:contains-header="true" t:display-filter-buttons="true" t:target-range-address="Sheet1.A1:Sheet1.D20" t:refresh-delay="PT5M"><t:database-source-sql t:database-name="db&amp;1" t:sql-statement="SELECT &lt;x&gt;" t:parse-sql-statement="true"/><t:filter t:target-range-address="Sheet1.F1:Sheet1.I20" t:condition-source="cell-range" t:condition-source-range-address="Sheet2.A1:Sheet2.B2" t:display-duplicates="false"><t:filter-and><t:filter-condition t:field-number="0" t:value="alpha" t:operator="=" t:case-sensitive="true" t:data-type="text"/><t:filter-or><t:filter-condition t:field-number="1" t:value="10" t:operator=">=" t:data-type="number"/><t:filter-condition t:field-number="2" t:value="" t:operator="in"><t:filter-set-item t:value="A&amp;B"/><t:filter-set-item t:value="C"/></t:filter-condition></t:filter-or></t:filter-and></t:filter><t:sort t:bind-styles-to-content="true" t:target-range-address="Sheet1.A2:Sheet1.D20" t:case-sensitive="false" t:language="en" t:country="US" t:script="Latn" t:rfc-language-tag="en-US" t:algorithm="unicode" t:embedded-number-behavior="integer"><t:sort-by t:field-number="1" t:data-type="number" t:order="descending"/></t:sort><t:subtotal-rules t:bind-styles-to-content="false" t:case-sensitive="true" t:page-breaks-on-group-change="true"><t:sort-groups t:data-type="text" t:order="ascending"/><t:subtotal-rule t:group-by-field-number="0"><t:subtotal-field t:field-number="3" t:function="sum"/></t:subtotal-rule></t:subtotal-rules></t:database-range></t:database-ranges></o:spreadsheet>"##;
-        let parsed = parse_database_ranges(xml).expect("test fixture or operation should succeed");
-        assert_eq!(parsed.len(), 1);
-        let range = &parsed[0];
-        assert_eq!(range.name.as_deref(), Some("Data & More"));
-        assert_eq!(range.orientation, Some(Orientation::Column));
-        assert_eq!(range.refresh_delay.as_deref(), Some("PT5M"));
-        assert!(matches!(range.source, Some(Source::Sql { .. })));
-        assert_eq!(
-            range
-                .sort
-                .as_ref()
-                .expect("test fixture or operation should succeed")
-                .keys[0]
-                .field_number,
-            1
+    let mut output = "prefix".to_string();
+    assert!(write_database_ranges(&mut output, &[first, Range::new("Sheet1.B1")]).is_err());
+    assert_eq!(output, "prefix");
+
+    let mut named = Range::new("Sheet1.A1");
+    named.name = Some("Named".to_string());
+    assert!(validate_database_range_collection(&[named, Range::new("Sheet1.B1")]).is_ok());
+}
+
+#[test]
+fn standalone_parser_rejects_multiple_unnamed_ranges() {
+    let xml = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="Sheet1.A1"/><t:database-range t:target-range-address="Sheet1.B1"/></t:database-ranges></s>"#;
+    assert!(parse_database_ranges(xml).is_err());
+}
+
+#[test]
+fn filter_color_data_types_follow_odf_vocabulary() {
+    let xml = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="Sheet1.A1"><t:filter><t:filter-condition t:field-number="0" t:data-type="text-color" t:value="window-font-color" t:operator="="/></t:filter></t:database-range></t:database-ranges></s>"#;
+    let ranges = parse_database_ranges(xml).expect("ODF color condition should parse");
+    assert_eq!(
+        ranges[0].filter.as_ref().unwrap().expression,
+        Expression::Condition(Condition {
+            field_number: 0,
+            value: "window-font-color".to_string(),
+            operator: "=".to_string(),
+            case_sensitive: None,
+            data_type: Some(DataType::TextColor),
+            set_items: Vec::new(),
+        })
+    );
+    let invalid = xml.replace("window-font-color", "not-a-color");
+    assert!(parse_database_ranges(&invalid).is_err());
+}
+
+#[test]
+fn database_range_children_follow_schema_order() {
+    let xml = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="Sheet1.A1"><t:sort><t:sort-by t:field-number="0"/></t:sort><t:filter><t:filter-condition t:field-number="0" t:value="x" t:operator="="/></t:filter></t:database-range></t:database-ranges></s>"#;
+    assert!(parse_database_ranges(xml).is_err());
+}
+
+#[test]
+fn standalone_parser_rejects_nested_leaf_source_content() {
+    let xml = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="Sheet1.A1"><t:database-source-query t:database-name="db" t:query-name="query"><t:database-source-table t:database-name="db" t:database-table-name="nested"/></t:database-source-query></t:database-range></t:database-ranges></s>"#;
+    assert!(parse_database_ranges(xml).is_err());
+}
+
+#[test]
+fn standalone_parser_rejects_known_children_under_all_leaf_metadata() {
+    for leaf in [
+        r#"<t:database-source-query t:database-name="db" t:query-name="query"><t:database-source-table t:database-name="db" t:database-table-name="nested"/></t:database-source-query>"#,
+        r#"<t:sort><t:sort-by t:field-number="0"><t:sort-by t:field-number="1"/></t:sort-by></t:sort>"#,
+        r#"<t:filter><t:filter-condition t:field-number="0" t:value="x" t:operator="="><t:filter-set-item t:value="nested"><t:filter-set-item t:value="deeper"/></t:filter-set-item></t:filter-condition></t:filter>"#,
+        r#"<t:subtotal-rules><t:subtotal-rule t:group-by-field-number="0"><t:subtotal-field t:field-number="1" t:function="sum"><t:subtotal-field t:field-number="2" t:function="sum"/></t:subtotal-field></t:subtotal-rule></t:subtotal-rules>"#,
+    ] {
+        let xml = format!(
+            r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="Sheet1.A1">{leaf}</t:database-range></t:database-ranges></s>"#
         );
-        assert_eq!(
-            range
-                .subtotals
-                .as_ref()
-                .expect("test fixture or operation should succeed")
-                .rules[0]
-                .fields[0]
-                .function,
-            "sum"
-        );
-
-        let mut written = String::new();
-        write_database_ranges(&mut written, &parsed)
-            .expect("test fixture or operation should succeed");
-        let reparsed = parse_database_ranges(&format!(
-            r#"<o:spreadsheet xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">{written}</o:spreadsheet>"#
-        ))
-        .expect("test fixture or operation should succeed");
-        assert_eq!(reparsed, parsed);
-        assert!(written.contains("Data &amp; More"));
-        assert!(written.contains("SELECT &lt;x&gt;"));
-    }
-
-    #[test]
-    fn rejects_invalid_filter_shapes_and_required_values() {
-        let same_group = Expression::And(vec![Expression::And(vec![Expression::Condition(
-            Condition::new(0, "=", "x"),
-        )])]);
-        assert!(validate_filter_expression(&same_group, 0, None).is_err());
-
-        let xml = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="A1:B2"><t:sort/></t:database-range></t:database-ranges></s>"#;
-        assert!(parse_database_ranges(xml).is_err());
-    }
-
-    #[test]
-    fn external_database_sources_remain_inert_data() {
-        let xml = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="A1"><t:database-source-query t:database-name="file:///database.odb" t:query-name="DangerousQuery"/></t:database-range></t:database-ranges></s>"#;
-        let ranges = parse_database_ranges(xml).expect("test fixture or operation should succeed");
-        assert_eq!(
-            ranges[0].source,
-            Some(Source::Query {
-                database_name: "file:///database.odb".to_string(),
-                query_name: "DangerousQuery".to_string(),
-            })
+        assert!(
+            parse_database_ranges(&xml).is_err(),
+            "nested leaf should fail: {leaf}"
         );
     }
+}
 
-    #[test]
-    fn database_ranges_round_trip_through_builder_and_mutable_packages() {
-        let mut range = Range::new("Sheet1.A1:Sheet1.C20");
-        range.name = Some("Sales".to_string());
-        range.orientation = Some(Orientation::Column);
-        range.display_filter_buttons = Some(true);
-        range.source = Some(Source::Query {
-            database_name: "file:///sales&forecast.odb".to_string(),
-            query_name: "Quarter <One>".to_string(),
-        });
-        range.filter = Some(Filter {
-            target_range_address: None,
-            condition_source: Some(ConditionSource::SelfContained),
-            condition_source_range_address: None,
-            display_duplicates: Some(false),
-            expression: Expression::And(vec![
-                Expression::Condition(Condition::new(0, "=", "East")),
-                Expression::Or(vec![
-                    Expression::Condition(Condition::new(1, ">", "100")),
-                    Expression::Condition(Condition::new(2, "=", "Open")),
-                ]),
-            ]),
-        });
-        range.sort = Some(Sort {
-            embedded_number_behavior: Some(EmbeddedNumberBehavior::Integer),
-            keys: vec![Key {
-                field_number: 1,
-                data_type: Some("number".to_string()),
-                order: Some(Order::Descending),
-            }],
-            ..Sort::default()
-        });
-        range.subtotals = Some(Rules {
-            rules: vec![Rule {
-                group_by_field_number: 0,
-                fields: vec![Field {
-                    field_number: 1,
-                    function: "sum".to_string(),
-                }],
-            }],
-            ..Rules::default()
-        });
+#[test]
+fn whole_column_and_row_target_addresses_are_valid_database_ranges() {
+    assert!(Range::new("Input.A:Input.C").validate().is_ok());
+    assert!(Range::new("Input.1:Input.3").validate().is_ok());
+    assert!(
+        Range::new("'Input Data'.A:'Input Data'.C")
+            .validate()
+            .is_ok()
+    );
+}
 
-        let mut builder = Builder::new();
-        builder
-            .add_sheet("Sheet1")
-            .expect("test fixture or operation should succeed");
-        builder
-            .add_database_range(range.clone())
-            .expect("test fixture or operation should succeed");
-        let bytes = builder
-            .build()
-            .expect("test fixture or operation should succeed");
-        let spreadsheet =
-            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
-        assert_eq!(spreadsheet.database_ranges(), &[range.clone()]);
+#[test]
+fn sort_language_fields_follow_schema_lexical_types() {
+    let mut range = Range::new("Input.A1");
+    range.sort = Some(Sort {
+        language: Some("en".to_string()),
+        country: Some("US".to_string()),
+        script: Some("Latn".to_string()),
+        rfc_language_tag: Some("en-US".to_string()),
+        keys: vec![Key::new(0)],
+        ..Sort::default()
+    });
+    assert!(range.validate().is_ok());
 
-        let mut mutable = MutableSpreadsheet::from_spreadsheet(spreadsheet)
-            .expect("test fixture or operation should succeed");
-        let Expression::And(expressions) = &mut mutable.database_ranges_mut()[0]
-            .filter
-            .as_mut()
-            .expect("test fixture or operation should succeed")
-            .expression
-        else {
-            panic!("expected AND filter")
-        };
-        let Expression::Condition(condition) = &mut expressions[0] else {
-            panic!("expected filter condition")
-        };
-        condition.value = "West & Central".to_string();
-
-        let reopened = Spreadsheet::from_bytes(
-            mutable
-                .to_bytes()
-                .expect("test fixture or operation should succeed"),
-        )
-        .expect("test fixture or operation should succeed");
-        let reopened_range = &reopened.database_ranges()[0];
-        let Expression::And(expressions) = &reopened_range
-            .filter
-            .as_ref()
-            .expect("test fixture or operation should succeed")
-            .expression
-        else {
-            panic!("expected AND filter")
-        };
-        let Expression::Condition(condition) = &expressions[0] else {
-            panic!("expected filter condition")
-        };
-        assert_eq!(condition.value, "West & Central");
-        assert_eq!(reopened_range.source, range.source);
-        assert_eq!(reopened_range.sort, range.sort);
-        assert_eq!(reopened_range.subtotals, range.subtotals);
+    for (field, value) in [
+        ("language", "en_US"),
+        ("country", "U-"),
+        ("script", ""),
+        ("rfc_language_tag", "en--US"),
+    ] {
+        let mut invalid = range.clone();
+        let sort = invalid.sort.as_mut().unwrap();
+        match field {
+            "language" => sort.language = Some(value.to_string()),
+            "country" => sort.country = Some(value.to_string()),
+            "script" => sort.script = Some(value.to_string()),
+            "rfc_language_tag" => sort.rfc_language_tag = Some(value.to_string()),
+            _ => unreachable!(),
+        }
+        assert!(invalid.validate().is_err(), "{field}={value} should fail");
     }
+
+    let mut invalid = range;
+    invalid.sort.as_mut().unwrap().algorithm = Some("bad\u{1}algorithm".to_string());
+    assert!(invalid.validate().is_err());
+}
+
+#[test]
+fn public_writer_rejects_sort_algorithm_controls_atomically() {
+    let mut range = Range::new("Input.A1");
+    range.sort = Some(Sort {
+        algorithm: Some("bad\u{1}algorithm".to_string()),
+        keys: vec![Key::new(0)],
+        ..Sort::default()
+    });
+    let mut output = "prefix".to_string();
+    assert!(write_database_ranges(&mut output, &[range]).is_err());
+    assert_eq!(output, "prefix");
+}
+
+#[test]
+fn standalone_parser_checks_matching_end_names_and_escaped_output_size() {
+    let mismatched = r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="Input.A1"></t:database-ranges></s>"#;
+    assert!(parse_database_ranges(mismatched).is_err());
+
+    let mut range = Range::new("Input.A1");
+    range.source = Some(Source::Table {
+        database_name: "db & \"quoted\"".to_string(),
+        table_name: "table <one>".to_string(),
+    });
+    let mut output = String::new();
+    write_database_ranges(&mut output, &[range.clone()]).expect("bounded writer should succeed");
+    assert!(output.contains("&amp;") && output.contains("&quot;"));
+    let reparsed = parse_database_ranges(&format!(
+        r#"<s xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0">{output}</s>"#
+    ))
+    .expect("escaped source should parse");
+    assert_eq!(reparsed, vec![range]);
+}
+
+#[test]
+fn standalone_parser_bounds_raw_attribute_before_decoding() {
+    let oversized = "x".repeat(1_048_577);
+    let xml = format!(
+        r#"<s xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><t:database-ranges><t:database-range t:target-range-address="{oversized}"/></t:database-ranges></s>"#
+    );
+    assert!(parse_database_ranges(&xml).is_err());
+}
+
+#[test]
+fn standalone_source_and_filter_writers_apply_validation_limits() {
+    let oversized = "x".repeat(1_048_577);
+    let source = Source::Query {
+        database_name: oversized,
+        query_name: "query".to_string(),
+    };
+    let mut output = String::new();
+    assert!(write_database_source(&mut output, &source).is_err());
+    assert!(output.is_empty(), "rejected source must not mutate output");
+
+    let filter = Filter {
+        target_range_address: Some("not-a-range".to_string()),
+        condition_source: Some(ConditionSource::SelfContained),
+        condition_source_range_address: None,
+        display_duplicates: None,
+        expression: Expression::Condition(Condition::new(0, "=", "value")),
+    };
+    assert!(write_filter(&mut output, &filter).is_err());
+    assert!(output.is_empty(), "rejected filter must not mutate output");
+}
+
+#[test]
+fn escaped_output_cap_is_checked_before_emission() {
+    let item = "'".repeat(900_000);
+    let mut condition = Condition::new(0, "=", "value");
+    condition.set_items = vec![item; 13];
+    let mut range = Range::new("Input.A1");
+    range.filter = Some(Filter {
+        target_range_address: None,
+        condition_source: Some(ConditionSource::SelfContained),
+        condition_source_range_address: None,
+        display_duplicates: None,
+        expression: Expression::Condition(condition),
+    });
+    let mut output = "prefix".to_string();
+    assert!(write_database_ranges(&mut output, &[range]).is_err());
+    assert_eq!(output, "prefix");
 }

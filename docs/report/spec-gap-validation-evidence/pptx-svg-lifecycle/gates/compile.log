@@ -1,0 +1,33 @@
+   Compiling num-traits v0.2.19
+    Checking getrandom v0.2.17
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/soapberry-zip)
+    Checking font-kit v0.14.3
+    Checking rand_core v0.6.4
+    Checking ff v0.13.1
+    Checking crypto-bigint v0.5.5
+    Checking rand_chacha v0.3.1
+    Checking signature v2.2.0
+    Checking group v0.13.0
+    Checking rand v0.8.8
+    Checking chrono v0.4.45
+    Checking num-integer v0.1.47
+    Checking allsorts v0.17.0
+    Checking num-iter v0.1.46
+    Checking num-bigint-dig v0.8.6
+    Checking elliptic-curve v0.13.8
+    Checking primeorder v0.13.6
+    Checking ecdsa v0.16.9
+    Checking rsa v0.9.10
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-core)
+    Checking p256 v0.13.2
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-cfb)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-sign)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-vba)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc)
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-fonts)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-crypto)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 16.41s

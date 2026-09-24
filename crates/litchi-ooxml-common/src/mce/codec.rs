@@ -571,6 +571,15 @@ impl BoundedOutput {
             let grow = target.saturating_sub(self.bytes.len());
             self.bytes
                 .try_reserve_exact(grow)
+                // Spare capacity is optional: under allocator pressure, retry
+                // the minimum allocation needed for this admitted write.
+                .or_else(|source| {
+                    if target > len {
+                        self.bytes.try_reserve_exact(additional)
+                    } else {
+                        Err(source)
+                    }
+                })
                 .map_err(|source| Error::Allocation {
                     resource: "MCE output",
                     source,

@@ -148,6 +148,20 @@ impl Relationship {
         &self.target_ref
     }
 
+    /// Get the stored base URI used to resolve an internal target.
+    #[inline]
+    #[must_use]
+    pub fn base_uri(&self) -> &str {
+        &self.base_uri
+    }
+
+    /// Get the stored source part URI, when this relationship belongs to one.
+    #[inline]
+    #[must_use]
+    pub fn source_uri(&self) -> Option<&str> {
+        self.source_uri.as_deref()
+    }
+
     /// Return the path component of the original target URI reference.
     #[must_use]
     pub fn target_path(&self) -> &str {
@@ -245,26 +259,31 @@ pub struct Relationships {
     /// holds. The conservative direction is preserved — the handle is cleared
     /// on every path that could have changed the value, and a cleared handle
     /// only costs the serialize-and-compare route.
-    source_capture: Option<Arc<CanonicalRelationshipsXml>>,
+    source_capture: Option<Arc<PreservedRelationshipsXml>>,
 }
 
-/// Canonical `.rels` serialization of one relationship collection.
+/// The `.rels` bytes one relationship collection was opened from.
 ///
 /// Captured while a package is opened and retained by the preservation
-/// provenance. [`Self::Empty`] avoids owning a buffer for the common empty
-/// collection; both variants render the exact bytes
+/// provenance. [`Self::Source`] is the admitted source member itself, kept so
+/// an unchanged collection republishes its producer's exact bytes even when
+/// they are not this library's canonical serialization. Without a retained
+/// source member, [`Self::Empty`] avoids owning a buffer for the common empty
+/// collection and [`Self::Owned`] holds the bytes
 /// [`Relationships::try_to_xml_bytes`] produces for the same value.
 #[derive(Debug)]
-pub(crate) enum CanonicalRelationshipsXml {
+pub(crate) enum PreservedRelationshipsXml {
+    /// The admitted source member's exact bytes.
+    Source(Arc<Vec<u8>>),
     /// The collection held no relationships.
     Empty,
-    /// The serialized bytes of a non-empty collection.
+    /// The canonical serialized bytes of a non-empty collection.
     Owned(Vec<u8>),
 }
 
 pub(crate) const EMPTY_RELATIONSHIPS_XML: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"#;
 
-impl CanonicalRelationshipsXml {
+impl PreservedRelationshipsXml {
     pub(crate) fn from_relationships(relationships: &Relationships) -> Option<Self> {
         if relationships.is_empty() {
             Some(Self::Empty)
@@ -275,6 +294,7 @@ impl CanonicalRelationshipsXml {
 
     pub(crate) fn as_bytes(&self) -> &[u8] {
         match self {
+            Self::Source(bytes) => bytes.as_slice(),
             Self::Empty => EMPTY_RELATIONSHIPS_XML,
             Self::Owned(bytes) => bytes.as_slice(),
         }
@@ -307,12 +327,12 @@ impl Relationships {
     }
 
     /// Record the canonical serialization captured for this collection at open.
-    pub(crate) fn set_source_capture(&mut self, capture: Arc<CanonicalRelationshipsXml>) {
+    pub(crate) fn set_source_capture(&mut self, capture: Arc<PreservedRelationshipsXml>) {
         self.source_capture = Some(capture);
     }
 
     /// The capture recorded at open, if no mutation has run since.
-    pub(crate) fn source_capture(&self) -> Option<&Arc<CanonicalRelationshipsXml>> {
+    pub(crate) fn source_capture(&self) -> Option<&Arc<PreservedRelationshipsXml>> {
         self.source_capture.as_ref()
     }
 
@@ -466,6 +486,20 @@ impl Relationships {
             })
             .map(Relationship::r_id)
             .min()
+    }
+
+    /// Get the stored base URI used by this relationship collection.
+    #[inline]
+    #[must_use]
+    pub fn base_uri(&self) -> &str {
+        &self.base_uri
+    }
+
+    /// Get the stored source part URI, when this collection belongs to one.
+    #[inline]
+    #[must_use]
+    pub fn source_uri(&self) -> Option<&str> {
+        self.source_uri.as_deref()
     }
 
     /// Get or add a relationship to a target part.
@@ -668,50 +702,63 @@ impl Relationships {
     /// code. It preserves the byte output of [`Self::to_xml`] without relying on
     /// infallible `String` growth or temporary escaped strings.
     pub(crate) fn try_to_xml_bytes(&self) -> Result<Vec<u8>> {
+        // Reserve once from the checked escaped size. Reserving each emitted
+        // fragment exactly otherwise requests progressively larger reallocations
+        // for every relationship in a large owner.
+        let xml_len = crate::source_backed::canonical_relationship_xml_len(self)?;
+        let mut xml = Vec::new();
+        xml.try_reserve_exact(xml_len)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC relationship XML",
+                source,
+            })?;
+        self.for_each_canonical_xml_chunk(|chunk| append_relationship_xml_bytes(&mut xml, chunk))?;
+        Ok(xml)
+    }
+
+    /// Visit the canonical XML serialization in bounded chunks without
+    /// allocating the serialized byte buffer.  Source-backed topology
+    /// planning uses this for an exact lexical comparison before aggregate
+    /// output admission; the same ordering and escaping helpers drive the
+    /// normal fallible serializer above.
+    pub(crate) fn for_each_canonical_xml_chunk<F>(&self, mut visit: F) -> Result<()>
+    where
+        F: FnMut(&[u8]) -> Result<()>,
+    {
         const HEADER: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#;
         const FOOTER: &[u8] = b"</Relationships>";
 
         let mut rels = Vec::new();
         rels.try_reserve_exact(self.rels.len())
             .map_err(|source| OpcError::Allocation {
-                resource: "OPC relationship XML references",
+                resource: "OPC relationship XML comparison references",
                 source,
             })?;
         rels.extend(self.rels.values());
         rels.sort_unstable_by_key(|rel| rel.r_id());
 
-        let mut xml = Vec::new();
-        append_relationship_xml_bytes(&mut xml, HEADER)?;
+        visit(HEADER)?;
         for rel in rels {
-            append_relationship_xml_bytes(&mut xml, br#"<Relationship Id=""#)?;
-            append_relationship_xml_escaped(&mut xml, rel.r_id())?;
-            append_relationship_xml_bytes(&mut xml, br#"" Type=""#)?;
-            append_relationship_xml_escaped(&mut xml, rel.reltype())?;
-            append_relationship_xml_bytes(&mut xml, br#"" Target=""#)?;
-            append_relationship_xml_escaped(&mut xml, rel.target_ref())?;
+            visit(br#"<Relationship Id=""#)?;
+            visit_escaped_xml(&mut visit, rel.r_id())?;
+            visit(br#"" Type=""#)?;
+            visit_escaped_xml(&mut visit, rel.reltype())?;
+            visit(br#"" Target=""#)?;
+            visit_escaped_xml(&mut visit, rel.target_ref())?;
             if rel.target_mode() == TargetMode::External {
-                append_relationship_xml_bytes(&mut xml, br#"" TargetMode="External"/>"#)?;
+                visit(br#"" TargetMode="External"/>"#)?;
             } else {
-                append_relationship_xml_bytes(&mut xml, br#""/>"#)?;
+                visit(br#""/>"#)?;
             }
         }
-        append_relationship_xml_bytes(&mut xml, FOOTER)?;
-        Ok(xml)
+        visit(FOOTER)
     }
 }
 
-fn append_relationship_xml_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
-    output
-        .try_reserve_exact(bytes.len())
-        .map_err(|source| OpcError::Allocation {
-            resource: "OPC relationship XML",
-            source,
-        })?;
-    output.extend_from_slice(bytes);
-    Ok(())
-}
-
-fn append_relationship_xml_escaped(output: &mut Vec<u8>, value: &str) -> Result<()> {
+fn visit_escaped_xml<F>(visit: &mut F, value: &str) -> Result<()>
+where
+    F: FnMut(&[u8]) -> Result<()>,
+{
     let bytes = value.as_bytes();
     let mut cursor = 0;
     for (index, byte) in bytes.iter().enumerate() {
@@ -724,12 +771,23 @@ fn append_relationship_xml_escaped(output: &mut Vec<u8>, value: &str) -> Result<
             _ => None,
         };
         if let Some(escaped) = escaped {
-            append_relationship_xml_bytes(output, &bytes[cursor..index])?;
-            append_relationship_xml_bytes(output, escaped)?;
+            visit(&bytes[cursor..index])?;
+            visit(escaped)?;
             cursor = index + 1;
         }
     }
-    append_relationship_xml_bytes(output, &bytes[cursor..])
+    visit(&bytes[cursor..])
+}
+
+fn append_relationship_xml_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
+    output
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "OPC relationship XML",
+            source,
+        })?;
+    output.extend_from_slice(bytes);
+    Ok(())
 }
 
 impl Default for Relationships {
@@ -858,7 +916,7 @@ mod tests {
     #[test]
     fn every_value_mutation_drops_the_open_time_capture() {
         let source = PackURI::new("/word/document.xml").expect("source URI");
-        let capture = || Arc::new(CanonicalRelationshipsXml::Empty);
+        let capture = || Arc::new(PreservedRelationshipsXml::Empty);
 
         let mut relationships = Relationships::for_source(&source);
         assert!(relationships.source_capture().is_none());
@@ -916,7 +974,7 @@ mod tests {
     #[test]
     fn establishing_nothing_keeps_the_open_time_capture() {
         let source = PackURI::new("/word/document.xml").expect("source URI");
-        let capture = || Arc::new(CanonicalRelationshipsXml::Empty);
+        let capture = || Arc::new(PreservedRelationshipsXml::Empty);
 
         let mut relationships = Relationships::for_source(&source);
         relationships.add_relationship(
@@ -989,7 +1047,7 @@ mod tests {
         let source = PackURI::new("/word/document.xml").expect("source URI");
         let mut relationships = Relationships::for_source(&source);
         assert_eq!(
-            CanonicalRelationshipsXml::from_relationships(&relationships)
+            PreservedRelationshipsXml::from_relationships(&relationships)
                 .expect("empty capture")
                 .as_bytes(),
             relationships.try_to_xml_bytes().expect("empty bytes")
@@ -1008,7 +1066,7 @@ mod tests {
             false,
         );
         assert_eq!(
-            CanonicalRelationshipsXml::from_relationships(&relationships)
+            PreservedRelationshipsXml::from_relationships(&relationships)
                 .expect("owned capture")
                 .as_bytes(),
             relationships.try_to_xml_bytes().expect("owned bytes")
@@ -1031,6 +1089,60 @@ mod tests {
             relationships.try_to_xml_bytes().unwrap(),
             br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test:type&lt;&amp;&gt;&quot;&apos;" Target="target&lt;&amp;&gt;&quot;&apos;" TargetMode="External"/></Relationships>"#
         );
+    }
+
+    #[test]
+    fn canonical_chunks_match_serialization_without_collecting_output() {
+        let mut relationships = Relationships::new("/word".to_owned());
+        for (id, mode, target) in [
+            ("rId2", TargetMode::Internal, "../media/image.xml?x=1&y=2#z"),
+            (
+                "rId10",
+                TargetMode::External,
+                "https://example.invalid/é<&>\"'",
+            ),
+            ("rId1", TargetMode::External, ""),
+        ] {
+            relationships
+                .try_add_relationship(
+                    "urn:example".to_owned(),
+                    target.to_owned(),
+                    id.to_owned(),
+                    mode,
+                )
+                .unwrap();
+        }
+        for relationships in [Relationships::default(), relationships] {
+            let expected = relationships.to_xml();
+            let mut remaining = expected.as_bytes();
+            relationships
+                .for_each_canonical_xml_chunk(|chunk| {
+                    remaining = remaining
+                        .strip_prefix(chunk)
+                        .expect("chunk matches canonical bytes");
+                    Ok(())
+                })
+                .unwrap();
+            assert!(remaining.is_empty());
+            assert_eq!(
+                relationships.try_to_xml_bytes().unwrap(),
+                expected.as_bytes()
+            );
+        }
+    }
+
+    #[test]
+    fn canonical_chunk_visitor_stops_on_consumer_failure() {
+        let relationships = Relationships::default();
+        let mut calls = 0;
+        let result = relationships.for_each_canonical_xml_chunk(|_| {
+            calls += 1;
+            Err(OpcError::PartNotFound("consumer sentinel".to_owned()))
+        });
+        assert!(
+            matches!(result, Err(OpcError::PartNotFound(message)) if message == "consumer sentinel")
+        );
+        assert_eq!(calls, 1);
     }
 
     #[test]
@@ -1089,6 +1201,31 @@ mod tests {
         assert_eq!(
             relationships.try_to_xml_bytes().unwrap(),
             relationships.to_xml().as_bytes()
+        );
+    }
+
+    #[test]
+    fn sized_relationship_xml_matches_large_mixed_escaped_owner() {
+        let mut relationships = Relationships::new("/word".to_owned());
+        for index in (0..1024).rev() {
+            relationships
+                .try_add_relationship(
+                    format!("urn:example:类型<&>\"':{index}"),
+                    format!("target-é-{index}<&>\"'.xml"),
+                    format!("rId{index}"),
+                    if index % 2 == 0 {
+                        TargetMode::External
+                    } else {
+                        TargetMode::Internal
+                    },
+                )
+                .unwrap();
+        }
+        let bytes = relationships.try_to_xml_bytes().unwrap();
+        assert_eq!(bytes, relationships.to_xml().as_bytes());
+        assert_eq!(
+            bytes.len(),
+            crate::source_backed::canonical_relationship_xml_len(&relationships).unwrap()
         );
     }
 }

@@ -1,7 +1,7 @@
 //! Bounded `WordprocessingML` and markup-compatibility codec for stories.
 
 use crate::error::{Error, Result};
-use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 use std::sync::Arc;
@@ -116,8 +116,18 @@ pub(crate) fn validate(xml: &[u8]) -> Result<Role> {
 
 /// Apply the shared bounded MCE visibility projection for semantic traversal.
 pub(crate) fn semantic_xml(xml: &Arc<Vec<u8>>) -> Result<Arc<Vec<u8>>> {
-    let processed = process_ooxml(xml.as_slice())?;
-    let output = match processed {
+    // Word 2023 adds `w16du:dateUtc` to tracked-change elements.  The
+    // attribute is carried by the story part just like the ordinary WML
+    // attributes, and producers must mark its namespace ignorable for older
+    // consumers.  A generic OOXML capability set would therefore discard the
+    // attribute before the story's semantic traversal.  Keep this capability
+    // local to DOCX story processing so unrelated OOXML parts do not silently
+    // acquire a Word-specific extension profile.
+    let mut capabilities = Capabilities::default();
+    capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
+    let processed =
+        process_markup_compatibility(xml.as_slice(), &capabilities, &Limits::default())?;
+    let output = match processed.xml {
         std::borrow::Cow::Borrowed(_) => Arc::clone(xml),
         std::borrow::Cow::Owned(value) => Arc::new(value),
     };

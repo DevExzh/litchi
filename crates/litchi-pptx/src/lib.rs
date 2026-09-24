@@ -119,6 +119,14 @@ pub use actions::{Jump, Kind, Setting, Target, Trigger};
 pub use animations::*;
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
 pub use chart::{Chart, Info as ChartInfo, Series as ChartSeries, Type as ChartType};
+pub use comments::collaboration::{
+    AuthorPresenceCommit, AuthorPresencePatch, AuthorPresenceSnapshot, AuthorPresenceTransaction,
+    CommentThreadingCommit, CommentThreadingPatch, CommentThreadingSnapshot,
+    CommentThreadingTransaction, ParentComment, PresenceInfo, ThreadingInfo, apply_presence_commit,
+    apply_presence_patch, apply_threading_commit, apply_threading_patch, load_presence,
+    load_presence_snapshot, load_threading, load_threading_snapshot, put_presence, put_threading,
+    remove_presence, remove_threading,
+};
 pub use comments::{
     Author, Comment, Comments, Conformance, List, add_presentation_comment,
     add_presentation_comment_author, find_presentation_comment, find_presentation_comment_author,
@@ -148,8 +156,13 @@ pub use litchi_ooxml_common::package_encryption::{
 /// Resource policy for package ingestion through [`Package`].
 pub use litchi_opc::ReadLimits;
 pub use master_layout::{
-    AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID, PlaceholderKind,
-    PlaceholderSpec, SlideLayoutKind,
+    AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID,
+    PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderKind, PlaceholderSignaturePolicy, PlaceholderSpec,
+    PlaceholderTypeExtension, PlaceholderTypeExtensionCommit, PlaceholderTypeExtensionEdit,
+    PlaceholderTypeExtensionLimits, PlaceholderTypeExtensionPatch,
+    PlaceholderTypeExtensionSlotCommit, PlaceholderTypeExtensionSlotEdit,
+    PlaceholderTypeExtensionSlotPatch, PlaceholderTypeExtensionSlotSnapshot,
+    PlaceholderTypeExtensionSnapshot, SlideLayoutKind,
 };
 pub use media_parts::{
     Bookmark, Data, ExtensionList, Fade, Picture, Poster, Resource, Transform, Trim,
@@ -161,14 +174,19 @@ pub use opened::{
     SlideCopyPart, SlideCopyPlan, SlideRemovalPatch, SlideRemovalPlan,
 };
 pub use package::Package;
+pub use presentation::embedded::ink_actions;
 pub use presentation::{
     MAX_SOURCE_BACKED_SLIDE_BATCH, Presentation, SourceBackedCrossSlideCopyPlan,
     SourceBackedCrossSlideCopySnapshot, SourceBackedPresentation, SourceBackedPresentationEditor,
     SourceBackedSlideBatchCommit, SourceBackedSlideBatchEdit, SourceBackedSlideBatchPatch,
     SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit, SourceBackedSlideEdit,
     SourceBackedSlideOrderCommit, SourceBackedSlideOrderEdit, SourceBackedSlideOrderPatch,
-    SourceBackedSlideOrderSnapshot, SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceImage,
-    SourceImageDescriptor, SourceImageTarget, SourceSlide,
+    SourceBackedSlideOrderSnapshot, SourceBackedSlidePatch, SourceBackedSlideSnapshot,
+    SourceBackedSvgAttachmentCommit, SourceBackedSvgAttachmentEdit, SourceBackedSvgAttachmentPatch,
+    SourceBackedSvgAttachmentSnapshot, SourceBackedSvgCommit, SourceBackedSvgEdit,
+    SourceBackedSvgPatch, SourceBackedSvgSnapshot, SourceImage, SourceImageDescriptor,
+    SourceImageTarget, SourceSlide, SourceSvgAttachment, SourceSvgAttachmentReplacement,
+    SourceSvgDescriptor, SourceSvgImage, SourceSvgReplacement,
 };
 pub use presentation_properties::{
     BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,

@@ -31,6 +31,10 @@ use quick_xml::{Reader, XmlVersion};
 use smallvec::SmallVec;
 use std::collections::HashSet;
 
+/// Source-preserving ownership and lifecycle APIs for the optional
+/// `stylesWithEffects` parts.
+pub mod effects;
+
 /// Semantic kind of a Word style.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]

@@ -224,11 +224,15 @@ fn matching_alias_duplicate_and_malformed_unrelated_attribute_are_rejected() {
         r#"<draw:rect draw:name="Box" draw:layer="front" drawAlias:layer="back" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm" foreign:opaque/>"#,
     );
 
-    // The public scanner's earlier draw:name lookup still checks every raw
-    // attribute, so the malformed tail is rejected before either value batch.
+    // Raw XML admission checks every raw attribute of every content.xml event
+    // before the namespace-aware scanner runs, so the malformed tail is
+    // rejected before the draw:name lookup or either value batch can see it.
     // The duplicate-only control below verifies the matching expanded-name
     // error independently.
-    assert!(error_text(&content).starts_with("Invalid format: invalid ODG attribute:"));
+    assert!(
+        error_text(&content)
+            .starts_with("Invalid format: invalid ODG content.xml event attribute:")
+    );
 
     let duplicate_only = content.replace(" foreign:opaque/>", "/>");
     assert_eq!(
@@ -237,7 +241,10 @@ fn matching_alias_duplicate_and_malformed_unrelated_attribute_are_rejected() {
     );
 
     let trailing_only = content.replace(r#" drawAlias:layer="back""#, "");
-    assert!(error_text(&trailing_only).starts_with("Invalid format: invalid ODG attribute:"));
+    assert!(
+        error_text(&trailing_only)
+            .starts_with("Invalid format: invalid ODG content.xml event attribute:")
+    );
 
     let valid = trailing_only.replace(" foreign:opaque/>", "/>");
     let drawing = Drawing::from_bytes(raw_package(&valid)).unwrap();

@@ -50,7 +50,7 @@ metadata rather than performing the behavior implied by the format.
 |---------|--------|------|-------|-------|
 | Paragraphs and rich text spans | ✅ | ✅ | ✅ | Typed `text:p`, spans, character data, whitespace, tabs, line breaks, and common inline elements can be extracted and mutated. |
 | Headings and outline levels | ✅ | ✅ | ✅ | Typed heading text, level, and style-name access with builder and mutable authoring. |
-| Numbered paragraphs | ✅ | ✅ | ✅ | `text:numbered-paragraph` blocks and their numbering attributes are retained as inert numbering metadata; labels are not regenerated. |
+| Numbered paragraphs | ✅ | ✅ | ✅ | `text:numbered-paragraph` blocks and their numbering attributes are retained as inert numbering metadata; explicit `text:number` fallback labels can be inspected or changed without regenerating a list style. |
 | Text blocks and ordering | ✅ | ✅ | ✅ | Paragraph, heading, list, table, and supported framed content can be inserted, replaced, removed, and enumerated in document order. |
 | Lists and list items | ✅ | ✅ | ✅ | Ordered and unordered lists, nested items, list headers, style references, and common list authoring are typed. |
 | Outline styles and label alignment | ✅ | ✅ | ✅ | Outline declarations and modern list-level label alignment have typed inspection and mutation; computed labels and pagination remain outside the model. |
@@ -60,7 +60,7 @@ metadata rather than performing the behavior implied by the format.
 | Ruby annotations | 🟡 | ✅ | 🟡 | Ruby pairs, base/annotation text, named ruby styles, and range-aware wrapping are supported; legal inline structure is bounded and no layout engine renders ruby. |
 | Frames and text boxes in text flow | 🟡 | ✅ | ✅ | Anchored frames and text boxes are discovered and selected text-box/image authoring is available; arbitrary nested frame content is not a complete general block model. |
 | Header and footer text | ✅ | ✅ | ✅ | Master-page header/footer content and properties can be inspected and changed, including XML-backed content when a typed convenience method is insufficient. |
-| Page breaks and inline structural markers | ✅ | ✅ | ✅ | Common page-break and inline marker elements are parsed and serialized as structure; no page calculation is performed. |
+| Page breaks and inline structural markers | ✅ | ✅ | ✅ | Common page-break and inline marker elements, including typed `text:soft-page-break` markers on schema-approved paragraphs, headings, list headers, and list items, are parsed and serialized as structure; numbered-paragraph children follow their nested block grammar, and no page calculation is performed. |
 | Text extraction as rendered text | 🟡 | ✅ | N/A | Flattened text is useful for content access but does not represent pagination, visual line wrapping, hidden-field evaluation, or every nested rich-content boundary. |
 
 ## Styles, page layout, and master pages
@@ -135,6 +135,7 @@ metadata rather than performing the behavior implied by the format.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | ODF `office:forms` containers | ✅ | ✅ | ✅ | Nested forms, names, properties, controls, shape references, event metadata, and order are typed. |
+| ODF XForms model declarations | 🟡 | ✅ | ✅ | `office:forms` `xforms:model` children expose ordered inert `instance`, `bind`, `submission`, and unknown extension children with bounded source-preserving replacement/removal; expressions, XPath, submissions, data binding, and runtime processing are never evaluated. |
 | Text, textarea, button, checkbox, radio, list, and combo controls | ✅ | ✅ | ✅ | Broad classic control families have typed inspection and insertion/replacement/removal APIs, including labels, IDs, current state, and options. |
 | Number, date, time, password/file, image-frame, and generic controls | ✅ | ✅ | ✅ | Specialized control models cover typed values, visual attributes, file/password metadata, image frames, and generic fallback controls. |
 | Value-range, typed-value, selection, and grid controls | ✅ | ✅ | ✅ | Control-specific properties and nested options/columns have typed authoring and mutation. |
@@ -169,7 +170,8 @@ metadata rather than performing the behavior implied by the format.
 | User-defined metadata | ✅ | ✅ | ✅ | Named user-defined values support string, boolean, date, time, float, and related ODF value types with validation. |
 | Document statistics | 🟡 | ✅ | ✅ | Stored paragraph, word, character, table, image, object, page, and editing statistics are read/written as metadata; they are not recomputed from content. |
 | Template, auto-reload, and hyperlink-behavior metadata | 🟡 | ✅ | ✅ | ODF metadata/configuration is represented, but attached templates, reload targets, and link policies are not followed or applied. |
-| RDF metadata graphs | ✅ | ✅ | ✅ | RDF package graph and triple CRUD are available where the package carries ODF RDF metadata. |
+| In-content RDFa and `text:meta` | 🟡 | ✅ | ✅ | `content.xml` and `styles.xml` RDFa hosts, paragraph/bookmark metadata, and validated inline `text:meta` mixed content have typed lazy inspection and preservation-safe content edits; CURIEs, datatypes, and metadata semantics remain inert strings. |
+| RDF metadata graphs | ✅ | ✅ | ✅ | RDF package graph and triple CRUD are available where the package carries ODF RDF metadata; this row covers package graph parts, while in-content RDFa is covered separately above. |
 | Settings tree | ✅ | ✅ | ✅ | `office:settings`, config sets, maps, items, scalar values, and flat/package adapters support structural inspection and mutation. |
 | Settings-driven application behavior | ❌ | 🟡 | ❌ | View, update, compatibility, spell-check, printer, cursor, and other configuration values may be preserved, but no office UI/runtime consumes them. |
 | Document protection policy metadata | 🟡 | ✅ | ✅ | Typed form, bookmark, read-only, and tracked-change key metadata is read and transactionally rewritten while unknown settings XML remains opaque; no policy enforcement or unlock behavior is provided. |

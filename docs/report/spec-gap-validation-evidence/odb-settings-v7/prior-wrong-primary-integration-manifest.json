@@ -1,0 +1,50 @@
+{
+  "archive_tar_sha256": "d61960f6e3a8687da293ea2da7bf1210b9c3e20fb0f548b5b1bc81ab343c46cf",
+  "base_commit": "eff351997f11e4017bd1504cce0b6ebb646ee58e",
+  "candidate_has_git_metadata": false,
+  "candidate_path_set_exact": true,
+  "candidate_root": "/var/tmp/litchi-odb-v7-integration-clean-20260910",
+  "committed_odg_common_ods_reconciliation": {
+    "all_candidate_hashes_match_base": true,
+    "mismatch_count": 0,
+    "path_count": 353,
+    "prefixes": [
+      "crates/litchi-odg",
+      "crates/litchi-odf-common",
+      "crates/litchi-ods"
+    ]
+  },
+  "construction": "git archive of eff351997 followed by exact 13-path V7 ODB overlay; explicit untracked Cargo.lock copied only as locked build input",
+  "created_utc": "2026-09-10T13:27:18.245479+00:00",
+  "evidence_root": "/var/tmp/litchi-odb-v7-integration-evidence-20260910",
+  "explicit_lock_input": {
+    "bytes": 138848,
+    "candidate_bytes": 138848,
+    "candidate_sha256": "8248c6b7787a9726e9f99396a5de147bc2f68acf0afef44b710a6392f940bd88",
+    "destination": "/var/tmp/litchi-odb-v7-integration-clean-20260910/Cargo.lock",
+    "sha256": "8248c6b7787a9726e9f99396a5de147bc2f68acf0afef44b710a6392f940bd88",
+    "source": "/var/tmp/litchi-odg-v8-integration-base-clean-20260910/Cargo.lock",
+    "tracked_in_base_commit": false
+  },
+  "no_stage_or_commit_performed": true,
+  "owned_path_count": 13,
+  "owned_paths_all_match": true,
+  "primary_concurrent_drift_recorded": true,
+  "primary_odb_scope_unchanged": true,
+  "primary_status_after_sha256": "b20d2eaa7c44d6a0bf6025de9aed9c4e622b3fbdc6b3cb21f4cc38d7c97b9667",
+  "primary_status_before_sha256": "fed7cbe44a646e0d096b5c0d2fef61d16277c830b06b31aba3229d03a7e4eed2",
+  "primary_status_unchanged_during_capture": false,
+  "primary_worktree": "/home/zhuhe/code/litchi",
+  "primary_worktree_modified_by_this_task": false,
+  "root_gate_status": "not run; root owns final integration gate and should avoid duplicate full gates when source identity is unchanged",
+  "schema": "litchi.odb.v7.integration-candidate.v1",
+  "semantic_preservation": {
+    "archive_path_set_plus_owned_delta": true,
+    "candidate_has_no_git_metadata": true,
+    "committed_odg_common_ods_exact_base": true,
+    "explicit_lock_matches_supplied_lock": true,
+    "owned_overlay_exact_source": true
+  },
+  "source_head": "c44a1ac0cee56c180862d75069ec6d8d5b7fb5e9",
+  "source_root": "/var/tmp/litchi-odb-settings-validation-v7-20260910"
+}

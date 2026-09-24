@@ -1,0 +1,2 @@
+config workload=StageBatch sheets=1 rows=64 columns=64 source_bytes=338634 warmups=3 iterations=15
+result mean_ns=2677111 p50_ns=2676961 p95_ns=2693061 p99_ns=2693061 memory_delta_p50=4308992 memory_delta_max=4308992 memory_final_p50=12218572 memory_final_max=12218572 work_delta_p50=1171456 work_delta_max=1171456 work_final_p50=2368858 work_final_max=2368858 probes=61440

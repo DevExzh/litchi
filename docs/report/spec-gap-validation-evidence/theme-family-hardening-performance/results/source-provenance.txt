@@ -1,0 +1,16 @@
+source_manifest_before_sha256=5cb3b62847215630e723a3009e95513c5ff6a4ea919fbc8af803be9ee0849082
+source_manifest_after_sha256=5cb3b62847215630e723a3009e95513c5ff6a4ea919fbc8af803be9ee0849082
+git_head=4814a84d7a52f31733409c48997691fc4e6f303c
+git_status_relevant=?? docs/report/spec-gap-validation-evidence/theme-family-hardening-performance/|
+fixture_sha256=50b662d8ff0e562157ff80aa19c85ff214cd21357d66457661d070f50c6fdc59  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/tests/fixtures/theme-part-native.xml
+source_sha256:
+3671ef78454309c45039741414d5385a400fd9c8a736fdfac974e704e577a910  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/family/codec.rs
+33557a195ba76b1eb793fa3bfca1b00ecec842c4016446ea969dd0da2932ace1  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/family/mod.rs
+e3f0e9cb33324faf29fdc94cad733cc7a95bf86ae3d583df37b29202220d7d55  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/family/model.rs
+cb3f384a6798a343b0e92c994d982a6e196bf50311a18d5441db3fa6678e6f79  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/family/part.rs
+006472620192f0561529a2f38809381fef45c4ba07080501f40bb5a40c52b1cf  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/family/transaction.rs
+19ec1d9f75a57a505f0c8eae8338691f3eb2467bdebe8f4e16773b26785fb040  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/tests/theme_part.rs
+harness_sha256:
+823d67f941d593edd514df4438fa741f4d0ad5cc2f7f8da41bde05ce7e442b41  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/theme-family-hardening-performance/harness/Cargo.lock
+8fa91f6ee3a251f4ab969519ea84673aea36cd6957c1a0ee838bc0e59a7545a5  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/theme-family-hardening-performance/harness/Cargo.toml
+499ab3baac73210d01f727cde7cc9c13a2687bad6ff8bcdb27573b06b38ac673  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/theme-family-hardening-performance/harness/main.rs

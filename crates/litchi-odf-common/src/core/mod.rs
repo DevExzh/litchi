@@ -75,6 +75,8 @@ mod manifest;
 pub mod metadata;
 /// ODF package handling
 pub mod package;
+/// XML event reader with normalized namespace declaration values.
+pub mod resolved_reader;
 /// Source-backed, content-only raw ZIP publication.
 pub mod source_publication;
 /// Fixed-window XML scanning for source-backed publication.
@@ -120,6 +122,7 @@ pub use package::{
     OwnedPackage, SourceBackedPackage, SourceMemberReaderError, SourcePackageLimits,
     is_signature_owner_path,
 };
+pub use resolved_reader::ResolvedReader;
 pub use source_publication::{
     SourceContentInsertionCallbackError, SourceContentInsertionError, SourceContentInsertionPlan,
     SourceContentPublicationError, SourceContentPublicationOptions,

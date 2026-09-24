@@ -1,0 +1,89 @@
+{
+  "checked_utc": "2026-09-12",
+  "status": {
+    "payload_field_order": "pinned_to_v20250916_field_descriptions",
+    "complete_payload_field_grammar": "pinned_to_v20250916_field_descriptions",
+    "published_extconn14_production": "pinned_to_v20250916",
+    "latest_v20251113_internal_abnf_source": "not_separately_downloadable",
+    "reason": "v20251113 §2.1.7.24 and §2.1.8 point to internal validation grammar files, but its §2.4.78 section is byte-for-byte identical to v20250916 and the packet-diagram convention establishes that ellipsis rows continue variable fields"
+  },
+  "official_artifacts": [
+    {
+      "revision": "21.0",
+      "release": "2025-09-16",
+      "url": "https://officeprotocoldoc.z19.web.core.windows.net/files/MS-XLSB/%5BMS-XLSB%5D-250916.pdf",
+      "bytes": 41654762,
+      "sha256": "983e5f423cb842c07576752cfa6b2b82e0e3c3da6ba3a3832c17b62bc9071c02",
+      "content_md5": "xwc9gd1z/roTuL4cIrGndw==",
+      "last_modified": "Tue, 16 Sep 2025 06:42:19 GMT",
+      "etag": "\"0x8DDF4EC2EFAC195\"",
+      "evidence": "§2.1.7.24 prints the compact record-sequence ABNF, including FRTEXTCONNECTIONS and EXTCONN14"
+    },
+    {
+      "revision": "21.1",
+      "release": "2025-11-13",
+      "url": "https://officeprotocoldoc.z19.web.core.windows.net/files/MS-XLSB/%5BMS-XLSB%5D-251113.pdf",
+      "bytes": 41368452,
+      "sha256": "295e4cc0681b2d4a920cff7202545559f40790701157b2e9923a1df657ca7a90",
+      "content_md5": "atPkdQVP1LBqMuO399YG6A==",
+      "last_modified": "Fri, 14 Nov 2025 08:39:06 GMT",
+      "etag": "\"0x8DE235945D765DC\"",
+      "evidence": "§2.4.78 is unchanged; §2.1.7.24 delegates to Biff12ExternalDataConnectionsGrammar.abnf"
+    },
+    {
+      "revision": "21.1",
+      "release": "2025-11-13",
+      "format": "DOCX cross-check",
+      "url": "https://officeprotocoldoc.z19.web.core.windows.net/files/MS-XLSB/%5BMS-XLSB%5D-251113.docx",
+      "bytes": 6597237,
+      "sha256": "86a7e4fe3c48c19be2d27433f2448c1a855d1517a27d9004e76ed92dca92d876",
+      "content_md5": "GjgwSUyDbBr717ZCaiUtw==",
+      "last_modified": "Fri, 14 Nov 2025 08:38:47 GMT",
+      "etag": "\"0x8DE23593AB1DB2A\"",
+      "evidence": "§2.4.78 packet has FRTHeader, irstCulture, and irstClientCubeUrn in that order"
+    }
+  ],
+  "extracted_section": {
+    "section": "2.4.78 BrtBeginExtConn14",
+    "selection": "from section heading through immediately before 2.4.79 BrtBeginExtConn15 after pdftotext -layout",
+    "sha256_v20250916": "39969f32ef770ef4fad96cb33616d96598953bc2201f2f46fe42088135d4e4a9",
+    "sha256_v20251113": "39969f32ef770ef4fad96cb33616d96598953bc2201f2f46fe42088135d4e4a9"
+  },
+  "local_artifacts": [
+    {
+      "path": "3rdparty/specs/[MS-XLSB]/Front Matter.md",
+      "sha256": "75c99d4d0c854120c8d0258170dff418e7935788a71704e5f7baa97b546458e2",
+      "relevant_lines": "92-93"
+    },
+    {
+      "path": "3rdparty/specs/[MS-XLSB]/2 Structures/2.4 Records.md",
+      "sha256": "de742ab9ecf03369b06055488e5c5f04de43e17c59420b830c3db089204797da",
+      "relevant_lines": "6238-6341, 6478-6479, 34758-34760"
+    },
+    {
+      "path": "3rdparty/specs/[MS-XLSB]/2 Structures/2.5 Structures.md",
+      "sha256": "407eddc3b3fd553690248e12920ecf298cfc3004fb40268ca6f1abb4bd3669ee",
+      "relevant_lines": "25892-25987"
+    },
+    {
+      "path": "3rdparty/specs/[MS-XLSB]/2 Structures/2.1 File Structure.md",
+      "sha256": "c3bede3d0db6d5190340a6c044a10d4a079ff0a9f3c52a87d3edc055b279c29b",
+      "relevant_lines": "803-819"
+    }
+  ],
+  "official_html": {
+    "brt_begin_ext_conn14": "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/985a2de9-9a1b-42c1-a299-d2057caa5e48",
+    "external_data_connections": "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/a4107f74-4883-4f67-8027-9f5a340ccde0",
+    "xl_wide_string": "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/5253755b-33cb-4796-835d-caf07bf70ad4",
+    "arg_desc_diagram_convention": "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/067ff23f-9caa-45bf-9576-71ffda47cd84",
+    "brt_model_table_diagram_convention": "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/be1d97e8-27ea-4d72-b105-695cae940864",
+    "dvals_diagram_convention": "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/52633552-72eb-4927-b7b8-b93686000101",
+    "common_productions": "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/c620f74b-2b48-4ae1-8d07-6033a9038299",
+    "revision_index": "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xlsb/acc8aa92-1f02-4167-99f5-84f9f676b95a"
+  },
+  "repository_implementation_evidence": {
+    "writer": "crates/litchi-xlsb/src/raw/writer.rs:60-85,160-185",
+    "reader": "crates/litchi-xlsb/src/raw/record.rs:14-17,403-417",
+    "note": "These files were read for BIFF12 framing implications and were not modified."
+  }
+}

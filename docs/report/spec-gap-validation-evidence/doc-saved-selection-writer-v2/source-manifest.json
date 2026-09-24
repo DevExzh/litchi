@@ -1,0 +1,53 @@
+{
+    "candidate": "/var/tmp/litchi-doc-saved-selection-publication-validation-20260910",
+    "base": "ce0be842b60a28db142b795389e24be5bde8ae07",
+    "scope": "DOC Selsf/fcWss bounded reader, source-bound reversible writer, and deterministic body-position remapping",
+    "paths": {
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md": "0be5fcc8ab15ce66f2e73f70d12311853df4de2bfd4458652055fe47111c1467",
+        "crates/litchi-doc/src/body_text.rs": "785490bc607882f750d9bbff3b3d6f86f77be5ac3f624bc8dca2cd6ae7ea5ef6",
+        "crates/litchi-doc/src/lib.rs": "7870a5684519d43ea243f6ddc2bbe26df613a925af32fa210ffbf1d1c8699b09",
+        "crates/litchi-doc/src/parts/saved_selection.rs": "dabe7db1eddba969ef3e6916f399662daf8c046e87b9e79383d9c9f171959047",
+        "crates/litchi-doc/src/tracked_revision/package.rs": "12f9e06750d6f40cfc94a98d25db42309b846791dc600f882daa421553a63405",
+        "crates/litchi-doc/tests/auxiliary_tables.rs": "2e90488302bce8adb23636002cef6aed267d61022a03da4c78c5d7ca4c06cd1c",
+        "crates/litchi-doc/tests/saved_selection.rs": "c1fb4400f2ddc48d6d42868c425f010796534f964e8ae2e1da504e04d9bd67f3"
+    },
+    "preserved_committed_context": [
+        "DOFR/VBA/PGP/print-reader commits already present at the candidate base",
+        "all unrelated current primary changes and matrix rows",
+        "doc-saved-selection-writer-v1 evidence remains historical and unchanged"
+    ],
+    "excluded": [
+        "primary working tree and staging/commits",
+        "unrelated DOC metadata, DOFR, VBA, and writer features",
+        "selection rendering, navigation, and host UI state"
+    ],
+    "specs": [
+        "3rdparty/specs/[MS-DOC]/2 Structures/2.9 Basic Types.md (Selsf 2.9.244 and TableSel 2.9.307)",
+        "docs/adr/0003-snapshots-edits-and-patches.md",
+        "docs/adr/0005-io-memory-and-performance.md",
+        "docs/adr/0006-validation-security-and-compatibility.md"
+    ],
+    "policy": {
+        "main_story_bounds": "Raw Selsf parsing remains context-free; strict DOC owner access and patch preflight validate active main-story CPs before table cloning.",
+        "length_changes": "Main-story length-changing operations remap cpFirst, cpLim, cpAnchor, and active text-block cpAnchorShrink at exact splice boundaries; interior CPs and insertion-at-CP ambiguity return a typed PositionDependency refusal before candidate/table cloning.",
+        "replay": "Durable text operations remain representable because replay invokes the same deterministic Selsf remap; explicit Selsf byte patches remain outside durable and semantic three-way merging.",
+        "ignored_fields": "Semantic no-ops preserve undefined blktblSel and shape fInsEnd bytes; partial TableSel transitions normalize invalid previously ignored edges before parsing, and applicability checks do not depend on setter order.",
+        "three_way": "Patches with explicit Selsf auxiliary changes are refused at the body three-way boundary to avoid dropping opaque effects."
+    },
+    "checks": {
+        "saved_selection_integration": "pass: 8 passed",
+        "saved_selection_unit": "pass: 9 passed, 1018 filtered",
+        "auxiliary_tables_integration": "pass: 2 passed",
+        "doc_body_transaction": "pass: 6 passed",
+        "all_features_all_targets": "pass: 1044 library tests ran; 1042 passed, 2 ignored; 1232 total passed, 0 failed, 2 ignored across 45 test binaries",
+        "strict_clippy": "pass: cargo +1.95.0 clippy --offline --locked -p litchi-doc --all-features --all-targets -- -D warnings",
+        "rustdoc": "pass: RUSTDOCFLAGS=-D warnings cargo +1.95.0 doc --offline --locked --all-features -p litchi-doc --no-deps",
+        "rustfmt": "pass: Rust 1.95.0 rustfmt --check, edition 2024, six owned Rust files",
+        "git_diff_check": "pass",
+        "target_isolation": "dedicated targets under /var/tmp/litchi-doc-saved-selection-v2-*"
+    },
+    "review": {
+        "independent_calc_chain_review": "pending",
+        "v1_evidence": "historical; not reused as v2 gate evidence"
+    }
+}

@@ -1,0 +1,7 @@
+1d8e6adf127a00dc25cd801bd90835f41442220ce944ba005cfdfa28e6dd62c2  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsx/src/drawing/source.rs
+85cc02483d70d1603c4937572a2bcbb3febd58b7e325ed60b36251b792abd005  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs
+92c0cf4c6f80e84725893ace3ba80fe3a8172c24659aa1db44c2507b57e04417  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs
+64ec008018096f1bf441cb1eccfaf93a4ec98b1c5addd7e7cf6341f8eadee16d  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsx/tests/drawing_svg_lifecycle.rs
+44f7da649c103eb330a3bf7d6617e03a28bd738a969341164a4aef001e35a070  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/adapter.rs
+ac757292987db580830d7346b18f8dbbfcde3c66ff553dacdd68f36019bd53b0  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/Cargo.toml
+52eb5b41856fa5cffa30b21451f97d61ef99247dea145236f9668cf531d9bee7  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/Cargo.lock

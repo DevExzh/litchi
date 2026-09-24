@@ -1,0 +1,55 @@
+{
+  "worktree": "/var/tmp/litchi-ods-formula-references-candidate-20260913",
+  "target": "/var/tmp/litchi-ods-formula-references-candidate-target-20260913",
+  "checks": [
+    {
+      "name": "formula-unit",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--lib",
+        "codec::formula"
+      ],
+      "status": 0,
+      "passed": 47
+    },
+    {
+      "name": "reference-integration",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--test",
+        "ods_formula_references"
+      ],
+      "status": 0,
+      "passed": 10
+    },
+    {
+      "name": "function-integration",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--test",
+        "ods_formula_functions"
+      ],
+      "status": 0,
+      "passed": 7
+    }
+  ],
+  "all_passed": true
+}

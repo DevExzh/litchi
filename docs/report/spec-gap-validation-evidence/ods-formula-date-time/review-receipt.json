@@ -1,0 +1,17 @@
+{
+  "contract_sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f",
+  "freeze_sha256": "461a76708e36b2a716cd622df45f014e009186223bd1db511c3e0ff0f7fa3561",
+  "reviews": {
+    "resource": {
+      "path": "contract-resource-review.md",
+      "sha256": "0df60bf7a2933924db6449e4e2d5ba1cb850213f26c399cee32258c9bda0b32e",
+      "status": "PASS"
+    },
+    "semantic": {
+      "path": "spec-review.md",
+      "sha256": "6b29d4eb13b8f726952005e84c5d8f29baab530ac02bd160c49dbc3a12513171",
+      "status": "PASS"
+    }
+  },
+  "status": "PASS"
+}

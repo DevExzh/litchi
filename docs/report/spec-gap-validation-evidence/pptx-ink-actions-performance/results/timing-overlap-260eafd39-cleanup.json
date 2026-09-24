@@ -1,0 +1,10 @@
+{
+  "retention_commit": "899a1165ca7e92f7c5a32de718b8738e5ad6597c",
+  "git_byte_verified_files": 70,
+  "raw_external_files_verified": 60,
+  "removed_capture_root": "/var/tmp/pptx-ink-actions-profile-260eafd39.wTYD89",
+  "removed_target_files": 1016,
+  "removed_target_bytes": 357023074,
+  "preserved_clean_source_worktree": "/var/tmp/pptx-ink-actions-profile-260eafd39-src.Q436KY",
+  "timing_admissible": false
+}

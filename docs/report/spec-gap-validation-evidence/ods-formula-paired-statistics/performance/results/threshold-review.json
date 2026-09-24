@@ -1,0 +1,565 @@
+{
+  "accepted_tradeoff": "Residual 250\u2013310 ns/repeat overhead on the tiny inline fixtures after the dyadic material fix; no allocation, work, read, RSS, or large-reference latency flags. Retain as a possible future optimization target.",
+  "bootstrap": {
+    "interpretation": "The DEVSQ residual direction is stable in this host/workload; SKEWP overlaps the 5% review boundary. These are descriptive timing uncertainties, not causal evidence.",
+    "intervals_percent": {
+      "matched-descriptive-sensitive-inline-devsq/evaluate": [
+        5.8104,
+        11.3208
+      ],
+      "matched-descriptive-sensitive-inline-devsq/parse-evaluate": [
+        5.8981,
+        9.3834
+      ],
+      "matched-descriptive-sensitive-inline-skewp/parse-evaluate": [
+        2.668,
+        6.499
+      ]
+    },
+    "method": "Independent 15-sample median resampling; candidate then baseline",
+    "resamples": 10000,
+    "sample_size": 15,
+    "seed": 20260919
+  },
+  "candidate_only_note": "Candidate-only paired rows have no before/after baseline and are reported as absolute measurements.",
+  "capture_disposition": "accepted-with-bounded-residual-overhead",
+  "flag_count": 3,
+  "flags": [
+    {
+      "assessment": "Independent seeded 10,000-resample median bootstrap confirms the DEVSQ direction in both phases; SKEWP has a wider interval near the threshold. This is retained as a small exact-ratio implementation tradeoff after the material shared-helper fix, not dismissed as noise and not treated as causal attribution.",
+      "baseline_p50_ns_per_repeat": 3210,
+      "baseline_raw_elapsed_ns": [
+        3130,
+        3260,
+        3370,
+        3120,
+        3210,
+        3210,
+        3140,
+        3240,
+        3100,
+        3270,
+        3170,
+        3300,
+        3300,
+        3180,
+        3310
+      ],
+      "baseline_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-15.time.txt"
+        }
+      ],
+      "bootstrap_percent_delta_95": [
+        5.8104,
+        11.3208
+      ],
+      "candidate_p50_ns_per_repeat": 3480,
+      "candidate_raw_elapsed_ns": [
+        3480,
+        3370,
+        3610,
+        3520,
+        3450,
+        3510,
+        3460,
+        3430,
+        3470,
+        3450,
+        3540,
+        3440,
+        3620,
+        3600,
+        3550
+      ],
+      "candidate_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.evaluate.sample-15.time.txt"
+        }
+      ],
+      "case": "matched-descriptive-sensitive-inline-devsq",
+      "delta_percent": 8.411214953271028,
+      "disposition": "accepted-bounded-overhead",
+      "metric": "time_ns_per_repeat",
+      "operation": "DEVSQ",
+      "phase": "evaluate",
+      "threshold_percent": 5.0
+    },
+    {
+      "assessment": "Independent seeded 10,000-resample median bootstrap confirms the DEVSQ direction in both phases; SKEWP has a wider interval near the threshold. This is retained as a small exact-ratio implementation tradeoff after the material shared-helper fix, not dismissed as noise and not treated as causal attribution.",
+      "baseline_p50_ns_per_repeat": 3740,
+      "baseline_raw_elapsed_ns": [
+        3750,
+        3731,
+        3900,
+        3740,
+        3710,
+        3800,
+        3870,
+        3650,
+        3730,
+        3700,
+        3810,
+        3730,
+        3640,
+        3750,
+        3760
+      ],
+      "baseline_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-15.time.txt"
+        }
+      ],
+      "bootstrap_percent_delta_95": [
+        5.8981,
+        9.3834
+      ],
+      "candidate_p50_ns_per_repeat": 4050,
+      "candidate_raw_elapsed_ns": [
+        4050,
+        3890,
+        3950,
+        4080,
+        4180,
+        3940,
+        4120,
+        4070,
+        4080,
+        4090,
+        4020,
+        4060,
+        4040,
+        4031,
+        3800
+      ],
+      "candidate_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-devsq.parse-evaluate.sample-15.time.txt"
+        }
+      ],
+      "case": "matched-descriptive-sensitive-inline-devsq",
+      "delta_percent": 8.288770053475936,
+      "disposition": "accepted-bounded-overhead",
+      "metric": "time_ns_per_repeat",
+      "operation": "DEVSQ",
+      "phase": "parse-evaluate",
+      "threshold_percent": 5.0
+    },
+    {
+      "assessment": "Independent seeded 10,000-resample median bootstrap confirms the DEVSQ direction in both phases; SKEWP has a wider interval near the threshold. This is retained as a small exact-ratio implementation tradeoff after the material shared-helper fix, not dismissed as noise and not treated as causal attribution.",
+      "baseline_p50_ns_per_repeat": 4830,
+      "baseline_raw_elapsed_ns": [
+        4860,
+        4820,
+        4780,
+        4770,
+        4770,
+        4740,
+        4740,
+        4790,
+        4830,
+        4910,
+        4920,
+        4930,
+        4830,
+        4920,
+        4980
+      ],
+      "baseline_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-15.time.txt"
+        }
+      ],
+      "bootstrap_percent_delta_95": [
+        2.668,
+        6.499
+      ],
+      "candidate_p50_ns_per_repeat": 5080,
+      "candidate_raw_elapsed_ns": [
+        5041,
+        4950,
+        5120,
+        5040,
+        4950,
+        5100,
+        5120,
+        5110,
+        4930,
+        5100,
+        5010,
+        5040,
+        5200,
+        5090,
+        5080
+      ],
+      "candidate_raw_receipts": [
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-01.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-01.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-02.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-02.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-03.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-03.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-04.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-04.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-05.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-05.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-06.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-06.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-07.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-07.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-08.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-08.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-09.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-09.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-10.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-10.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-11.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-11.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-12.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-12.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-13.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-13.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-14.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-14.time.txt"
+        },
+        {
+          "stdout": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-15.stdout.json",
+          "time": "raw/matched-descriptive-sensitive-inline-skewp.parse-evaluate.sample-15.time.txt"
+        }
+      ],
+      "case": "matched-descriptive-sensitive-inline-skewp",
+      "delta_percent": 5.175983436853002,
+      "disposition": "accepted-bounded-overhead",
+      "metric": "time_ns_per_repeat",
+      "operation": "SKEWP",
+      "phase": "parse-evaluate",
+      "threshold_percent": 5.0
+    }
+  ],
+  "metrics": [
+    "time_ns_per_repeat",
+    "allocator_calls",
+    "requested_bytes",
+    "released_bytes",
+    "peak_live_bytes",
+    "result_live_budget",
+    "work_per_repeat",
+    "reference_reads",
+    "rss_kib"
+  ],
+  "scope": "second frozen paired-statistics capture; matched controls only",
+  "threshold_percent": 5.0,
+  "uncertainty_note": "This is the complete second capture after the dyadic helper fix; no timing was rerun to clear residual triggers."
+}

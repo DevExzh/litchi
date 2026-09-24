@@ -42,6 +42,52 @@ pub(crate) fn load_from_workbook(
     )?))
 }
 
+/// Admit the inert connections owner under a caller's byte and typed-entry
+/// ceilings before the semantic parser allocates its connection vector and
+/// strings. The raw record pass borrows the owner payload and performs no
+/// connection-specific cloning.
+pub(crate) fn preflight(
+    package: &OpcPackage,
+    max_part_bytes: usize,
+    max_connections: usize,
+) -> Result<()> {
+    let workbook = package.main_document_part()?;
+    let Some(graph) = discover_graph(package, workbook.partname())? else {
+        return Ok(());
+    };
+    let part = package.get_part(&graph.part_name)?;
+    if part.blob().len() > max_part_bytes {
+        return Err(Error::LimitExceeded {
+            resource: "External Data Connections bytes",
+            actual: part.blob().len(),
+            maximum: max_part_bytes,
+        });
+    }
+    let raw_limit = max_part_bytes.min(crate::raw::MAX_WIRE_PAYLOAD);
+    let mut records = crate::raw::Records::try_with_limits(
+        part.blob(),
+        crate::raw::Limits::new(raw_limit, 1_048_576),
+    )?;
+    let mut connection_count = 0_usize;
+    for record in &mut records {
+        if record?.kind() == crate::raw::kind::BEGIN_EXT_CONNECTION {
+            connection_count = connection_count
+                .checked_add(1)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "External Data Connections",
+                })?;
+            if connection_count > max_connections {
+                return Err(Error::LimitExceeded {
+                    resource: "External Data Connections",
+                    actual: connection_count,
+                    maximum: max_connections,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Load and validate the workbook-level connections owner.
 pub fn load(package: &OpcPackage) -> Result<Option<Connections>> {
     let workbook = package.main_document_part()?;
@@ -70,7 +116,7 @@ pub(crate) fn store_on_workbook(
     let canonical_part = PackURI::new(CONNECTIONS_PART_NAME).map_err(Error::Encoding)?;
     if existing
         .as_ref()
-        .is_none_or(|graph| graph.part_name != canonical_part)
+        .is_none_or(|graph| !graph.part_name.is_equivalent_to(&canonical_part))
     {
         package.validate_new_part_name(&canonical_part)?;
         ensure_no_inbound_relationship(package, &canonical_part)?;
@@ -177,7 +223,7 @@ pub(crate) fn capture_source(package: &OpcPackage) -> Result<SourceImage> {
 
 pub(crate) fn restore_source(package: &mut OpcPackage, source: &SourceImage) -> Result<()> {
     let workbook_name = package.main_document_part()?.partname().clone();
-    if workbook_name != source.workbook_name {
+    if !workbook_name.is_equivalent_to(&source.workbook_name) {
         return Err(invalid("workbook part identity changed"));
     }
     if let Some(graph) = discover_graph(package, &workbook_name)? {
@@ -263,8 +309,13 @@ fn discover_graph(
     if relationship.is_external() {
         return Err(invalid("connections relationship cannot be external"));
     }
-    let part_name = relationship.target_partname()?;
-    let part = package.get_part(&part_name)?;
+    let target_name = relationship.target_partname()?;
+    let part = package.get_part(&target_name)?;
+    // Relationship resolution is case-insensitive, but mutation APIs remove
+    // parts by their stored key. Retain the physical name so a package
+    // authored with a case-variant owner can still be replaced, removed, and
+    // restored.
+    let part_name = part.partname().clone();
     if part.content_type() != CONNECTIONS_CONTENT_TYPE {
         return Err(invalid(format!(
             "connections part '{}' has content type '{}'",
@@ -285,7 +336,8 @@ fn discover_graph(
 
 fn ensure_no_orphan_parts(package: &OpcPackage, expected: Option<&PackURI>) -> Result<()> {
     if package.iter_parts().any(|part| {
-        part.content_type() == CONNECTIONS_CONTENT_TYPE && expected != Some(part.partname())
+        part.content_type() == CONNECTIONS_CONTENT_TYPE
+            && expected.is_none_or(|expected| !part.partname().is_equivalent_to(expected))
     }) {
         return Err(invalid(
             "package contains an orphan or additional connections part",
@@ -296,7 +348,7 @@ fn ensure_no_orphan_parts(package: &OpcPackage, expected: Option<&PackURI>) -> R
 
 fn ensure_no_inbound_relationship(package: &OpcPackage, target: &PackURI) -> Result<()> {
     for relationship in package.rels().iter() {
-        if !relationship.is_external() && relationship.target_partname()? == *target {
+        if !relationship.is_external() && relationship.target_partname()?.is_equivalent_to(target) {
             return Err(invalid(
                 "canonical connections part name has a dangling inbound relationship",
             ));
@@ -304,7 +356,9 @@ fn ensure_no_inbound_relationship(package: &OpcPackage, target: &PackURI) -> Res
     }
     for part in package.iter_parts() {
         for relationship in part.rels().iter() {
-            if !relationship.is_external() && relationship.target_partname()? == *target {
+            if !relationship.is_external()
+                && relationship.target_partname()?.is_equivalent_to(target)
+            {
                 return Err(invalid(
                     "canonical connections part name has a dangling inbound relationship",
                 ));
@@ -321,7 +375,7 @@ fn ensure_exclusive_inbound_relationship(
     expected_relationship_id: &str,
 ) -> Result<()> {
     for relationship in package.rels().iter() {
-        if !relationship.is_external() && relationship.target_partname()? == *target {
+        if !relationship.is_external() && relationship.target_partname()?.is_equivalent_to(target) {
             return Err(invalid(
                 "connections part has an unexpected package-level relationship",
             ));
@@ -329,10 +383,13 @@ fn ensure_exclusive_inbound_relationship(
     }
     for part in package.iter_parts() {
         for relationship in part.rels().iter() {
-            if relationship.is_external() || relationship.target_partname()? != *target {
+            if relationship.is_external()
+                || !relationship.target_partname()?.is_equivalent_to(target)
+            {
                 continue;
             }
-            if part.partname() != expected_source || relationship.r_id() != expected_relationship_id
+            if !part.partname().is_equivalent_to(expected_source)
+                || relationship.r_id() != expected_relationship_id
             {
                 return Err(invalid(
                     "connections part has an unexpected inbound relationship",

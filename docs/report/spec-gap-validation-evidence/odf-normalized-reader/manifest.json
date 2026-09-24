@@ -1,0 +1,14 @@
+{
+  "sha256": {
+    "combined-source.json": "b6a05c0b59312c64246fe391d922d3f1d915ea760ad1321dc582c0b5f26b18c0",
+    "clippy-exit.json": "6b2a0f69d537686534e98b34f617e4791d54358d8533628260ad777f13893b9b",
+    "README.md": "3f14c9542c3d56bdcd42b09fa3599ceec8c023f8ddbd272efb3839e12ccb35de",
+    "Cargo.lock.gz": "a636d778888922270418356094536135c0cd537aa8dffe7983324e02e4c9548b",
+    "tests.log.gz": "1108db28fcca16c43e00e210a8de9a24d885ef5305cfcd24b7fb024b941a120f",
+    "rustdoc.log.gz": "2c1af3428d307b14a5a7cc9c114b0db8ac37dbf23fb56a864c99c2841b30a182",
+    "clippy.log.gz": "92039ab3ebb47c6d33504862e0ef61fd705128af5979284adcac4145899d3e5f",
+    "rustdoc-exit.json": "b2c2338cedf323bd64764b9cec8c365bcab41b60c63ac8169e0372d1f39e50a3",
+    "tests-exit.json": "ea7f5ef7f73df67a7044a799f2c05967d977568a27392d2ac8367296d41186b0",
+    "source.json": "71f762813dbaefdeca93c6f95c839ed67495fcdb9fbff747c1778d522ce83673"
+  }
+}

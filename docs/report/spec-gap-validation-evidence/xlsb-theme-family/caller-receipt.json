@@ -1,0 +1,27 @@
+{
+  "passed": true,
+  "source_unchanged": true,
+  "production_source_manifest_sha256": "1c1cc793b0b6019ea0296a235f8ab7784de342bc286c83735edebb7ba070c30b",
+  "caller_inputs": {
+    "caller-example/Cargo.toml": "5ec028a55faf0404bc8ffd7b053f3a70c8e4a594e434de7ecf0ed976edaa08e1",
+    "caller-example/Cargo.lock": "55edef553cba04239fe72bcb2d1dc6bfc3eb05fbe51d1f4b8500c6a6aafc0249",
+    "caller-example/main.rs": "50cdf058e75ea88b28f2df2586ee08d8dbf4b95f0deece6daf2341169d972f81"
+  },
+  "binary_sha256": "bc7e6a03d29cd5b923713d008f722ea218a484aae8634e7001982745327eab9f",
+  "log_sha256": "b36089a777b1d878bc04b95045a3f42d64615b1bbd0dd637b82a8d2ac0257171",
+  "outputs": {
+    "caller-updated.xml": "4f584915b30c4f39853b13efa3e827aba8922b8e3f68bf9bc3646eaca4ed0c19",
+    "caller-removed.xml": "647e113330328971009c39b4dd10f876b823fed9d5224dbfd60458610b0dd2cb",
+    "caller-added.xml": "5c060c858d01f6c0b91837797e33c1e3810b39ca8927f433d8015811f578807e",
+    "caller-authored.xml": "90a4d05b109921a8df588fe4d759b8b182e8d3a286c10c703caa1afbce604073"
+  },
+  "command": [
+    "cargo",
+    "run",
+    "--locked",
+    "--manifest-path",
+    "docs/report/spec-gap-validation-evidence/xlsb-theme-family/caller-example/Cargo.toml"
+  ],
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "owned_temporary_target_removed": true
+}

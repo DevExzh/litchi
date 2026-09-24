@@ -1,0 +1,325 @@
+{
+  "capture_head": "cc435619cfe96264c40889e6012f139fb8dcff9e",
+  "capture_results_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+  "clean_source_worktree": "/var/tmp/pptx-ink-actions-correctness-cc435619c-clean",
+  "closure": {
+    "binary_path": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/target/release/pptx-ink-actions-performance",
+    "binary_sha256": "c68b101dd2e46080da30a25415ec1d72a63186f123e19c4989f30cc897fbd6a4",
+    "binary_size_bytes": 4237088,
+    "design_git_blob": "597400950b1027c47cd6e4cbbedd23915bc0980e",
+    "design_sha256": "30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d",
+    "harness_lock_sha256": "3c773b848134c52df596034ffbbe8688dde9924fb741dee8bc8bce0eaa772f2e",
+    "helper_sha256": "bec6baafcf735d778216fb54fe6299312707e912dcaed5f89de988f7112bb58e",
+    "metadata_after_sha256": "48a024f954ee5464e12c403d142e7a4e1f51297c83a62aafc58f2a09865399e5",
+    "metadata_before_sha256": "48a024f954ee5464e12c403d142e7a4e1f51297c83a62aafc58f2a09865399e5",
+    "source_manifest_after_sha256": "75bd989c33389925f1a81ccc0961bf7296928fbd1702c1a8346d888f144489d9",
+    "source_manifest_before_sha256": "75bd989c33389925f1a81ccc0961bf7296928fbd1702c1a8346d888f144489d9"
+  },
+  "counts": {
+    "capture_result_bytes": 4921714,
+    "capture_result_files": 38,
+    "diagnostic_bytes": 6201,
+    "diagnostic_files": 2,
+    "external_target_bytes": 356994119,
+    "external_target_files": 1015,
+    "retained_bytes": 4927915,
+    "retained_files": 40
+  },
+  "diagnostic_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c-diagnostic.ZZ7NWz",
+  "files": [
+    {
+      "bytes": 165,
+      "retained_path": "raw/binary-after.sha256",
+      "sha256": "947ba5384fb87e16406c42c5932e4277c90b068cbdff3553936488dd4ae36df7",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "binary-after.sha256"
+    },
+    {
+      "bytes": 208,
+      "retained_path": "raw/binary-file.txt",
+      "sha256": "f9d8181eab2dbb9c0044aed129c2abf6697a51dfb304f91302196eaadc4cdf9c",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "binary-file.txt"
+    },
+    {
+      "bytes": 42,
+      "retained_path": "raw/binary-stat.txt",
+      "sha256": "a9b7a8852de7c01e2cdedf1c16ae5f45773d5cad3ee236b6796dac46c9c641e0",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "binary-stat.txt"
+    },
+    {
+      "bytes": 165,
+      "retained_path": "raw/binary.sha256",
+      "sha256": "947ba5384fb87e16406c42c5932e4277c90b068cbdff3553936488dd4ae36df7",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "binary.sha256"
+    },
+    {
+      "bytes": 2495,
+      "retained_path": "raw/capture-provenance.json",
+      "sha256": "90ade7788936c8251378376b52a48396fb7fa71e7b9efb46bbc9cbf3341443a1",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "capture-provenance.json"
+    },
+    {
+      "bytes": 4125,
+      "retained_path": "raw/cargo-build-release.stderr",
+      "sha256": "6adae2ebcde04798148cb35c31c4fde745dacc68d26e84a9a213a7c2a9a587a7",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "cargo-build-release.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/cargo-build-release.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "cargo-build-release.stdout"
+    },
+    {
+      "bytes": 209,
+      "retained_path": "raw/cargo-lock.sha256",
+      "sha256": "ffa844cbf4e96515a4da3a072c1011a468e811c93205e95b016acee8b412f0ed",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "cargo-lock.sha256"
+    },
+    {
+      "bytes": 600754,
+      "retained_path": "raw/cargo-metadata-after.json",
+      "sha256": "48a024f954ee5464e12c403d142e7a4e1f51297c83a62aafc58f2a09865399e5",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "cargo-metadata-after.json"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/cargo-metadata-after.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "cargo-metadata-after.stderr"
+    },
+    {
+      "bytes": 600754,
+      "retained_path": "raw/cargo-metadata-before.json",
+      "sha256": "48a024f954ee5464e12c403d142e7a4e1f51297c83a62aafc58f2a09865399e5",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "cargo-metadata-before.json"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/cargo-metadata-before.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "cargo-metadata-before.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/cargo-version-before.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "cargo-version-before.stderr"
+    },
+    {
+      "bytes": 36,
+      "retained_path": "raw/cargo-version-before.txt",
+      "sha256": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "cargo-version-before.txt"
+    },
+    {
+      "bytes": 23212,
+      "retained_path": "raw/commands.jsonl",
+      "sha256": "9c17b4a975ecc1fa9928e0caa2916ba9c429afbfd05d448a113c6d5f85033763",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "commands.jsonl"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/committed-inputs-guard.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "committed-inputs-guard.stderr"
+    },
+    {
+      "bytes": 663,
+      "retained_path": "raw/committed-inputs-guard.stdout",
+      "sha256": "c4d5065dde3c1a098612f10ebb7ac50488a39ab2c1217a78f2316d1e3eb6c998",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "committed-inputs-guard.stdout"
+    },
+    {
+      "bytes": 211,
+      "retained_path": "raw/corpus-manifest.sha256",
+      "sha256": "611cceb0f54955cadee81f7fca01c8bc39a07c2ee04c1f44408d0e424f4d6d32",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "corpus-manifest.sha256"
+    },
+    {
+      "bytes": 188,
+      "retained_path": "raw/design.sha256",
+      "sha256": "ca26b7b72a4bcc612bbf2dab937aeb720d8bed61605a40a3cb6f0b97f94062d1",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "design.sha256"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/git-status-after.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "git-status-after.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/git-status-before.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "git-status-before.txt"
+    },
+    {
+      "bytes": 165,
+      "retained_path": "raw/helper.sha256",
+      "sha256": "491c642b2ecd3f8cda3af19507ed0ca2273a6d6d68dcb40aef2f754097c67b37",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "helper.sha256"
+    },
+    {
+      "bytes": 693,
+      "retained_path": "raw/host-after.txt",
+      "sha256": "d489f27ff3b5ce10d2bb0aae0077cdb3e0b1656842a343c65c5e63f715c4925c",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "host-after.txt"
+    },
+    {
+      "bytes": 694,
+      "retained_path": "raw/host-before.txt",
+      "sha256": "294bf400434b329f774af22000b0acecac901b338e2d77f33dafae2c46a88736",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "host-before.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/host-probe.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "host-probe.stderr"
+    },
+    {
+      "bytes": 954,
+      "retained_path": "raw/host-probe.stdout",
+      "sha256": "e67787a880e9069b05aa7778a1ab29f3efe3ec7565106a63e47071ae8a3bddeb",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "host-probe.stdout"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/matrix-correctness.json",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "matrix-correctness.json"
+    },
+    {
+      "bytes": 1118,
+      "retained_path": "raw/matrix-correctness.stderr",
+      "sha256": "8af971e69c2bb31ae4e8d88e0fb98815ad1e931c818368024f80b16e4d1d2709",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "matrix-correctness.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/rustc-vV-before.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "rustc-vV-before.stderr"
+    },
+    {
+      "bytes": 196,
+      "retained_path": "raw/rustc-vV-before.txt",
+      "sha256": "4fdff2578428e9c5c08ddd7a0d3079c1a106b1cdaa46e73e46f7cd32b0fb9cad",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "rustc-vV-before.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/rustfmt-version-before.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "rustfmt-version-before.stderr"
+    },
+    {
+      "bytes": 45,
+      "retained_path": "raw/rustfmt-version-before.txt",
+      "sha256": "21e923568a260155c34a6f780f9513d3962c088aa3bbe8c91ab5385f470547d1",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "rustfmt-version-before.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/source-manifest-after.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "source-manifest-after.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/source-manifest-after.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "source-manifest-after.stdout"
+    },
+    {
+      "bytes": 1842311,
+      "retained_path": "raw/source-manifest-after.txt",
+      "sha256": "75bd989c33389925f1a81ccc0961bf7296928fbd1702c1a8346d888f144489d9",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "source-manifest-after.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/source-manifest-before.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "source-manifest-before.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/source-manifest-before.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "source-manifest-before.stdout"
+    },
+    {
+      "bytes": 1842311,
+      "retained_path": "raw/source-manifest-before.txt",
+      "sha256": "75bd989c33389925f1a81ccc0961bf7296928fbd1702c1a8346d888f144489d9",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c.CmZmD6/results",
+      "source_relative": "source-manifest-before.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/diagnostic/package_read_tiny_shared.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c-diagnostic.ZZ7NWz",
+      "source_relative": "package_read_tiny_shared.stderr"
+    },
+    {
+      "bytes": 6201,
+      "retained_path": "raw/diagnostic/package_read_tiny_shared.stdout",
+      "sha256": "4731ae4031f20790656cbf81dc0b1944a020c6503999cc63f157ed1fb786f4b2",
+      "source_directory": "/var/tmp/pptx-ink-actions-correctness-cc435619c-diagnostic.ZZ7NWz",
+      "source_relative": "package_read_tiny_shared.stdout"
+    }
+  ],
+  "gates": {
+    "host_probe": 0,
+    "lanes_executed": 0,
+    "matrix_correctness": 1,
+    "preflight": 0,
+    "release_build": 0,
+    "timing_capture": false,
+    "usr_bin_time": false
+  },
+  "production_source_baseline_commit": "2a2ffa1cae4e6b7070082768ce84483e5d411dc8",
+  "reason": "The cc435 capture matrix failed all 42 lanes because retained Prepared lane/recipe metadata was allocated after the retained-baseline snapshot. This is rejected evidence; no lane result is admitted.",
+  "schema": "pptx-ink-actions-rejected-retention-v1",
+  "semantic_owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+  "status": "rejected-matrix-before-lanes"
+}

@@ -1,0 +1,98 @@
+{
+  "schema": "xlsb-model-identity-corpus-v2",
+  "fixture_kind": "synthetic_complete_xldm140",
+  "recipe": {
+    "id": "synthetic-complete-xldm140-table-identity",
+    "version": 2,
+    "source": "crates/litchi-xlsb/tests/data_model_identity.rs",
+    "generator": "docs/report/spec-gap-validation-evidence/xlsb-model-identity-performance/harness/scaled_fixture.rs",
+    "name_profiles": [
+      "same_length_ascii",
+      "shorter",
+      "longer",
+      "escaped_xml",
+      "unicode"
+    ],
+    "endpoint_layouts": ["selected_table", "distributed"],
+    "semantic_checks": [
+      "table_ids",
+      "table_names",
+      "relationship_ids",
+      "relationship_endpoints",
+      "relationship_metadata_paths",
+      "time_grouping_ids"
+    ],
+    "olap_proof_limits": {
+      "max_items": 1000000,
+      "max_string_bytes": 268435456,
+      "max_source_bytes": 536870912,
+      "max_work": 4000000
+    }
+  },
+  "host_feature_commit": "1b0d4864804d666aaf4ae5039bd6300996ca32a5",
+  "neutral_baseline_commit": "4f53be2d31e14b215d6eeaee56d11eefeae94107",
+  "recipe_source": "crates/litchi-xlsb/tests/data_model_identity.rs",
+  "recipe_generator": "docs/report/spec-gap-validation-evidence/xlsb-model-identity-performance/harness/scaled_fixture.rs",
+  "olap_proof_limits": {
+    "max_items": 1000000,
+    "max_string_bytes": 268435456,
+    "max_source_bytes": 536870912,
+    "max_work": 4000000
+  },
+  "scale_matrix": [
+    {"family": "tiny", "tables": 1, "relationships": 0},
+    {"family": "small", "tables": 4, "relationships": 0},
+    {"family": "small", "tables": 4, "relationships": 3},
+    {"family": "small", "tables": 4, "relationships": 8},
+    {"family": "medium", "tables": 16, "relationships": 0},
+    {"family": "medium", "tables": 16, "relationships": 15},
+    {"family": "medium", "tables": 16, "relationships": 32},
+    {"family": "medium", "tables": 16, "relationships": 64},
+    {"family": "large", "tables": 64, "relationships": 0},
+    {"family": "large", "tables": 64, "relationships": 63},
+    {"family": "large", "tables": 64, "relationships": 128},
+    {"family": "large", "tables": 64, "relationships": 256}
+  ],
+  "endpoint_layouts": {
+    "selected_table": "relationship pairs are ordered with the selected table first; all admitted pairs use it when R <= T-1",
+    "distributed": "relationship pairs are ordered by directed ring distance to spread containing-table incidence across multiple tables"
+  },
+  "caller_limits": [
+    "raw.payload",
+    "raw.string_units",
+    "max_tables",
+    "max_relationships",
+    "max_time_groupings",
+    "max_time_grouping_columns",
+    "max_rewrite_bytes",
+    "max_records",
+    "max_part_bytes",
+    "max_graph_parts",
+    "max_graph_relationships",
+    "max_metadata_bytes",
+    "max_connection_bytes",
+    "max_connections"
+  ],
+  "receipt_fields": {
+    "candidate_bytes": "planned resulting model-part bytes; null when the public API does not expose a candidate",
+    "staged_bytes": "detached staged model-part bytes; null when unavailable",
+    "source_bytes": "complete package source bytes",
+    "phase_times": ["open_ns", "stage_ns", "commit_ns", "save_ns", "reopen_ns", "inverse_ns", "validation_ns"],
+    "source_proof_status": "complete_xldm140 for successful points; unavailable_graph_work_limit for bounded graph-limit refusals",
+    "forward_preservation": "complete source/candidate hashes for OPC parts, relationship owners, content types, and XLDM inner members"
+  },
+  "scales_in_smoke": [
+    {"name": "tiny", "tables": 1, "relationships": 0},
+    {"name": "relationship", "tables": 1, "relationships": 1}
+  ],
+  "correctness_matrix": {
+    "cases": 12,
+    "endpoint_layouts": 2,
+    "name_profiles": 5,
+    "runs": 120,
+    "expected_bounded_refusal": {"tables": 64, "relationships": 256, "resource": "graph work"}
+  },
+  "full_matrix_pending": "performance timing/allocation/RSS remains unauthorized; correctness generation and public rename gates are exercised separately by the matrix runner",
+  "native_acceptance_claim": false,
+  "native_evidence": "none"
+}

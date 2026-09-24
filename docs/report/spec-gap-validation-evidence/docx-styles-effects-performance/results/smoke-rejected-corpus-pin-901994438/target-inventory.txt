@@ -1,0 +1,5 @@
+target=/var/tmp/litchi-docx-styles-effects-projection-reuse-smoke-target-901994438-20260912-a
+observed_after_exit=absent
+runner_cleanup=run_current_smoke.sh EXIT cleanup removed the target after verifier failure
+retained_target_files=0
+retained_target_bytes=0

@@ -5,7 +5,9 @@
 
 mod content;
 mod forms;
+mod metadata;
 mod references;
 mod structure;
 mod styles;
 mod tracking;
+mod xforms;

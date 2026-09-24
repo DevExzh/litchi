@@ -1,0 +1,55 @@
+{
+  "passed": true,
+  "source_unchanged": true,
+  "revision": "9d52321b46076fffd0dd2b3d87a0608ab899e17a",
+  "binary_sha256": "4f79c5265fe8bc7b7b6dfb20b8e8ad100af23505d18b8c040990f2e2f31f84b7",
+  "gate_source_files_checked_before_and_after": 1134,
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "run",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/harness/Cargo.toml",
+        "--",
+        "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/validate_schema.py",
+        "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/source.xml",
+        "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/attached.xml",
+        "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/detached.xml"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "inputs": {
+    "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/run_probe.py": "8307a8fde1bde7e0bd93045948af7196c2830fb2df3cd5a3d698e45d4f5418d5",
+    "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/gates/source-hashes.json": "09ed5848879728cd23e696ff0f7e593fcbc59c9e13b654939fa94781f54aabef",
+    "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/validate_schema.py": "eaa8714d4827c8c6aace863bbc77ee1ee26af2da1b8ab4663f8eb7511f2a6576",
+    "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/harness/Cargo.toml": "35602098ab32933147a2406937a3477e09a67e4194a7d73c505f5e58c4720315",
+    "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/harness/Cargo.lock": "0114fbff7f809e9842bb7037dd4899f0f7330408a476ee3ef6d7021e501edc99",
+    "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/harness/main.rs": "fa36d69a795642e7695ce3ca6a412a29ef7c51bf10d546fa25da949d15414819",
+    "3rdparty/specs/[MS-ODRAWXML]/2 Structures/2.26 http---schemas.microsoft.com-office-drawing-2016-SVG-main.md": "4ad574ec37a3f65553232485526fe2c044be79286467541f8c9bf560f997d68a",
+    "3rdparty/specs/[MS-ODRAWXML]/5 Appendix A - Full XML Schemas/5.24 http---schemas.microsoft.com-office-drawing-2016-SVG-main Schema.md": "30ae3393d282bb2f66291e17bf37db3ac98f574f3c4b0443ff449fe3c1067736",
+    "3rdparty/specs/[MS-OI29500]/2 Conformance Statements/2.1 Normative Variations.md": "f3fa6c8456b2e6ca05f6471f98851a8cbf73b18fb7393f02a712c02ae62733ce",
+    "3rdparty/specs/ECMA-376/ECMA-376-4_5th_edition_december_2016.zip": "bd25da1109f73762356596918bf5ff8b74a1331642dba5f1c1d1dfc6bed34ecd"
+  },
+  "outputs": {
+    "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/attached.pptx": "85384731b4acb1b42132bbc362476ce7a1d527e0c259d26d5805e3e9333396da",
+    "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/attached.xml": "d5dce81d4df79ff4901dbbd7275948ddf6cd5e99d0e739e57e42570f266ca525",
+    "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/detached.pptx": "62d4a7ee57f5f9cd87eb70d8d93f84f58f86525dad90d3ccfec4fa7f91941bce",
+    "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/detached.xml": "2f2874cfa3b2a3596dee3ecd100288f9f84cbe9cc27179c98bb8a84baa745af4",
+    "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/source.pptx": "62d4a7ee57f5f9cd87eb70d8d93f84f58f86525dad90d3ccfec4fa7f91941bce",
+    "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/source.xml": "2f2874cfa3b2a3596dee3ecd100288f9f84cbe9cc27179c98bb8a84baa745af4",
+    "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/probe.log": "175c8452903e368b168fa66cba8563d7038da16370264434c6bdb024afbce68a",
+    "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/schema-validation.json": "e767a553f179fac8fa2ee0a1a12b20d84d9a7a80e1b63637c71c3eaeb533f84c"
+  },
+  "scope": "Downstream PPTX SVG lifecycle with save/reopen and preserved raster; XSD for three generated slide XML outputs"
+}

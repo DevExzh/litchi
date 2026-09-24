@@ -14,7 +14,7 @@ use crate::consts::{
     DIRENTRY_SIZE, ENDOFCHAIN, FREESECT, HEADER_DIFAT_ENTRIES, HEADER_DIFAT_OFFSET, MAXREGSECT,
     NUM_FAT_SECTORS_OFFSET, SECTOR_SHIFT_OFFSET, SECTOR_SHIFT_V3, SECTOR_SIZE_V3, SECTOR_SIZE_V4,
 };
-use crate::{OleError, OleFile, OleFileLimits, writer::OleWriter};
+use crate::{OleError, OleFile, OleFileLimits, SharedOleFileLimits, writer::OleWriter};
 
 fn sample_file() -> Vec<u8> {
     let mut writer = OleWriter::new();
@@ -46,6 +46,15 @@ fn read_u32(bytes: &[u8], offset: usize) -> u32 {
 
 fn write_u32(bytes: &mut [u8], offset: usize, value: u32) {
     bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+}
+
+fn declared_allocation_table_bytes(bytes: &[u8]) -> u64 {
+    let sector_size = 1u64 << u16::from_le_bytes([bytes[0x1e], bytes[0x1f]]);
+    let sector_count = [0x2c, 0x48, 0x40]
+        .into_iter()
+        .map(|offset| u64::from(read_u32(bytes, offset)))
+        .sum::<u64>();
+    sector_count * (sector_size + 4)
 }
 
 fn data_entry_offset(bytes: &[u8]) -> usize {
@@ -145,6 +154,26 @@ fn low_level_default_ingress_limit_is_finite() {
         OleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES
     );
     assert_eq!(OleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES, 64 * 1024 * 1024);
+    assert_eq!(
+        OleFileLimits::default().max_allocation_table_bytes(),
+        OleFileLimits::DEFAULT_MAX_ALLOCATION_TABLE_BYTES
+    );
+    assert_eq!(
+        OleFileLimits::DEFAULT_MAX_ALLOCATION_TABLE_BYTES,
+        64 * 1024 * 1024
+    );
+    assert_eq!(
+        OleFileLimits::MAX_ALLOCATION_TABLE_BYTES,
+        2 * 1024 * 1024 * 1024
+    );
+    assert_eq!(
+        SharedOleFileLimits::default().max_allocation_table_bytes(),
+        SharedOleFileLimits::DEFAULT_MAX_ALLOCATION_TABLE_BYTES
+    );
+    assert_eq!(
+        SharedOleFileLimits::DEFAULT_MAX_ALLOCATION_TABLE_BYTES,
+        OleFileLimits::DEFAULT_MAX_ALLOCATION_TABLE_BYTES
+    );
     assert!(matches!(
         OleFileLimits::new(0),
         Err(OleError::InvalidLimit {
@@ -176,6 +205,50 @@ fn low_level_default_ingress_limit_is_finite() {
             value,
             maximum,
         }) if value == maximum + 1
+    ));
+    assert!(matches!(
+        OleFileLimits::default().with_max_allocation_table_bytes(0),
+        Err(OleError::InvalidLimit {
+            resource: "CFB allocation table bytes",
+            value: 0,
+            maximum: OleFileLimits::MAX_ALLOCATION_TABLE_BYTES,
+        })
+    ));
+    assert!(matches!(
+        OleFileLimits::default()
+            .with_max_allocation_table_bytes(OleFileLimits::MAX_ALLOCATION_TABLE_BYTES + 1),
+        Err(OleError::InvalidLimit {
+            resource: "CFB allocation table bytes",
+            value,
+            maximum,
+        }) if value == maximum + 1
+    ));
+}
+
+#[test]
+fn allocation_table_budget_accepts_exact_and_rejects_one_byte_under() {
+    let bytes = sample_file();
+    let observed = declared_allocation_table_bytes(&bytes);
+    assert!(observed > 1);
+
+    let exact = OleFileLimits::new(bytes.len() as u64)
+        .unwrap()
+        .with_max_allocation_table_bytes(observed)
+        .unwrap();
+    OleFile::open_with_limits(Cursor::new(bytes.clone()), exact)
+        .expect("a table budget exactly at the declared bytes opens");
+
+    let under = OleFileLimits::new(bytes.len() as u64)
+        .unwrap()
+        .with_max_allocation_table_bytes(observed - 1)
+        .unwrap();
+    assert!(matches!(
+        OleFile::open_with_limits(Cursor::new(bytes), under),
+        Err(OleError::LimitExceeded {
+            resource: "allocation table bytes",
+            observed: actual,
+            maximum,
+        }) if actual == observed && maximum == observed - 1
     ));
 }
 
@@ -220,6 +293,72 @@ fn hostile_reported_length_is_rejected_before_header_read() {
         }) if observed == maximum + 1
     ));
     assert_eq!(reads.load(Ordering::Relaxed), 0);
+}
+
+#[test]
+fn larger_explicit_ingress_preserves_defaults_and_version_three_size_limit() {
+    let default_bytes = 2 * 1024 * 1024 * 1024;
+    assert_eq!(OleFileLimits::default().max_input_bytes(), default_bytes);
+    assert_eq!(
+        SharedOleFileLimits::default().max_input_bytes(),
+        default_bytes
+    );
+    for ceiling in [default_bytes + 1, OleFileLimits::MAX_INPUT_BYTES] {
+        assert_eq!(
+            OleFileLimits::new(ceiling).unwrap().max_input_bytes(),
+            ceiling
+        );
+        assert_eq!(
+            SharedOleFileLimits::new(ceiling).unwrap().max_input_bytes(),
+            ceiling
+        );
+    }
+    let reads = Arc::new(AtomicUsize::new(0));
+    let reader = ReportedLengthReader {
+        bytes: sample_file(),
+        reported_length: default_bytes + 1,
+        position: 0,
+        reads: reads.clone(),
+    };
+    let limits = OleFileLimits::new(reader.reported_length).unwrap();
+    assert!(matches!(
+        OleFile::open_with_limits(reader, limits),
+        Err(OleError::InvalidFormat(message)) if message.contains("Version 3 CFB input cannot exceed")
+    ));
+    // Only the fixed header was read; no FAT/directory traversal occurred.
+    assert_eq!(reads.load(Ordering::Relaxed), 1);
+}
+
+#[test]
+fn hostile_allocation_table_count_is_rejected_before_sector_index_or_read() {
+    let mut bytes = sample_file();
+    bytes[0x1a..0x1c].copy_from_slice(&4u16.to_le_bytes());
+    bytes[SECTOR_SHIFT_OFFSET..SECTOR_SHIFT_OFFSET + 2].copy_from_slice(&12u16.to_le_bytes());
+    write_u32(&mut bytes, 0x28, 1);
+    write_u32(&mut bytes, NUM_FAT_SECTORS_OFFSET, 8_388_000);
+    write_u32(&mut bytes, 0x3c, ENDOFCHAIN);
+    write_u32(&mut bytes, 0x40, 0);
+    write_u32(&mut bytes, 0x44, ENDOFCHAIN);
+    write_u32(&mut bytes, 0x48, 0);
+
+    let reads = Arc::new(AtomicUsize::new(0));
+    let reader = ReportedLengthReader {
+        bytes,
+        reported_length: OleFileLimits::MAX_INPUT_BYTES,
+        position: 0,
+        reads: reads.clone(),
+    };
+    let limits = OleFileLimits::new(OleFileLimits::MAX_INPUT_BYTES).unwrap();
+    assert!(matches!(
+        OleFile::open_with_limits(reader, limits),
+        Err(OleError::LimitExceeded {
+            resource: "allocation table bytes",
+            observed,
+            maximum,
+        }) if observed > maximum
+            && maximum == OleFileLimits::DEFAULT_MAX_ALLOCATION_TABLE_BYTES
+    ));
+    assert_eq!(reads.load(Ordering::Relaxed), 1);
 }
 
 #[test]

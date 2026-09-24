@@ -1,16 +1,77 @@
 //! Workbook package integration for the `SpreadsheetML` connections owner.
 
-use super::codec::patch_connections_source;
+use super::codec::{normalize_connections_source_projection, patch_connections_source};
 use super::model::{
     CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP, Conformance, Connection, Connections,
-    QUERY_TABLE_CONTENT_TYPE, STRICT_CONNECTIONS_RELATIONSHIP, STRICT_NAMESPACE,
+    MAX_DOM_DEPTH, MAX_DOM_NODES, MAX_STRING_BYTES, MAX_XML_BYTES, QUERY_TABLE_CONTENT_TYPE,
+    STRICT_CONNECTIONS_RELATIONSHIP, STRICT_NAMESPACE,
 };
 use super::{codec, invalid};
+use crate::error::{Error as XlsxError, Result as XlsxResult};
+use litchi_core::Resource;
 use litchi_core::sheet::Result;
-use std::collections::HashSet;
+use quick_xml::{events::Event, name::ResolveResult, reader::NsReader};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, PackURI, Part};
+
+const WORKSHEET_CONTENT_TYPE: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml";
+const QUERY_TABLE_RELATIONSHIP: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable";
+const STRICT_QUERY_TABLE_RELATIONSHIP: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/queryTable";
+
+type SheetError = Box<dyn std::error::Error + Send + Sync>;
+type GraphResult<T> = std::result::Result<T, GraphError>;
+
+#[derive(Debug)]
+enum GraphError {
+    Host(XlsxError),
+    Invalid(String),
+}
+
+impl From<XlsxError> for GraphError {
+    fn from(error: XlsxError) -> Self {
+        Self::Host(error)
+    }
+}
+
+impl From<litchi_opc::OpcError> for GraphError {
+    fn from(error: litchi_opc::OpcError) -> Self {
+        Self::Host(XlsxError::Package(error))
+    }
+}
+
+impl From<SheetError> for GraphError {
+    fn from(error: SheetError) -> Self {
+        Self::Invalid(error.to_string())
+    }
+}
+
+impl GraphError {
+    fn into_xlsx(self) -> XlsxError {
+        match self {
+            Self::Host(error) => error,
+            Self::Invalid(error) => XlsxError::Invalid(error),
+        }
+    }
+
+    fn into_sheet(self) -> SheetError {
+        match self {
+            Self::Host(error) => Box::new(error),
+            Self::Invalid(error) => invalid(error),
+        }
+    }
+}
+
+macro_rules! graph_invalid {
+    ($value:expr $(,)?) => {
+        GraphError::Invalid($value.to_string())
+    };
+}
 
 pub fn store_in_package(package: &mut OpcPackage, value: &Connections, strict: bool) -> Result<()> {
     store_in_package_with_query_table_validator(package, value, strict, query_table_connection_id)
@@ -30,6 +91,11 @@ where
 {
     let xml = value.to_xml(strict)?;
     validate_query_table_connection_ids(package, value, query_table_connection_id)?;
+    // Validate the existing graph after the caller-supplied query-table
+    // callback has established the value-level reference invariant. This
+    // preserves the callback's diagnostic precedence while rejecting foreign
+    // recognized edges and orphan/wrong-content-type parts before mutation.
+    validate_graph(package)?;
     let workbook_name = package.main_document_part()?.partname().clone();
     let existing = {
         let workbook = package.get_part(&workbook_name)?;
@@ -42,8 +108,10 @@ where
         let first = found
             .next()
             .map(|relationship| {
-                if relationship.is_external() {
-                    return Err(invalid("connections relationship cannot be external"));
+                if relationship.is_external() || target_has_suffix(relationship) {
+                    return Err(invalid(
+                        "connections relationship must target an internal part URI",
+                    ));
                 }
                 Ok((
                     relationship.r_id().to_string(),
@@ -92,6 +160,10 @@ where
 }
 
 pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
+    // Refuse to repair or partially remove an invalid graph. In particular,
+    // this keeps orphan query-table parts and foreign recognized edges from
+    // being hidden by deleting only the workbook owner.
+    validate_graph(package)?;
     if package
         .iter_parts()
         .any(|part| part.content_type() == QUERY_TABLE_CONTENT_TYPE)
@@ -112,9 +184,14 @@ pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
             )
         })
         .map(|relationship| {
-            relationship
+            if relationship.is_external() || target_has_suffix(relationship) {
+                return Err(invalid(
+                    "connections relationship must target an internal part URI",
+                ));
+            }
+            Ok(relationship
                 .target_partname()
-                .map(|part_name| (relationship.r_id().to_string(), part_name))
+                .map(|part_name| (relationship.r_id().to_string(), part_name))?)
         })
         .transpose()?;
     let Some((relationship_id, part_name)) = relationship else {
@@ -162,18 +239,155 @@ where
     Ok(())
 }
 
+fn validate_query_table_connection_ids_with_parser<Q>(
+    package: &OpcPackage,
+    value: &Connections,
+    parse_query_table: &Q,
+) -> GraphResult<()>
+where
+    Q: Fn(&[u8]) -> GraphResult<u32>,
+{
+    let ids = value
+        .connections
+        .iter()
+        .map(|connection| connection.id)
+        .collect::<HashSet<_>>();
+    for part in package
+        .iter_parts()
+        .filter(|part| part.content_type() == QUERY_TABLE_CONTENT_TYPE)
+    {
+        // Only a query-table part's payload is parsed, so only a query-table
+        // part's payload is decoded (ADR 0030).
+        let connection_id = parse_query_table(package.get_part(part.partname())?.blob())?;
+        if !ids.contains(&connection_id) {
+            return Err(GraphError::Invalid(format!(
+                "query-table part '{}' references missing connection ID {}",
+                part.partname(),
+                connection_id
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn query_table_connection_id(xml: &[u8]) -> Result<u32> {
-    if xml.len() > 8 * 1024 * 1024 {
-        return Err(invalid("query-table part exceeds 8 MiB"));
+    query_table_connection_id_with_limits(
+        xml,
+        MAX_XML_BYTES,
+        MAX_DOM_NODES,
+        MAX_DOM_NODES.saturating_mul(4),
+        MAX_DOM_DEPTH,
+        MAX_STRING_BYTES,
+        MAX_XML_BYTES,
+        MAX_DOM_NODES,
+        MAX_XML_BYTES,
+    )
+    .map_err(|error| invalid(error.to_string()))
+}
+
+fn query_table_connection_id_with_limits(
+    xml: &[u8],
+    max_bytes: usize,
+    max_nodes: usize,
+    max_events: usize,
+    max_depth: usize,
+    max_string_bytes: usize,
+    max_namespace_bytes: usize,
+    max_attributes: usize,
+    max_temporary_bytes: usize,
+) -> XlsxResult<u32> {
+    let maximum = max_bytes.min(MAX_XML_BYTES);
+    if xml.len() > maximum {
+        return Err(XlsxError::ResourceLimit(litchi_core::ResourceLimit {
+            resource: Resource::InputBytes,
+            observed: xml.len() as u64,
+            limit: maximum as u64,
+            scope: Arc::<str>::from("XLSX Custom Data query-table input XML bytes"),
+        }));
     }
-    let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
-    if processed.len() > 8 * 1024 * 1024 {
-        return Err(invalid("processed query-table part exceeds 8 MiB"));
+    codec::preflight_xml_with_limits(
+        xml,
+        max_nodes.min(MAX_DOM_NODES),
+        max_events,
+        max_depth.min(MAX_DOM_DEPTH),
+        max_string_bytes,
+        max_namespace_bytes,
+        max_attributes,
+    )?;
+    // The MCE processor intentionally handles schema-bearing markup and
+    // rejects processing instructions. PIs are legal inert query-table XML;
+    // remove only those events for validation while the source snapshot keeps
+    // the original bytes for publication.
+    let without_pi = codec::strip_processing_instructions_with_limit(xml, max_temporary_bytes)?;
+    let depth = max_depth.min(MAX_DOM_DEPTH);
+    let mce_output_limit = if codec::contains_mce_markup(without_pi.as_ref()) {
+        maximum.min(max_temporary_bytes)
+    } else {
+        maximum
+    };
+    let processed = litchi_ooxml_common::mce::process_markup_compatibility(
+        without_pi.as_ref(),
+        &litchi_ooxml_common::mce::Capabilities::default(),
+        &litchi_ooxml_common::mce::Limits {
+            max_input_bytes: maximum,
+            max_output_bytes: mce_output_limit,
+            max_depth: depth,
+            max_namespace_bindings: max_attributes.min(4096),
+            max_directive_tokens: max_events.min(4096),
+            max_choices_per_alternate: max_events.min(1024),
+        },
+    )
+    .map_err(|error| {
+        let mapped = codec::map_mce_error(
+            error,
+            maximum,
+            mce_output_limit,
+            depth,
+            max_attributes.min(4096),
+            max_events.min(4096),
+            max_events.min(1024),
+            "query-table",
+        );
+        if mce_output_limit < maximum
+            && matches!(
+                mapped,
+                XlsxError::ResourceLimit(litchi_core::ResourceLimit {
+                    resource: Resource::OutputBytes,
+                    ..
+                })
+            )
+        {
+            query_table_temporary_limit(
+                mce_output_limit.saturating_add(1),
+                mce_output_limit,
+                "query-table MCE output bytes",
+            )
+        } else {
+            mapped
+        }
+    })?;
+    if processed.xml.len() > maximum {
+        return Err(XlsxError::ResourceLimit(litchi_core::ResourceLimit {
+            resource: Resource::OutputBytes,
+            observed: processed.xml.len() as u64,
+            limit: maximum as u64,
+            scope: Arc::<str>::from("XLSX Custom Data query-table processed XML bytes"),
+        }));
     }
-    let root = codec::parse_dom(processed.as_ref())?;
-    codec::expect(&root, "queryTable")?;
-    let _name = codec::req(&root, "name")?;
-    let connection_id = codec::u32req(&root, "connectionId")?;
+    let root = codec::parse_dom_with_limits(
+        processed.xml.as_ref(),
+        max_nodes.min(MAX_DOM_NODES),
+        max_events,
+        depth,
+        max_string_bytes,
+        max_namespace_bytes,
+        max_attributes,
+    )
+    .map_err(|error| XlsxError::Invalid(error.to_string()))?;
+    codec::expect(&root, "queryTable").map_err(|error| XlsxError::Invalid(error.to_string()))?;
+    let _name = codec::req(&root, "name").map_err(|error| XlsxError::Invalid(error.to_string()))?;
+    let connection_id = codec::u32req(&root, "connectionId")
+        .map_err(|error| XlsxError::Invalid(error.to_string()))?;
     codec::only_unqualified(
         &root,
         &[
@@ -200,9 +414,19 @@ fn query_table_connection_id(xml: &[u8]) -> Result<u32> {
             "applyAlignmentFormats",
             "applyWidthHeightFormats",
         ],
-    )?;
-    codec::kids(&root)?;
+    )
+    .map_err(|error| XlsxError::Invalid(error.to_string()))?;
+    codec::kids(&root).map_err(|error| XlsxError::Invalid(error.to_string()))?;
     Ok(connection_id)
+}
+
+fn query_table_temporary_limit(observed: usize, maximum: usize, name: &'static str) -> XlsxError {
+    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
+        resource: Resource::Memory,
+        observed: observed as u64,
+        limit: maximum as u64,
+        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
+    })
 }
 
 fn next_connections_part_name(package: &OpcPackage) -> Result<PackURI> {
@@ -239,17 +463,31 @@ fn package_part_is_referenced(package: &OpcPackage, target: &PackURI) -> bool {
             !relationship.is_external()
                 && relationship
                     .target_partname()
-                    .is_ok_and(|name| name == *target)
+                    .is_ok_and(|name| name.is_equivalent_to(target))
         })
     }) || package.rels().iter().any(|relationship| {
         !relationship.is_external()
             && relationship
                 .target_partname()
-                .is_ok_and(|name| name == *target)
+                .is_ok_and(|name| name.is_equivalent_to(target))
     })
 }
 pub fn load_from_package(package: &OpcPackage) -> Result<Option<Connections>> {
+    load_from_package_with_parser(package, &|xml| {
+        Connections::parse(xml).map_err(GraphError::from)
+    })
+    .map_err(GraphError::into_sheet)
+}
+
+fn load_from_package_with_parser<P>(
+    package: &OpcPackage,
+    parse_connections: &P,
+) -> GraphResult<Option<Connections>>
+where
+    P: Fn(&[u8]) -> GraphResult<Connections>,
+{
     let workbook = package.main_document_part()?;
+    require_workbook_content_type(workbook)?;
     let mut found = workbook.rels().iter().filter(|x| {
         matches!(
             x.reltype(),
@@ -260,52 +498,94 @@ pub fn load_from_package(package: &OpcPackage) -> Result<Option<Connections>> {
         return Ok(None);
     };
     if found.next().is_some() {
-        return Err(invalid("workbook has multiple connections relationships"));
+        return Err(graph_invalid!(
+            "workbook has multiple connections relationships"
+        ));
     }
-    if rel.is_external() {
-        return Err(invalid("connections relationship cannot be external"));
+    if rel.is_external() || target_has_suffix(rel) {
+        return Err(graph_invalid!(
+            "connections relationship must target an internal part URI",
+        ));
     }
     let uri: PackURI = rel.target_partname()?;
     let part = package.get_part(&uri)?;
     if part.content_type() != CONNECTIONS_CONTENT_TYPE {
-        return Err(invalid(format!(
+        return Err(graph_invalid!(format!(
             "connections part '{uri}' has invalid content type '{}'",
             part.content_type()
         )));
     }
     if part.rels().iter().next().is_some() {
-        return Err(invalid("connections part must not have relationships"));
+        return Err(graph_invalid!(
+            "connections part must not have relationships"
+        ));
     }
-    Ok(Some(Connections::parse(part.blob())?))
+    Ok(Some(parse_connections(part.blob())?))
 }
 
 /// Validate the workbook connection/query-table graph and return its typed
 /// connection catalog. No query-table payload is interpreted beyond its
 /// inert connection ID, and no target is opened or refreshed.
 pub fn validate_graph(package: &OpcPackage) -> Result<Option<Connections>> {
+    validate_graph_with_parsers(
+        package,
+        &|xml| Connections::parse(xml).map_err(GraphError::from),
+        &|xml| query_table_connection_id(xml).map_err(GraphError::from),
+    )
+    .map_err(GraphError::into_sheet)
+}
+
+fn validate_graph_with_parsers<CP, QP>(
+    package: &OpcPackage,
+    parse_connections: &CP,
+    parse_query_table: &QP,
+) -> GraphResult<Option<Connections>>
+where
+    CP: Fn(&[u8]) -> GraphResult<Connections>,
+    QP: Fn(&[u8]) -> GraphResult<u32>,
+{
     if package
         .rels()
         .iter()
         .any(|relationship| is_connections_relationship(relationship.reltype()))
     {
-        return Err(invalid(
+        return Err(graph_invalid!(
             "package root cannot source a workbook connections relationship",
         ));
     }
     let workbook = package.main_document_part()?;
+    require_workbook_content_type(workbook)?;
+    for part in package
+        .iter_parts()
+        .filter(|part| !part.partname().is_equivalent_to(workbook.partname()))
+    {
+        if part
+            .rels()
+            .iter()
+            .any(|relationship| is_connections_relationship(relationship.reltype()))
+        {
+            return Err(graph_invalid!(
+                "only the workbook may source a connections relationship",
+            ));
+        }
+    }
     let owners = workbook
         .rels()
         .iter()
         .filter(|relationship| is_connections_relationship(relationship.reltype()))
         .collect::<Vec<_>>();
     if owners.len() > 1 {
-        return Err(invalid("workbook has multiple connections relationships"));
+        return Err(graph_invalid!(
+            "workbook has multiple connections relationships"
+        ));
     }
     let owner_target = owners
         .first()
         .map(|relationship| {
-            if relationship.is_external() {
-                return Err(invalid("connections relationship cannot be external"));
+            if relationship.is_external() || target_has_suffix(relationship) {
+                return Err(graph_invalid!(
+                    "connections relationship must target an internal part URI",
+                ));
             }
             Ok(relationship.target_partname()?)
         })
@@ -313,18 +593,25 @@ pub fn validate_graph(package: &OpcPackage) -> Result<Option<Connections>> {
     if let Some(target) = owner_target.as_ref() {
         let part = package.get_part(target)?;
         if part.content_type() != CONNECTIONS_CONTENT_TYPE {
-            return Err(invalid("connections relationship targets an invalid part"));
+            return Err(graph_invalid!(
+                "connections relationship targets an invalid part"
+            ));
         }
         if part.rels().iter().next().is_some() {
-            return Err(invalid("connections part must not have relationships"));
+            return Err(graph_invalid!(
+                "connections part must not have relationships"
+            ));
         }
     }
     for part in package
         .iter_parts()
         .filter(|part| part.content_type() == CONNECTIONS_CONTENT_TYPE)
     {
-        if owner_target.as_ref() != Some(part.partname()) {
-            return Err(invalid(format!(
+        if !owner_target
+            .as_ref()
+            .is_some_and(|target| target.is_equivalent_to(part.partname()))
+        {
+            return Err(graph_invalid!(format!(
                 "connections part '{}' has no workbook owner",
                 part.partname()
             )));
@@ -335,43 +622,138 @@ pub fn validate_graph(package: &OpcPackage) -> Result<Option<Connections>> {
         .iter_parts()
         .filter(|part| part.content_type() == QUERY_TABLE_CONTENT_TYPE)
         .collect::<Vec<_>>();
+    if package
+        .rels()
+        .iter()
+        .any(|relationship| is_query_table_relationship(relationship.reltype()))
+    {
+        return Err(graph_invalid!(
+            "package root cannot source a query-table relationship",
+        ));
+    }
+    let mut query_owner_counts = HashMap::<String, usize>::new();
+    query_owner_counts
+        .try_reserve(query_parts.len())
+        .map_err(|_| invalid("query-table owner allocation failed"))?;
+    for source in package.iter_parts() {
+        for relationship in source.rels().iter() {
+            if !is_query_table_relationship(relationship.reltype()) {
+                continue;
+            }
+            if source.content_type() != WORKSHEET_CONTENT_TYPE {
+                return Err(graph_invalid!(
+                    "only worksheet parts may source a query-table relationship",
+                ));
+            }
+            if relationship.is_external() || target_has_suffix(relationship) {
+                return Err(graph_invalid!(
+                    "query-table relationship must target an internal part URI",
+                ));
+            }
+            let target = relationship.target_partname()?;
+            let target_part = package.get_part(&target)?;
+            if target_part.content_type() != QUERY_TABLE_CONTENT_TYPE {
+                return Err(graph_invalid!(
+                    "query-table relationship targets an invalid part"
+                ));
+            }
+            let key = target.as_str().to_ascii_lowercase();
+            let count = query_owner_counts.entry(key).or_insert(0);
+            *count += 1;
+        }
+    }
     let values = if owner_target.is_some() {
-        Some(load_from_package(package)?.ok_or_else(|| invalid("connections owner disappeared"))?)
+        Some(
+            load_from_package_with_parser(package, parse_connections)?
+                .ok_or_else(|| invalid("connections owner disappeared"))?,
+        )
     } else {
         None
     };
     if !query_parts.is_empty() && values.is_none() {
-        return Err(invalid(
+        return Err(graph_invalid!(
             "query-table parts require a workbook connections part",
         ));
     }
     if let Some(values) = values.as_ref() {
-        validate_query_table_connection_ids(package, values, query_table_connection_id)?;
+        validate_query_table_connection_ids_with_parser(package, values, parse_query_table)?;
     }
     for part in query_parts {
         if part.rels().iter().next().is_some() {
-            return Err(invalid("query-table parts must not have relationships"));
+            return Err(graph_invalid!(
+                "query-table parts must not have relationships"
+            ));
         }
-        let mut owners = 0usize;
-        for candidate in package.iter_parts() {
-            for relationship in candidate.rels().iter() {
-                if relationship.is_external()
-                    || !is_query_table_relationship(relationship.reltype())
-                    || relationship.target_partname().ok().as_ref() != Some(part.partname())
-                {
-                    continue;
-                }
-                owners += 1;
-            }
-        }
+        let owners = query_owner_counts
+            .get(&part.partname().as_str().to_ascii_lowercase())
+            .copied()
+            .unwrap_or(0);
         if owners != 1 {
-            return Err(invalid(format!(
+            return Err(graph_invalid!(format!(
                 "query-table part '{}' must have exactly one worksheet owner",
                 part.partname()
             )));
         }
     }
     Ok(values)
+}
+
+/// Validate the connection graph after admitting every XML-bearing member to
+/// the Custom Data owner’s caller-selected profile. The bounded closures are
+/// used by the complete graph walk, so neither typed connections parsing nor
+/// query-table MCE/DOM expansion can bypass the owner limits.
+pub(crate) fn validate_graph_with_limits(
+    package: &OpcPackage,
+    limits: &crate::custom_data::Limits,
+) -> XlsxResult<Option<Connections>> {
+    for part in package.iter_parts().filter(|part| {
+        matches!(
+            part.content_type(),
+            CONNECTIONS_CONTENT_TYPE | QUERY_TABLE_CONTENT_TYPE
+        )
+    }) {
+        // The owner byte ceiling is charged against the inflated payload, so
+        // each connections and query-table part is decoded here (ADR 0030).
+        let part = package.get_part(part.partname())?;
+        if part.blob().len() > limits.max_connections_bytes() {
+            return Err(XlsxError::ResourceLimit(litchi_core::ResourceLimit {
+                resource: Resource::InputBytes,
+                observed: part.blob().len() as u64,
+                limit: limits.max_connections_bytes() as u64,
+                scope: Arc::<str>::from(format!("XLSX Custom Data graph XML {}", part.partname())),
+            }));
+        }
+    }
+    let parse_connections = |xml: &[u8]| {
+        Connections::parse_with_limits(
+            xml,
+            limits.max_connections_bytes(),
+            limits.max_xml_nodes(),
+            limits.max_xml_events(),
+            limits.max_xml_depth(),
+            limits.max_xml_string_bytes(),
+            limits.max_xml_namespace_bytes(),
+            limits.max_xml_attributes(),
+            limits.max_temporary_bytes(),
+        )
+        .map_err(GraphError::from)
+    };
+    let parse_query_table = |xml: &[u8]| {
+        query_table_connection_id_with_limits(
+            xml,
+            limits.max_connections_bytes(),
+            limits.max_xml_nodes(),
+            limits.max_xml_events(),
+            limits.max_xml_depth(),
+            limits.max_xml_string_bytes(),
+            limits.max_xml_namespace_bytes(),
+            limits.max_xml_attributes(),
+            limits.max_temporary_bytes(),
+        )
+        .map_err(GraphError::from)
+    };
+    validate_graph_with_parsers(package, &parse_connections, &parse_query_table)
+        .map_err(GraphError::into_xlsx)
 }
 
 fn is_connections_relationship(value: &str) -> bool {
@@ -384,9 +766,29 @@ fn is_connections_relationship(value: &str) -> bool {
 fn is_query_table_relationship(value: &str) -> bool {
     matches!(
         value,
-        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable"
-            | "http://purl.oclc.org/ooxml/officeDocument/relationships/queryTable"
+        QUERY_TABLE_RELATIONSHIP | STRICT_QUERY_TABLE_RELATIONSHIP
     )
+}
+
+fn target_has_suffix(relationship: &litchi_opc::Relationship) -> bool {
+    relationship.target_query().is_some() || relationship.target_fragment().is_some()
+}
+
+fn require_workbook_content_type(workbook: &dyn Part) -> Result<()> {
+    if matches!(
+        workbook.content_type(),
+        ct::SML_SHEET_MAIN
+            | ct::SML_TEMPLATE_MAIN
+            | ct::SML_SHEET_MACRO_MAIN
+            | ct::SML_TEMPLATE_MACRO_MAIN
+    ) {
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "main document part '{}' is not an XML workbook",
+            workbook.partname()
+        )))
+    }
 }
 
 /// Immutable source snapshot used by connection transactions and patches.
@@ -435,7 +837,7 @@ impl Snapshot {
         self.source
             .query_tables
             .iter()
-            .find(|part| part.part_uri == *part_uri)
+            .find(|part| part.part_uri.is_equivalent_to(part_uri))
             .map(SourcePart::bytes)
     }
 
@@ -576,13 +978,24 @@ impl SourceRelationship {
 }
 
 fn detect_conformance(xml: &[u8]) -> Conformance {
-    if xml
-        .windows(STRICT_NAMESPACE.len())
-        .any(|window| window == STRICT_NAMESPACE.as_bytes())
-    {
-        Conformance::Strict
-    } else {
-        Conformance::Transitional
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(element)) | Ok(Event::Empty(element)) => {
+                let strict = match reader.resolver().resolve_element(element.name()).0 {
+                    ResolveResult::Bound(namespace) => std::str::from_utf8(namespace.0)
+                        .is_ok_and(|value| value == STRICT_NAMESPACE),
+                    ResolveResult::Unbound | ResolveResult::Unknown(_) => false,
+                };
+                return if strict {
+                    Conformance::Strict
+                } else {
+                    Conformance::Transitional
+                };
+            },
+            Ok(Event::Eof) | Err(_) => return Conformance::Transitional,
+            Ok(_) => {},
+        }
     }
 }
 
@@ -717,7 +1130,11 @@ impl<'a> Transaction<'a> {
             self.strict,
         )?;
         let snapshot = Snapshot::load(&candidate)?;
-        if snapshot.connections.as_ref() != self.draft.as_ref() {
+        let mut staged = self.draft.clone();
+        if let (Some(actual), Some(staged)) = (snapshot.connections.as_ref(), staged.as_mut()) {
+            normalize_connections_source_projection(actual, staged)?;
+        }
+        if snapshot.connections.as_ref() != staged.as_ref() {
             return Err(invalid("connection publication changed the staged model"));
         }
         let patch = Patch::new(self.before, snapshot.clone());
@@ -846,9 +1263,14 @@ fn apply_connections(
         .iter()
         .find(|relationship| is_connections_relationship(relationship.reltype()))
         .map(|relationship| {
-            relationship
+            if relationship.is_external() || target_has_suffix(relationship) {
+                return Err(invalid(
+                    "connections relationship must target an internal part URI",
+                ));
+            }
+            Ok(relationship
                 .target_partname()
-                .map(|target| (relationship.r_id().to_owned(), target))
+                .map(|target| (relationship.r_id().to_owned(), target))?)
         })
         .transpose()?;
     match (owner, after) {
@@ -911,9 +1333,14 @@ fn restore_snapshot(package: &mut OpcPackage, snapshot: &Snapshot) -> Result<()>
         .iter()
         .find(|relationship| is_connections_relationship(relationship.reltype()))
         .map(|relationship| {
-            relationship
+            if relationship.is_external() || target_has_suffix(relationship) {
+                return Err(invalid(
+                    "connections relationship must target an internal part URI",
+                ));
+            }
+            Ok(relationship
                 .target_partname()
-                .map(|target| (relationship.r_id().to_owned(), target))
+                .map(|target| (relationship.r_id().to_owned(), target))?)
         })
         .transpose()?;
     if let Some((relationship_id, part_name)) = existing {

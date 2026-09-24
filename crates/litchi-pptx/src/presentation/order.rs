@@ -25,7 +25,6 @@ const PRESENTATIONML_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PRESENTATIONML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
 const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
-const STRICT_MCE_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/markup-compatibility/2006";
 const CANONICAL_PRESENTATION_MEMBER: &str = "ppt/presentation.xml";
 
 const STRICT_PRES_PROPS: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/presProps";
@@ -591,16 +590,18 @@ fn inspect_metadata_xml(
     reader.config_mut().trim_text(false);
     let mut nodes = 0usize;
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event()
+        let event = reader
+            .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
+        let resolver = reader.resolver();
+        let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 bump_xml(&mut nodes)?;
                 if nodes % 256 == 0 {
                     check_execution_context(context)?;
                 }
-                if is_mce_namespace(&namespace) || has_mce_attribute(&element)? {
+                if is_mce_namespace(&namespace) || has_mce_attribute(&element, resolver)? {
                     return Err(metadata_refusal(
                         owner,
                         "positional metadata contains markup-compatibility content",
@@ -711,9 +712,11 @@ fn reject_root_features(xml: &[u8], context: Option<&ExecutionContext>) -> Resul
     let mut nodes = 0usize;
     let mut roots = 0usize;
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event()
+        let event = reader
+            .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
+        let resolver = reader.resolver();
+        let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
                 bump_xml(&mut nodes)?;
@@ -726,7 +729,7 @@ fn reject_root_features(xml: &[u8], context: Option<&ExecutionContext>) -> Resul
                         limit: MAX_XML_DEPTH,
                     });
                 }
-                reject_mce_element(&namespace, &element)?;
+                reject_mce_element(&namespace, &element, resolver)?;
                 if depth == 0 {
                     roots = roots
                         .checked_add(1)
@@ -748,7 +751,7 @@ fn reject_root_features(xml: &[u8], context: Option<&ExecutionContext>) -> Resul
                 if nodes % 256 == 0 {
                     check_execution_context(context)?;
                 }
-                reject_mce_element(&namespace, &element)?;
+                reject_mce_element(&namespace, &element, resolver)?;
                 if depth == 0 {
                     roots = roots
                         .checked_add(1)
@@ -808,6 +811,7 @@ fn reject_root_features(xml: &[u8], context: Option<&ExecutionContext>) -> Resul
 fn reject_mce_element(
     namespace: &ResolveResult<'_>,
     element: &quick_xml::events::BytesStart<'_>,
+    resolver: &quick_xml::name::NamespaceResolver,
 ) -> Result<()> {
     if is_mce_namespace(namespace) {
         return Err(refusal(
@@ -815,7 +819,7 @@ fn reject_mce_element(
             "presentation XML contains markup-compatibility content",
         ));
     }
-    if has_mce_attribute(element)? {
+    if has_mce_attribute(element, resolver)? {
         return Err(refusal(
             SlideOrderRefusal::MarkupCompatibility,
             "presentation XML contains markup-compatibility attributes",
@@ -824,17 +828,26 @@ fn reject_mce_element(
     Ok(())
 }
 
-fn has_mce_attribute(element: &quick_xml::events::BytesStart<'_>) -> Result<bool> {
+fn has_mce_attribute(
+    element: &quick_xml::events::BytesStart<'_>,
+    resolver: &quick_xml::name::NamespaceResolver,
+) -> Result<bool> {
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-        if matches!(
-            attribute.key.local_name().as_ref(),
-            b"Ignorable"
-                | b"MustUnderstand"
-                | b"ProcessContent"
-                | b"PreserveAttributes"
-                | b"PreserveElements"
-        ) {
+        if attribute.key.as_namespace_binding().is_some() {
+            continue;
+        }
+        let (namespace, local) = resolver.resolve_attribute(attribute.key);
+        if is_mce_namespace(&namespace)
+            && matches!(
+                local.as_ref(),
+                b"Ignorable"
+                    | b"MustUnderstand"
+                    | b"ProcessContent"
+                    | b"PreserveAttributes"
+                    | b"PreserveElements"
+            )
+        {
             return Ok(true);
         }
     }
@@ -926,7 +939,7 @@ fn is_mce_namespace(namespace: &ResolveResult<'_>) -> bool {
     matches!(
         namespace,
         ResolveResult::Bound(Namespace(value))
-            if *value == MCE_NAMESPACE || *value == STRICT_MCE_NAMESPACE
+            if *value == MCE_NAMESPACE
     )
 }
 
@@ -975,5 +988,72 @@ fn refusal(kind: SlideOrderRefusal, detail: impl Into<String>) -> Error {
     Error::SlideOrderPlan {
         kind,
         detail: detail.into(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FOREIGN_MCE: &[u8] = b"http://purl.oclc.org/ooxml/markup-compatibility/2006";
+
+    #[test]
+    fn only_canonical_mce_attributes_are_classified_as_markup_compatibility() {
+        let canonical_root = format!(
+            r#"<p:presentation xmlns:p="{}" xmlns:mc="{}" mc:Ignorable="p"/>"#,
+            std::str::from_utf8(PRESENTATIONML_NAMESPACE).unwrap(),
+            std::str::from_utf8(MCE_NAMESPACE).unwrap(),
+        );
+        assert!(matches!(
+            reject_root_features(canonical_root.as_bytes(), None),
+            Err(Error::SlideOrderPlan {
+                kind: SlideOrderRefusal::MarkupCompatibility,
+                ..
+            })
+        ));
+
+        let foreign_root = format!(
+            r#"<p:presentation xmlns:p="{}" xmlns:foreign="{}" foreign:Ignorable="p"/>"#,
+            std::str::from_utf8(PRESENTATIONML_NAMESPACE).unwrap(),
+            std::str::from_utf8(FOREIGN_MCE).unwrap(),
+        );
+        assert!(matches!(
+            reject_root_features(foreign_root.as_bytes(), None),
+            Err(Error::SlideOrderPlan {
+                kind: SlideOrderRefusal::PositionalOwner,
+                ..
+            })
+        ));
+
+        let canonical_metadata = format!(
+            r#"<p:viewPr xmlns:p="{}" xmlns:mc="{}" mc:Ignorable="p"/>"#,
+            std::str::from_utf8(PRESENTATIONML_NAMESPACE).unwrap(),
+            std::str::from_utf8(MCE_NAMESPACE).unwrap(),
+        );
+        assert!(matches!(
+            inspect_metadata_xml(
+                canonical_metadata.as_bytes(),
+                MetadataOwner::ViewProperties,
+                None,
+            ),
+            Err(Error::SlideOrderPlan {
+                kind: SlideOrderRefusal::ViewProperties,
+                ..
+            })
+        ));
+
+        let foreign_metadata = format!(
+            r#"<p:viewPr xmlns:p="{}" xmlns:foreign="{}" foreign:Ignorable="p"/>"#,
+            std::str::from_utf8(PRESENTATIONML_NAMESPACE).unwrap(),
+            std::str::from_utf8(FOREIGN_MCE).unwrap(),
+        );
+        assert!(
+            inspect_metadata_xml(
+                foreign_metadata.as_bytes(),
+                MetadataOwner::ViewProperties,
+                None,
+            )
+            .is_ok()
+        );
     }
 }

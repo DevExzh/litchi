@@ -1,0 +1,156 @@
+{
+  "group": "evaluation",
+  "candidate_only": true,
+  "phase_selection": "all",
+  "phases": [
+    "parse",
+    "evaluate",
+    "parse-evaluate"
+  ],
+  "case_count": 35,
+  "cases": [
+    {
+      "case": "eval-flat-64",
+      "repeat": 64
+    },
+    {
+      "case": "eval-flat-256",
+      "repeat": 32
+    },
+    {
+      "case": "eval-flat-1024",
+      "repeat": 8
+    },
+    {
+      "case": "eval-flat-4096",
+      "repeat": 2
+    },
+    {
+      "case": "eval-utf8-text-text-64",
+      "repeat": 64
+    },
+    {
+      "case": "eval-utf8-text-text-256",
+      "repeat": 32
+    },
+    {
+      "case": "eval-utf8-text-text-1024",
+      "repeat": 8
+    },
+    {
+      "case": "eval-utf8-text-text-4096",
+      "repeat": 2
+    },
+    {
+      "case": "eval-utf8-number-left-64",
+      "repeat": 64
+    },
+    {
+      "case": "eval-utf8-number-left-256",
+      "repeat": 32
+    },
+    {
+      "case": "eval-utf8-number-left-1024",
+      "repeat": 8
+    },
+    {
+      "case": "eval-utf8-number-left-4096",
+      "repeat": 2
+    },
+    {
+      "case": "eval-utf8-text-number-right-64",
+      "repeat": 64
+    },
+    {
+      "case": "eval-utf8-text-number-right-256",
+      "repeat": 32
+    },
+    {
+      "case": "eval-utf8-text-number-right-1024",
+      "repeat": 8
+    },
+    {
+      "case": "eval-utf8-text-number-right-4096",
+      "repeat": 2
+    },
+    {
+      "case": "eval-escaped-text-text-64",
+      "repeat": 64
+    },
+    {
+      "case": "eval-escaped-text-text-256",
+      "repeat": 32
+    },
+    {
+      "case": "eval-escaped-text-text-1024",
+      "repeat": 8
+    },
+    {
+      "case": "eval-escaped-text-text-4096",
+      "repeat": 2
+    },
+    {
+      "case": "eval-escaped-text-number-right-64",
+      "repeat": 64
+    },
+    {
+      "case": "eval-escaped-text-number-right-256",
+      "repeat": 32
+    },
+    {
+      "case": "eval-escaped-text-number-right-1024",
+      "repeat": 8
+    },
+    {
+      "case": "eval-escaped-text-number-right-4096",
+      "repeat": 2
+    },
+    {
+      "case": "eval-coerce-64",
+      "repeat": 64
+    },
+    {
+      "case": "eval-coerce-256",
+      "repeat": 32
+    },
+    {
+      "case": "eval-coerce-1024",
+      "repeat": 8
+    },
+    {
+      "case": "eval-coerce-4096",
+      "repeat": 2
+    },
+    {
+      "case": "eval-long-name-4096",
+      "repeat": 2
+    },
+    {
+      "case": "eval-array-4096",
+      "repeat": 2
+    },
+    {
+      "case": "eval-reference",
+      "repeat": 128
+    },
+    {
+      "case": "eval-exact-step",
+      "repeat": 128
+    },
+    {
+      "case": "eval-work-limit",
+      "repeat": 128
+    },
+    {
+      "case": "eval-text-limit",
+      "repeat": 128
+    },
+    {
+      "case": "eval-cancelled",
+      "repeat": 128
+    }
+  ],
+  "warmups": 3,
+  "iterations": 15,
+  "binary": "/var/tmp/ods-scalar-worktree/docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/performance/evaluation-candidate/ods-formula-scalar-evaluation-profile"
+}

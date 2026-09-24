@@ -37,6 +37,10 @@ pub(crate) fn parse_data_pilot_range(value: &str) -> litchi_core::Result<range::
     range::parse_data_pilot_range(value)
 }
 
+pub(crate) fn parse_database_range_address(value: &str) -> litchi_core::Result<range::ParsedRange> {
+    range::parse_database_range_address(value)
+}
+
 pub(crate) fn validate_data_pilot_tables(tables: &[Table]) -> litchi_core::Result<()> {
     validation::validate_data_pilot_tables(tables)
 }

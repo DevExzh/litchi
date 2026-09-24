@@ -125,10 +125,10 @@ pub enum Error {
         reason: &'static str,
     },
 
-    /// Fresh semantic authoring is not yet backed by a complete wire grammar.
+    /// A fresh semantic request is outside the supported authoring profile.
     #[error("unsupported chart authoring: {reason}")]
     UnsupportedAuthoring {
-        /// Static explanation of the missing proof boundary.
+        /// Static explanation of the unsupported proof boundary.
         reason: &'static str,
     },
 

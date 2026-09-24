@@ -8,66 +8,162 @@ use std::{path::Path, sync::Arc};
 pub use crate::authoring::{Builder, ResourceMember};
 
 const MAX_PARAGRAPH_BYTES: usize = 16 * 1024 * 1024;
+const MAX_STRUCTURAL_STAGED_BYTES: usize = 16 * 1024 * 1024;
 const MAX_DURABLE_PATCH_BYTES: usize = 512 * 1024 * 1024;
-const PATCH_MAGIC: &[u8; 8] = b"LOTHP002";
+const PATCH_MAGIC: &[u8; 8] = b"LOTHP005";
+const LEGACY_PATCH_MAGIC_V4: &[u8; 8] = b"LOTHP004";
+const LEGACY_PATCH_MAGIC: &[u8; 8] = b"LOTHP003";
+const LEGACY_PATCH_MAGIC_V2: &[u8; 8] = b"LOTHP002";
 
 /// A read-only semantic text-web body projection.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct TextBody {
-    bookmarks: Vec<crate::bookmark::Bookmark>,
-    forms: Vec<crate::form::Form>,
-    headings: Vec<crate::heading::Heading>,
-    lists: Vec<crate::list::List>,
-    order: Vec<crate::codec::BlockOrder>,
-    paragraphs: Vec<crate::paragraph::Paragraph>,
-    resources: Vec<crate::resource::Resource>,
+    package: crate::package::Snapshot,
 }
 
 impl TextBody {
+    /// Office annotations in source order. Their content is inert.
+    pub fn annotations(&self) -> Result<&[crate::annotation::Annotation]> {
+        self.package.annotations()
+    }
+
     /// Bookmarks in source-close order.
     #[must_use]
     pub fn bookmarks(&self) -> &[crate::bookmark::Bookmark] {
-        &self.bookmarks
+        self.package.bookmarks()
+    }
+
+    /// Tracked-change regions and markers in source order.
+    pub fn changes(&self) -> Result<&[crate::change::Change]> {
+        self.package.changes()
+    }
+
+    /// The optional `text:tracked-changes` declaration, independent of marks.
+    pub fn change_tracking(&self) -> Result<Option<&crate::change::ChangeTracking>> {
+        self.package.change_tracking()
+    }
+
+    /// Drawing frames and text boxes in source order.
+    pub fn frames(&self) -> Result<&[crate::frame::Frame]> {
+        self.package.frames()
     }
 
     /// Lists in source-close order. Nested lists carry their explicit level.
     #[must_use]
     pub fn lists(&self) -> &[crate::list::List] {
-        &self.lists
+        self.package.lists()
     }
 
     /// Inert image and object references.
     #[must_use]
     pub fn resources(&self) -> &[crate::resource::Resource] {
-        &self.resources
+        self.package.resources()
     }
 
     /// Inert forms and their controls.
     #[must_use]
     pub fn forms(&self) -> &[crate::form::Form] {
-        &self.forms
+        self.package.forms()
     }
+
+    /// Generated indexes and their inert cached bodies.
+    pub fn indexes(&self) -> Result<&[crate::index::Index]> {
+        self.package.indexes()
+    }
+
+    /// Footnotes and endnotes in source order.
+    pub fn notes(&self) -> Result<&[crate::note::Note]> {
+        self.package.notes()
+    }
+
+    /// Footnotes in source order.
+    pub fn footnotes(&self) -> Result<impl Iterator<Item = &crate::note::Note> + '_> {
+        Ok(self
+            .package
+            .notes()?
+            .iter()
+            .filter(|note| matches!(note.class(), crate::note::NoteClass::Footnote)))
+    }
+
+    /// Endnotes in source order.
+    pub fn endnotes(&self) -> Result<impl Iterator<Item = &crate::note::Note> + '_> {
+        Ok(self
+            .package
+            .notes()?
+            .iter()
+            .filter(|note| matches!(note.class(), crate::note::NoteClass::Endnote)))
+    }
+
     /// Iterates paragraphs and headings in source document order.
     #[must_use]
     pub fn blocks(&self) -> impl ExactSizeIterator<Item = Block<'_>> + '_ {
-        self.order.iter().map(|block| match *block {
-            crate::codec::BlockOrder::Heading(index) => Block::Heading(&self.headings[index]),
-            crate::codec::BlockOrder::Paragraph(index) => Block::Paragraph(&self.paragraphs[index]),
+        self.package.order().iter().map(|block| match *block {
+            crate::codec::BlockOrder::Heading(index) => {
+                Block::Heading(&self.package.headings()[index])
+            },
+            crate::codec::BlockOrder::Paragraph(index) => {
+                Block::Paragraph(&self.package.paragraphs()[index])
+            },
         })
     }
 
     /// Returns projected headings in source order among headings.
     #[must_use]
     pub fn headings(&self) -> &[crate::heading::Heading] {
-        &self.headings
+        self.package.headings()
     }
 
     /// Returns projected paragraph character data in document order.
     #[must_use]
     pub fn paragraphs(&self) -> &[crate::paragraph::Paragraph] {
-        &self.paragraphs
+        self.package.paragraphs()
+    }
+
+    /// Ruby base/pronunciation pairs in source order.
+    pub fn rubies(&self) -> Result<&[crate::ruby::Ruby]> {
+        self.package.rubies()
+    }
+
+    /// Text sections in source order.
+    pub fn sections(&self) -> Result<&[crate::section::Section]> {
+        self.package.sections()
+    }
+
+    /// Tables in source order. Repetitions remain compact counts.
+    pub fn tables(&self) -> Result<&[crate::table::Table]> {
+        self.package.tables()
     }
 }
+
+impl fmt::Debug for TextBody {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("TextBody")
+            .field("bookmarks", &self.bookmarks())
+            .field("forms", &self.forms())
+            .field("headings", &self.headings())
+            .field("lists", &self.lists())
+            .field("order", &self.package.order())
+            .field("paragraphs", &self.paragraphs())
+            .field("resources", &self.resources())
+            .finish_non_exhaustive()
+    }
+}
+
+impl PartialEq for TextBody {
+    fn eq(&self, other: &Self) -> bool {
+        self.package.content_xml() == other.package.content_xml()
+            && self.bookmarks() == other.bookmarks()
+            && self.forms() == other.forms()
+            && self.headings() == other.headings()
+            && self.lists() == other.lists()
+            && self.package.order() == other.package.order()
+            && self.paragraphs() == other.paragraphs()
+            && self.resources() == other.resources()
+    }
+}
+
+impl Eq for TextBody {}
 
 /// A borrowed semantic text block.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -234,18 +330,12 @@ impl Template {
     ///
     /// # Errors
     ///
-    /// The current eager snapshot projection is infallible. The result wrapper
-    /// is retained so future lazy projections can report bounded read errors
-    /// without changing this public entry point.
+    /// The ordinary paragraph projection is prepared at open time. Additional
+    /// body structures remain lazy and parse once when a typed accessor is
+    /// called, sharing the successful cache with subsequent clones.
     pub fn text_body(&self) -> Result<TextBody> {
         Ok(TextBody {
-            bookmarks: self.package.bookmarks().to_vec(),
-            forms: self.package.forms().to_vec(),
-            headings: self.package.headings().to_vec(),
-            lists: self.package.lists().to_vec(),
-            order: self.package.order().to_vec(),
-            paragraphs: self.package.paragraphs().to_vec(),
-            resources: self.package.resources().to_vec(),
+            package: self.package.clone(),
         })
     }
 
@@ -323,6 +413,8 @@ impl Template {
             resource_changes: Vec::new(),
             source: self,
             styles: PartChange::Keep,
+            structure_changes: Vec::new(),
+            structure_lifecycle_changes: Vec::new(),
         }
     }
 
@@ -755,6 +847,8 @@ pub struct Edit<'a> {
     resource_changes: Vec<ResourceChange>,
     source: &'a Template,
     styles: PartChange,
+    structure_changes: Vec<StructureChange>,
+    structure_lifecycle_changes: Vec<StructureLifecycleChange>,
 }
 
 impl Edit<'_> {
@@ -774,6 +868,385 @@ impl Edit<'_> {
                 source,
             })?;
         self.appended.push(block.into());
+        Ok(())
+    }
+
+    /// Replaces the one plain paragraph or heading body admitted inside a
+    /// selected `text:section`.
+    ///
+    /// The selector is source-order among sections.  Rich or multi-block
+    /// sections are readable but refuse this narrow text-splice owner so
+    /// unknown children and namespace declarations remain source-authoritative.
+    pub fn set_section_text(&mut self, section: Position, text: impl Into<String>) -> Result<()> {
+        self.stage_structure(StructureSelector::Section(section), text.into())
+    }
+
+    /// Replaces the one plain paragraph or heading body admitted inside a
+    /// selected `text:note-body`.
+    pub fn set_note_body(&mut self, note: Position, text: impl Into<String>) -> Result<()> {
+        self.stage_structure(StructureSelector::Note(note), text.into())
+    }
+
+    /// Replaces the one plain paragraph or heading body admitted inside a
+    /// selected `office:annotation`.
+    pub fn set_annotation_text(
+        &mut self,
+        annotation: Position,
+        text: impl Into<String>,
+    ) -> Result<()> {
+        self.stage_structure(StructureSelector::Annotation(annotation), text.into())
+    }
+
+    /// Appends a named section containing one plain paragraph.
+    ///
+    /// This deliberately creates only the bounded plain-text shape. Existing
+    /// content and unknown children remain source-owned; linked/protected
+    /// sections and external section references are not rewritten.
+    pub fn append_section(
+        &mut self,
+        name: impl Into<String>,
+        text: impl Into<String>,
+    ) -> Result<()> {
+        let name = checked_structure_identity(name.into(), "section name")?;
+        let text = checked_structure_text(text.into())?;
+        let fragment = authored_section(&name, &text)?;
+        self.stage_structure_insert(StructureKind::Section, name, fragment)
+    }
+
+    /// Appends a note with a stable `text:id`, citation, and one plain body
+    /// paragraph. Formula, field, and reference semantics remain inert.
+    pub fn append_note(
+        &mut self,
+        id: impl Into<String>,
+        class: crate::note::NoteClass,
+        citation: impl Into<String>,
+        body: impl Into<String>,
+    ) -> Result<()> {
+        let id = checked_structure_identity(id.into(), "note id")?;
+        let class = match class {
+            crate::note::NoteClass::Footnote => "footnote".to_owned(),
+            crate::note::NoteClass::Endnote => "endnote".to_owned(),
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "OTH fresh notes require the typed footnote or endnote class".to_string(),
+                ));
+            },
+        };
+        let class = checked_structure_identity(class, "note class")?;
+        let citation = checked_structure_text(citation.into())?;
+        let body = checked_structure_text(body.into())?;
+        let fragment = authored_note(&id, &class, &citation, &body)?;
+        self.stage_structure_insert(StructureKind::Note, id, fragment)
+    }
+
+    /// Appends an annotation identified by `office:name` with one plain
+    /// paragraph.
+    pub fn append_annotation(
+        &mut self,
+        name: impl Into<String>,
+        text: impl Into<String>,
+    ) -> Result<()> {
+        let name = checked_structure_identity(name.into(), "annotation name")?;
+        let text = checked_structure_text(text.into())?;
+        let fragment = authored_annotation(&name, &text)?;
+        self.stage_structure_insert(StructureKind::Annotation, name, fragment)
+    }
+
+    /// Appends a one-column, one-row plain string table.
+    ///
+    /// This operation never creates or rewrites formulas, spans, repeats, or
+    /// references. It is intended as a small structural insertion primitive.
+    pub fn append_table(
+        &mut self,
+        name: impl Into<String>,
+        cell_text: impl Into<String>,
+    ) -> Result<()> {
+        let name = checked_structure_identity(name.into(), "table name")?;
+        let cell_text = checked_structure_text(cell_text.into())?;
+        let fragment = authored_table(&name, &cell_text)?;
+        self.stage_structure_insert(StructureKind::Table, name, fragment)
+    }
+
+    /// Removes one existing named section after dependency checks.
+    pub fn remove_section(&mut self, section: Position) -> Result<()> {
+        self.stage_structure_remove(StructureSelector::Section(section))
+    }
+
+    /// Removes one existing note after dependency checks.
+    pub fn remove_note(&mut self, note: Position) -> Result<()> {
+        self.stage_structure_remove(StructureSelector::Note(note))
+    }
+
+    /// Removes one existing annotation after dependency checks.
+    pub fn remove_annotation(&mut self, annotation: Position) -> Result<()> {
+        self.stage_structure_remove(StructureSelector::Annotation(annotation))
+    }
+
+    fn stage_structure_insert(
+        &mut self,
+        kind: StructureKind,
+        identity: String,
+        fragment: String,
+    ) -> Result<()> {
+        if crate::codec::structure_sites(self.source.content_xml())?
+            .iter()
+            .any(|site| {
+                site.kind.to_public() == kind && site.identity.as_deref() == Some(&identity)
+            })
+            || self
+                .structure_lifecycle_changes
+                .iter()
+                .any(|change| change.kind == kind && change.identity == identity)
+        {
+            return Err(Error::InvalidFormat(
+                "OTH structural identity is already present or staged".to_string(),
+            ));
+        }
+        let position = crate::codec::structure_sites(self.source.content_xml())?
+            .iter()
+            .filter(|site| site.kind.to_public() == kind)
+            .count()
+            .checked_add(
+                self.structure_lifecycle_changes
+                    .iter()
+                    .filter(|change| change.kind == kind && change.before_xml.is_none())
+                    .count(),
+            )
+            .ok_or_else(|| Error::InvalidFormat("OTH structural selector overflow".to_string()))?;
+        self.structure_lifecycle_changes
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "OTH structural lifecycle changes",
+                source,
+            })?;
+        self.ensure_structure_staging_capacity(fragment.len())?;
+        self.structure_lifecycle_changes
+            .push(StructureLifecycleChange {
+                selector: StructureSelector::from_kind(kind, Position::new(position)),
+                kind,
+                identity,
+                before_xml: None,
+                after_xml: Some(fragment),
+            });
+        Ok(())
+    }
+
+    fn stage_structure_remove(&mut self, selector: StructureSelector) -> Result<()> {
+        let site = find_structure_site(self.source, selector)?;
+        let identity = site.identity.clone().ok_or_else(|| {
+            Error::InvalidFormat(
+                "OTH structural removal requires a non-empty semantic identity".to_string(),
+            )
+        })?;
+        if crate::codec::structure_sites(self.source.content_xml())?
+            .iter()
+            .filter(|candidate| candidate.kind == site.kind)
+            .filter_map(|candidate| candidate.identity.as_deref())
+            .filter(|candidate| *candidate == identity)
+            .count()
+            != 1
+        {
+            return Err(Error::InvalidFormat(
+                "OTH structural removal identity is absent or ambiguous".to_string(),
+            ));
+        }
+        if site.kind == crate::codec::EditableStructureKind::Section
+            && self
+                .source
+                .package
+                .sections()?
+                .get(selector.position().get())
+                .is_some_and(crate::section::Section::is_protected)
+        {
+            return Err(Error::InvalidFormat(
+                "OTH protected sections cannot be removed by this bounded edit".to_string(),
+            ));
+        }
+        ensure_structure_reference_closure(self.source, &site, &identity)?;
+        if self.structure_changes.iter().any(|change| {
+            change.selector.kind() == selector.kind()
+                && change.selector.position() == selector.position()
+        }) {
+            return Err(Error::InvalidFormat(
+                "OTH structural removal overlaps a text replacement".to_string(),
+            ));
+        }
+        if self.structure_lifecycle_changes.iter().any(|change| {
+            change.kind == selector.kind() && change.identity == identity
+                || change.selector.kind() == selector.kind()
+                    && change.selector.position() == selector.position()
+        }) {
+            return Err(Error::InvalidFormat(
+                "OTH structural identity is already staged".to_string(),
+            ));
+        }
+        let before_xml = self
+            .source
+            .content_xml()
+            .get(site.full.clone())
+            .ok_or_else(|| {
+                Error::InvalidFormat("OTH structural source span is invalid".to_string())
+            })?
+            .to_owned();
+        self.ensure_structure_staging_capacity(before_xml.len())?;
+        self.structure_lifecycle_changes
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "OTH structural lifecycle changes",
+                source,
+            })?;
+        self.structure_lifecycle_changes
+            .push(StructureLifecycleChange {
+                selector,
+                kind: selector.kind(),
+                identity,
+                before_xml: Some(before_xml),
+                after_xml: None,
+            });
+        Ok(())
+    }
+
+    fn ensure_structure_staging_capacity(&self, additional: usize) -> Result<()> {
+        let current = self
+            .structure_changes
+            .iter()
+            .try_fold(0usize, |total, change| {
+                structure_change_staged_bytes(change)?
+                    .checked_add(total)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("OTH structural staging size overflow".to_string())
+                    })
+            })?
+            .checked_add(self.structure_lifecycle_changes.iter().try_fold(
+                0usize,
+                |total, change| {
+                    lifecycle_change_staged_bytes(change)?
+                        .checked_add(total)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("OTH structural staging size overflow".to_string())
+                        })
+                },
+            )?)
+            .and_then(|value| value.checked_add(additional))
+            .ok_or_else(|| {
+                Error::InvalidFormat("OTH structural staging size overflow".to_string())
+            })?;
+        if current > MAX_STRUCTURAL_STAGED_BYTES {
+            return Err(Error::InvalidFormat(
+                "OTH structural staging exceeds the limit".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn stage_structure(&mut self, selector: StructureSelector, after: String) -> Result<()> {
+        if after.len() > MAX_PARAGRAPH_BYTES {
+            return Err(Error::InvalidFormat(
+                "OTH structural replacement text exceeds the limit".to_string(),
+            ));
+        }
+        let site = find_structure_site(self.source, selector)?;
+        let _text_site = site.text.ok_or_else(|| {
+            Error::InvalidFormat(
+                "OTH structural text is rich, empty-self-closing, or has multiple blocks"
+                    .to_string(),
+            )
+        })?;
+        let before = site.text_value.ok_or_else(|| {
+            Error::InvalidFormat("OTH structural text provenance is missing".to_string())
+        })?;
+        let before_xml = self
+            .source
+            .content_xml()
+            .get(site.full.clone())
+            .ok_or_else(|| {
+                Error::InvalidFormat("OTH structural source span is invalid".to_string())
+            })?
+            .to_owned();
+        if before_xml.len() > MAX_PARAGRAPH_BYTES {
+            return Err(Error::InvalidFormat(
+                "OTH structural source span exceeds the limit".to_string(),
+            ));
+        }
+        if before == after {
+            self.structure_changes
+                .retain(|change| change.selector != selector);
+            return Ok(());
+        }
+        if self
+            .structure_changes
+            .iter()
+            .any(|change| change.selector == selector)
+        {
+            let staged_bytes =
+                self.structure_changes
+                    .iter()
+                    .try_fold(0_usize, |total, change| {
+                        let replacement_len = if change.selector == selector {
+                            after.len()
+                        } else {
+                            change.after.len()
+                        };
+                        total
+                            .checked_add(change.before_xml.len())
+                            .and_then(|value| value.checked_add(change.before.len()))
+                            .and_then(|value| value.checked_add(replacement_len))
+                            .ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "OTH structural staging size overflow".to_string(),
+                                )
+                            })
+                    })?;
+            if staged_bytes > MAX_STRUCTURAL_STAGED_BYTES {
+                return Err(Error::InvalidFormat(
+                    "OTH structural staging exceeds the limit".to_string(),
+                ));
+            }
+            if let Some(change) = self
+                .structure_changes
+                .iter_mut()
+                .find(|change| change.selector == selector)
+            {
+                change.after = after;
+            }
+            return Ok(());
+        }
+        self.structure_changes
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "OTH structural changes",
+                source,
+            })?;
+        let staged_bytes = self.structure_changes.iter().try_fold(
+            before_xml
+                .len()
+                .checked_add(before.len())
+                .and_then(|value| value.checked_add(after.len()))
+                .ok_or_else(|| {
+                    Error::InvalidFormat("OTH structural staging size overflow".to_string())
+                })?,
+            |total, change| {
+                total
+                    .checked_add(structure_change_staged_bytes(change)?)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("OTH structural staging size overflow".to_string())
+                    })
+            },
+        )?;
+        if staged_bytes > MAX_STRUCTURAL_STAGED_BYTES {
+            return Err(Error::InvalidFormat(
+                "OTH structural staging exceeds the limit".to_string(),
+            ));
+        }
+        self.structure_changes.push(StructureChange {
+            selector,
+            target_selector: selector,
+            identity: site.identity,
+            before,
+            after,
+            before_xml,
+            after_xml: String::new(),
+        });
         Ok(())
     }
 
@@ -1868,6 +2341,8 @@ impl Edit<'_> {
             && self.payload_changes.is_empty()
             && self.resource_changes.is_empty()
             && self.styles.is_keep()
+            && self.structure_changes.is_empty()
+            && self.structure_lifecycle_changes.is_empty()
             && self.appended.is_empty()
         {
             return Ok(Commit::unchanged(self.source.clone()));
@@ -1882,6 +2357,8 @@ impl Edit<'_> {
             &self.list_changes,
             &self.appended,
             self.durable_fragment.as_deref(),
+            &self.structure_changes,
+            &self.structure_lifecycle_changes,
         )?)?;
         let snapshot = Template {
             package: self.source.package.rebuild_with_parts(
@@ -1893,6 +2370,8 @@ impl Edit<'_> {
         };
         validate_edit_readback(&self, &snapshot)?;
         let durable_fragment = published_durable_fragment(&self, &snapshot)?;
+        let structure_changes = published_structure_changes(&self, &snapshot)?;
+        let structure_lifecycle_changes = published_structure_lifecycle_changes(&self, &snapshot)?;
         Ok(Commit {
             snapshot: snapshot.clone(),
             patch: Patch {
@@ -1909,6 +2388,8 @@ impl Edit<'_> {
                 payload_changes: self.payload_changes,
                 resource_changes: self.resource_changes,
                 styles: self.styles,
+                structure_changes,
+                structure_lifecycle_changes,
             },
             changed: true,
         })
@@ -1928,7 +2409,17 @@ impl<'a> Edit<'a> {
     pub fn join(&mut self, other: Self) -> std::result::Result<&mut Self, JoinError<'a>> {
         let failure = if !self.source.package.is_same(&other.source.package) {
             Some(JoinFailure::DifferentSnapshot)
-        } else if !self.appended.is_empty() && !other.appended.is_empty() {
+        } else if (!self.appended.is_empty()
+            || self
+                .structure_lifecycle_changes
+                .iter()
+                .any(StructureLifecycleChange::is_insertion))
+            && (!other.appended.is_empty()
+                || other
+                    .structure_lifecycle_changes
+                    .iter()
+                    .any(StructureLifecycleChange::is_insertion))
+        {
             Some(JoinFailure::Append)
         } else if !self.metadata.is_keep() && !other.metadata.is_keep() {
             Some(JoinFailure::Metadata)
@@ -2008,6 +2499,62 @@ impl<'a> Edit<'a> {
                         })
                     })
                 })
+                .or_else(|| {
+                    self.structure_changes.iter().find_map(|accepted| {
+                        other
+                            .structure_changes
+                            .iter()
+                            .any(|incoming| structure_changes_overlap(accepted, incoming))
+                            .then_some(JoinFailure::Structure(accepted.selector))
+                    })
+                })
+                .or_else(|| {
+                    self.structure_lifecycle_changes
+                        .iter()
+                        .find_map(|accepted| {
+                            other
+                                .structure_lifecycle_changes
+                                .iter()
+                                .any(|incoming| lifecycle_changes_overlap(accepted, incoming))
+                                .then_some(JoinFailure::Structure(accepted.selector))
+                        })
+                })
+                .or_else(|| {
+                    self.structure_lifecycle_changes
+                        .iter()
+                        .find_map(|accepted| {
+                            if !accepted.is_removal() {
+                                return None;
+                            }
+                            other
+                                .structure_changes
+                                .iter()
+                                .find(|incoming| {
+                                    incoming.selector.kind() == accepted.selector.kind()
+                                        && incoming.selector.position()
+                                            == accepted.selector.position()
+                                })
+                                .map(|_| JoinFailure::Structure(accepted.selector))
+                        })
+                })
+                .or_else(|| {
+                    other
+                        .structure_lifecycle_changes
+                        .iter()
+                        .find_map(|incoming| {
+                            if !incoming.is_removal() {
+                                return None;
+                            }
+                            self.structure_changes
+                                .iter()
+                                .find(|accepted| {
+                                    accepted.selector.kind() == incoming.selector.kind()
+                                        && accepted.selector.position()
+                                            == incoming.selector.position()
+                                })
+                                .map(|_| JoinFailure::Structure(incoming.selector))
+                        })
+                })
         };
         if let Some(reason) = failure {
             return Err(JoinError {
@@ -2022,6 +2569,9 @@ impl<'a> Edit<'a> {
         self.heading_changes.extend(other.heading_changes);
         self.inline_changes.extend(other.inline_changes);
         self.list_changes.extend(other.list_changes);
+        self.structure_changes.extend(other.structure_changes);
+        self.structure_lifecycle_changes
+            .extend(other.structure_lifecycle_changes);
         self.payload_changes.extend(other.payload_changes);
         self.resource_changes.extend(other.resource_changes);
         self.appended.extend(other.appended);
@@ -2069,6 +2619,8 @@ pub enum JoinFailure {
     ResourcePayload,
     /// Both transactions replace the style catalog.
     Styles,
+    /// Both transactions edit the same admitted section, note, or annotation.
+    Structure(StructureSelector),
 }
 
 /// A join refusal that retains the rejected transaction.
@@ -2144,6 +2696,174 @@ pub struct ListChange {
     list: Position,
 }
 
+/// One source-bound text splice in an admitted section, note, or annotation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StructureChange {
+    /// Source-order selector used to verify and apply the source precondition.
+    selector: StructureSelector,
+    /// Target-order selector after lifecycle changes have shifted positions.
+    target_selector: StructureSelector,
+    /// Stable identity captured from the source structure, when present.
+    identity: Option<String>,
+    before: String,
+    after: String,
+    before_xml: String,
+    after_xml: String,
+}
+
+impl StructureChange {
+    /// Semantic source-order selector captured by the transaction.
+    #[must_use]
+    pub const fn selector(&self) -> StructureSelector {
+        self.selector
+    }
+
+    /// Semantic target-order selector after the transaction is applied.
+    ///
+    /// This can differ from [`Self::selector`] when an earlier structure is
+    /// removed in the same transaction.
+    #[must_use]
+    pub const fn target_selector(&self) -> StructureSelector {
+        self.target_selector
+    }
+
+    /// Stable structure identity, when the source supplied one.
+    #[must_use]
+    pub fn identity(&self) -> Option<&str> {
+        self.identity.as_deref()
+    }
+
+    /// Text read from the source structure.
+    #[must_use]
+    pub fn before(&self) -> &str {
+        &self.before
+    }
+
+    /// Replacement structure text.
+    #[must_use]
+    pub fn after(&self) -> &str {
+        &self.after
+    }
+}
+
+/// One reversible source-bound creation or removal of an identified body
+/// structure. The full source fragment is retained so unknown descendants are
+/// restored exactly by the inverse patch.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StructureLifecycleChange {
+    selector: StructureSelector,
+    kind: StructureKind,
+    identity: String,
+    before_xml: Option<String>,
+    after_xml: Option<String>,
+}
+
+impl StructureLifecycleChange {
+    /// Semantic source-order selector captured by the transaction.
+    #[must_use]
+    pub const fn selector(&self) -> StructureSelector {
+        self.selector
+    }
+
+    /// Structural family.
+    #[must_use]
+    pub const fn kind(&self) -> StructureKind {
+        self.kind
+    }
+
+    /// Stable source identity (`text:name`, `text:id`, `office:name`, or
+    /// `table:name`).
+    #[must_use]
+    pub fn identity(&self) -> &str {
+        &self.identity
+    }
+
+    /// Full source XML, or `None` for a creation.
+    #[must_use]
+    pub fn before_xml(&self) -> Option<&str> {
+        self.before_xml.as_deref()
+    }
+
+    /// Full target XML, or `None` for a removal.
+    #[must_use]
+    pub fn after_xml(&self) -> Option<&str> {
+        self.after_xml.as_deref()
+    }
+
+    /// Whether this operation creates a structure at the body tail.
+    #[must_use]
+    pub const fn is_insertion(&self) -> bool {
+        self.before_xml.is_none() && self.after_xml.is_some()
+    }
+
+    /// Whether this operation removes an existing structure.
+    #[must_use]
+    pub const fn is_removal(&self) -> bool {
+        self.before_xml.is_some() && self.after_xml.is_none()
+    }
+}
+
+/// The admitted structural text families for this bounded transaction slice.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum StructureSelector {
+    /// A section by source-order position.
+    Section(Position),
+    /// A footnote or endnote by source-order position.
+    Note(Position),
+    /// An office annotation by source-order position.
+    Annotation(Position),
+    /// A table by source-order position.
+    Table(Position),
+}
+
+/// Structural family selected by a [`StructureSelector`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum StructureKind {
+    /// `text:section`.
+    Section,
+    /// `text:note`.
+    Note,
+    /// `office:annotation`.
+    Annotation,
+    /// `table:table`.
+    Table,
+}
+
+impl StructureSelector {
+    /// Selected family.
+    #[must_use]
+    pub const fn kind(self) -> StructureKind {
+        match self {
+            Self::Section(_) => StructureKind::Section,
+            Self::Note(_) => StructureKind::Note,
+            Self::Annotation(_) => StructureKind::Annotation,
+            Self::Table(_) => StructureKind::Table,
+        }
+    }
+
+    /// Selected source-order position.
+    #[must_use]
+    pub const fn position(self) -> Position {
+        match self {
+            Self::Section(position)
+            | Self::Note(position)
+            | Self::Annotation(position)
+            | Self::Table(position) => position,
+        }
+    }
+
+    const fn from_kind(kind: StructureKind, position: Position) -> Self {
+        match kind {
+            StructureKind::Section => Self::Section(position),
+            StructureKind::Note => Self::Note(position),
+            StructureKind::Annotation => Self::Annotation(position),
+            StructureKind::Table => Self::Table(position),
+        }
+    }
+}
+
 impl ListChange {
     /// Zero-based projected list position.
     #[must_use]
@@ -2207,6 +2927,8 @@ impl Commit {
                 resource_changes: Vec::new(),
                 source: snapshot.clone(),
                 styles: PartChange::Keep,
+                structure_changes: Vec::new(),
+                structure_lifecycle_changes: Vec::new(),
                 target: snapshot.clone(),
             },
             snapshot,
@@ -2239,7 +2961,7 @@ impl Commit {
     }
 }
 
-/// A source-checked reversible OTH paragraph-text patch.
+/// A source-checked reversible OTH text and structural patch.
 #[derive(Clone)]
 pub struct Patch {
     appended: Vec<crate::ContentBlock>,
@@ -2254,6 +2976,8 @@ pub struct Patch {
     resource_changes: Vec<ResourceChange>,
     source: Template,
     styles: PartChange,
+    structure_changes: Vec<StructureChange>,
+    structure_lifecycle_changes: Vec<StructureLifecycleChange>,
     target: Template,
 }
 
@@ -2350,6 +3074,51 @@ impl Patch {
         }) {
             conflicts.push(MergeConflict::ResourcePayload);
         }
+        for change in &left.structure_changes {
+            if right
+                .structure_changes
+                .iter()
+                .any(|candidate| structure_changes_overlap(change, candidate))
+            {
+                conflicts.push(MergeConflict::Structure(change.selector));
+            }
+            if right.structure_lifecycle_changes.iter().any(|candidate| {
+                candidate.is_removal()
+                    && candidate.selector.kind() == change.selector.kind()
+                    && candidate.selector.position() == change.selector.position()
+            }) {
+                conflicts.push(MergeConflict::Structure(change.selector));
+            }
+        }
+        for change in &left.structure_lifecycle_changes {
+            if right.structure_changes.iter().any(|candidate| {
+                change.is_removal()
+                    && candidate.selector.kind() == change.selector.kind()
+                    && candidate.selector.position() == change.selector.position()
+            }) {
+                conflicts.push(MergeConflict::Structure(change.selector));
+            }
+        }
+        if left
+            .structure_lifecycle_changes
+            .iter()
+            .any(StructureLifecycleChange::is_insertion)
+            && right
+                .structure_lifecycle_changes
+                .iter()
+                .any(StructureLifecycleChange::is_insertion)
+        {
+            conflicts.push(MergeConflict::Append);
+        }
+        for change in &left.structure_lifecycle_changes {
+            if right
+                .structure_lifecycle_changes
+                .iter()
+                .any(|candidate| lifecycle_changes_overlap(change, candidate))
+            {
+                conflicts.push(MergeConflict::Structure(change.selector));
+            }
+        }
         Ok(MergePlan {
             base: base.clone(),
             conflicts,
@@ -2364,6 +3133,10 @@ impl Patch {
                 .durable_fragment
                 .as_deref()
                 .is_some_and(|fragment| !fragment.is_empty())
+            || self
+                .structure_lifecycle_changes
+                .iter()
+                .any(StructureLifecycleChange::is_insertion)
     }
     /// Returns whether this patch authorizes the supplied exact source bytes.
     #[must_use]
@@ -2434,6 +3207,18 @@ impl Patch {
     #[must_use]
     pub fn list_changes(&self) -> &[ListChange] {
         &self.list_changes
+    }
+
+    /// Source-bound section, note, and annotation text changes.
+    #[must_use]
+    pub fn structure_changes(&self) -> &[StructureChange] {
+        &self.structure_changes
+    }
+
+    /// Source-bound structure creations and removals in staging order.
+    #[must_use]
+    pub fn structure_lifecycle_changes(&self) -> &[StructureLifecycleChange] {
+        &self.structure_lifecycle_changes
     }
 
     /// Replacement metadata XML retained by this semantic patch.
@@ -2565,6 +3350,32 @@ impl Patch {
             push_wire_list(&mut output, change.before.as_ref())?;
             push_wire_list(&mut output, change.after.as_ref())?;
         }
+        push_wire_usize(&mut output, self.structure_changes.len())?;
+        for change in &self.structure_changes {
+            let kind = match change.selector {
+                StructureSelector::Section(_) => 0,
+                StructureSelector::Note(_) => 1,
+                StructureSelector::Annotation(_) => 2,
+                StructureSelector::Table(_) => 3,
+            };
+            push_wire_usize(&mut output, kind)?;
+            push_wire_usize(&mut output, change.selector.position().get())?;
+            push_wire_usize(&mut output, change.target_selector.position().get())?;
+            push_wire_optional_bytes(&mut output, change.identity.as_deref().map(str::as_bytes))?;
+            push_wire_bytes(&mut output, change.before.as_bytes())?;
+            push_wire_bytes(&mut output, change.after.as_bytes())?;
+            push_wire_bytes(&mut output, change.before_xml.as_bytes())?;
+            push_wire_bytes(&mut output, change.after_xml.as_bytes())?;
+        }
+        push_wire_usize(&mut output, self.structure_lifecycle_changes.len())?;
+        for change in &self.structure_lifecycle_changes {
+            push_wire_usize(&mut output, change.kind as usize)?;
+            push_wire_usize(&mut output, usize::from(change.is_removal()))?;
+            push_wire_usize(&mut output, change.selector.position().get())?;
+            push_wire_bytes(&mut output, change.identity.as_bytes())?;
+            push_wire_optional_bytes(&mut output, change.before_xml.as_deref().map(str::as_bytes))?;
+            push_wire_optional_bytes(&mut output, change.after_xml.as_deref().map(str::as_bytes))?;
+        }
         push_wire_part_change(&mut output, &self.metadata)?;
         push_wire_part_change(&mut output, &self.styles)?;
         if output.len() > MAX_DURABLE_PATCH_BYTES {
@@ -2582,12 +3393,24 @@ impl Patch {
     /// Returns an error for malformed, over-limit, stale-semantic, or invalid
     /// embedded source/target packages.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() > MAX_DURABLE_PATCH_BYTES || !bytes.starts_with(PATCH_MAGIC) {
+        if bytes.len() > MAX_DURABLE_PATCH_BYTES {
             return Err(Error::InvalidFormat(
                 "invalid or oversized OTH durable patch".to_string(),
             ));
         }
-        let mut cursor = PATCH_MAGIC.len();
+        let (mut cursor, version) = if bytes.starts_with(PATCH_MAGIC) {
+            (PATCH_MAGIC.len(), 5_u8)
+        } else if bytes.starts_with(LEGACY_PATCH_MAGIC_V4) {
+            (LEGACY_PATCH_MAGIC_V4.len(), 4_u8)
+        } else if bytes.starts_with(LEGACY_PATCH_MAGIC) {
+            (LEGACY_PATCH_MAGIC.len(), 3_u8)
+        } else if bytes.starts_with(LEGACY_PATCH_MAGIC_V2) {
+            (LEGACY_PATCH_MAGIC_V2.len(), 2_u8)
+        } else {
+            return Err(Error::InvalidFormat(
+                "invalid or oversized OTH durable patch".to_string(),
+            ));
+        };
         let source = Template::from_bytes(read_wire_bytes(bytes, &mut cursor)?.to_vec())?;
         let target = Template::from_bytes(read_wire_bytes(bytes, &mut cursor)?.to_vec())?;
         let appended_xml = read_wire_string(bytes, &mut cursor)?;
@@ -2608,6 +3431,16 @@ impl Patch {
         let payload_changes = read_payload_changes(bytes, &mut cursor, &source, &target)?;
         let list_changes =
             read_list_changes(bytes, &mut cursor, &source, &target, appended_list_count)?;
+        let structure_changes = if version < 3 {
+            Vec::new()
+        } else {
+            read_structure_changes(bytes, &mut cursor, &source, &target, version)?
+        };
+        let structure_lifecycle_changes = if version < 4 {
+            Vec::new()
+        } else {
+            read_structure_lifecycle_changes(bytes, &mut cursor, &source, &target)?
+        };
         let metadata = read_wire_part_change(bytes, &mut cursor)?;
         let styles = read_wire_part_change(bytes, &mut cursor)?;
         validate_part_change(&metadata, source.meta_xml(), target.meta_xml(), "metadata")?;
@@ -2634,6 +3467,8 @@ impl Patch {
             payload_changes,
             resource_changes,
             styles,
+            structure_changes,
+            structure_lifecycle_changes,
             source,
             target,
         })
@@ -2711,6 +3546,30 @@ impl Patch {
                     resource: change.resource,
                 })
                 .collect(),
+            structure_changes: self
+                .structure_changes
+                .iter()
+                .map(|change| StructureChange {
+                    selector: change.target_selector,
+                    target_selector: change.selector,
+                    identity: change.identity.clone(),
+                    before: change.after.clone(),
+                    after: change.before.clone(),
+                    before_xml: change.after_xml.clone(),
+                    after_xml: change.before_xml.clone(),
+                })
+                .collect(),
+            structure_lifecycle_changes: self
+                .structure_lifecycle_changes
+                .iter()
+                .map(|change| StructureLifecycleChange {
+                    selector: change.selector,
+                    kind: change.kind,
+                    identity: change.identity.clone(),
+                    before_xml: change.after_xml.clone(),
+                    after_xml: change.before_xml.clone(),
+                })
+                .collect(),
             source: self.target.clone(),
             styles: part_change_between(self.target.styles_xml(), self.source.styles_xml()),
             target: self.source.clone(),
@@ -2747,6 +3606,8 @@ pub enum MergeConflict {
     Styles,
     /// Both patches append at the structural tail.
     Append,
+    /// Both patches edit the same admitted section, note, or annotation.
+    Structure(StructureSelector),
 }
 
 /// Non-mutating three-way composition plan.
@@ -2792,6 +3653,10 @@ impl MergePlan {
         payload_changes.extend(self.right.payload_changes.clone());
         let mut list_changes = self.left.list_changes.clone();
         list_changes.extend(self.right.list_changes.clone());
+        let mut structure_changes = self.left.structure_changes.clone();
+        structure_changes.extend(self.right.structure_changes.clone());
+        let mut structure_lifecycle_changes = self.left.structure_lifecycle_changes.clone();
+        structure_lifecycle_changes.extend(self.right.structure_lifecycle_changes.clone());
         let mut appended = self.left.appended.clone();
         appended.extend(self.right.appended.clone());
         let durable_fragment = self
@@ -2809,6 +3674,8 @@ impl MergePlan {
             &list_changes,
             &appended,
             durable_fragment,
+            &structure_changes,
+            &structure_lifecycle_changes,
         )?)?;
         let metadata = if self.left.metadata.is_keep() {
             &self.right.metadata
@@ -2857,6 +3724,8 @@ impl MergePlan {
         validate_inline_readback(&inline_changes, &candidate)?;
         validate_forms_readback(forms_change, &candidate)?;
         validate_resource_readback(&resource_changes, &payload_changes, &candidate)?;
+        validate_structure_readback(&structure_changes, &structure_lifecycle_changes, &candidate)?;
+        validate_structure_lifecycle_readback(&structure_lifecycle_changes, &candidate)?;
         for change in &list_changes {
             let Some(expected) = change.after.as_ref() else {
                 continue;
@@ -3432,6 +4301,12 @@ fn validate_edit_readback(edit: &Edit<'_>, snapshot: &Template) -> Result<()> {
     validate_inline_readback(&edit.inline_changes, snapshot)?;
     validate_forms_readback(edit.forms_change.as_ref(), snapshot)?;
     validate_resource_readback(&edit.resource_changes, &edit.payload_changes, snapshot)?;
+    validate_structure_readback(
+        &edit.structure_changes,
+        &edit.structure_lifecycle_changes,
+        snapshot,
+    )?;
+    validate_structure_lifecycle_readback(&edit.structure_lifecycle_changes, snapshot)?;
     let replaced_lists = edit
         .list_changes
         .iter()
@@ -3525,7 +4400,9 @@ fn validate_edit_readback(edit: &Edit<'_>, snapshot: &Template) -> Result<()> {
         .saturating_add(replacement_block_count)
         .saturating_add(appended_block_count)
         .saturating_add(inserted_resource_blocks);
-    if snapshot.package.order().len() != expected_order_len {
+    if edit.structure_lifecycle_changes.is_empty()
+        && snapshot.package.order().len() != expected_order_len
+    {
         return Err(Error::InvalidFormat(
             "OTH structural edit failed block-order readback".to_string(),
         ));
@@ -3562,6 +4439,234 @@ fn published_durable_fragment(edit: &Edit<'_>, snapshot: &Template) -> Result<Op
         .ok_or_else(|| {
             Error::InvalidFormat("OTH exact transfer target span is invalid".to_string())
         })
+}
+
+fn published_structure_changes(
+    edit: &Edit<'_>,
+    snapshot: &Template,
+) -> Result<Vec<StructureChange>> {
+    let mut changes = Vec::new();
+    changes
+        .try_reserve_exact(edit.structure_changes.len())
+        .map_err(|source| Error::Allocation {
+            resource: "OTH published structural changes",
+            source,
+        })?;
+    for change in &edit.structure_changes {
+        let source_site = find_structure_site(edit.source, change.selector)?;
+        let target_site = find_structure_target_site(
+            snapshot,
+            change.selector,
+            change.identity.as_deref(),
+            &edit.structure_lifecycle_changes,
+        )?;
+        let target_xml = snapshot
+            .content_xml()
+            .get(target_site.full.clone())
+            .ok_or_else(|| {
+                Error::InvalidFormat("OTH structural target span is invalid".to_string())
+            })?;
+        let target_text = target_site.text_value.as_deref().ok_or_else(|| {
+            Error::InvalidFormat("OTH structural target text site is missing".to_string())
+        })?;
+        if target_text != change.after {
+            return Err(Error::InvalidFormat(
+                "OTH structural target text failed readback".to_string(),
+            ));
+        }
+        let source_xml = edit
+            .source
+            .content_xml()
+            .get(source_site.full)
+            .ok_or_else(|| {
+                Error::InvalidFormat("OTH structural source span is invalid".to_string())
+            })?;
+        if source_xml != change.before_xml {
+            return Err(Error::InvalidFormat(
+                "OTH structural source span changed before publication".to_string(),
+            ));
+        }
+        changes.push(StructureChange {
+            selector: change.selector,
+            target_selector: StructureSelector::from_kind(
+                change.selector.kind(),
+                Position::new(target_site.index),
+            ),
+            identity: change.identity.clone(),
+            before: change.before.clone(),
+            after: change.after.clone(),
+            before_xml: change.before_xml.clone(),
+            after_xml: target_xml.to_owned(),
+        });
+    }
+    Ok(changes)
+}
+
+fn find_structure_site_by_identity(
+    template: &Template,
+    kind: StructureKind,
+    identity: &str,
+) -> Result<crate::codec::StructureSite> {
+    let mut matches = crate::codec::structure_sites(template.content_xml())?
+        .into_iter()
+        .filter(|site| site.kind.to_public() == kind && site.identity.as_deref() == Some(identity));
+    let Some(site) = matches.next() else {
+        return Err(Error::InvalidFormat(
+            "OTH structural identity is absent".to_string(),
+        ));
+    };
+    if matches.next().is_some() {
+        return Err(Error::InvalidFormat(
+            "OTH structural identity is ambiguous".to_string(),
+        ));
+    }
+    Ok(site)
+}
+
+fn published_structure_lifecycle_changes(
+    edit: &Edit<'_>,
+    snapshot: &Template,
+) -> Result<Vec<StructureLifecycleChange>> {
+    let mut changes = Vec::new();
+    changes
+        .try_reserve_exact(edit.structure_lifecycle_changes.len())
+        .map_err(|source| Error::Allocation {
+            resource: "OTH published structural lifecycle changes",
+            source,
+        })?;
+    for change in &edit.structure_lifecycle_changes {
+        match (change.before_xml.as_deref(), change.after_xml.as_deref()) {
+            (None, Some(expected_fragment)) => {
+                if crate::codec::structure_sites(edit.source.content_xml())?
+                    .into_iter()
+                    .any(|site| {
+                        site.kind.to_public() == change.kind
+                            && site.identity.as_deref() == Some(change.identity.as_str())
+                    })
+                {
+                    return Err(Error::InvalidFormat(
+                        "OTH structural insertion identity appeared in its source".to_string(),
+                    ));
+                }
+                let target_site =
+                    find_structure_site_by_identity(snapshot, change.kind, &change.identity)?;
+                let target_xml = snapshot
+                    .content_xml()
+                    .get(target_site.full.clone())
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "OTH structural insertion target span is invalid".to_string(),
+                        )
+                    })?;
+                if target_xml != expected_fragment {
+                    return Err(Error::InvalidFormat(
+                        "OTH structural insertion failed target readback".to_string(),
+                    ));
+                }
+                changes.push(StructureLifecycleChange {
+                    selector: StructureSelector::from_kind(
+                        change.kind,
+                        Position::new(target_site.index),
+                    ),
+                    kind: change.kind,
+                    identity: change.identity.clone(),
+                    before_xml: None,
+                    after_xml: Some(target_xml.to_owned()),
+                });
+            },
+            (Some(expected_source), None) => {
+                let source_site = find_structure_site(edit.source, change.selector)?;
+                let source_xml =
+                    edit.source
+                        .content_xml()
+                        .get(source_site.full)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "OTH structural removal source span is invalid".to_string(),
+                            )
+                        })?;
+                if source_xml != expected_source
+                    || source_site.identity.as_deref() != Some(change.identity.as_str())
+                {
+                    return Err(Error::InvalidFormat(
+                        "OTH structural removal source precondition failed".to_string(),
+                    ));
+                }
+                if crate::codec::structure_sites(snapshot.content_xml())?
+                    .into_iter()
+                    .any(|site| {
+                        site.kind.to_public() == change.kind
+                            && site.identity.as_deref() == Some(change.identity.as_str())
+                    })
+                {
+                    return Err(Error::InvalidFormat(
+                        "OTH structural removal remained in target".to_string(),
+                    ));
+                }
+                changes.push(change.clone());
+            },
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "OTH structural lifecycle operation has invalid before/after state".to_string(),
+                ));
+            },
+        }
+    }
+    Ok(changes)
+}
+
+fn validate_structure_readback(
+    changes: &[StructureChange],
+    lifecycle: &[StructureLifecycleChange],
+    snapshot: &Template,
+) -> Result<()> {
+    for change in changes {
+        let site = find_structure_target_site(
+            snapshot,
+            change.selector,
+            change.identity.as_deref(),
+            lifecycle,
+        )?;
+        let text = site.text_value.as_deref().ok_or_else(|| {
+            Error::InvalidFormat("OTH structural readback text site is missing".to_string())
+        })?;
+        if text != change.after {
+            return Err(Error::InvalidFormat(
+                "OTH structural text failed semantic readback".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_structure_lifecycle_readback(
+    changes: &[StructureLifecycleChange],
+    snapshot: &Template,
+) -> Result<()> {
+    for change in changes {
+        let found = find_structure_site_by_identity(snapshot, change.kind, &change.identity);
+        match (change.is_insertion(), found) {
+            (true, Ok(site)) => {
+                let actual = snapshot.content_xml().get(site.full).ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "OTH structural insertion readback span is invalid".to_string(),
+                    )
+                })?;
+                if Some(actual) != change.after_xml.as_deref() {
+                    return Err(Error::InvalidFormat(
+                        "OTH structural insertion failed semantic readback".to_string(),
+                    ));
+                }
+            },
+            (false, Err(_)) if change.is_removal() => {},
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "OTH structural lifecycle operation failed semantic readback".to_string(),
+                ));
+            },
+        }
+    }
+    Ok(())
 }
 
 fn list_target_index(changes: &[ListChange], change: &ListChange) -> Result<usize> {
@@ -3627,6 +4732,177 @@ fn replacement_sites_overlap(
     right: &crate::codec::ReplacementSite,
 ) -> bool {
     left.range.start < right.range.end && right.range.start < left.range.end
+}
+
+fn find_structure_site(
+    template: &Template,
+    selector: StructureSelector,
+) -> Result<crate::codec::StructureSite> {
+    let kind = match selector {
+        StructureSelector::Section(_) => crate::codec::EditableStructureKind::Section,
+        StructureSelector::Note(_) => crate::codec::EditableStructureKind::Note,
+        StructureSelector::Annotation(_) => crate::codec::EditableStructureKind::Annotation,
+        StructureSelector::Table(_) => crate::codec::EditableStructureKind::Table,
+    };
+    let position = selector.position().get();
+    crate::codec::structure_sites(template.content_xml())?
+        .into_iter()
+        .find(|site| site.kind == kind && site.index == position)
+        .ok_or_else(|| Error::InvalidFormat("OTH structural selector is out of bounds".to_string()))
+}
+
+fn structure_target_position(
+    selector: StructureSelector,
+    lifecycle: &[StructureLifecycleChange],
+) -> Result<Position> {
+    let mut position = selector.position().get();
+    for _change in lifecycle.iter().filter(|change| {
+        change.kind == selector.kind()
+            && change.is_removal()
+            && change.selector.position().get() < selector.position().get()
+    }) {
+        position = position.checked_sub(1).ok_or_else(|| {
+            Error::InvalidFormat("OTH structural target position underflow".to_string())
+        })?;
+    }
+    Ok(Position::new(position))
+}
+
+fn find_structure_target_site(
+    template: &Template,
+    selector: StructureSelector,
+    identity: Option<&str>,
+    lifecycle: &[StructureLifecycleChange],
+) -> Result<crate::codec::StructureSite> {
+    if let Some(identity) = identity {
+        return find_structure_site_by_identity(template, selector.kind(), identity);
+    }
+    find_structure_site(
+        template,
+        StructureSelector::from_kind(
+            selector.kind(),
+            structure_target_position(selector, lifecycle)?,
+        ),
+    )
+}
+
+fn structure_change_staged_bytes(change: &StructureChange) -> Result<usize> {
+    change
+        .identity
+        .as_ref()
+        .map_or(0, String::len)
+        .checked_add(change.before_xml.len())
+        .and_then(|value| value.checked_add(change.before.len()))
+        .and_then(|value| value.checked_add(change.after.len()))
+        .ok_or_else(|| Error::InvalidFormat("OTH structural staging size overflow".to_string()))
+}
+
+fn lifecycle_change_staged_bytes(change: &StructureLifecycleChange) -> Result<usize> {
+    change
+        .identity
+        .len()
+        .checked_add(change.before_xml.as_ref().map_or(0, String::len))
+        .and_then(|value| value.checked_add(change.after_xml.as_ref().map_or(0, String::len)))
+        .ok_or_else(|| Error::InvalidFormat("OTH structural staging size overflow".to_string()))
+}
+
+fn lifecycle_changes_overlap(
+    left: &StructureLifecycleChange,
+    right: &StructureLifecycleChange,
+) -> bool {
+    left.kind == right.kind && left.identity == right.identity
+}
+
+fn structure_changes_overlap(left: &StructureChange, right: &StructureChange) -> bool {
+    if left.selector.kind() != right.selector.kind() {
+        return false;
+    }
+    match (left.identity.as_deref(), right.identity.as_deref()) {
+        (Some(left), Some(right)) => left == right,
+        _ => left.selector == right.selector,
+    }
+}
+
+fn checked_structure_identity(value: String, label: &str) -> Result<String> {
+    if value.is_empty() || value.len() > MAX_PARAGRAPH_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "OTH {label} is empty or exceeds the size limit"
+        )));
+    }
+    if value.chars().any(char::is_control) {
+        return Err(Error::InvalidFormat(format!(
+            "OTH {label} contains an XML control character"
+        )));
+    }
+    Ok(value)
+}
+
+fn checked_structure_text(value: String) -> Result<String> {
+    if value.len() > MAX_PARAGRAPH_BYTES || value.chars().any(char::is_control) {
+        return Err(Error::InvalidFormat(
+            "OTH structural text is empty or exceeds the size limit".to_string(),
+        ));
+    }
+    Ok(value)
+}
+
+fn escaped_xml(value: &str) -> String {
+    quick_xml::escape::escape(value).into_owned()
+}
+
+fn validate_authored_structure_fragment(fragment: &str) -> Result<String> {
+    let wrapped = format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?><office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\"><office:body><office:text>{fragment}</office:text></office:body></office:document-content>"
+    );
+    crate::codec::validate_authored(&wrapped)?;
+    Ok(fragment.to_owned())
+}
+
+fn authored_section(name: &str, text: &str) -> Result<String> {
+    validate_authored_structure_fragment(&format!(
+        "<text:section xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" text:name=\"{}\"><text:p>{}</text:p></text:section>",
+        escaped_xml(name),
+        escaped_xml(text)
+    ))
+}
+
+fn authored_note(id: &str, class: &str, citation: &str, body: &str) -> Result<String> {
+    validate_authored_structure_fragment(&format!(
+        "<text:note xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" text:id=\"{}\" text:note-class=\"{}\"><text:note-citation>{}</text:note-citation><text:note-body><text:p>{}</text:p></text:note-body></text:note>",
+        escaped_xml(id),
+        escaped_xml(class),
+        escaped_xml(citation),
+        escaped_xml(body)
+    ))
+}
+
+fn authored_annotation(name: &str, text: &str) -> Result<String> {
+    validate_authored_structure_fragment(&format!(
+        "<office:annotation xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" office:name=\"{}\"><text:p>{}</text:p></office:annotation>",
+        escaped_xml(name),
+        escaped_xml(text)
+    ))
+}
+
+fn authored_table(name: &str, text: &str) -> Result<String> {
+    validate_authored_structure_fragment(&format!(
+        "<table:table xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" table:name=\"{}\"><table:table-column/><table:table-row><table:table-cell office:value-type=\"string\"><text:p>{}</text:p></table:table-cell></table:table-row></table:table>",
+        escaped_xml(name),
+        escaped_xml(text)
+    ))
+}
+
+fn ensure_structure_reference_closure(
+    template: &Template,
+    site: &crate::codec::StructureSite,
+    identity: &str,
+) -> Result<()> {
+    if crate::codec::has_semantic_reference(template.content_xml(), site.full.clone(), identity)? {
+        return Err(Error::InvalidFormat(
+            "OTH structural removal would leave an unresolved external reference".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn list_changes_overlap(template: &Template, left: &ListChange, right: &ListChange) -> bool {
@@ -4385,6 +5661,265 @@ fn read_list_changes(
     Ok(changes)
 }
 
+fn read_structure_changes(
+    bytes: &[u8],
+    cursor: &mut usize,
+    source: &Template,
+    target: &Template,
+    version: u8,
+) -> Result<Vec<StructureChange>> {
+    let count = read_wire_usize(bytes, cursor)?;
+    if count > 1_000_000 {
+        return Err(Error::InvalidFormat(
+            "OTH durable structural change count exceeds the limit".to_string(),
+        ));
+    }
+    let mut changes = Vec::new();
+    changes
+        .try_reserve_exact(count)
+        .map_err(|source| Error::Allocation {
+            resource: "OTH durable structural changes",
+            source,
+        })?;
+    for _ in 0..count {
+        let kind = match read_wire_usize(bytes, cursor)? {
+            0 => StructureKind::Section,
+            1 => StructureKind::Note,
+            2 => StructureKind::Annotation,
+            3 => StructureKind::Table,
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "OTH durable structural selector kind is invalid".to_string(),
+                ));
+            },
+        };
+        let position = Position::new(read_wire_usize(bytes, cursor)?);
+        let selector = match kind {
+            StructureKind::Section => StructureSelector::Section(position),
+            StructureKind::Note => StructureSelector::Note(position),
+            StructureKind::Annotation => StructureSelector::Annotation(position),
+            StructureKind::Table => StructureSelector::Table(position),
+        };
+        let target_position = if version >= 5 {
+            Position::new(read_wire_usize(bytes, cursor)?)
+        } else {
+            position
+        };
+        let target_selector = StructureSelector::from_kind(kind, target_position);
+        let identity = if version >= 5 {
+            read_wire_optional_bytes(bytes, cursor)?
+                .map(|value| {
+                    String::from_utf8(value).map_err(|error| {
+                        Error::InvalidFormat(format!(
+                            "invalid OTH structural identity UTF-8: {error}"
+                        ))
+                    })
+                })
+                .transpose()?
+        } else {
+            None
+        };
+        if changes
+            .iter()
+            .any(|candidate: &StructureChange| candidate.selector == selector)
+        {
+            return Err(Error::InvalidFormat(
+                "OTH durable structural selector is duplicated".to_string(),
+            ));
+        }
+        let change = StructureChange {
+            selector,
+            target_selector,
+            identity,
+            before: read_wire_string(bytes, cursor)?,
+            after: read_wire_string(bytes, cursor)?,
+            before_xml: read_wire_string(bytes, cursor)?,
+            after_xml: read_wire_string(bytes, cursor)?,
+        };
+        let source_site = find_structure_site(source, selector)?;
+        let identity = change
+            .identity
+            .as_deref()
+            .or(source_site.identity.as_deref());
+        if let Some(identity) = identity {
+            if source_site.identity.as_deref() != Some(identity) {
+                return Err(Error::InvalidFormat(
+                    "OTH durable structural source identity failed exact readback".to_string(),
+                ));
+            }
+        }
+        let target_site = if change.identity.is_some() {
+            find_structure_site_by_identity(
+                target,
+                kind,
+                identity.ok_or_else(|| {
+                    Error::InvalidFormat("OTH durable structural identity is missing".to_string())
+                })?,
+            )?
+        } else {
+            find_structure_site(target, target_selector)?
+        };
+        if target_site.index != target_selector.position().get() {
+            return Err(Error::InvalidFormat(
+                "OTH durable structural target selector failed exact readback".to_string(),
+            ));
+        }
+        let source_xml = source.content_xml().get(source_site.full).ok_or_else(|| {
+            Error::InvalidFormat("OTH durable structural source span is invalid".to_string())
+        })?;
+        let target_xml = target.content_xml().get(target_site.full).ok_or_else(|| {
+            Error::InvalidFormat("OTH durable structural target span is invalid".to_string())
+        })?;
+        let source_text = source_site.text_value.as_deref().ok_or_else(|| {
+            Error::InvalidFormat(
+                "OTH durable structural source text is not replaceable".to_string(),
+            )
+        })?;
+        let target_text = target_site.text_value.as_deref().ok_or_else(|| {
+            Error::InvalidFormat(
+                "OTH durable structural target text is not replaceable".to_string(),
+            )
+        })?;
+        if change.before == change.after
+            || source_xml != change.before_xml
+            || target_xml != change.after_xml
+            || source_text != change.before
+            || target_text != change.after
+        {
+            return Err(Error::InvalidFormat(
+                "OTH durable structural change failed exact readback".to_string(),
+            ));
+        }
+        let mut change = change;
+        if change.identity.is_none() {
+            change.identity = source_site.identity.clone();
+        }
+        changes.push(change);
+    }
+    Ok(changes)
+}
+
+fn read_structure_lifecycle_changes(
+    bytes: &[u8],
+    cursor: &mut usize,
+    source: &Template,
+    target: &Template,
+) -> Result<Vec<StructureLifecycleChange>> {
+    let count = read_wire_usize(bytes, cursor)?;
+    if count > 1_000_000 {
+        return Err(Error::InvalidFormat(
+            "OTH durable structural lifecycle count exceeds the limit".to_string(),
+        ));
+    }
+    let mut changes = Vec::new();
+    changes
+        .try_reserve_exact(count)
+        .map_err(|source| Error::Allocation {
+            resource: "OTH durable structural lifecycle changes",
+            source,
+        })?;
+    for _ in 0..count {
+        let kind = match read_wire_usize(bytes, cursor)? {
+            0 => StructureKind::Section,
+            1 => StructureKind::Note,
+            2 => StructureKind::Annotation,
+            3 => StructureKind::Table,
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "OTH durable structural lifecycle kind is invalid".to_string(),
+                ));
+            },
+        };
+        let operation = read_wire_usize(bytes, cursor)?;
+        if operation > 1 {
+            return Err(Error::InvalidFormat(
+                "OTH durable structural lifecycle operation is invalid".to_string(),
+            ));
+        }
+        let selector =
+            StructureSelector::from_kind(kind, Position::new(read_wire_usize(bytes, cursor)?));
+        let identity = read_wire_string(bytes, cursor)?;
+        if identity.is_empty() {
+            return Err(Error::InvalidFormat(
+                "OTH durable structural lifecycle identity is empty".to_string(),
+            ));
+        }
+        let before_xml = read_wire_optional_bytes(bytes, cursor)?
+            .map(|value| {
+                String::from_utf8(value).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid OTH lifecycle source UTF-8: {error}"))
+                })
+            })
+            .transpose()?;
+        let after_xml = read_wire_optional_bytes(bytes, cursor)?
+            .map(|value| {
+                String::from_utf8(value).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid OTH lifecycle target UTF-8: {error}"))
+                })
+            })
+            .transpose()?;
+        let valid_shape = if operation == 0 {
+            before_xml.is_none() && after_xml.is_some()
+        } else {
+            before_xml.is_some() && after_xml.is_none()
+        };
+        if !valid_shape {
+            return Err(Error::InvalidFormat(
+                "OTH durable structural lifecycle before/after shape is invalid".to_string(),
+            ));
+        }
+        let change = StructureLifecycleChange {
+            selector,
+            kind,
+            identity,
+            before_xml,
+            after_xml,
+        };
+        if changes.iter().any(|candidate: &StructureLifecycleChange| {
+            lifecycle_changes_overlap(candidate, &change)
+        }) {
+            return Err(Error::InvalidFormat(
+                "OTH durable structural lifecycle selector is duplicated".to_string(),
+            ));
+        }
+        if change.is_insertion() {
+            if find_structure_site_by_identity(source, kind, &change.identity).is_ok() {
+                return Err(Error::InvalidFormat(
+                    "OTH durable structural insertion source identity already exists".to_string(),
+                ));
+            }
+            let target_site = find_structure_site_by_identity(target, kind, &change.identity)?;
+            let target_xml = target.content_xml().get(target_site.full).ok_or_else(|| {
+                Error::InvalidFormat(
+                    "OTH durable structural insertion target span is invalid".to_string(),
+                )
+            })?;
+            if Some(target_xml) != change.after_xml.as_deref() {
+                return Err(Error::InvalidFormat(
+                    "OTH durable structural insertion failed exact readback".to_string(),
+                ));
+            }
+        } else {
+            let source_site = find_structure_site(source, selector)?;
+            let source_xml = source.content_xml().get(source_site.full).ok_or_else(|| {
+                Error::InvalidFormat(
+                    "OTH durable structural removal source span is invalid".to_string(),
+                )
+            })?;
+            if source_site.identity.as_deref() != Some(change.identity.as_str())
+                || Some(source_xml) != change.before_xml.as_deref()
+                || find_structure_site_by_identity(target, kind, &change.identity).is_ok()
+            {
+                return Err(Error::InvalidFormat(
+                    "OTH durable structural removal failed exact readback".to_string(),
+                ));
+            }
+        }
+        changes.push(change);
+    }
+    Ok(changes)
+}
+
 fn part_change_between(before: Option<&str>, after: Option<&str>) -> PartChange {
     match (before, after) {
         (left, right) if left == right => PartChange::Keep,
@@ -4423,9 +5958,14 @@ fn replace_texts(
     list_changes: &[ListChange],
     appended: &[crate::ContentBlock],
     durable_fragment: Option<&str>,
+    structure_changes: &[StructureChange],
+    structure_lifecycle_changes: &[StructureLifecycleChange],
 ) -> Result<String> {
-    let has_append =
-        !appended.is_empty() || durable_fragment.is_some_and(|value| !value.is_empty());
+    let has_append = !appended.is_empty()
+        || durable_fragment.is_some_and(|value| !value.is_empty())
+        || structure_lifecycle_changes
+            .iter()
+            .any(StructureLifecycleChange::is_insertion);
     let mut replacements = Vec::new();
     replacements
         .try_reserve_exact(
@@ -4436,6 +5976,8 @@ fn replace_texts(
                 .saturating_add(usize::from(forms_change.is_some()))
                 .saturating_add(resource_changes.len())
                 .saturating_add(list_changes.len())
+                .saturating_add(structure_changes.len())
+                .saturating_add(structure_lifecycle_changes.len())
                 .saturating_add(usize::from(has_append)),
         )
         .map_err(|allocation_error| Error::Allocation {
@@ -4457,6 +5999,74 @@ fn replace_texts(
             .heading_replacement_site(change.heading.get())
             .ok_or_else(|| Error::InvalidFormat("OTH heading edit site disappeared".to_string()))?;
         replacements.push((site.clone(), quick_xml::escape::escape(&change.after)));
+    }
+    for change in structure_changes {
+        let site = find_structure_site(source, change.selector)?;
+        let actual_xml = source.content_xml().get(site.full.clone()).ok_or_else(|| {
+            Error::InvalidFormat("OTH structural source span is invalid".to_string())
+        })?;
+        let actual_text = site.text_value.as_deref().ok_or_else(|| {
+            Error::InvalidFormat(
+                "OTH structural text site is not losslessly replaceable".to_string(),
+            )
+        })?;
+        let text_site = site.text.as_ref().ok_or_else(|| {
+            Error::InvalidFormat("OTH structural text replacement site is missing".to_string())
+        })?;
+        if actual_xml != change.before_xml || actual_text != change.before {
+            return Err(Error::InvalidFormat(
+                "OTH structural edit source precondition failed".to_string(),
+            ));
+        }
+        replacements.push((text_site.clone(), quick_xml::escape::escape(&change.after)));
+    }
+    let mut structure_tail = String::new();
+    for change in structure_lifecycle_changes {
+        match (change.before_xml.as_deref(), change.after_xml.as_deref()) {
+            (Some(before_xml), None) => {
+                let site = find_structure_site(source, change.selector)?;
+                let actual_xml = source.content_xml().get(site.full.clone()).ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "OTH structural removal source span is invalid".to_string(),
+                    )
+                })?;
+                if actual_xml != before_xml
+                    || site.kind.to_public() != change.kind
+                    || site.identity.as_deref() != Some(change.identity.as_str())
+                {
+                    return Err(Error::InvalidFormat(
+                        "OTH structural removal source precondition failed".to_string(),
+                    ));
+                }
+                replacements.push((
+                    crate::codec::ReplacementSite {
+                        prefix: String::new(),
+                        range: site.full,
+                        suffix: String::new(),
+                    },
+                    std::borrow::Cow::Borrowed(""),
+                ));
+            },
+            (None, Some(after_xml)) => {
+                if find_structure_site_by_identity(source, change.kind, &change.identity).is_ok() {
+                    return Err(Error::InvalidFormat(
+                        "OTH structural insertion identity is already present".to_string(),
+                    ));
+                }
+                structure_tail
+                    .try_reserve(after_xml.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "OTH structural insertion tail",
+                        source,
+                    })?;
+                structure_tail.push_str(after_xml);
+            },
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "OTH structural lifecycle operation has invalid before/after state".to_string(),
+                ));
+            },
+        }
     }
     for change in inline_changes {
         let site = match change.block {
@@ -4560,12 +6170,13 @@ fn replace_texts(
         }
         replacements.push((site, std::borrow::Cow::Borrowed(change.after_xml.as_str())));
     }
-    if has_append || !resource_tail.is_empty() {
+    if has_append || !resource_tail.is_empty() || !structure_tail.is_empty() {
         let mut fragment = match durable_fragment {
             Some(fragment) => fragment.to_owned(),
             None => crate::authoring::render_fragment(appended)?,
         };
         fragment.push_str(&resource_tail);
+        fragment.push_str(&structure_tail);
         replacements.push((
             crate::codec::ReplacementSite {
                 prefix: String::new(),
@@ -4579,9 +6190,21 @@ fn replace_texts(
 
     let input = source.content_xml();
     let mut capacity = input.len();
+    let mut has_previous = false;
+    let mut previous_start = 0;
     let mut previous_end = 0;
     for (site, replacement) in &replacements {
+        let empty_overlaps = has_previous
+            && site.range.start == site.range.end
+            && site.range.start >= previous_start
+            && site.range.start <= previous_end;
+        let previous_empty_overlaps = has_previous
+            && previous_start == previous_end
+            && site.range.start <= previous_start
+            && site.range.end >= previous_start;
         if site.range.start < previous_end
+            || empty_overlaps
+            || previous_empty_overlaps
             || site.range.start > site.range.end
             || site.range.end > input.len()
         {
@@ -4589,6 +6212,8 @@ fn replace_texts(
                 "OTH paragraph source spans overlap or are invalid".to_string(),
             ));
         }
+        has_previous = true;
+        previous_start = site.range.start;
         previous_end = site.range.end;
         capacity = capacity
             .checked_sub(site.range.end - site.range.start)

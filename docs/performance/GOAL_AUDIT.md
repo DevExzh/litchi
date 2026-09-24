@@ -4275,6 +4275,59 @@ parallel-scaling and comprehensive CRUD evidence is not established by this
 batch. Existing caches and publication checks retain their bounds. The full
 non-iWork goal remains open; no completion or general speedup claim follows.
 
+## Evidence scope as of 2026-09-10
+
+The [0470 authority record](changes/0470-performance-authority-reconciliation.md)
+binds each published measurement to its source and keeps the full performance
+program open. The allocator publication proves its 201-row resource contract;
+its instrumented elapsed values are excluded from latency claims. The older
+normal report measures `1b3f2c2d`, and the three-repeat normal control measures
+`995bdaf09`. These code snapshots predate later feature changes. Documentation
+commits do not themselves invalidate a measurement; release evidence must match
+the measured production source and binary identities.
+
+The [accepted XLSX optimization](results/xlsx-plain-cell-tag-20260910/README.md)
+records 5.568% lower pooled normal p50, 20.559% fewer allocation calls and
+7.079% fewer allocated bytes for one dense-wide commit/save workload against
+historical base `995bdaf09`. Region peak increased by four bytes. The separate
+[paired scaling publication](results/paired-scaling-cf98-20260910/README.md)
+retains descriptive fixed-work and simulated-range evidence without a common
+Amdahl or production-wide scaling claim.
+
+The [sparse verification scanner](../report/spec-gap-validation-evidence/xlsx-scanner-v8/README.md)
+is committed in `6f281e386`. Its separate historical matched pair shares base
+`21d5fb0be`: 40 normal samples per side show 8.460474% lower median, 7.868794%
+lower nearest-rank p95 and 7.515784% lower p99. Operation-scoped allocator calls
+fall 20.897961% and allocated bytes 32.814253%; reallocations rise 0.315610%.
+These observations are not a combined gain with the earlier optimization and do
+not measure the later integration head. The exact delta passed 1,437 tests and
+strict gates on integration base `de80c3824`. A portable bundle retains all 31
+raw outputs and independently recomputes the historical statistics without
+executing the measured binaries; root verified a fresh extraction unchanged.
+
+The [provider/sink implementation](results/provider-sinks-validation-v3-20260910/README.md)
+is committed with four opt-in axes and unchanged default selection. The
+[verified capture](results/provider-sinks-capture-v3-20260910/README.md), published
+in `c44a1ac0c`, retains 18 provider/sink rows and 603 default rows from source
+`cab92a6bb`, with 15 samples per row after three warmups. This historical
+observation makes no gain claim: corpus verification establishes identity only,
+filesystem cold requests are advisory, and range reads are simulated. A baseline
+covering the later feature source remains open.
+The [dated 264-row audit](results/performance-requirements-audit-20260910/README.md)
+retains its original counts (10 complete, 99 incomplete, 116 weak, 39 missing),
+not a current completion score. The authority record lists eight remaining
+work classes. ADR-0005 and ADR-0008 remain open for their full applicable
+latency, resource, I/O, corpus, native/readback, scaling and release evidence.
+
+The active Phase-1 matrix is
+[`crud-coverage-index-v2.json`](crud-coverage-index-v2.json). It binds all 443
+current `Case::name` selectors by ordered list and SHA-256, and records whether
+each selector is a representative mapping or an explicit exclusion. The
+unchanged [`crud-coverage-index-v1.json`](crud-coverage-index-v1.json) remains
+the historical publication snapshot. Version 2 does not add timing evidence:
+`measured` still requires a validated full-run report, while
+`correctness-only` and `unsupported` remain non-timing statuses.
+
 ## Current audit: 0466 dense XLSX investigation (2026-09-08)
 
 [0466](changes/0466-xlsx-dense-commit-profile.md) advances the required
@@ -5400,6 +5453,7 @@ ADRs 0010/0011.
 | Scoped claims | The strict registry currently validates 10 claims. 0501 retains 208 comparison rows and 52 favorable flags; 0502 retains a matched timing summary and an explicit regression review. | Claims are scoped to named workflows and evidence; they do not establish program completion. |
 | Correctness and boundaries | Recent bundles retain source/build manifests, exact output/source oracles, budget/cancellation tests, preservation checks, and ADR matrices; 0495–0497 cover managed edit and an atomic logical-tail capability. | Strong scoped DOCX/OPC and ODG correctness/custody evidence; general atomic save, all formats, and full CRUD remain unproven. |
 | Provider and cache states | 0491 and 0494 cover owned, file, instrumented, short, simulated delayed/range, and verified-cold DOCX lanes; 0492/0493 measure and integrate bounded read-ahead. | Descriptive and opt-in evidence only. Genuine borrowed lifetimes, physical-device cold behavior, native producers, and cross-format intersections remain open. |
+| Verified-cold per-file state evidence | The isolated change-0496 candidate retains the existing fresh-child pre-operation `fincore` proof and adds an outside-timer post-operation `fincore_post` observation with size/provenance matching, explicit `ineligible_post_fincore` failure, and no cache-mode fallback. A private ext4 host probe passed without global cache eviction; focused Rust/90 Python validator tests, `cargo check --lib`, and warning-denied Clippy pass. | Scoped harness capability only; no workload capture, cold-cache speedup, physical-I/O claim, or full-goal completion follows. |
 | Hardware/resource profiling | 0490 sync traces, 0496 phase clocks, 0501 whole-child profiles, 0502 heaptrack/layout observations, and allocator/RSS reports are retained with scope limits. Hardware counters are unavailable for 0502. | Attribution is partial: whole-child/setup-inclusive evidence is not operation-local CPU, allocation, or RSS proof; lock-wait and full scaling evidence remain open. |
 | Parallelism and batching | 0498/0499 provide explicit bounded ordered Part batches, and 0500 measures managed paragraph batching; adverse local rows and serial controls remain visible. | Partial capability evidence. Full lifecycle 1/2/4/8 scaling, serial-fraction/Amdahl analysis, and stable lock-contention evidence remain open. |
 

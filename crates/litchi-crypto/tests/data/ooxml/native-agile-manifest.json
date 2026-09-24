@@ -1,0 +1,22 @@
+{
+  "generator": "msoffcrypto-tool",
+  "version": "6.0.0",
+  "provenance_kind": "third_party_synthetic_not_native_office",
+  "source": "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx",
+  "source_sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e",
+  "encrypted_sha256": "4202f94dfc3d11ac64d5115e74d35e97cb9f96e09ef01d68b31ae04d10e61ac3",
+  "password": "Litchi synthetic crypto fixture 2026",
+  "clear_bytes": 25636,
+  "encrypted_bytes": 31232,
+  "profile": "Agile AES-256 CBC SHA-512, spinCount=100000, dataIntegrity present",
+  "independent_decrypt_integrity": true,
+  "fixture_copy": "msoffcrypto-agile-aes256-sha512-valid-graph.docx",
+  "fixture_sha256": "65eb57739477b8a89f2be7c1188afd28caf88c3841b03797ae6035c37a1dabc4",
+  "fixture_bytes": 31232,
+  "dataspaces_normalization": {
+    "field": "StrongEncryptionTransform/\\x06Primary/EncryptionBlockSize",
+    "original_value": 0,
+    "fixture_value": 16,
+    "scope": "CFB advisory graph field only; EncryptionInfo and EncryptedPackage unchanged"
+  }
+}

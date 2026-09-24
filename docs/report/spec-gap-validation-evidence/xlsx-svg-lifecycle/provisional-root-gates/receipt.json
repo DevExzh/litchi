@@ -1,0 +1,38 @@
+{
+  "status": "provisional gates passed; independent resource review pending",
+  "created_utc": "2026-09-11T21:23:44.900871+00:00",
+  "base_commit": "dc8087e81c3626d5d2e9f0bc7b217127761a766f",
+  "overlay_files": 13,
+  "copied_inputs_match_shared_tree": true,
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "gates": [
+    {
+      "command": "cargo test --locked --offline -p litchi-xlsx --test drawing_svg_lifecycle --test drawing_svg_read --no-fail-fast",
+      "exit_code": 0,
+      "passed": 51
+    },
+    {
+      "command": "cargo test --locked --offline -p litchi-xlsx --lib --no-fail-fast",
+      "exit_code": 0,
+      "passed": 1105
+    },
+    {
+      "command": "cargo clippy --locked --offline -p litchi-xlsx --test drawing_svg_lifecycle --test drawing_svg_read -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "RUSTDOCFLAGS=\"-D warnings\" cargo doc --locked --offline -p litchi-xlsx --no-deps",
+      "exit_code": 0
+    }
+  ],
+  "setup_failure": "Initial --locked invocation failed because the base checkout lacks the ignored root Cargo.lock; copied the shared pinned lockfile, recorded its hash, and reran. Original setup log retained.",
+  "artifacts": {
+    "inputs.json": "d6ac40b37a8845364c6144464f028c03c51db8c43e75582c29d52a04c6309de5",
+    "root-clippy.log.gz": "f14eb07c4f8c10afa34854b896b53e1c3c9998dcc7fd97c4bd15c0ddddda297e",
+    "root-focused-locked.log.gz": "bdabf0707aa74969af9e834732ac938febd19cc0e5c20fdfbb0b59bbefa3887b",
+    "root-focused.log.gz": "af728bc1b080e617b4ae7fbf7173035889fac990d1899bde93c994a1ca379fb8",
+    "root-library.log.gz": "968409877ae32d5e953e075e69496815fc49826e65e7bd640a745ddffeeb8960",
+    "root-rustdoc.log.gz": "004d05e854353870ad6f5b034e8e897dedc40ee926a412026c17a36625718f30",
+    "source-overlay.tar.gz": "2eee523189237c98a08b9bf5563aaaad329bc574945d9893148fe23e1885eb6a"
+  }
+}

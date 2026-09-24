@@ -1,0 +1,53 @@
+{
+  "actor": "root",
+  "candidate": "/var/tmp/litchi-provider-sinks-validation-v3-20260910",
+  "base_commit": "995bdaf09352297bde17e6ed7d986360f8c10134",
+  "head_before": "73f7a1a4437d11136937f68da90e19c63f9af694",
+  "paths": [
+    {
+      "path": "tools/perf-baseline/src/lib.rs",
+      "preimage_sha256": "6437a6706436588fb6e3ae9259a70e61b1a3501761e800904d99962ea1f596c8",
+      "candidate_sha256": "3175625ac6bc32909e9a8c72cb958e8fadaf0c0c9f7832252208a3bc192cefe7"
+    },
+    {
+      "path": "tools/perf-baseline/src/filesystem.rs",
+      "preimage_sha256": "6d43007bd84cecef4c8bcab353344cce477f453234886c98493380c95fe3084f",
+      "candidate_sha256": "8a148a0107856f8bd2db07faacf27e2f344811845ce691a95214ee577d46d773"
+    }
+  ],
+  "patch_sha256": "2b4a0dccce2fc131779940917e8df7a7937ec4e9c3a8f6720631b9d47f846694",
+  "root_v2_full_test_gate": {
+    "exit_code": 101,
+    "passed": 366,
+    "failed": 1,
+    "ignored": 1,
+    "reason": "Old selectable count439; four added opt-in cases make443.",
+    "raw_log_sha256": "093a1902af10cd7e432cfdea1dd4b8c716273a73545c5ec4615d519bb0cba5aa"
+  },
+  "v2_to_v3_delta": "Only enumeration test/comment change; production sources identical. Root inspected exact diff.",
+  "preparer_v3_full_test_gate": {
+    "passed": 367,
+    "failed": 0,
+    "ignored": 1,
+    "evidence": "Preparer terminal summary, not a root full-suite run."
+  },
+  "root_v3_gates": {
+    "enumeration": {
+      "exit_code": 0,
+      "raw_log_sha256": "b06f3644d44b7fe3e15c888acde71a4f7342ca37ea47d234ef900683f935284f"
+    },
+    "provider-tests": {
+      "exit_code": 0,
+      "raw_log_sha256": "1519290c79463816a76341cc1aa5361fae6f0c00c4fd1f5178b676247eab2af8"
+    },
+    "clippy": {
+      "exit_code": 0,
+      "raw_log_sha256": "efbe714146cf8404a1c2e821df4515a2b9795f4e550aee5db4cc65144a93763e"
+    },
+    "rustfmt": {
+      "exit_code": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "timed_benchmark_capture": false
+}

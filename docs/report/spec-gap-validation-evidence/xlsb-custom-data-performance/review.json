@@ -1,0 +1,22 @@
+{
+  "scope": "Synthetic candidate-only XLSB Custom Data lifecycle characterization",
+  "verdict": "approved after independent re-review and root replay",
+  "source_commit": "16102fe751d7c5492042330f1bd1f49c304495f0",
+  "binary_sha256": "0478b3a60912be4d6909fb203b37581ff7363811d1c5689ba4ee494c60b94710",
+  "source_manifest_sha256": "f07d93ecdccc0ccb6844f783f8f2371d97bb246d56857d3c68b6f6e2890d7fe8",
+  "verified": [
+    "120 samples across 24 groups in canonical, replay, and root runs",
+    "Complete per-ID reference map including zero counts",
+    "Prepared forward candidate validation and hash for patchinverse",
+    "Exact expected payloads and inverse bytes",
+    "Reports match selected receipt summaries"
+  ],
+  "limitations": [
+    "Synthetic fixtures; no native or Office acceptance claim",
+    "No baseline or speedup claim",
+    "Instrumented timings; five-sample descriptive statistics",
+    "Allocator totals vary across mixed insert/remove replay samples",
+    "Logical allocator peak excludes hidden realloc overlap"
+  ],
+  "reviewer": "/root/xlsb_custom_data_perf_review"
+}

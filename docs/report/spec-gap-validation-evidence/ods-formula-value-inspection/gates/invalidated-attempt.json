@@ -1,0 +1,6 @@
+{
+  "status": "invalidated",
+  "reason": "Concurrent gate-script self-check removed isolated Cargo.lock during candidate gate execution; all gates will be rerun after restoring the frozen lock.",
+  "working_tree_lock_unchanged": "aa945c79965460e74a64063e1c45396eaae7a68e71072730e2bc426cded22f02",
+  "restored_gate_lock": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3"
+}

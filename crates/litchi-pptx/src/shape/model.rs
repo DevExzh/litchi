@@ -133,6 +133,26 @@ impl TextSpan {
 pub(super) struct PlaceholderRecord {
     pub(super) kind: Option<TextSpan>,
     pub(super) index: u32,
+    pub(super) type_extension: Option<PlaceholderTypeExtension>,
+}
+
+/// PowerPoint 2023 placeholder type extension (`p232:phTypeExt`).
+///
+/// This is the stable owner URI used by this crate for the generic
+/// `p:CT_Extension` entry that contains the p232 payload. The local p232
+/// schema defines the child namespace and grammar but does not assign a
+/// separate extension GUID. The extension is metadata only; it does not imply
+/// that the library can render or otherwise interpret the placeholder
+/// payload.
+pub const PLACEHOLDER_TYPE_EXTENSION_URI: &str = "urn:litchi:pptx:p232:phTypeExt";
+
+/// The schema-defined alternatives of `p232:phTypeExt/p232:type`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PlaceholderTypeExtension {
+    /// A cameo placeholder (`p232:type/p232:cameo`).
+    Cameo,
+    /// An explicitly unknown placeholder type (`p232:type/p232:unknown`).
+    Unknown,
 }
 
 /// Placeholder metadata declared by one shape.
@@ -140,6 +160,7 @@ pub(super) struct PlaceholderRecord {
 pub struct Placeholder<'a> {
     kind: Option<&'a str>,
     index: u32,
+    type_extension: Option<PlaceholderTypeExtension>,
 }
 
 impl<'a> Placeholder<'a> {
@@ -158,6 +179,13 @@ impl<'a> Placeholder<'a> {
     #[must_use]
     pub const fn index(self) -> u32 {
         self.index
+    }
+
+    /// PowerPoint 2023 placeholder type extension, when present and valid.
+    #[inline]
+    #[must_use]
+    pub const fn type_extension(self) -> Option<PlaceholderTypeExtension> {
+        self.type_extension
     }
 }
 
@@ -300,6 +328,7 @@ impl<'a> Common<'a> {
         Some(Placeholder {
             kind: value.kind.and_then(|span| span.get(self.strings)),
             index: value.index,
+            type_extension: value.type_extension,
         })
     }
 

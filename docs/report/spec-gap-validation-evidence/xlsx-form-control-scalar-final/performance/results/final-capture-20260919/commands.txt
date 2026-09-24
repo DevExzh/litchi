@@ -1,0 +1,8 @@
+source_root=/tmp/litchi-form-control-final
+fixture_root=/tmp/litchi-form-control-final/crates/litchi-xlsx/tests/fixtures/form_control_properties
+binary=/tmp/litchi-form-scalar-target.VKpqSG/release/xlsx-form-control-scalar-perf
+warmups=3
+iterations=15
+--fixture singlecontrol.xlsx --label singlecontrol --expected-controls 1
+--fixture tdf120301_xmlSpaceParsing.xlsx --label tdf120301_xmlSpaceParsing --expected-controls 2 --field NoThreeD
+--fixture tdf134769.xlsx --label tdf134769 --expected-controls 1 --field NoThreeD

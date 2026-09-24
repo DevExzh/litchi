@@ -1,0 +1,1 @@
+cargo +1.95.0 build --release --locked --offline --target-dir /var/tmp/litchi-xlsb-binary-index-final-target --jobs 2 -p litchi-xlsb --example binary_index_profile 

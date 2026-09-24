@@ -166,6 +166,43 @@ fn source_xml_publication_preserves_formatted_bytes_and_emits_checked_fragment()
 }
 
 #[test]
+fn empty_fragment_deletes_only_the_authorized_source_range() {
+    let package = open(FORMATTED_DOCUMENT);
+    let source = package.part(&document_uri()).unwrap().source_xml().unwrap();
+    let range = before_range(source.bytes());
+    let proof = source
+        .checked_range(range.clone(), &source.bytes()[range.clone()])
+        .unwrap();
+    let expected = [
+        &FORMATTED_DOCUMENT[..range.start],
+        &FORMATTED_DOCUMENT[range.end..],
+    ]
+    .concat();
+    let mut publication = source.into_publication().unwrap();
+    publication
+        .replace(proof, AuthoredXmlFragment::empty())
+        .unwrap();
+    let edited = publication.finish().unwrap();
+    assert_eq!(edited.bytes(), expected);
+
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_replace_source_xml_part(document_uri(), edited)
+        .unwrap();
+    let mut output = Vec::new();
+    package.write_topology_to_stream(&mut output, plan).unwrap();
+    let reopened = SourceBackedPackage::from_vec(output).unwrap();
+    assert_eq!(
+        reopened
+            .part(&document_uri())
+            .unwrap()
+            .data()
+            .unwrap()
+            .as_bytes(),
+        expected
+    );
+}
+
+#[test]
 fn the_authored_classifier_still_separates_compact_from_formatted_xml() {
     // Change 0657 stopped making compactness a publication refusal on the
     // source-backed replacement route: a replacement there is a splice of the

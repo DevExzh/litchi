@@ -1,0 +1,15 @@
+{
+  "group": "ast-abab",
+  "variants": [
+    "baseline",
+    "candidate"
+  ],
+  "cases": [
+    "expr-array-1024",
+    "expr-reference-1024"
+  ],
+  "rounds": 4,
+  "warmups": 3,
+  "iterations": 15,
+  "repeat": 32
+}

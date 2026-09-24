@@ -1,0 +1,8 @@
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi-spec-gaps/crates/xml-minifier-macros)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/soapberry-zip)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-core)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi-spec-gaps/crates/xml-minifier)
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-odf-common)
+ Documenting litchi-ods v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-ods)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.28s
+   Generated /var/tmp/ods-tokenizer-root-gates-target/doc/litchi_ods/index.html

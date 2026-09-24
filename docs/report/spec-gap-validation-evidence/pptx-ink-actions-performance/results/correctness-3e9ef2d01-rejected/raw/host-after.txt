@@ -1,0 +1,14 @@
+capture_head=3e9ef2d014a2f70bbbca18b824aa50a1567cdcc7
+semantic_owner_commit=cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd
+production_source_baseline_commit=2a2ffa1cae4e6b7070082768ce84483e5d411dc8
+uname=uname_result(system='Linux', node='ip-172-31-39-190', release='7.0.0-1012-aws', version='#12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026', machine='x86_64')
+hostname=ip-172-31-39-190
+loadavg=5.49267578125 2.13671875 1.654296875
+cpu_model=AMD EPYC 9R45
+memory=129447068 kB
+cwd=/var/tmp/litchi-pptx-ink-actions-profiler-3e9ef2d01-preflight
+cargo_target_dir=/var/tmp/pptx-ink-actions-3e9ef2d01-target-parent.onUULP/target
+RUSTFLAGS=None
+CARGO_ENCODED_RUSTFLAGS=None
+RUSTC_BOOTSTRAP=None
+RUSTDOCFLAGS=None

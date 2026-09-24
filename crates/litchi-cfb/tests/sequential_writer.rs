@@ -60,6 +60,81 @@ fn mixed_minifat_fat_nested_storage_clsids_reopen() {
 }
 
 #[test]
+fn sequential_directory_metadata_is_exact_and_defaults_are_zeroed() {
+    let mut writer = SequentialOleWriter::new();
+    writer.set_root_state_bits(0x1020_3040);
+    writer.set_root_creation_time(0).unwrap();
+    writer.set_root_modified_time(0x1112_1314_1516_1718);
+    writer.create_storage(&["Storage"]).unwrap();
+    writer
+        .set_storage_metadata(
+            &["Storage"],
+            0xA5A5_5A5A,
+            0xFEDC_BA98_7654_3210,
+            0x0123_4567_89AB_CDEF,
+        )
+        .unwrap();
+    writer
+        .add_stream(&["Storage", "Payload"], 7, Cursor::new(b"payload".to_vec()))
+        .unwrap();
+    writer
+        .set_stream_metadata(
+            &["Storage", "Payload"],
+            0xCAFEBABE,
+            0x8877_6655_4433_2211,
+            0x1100_FFEE_DDCC_BBAA,
+        )
+        .unwrap();
+    writer
+        .add_stream(&["Fresh"], 5, Cursor::new(b"fresh".to_vec()))
+        .unwrap();
+
+    let bytes = publish(writer);
+    let file = OleFile::open(Cursor::new(bytes)).unwrap();
+    let root = file.root_entry().unwrap();
+    assert_eq!(root.state_bits, 0x1020_3040);
+    assert_eq!(root.creation_time, 0);
+    assert_eq!(root.modified_time, 0x1112_1314_1516_1718);
+    let storage = file
+        .list_directory_entries(&[])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "Storage")
+        .unwrap();
+    assert_eq!(storage.state_bits, 0xA5A5_5A5A);
+    assert_eq!(storage.creation_time, 0xFEDC_BA98_7654_3210);
+    assert_eq!(storage.modified_time, 0x0123_4567_89AB_CDEF);
+    let fresh = file
+        .list_directory_entries(&[])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "Fresh")
+        .unwrap();
+    assert_eq!(fresh.state_bits, 0);
+    assert_eq!(fresh.creation_time, 0);
+    assert_eq!(fresh.modified_time, 0);
+    let stream = file
+        .list_directory_entries(&["Storage"])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "Payload")
+        .unwrap();
+    assert_eq!(stream.state_bits, 0xCAFEBABE);
+    assert_eq!(stream.creation_time, 0x8877_6655_4433_2211);
+    assert_eq!(stream.modified_time, 0x1100_FFEE_DDCC_BBAA);
+}
+
+#[test]
+fn sequential_fresh_root_creation_time_rejects_nonzero_without_mutation() {
+    let mut writer = SequentialOleWriter::new();
+    assert!(writer.set_root_creation_time(1).is_err());
+
+    let bytes = publish(writer);
+    let file = OleFile::open(Cursor::new(bytes)).unwrap();
+    assert_eq!(file.root_entry().unwrap().creation_time, 0);
+}
+
+#[test]
 fn sector_size_4096_and_current_writer_wire_parity() {
     let mut sequential = SequentialOleWriter::with_sector_size(4096).unwrap();
     sequential

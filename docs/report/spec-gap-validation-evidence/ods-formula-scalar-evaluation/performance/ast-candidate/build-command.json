@@ -1,0 +1,19 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--release",
+    "--manifest-path",
+    "docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/performance/ast-harness/Cargo.toml"
+  ],
+  "cwd": "/var/tmp/ods-scalar-worktree",
+  "env": {
+    "CARGO_TARGET_DIR": "/var/tmp/ods-scalar-target",
+    "TMPDIR": "/var/tmp/ods-scalar-tmp"
+  },
+  "started_at": "2026-09-13T11:39:42.802754Z",
+  "finished_at": "2026-09-13T11:39:43.196300Z",
+  "status": 0
+}

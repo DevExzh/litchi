@@ -1,0 +1,167 @@
+{
+  "verified_utc": "2026-09-13T05:17:58.788843+00:00",
+  "baseline_commit": "5347801fc2e8086d67fc6c140a023aeedd260c91",
+  "source_sha256": {
+    "crates/litchi-ods/src/authoring/mutable.rs": "cf50c89c0dc4aea48ef37362199ea4cd3103a1198ed12a8409e9b10c172ae57f",
+    "crates/litchi-ods/src/facade/mod.rs": "5e5a23698cdf3918dc9576ead1cc43bed2c6354c09a7674ea7a49e03910be9ec",
+    "crates/litchi-ods/src/facade/source.rs": "af69bfa318bec97ade9da279ee7cb19fd3fe302d84e4acb8a53e3565fffd0daa",
+    "crates/litchi-ods/src/model/dde/lexical.rs": "cc67145d64775ea993797c927639b4c98c100ada47e23df06e6429139686e427",
+    "crates/litchi-ods/src/model/dde/source_backed.rs": "38225c1d3d40008fe60008b86cc81a398d64ff95955cab964d73fd0829fdc35b",
+    "crates/litchi-ods/src/model/dde/transaction.rs": "bce59b24064e017d0a3f3cf945594fdd9870e84cdeda513d076ea9c86fc1bc4c",
+    "crates/litchi-ods/src/model/dde.rs": "98c15134cd0a89fd16e4aa8e2b7fc22aa4f1e10c5189a125f0a9186e3976f4d8",
+    "crates/litchi-ods/tests/ods_dde_facades.rs": "cd952632f5cb8252a5e6ad47a78a3179fb1864501c2afd0a207705ab4d285468",
+    "crates/litchi-ods/tests/ods_dde_transactions.rs": "5bad85510fcf7b2444e9b37ea254bd16d14c42b13ff6b6ab97b982da2660064b"
+  },
+  "source_unchanged_across_final_gates": true,
+  "gates": [
+    {
+      "gate": "all-targets",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--all-targets"
+      ],
+      "exit_code": 0
+    },
+    {
+      "gate": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    },
+    {
+      "gate": "rustdoc",
+      "command": [
+        "cargo",
+        "doc",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--no-deps"
+      ],
+      "exit_code": 0
+    },
+    {
+      "gate": "doctests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--doc"
+      ],
+      "exit_code": 0
+    },
+    {
+      "gate": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-ods",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0
+    },
+    {
+      "gate": "api-authoring-runner-final",
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "docs/report/spec-gap-validation-evidence/ods-dde-transactions/authoring-runner/Cargo.toml",
+        "--",
+        "docs/report/spec-gap-validation-evidence/ods-dde-transactions/fixtures/api-authored-content.xml"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "all_targets": {
+    "passed": 770,
+    "targets": 45,
+    "environment": "shared working tree"
+  },
+  "isolated_dde_tests": {
+    "passed": 45,
+    "targets": 2,
+    "environment": "baseline checkout with only scoped ODS overlay"
+  },
+  "api_fixture": {
+    "sha256": "c325938c04decebaf32eb0296ade4189a9da3a5d7d8df50c50e8db3659d631b8",
+    "whole_odf_14_rng_valid": true,
+    "dde_owner_count": 3,
+    "cache_prose_checks_pass": true,
+    "independent_lxml_control_values_and_empty_cache_pass": true,
+    "native_save_reopen_tested": false
+  },
+  "performance_receipts": {
+    "baseline": {
+      "count": 6,
+      "all_exit_zero": true,
+      "csv_matches_stdout_and_rss": true,
+      "raw_csv_sha256": "a9197e1a0716e3c0db21e086d3a9129a126a4c7d86372f52b6fefacf712e8f42"
+    },
+    "candidate": {
+      "count": 18,
+      "all_exit_zero": true,
+      "csv_matches_stdout_and_rss": true,
+      "raw_csv_sha256": "6566b32570dac184057810fb5a2dd39e42fca0441def6940329f5ce6a8723e58"
+    }
+  },
+  "performance_large_parse": {
+    "baseline_p50_ns": 8203595,
+    "candidate_p50_ns": 29905033,
+    "candidate_over_baseline": 3.645357066018008,
+    "interpretation": "regression on a shared host; no speedup claim"
+  },
+  "large_stage_memory_delta_bytes": 2103553,
+  "candidate_overlay_matches_gated_files": 9,
+  "candidate_patch_replay_matches_gated_files": 9,
+  "candidate_binary_hash_verified_before_cleanup": true,
+  "source_manifests_verified": {
+    "baseline_paths": 15,
+    "candidate_paths": 18
+  },
+  "owned_temp_targets_worktrees_and_scratch_removed": true,
+  "broader_spec_goal_complete": false,
+  "evidence_sha256": {
+    "gates/all-targets.log": "2033df02747747759800ef869e89773603414003ec7d64b432602577d9547364",
+    "gates/clippy.log": "e1319bc2195093aa86ec263fdf7a5f5721b920f289a64a2b666ea487d47c9a58",
+    "gates/rustdoc.log": "477fc1fa641a2d2045caffb975adf2186973080e9c42987219030528b2fbb848",
+    "gates/doctests.log": "9ac7e115def30ba3e3856e56c25e1524ac3700bb8b423e08ccf255adc9ea3553",
+    "gates/fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gates/crate-boundaries.log": "cdea9514ba7c77c1608a6e73b2eeaf093accc70aefd1c3591af13d73e8b871fa",
+    "gates/api-authoring-runner-final.log": "12ef9cef250b477b710e64e0f3d0e4af0eb869037a44afb33b1dd4f69e788a99",
+    "gates/api-authoring-schema-validation-final.txt": "b00c795f494c2e9cdb4f51e9a7b03facc2eb0dfc1fa0ba94f4342e6ec97cc5a4",
+    "gates/api-authoring-lxml-decode-final.txt": "c337065d5012633bf6ddc6e942f1940afd2ae1c65f70998b1a8297a2753ca072",
+    "candidate/scoped-tests-final.log": "08ff8770629ef741f49c061997094c7e65f02936a272372f16d179fd8b272b51",
+    "candidate/dde-api.diff": "69e4a59229819c9cf4a2411cfeaa8cb39b852d4398fd136b273321687e8ac8e8",
+    "candidate/source-hashes.sha256": "f236a5fb11cb78d3193f2bb7614712ff85768a2acc75bb0f15039584b5dbc411",
+    "baseline/source-hashes.sha256": "8a1343aa78102e18205d8c124ed419fb251b57844259b8e2af43fa39ad1abb72"
+  },
+  "log_normalization": "Trailing empty lines removed from three Cargo logs; command output otherwise retained."
+}

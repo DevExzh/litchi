@@ -14,15 +14,19 @@ use serde_json::Value;
 
 use super::{
     Commit, CompositionLimits, Edit, HistoryLimits, MAX_DOCUMENT_XML_BYTES, MAX_OPERATIONS,
-    ManagedAdmission, Operation, Patch, RevisionKind, Snapshot, SourceIdentity, TableCellAddress,
-    TransactionError, TransactionResult, TransferGraph, TransferPart, TransferRelationship,
-    XmlStorage,
+    ManagedAdmission, Operation, Patch, RevisionAction, RevisionKind, Snapshot, SourceIdentity,
+    TableCellAddress, TransactionError, TransactionResult, TransferGraph, TransferPart,
+    TransferRelationship, XmlStorage,
 };
 
 const FORMAT_NAME: &str = "litchi-docx/document";
 const RESTORE_OPERATION: &str = "document.restore";
 const RESTORE_TRANSFER_INSERT: &str = "document.restore-transfer.insert";
 const RESTORE_TRANSFER_REMOVE: &str = "document.restore-transfer.remove";
+
+#[cfg(test)]
+#[path = "composition_effects_tests.rs"]
+mod composition_effects_tests;
 
 #[derive(Clone, Debug)]
 enum Lineage {
@@ -845,6 +849,7 @@ fn history_graph_transition(
             | Operation::ReplaceSimpleFieldText { .. }
             | Operation::ReplaceComplexFieldText { .. }
             | Operation::ReplaceRevisionText { .. }
+            | Operation::ApplyRevision { .. }
             | Operation::ReplaceContentControlText { .. }
             | Operation::ReplaceNestedContentControlText { .. }
             | Operation::ReplaceNestedContentControlHyperlinkText { .. }
@@ -987,6 +992,21 @@ fn operation_effects(
                     revision.get()
                 ));
             },
+            Operation::ApplyRevision { selector, .. } => {
+                reads.push("body/paragraph-order".to_owned());
+                let paragraph_source =
+                    format!("body/paragraph:{}/all-text", selector.paragraph().get());
+                reads.push(paragraph_source.clone());
+                // The action replaces the complete owning paragraph. Every
+                // other inline owner reads this paragraph-wide source key, so
+                // retaining it as a write makes exact-key composition refuse
+                // same-paragraph joins while preserving cross-paragraph joins.
+                writes.push(paragraph_source);
+                writes.push(format!(
+                    "body/paragraph:{}/revision-structure",
+                    selector.paragraph().get()
+                ));
+            },
             Operation::ReplaceContentControlText {
                 paragraph, control, ..
             } => {
@@ -1121,6 +1141,14 @@ fn operation_effects(
     (reads, writes)
 }
 
+fn revision_xml_value(xml: &Arc<Vec<u8>>) -> Result<Value, litchi_core::patch::PatchError> {
+    String::from_utf8(xml.as_slice().to_vec())
+        .map(Value::String)
+        .map_err(|_error| litchi_core::patch::PatchError::InvalidText {
+            field: "revision XML",
+        })
+}
+
 fn durable_operation(
     limits: PatchLimits,
     operation: &Operation,
@@ -1221,6 +1249,32 @@ fn durable_operation(
                 },
                 format!("paragraph:{}/revision:{}", paragraph.get(), revision.get()),
                 Value::String(after.clone()),
+            )
+        },
+        Operation::ApplyRevision {
+            selector,
+            action,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), revision_xml_value(before)?);
+            (
+                match (selector.kind(), action) {
+                    (RevisionKind::Insertion, RevisionAction::Accept) => {
+                        "revision.insertion.accept"
+                    },
+                    (RevisionKind::Insertion, RevisionAction::Reject) => {
+                        "revision.insertion.reject"
+                    },
+                    (RevisionKind::Deletion, RevisionAction::Accept) => "revision.deletion.accept",
+                    (RevisionKind::Deletion, RevisionAction::Reject) => "revision.deletion.reject",
+                },
+                format!(
+                    "paragraph:{}/revision:{}",
+                    selector.paragraph().get(),
+                    selector.revision().get()
+                ),
+                revision_xml_value(after)?,
             )
         },
         Operation::ReplaceContentControlText {
@@ -1531,6 +1585,7 @@ fn restore_transfer_operation(
         | Operation::ReplaceSimpleFieldText { .. }
         | Operation::ReplaceComplexFieldText { .. }
         | Operation::ReplaceRevisionText { .. }
+        | Operation::ApplyRevision { .. }
         | Operation::ReplaceContentControlText { .. }
         | Operation::ReplaceNestedContentControlText { .. }
         | Operation::ReplaceNestedContentControlHyperlinkText { .. }
@@ -1757,6 +1812,31 @@ fn parse_durable_operation(
                 revision,
                 before: before()?,
                 after: after()?,
+            })
+        },
+        "revision.insertion.accept"
+        | "revision.insertion.reject"
+        | "revision.deletion.accept"
+        | "revision.deletion.reject"
+            if operation.preconditions.len() == 3 =>
+        {
+            let (paragraph, revision) =
+                parse_paragraph_child_target(&operation.target, "/revision:")?;
+            let kind = if operation.op.starts_with("revision.insertion.") {
+                RevisionKind::Insertion
+            } else {
+                RevisionKind::Deletion
+            };
+            let action = if operation.op.ends_with(".accept") {
+                RevisionAction::Accept
+            } else {
+                RevisionAction::Reject
+            };
+            Ok(Operation::ApplyRevision {
+                selector: super::RevisionSelector::new(paragraph, kind, revision),
+                action,
+                before: Arc::new(before()?.into_bytes()),
+                after: Arc::new(after()?.into_bytes()),
             })
         },
         "content-control.text.replace" if operation.preconditions.len() == 3 => {

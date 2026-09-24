@@ -1,0 +1,6 @@
+{
+  "scope": "One-argument IF reference-operand typed-refusal regression passes after count1 Logical(condition) fix. Other planner gaps remain; not full acceptance. Exact live production draft retained in archive.",
+  "archive": "planner-handler-25.tar.gz",
+  "sha256": "2b64b758e79a5244d109e5fa630a370264bb9747c30b4ff53ba23074c7a3a562",
+  "status": 0
+}

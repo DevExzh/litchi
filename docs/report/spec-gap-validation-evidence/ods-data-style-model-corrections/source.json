@@ -1,0 +1,15 @@
+{
+  "directory": "/var/tmp/litchi-ods-model-root-7t3u3ezb",
+  "checkout": "/var/tmp/litchi-ods-model-root-7t3u3ezb/worktree",
+  "base": "f5f816cfa888d9b33ea825e6dea9a4dfb3798b80",
+  "files": [
+    "crates/litchi-ods/src/data_style/mod.rs"
+  ],
+  "sha256": {
+    "crates/litchi-ods/src/data_style/mod.rs": "231c29b6a51640f1d57a0894feb192a581eac2493986d54465ef162109fa935b"
+  },
+  "shared_source_sha256": "4e41ada100ac7f7df749fb8593b35c8900cadbf179be2293c7dd774aa767c140",
+  "target": "/var/tmp/litchi-ods-model-root-7t3u3ezb/target",
+  "shared_target": false,
+  "scope": "pure data-style model; in-progress source-module export omitted"
+}

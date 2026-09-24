@@ -1,0 +1,7 @@
+lane,workload,case,sheet_sources,links,cache_rows,cache_columns,source_bytes,warmups,iterations,mean_ns,p50_ns,p95_ns,p99_ns,alloc_calls_p50,alloc_calls_max,dealloc_calls_p50,dealloc_calls_max,requested_bytes_p50,requested_bytes_max,released_bytes_p50,released_bytes_max,live_before_p50,live_after_p50,live_after_max,peak_live_delta_p50,peak_live_delta_max,probes,work_delta_p50,memory_delta_p50,max_rss_kib
+parse-large-cache,Parse,LargeCache,1,1,256,256,4132098,3,15,8252339,8203595,8961108,8961108,66128,66128,66093,66093,8071563,8071563,3938276,3938276,4993816,9127103,9127103,4134342,4134342,0,unavailable,unavailable,14388
+parse-many-links,Parse,ManyLinks,4,2048,1,1,863375,3,15,5759717,5755525,5929346,5929346,55445,55445,34898,34898,4736697,4736697,3486739,3486739,889060,2139018,2139018,1251345,1251345,0,unavailable,unavailable,4584
+parse-small,Parse,Small,1,2,8,8,9845,3,15,28163,27950,29961,29961,264,264,219,219,25673,25673,14597,14597,14488,25564,25564,12454,12454,0,unavailable,unavailable,2280
+read-large-cache,Read,LargeCache,1,1,256,256,4132098,3,15,38,30,180,180,0,0,0,0,0,0,0,0,9127103,9127103,9127103,0,0,30,unavailable,unavailable,14440
+read-many-links,Read,ManyLinks,4,2048,1,1,863375,3,15,5124,5120,5290,5290,0,0,0,0,0,0,0,0,2139018,2139018,2139018,0,0,30780,unavailable,unavailable,4556
+read-small,Read,Small,1,2,8,8,9845,3,15,22,20,30,30,0,0,0,0,0,0,0,0,25564,25564,25564,0,0,45,unavailable,unavailable,2280

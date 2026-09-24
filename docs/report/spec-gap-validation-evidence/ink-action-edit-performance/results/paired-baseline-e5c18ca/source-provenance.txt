@@ -1,0 +1,22 @@
+profile_arm=baseline
+source_pin=f1cb119361af9ea2227d27050e41915a9a92ae04
+source_manifest_before_sha256=eb61be9257ff6035a61089a7b77fb581595e00e95b38e17d5a32cf19be92db8d
+source_manifest_after_sha256=eb61be9257ff6035a61089a7b77fb581595e00e95b38e17d5a32cf19be92db8d
+approved_base_commit=079cbbcbfc00c8d2412a38586a9688ae7eb0009e
+git_head=e5c18ca02e120ea1d91e495d4cf58df6d66573be
+git_status_relevant=
+profile_pins_sha256=d6593e82a96423cc54b41f9f945f70219ffc2bd5506de520dbf114ec6afd709d
+source_sha256:
+4e4731d59ab95679f205d424567dcf4d8e02f27c9318ed8ac955a8c163910628  /home/zhuhe/code/litchi-ink-action-baseline-control-f1cb/crates/litchi-drawingml/src/ink/actions.rs
+b037eb7fae01b2e62c3c3a1050d9044466ad8d8e1a1402bb13533b2ba8bf9850  /home/zhuhe/code/litchi-ink-action-baseline-control-f1cb/crates/litchi-drawingml/src/ink/actions_edit.rs
+a9a55cf0c44b59afa00a7b7c472c0f010eef5c23e62a816d4bb0f27aa6f67ff7  /home/zhuhe/code/litchi-ink-action-baseline-control-f1cb/crates/litchi-drawingml/src/ink/mod.rs
+af92fe9d2923ac1197e4f152a5e34350217b5c782fa00365b82c141f69787640  /home/zhuhe/code/litchi-ink-action-baseline-control-f1cb/crates/litchi-drawingml/tests/ink_action_edit.rs
+f07b423989443d68ccba070aef5fed610bc39acb2c8b5a6adf14de8074afbf06  /home/zhuhe/code/litchi-ink-action-baseline-control-f1cb/crates/litchi-drawingml/tests/ink_action_id_boundaries.rs
+harness_sha256:
+efad8e8dfdbf8d115d43e34d73b2757792bf768f45f9bc9918c0136c2748ba1a  /home/zhuhe/code/litchi-ink-action-baseline-control-f1cb/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/harness/Cargo.lock
+3168aa1bf74a0b419299c6317440f9d2cbf54de9ed5882b250a70e8d8b6b175c  /home/zhuhe/code/litchi-ink-action-baseline-control-f1cb/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/harness/Cargo.toml
+2b6dbc5ef06d9181e5e8abb42fbd4ee2078619a76f08319e8c111c17bfb93863  /home/zhuhe/code/litchi-ink-action-baseline-control-f1cb/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/harness/main.rs
+test_sha256:
+2162cee47e2116720ceb826f865f7bcde65a6523e06f55305c24686e0e8d27e0  /home/zhuhe/code/litchi-ink-action-baseline-control-f1cb/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/test_verify.py
+caa81fb37858dded7749c7508bdf14df0ab70ad9a92bfb96062210e6719f1fca  /home/zhuhe/code/litchi-ink-action-baseline-control-f1cb/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/test_smoke_target.py
+0fcb00d89e3dca563dc664f3e6caf2a41938d64591dba31efe0694677bca7e18  /home/zhuhe/code/litchi-ink-action-baseline-control-f1cb/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/test_source_snapshot.py

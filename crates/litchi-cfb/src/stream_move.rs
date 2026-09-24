@@ -1003,6 +1003,9 @@ fn verify_exact_metadata(
                 if before.sid == after.sid
                     && before.entry_type == after.entry_type
                     && before.clsid == after.clsid
+                    && before.state_bits == after.state_bits
+                    && before.creation_time == after.creation_time
+                    && before.modified_time == after.modified_time
                     && before.start_sector == after.start_sector
                     && before.size == after.size
                     && before.is_minifat == after.is_minifat => {},

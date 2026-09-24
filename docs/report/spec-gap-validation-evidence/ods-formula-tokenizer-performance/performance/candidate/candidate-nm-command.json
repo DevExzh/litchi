@@ -1,0 +1,12 @@
+{
+  "command": [
+    "nm",
+    "-S",
+    "-C",
+    "--size-sort",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/candidate/ods-formula-reference-profile"
+  ],
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/candidate/ods-formula-reference-profile",
+  "binary_sha256": "30a7da005fdb3c18ac06f1c8a7328a6755cadd64abee02b97a4b869612c6effd",
+  "status": 0
+}

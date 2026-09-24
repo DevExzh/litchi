@@ -1,0 +1,15 @@
+{
+  "removed_at": "2026-09-13T14:55:59.178763+00:00",
+  "binaries": [
+    {
+      "variant": "baseline",
+      "sha256": "5d092ebb4d4d79236c5950c686955a86c8b1d39a309e23ccb1ae24d8192e94be",
+      "bytes": 1305776
+    },
+    {
+      "variant": "candidate",
+      "sha256": "dedd2e26816965572cb5a9367622118195ada202b5fdd0546d50ddb02cae4e84",
+      "bytes": 1316664
+    }
+  ]
+}

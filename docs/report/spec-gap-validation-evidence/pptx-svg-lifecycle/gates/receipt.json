@@ -1,0 +1,140 @@
+{
+  "base": "9d52321b46076fffd0dd2b3d87a0608ab899e17a",
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "commands": [
+    {
+      "name": "compile",
+      "argv": [
+        "cargo",
+        "check",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-opc",
+        "--all-features",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": "",
+      "RUSTFLAGS": "",
+      "RUSTC_BOOTSTRAP": "",
+      "CARGO_ENCODED_RUSTFLAGS": ""
+    },
+    {
+      "name": "tests",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-opc",
+        "--all-features",
+        "--no-fail-fast"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": "",
+      "RUSTFLAGS": "",
+      "RUSTC_BOOTSTRAP": "",
+      "CARGO_ENCODED_RUSTFLAGS": ""
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-opc",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": "",
+      "RUSTFLAGS": "",
+      "RUSTC_BOOTSTRAP": "",
+      "CARGO_ENCODED_RUSTFLAGS": ""
+    },
+    {
+      "name": "rustdoc",
+      "argv": [
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-opc",
+        "--all-features",
+        "--no-deps"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": "-D warnings",
+      "RUSTFLAGS": "",
+      "RUSTC_BOOTSTRAP": "",
+      "CARGO_ENCODED_RUSTFLAGS": ""
+    },
+    {
+      "name": "format",
+      "argv": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-opc",
+        "--check"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": "",
+      "RUSTFLAGS": "",
+      "RUSTC_BOOTSTRAP": "",
+      "CARGO_ENCODED_RUSTFLAGS": ""
+    },
+    {
+      "name": "diff",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": "",
+      "RUSTFLAGS": "",
+      "RUSTC_BOOTSTRAP": "",
+      "CARGO_ENCODED_RUSTFLAGS": ""
+    }
+  ],
+  "source_unchanged": true,
+  "test_totals_including_doctests": {
+    "passed": 1811,
+    "failed": 0,
+    "ignored": 3
+  },
+  "logs": {
+    "clippy.log": "b796497b89b6d11a6f5c23b3099594fc7cbb7b42fbe8b493abed572a9db51024",
+    "compile.log": "2f8055605174d3a25a95cada5527f11aa39f1c6d5497d0774534b6cf83752a90",
+    "diff.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rustdoc.log": "037ff38f2a450c4b87da3117bdb46df9c5f8e2ba4864175ec7b233bdc5d0080d",
+    "tests.log": "4481bb5e40f536da81864eababfcd31a3f35fbbfef60b5d4ac2833f283f1122e"
+  },
+  "passed": true
+}

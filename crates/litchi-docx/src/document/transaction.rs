@@ -11,15 +11,17 @@ use std::sync::Arc;
 
 use litchi_core::{ExecutionContext, Position, Reservation, Resource, SourceVersion};
 use litchi_ooxml_common::private::{BindingTracker, split_qualified_name};
+use litchi_ooxml_common::properties::time::DateTime;
 use litchi_opc::{PackURI, PartData, SourceLineage, SourceXmlPart};
 use quick_xml::events::Event;
-use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::name::{Namespace, PrefixDeclaration, ResolveResult};
 use quick_xml::reader::NsReader;
 use quick_xml::{Reader, XmlVersion};
 use thiserror::Error;
 
 use crate::namespace::{
-    STRICT_WORDPROCESSINGML_NAMESPACE, WORDPROCESSINGML_NAMESPACE, is_wordprocessing_namespace,
+    NamespaceBindings, NamespaceCapture, STRICT_WORDPROCESSINGML_NAMESPACE,
+    WORDPROCESSINGML_NAMESPACE, is_wordprocessing_namespace,
 };
 use crate::paragraph::Paragraph;
 
@@ -59,6 +61,14 @@ const MANAGED_SCAN_WORK_MULTIPLIER: usize = 2;
 // parsing starts.
 const MANAGED_NAMESPACE_SCAN_MEMORY_MULTIPLIER: usize = 32;
 const MANAGED_NAMESPACE_SCAN_FIXED_MEMORY: usize = 4096;
+const MAX_REVISION_ATTRIBUTES: usize = 256;
+const MAX_REVISION_METADATA_VALUE_BYTES: usize = 64 * 1024;
+const MAX_REVISION_TAG_ATTRIBUTE_BYTES: usize = 8 * 1024 * 1024;
+const MARKUP_COMPATIBILITY_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/markup-compatibility/2006";
+const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
+const WORD_2023_DATE_UTC_NAMESPACE: &[u8] =
+    b"http://schemas.microsoft.com/office/word/2023/wordml/word16du";
 
 /// Result returned by main-document transaction operations.
 pub type TransactionResult<T> = Result<T, TransactionError>;
@@ -91,6 +101,9 @@ pub enum Refusal {
     ComplexFieldNotFound,
     /// The selected tracked insertion or deletion does not exist.
     RevisionNotFound,
+    /// The selected tracked insertion or deletion contains a structure whose
+    /// ownership or dependency semantics this bounded operation cannot prove.
+    RevisionDependency,
     /// The selected direct inline content control does not exist.
     ContentControlNotFound,
     /// The selected table, row, or cell does not exist.
@@ -113,6 +126,9 @@ impl std::fmt::Display for Refusal {
             Self::FieldNotFound => "direct simple field was not found",
             Self::ComplexFieldNotFound => "complex field sequence was not found",
             Self::RevisionNotFound => "direct tracked revision was not found",
+            Self::RevisionDependency => {
+                "tracked revision contains unsupported move, range, property, table, or nested dependency content"
+            },
             Self::ContentControlNotFound => "direct inline content control was not found",
             Self::CellNotFound => "table cell was not found",
             Self::StructuralText => "text requires structural WordprocessingML elements",
@@ -121,13 +137,70 @@ impl std::fmt::Display for Refusal {
 }
 
 /// Direct tracked-revision wrapper selected for inert text replacement.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum RevisionKind {
     /// `w:ins` tracked insertion content.
     Insertion,
     /// `w:del` tracked deletion content.
     Deletion,
+}
+
+/// The Word redline disposition to apply to one direct inline revision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum RevisionAction {
+    /// Keep inserted content or remove deleted content.
+    Accept,
+    /// Remove inserted content or restore deleted content as ordinary text.
+    Reject,
+}
+
+impl RevisionAction {
+    const fn removes_content(self, kind: RevisionKind) -> bool {
+        matches!(
+            (self, kind),
+            (Self::Reject, RevisionKind::Insertion) | (Self::Accept, RevisionKind::Deletion)
+        )
+    }
+}
+
+/// A checked direct-body paragraph/revision selector.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RevisionSelector {
+    paragraph: Position,
+    kind: RevisionKind,
+    revision: Position,
+}
+
+impl RevisionSelector {
+    /// Construct a direct inline revision selector.
+    #[must_use]
+    pub const fn new(paragraph: Position, kind: RevisionKind, revision: Position) -> Self {
+        Self {
+            paragraph,
+            kind,
+            revision,
+        }
+    }
+
+    /// Return the direct-body paragraph position.
+    #[must_use]
+    pub const fn paragraph(self) -> Position {
+        self.paragraph
+    }
+
+    /// Return the selected tracked revision family.
+    #[must_use]
+    pub const fn kind(self) -> RevisionKind {
+        self.kind
+    }
+
+    /// Return the direct wrapper position among revisions of [`Self::kind`].
+    #[must_use]
+    pub const fn revision(self) -> Position {
+        self.revision
+    }
 }
 
 /// One table/row/cell step in a bounded nested-table selector path.
@@ -857,6 +930,7 @@ impl XmlStorage {
 pub struct Snapshot {
     xml: XmlStorage,
     paragraphs: Arc<[Range]>,
+    paragraph_namespaces: Arc<[NamespaceBindings]>,
     tables: Arc<[Range]>,
     block_controls: Arc<[Range]>,
     content_end: u32,
@@ -889,6 +963,7 @@ impl Snapshot {
         Ok(Self {
             xml: XmlStorage::Owned(Arc::new(xml)),
             paragraphs: layout.paragraphs.into(),
+            paragraph_namespaces: layout.paragraph_namespaces.into(),
             tables: layout.tables.into(),
             block_controls: layout.block_controls.into(),
             content_end: layout.content_end,
@@ -910,6 +985,7 @@ impl Snapshot {
         Ok(Self {
             xml: XmlStorage::Owned(xml),
             paragraphs: layout.paragraphs.into(),
+            paragraph_namespaces: layout.paragraph_namespaces.into(),
             tables: layout.tables.into(),
             block_controls: layout.block_controls.into(),
             content_end: layout.content_end,
@@ -1012,6 +1088,14 @@ impl Snapshot {
             if !preserves_body_child_shape(before, splice.replacement) {
                 return Ok(None);
             }
+            // Each paragraph's inherited-namespace snapshot is carried over
+            // unchanged, which is exact only while neither side of a splice
+            // declares a namespace; any declaration takes the full rescan.
+            if contains_namespace_declaration_marker(before)
+                || contains_namespace_declaration_marker(splice.replacement)
+            {
+                return Ok(None);
+            }
             let (Ok(start), Ok(end), Ok(length)) = (
                 u32::try_from(splice.start),
                 u32::try_from(splice.end),
@@ -1085,6 +1169,7 @@ impl Snapshot {
         }
         Ok(Some(SplicedLayout {
             paragraphs: paragraphs.into(),
+            paragraph_namespaces: Arc::clone(&self.paragraph_namespaces),
             tables,
             block_controls,
             content_end,
@@ -1107,6 +1192,7 @@ impl Snapshot {
                 None => XmlStorage::Owned(xml),
             },
             paragraphs: layout.paragraphs,
+            paragraph_namespaces: layout.paragraph_namespaces,
             tables: layout.tables,
             block_controls: layout.block_controls,
             content_end: layout.content_end,
@@ -1147,6 +1233,7 @@ impl Snapshot {
                 }),
             })),
             paragraphs: layout.paragraphs.into(),
+            paragraph_namespaces: layout.paragraph_namespaces.into(),
             tables: layout.tables.into(),
             block_controls: layout.block_controls.into(),
             content_end: layout.content_end,
@@ -1187,6 +1274,7 @@ impl Snapshot {
                 }),
             },
             paragraphs: layout.paragraphs.into(),
+            paragraph_namespaces: layout.paragraph_namespaces.into(),
             tables: layout.tables.into(),
             block_controls: layout.block_controls.into(),
             content_end: layout.content_end,
@@ -1224,6 +1312,7 @@ impl Snapshot {
                 identity,
             },
             paragraphs: layout.paragraphs.into(),
+            paragraph_namespaces: layout.paragraph_namespaces.into(),
             tables: layout.tables.into(),
             block_controls: layout.block_controls.into(),
             content_end: layout.content_end,
@@ -1294,9 +1383,20 @@ impl Snapshot {
         self.paragraphs
             .get(position.get())
             .and_then(|range| match &self.xml {
-                XmlStorage::Owned(xml) | XmlStorage::OwnedWithIdentity { xml, .. } => Some(
-                    Paragraph::from_arc_range(Arc::clone(xml), range.start, range.length),
-                ),
+                XmlStorage::Owned(xml) | XmlStorage::OwnedWithIdentity { xml, .. } => {
+                    // Every scan records one inherited-namespace snapshot per
+                    // paragraph range, so this lookup cannot miss.
+                    self.paragraph_namespaces
+                        .get(position.get())
+                        .map(|namespaces| {
+                            Paragraph::from_arc_range_with_context(
+                                Arc::clone(xml),
+                                range.start,
+                                range.length,
+                                Arc::clone(namespaces),
+                            )
+                        })
+                },
                 XmlStorage::Managed(xml) => self.admission.as_ref().map(|admission| {
                     Paragraph::from_managed_range(
                         Arc::clone(&xml.data),
@@ -1321,10 +1421,16 @@ impl Snapshot {
     pub fn paragraphs(&self) -> Vec<Paragraph> {
         self.paragraphs
             .iter()
-            .filter_map(|range| match &self.xml {
-                XmlStorage::Owned(xml) | XmlStorage::OwnedWithIdentity { xml, .. } => Some(
-                    Paragraph::from_arc_range(Arc::clone(xml), range.start, range.length),
-                ),
+            .zip(self.paragraph_namespaces.iter())
+            .filter_map(|(range, namespaces)| match &self.xml {
+                XmlStorage::Owned(xml) | XmlStorage::OwnedWithIdentity { xml, .. } => {
+                    Some(Paragraph::from_arc_range_with_context(
+                        Arc::clone(xml),
+                        range.start,
+                        range.length,
+                        Arc::clone(namespaces),
+                    ))
+                },
                 XmlStorage::Managed(xml) => self.admission.as_ref().map(|admission| {
                     Paragraph::from_managed_range(
                         Arc::clone(&xml.data),
@@ -1542,6 +1648,21 @@ pub enum Operation {
         /// Text produced by the operation.
         after: String,
     },
+    /// Apply or reject one direct inline tracked revision.
+    ///
+    /// The complete owning paragraph before and after bytes are retained so
+    /// replay and inversion remain exact even though the selected wrapper is
+    /// removed or unwrapped by the action.
+    ApplyRevision {
+        /// Direct paragraph/revision selector used to construct the action.
+        selector: RevisionSelector,
+        /// Word redline disposition requested by the caller.
+        action: RevisionAction,
+        /// Exact owning paragraph bytes required before replay.
+        before: Arc<Vec<u8>>,
+        /// Exact owning paragraph bytes produced by the action.
+        after: Arc<Vec<u8>>,
+    },
     /// Replace text in one direct inline content control.
     ReplaceContentControlText {
         /// Direct-body paragraph position.
@@ -1705,6 +1826,7 @@ impl Operation {
             | Self::ReplaceSimpleFieldText { .. }
             | Self::ReplaceComplexFieldText { .. }
             | Self::ReplaceRevisionText { .. }
+            | Self::ApplyRevision { .. }
             | Self::ReplaceContentControlText { .. }
             | Self::ReplaceNestedContentControlText { .. }
             | Self::ReplaceNestedContentControlHyperlinkText { .. }
@@ -1789,6 +1911,17 @@ impl Operation {
                 revision: *revision,
                 before: after.clone(),
                 after: before.clone(),
+            },
+            Self::ApplyRevision {
+                selector,
+                action,
+                before,
+                after,
+            } => Self::ApplyRevision {
+                selector: *selector,
+                action: *action,
+                before: Arc::clone(after),
+                after: Arc::clone(before),
             },
             Self::ReplaceContentControlText {
                 paragraph,
@@ -3581,6 +3714,103 @@ impl Edit {
         )
     }
 
+    /// Apply one direct inline tracked revision using Word redline semantics.
+    ///
+    /// Insertions are accepted by unwrapping their runs and rejected by
+    /// removing them. Deletions are accepted by removing them and rejected by
+    /// unwrapping their runs while converting `w:delText` to ordinary
+    /// `w:t`. The wrapper's revision metadata is intentionally consumed by
+    /// either disposition; bytes belonging to retained children remain exact,
+    /// including opaque extension markup and namespace declarations hoisted
+    /// from the removed wrapper when needed.
+    ///
+    /// Only a direct paragraph child is selectable. Moves, range markers,
+    /// property/table revisions, nested revision owners, fields, controls,
+    /// hyperlinks, and other structures whose ownership or dependency closure
+    /// cannot be proven are refused before the edit changes state.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked selector/refusal, resource-limit, or malformed XML
+    /// error without changing the projected snapshot.
+    pub fn apply_revision(
+        &mut self,
+        selector: RevisionSelector,
+        action: RevisionAction,
+    ) -> TransactionResult<&mut Self> {
+        self.reserve_operation()?;
+        let paragraph_range = self.range(selector.paragraph)?;
+        let paragraph_start = checked_start(paragraph_range, "paragraph")?;
+        let paragraph_end = checked_end(paragraph_range, "paragraph")?;
+        let paragraph_xml = checked_slice(
+            self.projected.xml_bytes(),
+            paragraph_start,
+            paragraph_end,
+            "paragraph",
+        )?;
+        let inherited_namespaces = self
+            .projected
+            .paragraph_namespaces
+            .get(selector.paragraph.get())
+            .ok_or(TransactionError::OutOfBounds {
+                position: selector.paragraph.get(),
+                len: self.projected.paragraph_count(),
+            })?;
+        let paragraph_after =
+            rewrite_revision_paragraph(paragraph_xml, selector, action, inherited_namespaces)?;
+        if paragraph_after == paragraph_xml {
+            return Ok(self);
+        }
+        let candidate = Snapshot::from_xml(replace_range(
+            self.projected.xml_bytes(),
+            paragraph_start,
+            paragraph_end,
+            &paragraph_after,
+        )?)?;
+        if candidate.paragraph_count() != self.projected.paragraph_count() {
+            return Err(crate::Error::InvalidFormat(
+                "revision action changed the paragraph count".into(),
+            )
+            .into());
+        }
+        let before = Arc::new(paragraph_xml.to_vec());
+        let after = Arc::new(paragraph_after);
+        self.operations.push(Operation::ApplyRevision {
+            selector,
+            action,
+            before,
+            after,
+        });
+        self.projected = candidate;
+        Ok(self)
+    }
+
+    /// Accept one direct inline tracked insertion or deletion.
+    pub fn accept_revision(
+        &mut self,
+        paragraph: Position,
+        kind: RevisionKind,
+        revision: Position,
+    ) -> TransactionResult<&mut Self> {
+        self.apply_revision(
+            RevisionSelector::new(paragraph, kind, revision),
+            RevisionAction::Accept,
+        )
+    }
+
+    /// Reject one direct inline tracked insertion or deletion.
+    pub fn reject_revision(
+        &mut self,
+        paragraph: Position,
+        kind: RevisionKind,
+        revision: Position,
+    ) -> TransactionResult<&mut Self> {
+        self.apply_revision(
+            RevisionSelector::new(paragraph, kind, revision),
+            RevisionAction::Reject,
+        )
+    }
+
     /// Replace text inside one direct inline content control while retaining
     /// `w:sdtPr`, data binding, lock state, wrapper metadata, and opaque XML.
     ///
@@ -4298,6 +4528,12 @@ impl Edit {
                 }
                 self.replace_revision_text(*paragraph, *kind, *revision, after.clone())
             },
+            Operation::ApplyRevision {
+                selector,
+                action,
+                before,
+                after,
+            } => self.apply_raw_revision_operation(*selector, *action, before, after),
             Operation::ReplaceContentControlText {
                 paragraph,
                 control,
@@ -4488,6 +4724,60 @@ impl Edit {
                 graph,
             ),
         }
+    }
+
+    fn apply_raw_revision_operation(
+        &mut self,
+        selector: RevisionSelector,
+        action: RevisionAction,
+        before: &Arc<Vec<u8>>,
+        after: &Arc<Vec<u8>>,
+    ) -> TransactionResult<&mut Self> {
+        self.reserve_operation()?;
+        let range = self.range(selector.paragraph)?;
+        let start = checked_start(range, "paragraph")?;
+        let end = checked_end(range, "paragraph")?;
+        let source = checked_slice(self.projected.xml_bytes(), start, end, "paragraph")?;
+        if source != before.as_slice() {
+            return Err(TransactionError::SemanticPrecondition);
+        }
+        let inherited_namespaces = self
+            .projected
+            .paragraph_namespaces
+            .get(selector.paragraph.get())
+            .ok_or(TransactionError::OutOfBounds {
+                position: selector.paragraph.get(),
+                len: self.projected.paragraph_count(),
+            })?;
+        let forward_match =
+            rewrite_revision_paragraph(source, selector, action, inherited_namespaces)
+                .is_ok_and(|candidate| candidate.as_slice() == after.as_slice());
+        let reverse_match = !forward_match
+            && rewrite_revision_paragraph(after, selector, action, inherited_namespaces)
+                .is_ok_and(|candidate| candidate.as_slice() == source);
+        if !forward_match && !reverse_match {
+            return Err(TransactionError::SemanticPrecondition);
+        }
+        let candidate = Snapshot::from_xml(replace_range(
+            self.projected.xml_bytes(),
+            start,
+            end,
+            after,
+        )?)?;
+        if candidate.paragraph_count() != self.projected.paragraph_count() {
+            return Err(crate::Error::InvalidFormat(
+                "revision replay changed the paragraph count".into(),
+            )
+            .into());
+        }
+        self.operations.push(Operation::ApplyRevision {
+            selector,
+            action,
+            before: Arc::clone(before),
+            after: Arc::clone(after),
+        });
+        self.projected = candidate;
+        Ok(self)
     }
 
     fn remove_plain_paragraph(
@@ -4733,6 +5023,12 @@ impl Edit {
         if let Some(context) = managed_context.as_ref() {
             context.check().map_err(managed_execution)?;
         }
+        // Revision dispositions preserve retained opaque payload bytes, including
+        // whitespace and attribute spelling. Global compaction would rewrite them.
+        let preserve_revision_source = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ApplyRevision { .. }));
         let projected = if self.base.same_source(&self.projected) {
             self.projected
         } else if self.base.is_source_backed() && self.projected.is_source_backed() {
@@ -4740,6 +5036,15 @@ impl Edit {
             // checked splice/output reservation. Running them through the
             // authored compacting writer would detach that owner and lose
             // the exact source proof required by publication.
+            self.projected
+        } else if preserve_revision_source {
+            // The preserved bytes skip compaction but not its UTF-8 check: a
+            // changed document that is not UTF-8 is refused either way.
+            std::str::from_utf8(self.projected.xml_bytes()).map_err(|error| {
+                crate::Error::InvalidFormat(format!(
+                    "changed main-document XML is not UTF-8: {error}"
+                ))
+            })?;
             self.projected
         } else {
             match self.compaction {
@@ -5131,6 +5436,11 @@ fn operation_string_bytes(operation: &Operation) -> usize {
         Operation::InsertParagraph { text, .. } | Operation::RemoveParagraph { text, .. } => {
             text.capacity()
         },
+        // The retained paragraph images are charged by their buffer capacity,
+        // like the string fields above.
+        Operation::ApplyRevision { before, after, .. } => {
+            before.capacity().saturating_add(after.capacity())
+        },
         Operation::InsertTransferredParagraph { .. }
         | Operation::RemoveTransferredParagraph { .. } => 0,
     }
@@ -5251,6 +5561,9 @@ impl SpliceBound {
 /// shifting every later direct-body range.
 struct SplicedLayout {
     paragraphs: Arc<[Range]>,
+    /// The source snapshot's per-paragraph inherited declarations, still exact
+    /// because no splice adds or removes a namespace declaration.
+    paragraph_namespaces: Arc<[NamespaceBindings]>,
     tables: Arc<[Range]>,
     block_controls: Arc<[Range]>,
     content_end: u32,
@@ -5692,6 +6005,7 @@ fn body_child_shape(fragment: &[u8]) -> Option<BodyChildShape> {
 
 struct Layout {
     paragraphs: Vec<Range>,
+    paragraph_namespaces: Vec<NamespaceBindings>,
     tables: Vec<Range>,
     block_controls: Vec<Range>,
     content_end: u32,
@@ -5882,12 +6196,17 @@ fn scan_document_with_context(
     let mut tracker = BindingTracker::new();
     let mut pending_pop = false;
     let mut paragraphs = Vec::new();
+    // Declarations each direct-body paragraph inherits, for the parsers that
+    // resolve a retained span in context (spec-gap branch). Consecutive
+    // paragraphs share one snapshot while their scope is unchanged.
+    let mut paragraph_namespaces = Vec::new();
+    let mut namespace_capture = NamespaceCapture::default();
     let mut tables = Vec::new();
     let mut block_controls = Vec::new();
     let mut body_depth = None;
     let mut body_end = None;
     let mut final_section_start = None;
-    let mut pending = None::<(bool, bool, bool, bool, usize)>;
+    let mut pending = None::<(bool, bool, bool, bool, usize, Option<NamespaceBindings>)>;
     let mut conformance = None;
     let mut saw_document = false;
     let mut depth = 0usize;
@@ -6056,7 +6375,19 @@ fn scan_document_with_context(
                         )
                         .into());
                     }
-                    pending = Some((is_paragraph, is_table, is_control, is_section, event_start));
+                    let namespaces = if is_paragraph {
+                        Some(namespace_capture.capture_tracker(&tracker)?)
+                    } else {
+                        None
+                    };
+                    pending = Some((
+                        is_paragraph,
+                        is_table,
+                        is_control,
+                        is_section,
+                        event_start,
+                        namespaces,
+                    ));
                 }
             },
             Event::Empty(element) => {
@@ -6075,6 +6406,7 @@ fn scan_document_with_context(
                     }
                     if is_word && local == b"p" {
                         paragraphs.push(checked_range(event_start, event_end)?);
+                        paragraph_namespaces.push(namespace_capture.capture_tracker(&tracker)?);
                     }
                     if is_word && local == b"tbl" {
                         tables.push(checked_range(event_start, event_end)?);
@@ -6088,11 +6420,16 @@ fn scan_document_with_context(
                 }
             },
             Event::End(element) => {
-                if let Some((is_paragraph, is_table, is_control, is_section, start)) = pending
-                    && body_depth.is_some_and(|body| depth == body + 1)
+                if let Some((is_paragraph, is_table, is_control, is_section, start, namespaces)) =
+                    pending.take_if(|_| body_depth.is_some_and(|body| depth == body + 1))
                 {
                     if is_paragraph {
                         paragraphs.push(checked_range(start, event_end)?);
+                        paragraph_namespaces.push(namespaces.ok_or_else(|| {
+                            crate::Error::InvalidFormat(
+                                "paragraph namespace capture disappeared".into(),
+                            )
+                        })?);
                     }
                     if is_table {
                         tables.push(checked_range(start, event_end)?);
@@ -6173,6 +6510,7 @@ fn scan_document_with_context(
     )?;
     Ok(Layout {
         paragraphs,
+        paragraph_namespaces,
         tables,
         block_controls,
         content_end,
@@ -6204,14 +6542,16 @@ fn scan_document_with_context_nsreader_oracle(
 ) -> TransactionResult<Layout> {
     let mut reader = NsReader::from_reader(xml);
     let mut paragraphs = Vec::new();
+    let mut paragraph_namespaces = Vec::new();
     let mut tables = Vec::new();
     let mut block_controls = Vec::new();
     let mut body_depth = None;
     let mut body_end = None;
     let mut final_section_start = None;
-    let mut pending = None::<(bool, bool, bool, bool, usize)>;
+    let mut pending = None::<(bool, bool, bool, bool, usize, NamespaceBindings)>;
     let mut conformance = None;
     let mut saw_document = false;
+    let mut namespace_capture = NamespaceCapture::default();
     let mut depth = 0usize;
     let mut nodes = 0usize;
     // Namespace accounting is only needed for the managed work charge. Keep
@@ -6239,8 +6579,7 @@ fn scan_document_with_context_nsreader_oracle(
             .ok_or_else(|| crate::Error::InvalidFormat("document offset overflow".into()))?;
         let raw_event = reader
             .read_event()
-            .map_err(|error| crate::Error::Xml(error.to_string()))?
-            .into_owned();
+            .map_err(|error| crate::Error::Xml(error.to_string()))?;
         let event_end = usize::try_from(reader.buffer_position())
             .map_err(|_conversion_error| {
                 crate::Error::InvalidFormat("document offset does not fit usize".into())
@@ -6280,10 +6619,11 @@ fn scan_document_with_context_nsreader_oracle(
                 })?;
             consume_managed(context, Resource::Work, lookup_work)?;
         }
-        // The event is owned, so namespace resolution can borrow the reader's
-        // resolver.  Cloning the resolver here would copy all in-scope
-        // namespace bindings once per event and turn a linear scan into a
-        // quadratic allocation path for adversarial namespace-heavy input.
+        // The event borrows the input slice rather than the reader, so
+        // namespace resolution can borrow the reader's resolver.  Cloning the
+        // resolver here would copy all in-scope namespace bindings once per
+        // event and turn a linear scan into a quadratic allocation path for
+        // adversarial namespace-heavy input.
         if matches!(&raw_event, Event::Start(_))
             && let (Some(bindings), Some(scopes)) =
                 (namespace_bindings.as_mut(), namespace_scopes.as_mut())
@@ -6351,7 +6691,14 @@ fn scan_document_with_context_nsreader_oracle(
                         )
                         .into());
                     }
-                    pending = Some((is_paragraph, is_table, is_control, is_section, event_start));
+                    pending = Some((
+                        is_paragraph,
+                        is_table,
+                        is_control,
+                        is_section,
+                        event_start,
+                        namespace_capture.capture(reader.resolver())?,
+                    ));
                 }
             },
             Event::Empty(element) => {
@@ -6369,6 +6716,7 @@ fn scan_document_with_context_nsreader_oracle(
                     }
                     if is_word && local.as_ref() == b"p" {
                         paragraphs.push(checked_range(event_start, event_end)?);
+                        paragraph_namespaces.push(namespace_capture.capture(reader.resolver())?);
                     }
                     if is_word && local.as_ref() == b"tbl" {
                         tables.push(checked_range(event_start, event_end)?);
@@ -6382,11 +6730,13 @@ fn scan_document_with_context_nsreader_oracle(
                 }
             },
             Event::End(element) => {
-                if let Some((is_paragraph, is_table, is_control, is_section, start)) = pending
-                    && body_depth.is_some_and(|body| depth == body + 1)
+                if body_depth.is_some_and(|body| depth == body + 1)
+                    && let Some((is_paragraph, is_table, is_control, is_section, start, namespaces)) =
+                        pending.take()
                 {
                     if is_paragraph {
                         paragraphs.push(checked_range(start, event_end)?);
+                        paragraph_namespaces.push(namespaces);
                     }
                     if is_table {
                         tables.push(checked_range(start, event_end)?);
@@ -6465,6 +6815,7 @@ fn scan_document_with_context_nsreader_oracle(
     )?;
     Ok(Layout {
         paragraphs,
+        paragraph_namespaces,
         tables,
         block_controls,
         content_end,
@@ -6497,6 +6848,1361 @@ fn checked_range(start: usize, end: usize) -> TransactionResult<Range> {
             crate::Error::InvalidFormat("paragraph length exceeds u32".into())
         })?,
     })
+}
+
+struct RevisionFragmentInfo {
+    root_open_end: usize,
+    root_close_start: usize,
+    child_ranges: Vec<(usize, usize)>,
+    namespace_declarations: Vec<Vec<u8>>,
+    scope_attributes: Vec<Vec<u8>>,
+    deleted_text_names: Vec<(usize, usize, Vec<u8>)>,
+}
+
+fn rewrite_revision_paragraph(
+    paragraph_xml: &[u8],
+    selector: RevisionSelector,
+    action: RevisionAction,
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> TransactionResult<Vec<u8>> {
+    if paragraph_has_revision_range_marker(paragraph_xml, inherited_namespaces).map_err(
+        |reason| TransactionError::Refused {
+            position: selector.paragraph.get(),
+            reason,
+        },
+    )? {
+        return Err(TransactionError::Refused {
+            position: selector.paragraph.get(),
+            reason: Refusal::RevisionDependency,
+        });
+    }
+    let revision_range = select_direct_child_with_context(
+        paragraph_xml,
+        b"p",
+        selector.kind.local_name(),
+        selector.revision,
+        Refusal::RevisionNotFound,
+        inherited_namespaces,
+    )
+    .map_err(|reason| TransactionError::Refused {
+        position: selector.paragraph.get(),
+        reason,
+    })?;
+    let revision_start = usize::try_from(revision_range.start).map_err(|_error| {
+        TransactionError::Document(crate::Error::InvalidFormat(
+            "revision offset does not fit usize".into(),
+        ))
+    })?;
+    let revision_end = revision_start
+        .checked_add(usize::try_from(revision_range.length).map_err(|_error| {
+            TransactionError::Document(crate::Error::InvalidFormat(
+                "revision length does not fit usize".into(),
+            ))
+        })?)
+        .ok_or_else(|| {
+            TransactionError::Document(crate::Error::InvalidFormat(
+                "revision range overflows usize".into(),
+            ))
+        })?;
+    let revision_xml = checked_slice(
+        paragraph_xml,
+        revision_start,
+        revision_end,
+        "tracked revision",
+    )?;
+    let replacement =
+        rewrite_revision_fragment(revision_xml, selector.kind, action, inherited_namespaces)
+            .map_err(|reason| TransactionError::Refused {
+                position: selector.paragraph.get(),
+                reason,
+            })?;
+    replace_range(paragraph_xml, revision_start, revision_end, &replacement)
+}
+
+fn paragraph_has_revision_range_marker(
+    paragraph_xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> Result<bool, Refusal> {
+    if paragraph_xml.len() > MAX_DOCUMENT_XML_BYTES {
+        return Err(Refusal::RevisionDependency);
+    }
+    let mut reader = NsReader::from_reader(paragraph_xml);
+    for (prefix, namespace) in inherited_namespaces {
+        let prefix = prefix
+            .as_deref()
+            .map_or(PrefixDeclaration::Default, PrefixDeclaration::Named);
+        reader
+            .resolver_mut()
+            .add(prefix, Namespace(namespace))
+            .map_err(|_error| Refusal::RevisionDependency)?;
+    }
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|_error| Refusal::RevisionDependency)?;
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or(Refusal::RevisionDependency)?;
+                if depth > MAX_DOCUMENT_DEPTH {
+                    return Err(Refusal::RevisionDependency);
+                }
+                nodes = nodes.checked_add(1).ok_or(Refusal::RevisionDependency)?;
+                if nodes > MAX_DOCUMENT_NODES {
+                    return Err(Refusal::RevisionDependency);
+                }
+                if depth == 2
+                    && is_wordprocessing_namespace(&namespace)
+                    && is_revision_range_marker(element.local_name().as_ref())
+                {
+                    return Ok(true);
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth.checked_add(1).ok_or(Refusal::RevisionDependency)?;
+                if child_depth > MAX_DOCUMENT_DEPTH {
+                    return Err(Refusal::RevisionDependency);
+                }
+                nodes = nodes.checked_add(1).ok_or(Refusal::RevisionDependency)?;
+                if nodes > MAX_DOCUMENT_NODES {
+                    return Err(Refusal::RevisionDependency);
+                }
+                if child_depth == 2
+                    && is_wordprocessing_namespace(&namespace)
+                    && is_revision_range_marker(element.local_name().as_ref())
+                {
+                    return Ok(true);
+                }
+            },
+            Event::End(_) => {
+                depth = depth.checked_sub(1).ok_or(Refusal::RevisionDependency)?;
+            },
+            Event::Eof => return Ok(false),
+            Event::Decl(_) | Event::DocType(_) => return Err(Refusal::RevisionDependency),
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
+fn is_revision_range_marker(local: &[u8]) -> bool {
+    matches!(
+        local,
+        b"moveFromRangeStart"
+            | b"moveFromRangeEnd"
+            | b"moveToRangeStart"
+            | b"moveToRangeEnd"
+            | b"commentRangeStart"
+            | b"commentRangeEnd"
+            | b"permStart"
+            | b"permEnd"
+            | b"bookmarkStart"
+            | b"bookmarkEnd"
+            | b"customXmlInsRangeStart"
+            | b"customXmlInsRangeEnd"
+            | b"customXmlDelRangeStart"
+            | b"customXmlDelRangeEnd"
+            | b"customXmlMoveFromRangeStart"
+            | b"customXmlMoveFromRangeEnd"
+            | b"customXmlMoveToRangeStart"
+            | b"customXmlMoveToRangeEnd"
+    )
+}
+
+fn rewrite_revision_fragment(
+    xml: &[u8],
+    kind: RevisionKind,
+    action: RevisionAction,
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> Result<Vec<u8>, Refusal> {
+    let info = scan_revision_fragment(xml, kind, inherited_namespaces)?;
+    if action.removes_content(kind) {
+        return Ok(Vec::new());
+    }
+    if info.root_close_start < info.root_open_end {
+        return Err(Refusal::RevisionDependency);
+    }
+    let inner_range = info.root_open_end..info.root_close_start;
+    let inner_source = xml
+        .get(inner_range.clone())
+        .ok_or(Refusal::RevisionDependency)?;
+    let declaration_bytes = info
+        .namespace_declarations
+        .iter()
+        .map(Vec::len)
+        .chain(info.scope_attributes.iter().map(Vec::len))
+        .try_fold(0usize, |size, length| {
+            length
+                .checked_add(1)
+                .and_then(|length| size.checked_add(length))
+        })
+        .ok_or(Refusal::RevisionDependency)?;
+    let expansion = info
+        .child_ranges
+        .len()
+        .checked_mul(declaration_bytes)
+        .and_then(|size| inner_source.len().checked_add(size))
+        .ok_or(Refusal::RevisionDependency)?;
+    if expansion > MAX_DOCUMENT_XML_BYTES {
+        return Err(Refusal::RevisionDependency);
+    }
+    let mut inner = Vec::new();
+    inner
+        .try_reserve_exact(inner_source.len())
+        .map_err(|_error| Refusal::RevisionDependency)?;
+    inner.extend_from_slice(inner_source);
+    let namespace_declarations = raw_attribute_fragments(&info.namespace_declarations)?;
+    let root_namespace_bindings = raw_namespace_bindings(&namespace_declarations)?;
+    let scope_attributes = raw_attribute_fragments(&info.scope_attributes)?;
+    let mut replacements = Vec::new();
+    let replace_deleted_text =
+        matches!(kind, RevisionKind::Deletion) && matches!(action, RevisionAction::Reject);
+    let replacement_count = info
+        .deleted_text_names
+        .len()
+        .checked_add(info.child_ranges.len())
+        .ok_or(Refusal::RevisionDependency)?;
+    replacements
+        .try_reserve_exact(replacement_count)
+        .map_err(|_error| Refusal::RevisionDependency)?;
+    if replace_deleted_text {
+        for (start, end, replacement) in info.deleted_text_names {
+            let start = start
+                .checked_sub(info.root_open_end)
+                .ok_or(Refusal::RevisionDependency)?;
+            let end = end
+                .checked_sub(info.root_open_end)
+                .ok_or(Refusal::RevisionDependency)?;
+            replacements.push((start, end, replacement));
+        }
+    }
+    for (child_start, child_end) in info.child_ranges {
+        let child_start = child_start
+            .checked_sub(info.root_open_end)
+            .ok_or(Refusal::RevisionDependency)?;
+        let tag_end = child_end
+            .checked_sub(info.root_open_end)
+            .ok_or(Refusal::RevisionDependency)?;
+        let opening = inner
+            .get(child_start..tag_end)
+            .ok_or(Refusal::RevisionDependency)?;
+        let existing = raw_tag_attributes(opening)?;
+        let mut child_namespace_declarations = Vec::new();
+        child_namespace_declarations
+            .try_reserve_exact(existing.len())
+            .map_err(|_error| Refusal::RevisionDependency)?;
+        for attribute in &existing {
+            if is_namespace_declaration_name(&attribute.name) {
+                child_namespace_declarations.push(attribute);
+            }
+        }
+        let name_end = raw_tag_name_end(opening)?
+            .checked_add(child_start)
+            .ok_or(Refusal::RevisionDependency)?;
+        let mut insertion = Vec::new();
+        insertion
+            .try_reserve_exact(declaration_bytes)
+            .map_err(|_error| Refusal::RevisionDependency)?;
+        for declaration in &namespace_declarations {
+            if let Some(current) = existing.iter().find(|item| item.name == declaration.name) {
+                if current.value != declaration.value {
+                    return Err(Refusal::RevisionDependency);
+                }
+                continue;
+            }
+            insertion.push(b' ');
+            insertion.extend_from_slice(&declaration.raw);
+        }
+        for scope_attribute in &scope_attributes {
+            let expected_namespace = raw_attribute_namespace_kind(
+                &scope_attribute.name,
+                &[],
+                &root_namespace_bindings,
+                inherited_namespaces,
+            )?;
+            let child_namespace = raw_attribute_namespace_kind(
+                &scope_attribute.name,
+                &child_namespace_declarations,
+                &root_namespace_bindings,
+                inherited_namespaces,
+            )?;
+            if child_namespace != expected_namespace {
+                return Err(Refusal::RevisionDependency);
+            }
+            let mut matched = false;
+            for current in &existing {
+                if is_namespace_declaration_name(&current.name) {
+                    continue;
+                }
+                let current_namespace = raw_attribute_namespace_kind(
+                    &current.name,
+                    &child_namespace_declarations,
+                    &root_namespace_bindings,
+                    inherited_namespaces,
+                )?;
+                let current_local = raw_attribute_local_name(&current.name)?;
+                if current_namespace == expected_namespace
+                    && current_local == raw_attribute_local_name(&scope_attribute.name)?
+                {
+                    if matched || current.value != scope_attribute.value {
+                        return Err(Refusal::RevisionDependency);
+                    }
+                    matched = true;
+                }
+            }
+            if matched {
+                continue;
+            }
+            insertion.push(b' ');
+            insertion.extend_from_slice(&scope_attribute.raw);
+        }
+        if !insertion.is_empty() {
+            replacements.push((name_end, name_end, insertion));
+        }
+    }
+    replacements.sort_by_key(|(start, _, _)| *start);
+    replace_ranges(&inner, &replacements).map_err(|_error| Refusal::RevisionDependency)
+}
+
+fn scan_revision_fragment(
+    xml: &[u8],
+    kind: RevisionKind,
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> Result<RevisionFragmentInfo, Refusal> {
+    let mut reader = NsReader::from_reader(xml);
+    for (prefix, namespace) in inherited_namespaces {
+        let prefix = prefix
+            .as_deref()
+            .map_or(PrefixDeclaration::Default, PrefixDeclaration::Named);
+        reader
+            .resolver_mut()
+            .add(prefix, Namespace(namespace))
+            .map_err(|_error| Refusal::RevisionDependency)?;
+    }
+    let mut root_started = false;
+    let mut root_closed = false;
+    let mut root_open_end = None;
+    let mut root_close_start = None;
+    let mut child_ranges = Vec::new();
+    let mut namespace_declarations = Vec::new();
+    let mut scope_attributes = Vec::new();
+    let mut deleted_text_names = Vec::new();
+    let mut run_depth = None;
+    let mut text_depth = None;
+    let mut opaque_depth = None;
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+
+    loop {
+        let event_start = usize::try_from(reader.buffer_position())
+            .map_err(|_error| Refusal::RevisionDependency)?;
+        let raw_event = reader
+            .read_event()
+            .map_err(|_error| Refusal::RevisionDependency)?;
+        let (namespace, event) = reader.resolver().resolve_event(raw_event);
+        let event_end = usize::try_from(reader.buffer_position())
+            .map_err(|_error| Refusal::RevisionDependency)?;
+        if matches!(event, Event::Start(_) | Event::Empty(_)) {
+            nodes = nodes.checked_add(1).ok_or(Refusal::RevisionDependency)?;
+            if nodes > MAX_DOCUMENT_NODES {
+                return Err(Refusal::RevisionDependency);
+            }
+            if let Event::Start(element) | Event::Empty(element) = &event {
+                validate_revision_element_attributes(element, reader.resolver(), reader.decoder())?;
+            }
+        }
+
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or(Refusal::RevisionDependency)?;
+                if depth > MAX_DOCUMENT_DEPTH {
+                    return Err(Refusal::RevisionDependency);
+                }
+                if !root_started {
+                    if depth != 1
+                        || !is_wordprocessing_namespace(&namespace)
+                        || element.local_name().as_ref() != kind.local_name()
+                    {
+                        return Err(Refusal::RevisionNotFound);
+                    }
+                    root_started = true;
+                    root_open_end = Some(event_end);
+                    namespace_declarations = raw_namespace_declarations(
+                        xml.get(event_start..event_end)
+                            .ok_or(Refusal::RevisionDependency)?,
+                    )?;
+                    scope_attributes = raw_revision_scope_attributes(
+                        xml.get(event_start..event_end)
+                            .ok_or(Refusal::RevisionDependency)?,
+                        &element,
+                        reader.resolver(),
+                        reader.decoder(),
+                    )?;
+                    continue;
+                }
+                if root_closed || depth == 1 {
+                    return Err(Refusal::RevisionDependency);
+                }
+                if depth == 2 {
+                    if !is_word_local(&namespace, element.name(), b"r") {
+                        return Err(Refusal::RevisionDependency);
+                    }
+                    child_ranges
+                        .try_reserve(1)
+                        .map_err(|_error| Refusal::RevisionDependency)?;
+                    child_ranges.push((event_start, event_end));
+                    run_depth = Some(depth);
+                } else if text_depth.is_some() {
+                    return Err(Refusal::RevisionDependency);
+                } else if run_depth == Some(depth - 1) {
+                    let mut deleted_name = None;
+                    inspect_revision_run_child(
+                        xml,
+                        &namespace,
+                        element.name(),
+                        kind,
+                        false,
+                        &mut text_depth,
+                        depth,
+                        Some((&mut deleted_name, event_start)),
+                    )?;
+                    if let Some((start, end, replacement)) = deleted_name {
+                        deleted_text_names
+                            .try_reserve(1)
+                            .map_err(|_error| Refusal::RevisionDependency)?;
+                        deleted_text_names.push((start, end, replacement));
+                    }
+                    if !is_wordprocessing_namespace(&namespace) {
+                        opaque_depth = Some(depth);
+                    }
+                } else {
+                    inspect_revision_descendant(&namespace, element.name(), depth)?;
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth.checked_add(1).ok_or(Refusal::RevisionDependency)?;
+                if !root_started {
+                    if depth != 0
+                        || !is_wordprocessing_namespace(&namespace)
+                        || element.local_name().as_ref() != kind.local_name()
+                    {
+                        return Err(Refusal::RevisionNotFound);
+                    }
+                    root_started = true;
+                    root_closed = true;
+                    root_open_end = Some(event_end);
+                    root_close_start = Some(event_end);
+                    namespace_declarations = raw_namespace_declarations(
+                        xml.get(event_start..event_end)
+                            .ok_or(Refusal::RevisionDependency)?,
+                    )?;
+                    scope_attributes = raw_revision_scope_attributes(
+                        xml.get(event_start..event_end)
+                            .ok_or(Refusal::RevisionDependency)?,
+                        &element,
+                        reader.resolver(),
+                        reader.decoder(),
+                    )?;
+                } else if root_closed {
+                    return Err(Refusal::RevisionDependency);
+                } else if child_depth == 2 {
+                    if !is_word_local(&namespace, element.name(), b"r") {
+                        return Err(Refusal::RevisionDependency);
+                    }
+                    child_ranges
+                        .try_reserve(1)
+                        .map_err(|_error| Refusal::RevisionDependency)?;
+                    child_ranges.push((event_start, event_end));
+                } else if text_depth.is_some() {
+                    return Err(Refusal::RevisionDependency);
+                } else if run_depth == Some(child_depth - 1) {
+                    let mut deleted_name = None;
+                    inspect_revision_run_child(
+                        xml,
+                        &namespace,
+                        element.name(),
+                        kind,
+                        true,
+                        &mut text_depth,
+                        child_depth,
+                        Some((&mut deleted_name, event_start)),
+                    )?;
+                    if let Some((start, end, replacement)) = deleted_name {
+                        deleted_text_names
+                            .try_reserve(1)
+                            .map_err(|_error| Refusal::RevisionDependency)?;
+                        deleted_text_names.push((start, end, replacement));
+                    }
+                } else {
+                    inspect_revision_descendant(&namespace, element.name(), child_depth)?;
+                }
+            },
+            Event::End(element) => {
+                if !root_started || root_closed || depth == 0 {
+                    return Err(Refusal::RevisionDependency);
+                }
+                if depth == 1 {
+                    if !is_word_local(&namespace, element.name(), kind.local_name()) {
+                        return Err(Refusal::RevisionDependency);
+                    }
+                    root_close_start = Some(event_start);
+                    root_closed = true;
+                    depth = 0;
+                } else {
+                    if let Some(text_depth_value) = text_depth {
+                        if text_depth_value == depth {
+                            if matches!(kind, RevisionKind::Deletion)
+                                && is_word_local(&namespace, element.name(), b"delText")
+                            {
+                                let (start, end, replacement) =
+                                    revision_tag_name_replacement(xml, event_start, true)?;
+                                deleted_text_names
+                                    .try_reserve(1)
+                                    .map_err(|_error| Refusal::RevisionDependency)?;
+                                deleted_text_names.push((start, end, replacement));
+                            }
+                            text_depth = None;
+                        } else if text_depth_value < depth {
+                            return Err(Refusal::RevisionDependency);
+                        }
+                    }
+                    if opaque_depth == Some(depth) {
+                        opaque_depth = None;
+                    }
+                    if run_depth == Some(depth) {
+                        run_depth = None;
+                    }
+                    depth = depth.checked_sub(1).ok_or(Refusal::RevisionDependency)?;
+                }
+            },
+            Event::Text(event_text) => {
+                validate_revision_text_event(Event::Text(event_text.borrow()))?;
+                if text_depth.is_none()
+                    && opaque_depth.is_none()
+                    && !event_text.as_ref().iter().all(u8::is_ascii_whitespace)
+                {
+                    return Err(Refusal::RevisionDependency);
+                }
+            },
+            Event::CData(event_text) => {
+                validate_revision_text_event(Event::CData(event_text.borrow()))?;
+                if text_depth.is_none() && opaque_depth.is_none() {
+                    return Err(Refusal::RevisionDependency);
+                }
+            },
+            Event::GeneralRef(reference) => {
+                validate_revision_text_event(Event::GeneralRef(reference.borrow()))?;
+                if text_depth.is_none() && opaque_depth.is_none() {
+                    return Err(Refusal::RevisionDependency);
+                }
+            },
+            Event::Eof => break,
+            Event::Decl(_) | Event::DocType(_) => return Err(Refusal::RevisionDependency),
+            Event::Comment(_) | Event::PI(_) => {},
+        }
+    }
+    if !root_started
+        || !root_closed
+        || depth != 0
+        || text_depth.is_some()
+        || opaque_depth.is_some()
+        || run_depth.is_some()
+    {
+        return Err(Refusal::RevisionDependency);
+    }
+    let root_open_end = root_open_end.ok_or(Refusal::RevisionDependency)?;
+    Ok(RevisionFragmentInfo {
+        root_open_end,
+        root_close_start: root_close_start.unwrap_or(root_open_end),
+        child_ranges,
+        namespace_declarations,
+        scope_attributes,
+        deleted_text_names,
+    })
+}
+
+fn inspect_revision_run_child(
+    xml: &[u8],
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    kind: RevisionKind,
+    empty: bool,
+    text_depth: &mut Option<usize>,
+    depth: usize,
+    deleted_name: Option<(&mut Option<(usize, usize, Vec<u8>)>, usize)>,
+) -> Result<(), Refusal> {
+    if matches!(namespace, ResolveResult::Unknown(_)) {
+        return Err(Refusal::RevisionDependency);
+    }
+    if !is_wordprocessing_namespace(namespace) {
+        // Extension children are retained byte-for-byte. Any known Word
+        // dependency nested below them is still rejected by the descendant
+        // scanner, so this does not silently reinterpret Word semantics.
+        return Ok(());
+    }
+    let local = name.local_name();
+    let local = local.as_ref();
+    if local == b"rPr" {
+        return Ok(());
+    }
+    let expected_text = match kind {
+        RevisionKind::Insertion => b"t".as_slice(),
+        RevisionKind::Deletion => b"delText".as_slice(),
+    };
+    if local == expected_text {
+        if !empty {
+            if text_depth.replace(depth).is_some() {
+                return Err(Refusal::RevisionDependency);
+            }
+        }
+        if matches!(kind, RevisionKind::Deletion) {
+            if let Some((slot, event_start)) = deleted_name {
+                let (start, end, replacement) =
+                    revision_tag_name_replacement(xml, event_start, false)?;
+                *slot = Some((start, end, replacement));
+            }
+        }
+        return Ok(());
+    }
+    if is_word_local(namespace, name, b"t") || is_word_local(namespace, name, b"delText") {
+        return Err(Refusal::RevisionDependency);
+    }
+    if matches!(
+        local,
+        b"tab" | b"br" | b"cr" | b"noBreakHyphen" | b"softHyphen"
+    ) {
+        if !empty {
+            return Err(Refusal::RevisionDependency);
+        }
+        return Ok(());
+    }
+    if unsupported_revision_word_local(local) {
+        return Err(Refusal::RevisionDependency);
+    }
+    Err(Refusal::RevisionDependency)
+}
+
+fn validate_revision_text_event(event: Event<'_>) -> Result<(), Refusal> {
+    let text = match event {
+        Event::Text(text) => {
+            let encoded = text
+                .xml_content(XmlVersion::Explicit1_0)
+                .map_err(|_error| Refusal::RevisionDependency)?;
+            quick_xml::escape::unescape(&encoded)
+                .map_err(|_error| Refusal::RevisionDependency)?
+                .into_owned()
+        },
+        Event::CData(text) => text
+            .xml_content(XmlVersion::Explicit1_0)
+            .map_err(|_error| Refusal::RevisionDependency)?
+            .into_owned(),
+        Event::GeneralRef(reference) => litchi_ooxml_common::xml::decode_xml_reference(&reference)
+            .map_err(|_error| Refusal::RevisionDependency)?,
+        _ => return Ok(()),
+    };
+    if text.chars().all(is_legal_revision_xml_character) {
+        Ok(())
+    } else {
+        Err(Refusal::RevisionDependency)
+    }
+}
+
+fn validate_revision_element_attributes(
+    element: &quick_xml::events::BytesStart<'_>,
+    resolver: &quick_xml::name::NamespaceResolver,
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<(), Refusal> {
+    let mut attributes = 0usize;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|_error| Refusal::RevisionDependency)?;
+        if attribute.value.len() > MAX_REVISION_METADATA_VALUE_BYTES
+            || attribute.value.contains(&b'<')
+        {
+            return Err(Refusal::RevisionDependency);
+        }
+        let decoded = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|_error| Refusal::RevisionDependency)?;
+        if !decoded.chars().all(is_legal_revision_xml_character) {
+            return Err(Refusal::RevisionDependency);
+        }
+        attributes = attributes
+            .checked_add(1)
+            .ok_or(Refusal::RevisionDependency)?;
+        if attributes > MAX_REVISION_ATTRIBUTES {
+            return Err(Refusal::RevisionDependency);
+        }
+        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
+        if matches!(
+            resolver.resolve_attribute(attribute.key).0,
+            ResolveResult::Unknown(_)
+        ) {
+            return Err(Refusal::RevisionDependency);
+        }
+    }
+    Ok(())
+}
+
+fn is_legal_revision_xml_character(character: char) -> bool {
+    matches!(
+        character as u32,
+        0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF
+    )
+}
+
+fn inspect_revision_descendant(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    depth: usize,
+) -> Result<(), Refusal> {
+    if matches!(namespace, ResolveResult::Unknown(_)) {
+        return Err(Refusal::RevisionDependency);
+    }
+    if !is_wordprocessing_namespace(namespace) {
+        return Ok(());
+    }
+    let local = name.local_name();
+    let local = local.as_ref();
+    if matches!(local, b"t" | b"delText" | b"r" | b"ins" | b"del")
+        || unsupported_revision_word_local(local)
+    {
+        return Err(Refusal::RevisionDependency);
+    }
+    if depth < 3 {
+        return Err(Refusal::RevisionDependency);
+    }
+    Ok(())
+}
+
+fn unsupported_revision_word_local(local: &[u8]) -> bool {
+    matches!(
+        local,
+        b"moveFrom"
+            | b"moveTo"
+            | b"moveFromRangeStart"
+            | b"moveFromRangeEnd"
+            | b"moveToRangeStart"
+            | b"moveToRangeEnd"
+            | b"bookmarkStart"
+            | b"bookmarkEnd"
+            | b"commentRangeStart"
+            | b"commentRangeEnd"
+            | b"permStart"
+            | b"permEnd"
+            | b"customXml"
+            | b"customXmlInsRangeStart"
+            | b"customXmlInsRangeEnd"
+            | b"customXmlDelRangeStart"
+            | b"customXmlDelRangeEnd"
+            | b"customXmlMoveFromRangeStart"
+            | b"customXmlMoveFromRangeEnd"
+            | b"customXmlMoveToRangeStart"
+            | b"customXmlMoveToRangeEnd"
+            | b"rPrChange"
+            | b"pPrChange"
+            | b"sectPrChange"
+            | b"tblPrChange"
+            | b"tblPrExChange"
+            | b"tblGridChange"
+            | b"trPrChange"
+            | b"tcPrChange"
+            | b"tbl"
+            | b"tr"
+            | b"tc"
+            | b"tblPr"
+            | b"trPr"
+            | b"tcPr"
+            | b"hyperlink"
+            | b"fldSimple"
+            | b"fldChar"
+            | b"instrText"
+            | b"delInstrText"
+            | b"sdt"
+            | b"sdtContent"
+            | b"commentReference"
+            | b"footnoteReference"
+            | b"endnoteReference"
+            | b"drawing"
+            | b"pict"
+            | b"object"
+    )
+}
+
+fn is_word_local(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    local: &[u8],
+) -> bool {
+    is_wordprocessing_namespace(namespace) && name.local_name().as_ref() == local
+}
+
+fn raw_namespace_declarations(open_tag: &[u8]) -> Result<Vec<Vec<u8>>, Refusal> {
+    let attributes = raw_tag_attributes(open_tag)?;
+    let mut declarations = Vec::new();
+    for attribute in attributes.into_iter().filter(|attribute| {
+        attribute.name.as_slice() == b"xmlns" || attribute.name.starts_with(b"xmlns:")
+    }) {
+        declarations
+            .try_reserve(1)
+            .map_err(|_error| Refusal::RevisionDependency)?;
+        declarations.push(attribute.raw);
+    }
+    Ok(declarations)
+}
+
+fn raw_revision_scope_attributes(
+    open_tag: &[u8],
+    element: &quick_xml::events::BytesStart<'_>,
+    resolver: &quick_xml::name::NamespaceResolver,
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<Vec<Vec<u8>>, Refusal> {
+    let raw_attributes = raw_tag_attributes(open_tag)?;
+    let mut raw_attributes = raw_attributes.into_iter();
+    let mut scope = Vec::new();
+    scope
+        .try_reserve_exact(element.attributes().size_hint().0)
+        .map_err(|_error| Refusal::RevisionDependency)?;
+    let mut seen_id = false;
+    let mut seen_author = false;
+    let mut seen_date = false;
+    let mut seen_date_utc = false;
+    let mut seen_user_id = false;
+    let mut seen_scope_attributes: Vec<(RevisionNamespaceKind, Vec<u8>)> = Vec::new();
+    let mut attribute_count = 0usize;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|_error| Refusal::RevisionDependency)?;
+        attribute_count = attribute_count
+            .checked_add(1)
+            .ok_or(Refusal::RevisionDependency)?;
+        if attribute_count > MAX_REVISION_ATTRIBUTES {
+            return Err(Refusal::RevisionDependency);
+        }
+        let raw = raw_attributes.next().ok_or(Refusal::RevisionDependency)?;
+        if raw.name.as_slice() != attribute.key.as_ref() {
+            return Err(Refusal::RevisionDependency);
+        }
+        if raw.name.as_slice() == b"xmlns" || raw.name.starts_with(b"xmlns:") {
+            continue;
+        }
+        let (namespace, local_name) = resolver.resolve_attribute(attribute.key);
+        let local_name = local_name.as_ref();
+        let classification = match &namespace {
+            ResolveResult::Bound(Namespace(uri)) if is_wordprocessing_namespace(&namespace) => {
+                match local_name {
+                    b"id" => RevisionAttributeClass::Metadata(RevisionMetadataAttribute::Id),
+                    b"author" => {
+                        RevisionAttributeClass::Metadata(RevisionMetadataAttribute::Author)
+                    },
+                    b"date" => RevisionAttributeClass::Metadata(RevisionMetadataAttribute::Date),
+                    b"userId" => {
+                        RevisionAttributeClass::Metadata(RevisionMetadataAttribute::UserId)
+                    },
+                    _ => return Err(Refusal::RevisionDependency),
+                }
+            },
+            ResolveResult::Bound(Namespace(uri))
+                if *uri == WORD_2023_DATE_UTC_NAMESPACE && local_name == b"dateUtc" =>
+            {
+                RevisionAttributeClass::Metadata(RevisionMetadataAttribute::DateUtc)
+            },
+            ResolveResult::Bound(Namespace(uri))
+                if *uri == MARKUP_COMPATIBILITY_NAMESPACE
+                    && is_markup_compatibility_scope_attribute(local_name) =>
+            {
+                RevisionAttributeClass::Scope(RevisionNamespaceKind::MarkupCompatibility)
+            },
+            ResolveResult::Bound(Namespace(uri))
+                if *uri == XML_NAMESPACE && is_xml_scope_attribute(local_name) =>
+            {
+                RevisionAttributeClass::Scope(RevisionNamespaceKind::Xml)
+            },
+            ResolveResult::Bound(_) | ResolveResult::Unbound | ResolveResult::Unknown(_) => {
+                return Err(Refusal::RevisionDependency);
+            },
+        };
+        if let RevisionAttributeClass::Metadata(metadata) = classification {
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                .map_err(|_error| Refusal::RevisionDependency)?;
+            validate_revision_metadata(metadata, &value)?;
+            match metadata {
+                RevisionMetadataAttribute::Id => {
+                    if seen_id {
+                        return Err(Refusal::RevisionDependency);
+                    }
+                    seen_id = true;
+                },
+                RevisionMetadataAttribute::Author => {
+                    if seen_author {
+                        return Err(Refusal::RevisionDependency);
+                    }
+                    seen_author = true;
+                },
+                RevisionMetadataAttribute::Date => {
+                    if seen_date {
+                        return Err(Refusal::RevisionDependency);
+                    }
+                    seen_date = true;
+                },
+                RevisionMetadataAttribute::DateUtc => {
+                    if seen_date_utc {
+                        return Err(Refusal::RevisionDependency);
+                    }
+                    seen_date_utc = true;
+                },
+                RevisionMetadataAttribute::UserId => {
+                    if seen_user_id {
+                        return Err(Refusal::RevisionDependency);
+                    }
+                    seen_user_id = true;
+                },
+            }
+        } else {
+            let RevisionAttributeClass::Scope(namespace_kind) = classification else {
+                return Err(Refusal::RevisionDependency);
+            };
+            if seen_scope_attributes.iter().any(|(current, local)| {
+                *current == namespace_kind && local.as_slice() == local_name
+            }) {
+                return Err(Refusal::RevisionDependency);
+            }
+            seen_scope_attributes
+                .try_reserve(1)
+                .map_err(|_error| Refusal::RevisionDependency)?;
+            seen_scope_attributes.push((namespace_kind, local_name.to_vec()));
+            scope.push(raw.raw);
+        }
+    }
+    if raw_attributes.next().is_some() || !seen_id || !seen_author {
+        return Err(Refusal::RevisionDependency);
+    }
+    Ok(scope)
+}
+
+#[derive(Clone, Copy)]
+enum RevisionMetadataAttribute {
+    Id,
+    Author,
+    Date,
+    DateUtc,
+    UserId,
+}
+
+enum RevisionAttributeClass {
+    Metadata(RevisionMetadataAttribute),
+    Scope(RevisionNamespaceKind),
+}
+
+fn validate_revision_metadata(
+    attribute: RevisionMetadataAttribute,
+    value: &str,
+) -> Result<(), Refusal> {
+    if value.len() > MAX_REVISION_METADATA_VALUE_BYTES
+        || !value.chars().all(is_legal_revision_xml_character)
+    {
+        return Err(Refusal::RevisionDependency);
+    }
+    match attribute {
+        RevisionMetadataAttribute::Id => {
+            let normalized = collapse_revision_metadata_whitespace(value);
+            let digits = normalized
+                .strip_prefix('+')
+                .or_else(|| normalized.strip_prefix('-'))
+                .unwrap_or(&normalized);
+            if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+                return Err(Refusal::RevisionDependency);
+            }
+        },
+        RevisionMetadataAttribute::Author => {},
+        RevisionMetadataAttribute::Date => {
+            DateTime::new(value.to_owned()).map_err(|_error| Refusal::RevisionDependency)?;
+        },
+        RevisionMetadataAttribute::DateUtc => {
+            if !value.is_ascii() || value.len() > 128 {
+                return Err(Refusal::RevisionDependency);
+            }
+            DateTime::new(value.to_owned()).map_err(|_error| Refusal::RevisionDependency)?;
+            let normalized = collapse_revision_metadata_whitespace(value);
+            if !normalized.ends_with('Z')
+                && !normalized.ends_with("+00:00")
+                && !normalized.ends_with("-00:00")
+            {
+                return Err(Refusal::RevisionDependency);
+            }
+        },
+        RevisionMetadataAttribute::UserId => {
+            if value.trim().is_empty() {
+                return Err(Refusal::RevisionDependency);
+            }
+        },
+    }
+    Ok(())
+}
+
+fn collapse_revision_metadata_whitespace(value: &str) -> String {
+    let mut output = String::with_capacity(value.len());
+    let mut pending_space = false;
+    for character in value.chars() {
+        if matches!(character, '\u{9}' | '\u{A}' | '\u{D}' | ' ') {
+            pending_space = true;
+        } else {
+            if pending_space && !output.is_empty() {
+                output.push(' ');
+            }
+            output.push(character);
+            pending_space = false;
+        }
+    }
+    output
+}
+
+fn is_markup_compatibility_scope_attribute(local_name: &[u8]) -> bool {
+    matches!(
+        local_name,
+        b"Ignorable" | b"ProcessContent" | b"MustUnderstand"
+    )
+}
+
+fn is_xml_scope_attribute(local_name: &[u8]) -> bool {
+    matches!(local_name, b"space" | b"lang")
+}
+
+struct RawTagAttribute {
+    name: Vec<u8>,
+    value: Vec<u8>,
+    raw: Vec<u8>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RevisionNamespaceKind {
+    Word,
+    MarkupCompatibility,
+    Xml,
+    DateUtc,
+    Other,
+}
+
+fn raw_attribute_fragments(fragments: &[Vec<u8>]) -> Result<Vec<RawTagAttribute>, Refusal> {
+    let mut attributes = Vec::new();
+    attributes
+        .try_reserve_exact(fragments.len())
+        .map_err(|_error| Refusal::RevisionDependency)?;
+    for fragment in fragments {
+        let mut tag = Vec::new();
+        let capacity = b"<x "
+            .len()
+            .checked_add(fragment.len())
+            .and_then(|size| size.checked_add(1))
+            .ok_or(Refusal::RevisionDependency)?;
+        tag.try_reserve_exact(capacity)
+            .map_err(|_error| Refusal::RevisionDependency)?;
+        tag.extend_from_slice(b"<x ");
+        tag.extend_from_slice(fragment);
+        tag.push(b'>');
+        let mut parsed = raw_tag_attributes(&tag)?;
+        if parsed.len() != 1 {
+            return Err(Refusal::RevisionDependency);
+        }
+        attributes.push(parsed.pop().ok_or(Refusal::RevisionDependency)?);
+    }
+    Ok(attributes)
+}
+
+fn raw_namespace_bindings(
+    declarations: &[RawTagAttribute],
+) -> Result<Vec<(Option<Vec<u8>>, Vec<u8>)>, Refusal> {
+    let mut bindings: Vec<(Option<Vec<u8>>, Vec<u8>)> = Vec::new();
+    bindings
+        .try_reserve_exact(declarations.len())
+        .map_err(|_error| Refusal::RevisionDependency)?;
+    for declaration in declarations {
+        let prefix = raw_namespace_declaration_prefix(&declaration.name)?;
+        if bindings
+            .iter()
+            .any(|(current, _)| current.as_deref() == prefix)
+        {
+            return Err(Refusal::RevisionDependency);
+        }
+        bindings.push((prefix.map(ToOwned::to_owned), declaration.value.clone()));
+    }
+    Ok(bindings)
+}
+
+fn is_namespace_declaration_name(name: &[u8]) -> bool {
+    name == b"xmlns" || name.starts_with(b"xmlns:")
+}
+
+fn raw_namespace_declaration_prefix(name: &[u8]) -> Result<Option<&[u8]>, Refusal> {
+    if name == b"xmlns" {
+        return Ok(None);
+    }
+    let prefix = name
+        .strip_prefix(b"xmlns:")
+        .filter(|prefix| !prefix.is_empty() && !prefix.contains(&b':'))
+        .ok_or(Refusal::RevisionDependency)?;
+    Ok(Some(prefix))
+}
+
+fn raw_attribute_local_name(name: &[u8]) -> Result<&[u8], Refusal> {
+    let Some(index) = name.iter().position(|byte| *byte == b':') else {
+        if name.is_empty() {
+            return Err(Refusal::RevisionDependency);
+        }
+        return Ok(name);
+    };
+    let local = name
+        .get(index + 1..)
+        .filter(|local| !local.is_empty() && !local.contains(&b':'))
+        .ok_or(Refusal::RevisionDependency)?;
+    Ok(local)
+}
+
+fn raw_attribute_prefix(name: &[u8]) -> Result<Option<&[u8]>, Refusal> {
+    let Some(index) = name.iter().position(|byte| *byte == b':') else {
+        return Ok(None);
+    };
+    let prefix = name
+        .get(..index)
+        .filter(|prefix| !prefix.is_empty())
+        .ok_or(Refusal::RevisionDependency)?;
+    Ok(Some(prefix))
+}
+
+fn raw_attribute_namespace_kind(
+    name: &[u8],
+    child_declarations: &[&RawTagAttribute],
+    root_bindings: &[(Option<Vec<u8>>, Vec<u8>)],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> Result<RevisionNamespaceKind, Refusal> {
+    let Some(prefix) = raw_attribute_prefix(name)? else {
+        raw_attribute_local_name(name)?;
+        return Ok(RevisionNamespaceKind::Other);
+    };
+    if prefix == b"xml" {
+        return Ok(RevisionNamespaceKind::Xml);
+    }
+    if prefix == b"xmlns" {
+        return Err(Refusal::RevisionDependency);
+    }
+    let namespace = child_declarations
+        .iter()
+        .find_map(|attribute| {
+            raw_namespace_declaration_prefix(&attribute.name)
+                .ok()
+                .flatten()
+                .filter(|current| *current == prefix)
+                .map(|_| attribute.value.as_slice())
+        })
+        .or_else(|| {
+            root_bindings.iter().find_map(|(current, namespace)| {
+                current
+                    .as_deref()
+                    .filter(|current| *current == prefix)
+                    .map(|_| namespace.as_slice())
+            })
+        })
+        .or_else(|| {
+            inherited_namespaces
+                .iter()
+                .find_map(|(current, namespace)| {
+                    current
+                        .as_deref()
+                        .filter(|current| *current == prefix)
+                        .map(|_| namespace.as_slice())
+                })
+        })
+        .ok_or(Refusal::RevisionDependency)?;
+    if namespace.is_empty() {
+        return Err(Refusal::RevisionDependency);
+    }
+    Ok(match namespace {
+        value
+            if value == WORDPROCESSINGML_NAMESPACE
+                || value == STRICT_WORDPROCESSINGML_NAMESPACE =>
+        {
+            RevisionNamespaceKind::Word
+        },
+        value if value == MARKUP_COMPATIBILITY_NAMESPACE => {
+            RevisionNamespaceKind::MarkupCompatibility
+        },
+        value if value == XML_NAMESPACE => RevisionNamespaceKind::Xml,
+        value if value == WORD_2023_DATE_UTC_NAMESPACE => RevisionNamespaceKind::DateUtc,
+        _ => RevisionNamespaceKind::Other,
+    })
+}
+
+fn raw_tag_name_end(tag: &[u8]) -> Result<usize, Refusal> {
+    if tag.first() != Some(&b'<') {
+        return Err(Refusal::RevisionDependency);
+    }
+    let mut end = 1usize;
+    if tag.get(end) == Some(&b'/') {
+        end += 1;
+    }
+    let start = end;
+    while end < tag.len() && !matches!(tag[end], b'>' | b'/' | b' ' | b'\t' | b'\r' | b'\n') {
+        end += 1;
+    }
+    if end == start {
+        return Err(Refusal::RevisionDependency);
+    }
+    Ok(end)
+}
+
+fn raw_tag_attributes(tag: &[u8]) -> Result<Vec<RawTagAttribute>, Refusal> {
+    if tag.len() > MAX_REVISION_TAG_ATTRIBUTE_BYTES {
+        return Err(Refusal::RevisionDependency);
+    }
+    let mut name_end = 1usize;
+    while name_end < tag.len()
+        && !matches!(
+            tag[name_end],
+            b':' | b'>' | b'/' | b'=' | b' ' | b'\t' | b'\r' | b'\n'
+        )
+    {
+        name_end += 1;
+    }
+    if name_end < tag.len() && tag[name_end] == b':' {
+        name_end += 1;
+        while name_end < tag.len()
+            && !matches!(
+                tag[name_end],
+                b'>' | b'/' | b'=' | b' ' | b'\t' | b'\r' | b'\n'
+            )
+        {
+            name_end += 1;
+        }
+    }
+    let mut cursor = name_end;
+    let mut attributes = Vec::new();
+    let mut attribute_count = 0usize;
+    let mut copied_bytes = 0usize;
+    while cursor < tag.len() {
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= tag.len() || matches!(tag[cursor], b'>' | b'/') {
+            break;
+        }
+        let start = cursor;
+        while cursor < tag.len()
+            && !matches!(
+                tag[cursor],
+                b'=' | b'>' | b'/' | b' ' | b'\t' | b'\r' | b'\n'
+            )
+        {
+            cursor += 1;
+        }
+        let name = tag.get(start..cursor).ok_or(Refusal::RevisionDependency)?;
+        if name.is_empty() || name.len() > MAX_REVISION_METADATA_VALUE_BYTES {
+            return Err(Refusal::RevisionDependency);
+        }
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if tag.get(cursor) != Some(&b'=') {
+            return Err(Refusal::RevisionDependency);
+        }
+        cursor += 1;
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        let quote = *tag.get(cursor).ok_or(Refusal::RevisionDependency)?;
+        if !matches!(quote, b'"' | b'\'') {
+            return Err(Refusal::RevisionDependency);
+        }
+        cursor += 1;
+        let value_start = cursor;
+        while cursor < tag.len() && tag[cursor] != quote {
+            cursor += 1;
+        }
+        let value = tag
+            .get(value_start..cursor)
+            .ok_or(Refusal::RevisionDependency)?;
+        if value.len() > MAX_REVISION_METADATA_VALUE_BYTES {
+            return Err(Refusal::RevisionDependency);
+        }
+        if cursor >= tag.len() {
+            return Err(Refusal::RevisionDependency);
+        }
+        cursor += 1;
+        attribute_count = attribute_count
+            .checked_add(1)
+            .ok_or(Refusal::RevisionDependency)?;
+        if attribute_count > MAX_REVISION_ATTRIBUTES {
+            return Err(Refusal::RevisionDependency);
+        }
+        let raw = tag.get(start..cursor).ok_or(Refusal::RevisionDependency)?;
+        copied_bytes = copied_bytes
+            .checked_add(name.len())
+            .and_then(|size| size.checked_add(value.len()))
+            .and_then(|size| size.checked_add(raw.len()))
+            .ok_or(Refusal::RevisionDependency)?;
+        if copied_bytes > MAX_REVISION_TAG_ATTRIBUTE_BYTES {
+            return Err(Refusal::RevisionDependency);
+        }
+        let mut name_owned = Vec::new();
+        name_owned
+            .try_reserve_exact(name.len())
+            .map_err(|_error| Refusal::RevisionDependency)?;
+        name_owned.extend_from_slice(name);
+        let mut value_owned = Vec::new();
+        value_owned
+            .try_reserve_exact(value.len())
+            .map_err(|_error| Refusal::RevisionDependency)?;
+        value_owned.extend_from_slice(value);
+        let mut raw_owned = Vec::new();
+        raw_owned
+            .try_reserve_exact(raw.len())
+            .map_err(|_error| Refusal::RevisionDependency)?;
+        raw_owned.extend_from_slice(raw);
+        attributes
+            .try_reserve_exact(1)
+            .map_err(|_error| Refusal::RevisionDependency)?;
+        attributes.push(RawTagAttribute {
+            name: name_owned,
+            value: value_owned,
+            raw: raw_owned,
+        });
+    }
+    Ok(attributes)
+}
+
+fn revision_tag_name_replacement(
+    xml: &[u8],
+    event_start: usize,
+    end_tag: bool,
+) -> Result<(usize, usize, Vec<u8>), Refusal> {
+    let name_start = event_start
+        .checked_add(if end_tag { 2 } else { 1 })
+        .ok_or(Refusal::RevisionDependency)?;
+    revision_tag_name_replacement_at(xml, name_start)
+}
+
+fn revision_tag_name_replacement_at(
+    xml: &[u8],
+    name_start: usize,
+) -> Result<(usize, usize, Vec<u8>), Refusal> {
+    let name_end = xml
+        .get(name_start..)
+        .and_then(|suffix| {
+            suffix
+                .iter()
+                .position(|byte| matches!(*byte, b'>' | b'/' | b' ' | b'\t' | b'\r' | b'\n'))
+        })
+        .and_then(|offset| offset.checked_add(name_start))
+        .ok_or(Refusal::RevisionDependency)?;
+    let local_start = xml
+        .get(name_start..name_end)
+        .and_then(|name| name.iter().rposition(|byte| *byte == b':'))
+        .map_or(name_start, |offset| name_start + offset + 1);
+    Ok((local_start, name_end, b"t".to_vec()))
 }
 
 fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
@@ -7147,7 +8853,27 @@ fn select_direct_child(
     position: Position,
     missing: Refusal,
 ) -> Result<Range, Refusal> {
+    select_direct_child_with_context(xml, root_name, child_name, position, missing, &[])
+}
+
+fn select_direct_child_with_context(
+    xml: &[u8],
+    root_name: &[u8],
+    child_name: &[u8],
+    position: Position,
+    missing: Refusal,
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> Result<Range, Refusal> {
     let mut reader = NsReader::from_reader(xml);
+    for (prefix, namespace) in inherited_namespaces {
+        let prefix = prefix
+            .as_deref()
+            .map_or(PrefixDeclaration::Default, PrefixDeclaration::Named);
+        reader
+            .resolver_mut()
+            .add(prefix, Namespace(namespace))
+            .map_err(|_error| missing)?;
+    }
     let mut fragment_prefix = FragmentPrefix::Unseen;
     let mut root_depth = None;
     let mut capture = None::<(usize, usize)>;
@@ -7156,9 +8882,8 @@ fn select_direct_child(
     let mut saw_root = false;
     loop {
         let start = usize::try_from(reader.buffer_position()).map_err(|_error| missing)?;
-        let raw_event = reader.read_event().map_err(|_error| missing)?.into_owned();
-        let resolver = reader.resolver().clone();
-        let (namespace, event) = resolver.resolve_event(raw_event);
+        let raw_event = reader.read_event().map_err(|_error| missing)?;
+        let (namespace, event) = reader.resolver().resolve_event(raw_event);
         let end = usize::try_from(reader.buffer_position()).map_err(|_error| missing)?;
         match event {
             Event::Start(element) => {
@@ -9542,6 +11267,416 @@ mod tests {
                 .xml_bytes(),
             source.xml_bytes()
         );
+    }
+
+    #[test]
+    fn direct_revision_actions_preserve_runs_are_durable_and_exactly_reversible() {
+        let source = Snapshot::from_xml(document(
+            "<w:p><w:r><w:t>before </w:t></w:r><w:ins w:id=\"7\" w:author=\"A\" xmlns:x=\"urn:extension\"><w:r><w:rPr><w:b/></w:rPr><w:t>added</w:t><x:opaque x:flag=\"1\">opaque text</x:opaque></w:r><w:r><w:t>second</w:t><x:second>second opaque</x:second></w:r></w:ins><w:del w:id=\"8\" w:author=\"A\"><w:r><w:rPr><w:i/></w:rPr><w:delText>gone &amp; old</w:delText></w:r></w:del><w:r><w:t>tail</w:t></w:r></w:p>",
+        ))
+        .unwrap();
+
+        let mut edit = source.edit();
+        edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+            .unwrap()
+            .reject_revision(Position::new(0), RevisionKind::Deletion, Position::new(0))
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let xml = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+        assert!(!xml.contains("<w:ins"));
+        assert!(!xml.contains("<w:del"));
+        assert!(xml.contains("<w:r xmlns:x=\"urn:extension\"><w:rPr><w:b/></w:rPr><w:t>added</w:t><x:opaque x:flag=\"1\">opaque text</x:opaque></w:r>"));
+        assert!(xml.contains("<w:r xmlns:x=\"urn:extension\"><w:t>second</w:t><x:second>second opaque</x:second></w:r>"));
+        assert!(xml.contains("<w:t>gone &amp; old</w:t>"));
+        assert!(xml.contains("<w:rPr><w:i/></w:rPr>"));
+        assert_eq!(commit.patch().operations().len(), 2);
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+
+        let durable = commit.patch().to_durable(durable_limits()).unwrap();
+        let wire = durable.to_deterministic_json().unwrap();
+        let decoded =
+            litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+                &wire,
+                durable_limits(),
+            )
+            .unwrap();
+        assert_eq!(
+            source.apply_durable(&decoded).unwrap().xml_bytes(),
+            commit.snapshot().xml_bytes()
+        );
+        assert_eq!(
+            source
+                .apply_durable(&decoded)
+                .unwrap()
+                .apply_durable(&decoded.inverse())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+
+        let mut reject_insert = source.edit();
+        reject_insert
+            .reject_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+            .unwrap();
+        let rejected = reject_insert.commit().unwrap();
+        let rejected_xml = std::str::from_utf8(rejected.snapshot().xml_bytes()).unwrap();
+        assert!(!rejected_xml.contains("added"));
+        assert!(rejected_xml.contains("<w:del"));
+
+        let mut accept_delete = source.edit();
+        accept_delete
+            .accept_revision(Position::new(0), RevisionKind::Deletion, Position::new(0))
+            .unwrap();
+        let accepted = accept_delete.commit().unwrap();
+        let accepted_xml = std::str::from_utf8(accepted.snapshot().xml_bytes()).unwrap();
+        assert!(!accepted_xml.contains("gone"));
+        assert!(accepted_xml.contains("<w:ins"));
+    }
+
+    #[test]
+    fn direct_revision_actions_are_atomic_and_empty_actions_are_exact_noops() {
+        let unsupported = Snapshot::from_xml(document(
+            "<w:p><w:ins w:id=\"1\" w:author=\"A\"><w:r><w:moveFrom w:id=\"2\" w:author=\"B\"><w:r><w:t>moved</w:t></w:r></w:moveFrom></w:r></w:ins></w:p>",
+        ))
+        .unwrap();
+        let mut refused = unsupported.edit();
+        assert!(matches!(
+            refused.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0),),
+            Err(TransactionError::Refused {
+                reason: Refusal::RevisionDependency,
+                ..
+            })
+        ));
+        assert_eq!(refused.projected().xml_bytes(), unsupported.xml_bytes());
+        assert!(refused.operations.is_empty());
+
+        let malformed_text = Snapshot::from_xml(document(
+            "<w:p><w:ins w:id=\"1\" w:author=\"A\"><w:r><w:t>&unknown;</w:t></w:r></w:ins></w:p>",
+        ))
+        .unwrap();
+        let mut malformed_edit = malformed_text.edit();
+        assert!(matches!(
+            malformed_edit.reject_revision(
+                Position::new(0),
+                RevisionKind::Insertion,
+                Position::new(0),
+            ),
+            Err(TransactionError::Refused {
+                reason: Refusal::RevisionDependency,
+                ..
+            })
+        ));
+        assert_eq!(
+            malformed_edit.projected().xml_bytes(),
+            malformed_text.xml_bytes()
+        );
+        assert!(malformed_edit.operations.is_empty());
+
+        let ranged = Snapshot::from_xml(document(
+            "<w:p><w:bookmarkStart w:id=\"1\" w:name=\"range\"/><w:ins w:id=\"2\" w:author=\"A\"><w:r><w:t>added</w:t></w:r></w:ins><w:bookmarkEnd w:id=\"1\"/></w:p>",
+        ))
+        .unwrap();
+        let mut ranged_edit = ranged.edit();
+        assert!(matches!(
+            ranged_edit.accept_revision(
+                Position::new(0),
+                RevisionKind::Insertion,
+                Position::new(0),
+            ),
+            Err(TransactionError::Refused {
+                reason: Refusal::RevisionDependency,
+                ..
+            })
+        ));
+        assert_eq!(ranged_edit.projected().xml_bytes(), ranged.xml_bytes());
+        assert!(ranged_edit.operations.is_empty());
+
+        let empty =
+            Snapshot::from_xml(document("<w:p><w:ins w:id=\"1\" w:author=\"A\"/></w:p>")).unwrap();
+        let mut noop = empty.edit();
+        assert!(matches!(
+            noop.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(1),),
+            Err(TransactionError::Refused {
+                reason: Refusal::RevisionNotFound,
+                ..
+            })
+        ));
+        assert_eq!(noop.projected().xml_bytes(), empty.xml_bytes());
+        assert!(noop.operations.is_empty());
+
+        let stale =
+            Snapshot::from_xml(document("<w:p><w:r><w:t>different</w:t></w:r></w:p>")).unwrap();
+        assert!(matches!(
+            noop.commit().unwrap().patch().apply(&stale),
+            Err(TransactionError::StaleSource)
+        ));
+    }
+
+    #[test]
+    fn revision_replay_refuses_tampered_after_atomically() {
+        let source = Snapshot::from_xml(document(
+            "<w:p><w:ins w:id=\"1\" w:author=\"A\"><w:r><w:t>added</w:t></w:r></w:ins></w:p>",
+        ))
+        .unwrap();
+        let mut edit = source.edit();
+        edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let Operation::ApplyRevision {
+            selector,
+            action,
+            before,
+            ..
+        } = commit.patch().operations()[0].clone()
+        else {
+            panic!("revision action must record ApplyRevision");
+        };
+        let tampered = Operation::ApplyRevision {
+            selector,
+            action,
+            before,
+            after: Arc::new(b"<w:p><w:r><w:t>tampered</w:t></w:r></w:p>".to_vec()),
+        };
+        let mut replay = source.edit();
+        assert!(matches!(
+            replay.apply_operation(&tampered),
+            Err(TransactionError::SemanticPrecondition)
+        ));
+        assert_eq!(replay.projected().xml_bytes(), source.xml_bytes());
+        assert!(replay.operations.is_empty());
+    }
+
+    #[test]
+    fn revision_actions_resolve_metadata_and_scope_qnames() {
+        let foreign_date = Snapshot::from_xml(document(
+            "<w:p><w:ins w:id=\"1\" w:author=\"A\" xmlns:x=\"urn:foreign\" x:dateUtc=\"2026-01-01T00:00:00Z\"><w:r><w:t>added</w:t></w:r></w:ins></w:p>",
+        ))
+        .unwrap();
+        let mut foreign_edit = foreign_date.edit();
+        assert!(matches!(
+            foreign_edit.reject_revision(
+                Position::new(0),
+                RevisionKind::Insertion,
+                Position::new(0),
+            ),
+            Err(TransactionError::Refused {
+                reason: Refusal::RevisionDependency,
+                ..
+            })
+        ));
+        assert_eq!(
+            foreign_edit.projected().xml_bytes(),
+            foreign_date.xml_bytes()
+        );
+        assert!(foreign_edit.operations.is_empty());
+
+        let aliased_scope = Snapshot::from_xml(document(
+            "<w:p><w:ins w:id=\"1\" w:author=\"A\" xmlns:w16du=\"http://schemas.microsoft.com/office/word/2023/wordml/word16du\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:m=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" mc:Ignorable=\"w16du\"><w:r m:Ignorable=\"w16du\"><w:t>added</w:t></w:r></w:ins></w:p>",
+        ))
+        .unwrap();
+        let mut aliased_edit = aliased_scope.edit();
+        aliased_edit
+            .accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+            .unwrap();
+        let aliased_commit = aliased_edit.commit().unwrap();
+        let aliased_xml = std::str::from_utf8(aliased_commit.snapshot().xml_bytes()).unwrap();
+        assert_eq!(aliased_xml.matches("Ignorable=\"w16du\"").count(), 1);
+        assert!(
+            aliased_xml.contains(
+                "xmlns:m=\"http://schemas.openxmlformats.org/markup-compatibility/2006\""
+            )
+        );
+        assert!(aliased_xml.contains("m:Ignorable=\"w16du\""));
+    }
+
+    #[test]
+    fn revision_actions_resolve_inherited_word_aliases() {
+        let source = Snapshot::from_xml(
+            format!(
+                "<w:document xmlns:w=\"{WORD}\" xmlns:q=\"{WORD}\"><w:body><w:p><q:ins q:id=\"1\" q:author=\"A\"><q:r><q:t>added</q:t></q:r></q:ins></w:p><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes(),
+        )
+        .unwrap();
+        let mut edit = source.edit();
+        edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let xml = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+        assert!(!xml.contains("<q:ins"));
+        assert!(xml.contains("<q:r><q:t>added</q:t></q:r>"));
+    }
+
+    #[test]
+    fn revision_actions_preserve_opaque_payload_quoted_attributes_and_inherited_scope() {
+        let source = Snapshot::from_xml(document(
+            r#"<w:p><w:ins w:id="1" w:author="A" xmlns:x="urn:opaque" xmlns:c="http://schemas.openxmlformats.org/markup-compatibility/2006" c:Ignorable="x" xml:space="preserve" xml:lang="en"><w:r x:vendor="a>b"><x:opaque>  <x:child/>  payload<![CDATA[ & ]]></x:opaque><w:t> x </w:t></w:r></w:ins></w:p>"#,
+        )).unwrap();
+        let mut edit = source.edit();
+        edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let xml = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+        for expected in [
+            r#"x:vendor="a>b""#,
+            r#"c:Ignorable="x""#,
+            r#"xml:space="preserve""#,
+            r#"xml:lang="en""#,
+            "<x:opaque>  <x:child/>  payload<![CDATA[ & ]]></x:opaque>",
+        ] {
+            assert!(xml.contains(expected), "missing {expected} in {xml}");
+        }
+        let durable = commit.patch().to_durable(durable_limits()).unwrap();
+        let replayed = source.apply_durable(&durable).unwrap();
+        assert_eq!(replayed.xml_bytes(), commit.snapshot().xml_bytes());
+        assert_eq!(
+            replayed
+                .apply_durable(&durable.inverse())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+        let visible = litchi_ooxml_common::mce::process_markup_compatibility(
+            commit.snapshot().xml_bytes(),
+            &litchi_ooxml_common::mce::Capabilities::default(),
+            &litchi_ooxml_common::mce::Limits::default(),
+        )
+        .unwrap();
+        assert!(
+            !std::str::from_utf8(&visible.xml)
+                .unwrap()
+                .contains("payload")
+        );
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+    }
+
+    #[test]
+    fn revision_commit_rejects_invalid_utf8_outside_the_selected_revision() {
+        for opaque in [false, true] {
+            let sibling = if opaque {
+                r#"<w:p><w:r><x:opaque xmlns:x="urn:opaque">invalid</x:opaque></w:r></w:p>"#
+            } else {
+                "<w:p><w:r><w:t>invalid</w:t></w:r></w:p>"
+            };
+            let mut xml = document(&format!(
+                r#"<w:p><w:ins w:id="1" w:author="A"><w:r><w:t>added</w:t></w:r></w:ins></w:p>{sibling}"#
+            ));
+            let index = xml
+                .windows(7)
+                .position(|bytes| bytes == b"invalid")
+                .unwrap();
+            xml[index] = 0xff;
+            let source = Snapshot::from_xml(xml).unwrap();
+            let mut edit = source.edit();
+            edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+                .unwrap();
+            assert!(matches!(
+                edit.commit(),
+                Err(TransactionError::Document(crate::Error::InvalidFormat(_)))
+            ));
+        }
+    }
+
+    #[test]
+    fn revision_actions_refuse_invalid_descendant_attributes_and_declarations() {
+        for child in [
+            r#"<w:r x:bad="&unknown;"/>"#,
+            r#"<w:r x:bad="&#0;"/>"#,
+            r#"<w:r><x:opaque x:bad="&#xFFFF;"/></w:r>"#,
+            r#"<w:r x:bad="raw<value"/>"#,
+            r#"<?xml version="1.0"?><w:r/>"#,
+        ] {
+            let source = Snapshot::from_xml(document(&format!(
+                r#"<w:p><w:ins w:id="1" w:author="A" xmlns:x="urn:opaque">{child}</w:ins></w:p>"#
+            )))
+            .unwrap();
+            for action in [RevisionAction::Accept, RevisionAction::Reject] {
+                let mut edit = source.edit();
+                assert!(
+                    edit.apply_revision(
+                        RevisionSelector::new(
+                            Position::new(0),
+                            RevisionKind::Insertion,
+                            Position::new(0)
+                        ),
+                        action
+                    )
+                    .is_err(),
+                    "{child}"
+                );
+                assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+                assert!(edit.operations.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn revision_namespace_expansion_and_deep_untrusted_replay_are_refused_atomically() {
+        let body = format!(
+            r#"<w:p><w:ins w:id="1" w:author="A" xmlns:x="urn:{}">{}</w:ins></w:p>"#,
+            "x".repeat(8192),
+            "<w:r/>".repeat(5000)
+        );
+        let source = Snapshot::from_xml(document(&body)).unwrap();
+        let mut edit = source.edit();
+        assert!(
+            edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+                .is_err()
+        );
+        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+        assert!(edit.operations.is_empty());
+
+        let source = Snapshot::from_xml(document(
+            r#"<w:p><w:ins w:id="1" w:author="A"><w:r><w:t>x</w:t></w:r></w:ins></w:p>"#,
+        ))
+        .unwrap();
+        let mut edit = source.edit();
+        edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let Operation::ApplyRevision {
+            selector,
+            action,
+            before,
+            ..
+        } = commit.patch().operations()[0].clone()
+        else {
+            panic!("revision operation");
+        };
+        let after = format!(
+            "<w:p>{}{}</w:p>",
+            "<w:r>".repeat(66_000),
+            "</w:r>".repeat(66_000)
+        );
+        let malformed = Operation::ApplyRevision {
+            selector,
+            action,
+            before,
+            after: Arc::new(after.into_bytes()),
+        };
+        let mut replay = source.edit();
+        assert!(matches!(
+            replay.apply_operation(&malformed),
+            Err(TransactionError::SemanticPrecondition)
+        ));
+        assert_eq!(replay.projected().xml_bytes(), source.xml_bytes());
+        assert!(replay.operations.is_empty());
     }
 
     #[test]

@@ -253,6 +253,246 @@ impl Package {
         crate::calculation_properties::Snapshot::load_with_limits(&self.0, limits)
     }
 
+    /// Read the table-owned Survey catalog without changing the package graph.
+    pub fn surveys(&self) -> Result<crate::survey::Snapshot> {
+        crate::survey::Snapshot::load(&self.0)
+    }
+
+    /// Read the table-owned Survey catalog with explicit resource limits.
+    pub fn surveys_with_limits(
+        &self,
+        limits: &crate::survey::Limits,
+    ) -> Result<crate::survey::Snapshot> {
+        crate::survey::Snapshot::load_with_limits(&self.0, limits)
+    }
+
+    /// Read the source-bound workbook Data Model graph, if present.
+    pub fn data_model(&self) -> Result<crate::workbook::data_model::Snapshot> {
+        crate::workbook::data_model::Snapshot::load(&self.0)
+    }
+
+    /// Start a source-bound Data Model transaction.
+    pub fn edit_data_model(&mut self) -> Result<crate::workbook::data_model::Transaction<'_>> {
+        self.ensure_mutation_allowed("edit_data_model")?;
+        crate::workbook::data_model::Transaction::new(&mut self.0)
+    }
+
+    /// Atomically create/import or replace a Data Model with outer validation.
+    ///
+    /// Creation/import validates the typed descriptor, XLDM storage profile,
+    /// OPC ownership, and relationship closure while retaining the binary
+    /// payload as opaque bytes. A time-grouping write additionally requires a
+    /// complete neutral XLDM identity closure for its table, source column,
+    /// and calculated columns. For an existing source-bound model,
+    /// payload-only replacement with an unchanged typed descriptor is
+    /// supported; other structural replacement remains refused until its
+    /// complete inner proof exists.
+    pub fn put_data_model(&mut self, model: crate::workbook::data_model::Model) -> Result<()> {
+        self.ensure_mutation_allowed("put_data_model")?;
+        let mut transaction = crate::workbook::data_model::Transaction::new(&mut self.0)?;
+        transaction.set(model)?;
+        transaction.commit().map(|_commit| ())
+    }
+
+    /// Atomically remove the workbook Data Model graph.
+    pub fn remove_data_model(&mut self) -> Result<()> {
+        self.ensure_mutation_allowed("remove_data_model")?;
+        let mut transaction = crate::workbook::data_model::Transaction::new(&mut self.0)?;
+        transaction.remove()?;
+        transaction.commit().map(|_commit| ())
+    }
+
+    /// Apply an exact source-bound Data Model patch.
+    pub fn apply_data_model_patch(
+        &mut self,
+        patch: &crate::workbook::data_model::Patch,
+    ) -> Result<()> {
+        self.ensure_mutation_allowed("apply_data_model_patch")?;
+        patch.apply(&mut self.0)
+    }
+
+    /// Read the source-bound Custom Data and Custom Data Properties catalog.
+    pub fn custom_data(&self) -> Result<crate::custom_data::Snapshot> {
+        crate::custom_data::Snapshot::load(&self.0)
+    }
+
+    /// Read Custom Data with explicit payload and storage limits.
+    pub fn custom_data_with_limits(
+        &self,
+        limits: &crate::custom_data::Limits,
+    ) -> Result<crate::custom_data::Snapshot> {
+        crate::custom_data::Snapshot::load_with_limits(&self.0, limits)
+    }
+
+    /// Alias emphasizing that the catalog includes Custom Data Properties.
+    pub fn custom_data_properties(&self) -> Result<crate::custom_data::Snapshot> {
+        self.custom_data()
+    }
+
+    /// Read Custom Data and Custom Data Properties with explicit limits.
+    pub fn custom_data_properties_with_limits(
+        &self,
+        limits: &crate::custom_data::Limits,
+    ) -> Result<crate::custom_data::Snapshot> {
+        self.custom_data_with_limits(limits)
+    }
+
+    /// Start a source-bound Custom Data transaction.
+    pub fn edit_custom_data(&mut self) -> Result<crate::custom_data::Transaction<'_>> {
+        self.ensure_mutation_allowed("edit_custom_data")?;
+        crate::custom_data::Transaction::new(&mut self.0)
+    }
+
+    /// Start a Custom Data transaction with explicit limits.
+    pub fn edit_custom_data_with_limits(
+        &mut self,
+        limits: &crate::custom_data::Limits,
+    ) -> Result<crate::custom_data::Transaction<'_>> {
+        self.ensure_mutation_allowed("edit_custom_data_with_limits")?;
+        crate::custom_data::Transaction::with_limits(&mut self.0, limits)
+    }
+
+    /// Atomically insert or replace one inert Custom Data storage.
+    pub fn put_custom_data(&mut self, value: crate::custom_data::CustomData) -> Result<()> {
+        self.ensure_mutation_allowed("put_custom_data")?;
+        let mut transaction = crate::custom_data::Transaction::new(&mut self.0)?;
+        transaction.upsert(value)?;
+        transaction.commit().map(|_commit| ())
+    }
+
+    /// Atomically insert or replace one inert Custom Data storage with
+    /// explicit resource limits.
+    pub fn put_custom_data_with_limits(
+        &mut self,
+        value: crate::custom_data::CustomData,
+        limits: &crate::custom_data::Limits,
+    ) -> Result<()> {
+        self.ensure_mutation_allowed("put_custom_data_with_limits")?;
+        let mut transaction = crate::custom_data::Transaction::with_limits(&mut self.0, limits)?;
+        transaction.upsert(value)?;
+        transaction.commit().map(|_commit| ())
+    }
+
+    /// Atomically remove a Custom Data storage by UID.  Missing UIDs are an
+    /// idempotent no-op. Referenced storages require an explicit disposition.
+    pub fn remove_custom_data(&mut self, id: &str) -> Result<()> {
+        self.remove_custom_data_with(id, crate::custom_data::RemovalDisposition::RejectReferenced)
+    }
+
+    /// Atomically remove one Custom Data storage with explicit limits.
+    /// Referenced storages require an explicit disposition through
+    /// [`Self::remove_custom_data_with_and_limits`].
+    pub fn remove_custom_data_with_limits(
+        &mut self,
+        id: &str,
+        limits: &crate::custom_data::Limits,
+    ) -> Result<()> {
+        self.remove_custom_data_with_and_limits(
+            id,
+            crate::custom_data::RemovalDisposition::RejectReferenced,
+            limits,
+        )
+    }
+
+    /// Rename a Custom Data storage and its recognized connection references.
+    pub fn rename_custom_data(&mut self, id: &str, new_id: impl Into<String>) -> Result<bool> {
+        self.ensure_mutation_allowed("rename_custom_data")?;
+        let mut transaction = crate::custom_data::Transaction::new(&mut self.0)?;
+        let index = transaction
+            .entries()
+            .iter()
+            .position(|entry| entry.id() == id)
+            .ok_or_else(|| crate::Error::Invalid("Custom Data storage UID is absent".into()))?;
+        let changed = transaction.rename(index, new_id)?;
+        transaction.commit()?;
+        Ok(changed)
+    }
+
+    /// Rename a Custom Data storage and its recognized connection references
+    /// with explicit resource limits.
+    pub fn rename_custom_data_with_limits(
+        &mut self,
+        id: &str,
+        new_id: impl Into<String>,
+        limits: &crate::custom_data::Limits,
+    ) -> Result<bool> {
+        self.ensure_mutation_allowed("rename_custom_data_with_limits")?;
+        let mut transaction = crate::custom_data::Transaction::with_limits(&mut self.0, limits)?;
+        let index = transaction
+            .entries()
+            .iter()
+            .position(|entry| entry.id() == id)
+            .ok_or_else(|| crate::Error::Invalid("Custom Data storage UID is absent".into()))?;
+        let changed = transaction.rename(index, new_id)?;
+        transaction.commit()?;
+        Ok(changed)
+    }
+
+    /// Remove a Custom Data storage with an explicit connection disposition.
+    pub fn remove_custom_data_with(
+        &mut self,
+        id: &str,
+        disposition: crate::custom_data::RemovalDisposition,
+    ) -> Result<()> {
+        self.ensure_mutation_allowed("remove_custom_data")?;
+        let mut transaction = crate::custom_data::Transaction::new(&mut self.0)?;
+        if let Some(index) = transaction
+            .entries()
+            .iter()
+            .position(|entry| entry.id() == id)
+        {
+            transaction.remove_with(index, disposition)?;
+        }
+        transaction.commit().map(|_commit| ())
+    }
+
+    /// Remove a Custom Data storage with an explicit connection disposition
+    /// and resource limits.
+    pub fn remove_custom_data_with_and_limits(
+        &mut self,
+        id: &str,
+        disposition: crate::custom_data::RemovalDisposition,
+        limits: &crate::custom_data::Limits,
+    ) -> Result<()> {
+        self.ensure_mutation_allowed("remove_custom_data_with_and_limits")?;
+        let mut transaction = crate::custom_data::Transaction::with_limits(&mut self.0, limits)?;
+        if let Some(index) = transaction
+            .entries()
+            .iter()
+            .position(|entry| entry.id() == id)
+        {
+            transaction.remove_with(index, disposition)?;
+        }
+        transaction.commit().map(|_commit| ())
+    }
+
+    /// Apply an exact source-bound Custom Data patch.
+    pub fn apply_custom_data_patch(&mut self, patch: &crate::custom_data::Patch) -> Result<()> {
+        self.ensure_mutation_allowed("apply_custom_data_patch")?;
+        patch.apply(&mut self.0)
+    }
+
+    /// Start a source-bound Survey transaction.
+    pub fn edit_surveys(&mut self) -> Result<crate::survey::Transaction<'_>> {
+        self.ensure_mutation_allowed("edit_surveys")?;
+        crate::survey::Transaction::new(&mut self.0)
+    }
+
+    /// Start a Survey transaction with explicit resource limits.
+    pub fn edit_surveys_with_limits(
+        &mut self,
+        limits: &crate::survey::Limits,
+    ) -> Result<crate::survey::Transaction<'_>> {
+        self.ensure_mutation_allowed("edit_surveys_with_limits")?;
+        crate::survey::Transaction::with_limits(&mut self.0, limits)
+    }
+
+    /// Apply an exact source-bound Survey patch.
+    pub fn apply_surveys_patch(&mut self, patch: &crate::survey::Patch) -> Result<()> {
+        self.ensure_mutation_allowed("apply_surveys_patch")?;
+        patch.apply(&mut self.0)
+    }
+
     /// Start a source-bound calculation-metadata transaction.
     pub fn edit_calculation_metadata(
         &mut self,
@@ -683,4 +923,58 @@ pub(crate) fn build_minimal_package() -> Result<OpcPackage> {
 }
 
 /// Inert analytical-model package resources.
-pub mod xldm;
+///
+/// The nested codecs live in the neutral [`litchi_xldm`] crate. The two
+/// package-level entry points retain the historical XLSX error type so code
+/// using `crate::package::xldm::inspect` continues to match [`crate::Error`].
+pub mod xldm {
+    pub use litchi_xldm::{
+        BackupLog, Compression, FileEntry, FileGroup, FileGroupClass, FileKind, GeneratedNameKind,
+        GeneratedPath, Header, LoggedFile, Offset, OlapProofLimits, PartitionMarker, Size, Storage,
+        StorageProfile, WriteAccess, XLDM_PAGE_SIZE, XLDM_STREAM_SIGNATURE, Xldm140Closure,
+        Xldm140ClosureMember, Xldm140ColumnBinding, Xldm140ColumnIdentity, Xldm140FileReplacement,
+        Xldm140IdentityProjection, Xldm140InversePatch, Xldm140MemberSection, Xldm140Patch,
+        Xldm140PatchBytes, Xldm140RelationshipIdentity, Xldm140TableIdentity,
+        Xldm140TimeGroupingBinding, Xldm140TimeGroupingContentType, XmlEncoding, compression,
+        crypt, generated, identity, metadata, native, olap, olapproof, project_xldm140_identity,
+        project_xldm140_identity_with_closure, prove_xldm140_closure,
+        validate_xldm140_identity_closure,
+    };
+
+    /// Classify a generated path while preserving the XLSX facade error type.
+    pub fn classify_generated_path(path: &str) -> crate::error::Result<GeneratedPath> {
+        litchi_xldm::classify_generated_path(path).map_err(super::map_xldm_error)
+    }
+
+    /// Inspect an XLDM stream while preserving the XLSX facade error type.
+    pub fn inspect(bytes: &[u8]) -> crate::error::Result<Storage<'_>> {
+        litchi_xldm::inspect(bytes).map_err(super::map_xldm_error)
+    }
+
+    /// Inspect a borrowed XLDM stream through the source-sharing API.
+    pub fn inspect_shared(bytes: &[u8]) -> crate::error::Result<Storage<'_>> {
+        litchi_xldm::inspect_shared(bytes).map_err(super::map_xldm_error)
+    }
+
+    /// Write an unchanged or explicitly edited XLDM storage snapshot.
+    pub fn write(storage: &Storage<'_>) -> crate::error::Result<Vec<u8>> {
+        litchi_xldm::write(storage).map_err(super::map_xldm_error)
+    }
+}
+
+fn map_xldm_error(error: litchi_xldm::Error) -> crate::error::Error {
+    match error {
+        litchi_xldm::Error::Invalid(message) => crate::error::Error::Invalid(message),
+        litchi_xldm::Error::Unsupported { feature } => crate::error::Error::Unsupported { feature },
+        litchi_xldm::Error::Allocation { resource, source } => {
+            crate::error::Error::Allocation { resource, source }
+        },
+        litchi_xldm::Error::Xml(message) => {
+            crate::error::Error::Xml(litchi_ooxml_common::XmlError::Malformed(message))
+        },
+        other => crate::error::Error::Invalid(other.to_string()),
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod xldm_test_support;

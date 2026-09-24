@@ -1,0 +1,38 @@
+{
+  "Cargo.lock.gz": {
+    "bytes": 33455,
+    "sha256": "d3473f6d569ad44006c97d7002c71a052d802bf5c2fe1d6dc1334b5a979e146b"
+  },
+  "README.md": {
+    "bytes": 1070,
+    "sha256": "bcc2e616a68ba9ae3aeb5d0604eb18b79ac070582219280f0d97f4f15833ff8a"
+  },
+  "clippy-exit.json": {
+    "bytes": 192,
+    "sha256": "31265a869594886bdb30510dc08a8c99bce8c50927b812089cd6fe7d18acafbf"
+  },
+  "clippy.log.gz": {
+    "bytes": 1255,
+    "sha256": "6a0b83a1ed29bd567c543daadc7a01ef61a8cad70886935f06ffbc75b78637ef"
+  },
+  "rustdoc-exit.json": {
+    "bytes": 142,
+    "sha256": "4168aa1d91e83175cb99b9ee8f9e36be386575ba7919485a3e609d8f1cc89d69"
+  },
+  "rustdoc.log.gz": {
+    "bytes": 268,
+    "sha256": "9a4f1720520814a103ebbfd85ff0f4e2c2f225213e460558ee1bf20dba7f0bf6"
+  },
+  "source.json": {
+    "bytes": 638,
+    "sha256": "5dc321ce1c5cbf9ca8db79a716923a71f0bc92e5169e5488a8fd85d071be90c4"
+  },
+  "tests-exit.json": {
+    "bytes": 139,
+    "sha256": "a99fb7fdbcd2629cf3d5687996152888f0615a84c1a297e7f285d6edc15053d9"
+  },
+  "tests.log.gz": {
+    "bytes": 7101,
+    "sha256": "f0744d85e915b343fac47bfce4fbdccc5299dbc756fedde379d88580eb2e3867"
+  }
+}

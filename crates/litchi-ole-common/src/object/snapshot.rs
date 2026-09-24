@@ -10,6 +10,7 @@ use super::editor::Editor;
 use super::link::Link;
 use super::model::Objects;
 use super::target::Targets;
+use crate::ole_streams::{self, NativeSnapshot, PresentationSnapshot};
 use litchi_cfb::{OleError, SectorLayoutPolicy};
 use std::sync::Arc;
 
@@ -127,6 +128,73 @@ impl Snapshot {
             .get(key)
             .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?
             .link()
+    }
+
+    /// Returns one selected object's direct-child OLEDS presentation stream.
+    ///
+    /// The returned snapshot shares the captured stream allocation.  It is an
+    /// inert view: no presentation payload is decoded, opened, or activated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `key` is absent, `index` is invalid, or the
+    /// matching stream is malformed or exceeds the default OLEDS limit.
+    pub fn presentation(
+        &self,
+        key: &str,
+        index: usize,
+    ) -> Result<Option<PresentationSnapshot>, OleError> {
+        self.presentation_with_limits(key, index, ole_streams::Limits::default())
+    }
+
+    /// Returns one selected object's presentation under explicit OLEDS limits.
+    pub fn presentation_with_limits(
+        &self,
+        key: &str,
+        index: usize,
+        limits: ole_streams::Limits,
+    ) -> Result<Option<PresentationSnapshot>, OleError> {
+        self.state
+            .objects
+            .get(key)
+            .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?
+            .presentation_with_limits(index, limits)
+    }
+
+    /// Returns all selected-object OLEDS presentations in numeric order.
+    pub fn presentations(&self, key: &str) -> Result<Vec<(usize, PresentationSnapshot)>, OleError> {
+        self.presentations_with_limits(key, ole_streams::Limits::default())
+    }
+
+    /// Returns all selected-object OLEDS presentations under explicit limits.
+    pub fn presentations_with_limits(
+        &self,
+        key: &str,
+        limits: ole_streams::Limits,
+    ) -> Result<Vec<(usize, PresentationSnapshot)>, OleError> {
+        self.state
+            .objects
+            .get(key)
+            .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?
+            .presentations_with_limits(limits)
+    }
+
+    /// Returns a selected object's direct-child OLEDS native-data stream.
+    pub fn native(&self, key: &str) -> Result<Option<NativeSnapshot>, OleError> {
+        self.native_with_limits(key, ole_streams::Limits::default())
+    }
+
+    /// Returns a selected object's native-data stream under explicit limits.
+    pub fn native_with_limits(
+        &self,
+        key: &str,
+        limits: ole_streams::Limits,
+    ) -> Result<Option<NativeSnapshot>, OleError> {
+        self.state
+            .objects
+            .get(key)
+            .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?
+            .native_with_limits(limits)
     }
 
     /// Creates an independent transactional editor from this snapshot.

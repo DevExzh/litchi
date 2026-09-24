@@ -1,0 +1,9 @@
+# Source-preserving XLSX Survey transactions
+
+Table-owned Survey metadata supports bounded snapshots, typed property/question creation and edits, collection operations, semantic table/column selectors, and source-bound patches. Existing source edits preserve lexical attributes, comments, namespace context, opaque extensions, and neighboring XML. Within-parent question moves and copies retain source subtrees. Catalog snapshots share parsed values; editing isolates the selected Survey. Retained content-type and relationship tokens preserve remove/save/reopen/inverse restoration, including empty relationship parts. Changed publication checks source identity and signature policy.
+
+Namespace-aware parsing checks schema order, expanded attribute identity, Survey extension ownership, IDs, and caller limits. ST_Xstring values decode once and protect literal escapes on output. Source extension capture and encoded output growth are bounded before allocation. Cross-parent opaque imports that cannot prove context are refused. Broader dependency closure, arbitrary detached opaque context, and native producer edit evidence remain incomplete; rendering and submission remain inert.
+
+Root standalone validation on Rust 1.95.0 passed 1,311 unit/integration tests and two doctests, strict all-target/all-feature Clippy, changed-file formatting, and whitespace checks. Four Survey implementation files match the previously reviewed combined candidate byte for byte. Standalone isolation includes only Survey exports/facades and the required source helper, without pending Custom Data or Connections changes. The normative sources are local MS-XLSX Markdown §§2.6.142–2.6.145. This batch makes no measured performance claim.
+
+The receipt binds all eight source/documentation paths and compressed root validation logs. The validation base precedes the independent OLEPS binding-only commit; the intervening change does not alter the Survey implementation.

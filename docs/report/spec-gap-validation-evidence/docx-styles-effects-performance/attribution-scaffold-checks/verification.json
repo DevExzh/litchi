@@ -1,0 +1,43 @@
+{
+  "scope": "Timing-free scaffold checks on shared tree; not profiling results or approval to capture.",
+  "git_head": "6454e4272c4eaa32f90117fc38abf9b98f7536c5",
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "source_sha256": {
+    "harness/support.rs": "729a170be7b612ed6083508feefce9a51f8ac669d9ac284dbe1f132ba60aacc9",
+    "optimization-plan.md": "f059ea491f8177ce42bbf4b7c86b5a298e56d20e2a2fdf26d4df65fb948160c4",
+    "performance-plan.md": "2bc7fa42158c08ebc6e4a3423be393edf6dd9f8abbe0bb3c846911acb717d6bd",
+    "profile-harness/main.rs": "9a29053bf08f1f88dbdfe1a16b20ac39f04fc89acb2dac8cbd2d08b5f02a2b18",
+    "profile-harness/profile_adapter.rs": "51d65d8b485c977baff0249e5fb5f8399b5ec139344625a950138755ce94e5c3",
+    "requirements.md": "b243543775e0e0c1ff7fe33f5f8b04515f9a9761d5f253622decb167d2ab6b7a",
+    "run_profile.sh": "103d6b6883977a48ea5a50697919d70042713fde99b4447d0a95f65bf9cd3ad5",
+    "test_profile_scaffold.py": "11cb9b9d102b92cc4fdbece04484ddd279662dd4b0a335d23b4aa2b4a6442591",
+    "verify.py": "30a5b9cb9b67c1347220df4ca8d1c847a2bf9b9d3f601a59e2b0ddfb80fc9c88",
+    "verify_profile.py": "941b9b061464d43baf4fddde83c13c05fd5c7e703c851545b4f16a370d690801",
+    "profile-harness/Cargo.lock": "fae17d47d39ab25c3e03f1d38c881f5ceed3b38f9749fc7e352686e16a3ea4a6",
+    "profile-harness/Cargo.toml": "2f6c0529dad385bbdcff445924da8d2740f9f035e64a61016bd9cbc19faa6091"
+  },
+  "commands": [
+    {
+      "command": "CARGO_TARGET_DIR=/var/tmp/docx-attribution-root-gate.QumwJ0/target cargo test --locked --offline --manifest-path docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/profile-harness/Cargo.toml -- --test-threads=1",
+      "exit_code": 0,
+      "tests_passed": 2,
+      "log": "test.log"
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/var/tmp/docx-attribution-root-gate.QumwJ0/target cargo clippy --locked --offline --manifest-path docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/profile-harness/Cargo.toml --all-targets -- -D warnings",
+      "exit_code": 0,
+      "log": "clippy.log"
+    },
+    {
+      "command": "python3 -B -m unittest discover -s docs/report/spec-gap-validation-evidence/docx-styles-effects-performance -p 'test_*.py'",
+      "exit_code": 0,
+      "tests_passed": 31,
+      "log": null
+    }
+  ],
+  "raw_sha256": {
+    "test.log": "13f84849add185e645a5dc3ba3cbafd688d883eabd74e70564d6b5f3020af858",
+    "clippy.log": "a1edcff28b26dbe6744387cce21532db540a812a28a04187a949cf8181f9dd78"
+  },
+  "post_gate_documentation_change": "Status changed to reviewed/unrun after final review; executable files unchanged."
+}

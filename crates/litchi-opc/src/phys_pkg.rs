@@ -9,6 +9,7 @@ use crate::error::{OpcError, Result};
 use crate::limits::{ReadLimits, ReadResource};
 use crate::packuri::{PackURI, PartNameConflict};
 use soapberry_zip::CompressionMethod;
+use soapberry_zip::ZipArchive;
 use soapberry_zip::office::{LazyArchiveReader, LimitResource};
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Seek, Write};
@@ -118,6 +119,7 @@ impl OwnedPhysPkgReader {
     /// ZIP archive under `limits`.
     pub fn from_bytes_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
         limits.check_input_bytes(data.len() as u64)?;
+        admit_total_archive_entries(&data, limits)?;
         // Validate the ZIP archive can be parsed
         let _ = LazyArchiveReader::new_with_limits(&data, limits.zip_limits())
             .map_err(|error| map_archive_error(&error))?;
@@ -297,6 +299,7 @@ impl<'data> PhysPkgReader<'data> {
         relationship_budget: Arc<Mutex<RelationshipBudget>>,
     ) -> Result<Self> {
         limits.check_input_bytes(data.len() as u64)?;
+        admit_total_archive_entries(data, limits)?;
         let archive = LazyArchiveReader::new_with_limits(data, limits.zip_limits())
             .map_err(|error| map_archive_error(&error))?;
         Ok(Self {
@@ -326,6 +329,9 @@ impl<'data> PhysPkgReader<'data> {
         let membername = pack_uri.membername();
         let label = pack_uri.to_string();
         let declared = self.declared_part_bytes(membername, &label)?;
+        self.archive
+            .validate_unencrypted_entry(membername)
+            .map_err(|error| map_part_error(&label, &error))?;
         let reservation = self.reserve_declared_parts(&[declared])?;
         match self.archive.read(membername) {
             Ok(blob) => {
@@ -368,6 +374,9 @@ impl<'data> PhysPkgReader<'data> {
             self.limits.max_part_bytes(),
         )?;
         self.archive
+            .validate_unencrypted_entry(membername)
+            .map_err(|error| map_part_error(&label, &error))?;
+        self.archive
             .read_stored_borrowed(membername)
             .map_err(|error| map_part_error(&label, &error))
     }
@@ -381,6 +390,9 @@ impl<'data> PhysPkgReader<'data> {
     /// # Errors
     /// Returns an error if the member is missing or unreadable.
     pub fn read_member(&self, name: &str) -> Result<Vec<u8>> {
+        self.archive
+            .validate_unencrypted_entry(name)
+            .map_err(|error| map_archive_error(&error))?;
         self.archive
             .read(name)
             .map_err(|error| map_archive_error(&error))
@@ -501,6 +513,9 @@ impl<'data> PhysPkgReader<'data> {
             })?;
         for uri in uris {
             let name = uri.membername();
+            self.archive
+                .validate_unencrypted_entry(name)
+                .map_err(|error| map_part_error(uri.as_str(), &error))?;
             declared.push(self.declared_part_bytes(name, uri.as_str())?);
             names.push(name);
         }
@@ -600,6 +615,9 @@ impl<'data> PhysPkgReader<'data> {
             .metadata(name)
             .map(|metadata| metadata.uncompressed_size())
             .map_err(|error| map_part_error(label, &error))?;
+        self.archive
+            .validate_unencrypted_entry(name)
+            .map_err(|error| map_part_error(label, &error))?;
         self.limits.check(resource, declared, maximum)?;
         let blob = self
             .archive
@@ -614,6 +632,9 @@ impl<'data> PhysPkgReader<'data> {
             .archive
             .metadata(name)
             .map(|metadata| metadata.uncompressed_size())
+            .map_err(|error| map_part_error(label, &error))?;
+        self.archive
+            .validate_unencrypted_entry(name)
             .map_err(|error| map_part_error(label, &error))?;
         self.limits.check(
             ReadResource::RelationshipXmlBytes,
@@ -941,6 +962,27 @@ impl<'data> PhysPkgReader<'data> {
         }
         result
     }
+}
+
+/// Admit the EOCD-declared total central-directory entry count before the
+/// lazy/indexed ZIP reader reserves ownership. The ZIP reader's bounded
+/// layout walk then validates the actual count against this declaration while
+/// it performs the one retained central-directory parse. `max_archive_members`
+/// is intentionally the non-directory file limit and cannot provide this
+/// guard.
+fn admit_total_archive_entries(data: &[u8], limits: ReadLimits) -> Result<()> {
+    let archive = ZipArchive::from_slice(data)
+        .map_err(|error| map_archive_error(&error))?
+        .into_zip_archive();
+    let declared = usize::try_from(archive.entries_hint()).map_err(|_| {
+        OpcError::ZipError("ZIP total entry count does not fit this platform".to_owned())
+    })?;
+    limits.check(
+        ReadResource::ArchiveTotalEntries,
+        declared as u64,
+        limits.max_archive_total_entries() as u64,
+    )?;
+    Ok(())
 }
 
 #[derive(Default)]
@@ -1941,6 +1983,7 @@ mod tests {
         reason = "test assertions panic on failure by design"
     )]
     use super::*;
+    use soapberry_zip::office::StreamingArchiveWriter;
 
     fn stored_archive(entries: &[(&str, &[u8])]) -> Vec<u8> {
         let mut writer = PhysPkgWriter::new();
@@ -1974,6 +2017,35 @@ mod tests {
             Err(OpcError::InvalidReadLimit {
                 resource: ReadResource::RelationshipTargetBytes,
                 value: 4,
+            })
+        ));
+    }
+
+    #[test]
+    fn total_archive_entry_limit_includes_directory_records() {
+        let mut writer = StreamingArchiveWriter::new();
+        for index in 0..=4_096 {
+            let name = format!("directory-{index}/");
+            writer.write_stored(&name, &[]).unwrap();
+        }
+        let bytes = writer.finish_to_bytes().unwrap();
+        let limits = ReadLimits::builder()
+            .max_archive_members(4_096)
+            .unwrap()
+            .max_archive_total_entries(4_096)
+            .unwrap()
+            .max_parts(4_096)
+            .unwrap()
+            .max_relationship_parts(4_096)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            PhysPkgReader::new_with_limits(&bytes, limits),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::ArchiveTotalEntries,
+                actual: 4_097,
+                maximum: 4_096,
             })
         ));
     }

@@ -1,7 +1,11 @@
 //! Focused regression tests for the tracked-revision semantic layer.
 
 use super::{Error, Limits, RevisionEditor, RevisionKind, RevisionMetadata, Snapshot};
+use crate::package::Error as PackageError;
+use crate::parts::fib::FileInformationBlock;
+use crate::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
 use crate::writer::{CharacterFormatting, ParagraphFormatting, TextRevision, Writer};
+use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
 use std::io::Cursor;
 
 fn base_doc() -> Vec<u8> {
@@ -26,7 +30,51 @@ fn base_doc() -> Vec<u8> {
         .unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    output.into_inner()
+    normalize_word2002_dop(output.into_inner())
+}
+
+fn normalize_word2002_dop(bytes: Vec<u8>) -> Vec<u8> {
+    let mut package = ObjectEditor::open(bytes, Targets::default(), Limits::default()).unwrap();
+    let word_path = ["WordDocument".to_string()];
+    let word = package.stream(&word_path).unwrap();
+    let fib = FileInformationBlock::parse(word).unwrap();
+    let table_name = if fib.which_table_stream() {
+        "1Table"
+    } else {
+        "0Table"
+    };
+    let table_path = [table_name.to_string()];
+    let mut word = word.to_vec();
+    let mut table = package.stream(&table_path).unwrap().to_vec();
+    let (offset, length) = fib.get_table_pointer(31).unwrap();
+    let offset = usize::try_from(offset).unwrap();
+    let length = usize::try_from(length).unwrap();
+    let dop = crate::parts::document_properties::DocumentProperties::writer_bytes(
+        false, false, false, true,
+    );
+    if length < dop.len() {
+        let insertion = offset + length;
+        let extra = dop.len() - length;
+        table.splice(insertion..insertion, std::iter::repeat_n(0, extra));
+        let count = fib.table_pointer_count().unwrap();
+        for index in 0..count {
+            let pointer = 154 + index * 8;
+            let current = usize::try_from(u32::from_le_bytes(
+                word[pointer..pointer + 4].try_into().unwrap(),
+            ))
+            .unwrap();
+            if current >= insertion {
+                let shifted = u32::try_from(current + extra).unwrap();
+                word[pointer..pointer + 4].copy_from_slice(&shifted.to_le_bytes());
+            }
+        }
+    }
+    table[offset..offset + dop.len()].copy_from_slice(&dop);
+    let pointer = 154 + 31 * 8;
+    word[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
+    package.put_stream(&word_path, word).unwrap();
+    package.put_stream(&table_path, table).unwrap();
+    package.finish().unwrap()
 }
 
 #[test]
@@ -188,4 +236,135 @@ fn replacement_retains_unmodeled_sprm_bytes() {
     )
     .unwrap();
     assert_eq!(&replacement[..unknown.len()], &unknown);
+}
+
+#[test]
+fn protected_revision_edit_requires_audited_policy_but_noop_is_readable() {
+    let source_bytes = protected_doc();
+    let snapshot = Snapshot::open(source_bytes.clone(), Limits::default()).unwrap();
+    assert_eq!(snapshot.finish(), source_bytes);
+    let mut transaction = snapshot.edit().unwrap();
+    let error = transaction
+        .add_text(
+            0,
+            "blocked",
+            RevisionKind::Insertion,
+            RevisionMetadata::new("Alice"),
+        )
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Invalid(PackageError::ProtectionDenied(_))
+    ));
+
+    let editor = RevisionEditor::open(source_bytes.clone(), Limits::default()).unwrap();
+    assert_eq!(editor.finish().unwrap(), source_bytes);
+
+    let mut editor = RevisionEditor::open(source_bytes.clone(), Limits::default()).unwrap();
+    let error = editor
+        .add_text(
+            0,
+            "blocked",
+            RevisionKind::Insertion,
+            RevisionMetadata::new("Alice"),
+        )
+        .unwrap_err();
+    assert!(matches!(error, PackageError::ProtectionDenied(_)));
+
+    let authorization =
+        ProtectionAuthorization::audited("alice", "approved revision repair").unwrap();
+    let policy = ProtectionPolicy::allow_protected(authorization);
+    let mut editor =
+        RevisionEditor::open_with_policy(source_bytes, Limits::default(), policy).unwrap();
+    editor
+        .add_text(
+            0,
+            "allowed",
+            RevisionKind::Insertion,
+            RevisionMetadata::new("Alice"),
+        )
+        .unwrap();
+    assert_ne!(editor.finish().unwrap(), protected_doc());
+
+    let authorization =
+        ProtectionAuthorization::audited("alice", "approved snapshot revision repair").unwrap();
+    let policy = ProtectionPolicy::allow_protected(authorization);
+    let snapshot = Snapshot::open_with_policy(protected_doc(), Limits::default(), policy).unwrap();
+    let mut transaction = snapshot.edit().unwrap();
+    transaction
+        .add_text(
+            0,
+            "allowed",
+            RevisionKind::Insertion,
+            RevisionMetadata::new("Alice"),
+        )
+        .unwrap();
+    let committed = transaction.commit().unwrap();
+    assert_ne!(committed.snapshot().bytes(), protected_doc().as_slice());
+}
+
+#[test]
+fn protected_patch_cannot_cross_into_an_enforcing_destination() {
+    let authorization =
+        ProtectionAuthorization::audited("alice", "approved revision patch").unwrap();
+    let allowed = Snapshot::open_with_policy(
+        protected_doc(),
+        Limits::default(),
+        ProtectionPolicy::allow_protected(authorization),
+    )
+    .unwrap();
+    let enforcing = Snapshot::open(allowed.bytes().to_vec(), Limits::default()).unwrap();
+
+    let mut transaction = allowed.edit().unwrap();
+    transaction
+        .add_text(
+            0,
+            "allowed",
+            RevisionKind::Insertion,
+            RevisionMetadata::new("Alice"),
+        )
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    assert!(matches!(
+        commit.patch().apply(&enforcing),
+        Err(Error::Invalid(PackageError::ProtectionDenied(_)))
+    ));
+
+    let changed_enforcing =
+        Snapshot::open(commit.snapshot().bytes().to_vec(), Limits::default()).unwrap();
+    assert!(matches!(
+        commit.patch().inverse().apply(&changed_enforcing),
+        Err(Error::Invalid(PackageError::ProtectionDenied(_)))
+    ));
+}
+
+fn protected_doc() -> Vec<u8> {
+    let mut package =
+        ObjectEditor::open(base_doc(), Targets::default(), Limits::default()).unwrap();
+    let word_path = ["WordDocument".to_string()];
+    let table_name = {
+        let word = package.stream(&word_path).unwrap();
+        let fib = FileInformationBlock::parse(word).unwrap();
+        if fib.which_table_stream() {
+            "1Table"
+        } else {
+            "0Table"
+        }
+        .to_owned()
+    };
+    let table_path = [table_name];
+    let mut word = package.stream(&word_path).unwrap().to_vec();
+    let mut table = package.stream(&table_path).unwrap().to_vec();
+    let offset = u32::try_from(table.len()).unwrap();
+    let mut dop = crate::parts::document_properties::DocumentProperties::writer_bytes(
+        false, false, false, true,
+    );
+    dop[6] = 0x10;
+    table.extend_from_slice(&dop);
+    let pointer = 154 + 31 * 8;
+    word[pointer..pointer + 4].copy_from_slice(&offset.to_le_bytes());
+    word[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
+    package.put_stream(&word_path, word).unwrap();
+    package.put_stream(&table_path, table).unwrap();
+    package.finish().unwrap()
 }

@@ -1,0 +1,1 @@
+command=cargo test --locked --offline --manifest-path docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/profile-harness/Cargo.toml -- --test-threads=1

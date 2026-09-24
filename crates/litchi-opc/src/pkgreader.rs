@@ -24,6 +24,41 @@ use std::collections::{HashMap, HashSet, TryReserveError};
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::Arc;
 
+/// Locate and index a positional ZIP archive after admitting its complete
+/// central-directory entry count.
+///
+/// `ArchiveLimits::max_files` intentionally counts non-directory members, so
+/// it cannot enforce the OPC `ArchiveTotalEntries` policy by itself. Locate
+/// the EOCD first, check its physical entry count, and only then let the
+/// indexed reader reserve its per-entry maps and layout vectors. Locating
+/// holds at most the locator's bounded central-directory prefill (change
+/// 0632), which the index then reuses as its scan buffer, so no per-entry
+/// ownership is allocated before the policy check and no read is repeated.
+pub(crate) fn indexed_archive_with_limits<R: soapberry_zip::ReaderAt>(
+    reader: R,
+    end_offset: u64,
+    limits: ReadLimits,
+) -> Result<soapberry_zip::office::IndexedArchive<R>> {
+    let located = soapberry_zip::office::LocatedArchive::locate(reader, end_offset)
+        .map_err(OpcError::from)?;
+    limits.check(
+        ReadResource::ArchiveTotalEntries,
+        located.declared_entries(),
+        limits.max_archive_total_entries() as u64,
+    )?;
+    let archive = located
+        .index_with_limits(limits.zip_limits())
+        .map_err(OpcError::from)?;
+    // Source-backed ingress performs this bounded fixed-header scan before it
+    // reserves catalog objects. IndexedArchive retains a proof under its
+    // existing byte-stable ReaderAt contract, so the source catalog's own
+    // fail-closed guard does not reread every local header.
+    archive
+        .validate_unencrypted_entries()
+        .map_err(OpcError::from)?;
+    Ok(archive)
+}
+
 /// The small ZIP surface needed by the structural OPC reader.
 ///
 /// Keeping this behind a private trait lets the eager byte-slice ingress and
@@ -51,6 +86,10 @@ pub(crate) trait ArchiveAccess {
     /// retains; every other implementation ignores it.
     fn note_relationship_member_count(&self, _relationship_members: usize) {}
 
+    /// Reject ZIP encryption in either central or local member headers before
+    /// the OPC catalog allocates retained structures or materializes payloads.
+    fn validate_unencrypted_entries(&self) -> std::result::Result<(), soapberry_zip::Error>;
+
     /// Return a shared materialization when this archive has a validated,
     /// reusable decompression path. Positional archives intentionally retain
     /// the default `None` so their structural reads stay caller-owned.
@@ -73,6 +112,25 @@ enum StructuralMember<'a> {
 }
 
 impl StructuralMember<'_> {
+    fn into_shared(self) -> Result<Arc<Vec<u8>>> {
+        self.into_shared_with_resource("OPC retained relationship XML")
+    }
+
+    fn into_shared_with_resource(self, resource: &'static str) -> Result<Arc<Vec<u8>>> {
+        match self {
+            Self::Shared(bytes) => Ok(bytes),
+            Self::Owned(bytes) => Ok(Arc::new(bytes)),
+            Self::Borrowed(bytes) => {
+                let mut owned = Vec::new();
+                owned
+                    .try_reserve_exact(bytes.len())
+                    .map_err(|source| allocation(resource, source))?;
+                owned.extend_from_slice(bytes);
+                Ok(Arc::new(owned))
+            },
+        }
+    }
+
     fn as_bytes(&self) -> &[u8] {
         match self {
             Self::Borrowed(bytes) => bytes,
@@ -125,6 +183,10 @@ impl ArchiveAccess for soapberry_zip::office::LazyArchiveReader<'_> {
         Self::read_stored_borrowed(self, name)
     }
 
+    fn validate_unencrypted_entries(&self) -> std::result::Result<(), soapberry_zip::Error> {
+        Self::validate_unencrypted_entries(self)
+    }
+
     fn read_shared(
         &self,
         name: &str,
@@ -161,6 +223,10 @@ impl<R: soapberry_zip::ReaderAt> ArchiveAccess for soapberry_zip::office::Indexe
         // borrowed payload would not have a sound lifetime, so they always
         // use the owned read path.
         Ok(None)
+    }
+
+    fn validate_unencrypted_entries(&self) -> std::result::Result<(), soapberry_zip::Error> {
+        Self::validate_unencrypted_entries(self)
     }
 }
 
@@ -240,6 +306,10 @@ impl<R: soapberry_zip::ReaderAt> ArchiveAccess for SessionedArchive<'_, R> {
         name: &str,
     ) -> std::result::Result<soapberry_zip::office::Metadata, soapberry_zip::Error> {
         self.archive.metadata(name)
+    }
+
+    fn validate_unencrypted_entries(&self) -> std::result::Result<(), soapberry_zip::Error> {
+        self.archive.validate_unencrypted_entries()
     }
 
     fn note_relationship_member_count(&self, relationship_members: usize) {
@@ -335,11 +405,29 @@ pub(crate) struct DeferredPart {
     pub(crate) srels: SmallVec<[SerializedRelationship; 8]>,
 }
 
+/// Facts collected while an admitted relationship manifest is parsed.
+///
+/// The source-backed topology validator uses these values to account for
+/// untouched `.rels` members without decompressing them a second time.  The
+/// record deliberately retains no XML bytes; the source relationship cache
+/// remains a separate, eager-reader-only concern.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RelationshipXmlMetrics {
+    pub(crate) uncompressed_bytes: u64,
+    pub(crate) event_count: u64,
+    pub(crate) relationship_count: u64,
+}
+
 /// Fully validated package catalog whose ordinary part payloads remain in ZIP.
 #[derive(Debug)]
 pub(crate) struct SourceCatalog {
     pub(crate) pkg_srels: SmallVec<[SerializedRelationship; 8]>,
     pub(crate) parts: Vec<DeferredPart>,
+    /// Metrics for each relationship owner whose manifest was admitted and
+    /// parsed during catalog construction.  The package pseudo-part `/` is
+    /// included when it has a `.rels` member.  The map is bounded by the
+    /// admitted relationship-member limit and retains only scalar facts.
+    pub(crate) relationship_xml_metrics: HashMap<PackURI, RelationshipXmlMetrics>,
     pub(crate) non_part_members: Vec<NonPartMember>,
     /// Exact spelling of the reserved content-types member in the source ZIP.
     pub(crate) content_types_member: String,
@@ -452,12 +540,8 @@ pub fn probe_package_catalog_from_reader_with_limits<R: Read + Seek + ?Sized>(
     let probe_result = (|| {
         let input_length = reader.seek(SeekFrom::End(0))?;
         limits.check_input_bytes(input_length)?;
-        let archive = soapberry_zip::office::IndexedArchive::from_reader_with_limits(
-            BorrowedReaderAt::new(reader),
-            input_length,
-            limits.zip_limits(),
-        )
-        .map_err(OpcError::from)?;
+        let archive =
+            indexed_archive_with_limits(BorrowedReaderAt::new(reader), input_length, limits)?;
         // One sequential structural admission pass, one reset Deflate decoder.
         let source = PackageReader::source_catalog(&SessionedArchive::new(&archive), limits)?;
         Ok(PackageCatalog { source })
@@ -598,6 +682,12 @@ mod physical_part_tests {
             .clone();
 
         assert!(Arc::ptr_eq(&archive_blob, &serialized_blob));
+        let relationship_blob = physical.archive().read_shared("_rels/.rels").unwrap();
+        let retained_relationships = reader
+            .source_relationships
+            .get(&PackURI::new("/").unwrap())
+            .unwrap();
+        assert!(Arc::ptr_eq(&relationship_blob, retained_relationships));
     }
 }
 
@@ -670,6 +760,16 @@ impl SerializedRelationship {
 /// This is the main entry point for reading OPC packages. It handles parsing
 /// the package structure, resolving relationships, and loading parts efficiently.
 pub struct PackageReader {
+    /// Policy used to admit the serialized package.
+    read_limits: ReadLimits,
+    /// Exact source bytes for the admitted content-types member. The bytes are
+    /// already charged to the structural XML limit before they are retained.
+    source_content_types_xml: Arc<Vec<u8>>,
+    /// Parsed source declarations used to decide whether those bytes remain
+    /// valid after a package edit.
+    source_content_types: ContentTypeMap,
+    /// Source XML retained only by eager ingress, within relationship read limits.
+    source_relationships: HashMap<PackURI, Arc<Vec<u8>>>,
     /// Package-level relationships
     /// Uses `SmallVec` for efficient storage of typically small relationship collections
     pkg_srels: SmallVec<[SerializedRelationship; 8]>,
@@ -682,6 +782,52 @@ pub struct PackageReader {
 }
 
 impl PackageReader {
+    pub(crate) const fn read_limits(&self) -> ReadLimits {
+        self.read_limits
+    }
+
+    pub(crate) fn parse_owned_relationships(
+        xml: &[u8],
+        owner: &PackURI,
+    ) -> Result<crate::Relationships> {
+        Self::parse_owned_relationships_with_limits(xml, owner, ReadLimits::default())
+    }
+
+    pub(crate) fn parse_owned_relationships_with_limits(
+        xml: &[u8],
+        owner: &PackURI,
+        limits: ReadLimits,
+    ) -> Result<crate::Relationships> {
+        crate::OwnedXmlPart::check_derived_capture_member_name(owner, limits)?;
+        let relationship_uri = owner.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        crate::OwnedXmlPart::check_capture_size(&relationship_uri, xml.len(), limits)?;
+        let mut ledger = RelationshipLedger::default();
+        ledger.preflight_xml_bytes(limits, xml.len() as u64)?;
+        ledger.retain_xml_bytes(limits, xml.len() as u64)?;
+        let serialized = Self::parse_rels_xml_with_source(
+            xml,
+            owner.base_uri(),
+            Some(owner.as_str()),
+            limits,
+            &mut ledger,
+        )?;
+        let mut relationships = if owner.as_str() == PACKAGE_URI {
+            crate::Relationships::new(PACKAGE_URI.into())
+        } else {
+            crate::Relationships::for_source(owner)
+        };
+        relationships.try_reserve(serialized.len())?;
+        for rel in serialized {
+            relationships.try_add_relationship(
+                rel.reltype,
+                rel.target_ref,
+                rel.r_id,
+                rel.target_mode,
+            )?;
+        }
+        Ok(relationships)
+    }
+
     /// Open and parse an OPC package from a byte slice.
     ///
     /// Uses the eager payload path:
@@ -703,6 +849,9 @@ impl PackageReader {
     pub fn from_phys_reader(phys_reader: &PhysPkgReader<'_>) -> Result<Self> {
         let archive = phys_reader.archive();
         let limits = phys_reader.limits();
+        archive
+            .validate_unencrypted_entries()
+            .map_err(OpcError::from)?;
         limits.check(
             ReadResource::ArchiveMembers,
             archive.len() as u64,
@@ -718,7 +867,7 @@ impl PackageReader {
             relationship_part_count as u64,
             limits.max_relationship_parts() as u64,
         )?;
-        let mut relationship_ledger = RelationshipLedger::default();
+        let mut relationship_ledger = RelationshipLedger::retaining_source();
 
         // Phase 1: Decompress and parse content types (on-demand)
         let content_types_member = Self::locate_content_types_member(archive)?;
@@ -730,6 +879,8 @@ impl PackageReader {
         )?;
         let content_types_xml = read_structural_member(archive, content_types_member)?;
         let content_types = ContentTypeMap::from_xml(content_types_xml.as_bytes(), limits)?;
+        let source_content_types_xml =
+            content_types_xml.into_shared_with_resource("OPC retained content-types XML")?;
 
         // Phase 2: Get package-level relationships (on-demand decompression)
         let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
@@ -754,6 +905,10 @@ impl PackageReader {
         )?;
 
         Ok(Self {
+            read_limits: limits,
+            source_content_types_xml,
+            source_content_types: content_types,
+            source_relationships: relationship_ledger.source_xml.unwrap_or_default(),
             pkg_srels,
             sparts,
             non_part_members,
@@ -781,6 +936,11 @@ impl PackageReader {
     ) -> Result<Self> {
         let archive = phys_reader.archive();
         let limits = phys_reader.limits();
+        // Every ingress refuses ZIP encryption before admitting structure,
+        // exactly as the eager constructors do.
+        archive
+            .validate_unencrypted_entries()
+            .map_err(OpcError::from)?;
         limits.check(
             ReadResource::ArchiveMembers,
             archive.len() as u64,
@@ -796,7 +956,10 @@ impl PackageReader {
             relationship_part_count as u64,
             limits.max_relationship_parts() as u64,
         )?;
-        let mut relationship_ledger = RelationshipLedger::default();
+        // Retain the admitted relationship and content-types XML as the eager
+        // constructors do, so a deferred package publishes an unchanged
+        // member's exact source bytes and keeps its preservation provenance.
+        let mut relationship_ledger = RelationshipLedger::retaining_source();
 
         let content_types_member = Self::locate_content_types_member(archive)?;
         let content_types_metadata = archive.metadata(content_types_member)?;
@@ -807,6 +970,8 @@ impl PackageReader {
         )?;
         let content_types_xml = read_structural_member(archive, content_types_member)?;
         let content_types = ContentTypeMap::from_xml(content_types_xml.as_bytes(), limits)?;
+        let source_content_types_xml =
+            content_types_xml.into_shared_with_resource("OPC retained content-types XML")?;
 
         let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
         let pkg_srels =
@@ -828,6 +993,10 @@ impl PackageReader {
         )?;
 
         Ok(Self {
+            read_limits: limits,
+            source_content_types_xml,
+            source_content_types: content_types,
+            source_relationships: relationship_ledger.source_xml.unwrap_or_default(),
             pkg_srels,
             sparts,
             non_part_members,
@@ -843,6 +1012,9 @@ impl PackageReader {
     ) -> Result<Self> {
         let archive = phys_reader.archive();
         let limits = phys_reader.limits();
+        archive
+            .validate_unencrypted_entries()
+            .map_err(OpcError::from)?;
         limits.check(
             ReadResource::ArchiveMembers,
             archive.len() as u64,
@@ -858,7 +1030,7 @@ impl PackageReader {
             relationship_part_count as u64,
             limits.max_relationship_parts() as u64,
         )?;
-        let mut relationship_ledger = RelationshipLedger::default();
+        let mut relationship_ledger = RelationshipLedger::retaining_source();
 
         let content_types_member = Self::locate_content_types_member(archive)?;
         let content_types_metadata = archive.metadata(content_types_member)?;
@@ -869,6 +1041,8 @@ impl PackageReader {
         )?;
         let content_types_xml = read_structural_member(archive, content_types_member)?;
         let content_types = ContentTypeMap::from_xml(content_types_xml.as_bytes(), limits)?;
+        let source_content_types_xml =
+            content_types_xml.into_shared_with_resource("OPC retained content-types XML")?;
 
         let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
         let pkg_srels =
@@ -897,6 +1071,10 @@ impl PackageReader {
         )?;
 
         Ok(Self {
+            read_limits: limits,
+            source_content_types_xml,
+            source_content_types: content_types,
+            source_relationships: relationship_ledger.source_xml.unwrap_or_default(),
             pkg_srels,
             sparts,
             non_part_members,
@@ -1057,13 +1235,40 @@ impl PackageReader {
                 ledger.preflight_xml_bytes(limits, metadata.uncompressed_size())?;
                 let rels_xml = read_structural_member(archive, rels_path)?;
                 ledger.retain_xml_bytes(limits, rels_xml.as_bytes().len() as u64)?;
-                Self::parse_rels_xml_with_source(
+                let event_start = ledger.xml_events;
+                let relationships = Self::parse_rels_xml_with_source(
                     rels_xml.as_bytes(),
                     source_uri.base_uri(),
                     Some(source_uri.as_str()),
                     limits,
                     ledger,
-                )
+                )?;
+                let event_count = ledger.xml_events.checked_sub(event_start).ok_or_else(|| {
+                    OpcError::InvalidRelationshipsManifest(
+                        "relationship XML event metrics underflow".to_string(),
+                    )
+                })?;
+                let relationship_count = u64::try_from(relationships.len()).map_err(|_| {
+                    OpcError::InvalidRelationshipsManifest(
+                        "relationship count exceeds u64 metrics range".to_string(),
+                    )
+                })?;
+                ledger.record_relationship_xml_metrics(
+                    source_uri,
+                    RelationshipXmlMetrics {
+                        uncompressed_bytes: metadata.uncompressed_size(),
+                        event_count,
+                        relationship_count,
+                    },
+                    limits,
+                )?;
+                if let Some(source_xml) = ledger.source_xml.as_mut() {
+                    source_xml
+                        .try_reserve(1)
+                        .map_err(|source| allocation("OPC relationship XML owners", source))?;
+                    source_xml.insert(source_uri.clone(), rels_xml.into_shared()?);
+                }
+                Ok(relationships)
             },
             Err(error) if is_member_missing(&error) => Ok(SmallVec::new()),
             Err(error) => Err(error.into()),
@@ -1490,6 +1695,9 @@ impl PackageReader {
         archive: &A,
         limits: ReadLimits,
     ) -> Result<SourceCatalog> {
+        archive
+            .validate_unencrypted_entries()
+            .map_err(OpcError::from)?;
         limits.check(
             ReadResource::ArchiveMembers,
             archive.len() as u64,
@@ -1535,6 +1743,7 @@ impl PackageReader {
         Ok(SourceCatalog {
             pkg_srels,
             parts,
+            relationship_xml_metrics: ledger.relationship_xml_metrics,
             non_part_members,
             content_types_member: content_types_member.to_string(),
         })
@@ -1547,6 +1756,10 @@ impl PackageReader {
         limits: ReadLimits,
     ) -> std::result::Result<SourceCatalog, ValidationCatalogError> {
         let phase = |phase, error| ValidationCatalogError { phase, error };
+        archive
+            .validate_unencrypted_entries()
+            .map_err(OpcError::from)
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
         limits
             .check(
                 ReadResource::ArchiveMembers,
@@ -1608,6 +1821,7 @@ impl PackageReader {
         Ok(SourceCatalog {
             pkg_srels,
             parts,
+            relationship_xml_metrics: ledger.relationship_xml_metrics,
             non_part_members,
             content_types_member: content_types_member.to_string(),
         })
@@ -1755,6 +1969,17 @@ impl PackageReader {
         std::mem::take(&mut self.pkg_srels)
     }
 
+    pub(crate) fn take_source_relationships(&mut self) -> HashMap<PackURI, Arc<Vec<u8>>> {
+        std::mem::take(&mut self.source_relationships)
+    }
+
+    pub(crate) fn take_source_content_types(&mut self) -> (Arc<Vec<u8>>, ContentTypeMap) {
+        (
+            Arc::clone(&self.source_content_types_xml),
+            std::mem::replace(&mut self.source_content_types, ContentTypeMap::empty()),
+        )
+    }
+
     /// Take ownership of all serialized parts (zero-copy move).
     pub fn take_sparts(&mut self) -> Vec<SerializedPart> {
         std::mem::take(&mut self.sparts)
@@ -1777,6 +2002,8 @@ impl PackageReader {
 
 #[derive(Default)]
 struct RelationshipLedger {
+    source_xml: Option<HashMap<PackURI, Arc<Vec<u8>>>>,
+    relationship_xml_metrics: HashMap<PackURI, RelationshipXmlMetrics>,
     declared_xml_bytes: u64,
     retained_xml_bytes: u64,
     relationships: u64,
@@ -1784,6 +2011,37 @@ struct RelationshipLedger {
 }
 
 impl RelationshipLedger {
+    fn retaining_source() -> Self {
+        Self {
+            source_xml: Some(HashMap::new()),
+            ..Self::default()
+        }
+    }
+
+    fn record_relationship_xml_metrics(
+        &mut self,
+        owner: &PackURI,
+        metrics: RelationshipXmlMetrics,
+        limits: ReadLimits,
+    ) -> Result<()> {
+        // A relationship owner can be encountered more than once while the
+        // graph and typed-part catalog are assembled. Keep one scalar record
+        // per owner and avoid charging duplicate map entries.
+        if self.relationship_xml_metrics.contains_key(owner) {
+            return Ok(());
+        }
+        checked_increment(
+            self.relationship_xml_metrics.len(),
+            limits.max_relationship_parts(),
+            ReadResource::RelationshipParts,
+        )?;
+        self.relationship_xml_metrics
+            .try_reserve(1)
+            .map_err(|source| allocation("OPC relationship XML metrics", source))?;
+        self.relationship_xml_metrics.insert(owner.clone(), metrics);
+        Ok(())
+    }
+
     fn preflight_xml_bytes(&mut self, limits: ReadLimits, bytes: u64) -> Result<()> {
         limits.check(
             ReadResource::RelationshipXmlBytes,
@@ -2578,6 +2836,61 @@ mod tests {
                 Err(OpcError::InvalidRelationshipsManifest(_))
             ));
         }
+    }
+
+    #[test]
+    fn relationship_metrics_follow_trimmed_ingress_event_policy() {
+        // The source catalog parser intentionally trims whitespace-only text
+        // between markup.  Keep a noncanonical prefix, indentation, and an
+        // opaque comment here so the metric proves that it is the ingress
+        // parser's event ledger rather than a later raw-byte scan.  The six
+        // admitted events are Decl, Start, Empty, Comment, End, and Eof.
+        let xml = br#"<?xml version="1.0" encoding="UTF-8"?>
+<r:Relationships xmlns:r="http://schemas.openxmlformats.org/package/2006/relationships">
+    <!-- retained source metadata -->
+    <r:Relationship Id="rId1" Type="urn:test:type" Target="document.xml" />
+</r:Relationships>
+"#;
+        let limits = ReadLimits::default();
+        let mut ledger = RelationshipLedger::default();
+        ledger
+            .preflight_xml_bytes(limits, xml.len() as u64)
+            .unwrap();
+        ledger.retain_xml_bytes(limits, xml.len() as u64).unwrap();
+        let event_start = ledger.xml_events;
+        let relationships =
+            PackageReader::parse_rels_xml_with_source(xml, "/", Some("/"), limits, &mut ledger)
+                .unwrap();
+        let event_count = ledger.xml_events.checked_sub(event_start).unwrap();
+        ledger
+            .record_relationship_xml_metrics(
+                &PackURI::new("/").unwrap(),
+                RelationshipXmlMetrics {
+                    uncompressed_bytes: xml.len() as u64,
+                    event_count,
+                    relationship_count: relationships.len() as u64,
+                },
+                limits,
+            )
+            .unwrap();
+
+        assert_eq!(relationships.len(), 1);
+        assert_eq!(event_count, 6);
+        assert_eq!(ledger.xml_events, event_count);
+        assert_eq!(ledger.relationships, 1);
+        assert_eq!(
+            ledger
+                .relationship_xml_metrics
+                .get(&PackURI::new("/").unwrap()),
+            Some(&RelationshipXmlMetrics {
+                uncompressed_bytes: xml.len() as u64,
+                event_count: 6,
+                relationship_count: 1,
+            })
+        );
+        // Metrics retain scalar facts only.  No relationship XML cache is
+        // created by the deferred/source-catalog ledger.
+        assert!(ledger.source_xml.is_none());
     }
 
     #[test]

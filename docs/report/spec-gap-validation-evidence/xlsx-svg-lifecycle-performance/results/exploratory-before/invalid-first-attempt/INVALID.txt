@@ -1,0 +1,2 @@
+This capture is intentionally excluded from the BEFORE baseline.
+The source manifest changed during the release build: crates/litchi-xlsx/src/drawing/source.rs was edited while the compiler was reading the worktree. The copied executable cannot be attributed to one stable source preimage. Retain this directory only as an audit trail; use the stable capture at the parent directory after this marker.

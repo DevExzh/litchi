@@ -20,6 +20,7 @@ use quick_xml::XmlVersion;
 use quick_xml::events::BytesStart;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 // ============================================================================
@@ -309,6 +310,21 @@ pub const XLINKNS: &str = "http://www.w3.org/1999/xlink";
     reason = "Retained as part of the complete ODF namespace vocabulary."
 )]
 pub const XMLNS: &str = "http://www.w3.org/XML/1998/namespace";
+
+/// The namespace URI reserved for `xmlns` declarations.
+///
+/// This URI is never a valid default namespace or an ordinary application
+/// prefix binding.  `quick-xml` validates most prefixed forms while parsing,
+/// but it intentionally leaves the default declaration available to callers,
+/// so the shared ODF helper validates it as well.
+pub const XMLNS_DECLARATION_NAMESPACE: &str = "http://www.w3.org/2000/xmlns/";
+
+/// Maximum decoded namespace URI size accepted by the shared resolver.
+///
+/// Namespace declarations in ODF are short tokens.  The ceiling is kept
+/// separate from the caller's XML-part limit so entity expansion is bounded
+/// before a destination string is allocated.
+pub const MAX_NAMESPACE_URI_BYTES: usize = 64 * 1024;
 
 /// XML Schema namespace
 #[allow(
@@ -668,6 +684,400 @@ impl QualifiedName {
 
 pub(crate) fn is_bound(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
     matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == expected)
+}
+
+/// Decode and XML 1.0-normalize a resolved namespace URI.
+///
+/// `Namespace` deliberately exposes quick-xml's lexical attribute bytes.  In
+/// particular, a declaration such as `urn:example&#58;forms` is semantically
+/// the same URI as `urn:example:forms`, but direct byte comparison misses it.
+/// This helper performs the XML 1.0 attribute-value steps for predefined and
+/// numeric character references and rejects undeclared or malformed entities.
+/// It preserves the borrowed fast path when the declaration has no decoding or
+/// normalization work.  The input and normalized output are bounded before a
+/// destination `String` is allocated.
+pub fn resolved_namespace_uri<'uri>(
+    namespace: &ResolveResult<'uri>,
+    decoder: quick_xml::Decoder,
+    context: &str,
+) -> Result<Option<Cow<'uri, str>>> {
+    match namespace {
+        ResolveResult::Unbound => Ok(None),
+        ResolveResult::Unknown(_) => Err(invalid_namespace(
+            context,
+            "the namespace prefix is not bound",
+        )),
+        ResolveResult::Bound(Namespace(raw)) => {
+            let uri = decode_namespace_uri(raw, decoder, context)?;
+            if uri.as_ref() == XMLNS_DECLARATION_NAMESPACE {
+                return Err(invalid_namespace(
+                    context,
+                    "the XMLNS namespace URI is reserved for namespace declarations",
+                ));
+            }
+            Ok(Some(uri))
+        },
+    }
+}
+
+/// Compare a resolved namespace against a canonical URI.
+///
+/// The expected value may be supplied as either a string or a byte slice.  A
+/// malformed resolved namespace is an error rather than a non-match, so a
+/// caller cannot silently treat an invalid or unknown prefix as opaque typed
+/// content.
+pub fn namespace_matches<E>(
+    namespace: &ResolveResult<'_>,
+    expected: E,
+    decoder: quick_xml::Decoder,
+    context: &str,
+) -> Result<bool>
+where
+    E: AsRef<[u8]>,
+{
+    let Some(actual) = resolved_namespace_uri(namespace, decoder, context)? else {
+        return Ok(false);
+    };
+    Ok(actual.as_bytes() == expected.as_ref())
+}
+
+/// Validate a namespace declaration while retaining its prefix context.
+///
+/// `ResolveResult` contains the resolved URI but not the prefix that produced
+/// it.  Callers scanning `xmlns` declarations should use this function when
+/// they have that lexical prefix available.  `None` means the default
+/// namespace.  The returned URI is the same borrowed/owned value produced by
+/// [`resolved_namespace_uri`].
+pub fn validate_namespace_binding<'uri>(
+    prefix: Option<&[u8]>,
+    namespace: &ResolveResult<'uri>,
+    decoder: quick_xml::Decoder,
+    context: &str,
+) -> Result<Option<Cow<'uri, str>>> {
+    if let Some(prefix) = prefix {
+        if prefix.is_empty() {
+            return Err(invalid_namespace(
+                context,
+                "a named namespace binding must have a non-empty prefix",
+            ));
+        }
+        if prefix == b"xmlns" {
+            return Err(invalid_namespace(
+                context,
+                "the xmlns prefix is reserved and cannot be declared",
+            ));
+        }
+    }
+    let resolved = resolved_namespace_uri(namespace, decoder, context)?;
+    let Some(uri) = resolved.as_ref() else {
+        if prefix.is_some() {
+            return Err(invalid_namespace(
+                context,
+                "a named namespace binding cannot be unbound",
+            ));
+        }
+        return Ok(None);
+    };
+
+    validate_normalized_namespace_binding(prefix, uri, context)?;
+    Ok(resolved)
+}
+
+/// Validate a namespace binding whose URI has already undergone XML
+/// attribute-value normalization.
+///
+/// This is kept separate from [`validate_namespace_binding`] so readers that
+/// normalize a declaration before adding it to a resolver do not normalize it
+/// a second time when applying the reserved-prefix rules.
+pub fn validate_normalized_namespace_binding(
+    prefix: Option<&[u8]>,
+    uri: &str,
+    context: &str,
+) -> Result<()> {
+    if let Some(prefix) = prefix {
+        if prefix.is_empty() {
+            return Err(invalid_namespace(
+                context,
+                "a named namespace binding must have a non-empty prefix",
+            ));
+        }
+        if prefix == b"xmlns" {
+            return Err(invalid_namespace(
+                context,
+                "the xmlns prefix is reserved and cannot be declared",
+            ));
+        }
+    }
+    let prefix = prefix.unwrap_or_default();
+    if uri.is_empty() && !prefix.is_empty() {
+        return Err(invalid_namespace(
+            context,
+            "a non-empty prefix cannot be bound to the empty namespace URI",
+        ));
+    }
+    if uri == XMLNS_DECLARATION_NAMESPACE {
+        return Err(invalid_namespace(
+            context,
+            "the XMLNS namespace URI is reserved for namespace declarations",
+        ));
+    }
+    if uri == XMLNS {
+        if prefix != b"xml" {
+            return Err(invalid_namespace(
+                context,
+                "the XML namespace URI may only be bound to the xml prefix",
+            ));
+        }
+    } else if prefix == b"xml" {
+        return Err(invalid_namespace(
+            context,
+            "the xml prefix must be bound to the XML namespace URI",
+        ));
+    }
+    Ok(())
+}
+
+/// Normalize one lexical namespace declaration value with the shared byte,
+/// entity-expansion, and XML-character bounds.
+pub fn normalize_namespace_uri<'uri>(
+    raw: &'uri [u8],
+    decoder: quick_xml::Decoder,
+    context: &str,
+) -> Result<Cow<'uri, str>> {
+    decode_namespace_uri(raw, decoder, context)
+}
+
+fn invalid_namespace(context: &str, reason: &str) -> Error {
+    Error::InvalidFormat(format!("invalid {context} namespace URI: {reason}"))
+}
+
+fn decode_namespace_uri<'uri>(
+    raw: &'uri [u8],
+    decoder: quick_xml::Decoder,
+    context: &str,
+) -> Result<Cow<'uri, str>> {
+    ensure_utf8_decoder(decoder, context)?;
+    if raw.len() > MAX_NAMESPACE_URI_BYTES {
+        return Err(invalid_namespace(
+            context,
+            "the lexical value exceeds the namespace URI limit",
+        ));
+    }
+    if raw.contains(&b'<') {
+        return Err(invalid_namespace(
+            context,
+            "the lexical value contains an unescaped '<'",
+        ));
+    }
+
+    let decoded = decoder.decode(raw).map_err(|error| {
+        invalid_namespace(
+            context,
+            &format!("the value is not valid in the XML encoding: {error}"),
+        )
+    })?;
+    if decoded.len() > MAX_NAMESPACE_URI_BYTES {
+        return Err(invalid_namespace(
+            context,
+            "the decoded value exceeds the namespace URI limit",
+        ));
+    }
+
+    let (normalized_len, changed) = namespace_normalized_len(&decoded, context)?;
+    if normalized_len > MAX_NAMESPACE_URI_BYTES {
+        return Err(invalid_namespace(
+            context,
+            "entity expansion exceeds the namespace URI limit",
+        ));
+    }
+    if !changed {
+        return Ok(decoded);
+    }
+
+    let mut output = String::new();
+    output
+        .try_reserve_exact(normalized_len)
+        .map_err(|source| Error::Allocation {
+            resource: "ODF namespace URI normalization",
+            source,
+        })?;
+    append_normalized_namespace(&mut output, &decoded, context)?;
+    debug_assert_eq!(output.len(), normalized_len);
+    Ok(Cow::Owned(output))
+}
+
+fn ensure_utf8_decoder(decoder: quick_xml::Decoder, context: &str) -> Result<()> {
+    let valid_utf8 = decoder
+        .decode(b"\xC3\xA9")
+        .map(|value| value.as_ref() == "é")
+        .unwrap_or(false);
+    let rejects_invalid_utf8 = decoder.decode(b"\xFF").is_err();
+    if valid_utf8 && rejects_invalid_utf8 {
+        Ok(())
+    } else {
+        Err(invalid_namespace(
+            context,
+            "namespace URI resolution requires an XML UTF-8 decoder",
+        ))
+    }
+}
+
+fn namespace_normalized_len(value: &str, context: &str) -> Result<(usize, bool)> {
+    let bytes = value.as_bytes();
+    let mut index = 0;
+    let mut length = 0usize;
+    let mut changed = false;
+    while index < bytes.len() {
+        if bytes[index] == b'&' {
+            let relative_end = memchr::memchr(b';', &bytes[index + 1..]).ok_or_else(|| {
+                invalid_namespace(context, "an entity reference is not terminated")
+            })?;
+            let end = index + 1 + relative_end;
+            let name = value
+                .get(index + 1..end)
+                .ok_or_else(|| invalid_namespace(context, "an entity reference is not UTF-8"))?;
+            let replacement = namespace_entity(name, context)?;
+            length = length
+                .checked_add(namespace_entity_len(replacement))
+                .ok_or_else(|| invalid_namespace(context, "entity expansion length overflow"))?;
+            changed = true;
+            index = end + 1;
+            continue;
+        }
+
+        let character = value[index..]
+            .chars()
+            .next()
+            .ok_or_else(|| invalid_namespace(context, "invalid UTF-8 boundary"))?;
+        validate_xml10_character(character, context)?;
+        if character == '\r' && value[index + character.len_utf8()..].starts_with('\n') {
+            length = length
+                .checked_add(1)
+                .ok_or_else(|| invalid_namespace(context, "normalized length overflow"))?;
+            changed = true;
+            index += 2;
+            continue;
+        }
+        let output = normalized_literal_character(character);
+        length = length
+            .checked_add(output.len_utf8())
+            .ok_or_else(|| invalid_namespace(context, "normalized length overflow"))?;
+        changed |= output != character;
+        index += character.len_utf8();
+    }
+    Ok((length, changed))
+}
+
+fn append_normalized_namespace(output: &mut String, value: &str, context: &str) -> Result<()> {
+    let bytes = value.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'&' {
+            let relative_end = memchr::memchr(b';', &bytes[index + 1..]).ok_or_else(|| {
+                invalid_namespace(context, "an entity reference is not terminated")
+            })?;
+            let end = index + 1 + relative_end;
+            let name = value
+                .get(index + 1..end)
+                .ok_or_else(|| invalid_namespace(context, "an entity reference is not UTF-8"))?;
+            match namespace_entity(name, context)? {
+                NamespaceEntity::Named(replacement) => output.push_str(replacement),
+                NamespaceEntity::Character(character) => output.push(character),
+            }
+            index = end + 1;
+            continue;
+        }
+
+        let character = value[index..]
+            .chars()
+            .next()
+            .ok_or_else(|| invalid_namespace(context, "invalid UTF-8 boundary"))?;
+        validate_xml10_character(character, context)?;
+        if character == '\r' && value[index + character.len_utf8()..].starts_with('\n') {
+            output.push(' ');
+            index += 2;
+            continue;
+        }
+        output.push(normalized_literal_character(character));
+        index += character.len_utf8();
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+enum NamespaceEntity {
+    Named(&'static str),
+    Character(char),
+}
+
+fn namespace_entity(name: &str, context: &str) -> Result<NamespaceEntity> {
+    if let Some(value) = quick_xml::escape::resolve_xml_entity(name) {
+        return Ok(NamespaceEntity::Named(value));
+    }
+
+    let (radix, digits) = if let Some(value) = name.strip_prefix("#x") {
+        (16, value)
+    } else if let Some(value) = name.strip_prefix('#') {
+        (10, value)
+    } else {
+        return Err(invalid_namespace(
+            context,
+            "the entity reference is not a predefined XML entity",
+        ));
+    };
+    if digits.is_empty() {
+        return Err(invalid_namespace(
+            context,
+            "the character reference has no digits",
+        ));
+    }
+    let valid_digits = if radix == 16 {
+        digits.bytes().all(|value| value.is_ascii_hexdigit())
+    } else {
+        digits.bytes().all(|value| value.is_ascii_digit())
+    };
+    if !valid_digits {
+        return Err(invalid_namespace(
+            context,
+            "the character reference contains invalid digits",
+        ));
+    }
+    let codepoint = u32::from_str_radix(digits, radix)
+        .map_err(|_| invalid_namespace(context, "the character reference is not numeric"))?;
+    let character = char::from_u32(codepoint).ok_or_else(|| {
+        invalid_namespace(context, "the character reference is not a Unicode scalar")
+    })?;
+    validate_xml10_character(character, context)?;
+    Ok(NamespaceEntity::Character(character))
+}
+
+fn namespace_entity_len(entity: NamespaceEntity) -> usize {
+    match entity {
+        NamespaceEntity::Named(value) => value.len(),
+        NamespaceEntity::Character(value) => value.len_utf8(),
+    }
+}
+
+fn normalized_literal_character(character: char) -> char {
+    match character {
+        '\t' | '\n' | '\r' => ' ',
+        value => value,
+    }
+}
+
+fn validate_xml10_character(character: char, context: &str) -> Result<()> {
+    let value = character as u32;
+    if matches!(
+        value,
+        0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF
+    ) {
+        Ok(())
+    } else {
+        Err(invalid_namespace(
+            context,
+            "the value contains a character forbidden by XML 1.0",
+        ))
+    }
 }
 
 pub(crate) fn namespaced_attribute(

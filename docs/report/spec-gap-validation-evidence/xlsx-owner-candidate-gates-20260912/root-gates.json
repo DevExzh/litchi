@@ -1,0 +1,125 @@
+{
+  "base_head": "913eec261e52618599f85ab8282a7012429eb56f",
+  "source_sha256": {
+    "crates/litchi-xlsx/src/lib.rs": "64ed50dfcb85002cb5d408f4fc55d27aa92d30f6431a998d13bf01b3d6da5474",
+    "crates/litchi-xlsx/src/pivot/mod.rs": "2f8157a82493d427d0b5b2b3f4f4c5cc59701fd33a28e97e3e4d3b0761501fd5",
+    "crates/litchi-xlsx/src/pivot/server_formats/mod.rs": "99edd4b17a11386fecee172ec9c271d6e9d980d0e51b8fcfda113efc59bfa872",
+    "crates/litchi-xlsx/src/pivot/server_formats/cached_unique_names.rs": "b72b23df2d5bd509bf0b8b7a246013b06813616e97dcf4a932820ea2e75f29f3",
+    "crates/litchi-xlsx/src/pivot/server_formats/table_data.rs": "8ec8da0f29e21e7bd026ca057b4634f8a468cedcb31135ff5ce464e741dd0438",
+    "crates/litchi-xlsx/src/raw/catalog.rs": "2f1a6a7a56aa7515b71aab443c95eb504e61788da685c4c9740c8961dc74cbcb",
+    "crates/litchi-xlsx/src/workbook/model.rs": "bdb6006fee3fb98676771ad1b84c1f91b6402423d65a987e8119ba36baf9e2d7",
+    "crates/litchi-xlsx/src/workbook/source.rs": "740160b04b3b6e6f986c6e6449decb1b1bf3bf55446cabbbacac307bde312bfa",
+    "crates/litchi-xlsx/src/form_control/mod.rs": "9ad06346304919c79edfac370d6043b5b69e0a334110c91c0362925564e1904b",
+    "crates/litchi-xlsx/src/form_control/owner.rs": "338761beaa5f30fb2d552c946f37a7b3ca3af9fe7e17cbf8767c27d91767dba0",
+    "crates/litchi-xlsx/tests/pivot_table_data.rs": "afae223e8131a9b63000338f4ba7557e7973af750f21f11b7b5ab2913643670e",
+    "crates/litchi-xlsx/tests/cached_unique_names.rs": "8b24723aa0b97af84ab850fc5cb7a69bbe5f0ff9964a8989beb4de71f8f5da47",
+    "crates/litchi-xlsx/tests/pivot_server_formats.rs": "dad3ae61eefb1f6f5bbf9c294c04633149c5e5756e69637b5eff25d819fcaf00",
+    "crates/litchi-xlsx/tests/form_control_owner_read.rs": "87103b0ba69665e35f61184bf73bb3f6525947b0166e557668ad5a740fe544e6"
+  },
+  "environment": {
+    "TMPDIR": "/var/tmp",
+    "RUSTFLAGS": "unset",
+    "RUSTDOCFLAGS_for_rustdoc": "-D warnings"
+  },
+  "gates": [
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--offline",
+        "--lib",
+        "--test",
+        "pivot_table_data",
+        "--test",
+        "cached_unique_names",
+        "--test",
+        "pivot_server_formats",
+        "--test",
+        "form_control_owner_read"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "aee104a8138e0daf7ceabc1b30e95b4c2545eaf2854293947dadcec48f0b7b09",
+      "source_unchanged": true,
+      "summaries": [
+        "test result: ok. 1153 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.07s",
+        "test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s",
+        "test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s",
+        "test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s"
+      ]
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--offline",
+        "--lib",
+        "--test",
+        "pivot_table_data",
+        "--test",
+        "cached_unique_names",
+        "--test",
+        "pivot_server_formats",
+        "--test",
+        "form_control_owner_read",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "a6e365cdb2bf18f0bcd82f2e9ad78aa80047c865f5175827fcab861b4a929169",
+      "source_unchanged": true
+    },
+    {
+      "name": "rustdoc",
+      "command": [
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--offline",
+        "--no-deps"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "626cba2df59a2dfd2c72f2689b69a861998c19d61989fe806f8b62f8e4946489",
+      "source_unchanged": true
+    },
+    {
+      "name": "rustfmt",
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2024",
+        "--check",
+        "crates/litchi-xlsx/src/lib.rs",
+        "crates/litchi-xlsx/src/pivot/mod.rs",
+        "crates/litchi-xlsx/src/pivot/server_formats/mod.rs",
+        "crates/litchi-xlsx/src/pivot/server_formats/cached_unique_names.rs",
+        "crates/litchi-xlsx/src/pivot/server_formats/table_data.rs",
+        "crates/litchi-xlsx/src/raw/catalog.rs",
+        "crates/litchi-xlsx/src/workbook/model.rs",
+        "crates/litchi-xlsx/src/workbook/source.rs",
+        "crates/litchi-xlsx/src/form_control/mod.rs",
+        "crates/litchi-xlsx/src/form_control/owner.rs",
+        "crates/litchi-xlsx/tests/pivot_table_data.rs",
+        "crates/litchi-xlsx/tests/cached_unique_names.rs",
+        "crates/litchi-xlsx/tests/pivot_server_formats.rs",
+        "crates/litchi-xlsx/tests/form_control_owner_read.rs"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_unchanged": true
+    }
+  ],
+  "source_archive_sha256": "7a386aff175010f109836fd735a17bfd596ce414a6cfd26ad5eb686f1099f6f4",
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14)"
+}

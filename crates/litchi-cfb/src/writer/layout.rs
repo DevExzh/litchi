@@ -27,7 +27,8 @@ use super::super::consts::{
     MAXREGSECT, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM,
 };
 use super::super::file::{CandidateBytes, OleError, OleFile, OleFileLimits};
-use std::collections::{BTreeMap, BTreeSet};
+use super::core::DirectoryMetadata;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 
 #[cfg(test)]
@@ -49,6 +50,12 @@ const NUM_MINIFAT_SECTORS_OFFSET: usize = 0x40;
 const FIRST_DIFAT_SECTOR_OFFSET: usize = 0x44;
 /// Header offset of the Number of DIFAT Sectors field (MS-CFB 2.2).
 const NUM_DIFAT_SECTORS_OFFSET: usize = 0x48;
+/// Directory entry offset of the State Bits field (MS-CFB 2.6.1).
+const ENTRY_STATE_BITS_OFFSET: usize = 0x60;
+/// Directory entry offset of the Creation Time field (MS-CFB 2.6.1).
+const ENTRY_CREATION_TIME_OFFSET: usize = 0x64;
+/// Directory entry offset of the Modified Time field (MS-CFB 2.6.1).
+const ENTRY_MODIFIED_TIME_OFFSET: usize = 0x6C;
 /// Directory entry offset of the Starting Sector Location field (MS-CFB 2.6.1).
 const ENTRY_START_SECTOR_OFFSET: usize = 0x74;
 /// Directory entry offset of the Stream Size field (MS-CFB 2.6.1).
@@ -67,7 +74,10 @@ const LAYOUT_FIXED_POINT_ROUNDS: usize = 32;
 /// identical hierarchy, identical names and identical class identifiers. They
 /// differ only in where the bytes land inside the container, and in how much
 /// of the source's directory metadata survives — see the crate documentation
-/// of [`SectorLayoutReport`].
+/// of [`SectorLayoutReport`]. Directory state bits and FILETIMEs that the
+/// caller supplies through the writer's metadata setters are published
+/// identically by both: a reused layout that would publish other values is
+/// declined with [`SectorLayoutFallback::DirectoryMetadataChanged`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[non_exhaustive]
 pub enum SectorLayoutPolicy {
@@ -115,6 +125,14 @@ pub enum SectorLayoutFallback {
     DirectoryShapeChanged,
     /// A class identifier the caller set differs from the adopted source's.
     ClassIdChanged,
+    /// The caller supplied directory state bits or FILETIMEs, and at least
+    /// one entry's values differ from the adopted source's.
+    ///
+    /// Supplied metadata is authoritative for every entry, including the
+    /// all-zero default of an entry the caller did not set. The reused
+    /// directory image carries the source's values, so the writer serializes
+    /// from scratch to publish the model's values exactly.
+    DirectoryMetadataChanged,
     /// The adopted source declares DIFAT sectors.
     ///
     /// Reuse rebuilds the FAT, so it would have to rebuild the DIFAT chain as
@@ -654,6 +672,32 @@ fn entry_class_id(directory_image: &[u8], sid: u32) -> Result<[u8; 16], OleError
     let mut class_id = [0u8; 16];
     class_id.copy_from_slice(slice);
     Ok(class_id)
+}
+
+/// The state bits and FILETIME fields of one entry of a directory image.
+fn entry_metadata(directory_image: &[u8], sid: u32) -> Result<DirectoryMetadata, OleError> {
+    let start = usize_from_u32(sid, "CFB directory SID does not fit usize")?
+        .checked_mul(DIRENTRY_SIZE)
+        .ok_or_else(|| invalid("CFB directory entry offset overflows usize"))?;
+    let end = start
+        .checked_add(DIRENTRY_SIZE)
+        .ok_or_else(|| invalid("CFB directory entry end overflows usize"))?;
+    let entry = directory_image
+        .get(start..end)
+        .ok_or_else(|| invalid("CFB directory entry is outside the directory image"))?;
+    let field_u64 = |offset: usize| -> Result<u64, OleError> {
+        let slice = entry
+            .get(offset..offset + 8)
+            .ok_or_else(|| invalid("CFB directory entry field is outside its record"))?;
+        let mut raw = [0u8; 8];
+        raw.copy_from_slice(slice);
+        Ok(u64::from_le_bytes(raw))
+    };
+    Ok(DirectoryMetadata {
+        state_bits: read_u32(entry, ENTRY_STATE_BITS_OFFSET)?,
+        creation_time: field_u64(ENTRY_CREATION_TIME_OFFSET)?,
+        modified_time: field_u64(ENTRY_MODIFIED_TIME_OFFSET)?,
+    })
 }
 
 fn collect_paths(
@@ -1274,6 +1318,19 @@ pub(super) struct ModelInputs<'a> {
     /// `None` preserves the source root CLSID; `Some([0; 16])` explicitly
     /// clears it while `Some(nonzero)` requests the supplied identifier.
     pub(super) root_class_id: Option<[u8; 16]>,
+    /// The caller-supplied directory state bits and FILETIMEs, or `None` when
+    /// the caller supplied none and the source's values survive.
+    pub(super) directory_metadata: Option<ModelMetadata<'a>>,
+}
+
+/// The writer's authoritative directory metadata.
+///
+/// An entry absent from a table has the all-zero default, exactly as the
+/// from-scratch serializer writes it.
+pub(super) struct ModelMetadata<'a> {
+    pub(super) root: DirectoryMetadata,
+    pub(super) storages: &'a HashMap<Vec<String>, DirectoryMetadata>,
+    pub(super) streams: &'a HashMap<Vec<String>, DirectoryMetadata>,
 }
 
 struct SectorPool {
@@ -1432,6 +1489,38 @@ pub(super) fn plan_reuse(
             .ok_or_else(|| invalid("CFB reused layout storage SID is outside the directory"))?;
         if *class_id != entry.class_id && *class_id != [0u8; 16] {
             return Ok(Outcome::Declined(SectorLayoutFallback::ClassIdChanged));
+        }
+    }
+    // Supplied directory metadata is authoritative for every entry, and the
+    // reused directory image carries the source's values. Emit it only when
+    // every entry already holds the model's values; any difference declines
+    // to the from-scratch serializer, which publishes the model exactly.
+    if let Some(metadata) = &model.directory_metadata {
+        let declined = Ok(Outcome::Declined(
+            SectorLayoutFallback::DirectoryMetadataChanged,
+        ));
+        if entry_metadata(&source.directory_image, 0)? != metadata.root {
+            return declined;
+        }
+        for (path, sid) in &source.storage_paths {
+            let wanted = metadata
+                .storages
+                .get(path.as_slice())
+                .copied()
+                .unwrap_or_default();
+            if entry_metadata(&source.directory_image, *sid)? != wanted {
+                return declined;
+            }
+        }
+        for (index, stream) in model.streams.iter().enumerate() {
+            let wanted = metadata
+                .streams
+                .get(stream.path)
+                .copied()
+                .unwrap_or_default();
+            if entry_metadata(&source.directory_image, stream_sid[index])? != wanted {
+                return declined;
+            }
         }
     }
 

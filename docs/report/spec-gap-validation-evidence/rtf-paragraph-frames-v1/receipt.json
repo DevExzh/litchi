@@ -1,0 +1,72 @@
+{
+  "feature": "RTF positioned paragraph frames and table-cell paragraph-frame preservation",
+  "revision": "v4 implicit legacy cell invariant and no-op allocation",
+  "base_commit": "1b3f2c2d0c059e8e59272775a97d0567e14e67f2",
+  "candidate_root": "/var/tmp/litchi-rtf-paragraph-frames-validation-20260909",
+  "source_manifest": {
+    "file": "source-manifest.json",
+    "sha256": "121dd7d32be0fb8b77b05b37f8fa3dbbc78a5dde49919243b23f1ace5e7ea584",
+    "paths": 20
+  },
+  "validation_history": {
+    "v3_full_gate": "receipt-v3.json",
+    "v3_full_tests": 1348,
+    "v3_doctests": 9,
+    "v4_changed_paths": [
+      "crates/litchi-rtf/src/content/table.rs",
+      "crates/litchi-rtf/tests/paragraph_frames.rs"
+    ],
+    "v4_targeted_tests": 32,
+    "failures": 0,
+    "ignores": 0,
+    "reason": "Only row invariant, exact-text no-op allocation and docs changed after full v3 gate; focused public constructed/nested row, frame, transaction and native regressions rerun."
+  },
+  "commands": [
+    "env RUSTUP_HOME=/tmp/litchi-spec-gap-rustup TMPDIR=/var/tmp/litchi-spec-gap-gate-tmp CARGO_TARGET_DIR=/var/tmp/litchi-rtf-frames-root-target-195 CARGO_BUILD_JOBS=4 cargo +1.95.0 test -p litchi-rtf --all-features --test paragraph_frames --test paragraph_layout_transactions --test character_decorations",
+    "env RUSTUP_HOME=/tmp/litchi-spec-gap-rustup TMPDIR=/var/tmp/litchi-spec-gap-gate-tmp CARGO_TARGET_DIR=/var/tmp/litchi-rtf-frames-root-target-195 CARGO_BUILD_JOBS=4 cargo +1.95.0 clippy -p litchi-rtf --all-targets --all-features -- -D warnings",
+    "env RUSTUP_HOME=/tmp/litchi-spec-gap-rustup TMPDIR=/var/tmp/litchi-spec-gap-gate-tmp CARGO_TARGET_DIR=/var/tmp/litchi-rtf-frames-root-target-195 CARGO_BUILD_JOBS=4 RUSTDOCFLAGS='-D warnings' cargo +1.95.0 doc -p litchi-rtf --all-features --no-deps"
+  ],
+  "logs": {
+    "tests": {
+      "file": "tests-v4.log.gz",
+      "raw_sha256": "97ce5d1ab818df2865381f9a0a7caffe24db7c5e8faa83f618472a5ffe63236b",
+      "sha256": "f878fe6258e5051215600b1acf0286c7b7831340b8184864dc8c93ef41a477ec",
+      "exit_code": 0
+    },
+    "clippy": {
+      "file": "clippy-v4.log.gz",
+      "raw_sha256": "edb29939469e0115921bcc4f7baf6340ec14fe04d50269d4c498f667c3d5eb74",
+      "sha256": "dc459ffc99a3e607f562a5440c7cb459ab834eb344032c0cf53fbe9fc6a50704",
+      "exit_code": 0
+    },
+    "rustdoc": {
+      "file": "rustdoc-v4.log.gz",
+      "raw_sha256": "e029e754149328df1a304780ba9d40a704a85d85ab524a696d15197accbe2652",
+      "sha256": "a5d3919e0c37241e416480ca37cc653ad4c431f8b5bd3b700d223d56302f0b98",
+      "exit_code": 0
+    }
+  },
+  "toolchain": {
+    "rust": "1.95.0",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "rustup_home": "/tmp/litchi-spec-gap-rustup"
+  },
+  "cargo_lock_sha256": "28499130dfcc9fe70f86205d3872b5cac1290a74099bcaeabb88add3c418f3c5",
+  "cargo_lock_file": "Cargo.lock.gz",
+  "format_and_diff": "passed pinned Rust 1.95 with skip_children=true; all20hashes verified",
+  "semantic_boundaries": [
+    "Models and emits the RTF 1.9.1 positioned paragraph controls with bounded numeric validation; it does not render, paginate, or calculate layout.",
+    "Table cells retain paragraph text spans and effective frames, including inherited controls before intbl and nested itap levels; every paragraph in a positioned table row must carry the same effective frame controls, as required by the local RTF grammar.",
+    "wrapdefault alone remains the existing paragraph line-breaking default and does not manufacture a positioned frame from common native default formatting.",
+    "CellParagraph metadata distinguishes in-paragraph line breaks from paragraph boundaries: preserved or applicable in-range newlines emit line, while paragraph-boundary metadata emits par. Newly unmatched newlines use the existing text-edit paragraph-break semantics.",
+    "Paragraph-layout transactions cover direct paragraph properties and refuse style-dependent effective-property edits; table-containing and unsupported dependent positioned structures are refused before publication.",
+    "Source-aware body layout publication preserves accepted opaque nodes and zero-width bookmark/page/column/soft-break metadata within the admitted source span; unsupported dependent structure, rendering, arbitrary table mutation, and native-producer acceptance remain outside this batch.",
+    "The existing flat table cell text API records bounded paragraph spans and frame metadata but does not claim a full table layout engine."
+  ],
+  "independent_review": {
+    "reviewer": "cfb_boundary_tests",
+    "verdict": "clear for publication",
+    "checked": "20 v4 path hashes; implicit ordinary/nested/empty legacy cells; no-op span preservation; ordinal remapping; prior grammar/preservation/transaction/resource blockers resolved"
+  }
+}

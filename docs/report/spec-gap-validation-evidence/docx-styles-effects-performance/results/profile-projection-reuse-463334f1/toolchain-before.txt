@@ -1,0 +1,14 @@
+rustc 1.95.0 (59807616e 2026-04-14)
+rustc -vV
+rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: x86_64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2
+cargo --version
+cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+active-toolchain: 1.95.0-x86_64-unknown-linux-gnu (overridden by '/var/tmp/litchi-docx-styles-effects-profile-projection-reuse-d000-c4ac-frozen463/rust-toolchain.toml')
+target_triple=x86_64-unknown-linux-gnu
+linker=default

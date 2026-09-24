@@ -1,0 +1,36 @@
+snapshot_kind=pre_run_contention
+2026-09-10T03:05:59+00:00
+pid 3295525's current affinity list: 2
+loadavg=
+7.76 12.33 10.85 10/1267 3295528
+cpus_allowed_list=
+2
+online_cpus=
+0-31
+top_processes=
+    PID    PPID PSR %CPU %MEM STAT COMMAND
+3295521 3294359  25  100  0.0 Sl   rustc
+1416416  225771  24 99.9  0.0 Rs   git
+1416559  225771   8 99.9  0.0 Rs   git
+3294398 3294359   4 98.8  0.1 Sl   rustc
+3295096 3294359  19 98.5  0.1 Sl   rustc
+3295200 3294359   7 98.5  0.1 Sl   rustc
+3295409 3294359  11 92.5  0.1 Sl   rustc
+3294359  225771  30 37.0  0.0 Ssl  cargo
+ 225771  192616  15  2.9  0.8 Sl+  codex
+1511943  198235  26  1.1  0.0 Ssl+ lazygit
+ 227706  188364  13  0.9  0.5 Sl+  codex
+ 127282  127198  12  0.6  0.0 S    run-pipeline3
+3292153  127282   7  0.4  0.0 S    wget-at
+2632040  252768  16  0.3  0.4 Sl+  kimi-code
+   5191       1  12  0.3  0.0 Ss   tmux: server
+2882696  224533  14  0.3  0.0 Sl+  codex
+1221149  395345  20  0.3  0.4 Sl+  kimi-code
+ 198235  198234  23  0.2  0.3 Ssl  nvim
+1309380 1309379  20  0.2  0.2 Ssl  nvim
+1490696 1490695   7  0.2  0.0 Ssl  nvim
+3200998       2   3  0.1  0.0 I    kworker/u129:4-ext4-rsv-conversion
+3083261       2  13  0.1  0.0 I    kworker/u130:0-events_unbound
+    244       2  17  0.1  0.0 S    kswapd0
+2381033       1   9  0.0  0.0 Ssl  bun
+1489627 1435459  30  0.0  0.0 Sl+  codex

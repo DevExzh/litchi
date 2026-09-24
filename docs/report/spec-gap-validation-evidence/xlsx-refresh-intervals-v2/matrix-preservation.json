@@ -1,0 +1,10 @@
+{
+  "path": "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+  "base_sha256": "652b583c6d1a161d14ef96d644f3f53b726a1cb00623109d074ac031d484db6e",
+  "pending_sha256": "ed85e234a5e94301746836d8b5281f625decc92a4fe5b6f3ccb6daced5f232c3",
+  "clean_sha256": "f5df2a79d8621543147667037c18effb87b5da8ff8a6d867de3617ffd4364d1a",
+  "mixed_sha256": "f65dede5b0f022f0f6dc2359234e72e61466aa8d8fac9de3e573ee689e49128f",
+  "merge_exit": 0,
+  "pending_row_preserved": true,
+  "feature_row_present": true
+}

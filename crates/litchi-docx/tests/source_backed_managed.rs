@@ -218,6 +218,17 @@ fn managed_document_read_retains_budgeted_part_data_and_supports_selective_queri
     let document = package.document().unwrap();
     assert_eq!(document.extract_text().unwrap(), "managedread");
     assert_eq!(document.paragraph_count().unwrap(), 2);
+    assert!(document.revisions().unwrap().is_empty());
+    assert!(matches!(
+        document.revisions_with_limits(litchi_docx::revision::Limits {
+            max_source_bytes: 0,
+            ..litchi_docx::revision::Limits::default()
+        }),
+        Err(Error::RevisionLimit {
+            resource: "source bytes",
+            ..
+        })
+    ));
     assert_eq!(document.paragraph_text(1).unwrap().as_deref(), Some("read"));
     assert_eq!(
         document.source_version().id(),
@@ -237,6 +248,10 @@ fn managed_document_read_retains_budgeted_part_data_and_supports_selective_queri
     cancellation_source.cancel();
     assert!(matches!(
         document.extract_text(),
+        Err(Error::Opc(OpcError::Cancelled))
+    ));
+    assert!(matches!(
+        document.revisions(),
         Err(Error::Opc(OpcError::Cancelled))
     ));
     drop(document);

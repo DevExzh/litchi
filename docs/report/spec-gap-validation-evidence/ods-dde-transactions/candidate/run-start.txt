@@ -1,0 +1,6 @@
+utc=2026-09-13T05:09:41.524812+00:00
+candidate_base=5347801fc2e8086d67fc6c140a023aeedd260c91
+binary=/var/tmp/ods-dde-candidate-target/release/ods-dde-transaction-profile
+cpu_affinity=2
+warmups=3
+iterations=15

@@ -1,0 +1,1205 @@
+{
+  "schema": "ods-formula-financial-scalar-native-results-v1",
+  "status": "captured compatibility fixture",
+  "contract_sha256": "fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b",
+  "oracle_sha256": "15bb7e32bd47dc64de2656cb24a8995f59916a9d87d13fffaa836aa82c302531",
+  "rows": 65,
+  "observations": [
+    {
+      "id": "effect.basic",
+      "function": "EFFECT",
+      "formula": "of:=EFFECT(0.1;2)",
+      "normative": {
+        "kind": "number",
+        "value": "0.102500000000000005828670879282071844927786035025750052848911770339709274152406592861552780959755182",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.1025
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "effect.zero_rate",
+      "function": "EFFECT",
+      "formula": "of:=EFFECT(0;12)",
+      "normative": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "effect.integer_truncates",
+      "function": "EFFECT",
+      "formula": "of:=EFFECT(0.1;2.9)",
+      "normative": {
+        "kind": "number",
+        "value": "0.102500000000000005828670879282071844927786035025750052848911770339709274152406592861552780959755182",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.1025
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "effect.negative_rate_num",
+      "function": "EFFECT",
+      "formula": "of:=EFFECT(-0.1;2)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:502'; profile error is '#NUM!'"
+    },
+    {
+      "id": "effect.zero_payments_num",
+      "function": "EFFECT",
+      "formula": "of:=EFFECT(0.1;0)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:502'; profile error is '#NUM!'"
+    },
+    {
+      "id": "fv.basic",
+      "function": "FV",
+      "formula": "of:=FV(0.1;1;-110)",
+      "normative": {
+        "kind": "number",
+        "value": "110",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 110.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "fv.zero_rate",
+      "function": "FV",
+      "formula": "of:=FV(0;10;-10)",
+      "normative": {
+        "kind": "number",
+        "value": "100",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 100.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "fv.beginning_payment",
+      "function": "FV",
+      "formula": "of:=FV(0.1;1;-100;0;1)",
+      "normative": {
+        "kind": "number",
+        "value": "110.00000000000000055511151231257827021181583404541015625",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 110.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "fv.negative_base_integer_power",
+      "function": "FV",
+      "formula": "of:=FV(-2;2;0;100;0)",
+      "normative": {
+        "kind": "number",
+        "value": "-100",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -100.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "fv.fractional_nper",
+      "function": "FV",
+      "formula": "of:=FV(0.1;0.5;-10)",
+      "normative": {
+        "kind": "number",
+        "value": "4.880884817015154692840846073109009558058603802126508255053192651070361884662476482536585311694664205",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 4.88088481701516
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "fv.invalid_pay_type_num",
+      "function": "FV",
+      "formula": "of:=FV(0.1;2;0;0;0.5)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "number",
+        "value": -0.0
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native kind/value {'kind': 'number', 'value': -0.0} differs from profile {'kind': 'error', 'value': '#NUM!'}"
+    },
+    {
+      "id": "ipmt.ordinary_period_one",
+      "function": "IPMT",
+      "formula": "of:=IPMT(0.1;1;2;100)",
+      "normative": {
+        "kind": "number",
+        "value": "-10.00000000000000055511151231257827021181583404541015625",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -10.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "ipmt.ordinary_period_two",
+      "function": "IPMT",
+      "formula": "of:=IPMT(0.1;2;2;100)",
+      "normative": {
+        "kind": "number",
+        "value": "-5.238095238095238398598354801204905701865431178379820134892790811987155578753442624942423219429286122",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -5.23809523809523
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "ipmt.due_first_period_zero",
+      "function": "IPMT",
+      "formula": "of:=IPMT(0.1;1;2;100;0;1)",
+      "normative": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "ipmt.due_after_period_one",
+      "function": "IPMT",
+      "formula": "of:=IPMT(0.1;2;2;100;0;1)",
+      "normative": {
+        "kind": "number",
+        "value": "-4.761904761904762156513157511373364509950402867030336115107209188012844421246557375057576780570713874",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -4.76190476190476
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "ipmt.zero_rate",
+      "function": "IPMT",
+      "formula": "of:=IPMT(0;1;10;100)",
+      "normative": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -0.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "ipmt.zero_nper_divzero",
+      "function": "IPMT",
+      "formula": "of:=IPMT(0.1;1;0;100)",
+      "normative": {
+        "kind": "error",
+        "value": "#DIV/0!"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:502'; profile error is '#DIV/0!'"
+    },
+    {
+      "id": "ipmt.invalid_type_num",
+      "function": "IPMT",
+      "formula": "of:=IPMT(0.1;1;2;100;0;0.5)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native kind/value {'kind': 'number', 'value': 0.0} differs from profile {'kind': 'error', 'value': '#NUM!'}"
+    },
+    {
+      "id": "ispmt.period_one",
+      "function": "ISPMT",
+      "formula": "of:=ISPMT(0.1;1;2;100)",
+      "normative": {
+        "kind": "number",
+        "value": "-5.000000000000000277555756156289135105907917022705078125",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -5.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "ispmt.period_two",
+      "function": "ISPMT",
+      "formula": "of:=ISPMT(0.1;2;2;100)",
+      "normative": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "ispmt.period_zero",
+      "function": "ISPMT",
+      "formula": "of:=ISPMT(0.1;0;2;100)",
+      "normative": {
+        "kind": "number",
+        "value": "-10.00000000000000055511151231257827021181583404541015625",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -10.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "ispmt.zero_rate",
+      "function": "ISPMT",
+      "formula": "of:=ISPMT(0;1;2;100)",
+      "normative": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -0.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "ispmt.zero_nper_divzero",
+      "function": "ISPMT",
+      "formula": "of:=ISPMT(0.1;1;0;100)",
+      "normative": {
+        "kind": "error",
+        "value": "#DIV/0!"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "#NUM!"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes '#NUM!'; profile error is '#DIV/0!'"
+    },
+    {
+      "id": "nominal.basic",
+      "function": "NOMINAL",
+      "formula": "of:=NOMINAL(0.1025;2)",
+      "normative": {
+        "kind": "number",
+        "value": "0.099999999999999994184546061487275256395380664533045481458587066293116646765970870318136543500954732",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.1
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "nominal.integer_truncates",
+      "function": "NOMINAL",
+      "formula": "of:=NOMINAL(0.1025;2.9)",
+      "normative": {
+        "kind": "number",
+        "value": "0.099999999999999994184546061487275256395380664533045481458587066293116646765970870318136543500954732",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.1
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "nominal.one_period",
+      "function": "NOMINAL",
+      "formula": "of:=NOMINAL(0.1;1)",
+      "normative": {
+        "kind": "number",
+        "value": "0.1000000000000000055511151231257827021181583404541015625",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.1
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "nominal_zero_rate_num",
+      "function": "NOMINAL",
+      "formula": "of:=NOMINAL(0;2)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:502'; profile error is '#NUM!'"
+    },
+    {
+      "id": "nper.basic",
+      "function": "NPER",
+      "formula": "of:=NPER(0.1;-110;100)",
+      "normative": {
+        "kind": "number",
+        "value": "1.000000000000000005294784150141451687268949724521758255023920216678950576347992806212244717014131122",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 1.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "nper.zero_rate",
+      "function": "NPER",
+      "formula": "of:=NPER(0;-10;100)",
+      "normative": {
+        "kind": "number",
+        "value": "10",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 10.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "nper.tiny_rate",
+      "function": "NPER",
+      "formula": "of:=NPER(1E-020;-10;100;0;0)",
+      "normative": {
+        "kind": "number",
+        "value": "10.00000000000000000054999999999999996987004929981526440453234886217571699277847560740806937794848453",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native 0.0 differs from profile 10.0 beyond tolerance 1e-11"
+    },
+    {
+      "id": "nper.negative_rate",
+      "function": "NPER",
+      "formula": "of:=NPER(-0.1;-10;100)",
+      "normative": {
+        "kind": "number",
+        "value": "6.578813478960583661393815673928933815288427540477597738165169435338559613865577799037802707246547512",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 6.57881347896058
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "nper.beginning_payment",
+      "function": "NPER",
+      "formula": "of:=NPER(0.1;-110;100;0;1)",
+      "normative": {
+        "kind": "number",
+        "value": "0.9050485946149977133390070127618637668605402279103615351720757346623409481542952207590471111429287665",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.905048594614997
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "nper.zero_denominator_divzero",
+      "function": "NPER",
+      "formula": "of:=NPER(0.125;-12.5;100)",
+      "normative": {
+        "kind": "error",
+        "value": "#DIV/0!"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "#NUM!"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes '#NUM!'; profile error is '#DIV/0!'"
+    },
+    {
+      "id": "nper.invalid_pay_type_num",
+      "function": "NPER",
+      "formula": "of:=NPER(0.1;-110;100;0;1.9)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.905048594614997
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native kind/value {'kind': 'number', 'value': 0.905048594614997} differs from profile {'kind': 'error', 'value': '#NUM!'}"
+    },
+    {
+      "id": "pduration.basic",
+      "function": "PDURATION",
+      "formula": "of:=PDURATION(0.1;100;121)",
+      "normative": {
+        "kind": "number",
+        "value": "1.999999999999999894104316997170972426931843112315027447622330089979203202530925166735249841648001335",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 2.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "pduration.equal_values",
+      "function": "PDURATION",
+      "formula": "of:=PDURATION(0.1;100;100)",
+      "normative": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "pduration.decrease",
+      "function": "PDURATION",
+      "formula": "of:=PDURATION(0.1;121;100)",
+      "normative": {
+        "kind": "number",
+        "value": "-1.999999999999999894104316997170972426931843112315027447622330089979203202530925166735249841648001335",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -2.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "pduration.invalid_rate_num",
+      "function": "PDURATION",
+      "formula": "of:=PDURATION(0;100;121)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:502'; profile error is '#NUM!'"
+    },
+    {
+      "id": "pduration.invalid_current_num",
+      "function": "PDURATION",
+      "formula": "of:=PDURATION(0.1;0;121)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:502'; profile error is '#NUM!'"
+    },
+    {
+      "id": "pmt.basic",
+      "function": "PMT",
+      "formula": "of:=PMT(0.1;1;100)",
+      "normative": {
+        "kind": "number",
+        "value": "-110.00000000000000055511151231257827021181583404541015625",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -110.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "pmt.zero_rate",
+      "function": "PMT",
+      "formula": "of:=PMT(0;10;100)",
+      "normative": {
+        "kind": "number",
+        "value": "-10",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -10.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "pmt.beginning_payment",
+      "function": "PMT",
+      "formula": "of:=PMT(0.1;1;100;0;1)",
+      "normative": {
+        "kind": "number",
+        "value": "-100",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -100.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "pmt.integer_nper_truncates",
+      "function": "PMT",
+      "formula": "of:=PMT(0.1;2.9;100)",
+      "normative": {
+        "kind": "number",
+        "value": "-57.61904761904761947685493355689158795684063261189498819244639540599357778937672131247121160971464309",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -41.4095529037357
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native -41.4095529037357 differs from profile -57.61904761904762 beyond tolerance 5.761904761904762e-11"
+    },
+    {
+      "id": "pmt.invalid_nper_num",
+      "function": "PMT",
+      "formula": "of:=PMT(0.1;0;100)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "#NUM!"
+      },
+      "comparison": "error-code-match",
+      "divergence_reason": null
+    },
+    {
+      "id": "pmt.invalid_pay_type_num",
+      "function": "PMT",
+      "formula": "of:=PMT(0.1;1;100;0;0.5)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "number",
+        "value": -100.0
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native kind/value {'kind': 'number', 'value': -100.0} differs from profile {'kind': 'error', 'value': '#NUM!'}"
+    },
+    {
+      "id": "ppmt.basic",
+      "function": "PPMT",
+      "formula": "of:=PPMT(0.1;1;2;100)",
+      "normative": {
+        "kind": "number",
+        "value": "-47.61904761904761892174342124431331774502479856648483194244639540599357778937672131247121160971464309",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -47.6190476190476
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "ppmt.beginning_payment",
+      "function": "PPMT",
+      "formula": "of:=PPMT(0.1;1;2;100;0;1)",
+      "normative": {
+        "kind": "number",
+        "value": "-52.38095238095238107825657875568668225497520143351516805755360459400642221062327868752878839028535694",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -52.3809523809524
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "ppmt.period_equal_nper_num",
+      "function": "PPMT",
+      "formula": "of:=PPMT(0.1;2;2;100)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "number",
+        "value": -52.3809523809524
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native kind/value {'kind': 'number', 'value': -52.3809523809524} differs from profile {'kind': 'error', 'value': '#NUM!'}"
+    },
+    {
+      "id": "ppmt.period_integer_truncates",
+      "function": "PPMT",
+      "formula": "of:=PPMT(0.1;1.9;2.9;100)",
+      "normative": {
+        "kind": "number",
+        "value": "-47.61904761904761892174342124431331774502479856648483194244639540599357778937672131247121160971464309",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -34.2227709948229
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native -34.2227709948229 differs from profile -47.61904761904762 beyond tolerance 4.761904761904762e-11"
+    },
+    {
+      "id": "ppmt.zero_rate_num",
+      "function": "PPMT",
+      "formula": "of:=PPMT(0;1;2;100)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "number",
+        "value": -50.0
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native kind/value {'kind': 'number', 'value': -50.0} differs from profile {'kind': 'error', 'value': '#NUM!'}"
+    },
+    {
+      "id": "ppmt.invalid_type_num",
+      "function": "PPMT",
+      "formula": "of:=PPMT(0.1;1;2;100;0;0.5)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "number",
+        "value": -52.3809523809524
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native kind/value {'kind': 'number', 'value': -52.3809523809524} differs from profile {'kind': 'error', 'value': '#NUM!'}"
+    },
+    {
+      "id": "pv.basic",
+      "function": "PV",
+      "formula": "of:=PV(0.1;1;-110)",
+      "normative": {
+        "kind": "number",
+        "value": "99.99999999999999949535317062492884780866982939638527063135013851196095541019433084935872868461345981",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 100.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "pv.zero_rate",
+      "function": "PV",
+      "formula": "of:=PV(0;10;-10)",
+      "normative": {
+        "kind": "number",
+        "value": "100",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 100.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "pv.beginning_payment",
+      "function": "PV",
+      "formula": "of:=PV(0.1;1;-100;0;1)",
+      "normative": {
+        "kind": "number",
+        "value": "100",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 100.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "pv.rate_minus_one_divzero",
+      "function": "PV",
+      "formula": "of:=PV(-1;1;0;1)",
+      "normative": {
+        "kind": "error",
+        "value": "#DIV/0!"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "#NUM!"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes '#NUM!'; profile error is '#DIV/0!'"
+    },
+    {
+      "id": "pv.invalid_pay_type_num",
+      "function": "PV",
+      "formula": "of:=PV(0.1;1;-100;0;1.9)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "number",
+        "value": 100.0
+      },
+      "comparison": "divergence",
+      "divergence_reason": "native kind/value {'kind': 'number', 'value': 100.0} differs from profile {'kind': 'error', 'value': '#NUM!'}"
+    },
+    {
+      "id": "rri.basic",
+      "function": "RRI",
+      "formula": "of:=RRI(2;100;121)",
+      "normative": {
+        "kind": "number",
+        "value": "0.1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.1
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "rri.one_period",
+      "function": "RRI",
+      "formula": "of:=RRI(1;100;110)",
+      "normative": {
+        "kind": "number",
+        "value": "0.1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.1
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "rri.negative_ratio_integer_exponent",
+      "function": "RRI",
+      "formula": "of:=RRI(1;100;-100)",
+      "normative": {
+        "kind": "number",
+        "value": "-2",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -2.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "rri.negative_ratio_even_power",
+      "function": "RRI",
+      "formula": "of:=RRI(0.5;100;-100)",
+      "normative": {
+        "kind": "number",
+        "value": "0",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": 0.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "rri.negative_ratio_odd_root_refused",
+      "function": "RRI",
+      "formula": "of:=RRI(3;100;-800)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "#NUM!"
+      },
+      "comparison": "error-code-match",
+      "divergence_reason": null
+    },
+    {
+      "id": "rri.zero_future_minus_one",
+      "function": "RRI",
+      "formula": "of:=RRI(2;100;0)",
+      "normative": {
+        "kind": "number",
+        "value": "-1",
+        "subtype": "Number",
+        "tolerance": {
+          "absolute": "0",
+          "relative": "1e-12"
+        }
+      },
+      "native": {
+        "kind": "number",
+        "value": -1.0
+      },
+      "comparison": "numeric-tolerance",
+      "divergence_reason": null
+    },
+    {
+      "id": "rri.negative_ratio_fractional_num",
+      "function": "RRI",
+      "formula": "of:=RRI(2;100;-100)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "#NUM!"
+      },
+      "comparison": "error-code-match",
+      "divergence_reason": null
+    },
+    {
+      "id": "rri.zero_nper_num",
+      "function": "RRI",
+      "formula": "of:=RRI(0;100;121)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:502'; profile error is '#NUM!'"
+    },
+    {
+      "id": "rri.zero_present_num",
+      "function": "RRI",
+      "formula": "of:=RRI(2;0;121)",
+      "normative": {
+        "kind": "error",
+        "value": "#NUM!"
+      },
+      "native": {
+        "kind": "error",
+        "raw": "Err:502"
+      },
+      "comparison": "error-kind-match",
+      "divergence_reason": "native exposes 'Err:502'; profile error is '#NUM!'"
+    }
+  ],
+  "comparison_counts": {
+    "numeric-tolerance": 40,
+    "error-kind-match": 11,
+    "divergence": 11,
+    "error-code-match": 3
+  }
+}

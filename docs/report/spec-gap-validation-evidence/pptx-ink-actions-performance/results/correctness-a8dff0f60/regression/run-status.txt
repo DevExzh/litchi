@@ -1,0 +1,4 @@
+SRC=/var/tmp/pptx-ink-actions-correctness-a8dff0f60-src.Zk6bXL
+CAP=/var/tmp/pptx-ink-actions-correctness-a8dff0f60.l7raBv
+REGTARGET=/var/tmp/pptx-ink-actions-correctness-a8dff0f60.l7raBv/regression-target-parent/target
+STATUS=0

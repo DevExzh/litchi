@@ -1,0 +1,20 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--release",
+    "--manifest-path",
+    "docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/performance/scalar-harness/Cargo.toml"
+  ],
+  "cwd": "/home/zhuhe/code/litchi-array-worktree",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-array-target",
+    "TMPDIR": "/home/zhuhe/code/litchi-array-tmp",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "started_at": "2026-09-13T15:31:10.566097306Z",
+  "finished_at": "2026-09-13T15:31:30.403974493Z",
+  "status": 0
+}

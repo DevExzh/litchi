@@ -1,0 +1,106 @@
+{
+  "upstream": "https://github.com/LibreOffice/core",
+  "raw_url": "https://raw.githubusercontent.com/LibreOffice/core/d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "commit": "d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "inputs": {
+    "sc/qa/unit/data/functions/statistical/fods/large.fods": "4d239b922adf5b764a0a75019d9a8d3e9a3883b2dfa1ef46e2b065b25474a7db",
+    "sc/qa/unit/data/functions/statistical/fods/median.fods": "87b67b40f0a8a35439e89bde05950c1a4d77a26939569c0be18248ccc84343fa",
+    "sc/qa/unit/data/functions/statistical/fods/mode.fods": "2ed75160e09f4663c7a7a72e3fdfb9cd233e7ccf92fcd1f8b0f5912185a75088",
+    "sc/qa/unit/data/functions/statistical/fods/percentile.fods": "a7c68f5006fe2e106f522a5a992800f53baae81b03ad42e464f6e13ac68c5e0a",
+    "sc/qa/unit/data/functions/statistical/fods/percentrank.fods": "8295a406881fc701257f9d07ea99f4414b5cac1c24aed6703cea9c5bd35d55ec",
+    "sc/qa/unit/data/functions/statistical/fods/quartile.fods": "c999562446e1801a76b607c346c3ee71e9dfa178f2a7c975673ae68746552e8d",
+    "sc/qa/unit/data/functions/statistical/fods/rank.fods": "06368e7b89831ed738440158d93544e7af63b01dbd35923147e23beaee501c15",
+    "sc/qa/unit/data/functions/statistical/fods/small.fods": "c9c2ebcd79fed0a56a1a426ecb08a2a9141af86bea240318f38d352ea513c02b"
+  },
+  "source_staging": "Receipt inputs were assembled in a temporary tree from exact raw GitHub files at the pinned commit; the repository auxiliary checkout was not assumed to be pinned.",
+  "byte_comparison": "Each staged input was SHA-256 checked against the exact raw GitHub file at commit before extraction.",
+  "selected_observations": 45,
+  "selected_functions": [
+    "LARGE",
+    "MEDIAN",
+    "MODE",
+    "PERCENTILE",
+    "PERCENTRANK",
+    "QUARTILE",
+    "RANK",
+    "SMALL"
+  ],
+  "selected_modes": [
+    "scalar",
+    "matrix"
+  ],
+  "excluded_profile_variances": [
+    {
+      "function": "LARGE",
+      "source": "sc/qa/unit/data/functions/statistical/fods/large.fods",
+      "sheet": "Sheet2",
+      "row": 4,
+      "column": 1,
+      "formula": "of:=LARGE([.K1:.X329];6)",
+      "cached": "900000095",
+      "kind": "formula_closure",
+      "reason": "The 4,606-cell closure contains formula-generated regression data; the cached result is excluded rather than importing formulas."
+    },
+    {
+      "function": "LARGE",
+      "source": "sc/qa/unit/data/functions/statistical/fods/large.fods",
+      "sheet": "Sheet2",
+      "row": 12,
+      "column": 1,
+      "formula": "of:=LARGE(sl_j;2)",
+      "cached": "8",
+      "kind": "named_range_unmaterialized",
+      "reason": "The named range has no bounded literal closure in the FODS table."
+    },
+    {
+      "function": "RANK",
+      "source": "sc/qa/unit/data/functions/statistical/fods/rank.fods",
+      "sheet": "Sheet2",
+      "row": 6,
+      "column": 1,
+      "formula": "of:=RANK([.M3];[.M$3:.M$9];1)",
+      "cached": "5",
+      "kind": "formula_closure",
+      "reason": "The reference range contains formula-generated elapsed-time values; no formula closure is promoted."
+    },
+    {
+      "function": "RANK",
+      "source": "sc/qa/unit/data/functions/statistical/fods/rank.fods",
+      "sheet": "Sheet2",
+      "row": 15,
+      "column": 1,
+      "formula": "of:=RANK(32;([.Q1:.Q5]~[.P1:.P5]~[.R1:.R5]))",
+      "cached": "3",
+      "kind": "multi_area_reference",
+      "reason": "Multi-area union closure is outside this bounded extractor; the cached result is retained as an explicit exclusion."
+    },
+    {
+      "function": "QUARTILE",
+      "source": "sc/qa/unit/data/functions/statistical/fods/quartile.fods",
+      "sheet": "Sheet2",
+      "row": 15,
+      "column": 1,
+      "formula": "of:=QUARTILE([.H2:.H9];-1)",
+      "cached": null,
+      "kind": "invalid_quartile_index",
+      "reason": "LibreOffice reports an error for a quartile index outside 0 through 4."
+    },
+    {
+      "function": "PERCENTRANK",
+      "source": "sc/qa/unit/data/functions/statistical/fods/percentrank.fods",
+      "sheet": "Sheet2",
+      "row": 18,
+      "column": 1,
+      "formula": "of:=PERCENTRANK([.I2];1;1)",
+      "cached": "1",
+      "kind": "insufficient_range",
+      "reason": "The one-cell range is retained as an explicit edge-case exclusion from the broader reference receipt."
+    }
+  ],
+  "coverage_notes": {
+    "source_format": "All selected sources are upstream FODS fixtures; no conversion tool or recalculation step is used.",
+    "closure": "Each selected reference closure contains only literal number, logical, text, or empty cells. Formula cells, dates, named ranges, and nested formula dependencies remain explicit exclusions.",
+    "cache": "The retained cached value is used only as an upstream observation. The Rust test reconstructs the literal closure and evaluates the formula in both scalar and matrix modes.",
+    "profile": "Host-specific date/error coercions and unsupported named-range or nested-expression behavior are not silently promoted to the evaluator contract."
+  }
+}

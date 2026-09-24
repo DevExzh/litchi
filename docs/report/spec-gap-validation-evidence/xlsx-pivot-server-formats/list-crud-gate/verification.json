@@ -1,0 +1,45 @@
+{
+  "baseline_commit": "ecc2ce802bbaa4d770f1ee2f6f11e62681f00d12",
+  "worktree": "/var/tmp/xlsx-pivot-server-formats-gate.6rNu9B/worktree",
+  "environment": {
+    "CARGO_TARGET_DIR": "/var/tmp/xlsx-pivot-server-formats-gate.6rNu9B/cargo-target",
+    "RUSTDOCFLAGS_for_doc": "-D warnings"
+  },
+  "commands_in_log_order": [
+    "cargo test --locked --offline -p litchi-xlsx --all-features --test pivot_server_formats",
+    "cargo test --locked --offline -p litchi-xlsx --all-features --lib pivot::server_formats",
+    "cargo clippy --locked --offline -p litchi-xlsx --all-features --lib -- -D warnings",
+    "cargo clippy --locked --offline -p litchi-xlsx --all-features --test pivot_server_formats -- -D warnings",
+    "cargo doc --locked --offline -p litchi-xlsx --all-features --lib --no-deps",
+    "cargo check --locked -p litchi-xlsx --lib --offline",
+    "git diff --check"
+  ],
+  "all_exit_codes": 0,
+  "unit_passed": 12,
+  "integration_passed": 47,
+  "source_sha256": {
+    "crates/litchi-xlsx/src/pivot/server_formats/mod.rs": "1ec97e0c5afd18e3a6123d8e9cd59c402e5511ea589821f246cd67813f8c8d85",
+    "crates/litchi-xlsx/src/pivot/server_formats/tests.rs": "c5c51cea0975d5b6a8948ff4f1ea70186c4091c45bc9cf077f4b70e64d9d117e",
+    "crates/litchi-xlsx/tests/pivot_server_formats.rs": "c6b3ac317ebf8ce8e76290fb57eb00e6d7adefa7847fbf2e102c0587e7f02d84",
+    "docs/report/spec-gap-validation-evidence/xlsx-pivot-server-formats/README.md": "98763887bd44e4945a8813df00fe2d27c316c34cd30b251bb382f7ec6645f83f",
+    "crates/litchi-xlsx/docs/FEATURE_MATRIX.md": "68786cbfebe1876aa89bafe9a6d08c4f6f4e5c25f808a8d30aa4e95211ef4887"
+  },
+  "cargo_lock_sha256": "ff45c428d2047106e3cc586e879cea7bd5d7556eaebcf6634e00659406d49a9b",
+  "log_sha256": {
+    "fix2-01-cargo-test-integration-pivot.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "fix2-01-cargo-test-integration-pivot.log": "0ddd84a484ffb41962e5240765c78351b6f5095299454f844e95b7fb61768ca2",
+    "fix2-02-cargo-test-unit-pivot.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "fix2-02-cargo-test-unit-pivot.log": "be7140712519bd7ee7b09d02f3b729cf13d7223b97a1448670f5d3ea5ccca128",
+    "fix2-03-cargo-clippy-lib.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "fix2-03-cargo-clippy-lib.log": "9246a93708f57a4f13905d1bf304aa458d7ea485999b5f2967188685640b13c6",
+    "fix2-04-cargo-clippy-integration-pivot.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "fix2-04-cargo-clippy-integration-pivot.log": "9b62f000b8a90469d3a4556ac685780911d91b50b2dd9316aefe997c297f050a",
+    "fix2-05-cargo-doc-lib.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "fix2-05-cargo-doc-lib.log": "435c50e9577f67bae375eea33d74a401c1eba2bfb0b27aa40bd4fb7e1875bef7",
+    "fix2-06-cargo-check-lib.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "fix2-06-cargo-check-lib.log": "a41051563a4cb5fc1b1bcdd9aa0ba28ca80f7736d629d90cc138218756e8e3a9",
+    "fix2-07-git-diff-check.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "fix2-07-git-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "scope": "Focused isolated correctness/lint/doc gate; not a whole-workspace, native interoperability, or performance claim."
+}

@@ -1,0 +1,9 @@
+{
+  "label": "round-4-candidate",
+  "binary_sha256": "507c989691190554711c023ebe19796e62388bdc27fe942ab8015e862c49689f",
+  "status": 0,
+  "raw_sha256": "0d6ee6f76caad2c849abfd004cc25071236c4118f37e20d8fa9ce0c13dffedcf",
+  "elapsed_seconds": 0.05205702781677246,
+  "finished_at": "2026-09-13T08:28:52Z",
+  "row_count": 1
+}

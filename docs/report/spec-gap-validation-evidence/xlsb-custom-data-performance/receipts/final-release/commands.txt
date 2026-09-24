@@ -1,0 +1,27 @@
+source=16102fe751d7c5492042330f1bd1f49c304495f0
+build=cargo build --release --locked --offline --manifest-path harness/Cargo.toml
+binary=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane read --level small --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane snapshotclone --level small --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane noop --level small --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane editpayload --level small --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane rename-many-to-one --level small --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane mixedinsertremove --level small --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane patchinverse --level small --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane publicapply --level small --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane read --level medium --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane snapshotclone --level medium --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane noop --level medium --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane editpayload --level medium --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane rename-many-to-one --level medium --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane mixedinsertremove --level medium --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane patchinverse --level medium --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane publicapply --level medium --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane read --level large --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane snapshotclone --level large --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane noop --level large --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane editpayload --level large --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane rename-many-to-one --level large --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane mixedinsertremove --level large --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane patchinverse --level large --samples 5 --warmups 1
+/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-custom-data-performance/receipts/final-release/binary --lane publicapply --level large --samples 5 --warmups 1

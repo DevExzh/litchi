@@ -1,0 +1,19 @@
+source_manifest_before_sha256=c4c6f0996244608f4fd84700baf413b0c38b505d1347ccd1e0829fdece141015
+source_manifest_after_sha256=c4c6f0996244608f4fd84700baf413b0c38b505d1347ccd1e0829fdece141015
+approved_base_commit=079cbbcbfc00c8d2412a38586a9688ae7eb0009e
+git_head=f1cb119361af9ea2227d27050e41915a9a92ae04
+git_status_relevant=
+source_sha256:
+4e4731d59ab95679f205d424567dcf4d8e02f27c9318ed8ac955a8c163910628  /tmp/litchi-ink-action-baseline-f1cb/crates/litchi-drawingml/src/ink/actions.rs
+b037eb7fae01b2e62c3c3a1050d9044466ad8d8e1a1402bb13533b2ba8bf9850  /tmp/litchi-ink-action-baseline-f1cb/crates/litchi-drawingml/src/ink/actions_edit.rs
+a9a55cf0c44b59afa00a7b7c472c0f010eef5c23e62a816d4bb0f27aa6f67ff7  /tmp/litchi-ink-action-baseline-f1cb/crates/litchi-drawingml/src/ink/mod.rs
+af92fe9d2923ac1197e4f152a5e34350217b5c782fa00365b82c141f69787640  /tmp/litchi-ink-action-baseline-f1cb/crates/litchi-drawingml/tests/ink_action_edit.rs
+f07b423989443d68ccba070aef5fed610bc39acb2c8b5a6adf14de8074afbf06  /tmp/litchi-ink-action-baseline-f1cb/crates/litchi-drawingml/tests/ink_action_id_boundaries.rs
+harness_sha256:
+efad8e8dfdbf8d115d43e34d73b2757792bf768f45f9bc9918c0136c2748ba1a  /tmp/litchi-ink-action-baseline-f1cb/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/harness/Cargo.lock
+3168aa1bf74a0b419299c6317440f9d2cbf54de9ed5882b250a70e8d8b6b175c  /tmp/litchi-ink-action-baseline-f1cb/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/harness/Cargo.toml
+2b6dbc5ef06d9181e5e8abb42fbd4ee2078619a76f08319e8c111c17bfb93863  /tmp/litchi-ink-action-baseline-f1cb/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/harness/main.rs
+test_sha256:
+2bb39cd8ddc05bf2146757cee2b6ca82ab1ab342dc88db92b08f82ec4a4e97a6  /tmp/litchi-ink-action-baseline-f1cb/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/test_verify.py
+aacbbc7d388d183c8d10064b0a422b0d5f1031be19bf8f8ce53958dc7cf3bead  /tmp/litchi-ink-action-baseline-f1cb/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/test_smoke_target.py
+0fcb00d89e3dca563dc664f3e6caf2a41938d64591dba31efe0694677bca7e18  /tmp/litchi-ink-action-baseline-f1cb/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/test_source_snapshot.py

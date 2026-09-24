@@ -1,0 +1,10 @@
+# SHA-256 of original root gate logs, as recorded by the receipts
+# The files in this publication bundle are deterministic gzip copies; decompress before comparing.
+# v1
+17e217610895df98f85e40c78be30c5698527f80dfbcc2a2dab1363deea1cdc1  v1-full-proof/logs/root-tests-v1.log
+60f0c481624215419b50456e88a80e1b7a69b77c009fe0f1f27a0533d3b493bd  v1-full-proof/logs/root-clippy-v1.log
+033270f311b365f9a2800205c340229cbf121c1097317e633180a561a3d5b95f  v1-full-proof/logs/root-rustdoc-v1.log
+# v2
+11afe48866cee7a98461cc001f0cc4d1e775beca5d6b1246303bd82f44829df5  v2/logs/root-tests-v2.log
+ba08b9c2551a0f753e6bf525246df263484569257af4d90bcd1d0b4b5d72c0d5  v2/logs/root-clippy-v2.log
+7caf92177f2a3d5079a837746c68cb8807a60dd433b417f6ed0f90d919fe49a8  v2/logs/root-rustdoc-v2.log

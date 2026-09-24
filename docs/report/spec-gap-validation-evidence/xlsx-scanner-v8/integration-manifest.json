@@ -1,0 +1,86 @@
+{
+  "build_inputs": {
+    "gate_cpu_set": "8-31",
+    "lock_is_de80_commit_content": "577ca67feffe8866fb061b82dca0e36203d66f72e913fb7861c2332e38427562",
+    "perf_lock_path": "/var/tmp/litchi-xlsx-current-de80-scanner-integration-20260910/tools/perf-baseline/Cargo.lock",
+    "perf_lock_sha256": "577ca67feffe8866fb061b82dca0e36203d66f72e913fb7861c2332e38427562",
+    "perf_manifest_path": "/var/tmp/litchi-xlsx-current-de80-scanner-integration-20260910/tools/perf-baseline/Cargo.toml",
+    "perf_manifest_sha256": "9692ba054ce1ae07cd0d8d585a2d30e28f8e294175895f3eb7477e5de8180470",
+    "timed_capture": "not rerun; historical raw V8 capture remains bound to base 21d5",
+    "toolchain": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup cargo +1.95.0"
+  },
+  "created_utc": "2026-09-10T13:30:21.428249+00:00",
+  "kind": "xlsx_current_feature_scanner_integration",
+  "scanner_delta": {
+    "base_preimages_at_de80_sha256": {
+      "crates/litchi-xlsx/src/raw/worksheet/selected.rs": "d3353047a918002a01972cb5de425e695a60e1964ec8cdcfa6d56ed80c2cfcbb",
+      "crates/litchi-xlsx/src/raw/worksheet/tests.rs": "cb216659affe6788dc451abb95f53e98a02c654ba3be634b3c1936ee5d5e4f08",
+      "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs": "328adb7780553627efb7cab693d776c46c2e044267799f14e87195a6b3fd9243",
+      "crates/litchi-xlsx/src/workbook/edit/tests/cells.rs": "c2b530f259880b45de2099025e645e267a6ef97cebb360815fd76b60e60850da"
+    },
+    "final_sha256_after_patch": {
+      "crates/litchi-xlsx/src/raw/worksheet/selected.rs": "2ef75bd03b903bbfd53067ca20188c2d5e71b6af4d2f3257699c25a81d5ac05c",
+      "crates/litchi-xlsx/src/raw/worksheet/tests.rs": "cb4af25f365a84ba85316e4fb22326e467138098b3786f5ed7d51bdf7bf13ba9",
+      "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs": "360e6dad8acce3beed883b6cc6c6225841a918538abd323723cb1a46eb53f086",
+      "crates/litchi-xlsx/src/workbook/edit/tests/cells.rs": "bb52c385713104fd6dd993ec49adae5a97581c452f54303d3c886ee3e03576c2"
+    },
+    "frozen_v8_candidate_final_sha256": {
+      "crates/litchi-xlsx/src/raw/worksheet/selected.rs": "2ef75bd03b903bbfd53067ca20188c2d5e71b6af4d2f3257699c25a81d5ac05c",
+      "crates/litchi-xlsx/src/raw/worksheet/tests.rs": "cb4af25f365a84ba85316e4fb22326e467138098b3786f5ed7d51bdf7bf13ba9",
+      "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs": "360e6dad8acce3beed883b6cc6c6225841a918538abd323723cb1a46eb53f086",
+      "crates/litchi-xlsx/src/workbook/edit/tests/cells.rs": "bb52c385713104fd6dd993ec49adae5a97581c452f54303d3c886ee3e03576c2"
+    },
+    "matches_frozen_v8_source_delta_sha256": "64eb23b8074639dbf99372268a66cad96119b672a0df620259ec728cad380b1a",
+    "patch_bytes": 68812,
+    "patch_path": "/var/tmp/litchi-xlsx-current-de80-scanner-delta-20260910.patch",
+    "patch_sha256": "64eb23b8074639dbf99372268a66cad96119b672a0df620259ec728cad380b1a",
+    "scope": "exactly four source/test paths; no Cargo.lock or other path changes",
+    "source_paths": [
+      "crates/litchi-xlsx/src/raw/worksheet/selected.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+      "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs",
+      "crates/litchi-xlsx/src/workbook/edit/tests/cells.rs"
+    ]
+  },
+  "schema_version": 1,
+  "source": {
+    "accepted_plain_cell_tag_commit": "556c61ef355bac77a1dcef0870209c68bf3290e9",
+    "accepted_plain_cell_tag_is_ancestor": true,
+    "archive_command": "git archive --format=tar de80c38248ff797501564886c5df0987088f430c | tar -xf - -C /var/tmp/litchi-xlsx-current-de80-scanner-integration-20260910",
+    "archive_root": "/var/tmp/litchi-xlsx-current-de80-scanner-integration-20260910",
+    "base_commit_for_scanner_delta": "21d5fb0bef3a36ee42903e5cc7cb2fd98373150e",
+    "commit": "de80c38248ff797501564886c5df0987088f430c",
+    "feature_path_sha256": {
+      "crates/litchi-xlsx/docs/FEATURE_MATRIX.md": "357a993de3115603b48cff7d31bf2864f56f0b8c82cb106b0025e498ef7698d3",
+      "crates/litchi-xlsx/src/external_links/codec.rs": "da08bf9bb82c30de93c2c6b08aa24dba92b9afe7ce5f5314a9585036e8fd0797",
+      "crates/litchi-xlsx/src/external_links/mod.rs": "9da1ed0b839016ce200a7d70591149803a64c754bae363662636d0d38851ff48",
+      "crates/litchi-xlsx/src/external_links/model.rs": "08f02f007f4ccd0da0862b48f20b508e24dcb3767b0444bdb2b9166b6339fd02",
+      "crates/litchi-xlsx/src/external_links/package.rs": "6fc26903321433cabb1b0f4ae199b663f36d429f7bb5bb13e72288e90d22fd5b",
+      "crates/litchi-xlsx/src/external_links/tests.rs": "9834bd272a8be9ad101e7593505de8332f7527fc4f29bb65a3029222fba197ef",
+      "crates/litchi-xlsx/src/external_links/transaction.rs": "a8a6d9c87758a4a99f5d92c759d2a4dc6cb67b4070ed185dcb783a7345921c27",
+      "crates/litchi-xlsx/src/lib.rs": "9068f1b35d785b81d1b9fc7742aaafba4445fc9db2e178824282632da9d4238a"
+    },
+    "feature_paths_at_commit": [
+      "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+      "crates/litchi-xlsx/src/external_links/codec.rs",
+      "crates/litchi-xlsx/src/external_links/mod.rs",
+      "crates/litchi-xlsx/src/external_links/model.rs",
+      "crates/litchi-xlsx/src/external_links/package.rs",
+      "crates/litchi-xlsx/src/external_links/tests.rs",
+      "crates/litchi-xlsx/src/external_links/transaction.rs",
+      "crates/litchi-xlsx/src/lib.rs"
+    ],
+    "preserved_feature": "bounded alternate external-link URL editing from de80c3824",
+    "scanner_base_is_ancestor": true,
+    "tree": "4981cf4b137dad50cc6fec9b11f7c42cb256d4cf"
+  },
+  "status": "prepared_no_primary_mutation",
+  "verification": {
+    "final_path_hashes_match_frozen_candidate": true,
+    "historical_capture_preserved": true,
+    "no_primary_edit_stage_or_commit": true,
+    "patch_applied": "git -C <archive_root> apply <patch_path> passed",
+    "patch_check": "git -C <archive_root> apply --check <patch_path> passed before application",
+    "root_next_step": "run current-feature XLSX correctness/strict gates on archive_root; do not attribute historical V8 timing to de80 integration"
+  }
+}

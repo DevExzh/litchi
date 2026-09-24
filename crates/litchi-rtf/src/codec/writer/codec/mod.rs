@@ -44,18 +44,21 @@ use super::super::{
     ListOverrideTable, ListTable, MAX_EMBEDDED_OBJECTS, MAX_LEGACY_DRAWINGS,
     MAX_PICTURE_COMPATIBILITY_RECORDS, MAX_TABLE_CELLS_PER_ROW, MAX_TABLE_NESTING_DEPTH, MailMerge,
     MathElement, MathElementRole, MathObject, MathProperties, MathPropertyName, MathRun,
-    MathStructure, MathStructureChild, MathStructureKind, MathZone, MathZoneKind, NavigationEntry,
-    Note, NoteNumberingStyle, NoteOptions, NotePlacement, NoteSeparatorElement, NoteSeparatorKind,
-    NoteSeparatorTable, ObjectKind, ObjectResultKind, PageBorders, PageOrientation, Paragraph,
-    ParagraphFontAlignment, ParagraphGroupPropertyTable, ParagraphWrapping, Picture,
-    PictureCompatibilityKind, PictureCompatibilityRecord, PictureShapeProperties, PresentNoteKinds,
-    ProtectionRange, ProtectionUserTable, Revision, RevisionAuthor, RevisionMetadata,
-    RevisionSaveMetadata, RevisionType, Row, RtfDocument, RtfTimestamp, Section, SectionBreakType,
+    MathStructure, MathStructureChild, MathStructureKind, MathZone, MathZoneKind, MoveBookmark,
+    NavigationEntry, Note, NoteNumberingStyle, NoteOptions, NotePlacement, NoteSeparatorElement,
+    NoteSeparatorKind, NoteSeparatorTable, ObjectKind, ObjectResultKind, PageBorders,
+    PageOrientation, Paragraph, ParagraphFontAlignment, ParagraphFrame,
+    ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference, ParagraphFrameTextFlow,
+    ParagraphFrameVerticalPosition, ParagraphFrameVerticalReference, ParagraphFrameWrap,
+    ParagraphGroupPropertyTable, ParagraphWrapping, Picture, PictureCompatibilityKind,
+    PictureCompatibilityRecord, PictureShapeProperties, PresentNoteKinds, ProtectionRange,
+    ProtectionUserTable, Revision, RevisionAuthor, RevisionMetadata, RevisionSaveMetadata,
+    RevisionType, Row, RtfDocument, RtfTimestamp, Section, SectionBreakType,
     SectionFootnotePlacement, SectionLineNumberRestart, SectionNoteOptions, SectionRendering,
     Shading, ShadingPattern, Shape, ShapeGroup, ShapeGroupChild, ShapeGroupInfo, ShapeProperty,
-    ShapeResult, ShapeThemeColor, ShapeType, SoftBreak, SoftBreakKind, StoryDrawing, StoryEvent,
-    StoryField, Style, StyleBlock, StyleSheet, StyleType, TabAlignment, TabLeader, TabStop, Table,
-    TableAutoformatFlag, TableCellBorders, TableCellMergeRole, TableCellTextFlow,
+    ShapeResult, ShapeThemeColor, ShapeType, SmartTag, SoftBreak, SoftBreakKind, StoryDrawing,
+    StoryEvent, StoryField, Style, StyleBlock, StyleSheet, StyleType, TabAlignment, TabLeader,
+    TabStop, Table, TableAutoformatFlag, TableCellBorders, TableCellMergeRole, TableCellTextFlow,
     TableCellVerticalAlignment, TableDistanceUnit, TableEdgeDistances, TableHorizontalPosition,
     TableHorizontalReference, TableIndentUnit, TablePreferredWidth, TablePreferredWidthUnit,
     TableRowAlignment, TableRowBandIndex, TableRowBorders, TableRowCellDefaults, TableRowGeometry,
@@ -166,8 +169,12 @@ enum BodyEventKind<'b, 'a> {
     NavigationEntry(&'b NavigationEntry<'a>),
     BookmarkStart(&'b Bookmark<'a>),
     BookmarkEnd(&'b Bookmark<'a>),
+    MoveBookmarkStart(&'b MoveBookmark<'a>),
+    MoveBookmarkEnd(&'b MoveBookmark<'a>),
     CustomXmlOpen(&'b CustomXmlTag<'a>),
     CustomXmlClose(&'b CustomXmlTag<'a>),
+    SmartTagOpen(&'b SmartTag<'a>),
+    SmartTagClose(&'b SmartTag<'a>),
     MathZone(&'b MathZone<'a>),
     ProtectionRangeStart(&'b ProtectionRange<'a>),
     ProtectionRangeEnd(&'b ProtectionRange<'a>),
@@ -255,6 +262,12 @@ impl<W: Write> RtfWriter<W> {
     /// # Errors
     /// Returns an error when writing to the underlying output fails.
     pub fn write_document(&mut self, doc: &RtfDocument<'_>) -> io::Result<()> {
+        if doc.has_unmatched_move_bookmarks() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF canonical rewrite cannot preserve unmatched move-bookmark destinations",
+            ));
+        }
         if doc
             .opaque_nodes()
             .iter()
@@ -460,7 +473,9 @@ impl<W: Write> RtfWriter<W> {
             doc.blocks(),
             doc.body_boundaries(),
             doc.bookmarks(),
+            doc.move_bookmarks(),
             doc.custom_xml_tags(),
+            doc.smart_tags(),
             doc.math_zones(),
             doc.protection_ranges(),
             doc.editable_regions(),

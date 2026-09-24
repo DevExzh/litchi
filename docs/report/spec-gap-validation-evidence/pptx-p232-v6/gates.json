@@ -1,0 +1,82 @@
+[
+  {
+    "gate": "tests",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--all-targets",
+      "--offline",
+      "--no-fail-fast"
+    ],
+    "log": "/var/tmp/litchi-pptx-p232-root-integration-v6-20260910-tests.log",
+    "sha256": "d1ada3aef3edda00adde5d6f26b7b19dba76a7bac5d700212601d51440113d48"
+  },
+  {
+    "gate": "doctests",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--doc",
+      "--offline"
+    ],
+    "log": "/var/tmp/litchi-pptx-p232-root-integration-v6-20260910-doctests.log",
+    "sha256": "0f1a88b165195ef53c41bdf0ee840fd8c1270d3b8a04bb81024d5f56d864a3b5"
+  },
+  {
+    "gate": "clippy",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--all-targets",
+      "--offline",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "log": "/var/tmp/litchi-pptx-p232-root-integration-v6-20260910-clippy.log",
+    "sha256": "dc041c03d231bd61cd063d76defa25796085e28caf18c734dd754e9f0aaee5d8"
+  },
+  {
+    "gate": "rustdoc",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "doc",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--no-deps",
+      "--offline"
+    ],
+    "log": "/var/tmp/litchi-pptx-p232-root-integration-v6-20260910-rustdoc.log",
+    "sha256": "8a97135a476bdb12ff6f2faeabd49b9bcd398ce38523045f677160867d7f4a9d"
+  }
+]

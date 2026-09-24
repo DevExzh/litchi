@@ -5,7 +5,6 @@
     reason = "semantic field owners share the stable model facade namespace"
 )]
 use super::*;
-use std::collections::HashSet;
 /// One of the eight temporal/revision ODF document-metadata fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MetadataFieldKind {
@@ -166,8 +165,20 @@ pub struct MetaFieldContent {
 
 impl MetaFieldContent {
     pub fn new(nodes: Vec<MetaFieldNode>) -> Result<Self> {
-        let display_text =
-            validated_meta_display_text(&nodes, MetaContentGrammar::ParagraphOrHyperlink)?;
+        Self::new_with_reservation(nodes, |_amount, _resource| Ok(()))
+    }
+
+    /// Construct metadata content while charging the cached text projection
+    /// through the caller's allocation ledger before its `String` is grown.
+    pub(crate) fn new_with_reservation<F>(nodes: Vec<MetaFieldNode>, mut reserve: F) -> Result<Self>
+    where
+        F: FnMut(usize, &'static str) -> Result<()>,
+    {
+        let display_text = validated_meta_display_text_with_reservation(
+            &nodes,
+            MetaContentGrammar::ParagraphOrHyperlink,
+            &mut reserve,
+        )?;
         Ok(Self {
             nodes,
             display_text,
@@ -184,8 +195,20 @@ impl MetaFieldContent {
 
     /// Revalidate the borrowed mixed-content nodes and cached text projection.
     pub fn validate(&self) -> Result<()> {
-        let display_text =
-            validated_meta_display_text(&self.nodes, MetaContentGrammar::ParagraphOrHyperlink)?;
+        self.validate_with_reservation(|_amount, _resource| Ok(()))
+    }
+
+    /// Revalidate metadata content while charging the temporary display
+    /// projection through the caller's allocation ledger.
+    pub(crate) fn validate_with_reservation<F>(&self, mut reserve: F) -> Result<()>
+    where
+        F: FnMut(usize, &'static str) -> Result<()>,
+    {
+        let display_text = validated_meta_display_text_with_reservation(
+            &self.nodes,
+            MetaContentGrammar::ParagraphOrHyperlink,
+            &mut reserve,
+        )?;
         if display_text != self.display_text {
             return Err(Error::InvalidFormat(
                 "text:meta-field cached display text is inconsistent".to_string(),
@@ -195,6 +218,12 @@ impl MetaFieldContent {
     }
 
     pub(super) fn write_xml(&self, output: &mut String) {
+        self.write_xml_to(output);
+    }
+
+    /// Serialize the validated mixed-content projection for a sibling ODF
+    /// owner such as `text:meta`.
+    pub(crate) fn write_xml_to(&self, output: &mut String) {
         for node in &self.nodes {
             write_meta_node(node, output);
         }
@@ -287,9 +316,39 @@ fn validated_meta_display_text(
     nodes: &[MetaFieldNode],
     grammar: MetaContentGrammar,
 ) -> Result<String> {
+    validated_meta_display_text_with_reservation(nodes, grammar, &mut |_amount, _resource| Ok(()))
+}
+
+fn validated_meta_display_text_with_reservation<F>(
+    nodes: &[MetaFieldNode],
+    grammar: MetaContentGrammar,
+    reserve: &mut F,
+) -> Result<String>
+where
+    F: FnMut(usize, &'static str) -> Result<()>,
+{
+    // The validator appends exactly the character-data nodes it accepts.  A
+    // checked read-only walk gives the exact UTF-8 length before the output
+    // string is allocated, so the budgeted caller can charge it up front.
+    let mut check = || reserve(0, "ODT meta-field display text sizing");
+    let display_length = meta_display_text_length(nodes, &mut check)?;
+    reserve(display_length, "ODT meta-field display text")?;
+    let mut display_text = String::new();
+    display_text
+        .try_reserve_exact(display_length)
+        .map_err(|source| Error::Allocation {
+            resource: "ODT meta-field display text",
+            source,
+        })?;
+    let actual_capacity = display_text.capacity();
+    if actual_capacity > display_length {
+        reserve(
+            actual_capacity - display_length,
+            "ODT meta-field display text",
+        )?;
+    }
     let mut aggregate = 0usize;
     let mut node_count = 0usize;
-    let mut display_text = String::new();
     validate_meta_nodes(
         nodes,
         0,
@@ -299,6 +358,84 @@ fn validated_meta_display_text(
         &mut display_text,
     )?;
     Ok(display_text)
+}
+
+fn meta_display_text_length<F>(nodes: &[MetaFieldNode], check: &mut F) -> Result<usize>
+where
+    F: FnMut() -> Result<()>,
+{
+    // Keep sizing allocation-free and iterative.  The validator applies the
+    // same node/depth limits, but sizing must enforce them before descending
+    // because it runs first to establish the String reservation.
+    let mut stack: [Option<(&[MetaFieldNode], usize, usize)>; MAX_META_FIELD_DEPTH + 2] =
+        [None; MAX_META_FIELD_DEPTH + 2];
+    stack[0] = Some((nodes, 0, 0));
+    let mut stack_len = 1usize;
+    let mut node_count = 0usize;
+    let mut length = 0usize;
+    let mut aggregate = 0usize;
+    while stack_len != 0 {
+        let frame = stack[stack_len - 1]
+            .as_mut()
+            .expect("metadata sizing stack frame is initialized");
+        let Some(node) = frame.0.get(frame.2) else {
+            stack_len -= 1;
+            continue;
+        };
+        frame.2 += 1;
+        node_count = node_count.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("text:meta-field node count overflow".to_string())
+        })?;
+        if node_count > MAX_META_FIELD_NODES {
+            return Err(Error::InvalidFormat(format!(
+                "text:meta-field exceeds {MAX_META_FIELD_NODES} content nodes"
+            )));
+        }
+        if node_count & 0x03ff == 0 {
+            check()?;
+        }
+        match node {
+            MetaFieldNode::Text(value) => {
+                // Enforce the same per-value and aggregate dynamic-field
+                // limits that the allocating validator applies.  This walk
+                // must reject oversized metadata before the display String
+                // is charged or constructed.
+                validate_dynamic_value("meta-field text", Some(value), false, &mut aggregate)?;
+                length = length.checked_add(value.len()).ok_or_else(|| {
+                    Error::InvalidFormat("meta-field display text size overflow".to_string())
+                })?;
+            },
+            MetaFieldNode::Element(element) => {
+                // Attribute values contribute to the same dynamic-field
+                // aggregate even though they do not enter display_text.
+                // Reuse the allocation-free structural/lexical validator so
+                // its per-value and XML-character checks happen pre-charge.
+                validate_meta_element_parts(
+                    &element.namespace_uri,
+                    &element.local_name,
+                    &element.attributes,
+                    &mut aggregate,
+                )?;
+                let child_depth = frame.1.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("text:meta-field depth overflow".to_string())
+                })?;
+                if child_depth > MAX_META_FIELD_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "text:meta-field content exceeds {MAX_META_FIELD_DEPTH} levels"
+                    )));
+                }
+                if stack_len == stack.len() {
+                    return Err(Error::InvalidFormat(format!(
+                        "text:meta-field content exceeds {MAX_META_FIELD_DEPTH} levels"
+                    )));
+                }
+                stack[stack_len] = Some((&element.children, child_depth, 0));
+                stack_len += 1;
+            },
+        }
+    }
+    check()?;
+    Ok(length)
 }
 
 fn note_body_display_text(nodes: &[MetaFieldNode]) -> Result<String> {
@@ -1288,8 +1425,7 @@ pub(crate) fn validate_meta_element_parts(
             "meta-field child exceeds {MAX_META_FIELD_ATTRIBUTES} attributes"
         )));
     }
-    let mut seen = HashSet::new();
-    for attribute in attributes {
+    for (index, attribute) in attributes.iter().enumerate() {
         if !is_allowed_meta_namespace(&attribute.namespace_uri) {
             return Err(Error::InvalidFormat(format!(
                 "foreign meta-field attribute namespace '{}'",
@@ -1297,7 +1433,10 @@ pub(crate) fn validate_meta_element_parts(
             )));
         }
         validate_xml_ncname(&attribute.local_name, "meta-field attribute name")?;
-        if !seen.insert((&attribute.namespace_uri, &attribute.local_name)) {
+        if attributes[..index].iter().any(|previous| {
+            previous.namespace_uri == attribute.namespace_uri
+                && previous.local_name == attribute.local_name
+        }) {
             return Err(Error::InvalidFormat(
                 "duplicate namespace-resolved meta-field attribute".to_string(),
             ));
@@ -1410,11 +1549,15 @@ pub(super) fn write_meta_node(node: &MetaFieldNode, output: &mut String) {
             output.push_str("=\"");
             output.push_str(&element.namespace_uri);
             output.push('"');
-            let mut declared = HashSet::new();
-            declared.insert(prefix);
-            for attribute in &element.attributes {
+            for (index, attribute) in element.attributes.iter().enumerate() {
                 let attribute_prefix = canonical_meta_prefix(&attribute.namespace_uri);
-                if attribute_prefix != "xml" && declared.insert(attribute_prefix) {
+                let already_declared = attribute_prefix == "xml"
+                    || attribute_prefix == prefix
+                    || element.attributes[..index].iter().any(|previous| {
+                        canonical_meta_prefix(&previous.namespace_uri) == attribute_prefix
+                            && canonical_meta_prefix(&previous.namespace_uri) != "xml"
+                    });
+                if !already_declared {
                     output.push_str(" xmlns:");
                     output.push_str(attribute_prefix);
                     output.push_str("=\"");
@@ -1443,5 +1586,27 @@ pub(super) fn write_meta_node(node: &MetaFieldNode, output: &mut String) {
                 output.push('>');
             }
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn metadata_projection_rejects_aggregate_before_display_reservation() {
+        let value_count = MAX_DYNAMIC_FIELD_AGGREGATE / MAX_DYNAMIC_FIELD_VALUE + 1;
+        let nodes = (0..value_count)
+            .map(|_| MetaFieldNode::Text("x".repeat(MAX_DYNAMIC_FIELD_VALUE)))
+            .collect();
+        let mut reserve_calls = 0usize;
+
+        let result = MetaFieldContent::new_with_reservation(nodes, |_amount, _resource| {
+            reserve_calls += 1;
+            Ok(())
+        });
+
+        assert!(result.is_err());
+        assert_eq!(reserve_calls, 0);
     }
 }

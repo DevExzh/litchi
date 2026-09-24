@@ -1,0 +1,11 @@
+{
+  "label": "baseline-comparable",
+  "group": "comparable",
+  "binary": "/var/tmp/ods-tokenizer-baseline-snapshot-20260913",
+  "binary_sha256": "22848ae5d44947481eccc38c3af5f8e7254ecbfa148070fe5b83ef7d7a81c185",
+  "harness": "/var/tmp/ods-tokenizer-baseline-20260913/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/harness/run.py",
+  "output": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/baseline",
+  "warmups": 3,
+  "iterations": 15,
+  "started_at": "2026-09-13T08:03:36Z"
+}

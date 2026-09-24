@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running tests/data_model_native_package.rs (target/debug/deps/data_model_native_package-7355748a2982e78c)
+
+running 2 tests
+test native_fixture_is_model_free_before_synthetic_attachment ... ok
+test native_package_preserves_members_through_synthetic_model_lifecycle ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s

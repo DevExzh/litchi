@@ -1,0 +1,58 @@
+{
+  "created_at": "2026-09-13T08:10:47Z",
+  "owned_paths": [
+    "/var/tmp/ods-tokenizer-baseline-20260913",
+    "/var/tmp/ods-tokenizer-baseline-target-20260913",
+    "/var/tmp/ods-tokenizer-baseline-snapshot-20260913",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/baseline/ods-formula-reference-profile",
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/candidate/ods-formula-reference-profile"
+  ],
+  "pre_delete": [
+    {
+      "path": "/var/tmp/ods-tokenizer-baseline-20260913",
+      "kind": "directory",
+      "bytes": 2478969691,
+      "file_count": 43329
+    },
+    {
+      "path": "/var/tmp/ods-tokenizer-baseline-target-20260913",
+      "kind": "directory",
+      "bytes": 2181844183,
+      "file_count": 4101
+    },
+    {
+      "path": "/var/tmp/ods-tokenizer-baseline-snapshot-20260913",
+      "kind": "file",
+      "bytes": 1167256,
+      "sha256": "22848ae5d44947481eccc38c3af5f8e7254ecbfa148070fe5b83ef7d7a81c185",
+      "mode": "0o755"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/baseline/ods-formula-reference-profile",
+      "kind": "file",
+      "bytes": 1167256,
+      "sha256": "22848ae5d44947481eccc38c3af5f8e7254ecbfa148070fe5b83ef7d7a81c185",
+      "mode": "0o664"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/candidate/ods-formula-reference-profile",
+      "kind": "file",
+      "bytes": 1168912,
+      "sha256": "30a7da005fdb3c18ac06f1c8a7328a6755cadd64abee02b97a4b869612c6effd",
+      "mode": "0o775"
+    }
+  ],
+  "active_process_matches": [
+    "2980127 /bin/bash -c python3 - <<'PY' from pathlib import Path import hashlib,json,subprocess,time,os root=Path('/home/zhuhe/code/litchi-spec-gaps') perf=root/'docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance' paths=[  Path('/var/tmp/ods-tokenizer-baseline-20260913'),  Path('/var/tmp/ods-tokenizer-baseline-target-20260913'),  Path('/var/tmp/ods-tokenizer-baseline-snapshot-20260913'),  perf/'baseline/ods-formula-reference-profile',  perf/'candidate/ods-formula-reference-profile', ] def digest(p):  h=hashlib.sha256();  with p.open('rb') as f:   for b in iter(lambda:f.read(1<<20),b''): h.update(b)  return h.hexdigest() def stats(p):  if p.is_file(): return {'path':str(p),'kind':'file','bytes':p.stat().st_size,'sha256':digest(p),'mode':oct(p.stat().st_mode&0o777)}  total=0; count=0  for q in p.rglob('*'):   if q.is_file(): total+=q.stat().st_size; count+=1  return {'path':str(p),'kind':'directory','bytes':total,'file_count':count} ps=subprocess.run(['ps','-eo','pid=,args='],text=True,capture_output=True).stdout active=[line.strip() for line in ps.splitlines() if 'ods-tokenizer' in line or 'ods-formula-reference-profile' in line] wtlist=subprocess.run(['git','worktree','list','--porcelain'],cwd=root,text=True,capture_output=True,check=True).stdout receipt={'created_at':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'owned_paths': [str(p) for p in paths], 'pre_delete': [stats(p) for p in paths if p.exists()], 'active_process_matches':active, 'registered_worktree_before_delete':'/var/tmp/ods-tokenizer-baseline-20260913' in wtlist} (perf/'cleanup.json').write_text(json.dumps(receipt,indent=2)+'\\n') print(json.dumps(receipt,indent=2)) PY"
+  ],
+  "registered_worktree_before_delete": true,
+  "deleted_at": "2026-09-13T08:12:09Z",
+  "deleted_bytes": 4664317298,
+  "deleted_gib_decimal": 4.664,
+  "post_delete": {
+    "all_owned_paths_absent": true,
+    "registered_worktree_absent": true,
+    "independent_active_process_matches": []
+  },
+  "notes": "The only pre-delete process match was the receipt-writing scan command itself; no independent tokenizer process was active. Evidence binary hashes remain in binary-sha256.txt and binary-provenance.json."
+}

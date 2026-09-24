@@ -36,12 +36,14 @@ pub fn read(xml: &[u8]) -> Result<(Catalog, Conformance)> {
         max_directive_tokens: MAX_VALUES,
         max_choices_per_alternate: MAX_VALUES,
     };
-    let xml = litchi_ooxml_common::mce::process_markup_compatibility(
-        xml,
-        &litchi_ooxml_common::mce::Capabilities::default(),
-        &limits,
-    )?
-    .xml;
+    // Glossary entries can carry the same tracked-change attributes as the
+    // main document.  Keep Word 2023's dateUtc namespace understood in this
+    // DOCX-owned MCE profile so an ignorable declaration does not erase it
+    // during the semantic projection.
+    let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
+    capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
+    let xml =
+        litchi_ooxml_common::mce::process_markup_compatibility(xml, &capabilities, &limits)?.xml;
     if xml.len() > MAX {
         return Err(invalid("processed glossary document exceeds 32 MiB"));
     }

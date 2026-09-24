@@ -26,13 +26,280 @@ use crate::error::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::sync::{Arc, LazyLock};
 
 pub(crate) const WORDPROCESSINGML_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 pub(crate) const STRICT_WORDPROCESSINGML_NAMESPACE: &[u8] =
     b"http://purl.oclc.org/ooxml/wordprocessingml/main";
+
+/// A bounded snapshot of the namespace bindings that are in scope at a
+/// retained Word element.
+///
+/// Element views are zero-copy ranges into a part, so their opening tag does
+/// not necessarily carry declarations written on an ancestor.  The package
+/// scanner captures this snapshot while it already has the ancestor stack
+/// open and shares it with the view.
+pub(crate) type NamespaceBindings = Arc<[(Option<Vec<u8>>, Vec<u8>)]>;
+
+static EMPTY_NAMESPACE_BINDINGS: LazyLock<NamespaceBindings> = LazyLock::new(|| Arc::from([]));
+
+const MAX_NAMESPACE_BINDINGS: usize = 256;
+const MAX_NAMESPACE_BYTES: usize = 64 * 1024;
+
+#[cfg(test)]
+#[path = "namespace_capture_tests.rs"]
+mod capture_tests;
+
+/// Reuse unchanged namespace scopes and bound aggregate new captures per scan.
+/// The charge includes owned prefix/URI bytes and binding entries, not allocator RSS.
+pub(crate) struct NamespaceCapture {
+    last: Option<NamespaceBindings>,
+    used: usize,
+    maximum: usize,
+}
+
+impl Default for NamespaceCapture {
+    fn default() -> Self {
+        Self {
+            last: None,
+            used: 0,
+            maximum: 64 * 1024 * 1024,
+        }
+    }
+}
+
+impl NamespaceCapture {
+    pub(crate) fn capture(&mut self, resolver: &NamespaceResolver) -> Result<NamespaceBindings> {
+        if let Some(last) = &self.last {
+            let mut saved = last.iter();
+            let equal = resolver.bindings().all(|(prefix, Namespace(namespace))| {
+                saved.next().is_some_and(|(old_prefix, old_namespace)| {
+                    let prefix = match prefix {
+                        PrefixDeclaration::Default => None,
+                        PrefixDeclaration::Named(prefix) => Some(prefix),
+                    };
+                    prefix == old_prefix.as_deref() && namespace == old_namespace.as_slice()
+                })
+            }) && saved.next().is_none();
+            if equal {
+                return Ok(Arc::clone(last));
+            }
+        }
+        let (count, bytes) = namespace_requirements(resolver)?;
+        let required = count
+            .checked_mul(size_of::<(Option<Vec<u8>>, Vec<u8>)>())
+            .and_then(|entries| entries.checked_add(bytes))
+            .and_then(|additional| self.used.checked_add(additional))
+            .ok_or_else(|| Error::InvalidFormat("Word namespace capture budget overflow".into()))?;
+        if required > self.maximum {
+            return Err(Error::InvalidFormat(format!(
+                "Word namespace captures require {required} bytes, limit {}",
+                self.maximum
+            )));
+        }
+        let captured = snapshot_namespace_bindings(resolver, count)?;
+        self.used = required;
+        self.last = Some(Arc::clone(&captured));
+        Ok(captured)
+    }
+}
+
+impl NamespaceCapture {
+    /// Capture the bindings in scope in the shared binding tracker that the
+    /// production layout scanner drives (change 0754), under the same reuse,
+    /// count, byte and aggregate bounds as [`Self::capture`].
+    ///
+    /// The tracker visits each prefix once, innermost first, and omits the
+    /// reserved prefixes and undeclared bindings, so the snapshot is exactly
+    /// the set a retained span needs to resolve every name the way it
+    /// resolves in its part.
+    pub(crate) fn capture_tracker(
+        &mut self,
+        tracker: &litchi_ooxml_common::private::BindingTracker,
+    ) -> Result<NamespaceBindings> {
+        if let Some(last) = &self.last {
+            let mut saved = last.iter();
+            let mut equal = true;
+            tracker.for_each_in_scope(|prefix, namespace| {
+                if !equal {
+                    return;
+                }
+                let prefix = (!prefix.is_empty()).then_some(prefix);
+                equal = saved.next().is_some_and(|(old_prefix, old_namespace)| {
+                    prefix == old_prefix.as_deref() && namespace == old_namespace.as_slice()
+                });
+            });
+            if equal && saved.next().is_none() {
+                return Ok(Arc::clone(last));
+            }
+        }
+        let mut count = 0usize;
+        let mut bytes = 0usize;
+        let mut bound_error = None;
+        tracker.for_each_in_scope(|prefix, namespace| {
+            if bound_error.is_some() {
+                return;
+            }
+            count += 1;
+            if count > MAX_NAMESPACE_BINDINGS {
+                bound_error = Some(Error::InvalidFormat(format!(
+                    "Word XML namespace binding count exceeds {MAX_NAMESPACE_BINDINGS}"
+                )));
+                return;
+            }
+            match bytes
+                .checked_add(prefix.len())
+                .and_then(|value| value.checked_add(namespace.len()))
+            {
+                Some(total) if total <= MAX_NAMESPACE_BYTES => bytes = total,
+                Some(_) => {
+                    bound_error = Some(Error::InvalidFormat(format!(
+                        "Word XML namespace bytes exceed {MAX_NAMESPACE_BYTES}"
+                    )));
+                },
+                None => {
+                    bound_error = Some(Error::InvalidFormat(
+                        "Word XML namespace bytes overflow".into(),
+                    ));
+                },
+            }
+        });
+        if let Some(error) = bound_error {
+            return Err(error);
+        }
+        let required = count
+            .checked_mul(size_of::<(Option<Vec<u8>>, Vec<u8>)>())
+            .and_then(|entries| entries.checked_add(bytes))
+            .and_then(|additional| self.used.checked_add(additional))
+            .ok_or_else(|| Error::InvalidFormat("Word namespace capture budget overflow".into()))?;
+        if required > self.maximum {
+            return Err(Error::InvalidFormat(format!(
+                "Word namespace captures require {required} bytes, limit {}",
+                self.maximum
+            )));
+        }
+        let captured = if count == 0 {
+            Arc::clone(&EMPTY_NAMESPACE_BINDINGS)
+        } else {
+            let mut bindings = Vec::new();
+            bindings
+                .try_reserve_exact(count)
+                .map_err(|source| Error::Allocation {
+                    resource: "Word namespace bindings",
+                    source,
+                })?;
+            let mut copy_error = None;
+            tracker.for_each_in_scope(|prefix, namespace| {
+                if copy_error.is_some() {
+                    return;
+                }
+                let copied = (|| -> Result<(Option<Vec<u8>>, Vec<u8>)> {
+                    let prefix = if prefix.is_empty() {
+                        None
+                    } else {
+                        Some(copy_namespace_bytes(prefix)?)
+                    };
+                    Ok((prefix, copy_namespace_bytes(namespace)?))
+                })();
+                match copied {
+                    Ok(binding) => bindings.push(binding),
+                    Err(error) => copy_error = Some(error),
+                }
+            });
+            if let Some(error) = copy_error {
+                return Err(error);
+            }
+            Arc::from(bindings.into_boxed_slice())
+        };
+        self.used = required;
+        self.last = Some(Arc::clone(&captured));
+        Ok(captured)
+    }
+}
+
+fn copy_namespace_bytes(bytes: &[u8]) -> Result<Vec<u8>> {
+    let mut value = Vec::new();
+    value
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| Error::Allocation {
+            resource: "Word namespace bytes",
+            source,
+        })?;
+    value.extend_from_slice(bytes);
+    Ok(value)
+}
+
+fn namespace_requirements(resolver: &NamespaceResolver) -> Result<(usize, usize)> {
+    let mut count = 0usize;
+    let mut bytes = 0usize;
+    for (prefix, Namespace(namespace)) in resolver.bindings() {
+        count += 1;
+        if count > MAX_NAMESPACE_BINDINGS {
+            return Err(Error::InvalidFormat(format!(
+                "Word XML namespace binding count exceeds {MAX_NAMESPACE_BINDINGS}"
+            )));
+        }
+        let prefix_len = match prefix {
+            PrefixDeclaration::Default => 0,
+            PrefixDeclaration::Named(prefix) => prefix.len(),
+        };
+        bytes = bytes
+            .checked_add(prefix_len)
+            .and_then(|value| value.checked_add(namespace.len()))
+            .ok_or_else(|| Error::InvalidFormat("Word XML namespace bytes overflow".into()))?;
+        if bytes > MAX_NAMESPACE_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "Word XML namespace bytes exceed {MAX_NAMESPACE_BYTES}"
+            )));
+        }
+    }
+    Ok((count, bytes))
+}
+
+/// Snapshot the bindings a resolver holds, under the same binding-count and
+/// byte bounds as a captured scan snapshot.
+pub(crate) fn resolver_bindings(resolver: &NamespaceResolver) -> Result<NamespaceBindings> {
+    let (count, _bytes) = namespace_requirements(resolver)?;
+    snapshot_namespace_bindings(resolver, count)
+}
+
+fn snapshot_namespace_bindings(
+    resolver: &NamespaceResolver,
+    count: usize,
+) -> Result<NamespaceBindings> {
+    fn copy(bytes: &[u8]) -> Result<Vec<u8>> {
+        let mut value = Vec::new();
+        value
+            .try_reserve_exact(bytes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "Word namespace bytes",
+                source,
+            })?;
+        value.extend_from_slice(bytes);
+        Ok(value)
+    }
+    if count == 0 {
+        return Ok(Arc::clone(&EMPTY_NAMESPACE_BINDINGS));
+    }
+    let mut bindings = Vec::new();
+    bindings
+        .try_reserve_exact(count)
+        .map_err(|source| Error::Allocation {
+            resource: "Word namespace bindings",
+            source,
+        })?;
+    for (prefix, Namespace(namespace)) in resolver.bindings() {
+        let prefix = match prefix {
+            PrefixDeclaration::Default => None,
+            PrefixDeclaration::Named(prefix) => Some(copy(prefix)?),
+        };
+        bindings.push((prefix, copy(namespace)?));
+    }
+    Ok(Arc::from(bindings.into_boxed_slice()))
+}
 
 pub(crate) fn is_wordprocessing_namespace(namespace: &ResolveResult<'_>) -> bool {
     matches!(
@@ -135,18 +402,63 @@ pub(crate) fn scan_word_element_ranges(
     targets: &[&[u8]],
     mut emit: impl FnMut(usize, u32, u32) -> Result<()>,
 ) -> Result<()> {
+    scan_word_element_ranges_impl(
+        xml_bytes,
+        &[],
+        targets,
+        false,
+        |target, start, length, _| emit(target, start, length),
+    )
+}
+
+/// Scan selected Word elements while retaining the namespace context that was
+/// active at each selected element's opening tag.
+///
+/// The context is captured during this pass, when the resolver already has all
+/// ancestor declarations in scope. Callers that retain detached zero-copy
+/// ranges can store the returned [`NamespaceBindings`] beside each range and
+/// avoid reparsing the complete source part on every semantic query.
+pub(crate) fn scan_word_element_ranges_with_context(
+    xml_bytes: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+    targets: &[&[u8]],
+    emit: impl FnMut(usize, u32, u32, NamespaceBindings) -> Result<()>,
+) -> Result<()> {
+    scan_word_element_ranges_impl(xml_bytes, inherited_namespaces, targets, true, emit)
+}
+
+fn scan_word_element_ranges_impl(
+    xml_bytes: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+    targets: &[&[u8]],
+    capture_namespaces: bool,
+    mut emit: impl FnMut(usize, u32, u32, NamespaceBindings) -> Result<()>,
+) -> Result<()> {
     enum ScanEvent {
-        Start(usize),
+        Start(usize, NamespaceBindings),
         NestedStart,
-        Empty(usize),
+        Empty(usize, NamespaceBindings),
         End,
         Eof,
         Other,
     }
 
     let mut reader = NsReader::from_reader(xml_bytes);
+    for (prefix, namespace) in inherited_namespaces {
+        let prefix = prefix
+            .as_deref()
+            .map_or(PrefixDeclaration::Default, |prefix| {
+                PrefixDeclaration::Named(prefix)
+            });
+        reader
+            .resolver_mut()
+            .add(prefix, Namespace(namespace))
+            .map_err(|error| Error::Xml(error.to_string()))?;
+    }
+    let mut namespace_capture = NamespaceCapture::default();
+    let mut first_element = true;
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
-    let mut capture: Option<(usize, usize, usize)> = None;
+    let mut capture: Option<(usize, usize, usize, NamespaceBindings)> = None;
     let mut nodes = 0usize;
     let mut total_depth = 0usize;
 
@@ -188,16 +500,19 @@ pub(crate) fn scan_word_element_ranges(
                     .ok_or_else(|| Error::InvalidFormat("invalid Word XML nesting".to_string()))?;
             }
 
-            if fragment_prefix.is_none()
-                && let Event::Start(element) = &event
-                && !matches!(namespace, ResolveResult::Bound(_))
-            {
-                fragment_prefix = Some(
-                    element
-                        .name()
-                        .prefix()
-                        .map(|prefix| prefix.into_inner().to_vec()),
-                );
+            if first_element && matches!(event, Event::Start(_) | Event::Empty(_)) {
+                first_element = false;
+                if inherited_namespaces.is_empty()
+                    && !matches!(namespace, ResolveResult::Bound(_))
+                    && let Event::Start(element) | Event::Empty(element) = &event
+                {
+                    fragment_prefix = Some(
+                        element
+                            .name()
+                            .prefix()
+                            .map(|prefix| prefix.into_inner().to_vec()),
+                    );
+                }
             }
 
             match event {
@@ -205,19 +520,41 @@ pub(crate) fn scan_word_element_ranges(
                 Event::Start(element)
                     if is_fragment_word_namespace(&namespace, &fragment_prefix) =>
                 {
-                    targets
+                    if let Some(target) = targets
                         .iter()
                         .position(|target| element.local_name().as_ref() == *target)
-                        .map_or(ScanEvent::Other, ScanEvent::Start)
+                    {
+                        ScanEvent::Start(
+                            target,
+                            if capture_namespaces {
+                                namespace_capture.capture(reader.resolver())?
+                            } else {
+                                Arc::clone(&EMPTY_NAMESPACE_BINDINGS)
+                            },
+                        )
+                    } else {
+                        ScanEvent::Other
+                    }
                 },
                 Event::Empty(element)
                     if capture.is_none()
                         && is_fragment_word_namespace(&namespace, &fragment_prefix) =>
                 {
-                    targets
+                    if let Some(target) = targets
                         .iter()
                         .position(|target| element.local_name().as_ref() == *target)
-                        .map_or(ScanEvent::Other, ScanEvent::Empty)
+                    {
+                        ScanEvent::Empty(
+                            target,
+                            if capture_namespaces {
+                                namespace_capture.capture(reader.resolver())?
+                            } else {
+                                Arc::clone(&EMPTY_NAMESPACE_BINDINGS)
+                            },
+                        )
+                    } else {
+                        ScanEvent::Other
+                    }
                 },
                 Event::End(_) if capture.is_some() => ScanEvent::End,
                 Event::Eof => ScanEvent::Eof,
@@ -238,9 +575,11 @@ pub(crate) fn scan_word_element_ranges(
         })?;
 
         match event {
-            ScanEvent::Start(target) => capture = Some((target, event_start, 1)),
+            ScanEvent::Start(target, namespaces) => {
+                capture = Some((target, event_start, 1, namespaces));
+            },
             ScanEvent::NestedStart => {
-                let Some((_, _, depth)) = capture.as_mut() else {
+                let Some((_, _, depth, _)) = capture.as_mut() else {
                     return Err(Error::InvalidFormat(
                         "missing captured Word element".to_string(),
                     ));
@@ -254,11 +593,25 @@ pub(crate) fn scan_word_element_ranges(
                     )));
                 }
             },
-            ScanEvent::Empty(target) => {
-                emit_word_element_range(target, event_start, event_end, &mut emit)?;
+            ScanEvent::Empty(target, namespaces) => {
+                let length =
+                    u32::try_from(event_end.checked_sub(event_start).ok_or_else(|| {
+                        Error::InvalidFormat("Word element range underflow".into())
+                    })?)
+                    .map_err(|_source_error| {
+                        Error::InvalidFormat("Word element range exceeds u32".into())
+                    })?;
+                emit(
+                    target,
+                    u32::try_from(event_start).map_err(|_source_error| {
+                        Error::InvalidFormat("Word element offset exceeds u32".into())
+                    })?,
+                    length,
+                    namespaces,
+                )?;
             },
             ScanEvent::End => {
-                let Some((_, _, depth)) = capture.as_mut() else {
+                let Some((_, _, depth, _)) = capture.as_mut() else {
                     return Err(Error::InvalidFormat(
                         "missing captured Word element".to_string(),
                     ));
@@ -267,12 +620,22 @@ pub(crate) fn scan_word_element_ranges(
                     Error::InvalidFormat("invalid Word element nesting".to_string())
                 })?;
                 if *depth == 0 {
-                    let Some((target, start, _)) = capture.take() else {
+                    let Some((target, start, _, namespaces)) = capture.take() else {
                         return Err(Error::InvalidFormat(
                             "missing captured Word element range".to_string(),
                         ));
                     };
-                    emit_word_element_range(target, start, event_end, &mut emit)?;
+                    let start = u32::try_from(start).map_err(|_source_error| {
+                        Error::InvalidFormat("Word element offset exceeds u32".into())
+                    })?;
+                    let length =
+                        u32::try_from(event_end.checked_sub(start as usize).ok_or_else(|| {
+                            Error::InvalidFormat("Word element range underflow".into())
+                        })?)
+                        .map_err(|_source_error| {
+                            Error::InvalidFormat("Word element range exceeds u32".into())
+                        })?;
+                    emit(target, start, length, namespaces)?;
                 }
             },
             ScanEvent::Eof if capture.is_some() => {
@@ -485,24 +848,6 @@ pub(crate) fn normalize_xml_integer(value: String, description: &str) -> Result<
         )));
     }
     Ok(value.to_owned())
-}
-
-fn emit_word_element_range(
-    target: usize,
-    start: usize,
-    end: usize,
-    emit: &mut impl FnMut(usize, u32, u32) -> Result<()>,
-) -> Result<()> {
-    let length = end
-        .checked_sub(start)
-        .ok_or_else(|| Error::InvalidFormat("invalid Word element byte range".to_string()))?;
-    let start = u32::try_from(start).map_err(|_source_error| {
-        Error::InvalidFormat("Word element offset exceeds u32".to_string())
-    })?;
-    let length = u32::try_from(length).map_err(|_source_error| {
-        Error::InvalidFormat("Word element length exceeds u32".to_string())
-    })?;
-    emit(target, start, length)
 }
 
 #[cfg(test)]

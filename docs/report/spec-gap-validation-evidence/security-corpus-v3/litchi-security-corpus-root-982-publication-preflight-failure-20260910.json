@@ -1,0 +1,11 @@
+{
+  "publication_sha256": "a456d59668fbe3ad5d8b00e767b47ef376380402741553c8edc8afa98c227e75",
+  "mismatches": [
+    {
+      "path": "docs/performance/results/security-corpus-v3/integration-provenance.json",
+      "declared": "813d3b6057c273f78faaf39c96e7c89b56221d6cf0916bcb947e57f72701e28c",
+      "actual": "f08ad864c3259bf75ce7c613fd9fc2e75361a0c8f03b5f9f3e84ce8081cb5b7d"
+    }
+  ],
+  "decision": "No integration/staging; require corrected immutable publication receipt with history retained."
+}

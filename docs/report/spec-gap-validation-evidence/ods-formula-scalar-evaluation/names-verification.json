@@ -1,0 +1,14 @@
+{
+  "helper": "crates/litchi-ods/src/codec/formula/expression/names.rs",
+  "helper_sha256": "79631c602b587391baa9efe695da6e6c480434a12a7ab826e32d4076c9fb53b2",
+  "independent_fixture": "docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/names-character-ranges.json",
+  "fixture_sha256": "20ef949ce6c27825f10f653c785a1d68ccce32f3bfb42ef6a8555c5480037440",
+  "expanded_sets_equal": true,
+  "counts": {
+    "LETTER_RANGES": 34514,
+    "DIGIT_RANGES": 149,
+    "COMBINING_RANGES": 437
+  },
+  "experiment_helper_sha256": "ef460ca38fce28add285cd3717956e398d7da77e13fdaaf6689b6ea2f36021e4",
+  "disposition": "ASCII fast path reverted after repeated reference regressions; range tables unchanged in both experiment and final source."
+}

@@ -1,0 +1,1042 @@
+diff --git a/crates/litchi-ods/docs/FEATURE_MATRIX.md b/crates/litchi-ods/docs/FEATURE_MATRIX.md
+index 826e05f3a..022f4b8bc 100644
+--- a/crates/litchi-ods/docs/FEATURE_MATRIX.md
++++ b/crates/litchi-ods/docs/FEATURE_MATRIX.md
+@@ -77,7 +77,7 @@ the existence of an XLSX feature is never treated as ODS support.
+ | Rich cell text, spans, whitespace, fields, and hyperlinks | 🟡 | 🟡 | 🟡 | `document::{RichText, RichRun}` authors bounded paragraphs, text spans, explicit spaces, tabs, line breaks, and inert safe hyperlinks in existing non-repeated cells through provenance splices. The ordinary worksheet projection remains collapsed plain text, and arbitrary fields/foreign inline markup are not structurally editable |
+ | Formula strings and references | ✅ | ✅ | ✅ | Public `codec::formula` recognizes all 393 ODF 1.4 Part 4 chapter-6 function names and tokenizes supported literals, A1 references, ranges, operators, and sheet references. Function calls take precedence over A1-shaped names; UTF-8 strings and doubled quotes retain their values; decoded literal storage is sized to its content and U+0000 is refused under Part 4 §5.4. The bounded `codec::formula::reference` reader represents ODF 1.4 Part 4 §5.8 source IRIs, whole-axis ranges, nested sheet locators, inheritance, absolute markers, and reference errors; external sources remain inert. Worksheet and unified transactions retain, set, or clear inert formula strings. Complete expression grammar, function arity, host-defined identifiers, and evaluation remain outside this tokenizer. [Catalog evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-functions/README.md), [reference evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-references/README.md), [literal validation](../../../docs/report/spec-gap-validation-evidence/ods-formula-string-performance/README.md) |
+ | OpenFormula expression syntax | ✅ | ✅ | N/A | `codec::formula::expression::Expression` parses ODF 1.4 Part 4 chapter 5 into a bounded immutable flat tree with source-preserving node views, precedence, arrays, missing parameters, names, labels, errors, and inert external references. Explicit byte/node/depth/array-cell/reference limits and fallible storage apply. It does not perform function arity/type validation, name/reference resolution, evaluation, or recalculation. [Grammar and measurement evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/README.md). |
+-| Formula evaluation and recalculation | 🟡 | 🟡 | N/A | `codec::formula::evaluation::evaluate_scalar` evaluates already-parsed constant scalar expressions (all scalar operators and `TRUE()`/`FALSE()`) with explicit finite limits and caller cancellation/resource charging. It preserves Number/Logical/Text/Error values, uses no workbook/cache/I/O, and returns typed refusals for references, arrays, names, labels, and unimplemented functions. Formula caches remain inert; dependency-graph recalculation, reference/name resolution, external sources, arrays, and cache publication remain outside this bounded profile. This does not claim an ODF Small Group evaluator. [Scalar evaluation evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/README.md) |
++| Formula evaluation and recalculation | 🟡 | 🟡 | N/A | `codec::formula::evaluation::evaluate_scalar` evaluates already-parsed constant scalar expressions (all scalar operators and all nine Part 4 §6.15 logical functions, including lazy `IF`/`IFERROR`/`IFNA`) with explicit finite limits and caller cancellation/resource charging. It preserves Number/Logical/Text/Error values, uses no workbook/cache/I/O, and returns typed refusals for references, arrays, names, labels, and unimplemented functions. Formula caches remain inert; dependency-graph recalculation, reference/name resolution, external sources, arrays, and cache publication remain outside this bounded profile. This does not claim an ODF Small Group evaluator. [Scalar evaluation evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-scalar-evaluation/README.md), [logical-family evidence](../../../docs/report/spec-gap-validation-evidence/ods-formula-logical-evaluation/README.md) |
+ | Repeated rows/cells and merged/covered cells | ✅ | ✅ | ✅ | Physical repeated runs are retained, logical lookup/edit splits only the affected run, and merge/covered metadata is typed and validated |
+ | Named ranges and named expressions | ✅ | ✅ | ✅ | Global and sheet-scoped definitions are parsed and validated per ODF 1.4 Part 3 sections 9.4.11-9.4.13; `definitions::{Snapshot, Edit, Commit, Patch}` adds exact key/checked-position CRUD and reorder, compact authored XML, typed readback, exact no-op retention, and reversible exact-source patches alongside the minimal builder |
+ | Cell and sheet styles | 🟡 | 🟡 | 🟡 | Typed source structures cover alignment, borders, background, common number/date/time/currency/percentage/boolean data styles, text properties, and protection flags. Unified transactions add or same-family replace bounded automatic graphs, conservatively remove styles with no retained package references, apply cell/rich-run references, and resolve supported inherited properties across `styles.xml` plus content automatic styles. Full property vocabulary and effective layout remain unsupported |
+diff --git a/crates/litchi-ods/src/codec/formula/evaluation.rs b/crates/litchi-ods/src/codec/formula/evaluation.rs
+index 16cf8e296..f859c33e6 100644
+--- a/crates/litchi-ods/src/codec/formula/evaluation.rs
++++ b/crates/litchi-ods/src/codec/formula/evaluation.rs
+@@ -2,10 +2,11 @@
+ //!
+ //! This module evaluates the already-parsed ODS expression tree directly.  It
+ //! does not stringify and reparse formulas, inspect a workbook, resolve an
+-//! external source, refresh a cache, or publish a cell change.  The first
+-//! evaluation profile intentionally covers constants, scalar operators, and
+-//! `TRUE()`/`FALSE()` only.  References, arrays, names, labels, and all other
+-//! functions are reported as typed capability refusals.
++//! external source, refresh a cache, or publish a cell change.  The scalar
++//! profile covers constants, scalar operators, and the normative logical
++//! functions (`TRUE`, `FALSE`, `IF`, `IFERROR`, `IFNA`, `AND`, `OR`, `NOT`,
++//! and `XOR`).  References, arrays, names, labels, and other functions are
++//! reported as typed capability refusals.
+ //!
+ //! The profile makes the following deterministic choices for host-dependent
+ //! scalar behavior:
+@@ -20,6 +21,8 @@
+ //!   before being exposed here;
+ //! * text-to-number conversion accepts only locale-independent decimal-point
+ //!   syntax and reports a value error when conversion fails;
++//! * Text used where a Logical is required reports `#VALUE!`; AND/OR follow
++//!   their `NumberSequenceList` signature and convert scalar numeric Text;
+ //! * `0^0` is accepted as `1`, as permitted by this bounded profile.
+ //!
+ //! A successful text result keeps its memory reservation in
+@@ -47,11 +50,13 @@
+ //! #     Budget::root("formula", Limits::for_profile(Profile::Server)), token,
+ //! #     ExecutionLimits::new(NonZeroUsize::MIN, NonZeroUsize::MIN, NonZeroU64::MIN, 0)?,
+ //! # );
+-//! let expression = Expression::parse("of:=2+3*4")?;
++//! // The reference in the unselected branch is never resolved, and IFERROR
++//! // catches the selected branch's formula-level division error.
++//! let expression = Expression::parse("of:=IF(FALSE();[.A1];IFERROR(1/0;42))")?;
+ //! let result = evaluate_scalar_with_context(
+ //!     &expression, &execution, &EvaluationLimits::default(),
+ //! )?;
+-//! assert_eq!(result.value(), &ScalarValue::Number(14.0));
++//! assert_eq!(result.value(), &ScalarValue::Number(42.0));
+ //! # Ok(())
+ //! # }
+ //! ```
+@@ -321,9 +326,9 @@ pub enum UnsupportedKind {
+     NamedExpression,
+     /// A quoted label or automatic intersection requires a label resolver.
+     Label,
+-    /// A missing function parameter is outside this scalar profile.
++    /// A missing function parameter outside a function's defined defaults.
+     MissingArgument,
+-    /// A standard or host-defined function other than TRUE/FALSE.
++    /// A standard or host-defined function outside this scalar profile.
+     Function,
+ }
+ 
+@@ -455,6 +460,7 @@ struct Evaluator<'a, 'ctx, 'exec> {
+ enum Frame<'a> {
+     Visit(Node<'a>),
+     Apply(Node<'a>),
++    VisitArgument(Node<'a>),
+ }
+ 
+ enum WorkingValue<'a> {
+@@ -575,6 +581,7 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
+             match frame {
+                 Frame::Visit(node) => self.visit(node)?,
+                 Frame::Apply(node) => self.apply(node)?,
++                Frame::VisitArgument(node) => self.visit_argument(node)?,
+             }
+         }
+ 
+@@ -686,62 +693,86 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
+         }
+     }
+ 
++    fn visit_argument(&mut self, node: Node<'a>) -> EvaluationResult<()> {
++        if node.is_missing() {
++            self.push_value(WorkingValue::Error(ScalarError::Value))
++        } else {
++            self.visit(node)
++        }
++    }
++
+     fn visit_function(&mut self, node: Node<'a>, name: &'a str) -> EvaluationResult<()> {
+         self.charge_bytes(name.len())?;
+-        let value = if name.eq_ignore_ascii_case("TRUE") {
+-            true
+-        } else if name.eq_ignore_ascii_case("FALSE") {
+-            false
+-        } else {
+-            return Err(EvaluationFailure::Unsupported(UnsupportedKind::Function));
+-        };
+-        if node.child_count() == 0 {
+-            return self.push_value(WorkingValue::Logical(value));
++
++        if name.eq_ignore_ascii_case("TRUE") || name.eq_ignore_ascii_case("FALSE") {
++            if node.child_count() == 0 {
++                return self.push_value(WorkingValue::Logical(name.eq_ignore_ascii_case("TRUE")));
++            }
++            return self.schedule_eager_function(node);
+         }
+ 
+-        // These supported functions have no lazy-argument exception. Visit
+-        // arguments in source order before reporting their arity error; this
+-        // also preserves child errors, capability refusals, and work limits.
+-        self.charge_work(u64::try_from(node.child_count()).unwrap_or(u64::MAX))?;
++        if name.eq_ignore_ascii_case("IF") {
++            let count = node.child_count();
++            if !(1..=3).contains(&count) {
++                return self.push_value(WorkingValue::Error(ScalarError::Value));
++            }
++            let condition = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
++                "IF condition is missing from the expression tree",
++            ))?;
++            self.push_frame(Frame::Apply(node))?;
++            return self.push_frame(Frame::VisitArgument(condition));
++        }
++
++        if name.eq_ignore_ascii_case("IFERROR") || name.eq_ignore_ascii_case("IFNA") {
++            if node.child_count() != 2 {
++                return self.push_value(WorkingValue::Error(ScalarError::Value));
++            }
++            let value = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
++                "error-handling value is missing from the expression tree",
++            ))?;
++            self.push_frame(Frame::Apply(node))?;
++            return self.push_frame(Frame::VisitArgument(value));
++        }
++
++        if name.eq_ignore_ascii_case("AND")
++            || name.eq_ignore_ascii_case("OR")
++            || name.eq_ignore_ascii_case("XOR")
++            || name.eq_ignore_ascii_case("NOT")
++        {
++            return self.schedule_eager_function(node);
++        }
++
++        Err(EvaluationFailure::Unsupported(UnsupportedKind::Function))
++    }
++
++    fn schedule_eager_function(&mut self, node: Node<'a>) -> EvaluationResult<()> {
++        let count = node.child_count();
++        self.charge_work(u64::try_from(count).unwrap_or(u64::MAX))?;
+         self.push_frame(Frame::Apply(node))?;
+-        for index in (0..node.child_count()).rev() {
+-            if index % 4096 == 0 {
++        let mut processed = 0usize;
++        let mut next_check = 0usize;
++        for index in (0..count).rev() {
++            if processed >= next_check {
+                 self.context
+                     .execution
+                     .check()
+                     .map_err(map_execution_error)?;
++                next_check = processed.saturating_add(4096);
+             }
++            processed = processed.saturating_add(1);
+             let child = node
+                 .child(index)
+                 .ok_or(EvaluationFailure::InvalidExpression(
+                     "function argument is missing from the expression tree",
+                 ))?;
+-            self.push_frame(Frame::Visit(child))?;
++            self.push_frame(Frame::VisitArgument(child))?;
+         }
+         Ok(())
+     }
+ 
+     fn apply(&mut self, node: Node<'a>) -> EvaluationResult<()> {
+         match node.kind() {
+-            Kind::Function { .. } => {
+-                let mut propagated = None;
+-                // Values are popped in reverse source order. Replacing the
+-                // error each time retains the first source-ordered Error.
+-                for index in 0..node.child_count() {
+-                    if index % 4096 == 0 {
+-                        self.context
+-                            .execution
+-                            .check()
+-                            .map_err(map_execution_error)?;
+-                    }
+-                    if let WorkingValue::Error(error) = self.pop_value()? {
+-                        propagated = Some(error);
+-                    }
+-                }
+-                self.push_value(WorkingValue::Error(
+-                    propagated.unwrap_or(ScalarError::Value),
+-                ))
+-            },
++            Kind::Function { name } => self.apply_function(node, name),
+             Kind::Prefix(operator) => {
+                 let value = self.pop_value()?;
+                 let value = apply_prefix(operator, value, self)?;
+@@ -764,6 +795,186 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
+         }
+     }
+ 
++    fn apply_function(&mut self, node: Node<'a>, name: &str) -> EvaluationResult<()> {
++        if name.eq_ignore_ascii_case("IF") {
++            return self.dispatch_if(node);
++        }
++        if name.eq_ignore_ascii_case("IFERROR") || name.eq_ignore_ascii_case("IFNA") {
++            return self.dispatch_if_error(node);
++        }
++        if name.eq_ignore_ascii_case("AND") || name.eq_ignore_ascii_case("OR") {
++            return self.apply_and_or(node, name.eq_ignore_ascii_case("AND"));
++        }
++        if name.eq_ignore_ascii_case("XOR") {
++            return self.apply_xor(node);
++        }
++        if name.eq_ignore_ascii_case("NOT") {
++            return self.apply_not(node);
++        }
++
++        // TRUE/FALSE reach this path only for an invalid arity.  Consume all
++        // scheduled arguments so the value stack remains balanced and retain
++        // the leftmost formula error if one was produced.
++        let mut propagated = None;
++        let mut next_check = 0usize;
++        for index in 0..node.child_count() {
++            if index >= next_check {
++                self.context
++                    .execution
++                    .check()
++                    .map_err(map_execution_error)?;
++                next_check = index.saturating_add(4096);
++            }
++            if let WorkingValue::Error(error) = self.pop_value()? {
++                propagated = Some(error);
++            }
++        }
++        self.push_value(WorkingValue::Error(
++            propagated.unwrap_or(ScalarError::Value),
++        ))
++    }
++
++    fn apply_and_or(&mut self, node: Node<'a>, conjunction: bool) -> EvaluationResult<()> {
++        if node.child_count() == 0 {
++            return self.push_value(WorkingValue::Error(ScalarError::Value));
++        }
++
++        let mut result = conjunction;
++        let mut propagated = None;
++        let mut next_check = 0usize;
++        for index in 0..node.child_count() {
++            if index >= next_check {
++                self.context
++                    .execution
++                    .check()
++                    .map_err(map_execution_error)?;
++                next_check = index.saturating_add(4096);
++            }
++            let value = self.pop_value()?;
++            match to_number_sequence(value, self)? {
++                Ok(value) => {
++                    if conjunction {
++                        result &= value;
++                    } else {
++                        result |= value;
++                    }
++                },
++                Err(error) => propagated = Some(error),
++            }
++        }
++        self.push_value(match propagated {
++            Some(error) => WorkingValue::Error(error),
++            None => WorkingValue::Logical(result),
++        })
++    }
++
++    fn apply_xor(&mut self, node: Node<'a>) -> EvaluationResult<()> {
++        if node.child_count() == 0 {
++            return self.push_value(WorkingValue::Error(ScalarError::Value));
++        }
++
++        let mut result = false;
++        let mut propagated = None;
++        let mut next_check = 0usize;
++        for index in 0..node.child_count() {
++            if index >= next_check {
++                self.context
++                    .execution
++                    .check()
++                    .map_err(map_execution_error)?;
++                next_check = index.saturating_add(4096);
++            }
++            let value = self.pop_value()?;
++            match to_logical(value, self)? {
++                Ok(value) => result ^= value,
++                Err(error) => propagated = Some(error),
++            }
++        }
++        self.push_value(match propagated {
++            Some(error) => WorkingValue::Error(error),
++            None => WorkingValue::Logical(result),
++        })
++    }
++
++    fn apply_not(&mut self, node: Node<'a>) -> EvaluationResult<()> {
++        if node.child_count() != 1 {
++            let mut propagated = None;
++            let mut next_check = 0usize;
++            for index in 0..node.child_count() {
++                if index >= next_check {
++                    self.context
++                        .execution
++                        .check()
++                        .map_err(map_execution_error)?;
++                    next_check = index.saturating_add(4096);
++                }
++                if let WorkingValue::Error(error) = self.pop_value()? {
++                    propagated = Some(error);
++                }
++            }
++            return self.push_value(WorkingValue::Error(
++                propagated.unwrap_or(ScalarError::Value),
++            ));
++        }
++
++        let value = self.pop_value()?;
++        let value = match to_logical(value, self)? {
++            Ok(value) => WorkingValue::Logical(!value),
++            Err(error) => WorkingValue::Error(error),
++        };
++        self.push_value(value)
++    }
++
++    fn dispatch_if(&mut self, node: Node<'a>) -> EvaluationResult<()> {
++        let condition = self.pop_value()?;
++        let condition = match to_logical(condition, self)? {
++            Ok(value) => value,
++            Err(error) => return self.push_value(WorkingValue::Error(error)),
++        };
++
++        match node.child_count() {
++            1 => self.push_value(WorkingValue::Logical(condition)),
++            2 if !condition => self.push_value(WorkingValue::Logical(false)),
++            2 => self.push_if_branch(node.child(1)),
++            3 if condition => self.push_if_branch(node.child(1)),
++            3 => self.push_if_branch(node.child(2)),
++            _ => self.push_value(WorkingValue::Error(ScalarError::Value)),
++        }
++    }
++
++    fn push_if_branch(&mut self, branch: Option<Node<'a>>) -> EvaluationResult<()> {
++        let branch = branch.ok_or(EvaluationFailure::InvalidExpression(
++            "IF branch is missing from the expression tree",
++        ))?;
++        if branch.is_missing() {
++            self.push_value(WorkingValue::Number(0.0))
++        } else {
++            self.push_frame(Frame::Visit(branch))
++        }
++    }
++
++    fn dispatch_if_error(&mut self, node: Node<'a>) -> EvaluationResult<()> {
++        let value = self.pop_value()?;
++        let catches = match &value {
++            WorkingValue::Error(error) => match node.kind() {
++                Kind::Function { name } if name.eq_ignore_ascii_case("IFERROR") => true,
++                Kind::Function { name } if name.eq_ignore_ascii_case("IFNA") => {
++                    *error == ScalarError::NotAvailable
++                },
++                _ => false,
++            },
++            _ => false,
++        };
++
++        if !catches {
++            return self.push_value(value);
++        }
++        let alternative = node.child(1).ok_or(EvaluationFailure::InvalidExpression(
++            "error-handling alternative is missing from the expression tree",
++        ))?;
++        self.push_frame(Frame::VisitArgument(alternative))
++    }
++
+     fn apply_infix(
+         &mut self,
+         operator: InfixOperator,
+@@ -1177,6 +1388,38 @@ fn to_number<'a>(
+     }
+ }
+ 
++/// Conversion used by the scalar Logical parameter family.  Text conversion
++/// is deliberately deterministic for this profile: text is not accepted as a
++/// logical spelling and produces `#VALUE!`.  AND/OR use the separate numeric
++/// sequence conversion below, as required by their OpenFormula signatures.
++fn to_logical<'a>(
++    value: WorkingValue<'a>,
++    evaluator: &mut Evaluator<'_, '_, '_>,
++) -> EvaluationResult<Result<bool, ScalarError>> {
++    match value {
++        WorkingValue::Number(value) => Ok(Ok(value != 0.0)),
++        WorkingValue::Logical(value) => Ok(Ok(value)),
++        WorkingValue::Text(text) => {
++            evaluator.charge_bytes(text.text.len())?;
++            Ok(Err(ScalarError::Value))
++        },
++        WorkingValue::Error(error) => Ok(Err(error)),
++    }
++}
++
++/// Conversion for the `NumberSequenceList` alternative accepted by AND and
++/// OR.  A scalar Text therefore follows Conversion to Number, while the
++/// other Logical functions use `to_logical` directly.
++fn to_number_sequence<'a>(
++    value: WorkingValue<'a>,
++    evaluator: &mut Evaluator<'_, '_, '_>,
++) -> EvaluationResult<Result<bool, ScalarError>> {
++    match to_number(value, evaluator)? {
++        Ok(value) => Ok(Ok(value != 0.0)),
++        Err(error) => Ok(Err(error)),
++    }
++}
++
+ fn to_text<'a>(
+     value: WorkingValue<'a>,
+     evaluator: &mut Evaluator<'_, '_, '_>,
+diff --git a/crates/litchi-ods/tests/ods_formula_logical_evaluation.rs b/crates/litchi-ods/tests/ods_formula_logical_evaluation.rs
+new file mode 100644
+index 000000000..defac3341
+--- /dev/null
++++ b/crates/litchi-ods/tests/ods_formula_logical_evaluation.rs
+@@ -0,0 +1,602 @@
++//! Independent integration coverage for the scalar logical-function profile.
++//!
++//! The expected values in this file come from OpenDocument v1.4 Part 4
++//! sections 6.1, 6.3, and 6.15. Formula errors remain values; evaluator
++//! capability, cancellation, and resource failures remain Rust results.
++//! Conditional functions are tested for their specified one-branch behavior,
++//! while aggregate Boolean functions are tested for eager child evaluation.
++
++use std::num::{NonZeroU64, NonZeroUsize};
++
++use litchi_core::{
++    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits, Profile,
++    Resource,
++};
++use litchi_ods::codec::formula::{
++    evaluation::{
++        EvaluatedScalar, EvaluationContext, EvaluationFailure, EvaluationLimits, ScalarError,
++        ScalarValue, UnsupportedKind, evaluate_scalar,
++    },
++    expression::Expression,
++};
++
++fn execution(scope: &str) -> (Budget, CancellationSource, ExecutionContext) {
++    execution_with_core_limits(scope, CoreLimits::for_profile(Profile::Server))
++}
++
++fn execution_with_memory(
++    scope: &str,
++    memory_bytes: usize,
++) -> (Budget, CancellationSource, ExecutionContext) {
++    execution_with_core_limits(
++        scope,
++        CoreLimits::new(
++            u64::try_from(memory_bytes).expect("test memory limit fits u64"),
++            1 << 30,
++            1 << 30,
++            10_000_000,
++            256,
++            1_000_000_000,
++        ),
++    )
++}
++
++fn execution_with_core_limits(
++    scope: &str,
++    core_limits: CoreLimits,
++) -> (Budget, CancellationSource, ExecutionContext) {
++    let budget = Budget::root(scope.to_owned(), core_limits);
++    let (cancellation, token) = CancellationSource::pair();
++    let execution_limits = ExecutionLimits::new(
++        NonZeroUsize::new(1).expect("one worker"),
++        NonZeroUsize::new(1).expect("one in-flight task"),
++        NonZeroU64::new(1024 * 1024).expect("one in-flight MiB"),
++        0,
++    )
++    .expect("valid execution limits");
++    (
++        budget.clone(),
++        cancellation,
++        ExecutionContext::new(budget, token, execution_limits),
++    )
++}
++
++fn parse(source: &str) -> Expression {
++    Expression::parse(source).unwrap_or_else(|error| panic!("{source:?} should parse: {error}"))
++}
++
++fn evaluate<'a>(
++    expression: &'a Expression,
++    context: &ExecutionContext,
++    limits: &EvaluationLimits,
++) -> Result<EvaluatedScalar<'a>, EvaluationFailure> {
++    let evaluation_context = EvaluationContext::new(context);
++    evaluate_scalar(expression, &evaluation_context, limits)
++}
++
++fn number(result: &EvaluatedScalar<'_>) -> f64 {
++    match result.value() {
++        ScalarValue::Number(value) => *value,
++        value => panic!("expected Number, got {value:?}"),
++    }
++}
++
++fn logical(result: &EvaluatedScalar<'_>) -> bool {
++    match result.value() {
++        ScalarValue::Logical(value) => *value,
++        value => panic!("expected Logical, got {value:?}"),
++    }
++}
++
++fn text<'r>(result: &'r EvaluatedScalar<'_>) -> &'r str {
++    match result.value() {
++        ScalarValue::Text(value) => value.as_ref(),
++        value => panic!("expected Text, got {value:?}"),
++    }
++}
++
++fn formula_error(result: &EvaluatedScalar<'_>) -> ScalarError {
++    match result.value() {
++        ScalarValue::Error(error) => *error,
++        value => panic!("expected formula Error, got {value:?}"),
++    }
++}
++
++fn assert_unsupported(source: &str, expected: UnsupportedKind) {
++    let expression = parse(source);
++    let (_budget, _cancellation, context) = execution("ods-formula-logical-unsupported");
++    let error = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect_err("capability-dependent logical expression should be refused");
++    assert!(
++        matches!(&error, EvaluationFailure::Unsupported(kind) if *kind == expected),
++        "{source:?} returned the wrong capability error: {error}"
++    );
++}
++
++fn long_addition_body(terms: usize) -> String {
++    assert!(terms > 0);
++    let mut source = String::from("1");
++    for _ in 1..terms {
++        source.push_str("+1");
++    }
++    source
++}
++
++fn escaped_literal(decoded_bytes: usize) -> String {
++    assert!(decoded_bytes >= 1);
++    let mut literal = String::from("\"");
++    literal.push_str(&"x".repeat(decoded_bytes - 1));
++    literal.push_str("\"\"");
++    literal.push('"');
++    literal
++}
++
++#[test]
++fn all_standard_logical_functions_return_their_scalar_profile_values() {
++    let (_budget, _cancellation, context) = execution("ods-formula-logical-values");
++    let cases = [
++        ("=TRUE()", true),
++        ("=FALSE()", false),
++        ("=NOT(TRUE())", false),
++        ("=NOT(FALSE())", true),
++        ("=AND(TRUE();TRUE())", true),
++        ("=AND(TRUE();FALSE())", false),
++        ("=OR(FALSE();FALSE())", false),
++        ("=OR(FALSE();TRUE())", true),
++        ("=XOR(FALSE();TRUE())", true),
++        ("=XOR(TRUE();TRUE())", false),
++        ("=XOR(1;2;3;4)", false),
++        ("=IF(TRUE();1;2)", true),
++    ];
++    for (source, expected) in cases {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        if source == "=IF(TRUE();1;2)" {
++            assert_eq!(number(&result), 1.0, "{source:?}");
++        } else {
++            assert_eq!(logical(&result), expected, "{source:?}");
++        }
++    }
++
++    for (source, expected) in [("=IFERROR(#N/A;2)", 2.0), ("=IFNA(#N/A;3)", 3.0)] {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        assert_eq!(number(&result), expected, "{source:?}");
++    }
++}
++
++#[test]
++fn logical_functions_apply_number_coercion_and_and_or_numeric_text_profile() {
++    let (_budget, _cancellation, context) = execution("ods-formula-logical-coercion");
++    let logical_cases = [
++        ("=NOT(0)", true),
++        ("=NOT(-2)", false),
++        ("=AND(1;2)", true),
++        ("=AND(1;0)", false),
++        ("=OR(0;0)", false),
++        ("=OR(0;2)", true),
++        ("=XOR(1;0;1)", false),
++    ];
++    for (source, expected) in logical_cases {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        assert_eq!(logical(&result), expected, "{source:?}");
++    }
++
++    let number_cases = [("=IF(0;1;2)", 2.0), ("=IF(-1;1;2)", 1.0)];
++    for (source, expected) in number_cases {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        assert_eq!(number(&result), expected, "{source:?}");
++    }
++
++    // This profile uses locale-independent decimal text-to-number conversion
++    // for NumberSequenceList, which is the parameter type of AND and OR.
++    for (source, expected) in [("=AND(\"1\")", true), ("=OR(\"0\")", false)] {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        assert_eq!(logical(&result), expected, "{source:?}");
++    }
++
++    // The profile deliberately does not guess a locale-specific textual
++    // Boolean spelling for the Logical parameter family.
++    for source in ["=IF(\"1\";1;2)", "=NOT(\"TRUE\")", "=XOR(\"1\")"] {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should return a formula Error: {error}"));
++        assert_eq!(formula_error(&result), ScalarError::Value, "{source:?}");
++    }
++}
++
++#[test]
++fn conditional_functions_honor_all_optional_argument_forms() {
++    let (_budget, _cancellation, context) = execution("ods-formula-if-forms");
++    let number_cases = [
++        ("=IF(TRUE();)", 0.0),
++        ("=IF(TRUE();1)", 1.0),
++        ("=IF(TRUE();;)", 0.0),
++        ("=IF(FALSE();;)", 0.0),
++        ("=IF(TRUE();;2)", 0.0),
++        ("=IF(FALSE();;2)", 2.0),
++        ("=IF(TRUE();1;)", 1.0),
++        ("=IF(FALSE();1;)", 0.0),
++        ("=IF(TRUE();1;2)", 1.0),
++        ("=IF(FALSE();1;2)", 2.0),
++    ];
++    for (source, expected) in number_cases {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        assert_eq!(number(&result), expected, "{source:?}");
++    }
++
++    let logical_cases = [
++        ("=IF(TRUE())", true),
++        ("=IF(FALSE())", false),
++        ("=IF(FALSE();1)", false),
++        ("=IF(FALSE();)", false),
++    ];
++    for (source, expected) in logical_cases {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        assert_eq!(logical(&result), expected, "{source:?}");
++    }
++}
++
++#[test]
++fn required_arity_errors_are_formula_values() {
++    let cases = [
++        ("=TRUE(1)", ScalarError::Value),
++        ("=FALSE(1)", ScalarError::Value),
++        ("=NOT()", ScalarError::Value),
++        ("=XOR()", ScalarError::Value),
++        ("=NOT(1;2)", ScalarError::Value),
++        ("=IF()", ScalarError::Value),
++        ("=IFERROR(1)", ScalarError::Value),
++        ("=IFNA(1;2;3)", ScalarError::Value),
++        ("=AND(;TRUE())", ScalarError::Value),
++        ("=OR(FALSE();)", ScalarError::Value),
++        ("=XOR(;TRUE())", ScalarError::Value),
++    ];
++    for (source, expected) in cases {
++        let expression = parse(source);
++        let (budget, _cancellation, context) = execution("ods-formula-logical-arity");
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should return a formula error: {error}"));
++        assert_eq!(formula_error(&result), expected, "{source:?}");
++        assert_eq!(
++            budget.used(Resource::Memory),
++            0,
++            "{source:?} leaked storage"
++        );
++    }
++
++    // The standard permits either a Logical identity or an Error for zero
++    // arguments to AND and OR. Whichever choice the profile makes remains a
++    // formula result rather than a capability/refusal failure.
++    for source in ["=AND()", "=OR()"] {
++        let expression = parse(source);
++        let (_budget, _cancellation, context) = execution("ods-formula-logical-zero");
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should return a scalar result: {error}"));
++        assert!(
++            matches!(
++                result.value(),
++                ScalarValue::Logical(_) | ScalarValue::Error(_)
++            ),
++            "{source:?} returned a non-logical formula value: {:?}",
++            result.value()
++        );
++    }
++}
++
++#[test]
++fn eager_wrong_arity_still_evaluates_present_children() {
++    let no_arguments = parse("=NOT()");
++    let (empty_budget, _cancellation, empty_context) = execution("ods-formula-arity-empty");
++    let empty_result = evaluate(&no_arguments, &empty_context, &EvaluationLimits::default())
++        .expect("NOT() should return a formula arity error");
++    assert_eq!(formula_error(&empty_result), ScalarError::Value);
++    let empty_work = empty_budget.used(Resource::Work);
++
++    let with_children = parse("=NOT(1+2;3+4)");
++    let (child_budget, _cancellation, child_context) = execution("ods-formula-arity-children");
++    let child_result = evaluate(&with_children, &child_context, &EvaluationLimits::default())
++        .expect("wrong-arity NOT should return a formula arity error");
++    assert_eq!(formula_error(&child_result), ScalarError::Value);
++    assert!(
++        child_budget.used(Resource::Work) > empty_work,
++        "present arguments must be visited before a wrong-arity result"
++    );
++}
++
++#[test]
++fn and_or_evaluate_all_children_and_propagate_source_errors() {
++    let (_budget, _cancellation, context) = execution("ods-formula-logical-errors");
++    for (source, expected) in [
++        ("=AND(#N/A;TRUE())", ScalarError::NotAvailable),
++        ("=OR(#N/A;FALSE())", ScalarError::NotAvailable),
++        ("=XOR(#DIV/0!;TRUE())", ScalarError::DivisionByZero),
++    ] {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should retain formula Error: {error}"));
++        assert_eq!(formula_error(&result), expected, "{source:?}");
++    }
++
++    // A decisive Boolean value does not short-circuit aggregate functions.
++    // The reference is a capability refusal, so this distinguishes eager
++    // child scheduling from merely checking the final Boolean result.
++    assert_unsupported("=AND(FALSE();[.A1])", UnsupportedKind::Reference);
++    assert_unsupported("=OR(TRUE();[.A1])", UnsupportedKind::Reference);
++}
++
++#[test]
++fn if_and_error_handlers_visit_only_the_selected_or_needed_value() {
++    let (_budget, _cancellation, context) = execution("ods-formula-logical-lazy");
++    let selected = [
++        ("=IF(TRUE();1;#DIV/0!)", 1.0),
++        ("=IF(FALSE();#N/A;2)", 2.0),
++        ("=IFERROR(1;#DIV/0!)", 1.0),
++        ("=IFNA(1;#DIV/0!)", 1.0),
++    ];
++    for (source, expected) in selected {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should skip its unused branch: {error}"));
++        assert_eq!(number(&result), expected, "{source:?}");
++    }
++
++    for source in [
++        "=IF(TRUE();1;[.A1])",
++        "=IF(FALSE();[.A1];2)",
++        "=IFERROR(1;[.A1])",
++        "=IFNA(1;[.A1])",
++    ] {
++        let expression = parse(source);
++        let result =
++            evaluate(&expression, &context, &EvaluationLimits::default()).unwrap_or_else(|error| {
++                panic!("{source:?} should skip its unused capability branch: {error}")
++            });
++        assert_eq!(
++            number(&result),
++            if source.contains("FALSE") { 2.0 } else { 1.0 }
++        );
++    }
++}
++
++#[test]
++fn iferror_and_ifna_handle_formula_errors_but_not_evaluator_failures() {
++    let (_budget, _cancellation, context) = execution("ods-formula-logical-error-handlers");
++    for (source, expected) in [
++        ("=IFERROR(#N/A;2)", 2.0),
++        ("=IFERROR(1/0;2)", 2.0),
++        ("=IFNA(#N/A;3)", 3.0),
++        // Missing required slots produce a Value error when evaluated. A
++        // handler can catch that formula error, and an unused slot stays lazy.
++        ("=IFERROR(;2)", 2.0),
++        ("=IFERROR(1;)", 1.0),
++        ("=IFNA(1;)", 1.0),
++    ] {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should catch formula Error: {error}"));
++        assert_eq!(number(&result), expected, "{source:?}");
++    }
++
++    let expression = parse("=IFNA(#DIV/0!;3)");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect("IFNA should return the non-NA formula Error");
++    assert_eq!(formula_error(&result), ScalarError::DivisionByZero);
++
++    for source in ["=IFNA(;2)", "=IFERROR(#N/A;)", "=IFNA(#N/A;)"] {
++        let expression = parse(source);
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .expect("an evaluated missing slot should remain a formula error");
++        assert_eq!(formula_error(&result), ScalarError::Value, "{source:?}");
++    }
++
++    assert_unsupported("=IFERROR([.A1];2)", UnsupportedKind::Reference);
++    assert_unsupported("=IFNA([.A1];2)", UnsupportedKind::Reference);
++    assert_unsupported("=IFERROR(#N/A;[.A1])", UnsupportedKind::Reference);
++    assert_unsupported("=IFNA(#N/A;[.A1])", UnsupportedKind::Reference);
++
++    let expression = parse("=IFERROR(1+2;3)");
++    let (budget, cancellation, context) = execution("ods-formula-logical-handler-cancel");
++    cancellation.cancel();
++    let error = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect_err("cancellation must not be converted into Alternative");
++    assert!(matches!(error, EvaluationFailure::Cancelled));
++    assert_eq!(budget.used(Resource::Memory), 0);
++
++    let source = format!("=IFERROR({};2)", long_addition_body(512));
++    let expression = parse(&source);
++    let (_budget, _cancellation, context) = execution("ods-formula-logical-handler-limit");
++    let error = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default().with_max_steps(32),
++    )
++    .expect_err("a Work refusal must not be converted into Alternative");
++    assert!(
++        matches!(&error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Work),
++        "wrong handler failure: {error}"
++    );
++}
++
++#[test]
++fn error_handlers_compute_a_successful_input_once() {
++    let input_body = long_addition_body(256);
++    let input_source = format!("={input_body}");
++    let input_expression = parse(&input_source);
++    let (direct_budget, _cancellation, direct_context) =
++        execution("ods-formula-handler-direct-input");
++    let direct = evaluate(
++        &input_expression,
++        &direct_context,
++        &EvaluationLimits::default(),
++    )
++    .expect("the handler input should evaluate directly");
++    assert_eq!(number(&direct), 256.0);
++    let direct_work = direct_budget.used(Resource::Work);
++    assert!(direct_work > 0);
++
++    for name in ["IFERROR", "IFNA"] {
++        let source = format!("={name}({input_body};2)");
++        let expression = parse(&source);
++        let (budget, _cancellation, context) = execution("ods-formula-handler-single-evaluation");
++        let result = evaluate(&expression, &context, &EvaluationLimits::default())
++            .unwrap_or_else(|error| panic!("{source:?} should evaluate: {error}"));
++        assert_eq!(number(&result), 256.0, "{source:?}");
++        assert!(
++            budget.used(Resource::Work) < direct_work.saturating_mul(2),
++            "{source:?} appears to evaluate X more than once: direct={direct_work}, handler={}",
++            budget.used(Resource::Work)
++        );
++    }
++}
++
++#[test]
++fn unused_conditional_work_and_storage_are_not_admitted() {
++    let body = long_addition_body(512);
++    for source in [
++        format!("=IF(TRUE();1;{})", body),
++        format!("=IF(FALSE();{};2)", body),
++    ] {
++        let expression = parse(&source);
++        let (_budget, _cancellation, context) = execution("ods-formula-logical-unused-work");
++        let result = evaluate(
++            &expression,
++            &context,
++            &EvaluationLimits::default().with_max_steps(64),
++        )
++        .unwrap_or_else(|error| panic!("{source:?} should skip its Work-heavy branch: {error}"));
++        assert_eq!(
++            number(&result),
++            if source.contains("TRUE") { 1.0 } else { 2.0 }
++        );
++    }
++
++    let large = escaped_literal(4_096);
++    let source = format!("=IF(TRUE();\"plain\";{})", large);
++    let expression = parse(&source);
++    let (budget, _cancellation, context) =
++        execution_with_memory("ods-formula-logical-unused-memory", 256);
++    let result = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default()
++            .with_max_storage_bytes(256)
++            .with_max_text_bytes(4_096),
++    )
++    .expect("the unselected owned text must not consume storage");
++    assert_eq!(text(&result), "plain");
++    assert_eq!(result.reserved_output_bytes(), 0);
++    assert_eq!(budget.used(Resource::Memory), 0);
++}
++
++#[test]
++fn selected_owned_text_keeps_and_releases_its_result_reservation() {
++    let expression = parse("=IF(TRUE();\"a\"\"b\";\"unused\")");
++    let (budget, _cancellation, context) = execution("ods-formula-logical-result");
++    let result = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default().with_max_storage_bytes(256),
++    )
++    .expect("selected escaped text should evaluate");
++    assert_eq!(text(&result), "a\"b");
++    assert!(result.reserved_output_bytes() >= 3);
++    assert!(budget.used(Resource::Memory) > 0);
++    drop(context);
++    assert!(budget.used(Resource::Memory) > 0);
++    drop(result);
++    assert_eq!(budget.used(Resource::Memory), 0);
++}
++
++#[test]
++fn eager_boolean_children_charge_work_and_limits() {
++    let body = long_addition_body(512);
++    for source in [
++        format!("=AND(FALSE();{})", body),
++        format!("=OR(TRUE();{})", body),
++    ] {
++        let expression = parse(&source);
++        let (budget, _cancellation, context) = execution("ods-formula-logical-eager-work");
++        let error = evaluate(
++            &expression,
++            &context,
++            &EvaluationLimits::default().with_max_steps(64),
++        )
++        .expect_err("eager AND/OR must visit a Work-heavy child");
++        assert!(
++            matches!(&error, EvaluationFailure::ResourceLimit(limit) if limit.resource == Resource::Work),
++            "{source:?} returned the wrong eager failure: {error}"
++        );
++        assert!(
++            budget.used(Resource::Work) > 0,
++            "{source:?} charged no work"
++        );
++        assert_eq!(
++            budget.used(Resource::Memory),
++            0,
++            "{source:?} leaked storage"
++        );
++    }
++}
++
++#[test]
++fn cancellation_is_checked_before_logical_work_and_is_not_caught() {
++    let expression = parse("=IFERROR(#N/A;2)");
++    let (budget, cancellation, context) = execution("ods-formula-logical-cancel");
++    cancellation.cancel();
++    let error = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect_err("cancelled logical evaluation should refuse before handler logic");
++    assert!(matches!(error, EvaluationFailure::Cancelled));
++    assert_eq!(budget.used(Resource::Work), 0);
++    assert_eq!(budget.used(Resource::Memory), 0);
++}
++
++#[test]
++fn nested_conditionals_evaluate_iteratively_with_bounded_stack() {
++    const DEPTH: usize = 128;
++    let mut source = String::from("=");
++    for _ in 0..DEPTH {
++        source.push_str("IF(TRUE();");
++    }
++    source.push('1');
++    for _ in 0..DEPTH {
++        source.push_str(";0)");
++    }
++    let expression = parse(&source);
++    let (_budget, _cancellation, context) = execution("ods-formula-logical-deep");
++    let result = evaluate(
++        &expression,
++        &context,
++        &EvaluationLimits::default()
++            .with_max_steps(100_000)
++            .with_max_stack_entries(2_048),
++    )
++    .expect("deep selected branches should not recurse in the evaluator");
++    assert_eq!(number(&result), 1.0);
++}
++
++#[test]
++fn logical_source_spelling_and_function_case_are_preserved() {
++    let source = "of:== if(TRUE();1;2) ";
++    let expression = parse(source);
++    assert_eq!(expression.source(), source);
++    assert!(expression.is_force_recalculate());
++    let (_budget, _cancellation, context) = execution("ods-formula-logical-source");
++    let result = evaluate(&expression, &context, &EvaluationLimits::default())
++        .expect("function names are case-insensitive");
++    assert_eq!(number(&result), 1.0);
++    assert_eq!(expression.source(), source);
++    assert!(expression.is_force_recalculate());
++}

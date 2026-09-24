@@ -1,0 +1,2 @@
+config workload=parse case=parse-malformed-zero-row input_bytes=9 repeat=1000 warmups=3 iterations=15 expected_success=false
+result mean_ns=175186 p50_ns=173600 p95_ns=182611 p99_ns=182611 alloc_calls_p50=4000 alloc_calls_max=4000 dealloc_calls_p50=3000 dealloc_calls_max=3000 requested_bytes_p50=101000 requested_bytes_max=101000 released_bytes_p50=101000 released_bytes_max=101000 live_before_p50=2901 live_after_p50=2901 live_after_max=2901 peak_live_delta_p50=76 peak_live_delta_max=76 successes_p50=0 successes_max=0 checksum_p50=46000 checksum_max=46000

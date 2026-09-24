@@ -1,0 +1,5 @@
+checkout=/var/tmp/litchi-xlsb-identity-clean
+commit=2a726ded6feb79f36b23980ed89c350aafd3cb55
+status=clean detached checkout at capture
+scope=correctness-only 11-lane smoke; no full performance profile
+native_acceptance_claim=false

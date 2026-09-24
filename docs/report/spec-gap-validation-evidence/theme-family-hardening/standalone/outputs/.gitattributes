@@ -1,0 +1,2 @@
+# Retained exact XML receipts include native CRLF bytes.
+*.xml binary

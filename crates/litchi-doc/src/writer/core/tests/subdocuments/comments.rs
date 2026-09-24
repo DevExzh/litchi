@@ -109,6 +109,46 @@ fn rejects_comment_metadata_outside_binary_limits() {
 }
 
 #[test]
+fn rejects_annotation_bookmarks_above_spec_count_before_story_allocations() {
+    let count = crate::parts::annotation_bookmarks::MAX_ENTRIES + 1;
+    let mut writer = Writer::new();
+    writer
+        .add_paragraph(&"x".repeat(count + 1))
+        .expect("main paragraph is accepted");
+    for index in 0..count {
+        writer.add_comment(CommentEntry::new(index as u32, "Body", "Author", "A").with_range(0, 1));
+    }
+
+    let error = writer
+        .write_to(&mut Cursor::new(Vec::new()))
+        .expect_err("annotation bookmark count must be bounded");
+    assert!(error.to_string().contains("0x3FFB"));
+}
+
+#[test]
+fn writes_maximum_annotation_bookmark_count() {
+    let count = crate::parts::annotation_bookmarks::MAX_ENTRIES;
+    let mut writer = Writer::new();
+    writer
+        .add_paragraph(&"x".repeat(count + 1))
+        .expect("main paragraph is accepted");
+    for index in 0..count {
+        writer.add_comment(CommentEntry::new(index as u32, "Body", "Author", "A").with_range(0, 1));
+    }
+
+    let mut output = Cursor::new(Vec::new());
+    writer
+        .write_to(&mut output)
+        .expect("maximum annotation bookmark count is writable");
+    let mut package = crate::Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let document = package.document().unwrap();
+    assert_eq!(
+        document.annotation_bookmarks().unwrap().unwrap().len(),
+        count
+    );
+}
+
+#[test]
 fn rejects_invalid_comment_ranges_timestamps_and_reply_trees() {
     let write_error = |entry: CommentEntry| {
         let mut writer = Writer::new();

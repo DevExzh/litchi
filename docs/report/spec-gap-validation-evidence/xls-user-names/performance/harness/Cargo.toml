@@ -1,0 +1,13 @@
+[package]
+name = "litchi-xls-profiler-v5"
+version = "0.0.0"
+edition = "2024"
+
+[workspace]
+
+[profile.release]
+lto = true
+panic = "abort"
+
+[dependencies]
+litchi-xls = { package = "litchi-xls", path = "../../../../../../crates/litchi-xls" }

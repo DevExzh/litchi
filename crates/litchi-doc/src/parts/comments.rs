@@ -6,6 +6,7 @@
 use super::super::package::{Error as PackageError, Result};
 use super::super::{DateTime, ExtendedMetadata};
 use super::fib::FileInformationBlock;
+use crate::parts::annotation_bookmarks::MAX_ENTRIES;
 use crate::plcf::Plcf;
 use std::collections::{HashMap, HashSet};
 
@@ -459,7 +460,7 @@ fn parse_annotation_bookmark_tags(data: &[u8]) -> Result<Vec<u32>> {
     }
     let count = usize::from(read_u16(data, 2, "SttbfAtnBkmk count")?);
     if read_u16(data, 0, "SttbfAtnBkmk fExtend")? != 0xFFFF
-        || count > 0x3FFC
+        || count > MAX_ENTRIES
         || read_u16(data, 4, "SttbfAtnBkmk cbExtra")? != 10
         || data.len() != 6 + count * 12
     {
@@ -672,6 +673,32 @@ mod tests {
         data.extend_from_slice(&parent_delta.to_le_bytes());
         data.extend_from_slice(&flags.to_le_bytes());
         data
+    }
+
+    fn annotation_bookmark_table(count: usize) -> Vec<u8> {
+        let mut data = Vec::with_capacity(6 + count * 12);
+        data.extend_from_slice(&0xFFFFu16.to_le_bytes());
+        data.extend_from_slice(&(count as u16).to_le_bytes());
+        data.extend_from_slice(&10u16.to_le_bytes());
+        for tag in 0..count {
+            data.extend_from_slice(&0u16.to_le_bytes());
+            data.extend_from_slice(&0x0100u16.to_le_bytes());
+            data.extend_from_slice(&(tag as u32).to_le_bytes());
+            data.extend_from_slice(&(-1i32).to_le_bytes());
+        }
+        data
+    }
+
+    #[test]
+    fn enforces_annotation_bookmark_count_boundary() {
+        let maximum = annotation_bookmark_table(MAX_ENTRIES);
+        assert_eq!(
+            parse_annotation_bookmark_tags(&maximum).unwrap().len(),
+            MAX_ENTRIES
+        );
+
+        let too_many = annotation_bookmark_table(MAX_ENTRIES + 1);
+        assert!(parse_annotation_bookmark_tags(&too_many).is_err());
     }
 
     #[test]

@@ -1,0 +1,11 @@
+{
+  "source_basis": "../../../diagnostics/complex-candidate-07/source.tar.gz",
+  "runs": 225,
+  "failed_runs": 3,
+  "failed_case": "complex-long-text-over-limit",
+  "cause": "Harness expected formula error; evaluator correctly returned typed text Memory limit",
+  "archives": {
+    "capture.tar.gz": "3eff0bcefed37f0ee9040b92dd4af8db62d8b9247e735071058c92cb13124114",
+    "build.tar.gz": "5625d394aaf3d6a8d87b197ca4da2d728ee5a3c117717dbc97ca92959e2b69fc"
+  }
+}

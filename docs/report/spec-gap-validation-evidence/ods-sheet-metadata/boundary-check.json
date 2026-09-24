@@ -1,0 +1,15 @@
+{
+  "command": "python3 tools/check_crate_boundaries.py",
+  "exit_code": 0,
+  "workspace_packages": 65,
+  "internal_dependency_declarations": 241,
+  "existing_migration_debt_items": 11,
+  "scope": "Current worktree topology; unchanged ODS dependency manifest. This is not an all-feature runtime gate.",
+  "inputs_sha256": {
+    "tools/check_crate_boundaries.py": "75ca53760f5506dad053ef575ae50b44d9609ab1841456306be0e45965e6e12a",
+    "tools/crate_boundaries.json": "83cd3e394b95d81a1596f4452426ddad10182dd89437e1111d41d044efae4b95",
+    "Cargo.toml": "650c381d29558d9f818fa98fb0c1afcd412a83cd7edb846779ce89afb9c2e1c8",
+    "crates/litchi-ods/Cargo.toml": "8b0aa977a404eadf4b466f9aa1dcb871c3b5cf18a7462fa3fe11ace65278ace1"
+  },
+  "verified_utc": "2026-09-13T02:05:13.475415+00:00"
+}

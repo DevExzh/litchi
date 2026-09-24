@@ -1,0 +1,5 @@
+OTH typed body structures and reversible edits
+
+Adds lazy bounded table, section, note, annotation, tracked-change, index, frame and ruby projections, with source-checked structure text/lifecycle edits and durable reversible patches. Stable identities preserve target selection when an earlier structure is removed. Semantic local-reference checks decode XML/URI forms without fetching external data. Unsupported rich edits remain explicit in the feature matrix.
+
+Root validated the isolated 18-path candidate and reconciled the existing owned primary changes by exact preimage/final hashes. The equivalent Edit::join is_empty rewrite supersedes the old iterator condition. Full OTH tests passed 56 ordinary tests and zero doctests; strict all-target Clippy, warning-denied rustdoc and scoped rustfmt passed. Root commands were cargo +1.95.0 test -p litchi-oth --all-features --no-fail-fast; clippy -p litchi-oth --all-features --all-targets -- -D warnings; and doc -p litchi-oth --all-features --no-deps with RUSTDOCFLAGS=-D warnings. The preparer reconciliation archive describes test coverage as all-target; the root test command above is authoritative.

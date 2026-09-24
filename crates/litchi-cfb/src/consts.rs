@@ -28,6 +28,17 @@ pub const SECTOR_SHIFT_V3: u8 = 9;
 /// Default sector size for version 4 (4096 bytes)
 pub const SECTOR_SIZE_V4: usize = 4096;
 
+/// The 4,096-byte sector whose final 256 bytes cover the MS-CFB range-lock
+/// offsets `0x7FFFFF00..=0x7FFFFFFF`.
+///
+/// Sector `n` begins at `(n + 1) * 4096` because the compound-file header
+/// occupies the first sector.  The range-lock sector therefore starts at
+/// `0x7FFFF000` and has sector number `0x7FFFE`.
+pub const RANGE_LOCK_SECTOR_V4: u32 = 0x0007_FFFE;
+
+/// The first byte after the 2-GiB compatibility boundary.
+pub const TWO_GIB_BYTES: u64 = 1_u64 << 31;
+
 // Sector IDs (from AAF specifications)
 /// Maximum regular sector ID
 pub const MAXREGSECT: u32 = 0xFFFF_FFFA; // -6

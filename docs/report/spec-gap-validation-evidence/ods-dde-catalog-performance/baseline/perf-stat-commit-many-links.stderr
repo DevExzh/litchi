@@ -1,0 +1,11 @@
+
+ Performance counter stats for '/var/tmp/ods-dde-catalog-baseline-target/release/ods-dde-transaction-profile --workload commit --case many-links --warmups 3 --iterations 15' (3 runs):
+
+        2524659326      cycles                                                                  ( +-  0.13% )
+        9066905369      instructions                                                            ( +-  0.00% )
+        2118541345      branches                                                                ( +-  0.00% )
+           2846352      branch-misses                                                           ( +-  1.37% )
+           1169384      cache-misses                                                            ( +-  0.07% )
+             19914      page-faults                                                             ( +-  0.00% )
+
+       0.571599973 +- 0.010118400 seconds time elapsed  ( +-  1.77% )

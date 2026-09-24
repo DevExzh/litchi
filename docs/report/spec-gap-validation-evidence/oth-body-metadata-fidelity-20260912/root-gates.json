@@ -1,0 +1,81 @@
+{
+  "source_sha256": {
+    "crates/litchi-oth/src/codec/structure.rs": "66b89cd91446286aa7d8b7233a7859dab8cf7246cc3a87fe53d2b0edbb37fc59",
+    "crates/litchi-oth/src/codec/structure/date.rs": "8761ffb181feddf98a1fdece5ec03ab2b71a62f0eed97431878bbb846c8e5ca9",
+    "crates/litchi-oth/src/codec/structure/namespace.rs": "9e666e9d146d8ba3a3b7734e25a78100cc07e556380d84f72cbf5e33d1c5d2b7",
+    "crates/litchi-oth/src/model/table.rs": "0e282e0f9b9ff209c3b156f32333994478e9903970402411dfc001f4a1360ac6",
+    "crates/litchi-oth/tests/body_metadata.rs": "69d9f9f47156eb396885be3a666e7090c0137a602ba5cffdaa8e8a68f5f65672",
+    "crates/litchi-oth/tests/body_structures.rs": "9580a36e84617f25a82bd348813ee2ff0f98a69ac21334d9e1236f21c8b99961"
+  },
+  "source_stable_during_gates": true,
+  "base_head": "37b7ff0ef1e5b3d04d50df4e8c961e3006f6352f",
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "environment": {
+    "TMPDIR": "/var/tmp",
+    "RUSTDOCFLAGS_for_rustdoc": "-D warnings"
+  },
+  "gates": [
+    {
+      "gate": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-oth",
+        "--all-targets",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "cb50b759d38f904bfba6f736d65e3245b1189e171837a5dbf98fb3d37974b953"
+    },
+    {
+      "gate": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "litchi-oth",
+        "--all-targets",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "5c01b0a4d1273fdc8182791e1bd06cec259fb35f2501e7c9d482949dd961fcb1"
+    },
+    {
+      "gate": "rustdoc",
+      "command": [
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "litchi-oth",
+        "--no-deps",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "363d5f5a5e54178ed91af6026cf15b8b0565ff1bfa0facff969d4b815f7d2bee"
+    },
+    {
+      "gate": "rustfmt",
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2024",
+        "--check",
+        "crates/litchi-oth/src/codec/structure.rs",
+        "crates/litchi-oth/src/codec/structure/date.rs",
+        "crates/litchi-oth/src/codec/structure/namespace.rs",
+        "crates/litchi-oth/src/model/table.rs",
+        "crates/litchi-oth/tests/body_metadata.rs",
+        "crates/litchi-oth/tests/body_structures.rs"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

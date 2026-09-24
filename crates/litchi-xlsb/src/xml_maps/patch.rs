@@ -137,6 +137,15 @@ impl Commit {
 
 fn restore_part(package: &mut OpcPackage, source: &SourcePart) -> Result<()> {
     if package.contains_part(&source.part_name) {
+        if source.content_type == super::package::WORKSHEET_CONTENT_TYPE {
+            let current = package.get_part(&source.part_name)?.blob().to_vec();
+            crate::worksheet_index::maintain(
+                package,
+                &source.part_name,
+                &current,
+                source.bytes.as_slice(),
+            )?;
+        }
         let part = package.get_part_mut(&source.part_name)?;
         part.set_content_type(source.content_type.clone())?;
         part.set_blob_shared(source.bytes.clone());

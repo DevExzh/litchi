@@ -1,0 +1,21 @@
+{
+  "base": "5d21e069d",
+  "file": "crates/litchi-ods/src/advanced.rs",
+  "sha256": "20eb69aa8402ac5c621efdf767a1069b89712f327e83d03d2f0a305a55e0822a",
+  "built_sha256": "20eb69aa8402ac5c621efdf767a1069b89712f327e83d03d2f0a305a55e0822a",
+  "cargo_lock_sha256": "aa945c79965460e74a64063e1c45396eaae7a68e71072730e2bc426cded22f02",
+  "test_scope": {
+    "library": 298,
+    "data_style_vocabulary": 47
+  },
+  "commands": [
+    "cargo test --locked -p litchi-ods --lib --offline",
+    "cargo test --locked -p litchi-ods --test data_style_vocabulary --offline",
+    "cargo clippy --locked -p litchi-ods --lib --offline -- -D warnings"
+  ],
+  "exits": {
+    "tests": 0,
+    "clippy": 0,
+    "focused": 0
+  }
+}

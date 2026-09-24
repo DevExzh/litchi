@@ -1,0 +1,6 @@
+    Checking litchi-odf-common v0.0.1 (/var/tmp/litchi-ods-source-root-wpza2cec/worktree/crates/litchi-odf-common)
+ Documenting litchi-odf-common v0.0.1 (/var/tmp/litchi-ods-source-root-wpza2cec/worktree/crates/litchi-odf-common)
+ Documenting litchi-ods v0.0.1 (/var/tmp/litchi-ods-source-root-wpza2cec/worktree/crates/litchi-ods)
+ Documenting litchi-odt v0.0.1 (/var/tmp/litchi-ods-source-root-wpza2cec/worktree/crates/litchi-odt)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.55s
+   Generated /var/tmp/litchi-ods-source-root-wpza2cec/target-isolated/doc/litchi_odf_common/index.html and 2 other files

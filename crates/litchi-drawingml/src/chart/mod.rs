@@ -78,6 +78,7 @@ pub mod axis;
 pub mod bubble;
 pub mod data;
 pub mod edit;
+pub mod extension;
 pub mod legend;
 pub mod model;
 pub mod plot_area;

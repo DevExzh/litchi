@@ -1,0 +1,34 @@
+{
+  "experiment": "remove #[inline] bump_component, #[cold] limit_error, #[inline] copy_component",
+  "order": [
+    {
+      "label": "round-1-baseline",
+      "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/baseline/ods-formula-reference-profile",
+      "binary_sha256": "421a788fe9c2199bc4b224f4bcc05bb19c15c0ea6d0b61bf56ffe45f764bd274",
+      "status": 0,
+      "elapsed_seconds": 0.27596473693847656
+    },
+    {
+      "label": "round-2-annotation-removals",
+      "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/annotation-removals/ods-formula-reference-profile",
+      "binary_sha256": "e1054973ab6da8068f90728a2714d9cf505bafb8a37de8cd78280d231a224460",
+      "status": 0,
+      "elapsed_seconds": 0.27770352363586426
+    },
+    {
+      "label": "round-3-baseline",
+      "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/baseline/ods-formula-reference-profile",
+      "binary_sha256": "421a788fe9c2199bc4b224f4bcc05bb19c15c0ea6d0b61bf56ffe45f764bd274",
+      "status": 0,
+      "elapsed_seconds": 0.2762315273284912
+    },
+    {
+      "label": "round-4-annotation-removals",
+      "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/annotation-removals/ods-formula-reference-profile",
+      "binary_sha256": "e1054973ab6da8068f90728a2714d9cf505bafb8a37de8cd78280d231a224460",
+      "status": 0,
+      "elapsed_seconds": 0.2685694694519043
+    }
+  ],
+  "alternating": "baseline,annotation-removals,baseline,annotation-removals"
+}

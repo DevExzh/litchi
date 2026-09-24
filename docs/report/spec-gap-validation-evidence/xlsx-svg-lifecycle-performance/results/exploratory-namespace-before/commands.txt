@@ -1,0 +1,1 @@
+/usr/bin/time -v /var/tmp/litchi-xlsx-svg-namespace-isolated-source-1/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/target/release/xlsx-svg-lifecycle-profile --lane inventory_shared_root_namespace_32 --warmup 0 --samples 1 (fresh_process=1)

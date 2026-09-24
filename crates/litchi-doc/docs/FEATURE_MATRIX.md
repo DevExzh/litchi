@@ -86,6 +86,38 @@ coverage of a genuine Word 97 floating-picture donor whose producer graph is
 outside the canonical slice. The suite does not claim a native Word or
 LibreOffice changed-save result.
 
+## Auxiliary structures: explicit public coverage
+
+These rows expand the aggregate auxiliary-table entries below. A public binary
+codec does not by itself provide package-level CRUD; the Notes column names
+that boundary. Record names refer to the checked-in [MS-DOC] structures.
+
+| Feature | Status | Read | Write | Notes |
+|---------|--------|------|-------|-------|
+| AutoText and attached glossary (`PlcfGlsy`, `SttbfGlsy`, `SttbGlsyStyle`, `LEGOXTR_V11`) | 🟡 | ✅ | 🟡 | `Document::{glossary_metadata,glossary_item_text,attached_glossary}` exposes metadata and selected content, including the secondary FIB. `Writer` can set/clear glossary metadata and attached glossary documents; `GlossaryMetadata::to_table_bytes` encodes tables. This is not arbitrary opened-template glossary transaction support. |
+| Word 2003 XML schema references (`Hplxsdr`, `XSDR`, `TIQ`) | 🟡 | ✅ | ❌ | `Document::xml_schemas()` returns typed schema and name references through `parts::xml_schemas`; schema URIs remain inert. No semantic schema-table writer or external schema resolver. |
+| Structured document tags (`SttbfBkmkSdt`, SDT bookmark PLCs, `SDTI`) | 🟡 | ✅ | ❌ | `Document::structured_tags()` exposes the checked `parts::structured_tags` projection; no general tag authoring or binding evaluation. |
+| Format consistency checker marks (`SttbfBkmkFcc`, `DPCID`) | 🟡 | ✅ | ❌ | `Document::format_consistency_marks()` returns typed ranges and metadata; no checker execution or dedicated mark editor. |
+| Text Services Framework tables (`Plcfuim`, `PlfguidUim`, `UIM`) | 🟡 | ✅ | 🟡 | `Document::text_services_tables()` exposes validated records/GUIDs. Public record/table encoders retain inert values; they do not attach an input service or provide an ordinary package transaction. |
+| Grammar checker cookies (`Plcfcookie` and legacy cookies) | 🟡 | ✅ | 🟡 | `Document::grammar_cookie_tables()` returns current/legacy cookie tables; checked record/table codecs serialize the values. No grammar checking or ordinary cookie-table package editor. |
+| Language auto-detection state (`Plcflad`, `LadSpls`) | 🟡 | ✅ | 🟡 | `Document::proofing_tables().language_detection()` exposes ranges/states through the fallible proofing accessor. `parts::proofing` supplies table encoding and in-memory set/remove; this does not detect languages. |
+| Table character cache (`PlcfTch`) | 🟡 | ✅ | 🟡 | `Document::table_character_cache()` exposes checked CP ranges and `TableCharInfo`; `TableCharacterCache::to_bytes` serializes a table. No cache regeneration or standalone package editor. |
+| E-mail revision threading (`RmdThreading`) | 🟡 | ✅ | ❌ | `Document::rmd_threading()` exposes messages, display metadata, author indices, and personal styles. No mail transport, threading engine, or semantic writer. |
+| Repair bookmarks (`SttbfBkmkBPRepairs` and companion PLCs) | 🟡 | ✅ | 🟡 | `Document::repair_bookmarks()` exposes retained repair ranges. `DocumentRepairBookmarks::to_bytes` encodes the three tables; it does not apply repairs or provide an ordinary repair-bookmark transaction. |
+| Annotation bookmarks (`SttbfAtnBkmk`) | ✅ | ✅ | ✅ | `parts::annotation_bookmarks` provides typed tags, source-checked transactions/inverse patches, and a package `Editor` that supports insert/replace/remove/clear. Annotation-tag edits are distinct from rewriting comment stories. |
+| Embedded font descriptions (`SttbTtmbd`) | 🟡 | ✅ | ❌ | `Document::embedded_fonts()` exposes font indices, source offsets, bold/italic flags, and subset order. This row covers descriptions only; no font-program interpretation or dedicated description authoring. |
+| VBA digital-signature storage (`DigitalSignature` PIDDSI and `StwUser` `Sign`/`SigAgile`/`SigV3`) | 🟡 | ✅ | 🟡 | `Package::vba_signature()` and the property-set snapshot/transaction facade expose bounded, inert `DigSigBlob` reads and source-preserving opaque signature/certificate-store edits. `Document::vba_signatures()` defers bounded `StwUser`/`WordSigBlob` reads and caches the first range or parse error. The PKCS#7 `SignedData`, `contentInfo` form (`SpcIndirectDataContent` versus `SpcIndirectDataContentV2`), certificate trust, project activation, and `StwUser` writing remain outside this owner. |
+| Saved selection (`Selsf`, `fcWss`) | 🟡 | ✅ | 🟡 | `Document::saved_selection()` defers a bounded typed read of the main-document selection flags, CP anchors, and validated `BlockSel`/`TableSel` geometry. `SavedSelection::transaction()` produces source-checked reversible patches; `body_text::Snapshot`/`Edit` publish same-length patches through the DOC commit/reopen path without exposing FIB or mutable table streams. Main-story length changes remap absolute Selsf CPs at proven splice boundaries and refuse only ambiguous interior or insertion-point transitions; replayed text patches apply the same remap. It never applies UI selection state. |
+| Paragraph-group properties (`PGPArray`, `PGPInfo`, `PGPOptions`) | 🟡 | ✅ | ❌ | `Document::paragraph_groups()` defers bounded typed PGP identifiers, table depth, presence bits, margins, HTML block type, raw `Brc` bytes, and future option bytes. No paragraph-layout application or PGP writer is provided. |
+| Print metadata (`PrDrvr`, `PrEnvPort`, `PrEnvLand`) | 🟡 | ✅ | ❌ | `Document::print_environment()` defers bounded four-string driver metadata and exact ignored portrait/landscape printer blobs. No printer access, pagination, or print-settings writer is provided. |
+| Frame/list records (`RgDofr`, `Dofr`) | 🟡 | ✅ | 🟡 | `Document::dofr_records()` exposes bounded `Dofrh` boundaries, typed frame/list payloads, and retained unknown payload bytes. Same-length complete-record replacements produce source-checked reversible patches; `body_text::Snapshot`/`Edit` publish them through the DOC commit/reopen path without exposing FIB or mutable table streams. No frame renderer, external-file resolution, or list-style application is provided. |
+
+### Unmodeled FIB tables
+
+No `RgDofr`/`Dofr` subtable remains in this auxiliary gap list. The bounded
+reader intentionally stops at passive record semantics; renderer and list-style
+execution remain outside the DOC package API.
+
 ## Core Word binary document model
 
 | Feature | Status | Read | Write | Notes |

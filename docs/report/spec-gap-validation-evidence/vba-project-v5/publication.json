@@ -1,0 +1,204 @@
+{
+  "base": "2983c4386048742298098aaa76d110acd141a635",
+  "source_sha256": {
+    "crates/litchi-vba/src/build.rs": "61b784c341a4da50d328b3e47884f6e3b9f25cd3a062c831b49ff680e8f3bfba",
+    "crates/litchi-vba/src/dir.rs": "939659dc8c1fcf7b6b59c4888b765bd26dcb75b3e4ae5aea5a39138fcfa670ae",
+    "crates/litchi-vba/src/lib.rs": "90e47886ac417b89d8308351fc829aeedb8d669f2121eafd8a5cdca4878545ed",
+    "crates/litchi-vba/src/project.rs": "5642cb5a978dadb3eaa3f9a5444ccb1826d486ef4830ebf93d90cd7680aa9958",
+    "crates/litchi-vba/tests/real_ooxml_fixtures.rs": "46751f46a64ef67d8d06371823398bb645186f4d3603e3f4b33f7f8587a33999"
+  },
+  "artifacts": [
+    {
+      "artifact": "root-gates.json.gz",
+      "original_path": "/var/tmp/litchi-vba-v5-root-298-20260910/gates.json",
+      "raw_sha256": "2f0350fcf3d43c59237cc5d4e18737023aeb5ad5cb48ed9fd242121c8e098fa7",
+      "gzip_sha256": "3f6da6434fa32bff265b9fcfb0f7bc84885c31a6c939409ad4e5459343cb899b"
+    },
+    {
+      "artifact": "root-test-counts.json.gz",
+      "original_path": "/var/tmp/litchi-vba-v5-root-298-20260910/test-counts.json",
+      "raw_sha256": "dd3b1cd2a4e634d46552f142d799a860f0090a533d3a77cf30f868ca3fea9c4d",
+      "gzip_sha256": "4d90927d4f1ab8d7725ffd7ec8b9b4603b6377d23f644df6a574c04e85345578"
+    },
+    {
+      "artifact": "root-clippy.log.gz",
+      "original_path": "/var/tmp/litchi-vba-v5-root-298-20260910/clippy.log",
+      "raw_sha256": "de676c1df1d33173424a1f0611fdda92932de38bdc3f1ea9639cd83612e7a3e3",
+      "gzip_sha256": "601c7ddadad001d2244c9c12bbaac3ac6197bd98c5be8e178b2cbd34d3005277"
+    },
+    {
+      "artifact": "root-source-after.json.gz",
+      "original_path": "/var/tmp/litchi-vba-v5-root-298-20260910/source-after.json",
+      "raw_sha256": "6a105fe398ce657f0ec84cfe5245a0776d9413cf087ce4b5810befbe5bf54599",
+      "gzip_sha256": "19905e371dde3f2501de9f276e4741bd9670295dbbe0d7cff3b3261ea47203eb"
+    },
+    {
+      "artifact": "root-integration.json.gz",
+      "original_path": "/var/tmp/litchi-vba-v5-root-298-20260910/integration.json",
+      "raw_sha256": "0fe12aea276ec0d909abea0b1997287d05cb13e7cacb4a92685ad09c05dfbb19",
+      "gzip_sha256": "037d1a4ba5b7498834084ba3d0e697fe15b30bf7bb64b3176510137473a9d050"
+    },
+    {
+      "artifact": "root-rustfmt.log.gz",
+      "original_path": "/var/tmp/litchi-vba-v5-root-298-20260910/rustfmt.log",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "artifact": "root-test.log.gz",
+      "original_path": "/var/tmp/litchi-vba-v5-root-298-20260910/test.log",
+      "raw_sha256": "43150819510c53e088b0b275d0c60fa966005b8e1c01c3d9b25795c59c1ed1a3",
+      "gzip_sha256": "ca7fac7601ac1e0b0df16e87c74cc1e0b0d7803ac5f29598f2c7f28793e88133"
+    },
+    {
+      "artifact": "root-rustdoc.log.gz",
+      "original_path": "/var/tmp/litchi-vba-v5-root-298-20260910/rustdoc.log",
+      "raw_sha256": "7f3d542f925ee64c3a5231b08bf6ebf31f8b4b76df4be3aefcc1f9a67b958bfb",
+      "gzip_sha256": "c157717f736c075bd115ea42d53bea0782a360e72c2e040904565d07cf3c9e0d"
+    },
+    {
+      "artifact": "author-candidate-manifest-v5.json.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/candidate-manifest-v5.json",
+      "raw_sha256": "e76e15b3e448ef98ce65107f81deb7419a171a5943ef5823ad143d6119e9e6b7",
+      "gzip_sha256": "68810a41b4151cdc1cb7847be5e6bcfb407c6510adbdb2b2c6a633a7fc038d31"
+    },
+    {
+      "artifact": "author-independent-review-v4-receipt.md.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/independent-review-v4-receipt.md",
+      "raw_sha256": "eba838aba7df214ae243887f074178b968498d99c3ef7363be218f00c5b785b9",
+      "gzip_sha256": "a790bd215c08cd5a4b3d2ceb15aba597c4655adec00634eac75edd7364eec12e"
+    },
+    {
+      "artifact": "author-README.md.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/README.md",
+      "raw_sha256": "38529c93b9fcdea4f34e74a3ff7d5c010586dd872679e3b7615dd707a4e61b96",
+      "gzip_sha256": "6d9f343fb5467ebd9caef2b9c784d1fd6061013ac5de3379092dfa76f7bda0ef"
+    },
+    {
+      "artifact": "author-candidate-manifest-v4.json.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/candidate-manifest-v4.json",
+      "raw_sha256": "6261e5057ac01d5055c4a17c379f5d5289b56d4dc769784fb556f3f9c1c4590c",
+      "gzip_sha256": "36d2858eacf7b83992e785684157c0ce39774c581214b9f64ac39f691d5fbbf8"
+    },
+    {
+      "artifact": "author-litchi-vba-independent-v5-deep.log.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/litchi-vba-independent-v5-deep.log",
+      "raw_sha256": "b2f02ff11557d53bc86fa55f130ddcac81b1d4e8e00a9927ac801b53cdd74b09",
+      "gzip_sha256": "c80190c343edc430953bd64845f9a4a306da49cc256117d11d11bb738b3b2ac3"
+    },
+    {
+      "artifact": "author-litchi-vba-pending-v5-diff-check.log.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/litchi-vba-pending-v5-diff-check.log",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "artifact": "author-litchi-vba-independent-v5-codepages.log.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/litchi-vba-independent-v5-codepages.log",
+      "raw_sha256": "3c75f37bbf5378482f37ddc43df4f20714a85534680e394814663805c314debd",
+      "gzip_sha256": "5b436498c3874e04a29b29803bba5f74b520ceda05c7fcd698860fc5ae9c89a4"
+    },
+    {
+      "artifact": "author-litchi-vba-pending-v5-rustdoc.log.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/litchi-vba-pending-v5-rustdoc.log",
+      "raw_sha256": "94f9a5e8b20f4f8b3cea855c915589113cddc7d670f98933cd171d1805e90cb9",
+      "gzip_sha256": "e6040580707053e827bae7729f1368d2737a792cf05aaed8a7ca0ca46c35a6ee"
+    },
+    {
+      "artifact": "author-litchi-vba-independent-v5-alloc-wm.log.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/litchi-vba-independent-v5-alloc-wm.log",
+      "raw_sha256": "9da6d10722752465edd753d6bb056e1339c90386de611972c4cd8f66d7458143",
+      "gzip_sha256": "44fb76f922069986e2ed24f3f55e1be9dded0776a1f9371a5e60bcc83c2e5410"
+    },
+    {
+      "artifact": "author-litchi-vba-pending-v5-tests.log.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/litchi-vba-pending-v5-tests.log",
+      "raw_sha256": "d55e4612449fbfbe69ba87f74ba4a83bbea570e31c7d52d5bc49366040040376",
+      "gzip_sha256": "57d555239f46de7b04462bd9e7e47386a7428d231d9929d1518f3e7c4c58d8e2"
+    },
+    {
+      "artifact": "author-v5-delta-from-v4.patch.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/v5-delta-from-v4.patch",
+      "raw_sha256": "ade2854c80c5b6ead4638f7f3c515ccce32e550bb1346bcc3f2f9efdf7fb00a6",
+      "gzip_sha256": "2c31c30b546e0d5b7ebf10eca2feb50fa902ef2cdbf5630e9b948fd06f3f32ba"
+    },
+    {
+      "artifact": "author-independent-review-v3-receipt.md.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/independent-review-v3-receipt.md",
+      "raw_sha256": "22266fbb393dc9500bc3d59412ae3cb534270565cdb7ddf760dc5ef6ffd435ba",
+      "gzip_sha256": "28c9d494013c06df19c07e74717c194687c2d583fa0d76fccdb8273c002f3460"
+    },
+    {
+      "artifact": "author-litchi-vba-pending-v5-rustfmt.log.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/litchi-vba-pending-v5-rustfmt.log",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "artifact": "author-commands.txt.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/commands.txt",
+      "raw_sha256": "a6a21a06e4c835b8cd1b68a5f49fe951772cc31878f601a19dbb1daa4f4076b9",
+      "gzip_sha256": "a0820c10cff0999c4e7c00ef6f55c1f62c281148b03fd40e3faff1ff38970333"
+    },
+    {
+      "artifact": "author-review-findings-v4.md.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/review-findings-v4.md",
+      "raw_sha256": "895322e2aca89e35532f2b12df896fa4e1331ce860029fd457a787f5efb993c6",
+      "gzip_sha256": "41940617f966bd2bc753749e0e7057b865caa9abb57e47ef3dbe8967198d7b11"
+    },
+    {
+      "artifact": "author-codepages.rs.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/codepages.rs",
+      "raw_sha256": "91062aa0689bc48474eab919bdb2f8a2972cab87bf4c945c12b857c18faa474f",
+      "gzip_sha256": "7507278bccefcd2ed18ef26ef0c4c86b0899c35529f2ee62ce85dacd2b0a78b9"
+    },
+    {
+      "artifact": "author-litchi-vba-pending-v5-clippy.log.gz",
+      "original_path": "/var/tmp/litchi-vba-pending-validation-v5-evidence-20260910/litchi-vba-pending-v5-clippy.log",
+      "raw_sha256": "f8039f4791654c383864f53a3be471e8ae5bebe9fd44d62ac258a6028788e7cd",
+      "gzip_sha256": "1b4c6a09b14e966314dd5cda60484b6444bbf9c029ed8093e16ea055291d2680"
+    },
+    {
+      "artifact": "independent-full-adjudication.md.gz",
+      "original_path": "/var/tmp/litchi-vba-independent-v5-full-candidate-adjudication.md",
+      "raw_sha256": "acd09c56eff15214c58520b5fe7c33395bb0c1128e5169f6ae36a3c3857c5cef",
+      "gzip_sha256": "5f0eb9e57e5135a4d765147d93c7f72185f013762c60a5c42dad18239ec7e0dd"
+    },
+    {
+      "artifact": "independent-v5-review.md.gz",
+      "original_path": "/var/tmp/litchi-vba-independent-v5-review-receipt.md",
+      "raw_sha256": "af8dbd9011b29f3a3e557784870200e5b0a01cb7cd2baf8233a04340c9ec3fdb",
+      "gzip_sha256": "247b549fdc568f56eb77ec14c7efc58b5b369756785b04dcda796937325c68da"
+    },
+    {
+      "artifact": "independent-v4-review.md.gz",
+      "original_path": "/var/tmp/litchi-vba-independent-review-v4-receipt-20260910.md",
+      "raw_sha256": "eba838aba7df214ae243887f074178b968498d99c3ef7363be218f00c5b785b9",
+      "gzip_sha256": "a790bd215c08cd5a4b3d2ceb15aba597c4655adec00634eac75edd7364eec12e"
+    },
+    {
+      "artifact": "independent-v3-review.md.gz",
+      "original_path": "/var/tmp/litchi-vba-independent-review-v3-receipt-20260910.md",
+      "raw_sha256": "22266fbb393dc9500bc3d59412ae3cb534270565cdb7ddf760dc5ef6ffd435ba",
+      "gzip_sha256": "28c9d494013c06df19c07e74717c194687c2d583fa0d76fccdb8273c002f3460"
+    },
+    {
+      "artifact": "independent-v2-review.md.gz",
+      "original_path": "/var/tmp/litchi-vba-independent-review-v2-receipt-20260910.md",
+      "raw_sha256": "e7bfda77c55d25c95e00fe6e5fa41cd3228dc2f7d48964fc5070ef7084676a36",
+      "gzip_sha256": "b0c70a414c68b548019f88aabbf8f4038eac44ccc838e7f32e2cf111f2d4188a"
+    },
+    {
+      "artifact": "primary-preimages.tar.gz",
+      "raw_sha256": "f2bef4ea19eb511a077670f42e5ebf3891b32526311ddc8d1a628a942c283c1f",
+      "gzip_sha256": "2c15fd607dd1967e6351a416dad395f965c8335e884fa178d22b7bab3dc412d5"
+    }
+  ],
+  "validation": {
+    "passed": 47,
+    "failed": 0,
+    "ignored": 0,
+    "targets": 3
+  },
+  "independent_status": "cumulative scoped CLEAR for this five-path inert feature"
+}

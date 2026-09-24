@@ -1,0 +1,10 @@
+{
+  "candidate": "/var/tmp/litchi-doc-source-owner-publication-validation-20260910",
+  "base": "ce0be842b60a28db142b795389e24be5bde8ae07",
+  "sources": {
+    "crates/litchi-doc/src/embedded_object/tests.rs": "ba8ae340fbfbe7e3663c548e75ce0682d7cf63815e8b6585da2a1fe5b56347f0",
+    "crates/litchi-doc/src/embedded_object/transaction/edit.rs": "033316ae4ae2e0a2e1729c80b468c5aa5d83dccecfdeed78085d27a4ded7682d",
+    "crates/litchi-doc/src/embedded_object/transaction/patch.rs": "6783119c2628b3f3843752986d07dc6794f40a217515779e562309a3d9f5072b",
+    "crates/litchi-doc/src/embedded_object/transaction/snapshot.rs": "2c96f296758c0e0f080ee70c68affe4e3ebc436d21501b91b571035695a44b4d"
+  }
+}

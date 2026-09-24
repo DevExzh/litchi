@@ -32,6 +32,13 @@ use std::sync::Arc;
 
 use crate::document::ParagraphHyperlinkAddress;
 
+mod source;
+#[allow(
+    unused_imports,
+    reason = "source-backed consumers use the inventory and part types as they land"
+)]
+pub(crate) use source::{SourceStoryInventory, SourceStoryPart, capture_source};
+
 const TRANSITIONAL_RELATIONSHIPS: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
 const STRICT_RELATIONSHIPS: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/";
@@ -537,7 +544,9 @@ pub(crate) fn capture_with_policy(
         .iter()
         .position(|story| story.part == main)
         .ok_or_else(|| invalid("resolved main document disappeared during story capture"))?;
-    stories.swap(0, main_index);
+    // Move the main story to the front without disturbing the canonical order
+    // of the remaining stories, which defines snapshot-local positions.
+    stories[..=main_index].rotate_right(1);
     let topology = encode_topology(&stories, limits.max_topology_bytes)?;
     Ok(StoryInventory {
         main,

@@ -358,6 +358,23 @@ impl Snapshot {
         crate::content::inventory(&self.package)
     }
 
+    /// Inspect typed drawing-layer declarations without eagerly materializing
+    /// them during snapshot opening.
+    pub fn layers(&self) -> Result<crate::model::LayerInventory> {
+        let content = String::from_utf8(self.package.get_file("content.xml")?)
+            .map_err(|error| invalid_error(format!("ODP content.xml is not UTF-8: {error}")))?;
+        let styles = if self.package.has_file("styles.xml")? {
+            Some(
+                String::from_utf8(self.package.get_file("styles.xml")?).map_err(|error| {
+                    invalid_error(format!("ODP styles.xml is not UTF-8: {error}"))
+                })?,
+            )
+        } else {
+            None
+        };
+        crate::model::layer::inventory(&content, styles.as_deref())
+    }
+
     /// Select a slide by checked zero-based position or exact title.
     ///
     /// # Errors
@@ -392,6 +409,7 @@ impl Snapshot {
             design: None,
             annotations: None,
             content: None,
+            layer_operations: Vec::new(),
             media_bytes: 0,
             resource_bytes: self.resource_bytes,
             source_resource_bytes: self.resource_bytes,
@@ -464,6 +482,7 @@ pub struct Transaction {
     design: Option<DesignDraft>,
     annotations: Option<AnnotationDraft>,
     content: Option<ContentDraft>,
+    layer_operations: Vec<crate::authoring::layer::Operation>,
     media_bytes: usize,
     resource_bytes: usize,
     source_resource_bytes: usize,
@@ -653,6 +672,131 @@ impl Transaction {
     #[must_use]
     pub fn slides(&self) -> &[Slide] {
         self.draft.slides()
+    }
+
+    /// Inspect drawing-layer declarations in the current transaction draft.
+    ///
+    /// The inventory is rebuilt from the source-bound XML after replaying the
+    /// staged layer operations.  Unknown XML remains outside this typed view.
+    pub fn layers(&self) -> Result<crate::model::LayerInventory> {
+        let package = self.layer_package()?;
+        crate::authoring::layer::inventory(&package)
+    }
+
+    /// Add a drawing layer to a selected global, page-local, or master-page
+    /// declaration owner.
+    pub fn add_layer(
+        &mut self,
+        owner: crate::model::LayerOwner,
+        layer: crate::model::Layer,
+    ) -> Result<()> {
+        self.stage_layer(crate::authoring::layer::Operation::Add { owner, layer })
+    }
+
+    /// Add a global layer declared in `office:master-styles`.
+    pub fn add_global_layer(&mut self, layer: crate::model::Layer) -> Result<()> {
+        self.add_layer(crate::model::LayerOwner::master_styles(), layer)
+    }
+
+    /// Add a layer declared directly by a presentation page.
+    pub fn add_page_layer(&mut self, page: usize, layer: crate::model::Layer) -> Result<()> {
+        self.add_layer(crate::model::LayerOwner::page(page), layer)
+    }
+
+    /// Add a layer declared directly by a named master page.
+    pub fn add_master_page_layer(
+        &mut self,
+        master_page: impl Into<String>,
+        layer: crate::model::Layer,
+    ) -> Result<()> {
+        self.add_layer(crate::model::LayerOwner::master_page(master_page), layer)
+    }
+
+    /// Rename a layer and every shape reference resolved to the same owner.
+    pub fn rename_layer(
+        &mut self,
+        owner: crate::model::LayerOwner,
+        from: &str,
+        to: &str,
+    ) -> Result<()> {
+        self.stage_layer(crate::authoring::layer::Operation::Rename {
+            owner,
+            from: from.to_owned(),
+            to: to.to_owned(),
+        })
+    }
+
+    /// Rename a global layer and its resolved shape references.
+    pub fn rename_global_layer(&mut self, from: &str, to: &str) -> Result<()> {
+        self.rename_layer(crate::model::LayerOwner::master_styles(), from, to)
+    }
+
+    /// Rename a page-local layer and its resolved shape references.
+    pub fn rename_page_layer(&mut self, page: usize, from: &str, to: &str) -> Result<()> {
+        self.rename_layer(crate::model::LayerOwner::page(page), from, to)
+    }
+
+    /// Rename a master-page-local layer and its resolved shape references.
+    pub fn rename_master_page_layer(
+        &mut self,
+        master_page: impl Into<String>,
+        from: &str,
+        to: &str,
+    ) -> Result<()> {
+        self.rename_layer(crate::model::LayerOwner::master_page(master_page), from, to)
+    }
+
+    /// Remove an unreferenced layer, returning its detached declaration.
+    pub fn remove_layer(
+        &mut self,
+        owner: crate::model::LayerOwner,
+        name: &str,
+    ) -> Result<crate::model::Layer> {
+        self.remove_layer_with_replacement(owner, name, None)
+    }
+
+    /// Remove a layer, optionally retargeting its resolved shape references to
+    /// another declaration in the same owner.
+    pub fn remove_layer_with_replacement(
+        &mut self,
+        owner: crate::model::LayerOwner,
+        name: &str,
+        replacement: Option<&str>,
+    ) -> Result<crate::model::Layer> {
+        let inventory = self.layers()?;
+        let selected = inventory
+            .sets()
+            .iter()
+            .find(|set| set.owner() == &owner)
+            .ok_or_else(|| invalid_error("selected ODP layer owner has no layer-set"))?
+            .get(name)?
+            .cloned()
+            .ok_or_else(|| invalid_error("selected ODP layer does not exist"))?;
+        self.stage_layer(crate::authoring::layer::Operation::Remove {
+            owner,
+            name: name.to_owned(),
+            replacement: replacement.map(str::to_owned),
+        })?;
+        Ok(selected)
+    }
+
+    /// Remove a global layer without retargeting references.
+    pub fn remove_global_layer(&mut self, name: &str) -> Result<crate::model::Layer> {
+        self.remove_layer(crate::model::LayerOwner::master_styles(), name)
+    }
+
+    /// Remove a page-local layer without retargeting references.
+    pub fn remove_page_layer(&mut self, page: usize, name: &str) -> Result<crate::model::Layer> {
+        self.remove_layer(crate::model::LayerOwner::page(page), name)
+    }
+
+    /// Remove a master-page-local layer without retargeting references.
+    pub fn remove_master_page_layer(
+        &mut self,
+        master_page: impl Into<String>,
+        name: &str,
+    ) -> Result<crate::model::Layer> {
+        self.remove_layer(crate::model::LayerOwner::master_page(master_page), name)
     }
 
     /// Return the identity of the validated archive index retained by the
@@ -2188,12 +2332,19 @@ impl Transaction {
             .content
             .as_ref()
             .is_some_and(|draft| !draft.operations.is_empty());
+        let layer_changed = !self.layer_operations.is_empty();
+        let expected_layers = if layer_changed {
+            Some(self.layers()?)
+        } else {
+            None
+        };
         let slide_only = self.changed
             && !rdf_changed
             && !charts_changed
             && !design_changed
             && !annotations_changed
-            && !content_changed;
+            && !content_changed
+            && !layer_changed;
         let mut domains = Vec::new();
         if self.changed {
             domains.push(Domain::Slides);
@@ -2204,7 +2355,7 @@ impl Transaction {
         if charts_changed {
             domains.push(Domain::Charts);
         }
-        if design_changed {
+        if design_changed || layer_changed {
             domains.push(Domain::Design);
         }
         if annotations_changed {
@@ -2219,6 +2370,7 @@ impl Transaction {
             && !design_changed
             && !annotations_changed
             && !content_changed
+            && !layer_changed
         {
             return Ok(Commit::unchanged(self.source));
         }
@@ -2234,10 +2386,23 @@ impl Transaction {
             let package = self.source.package.clone();
             (package.shared_bytes(), package, None, None)
         };
+        if layer_changed {
+            for operation in &self.layer_operations {
+                let output = crate::authoring::layer::apply(&package, operation)?;
+                if output.len() > MAX_PACKAGE_BYTES {
+                    return invalid(
+                        "ODP drawing-layer transaction exceeds the 128 MiB package limit",
+                    );
+                }
+                package = OwnedPackage::from_bytes(output)?;
+                bytes = package.shared_bytes();
+                audit_proof = None;
+            }
+        }
         if let Some(design) = &self.design
             && !design.operations.is_empty()
         {
-            if self.changed {
+            if self.changed || layer_changed {
                 for operation in &design.operations {
                     let output = apply_design_operation(&package, operation)?;
                     if output.len() > MAX_PACKAGE_BYTES {
@@ -2256,7 +2421,7 @@ impl Transaction {
         if let Some(annotations) = &self.annotations
             && !annotations.operations.is_empty()
         {
-            if self.changed || design_changed {
+            if self.changed || design_changed || layer_changed {
                 for operation in &annotations.operations {
                     let output = apply_annotation_operation(&package, operation)?;
                     if output.len() > MAX_PACKAGE_BYTES {
@@ -2277,7 +2442,7 @@ impl Transaction {
         if let Some(rdf) = &self.rdf
             && !rdf.operations.is_empty()
         {
-            if self.changed || design_changed || annotations_changed {
+            if self.changed || design_changed || annotations_changed || layer_changed {
                 for operation in &rdf.operations {
                     let output = apply_rdf_operation(&package, operation)?;
                     if output.len() > MAX_PACKAGE_BYTES {
@@ -2296,7 +2461,8 @@ impl Transaction {
         if let Some(charts) = &self.charts
             && !charts.operations.is_empty()
         {
-            if self.changed || design_changed || annotations_changed || rdf_changed {
+            if self.changed || design_changed || annotations_changed || rdf_changed || layer_changed
+            {
                 for operation in &charts.operations {
                     let output = apply_chart_operation(&package, charts.limits, operation)?;
                     if output.len() > MAX_PACKAGE_BYTES {
@@ -2320,6 +2486,7 @@ impl Transaction {
                 || annotations_changed
                 || rdf_changed
                 || charts_changed
+                || layer_changed
             {
                 for operation in &content.operations {
                     let output = crate::content::apply(&package, operation)?;
@@ -2382,7 +2549,7 @@ impl Transaction {
                 return invalid("ODP transaction chart readback differs from the staged model");
             }
         }
-        let presentation = if design_changed || annotations_changed {
+        let presentation = if design_changed || annotations_changed || layer_changed {
             Some(Presentation::from_owned_package(reopened.clone())?)
         } else {
             None
@@ -2408,6 +2575,14 @@ impl Transaction {
                 );
             }
         }
+        if let Some(expected_layers) = expected_layers {
+            let presentation = presentation
+                .as_ref()
+                .ok_or_else(|| invalid_error("ODP layer readback presentation missing"))?;
+            if presentation.layers()? != expected_layers {
+                return invalid("ODP transaction layer readback differs from the staged model");
+            }
+        }
         let snapshot = match (slide_only, slide_candidate) {
             (true, Some(candidate)) => {
                 debug_assert!(Arc::ptr_eq(&candidate.bytes, &bytes));
@@ -2428,6 +2603,43 @@ impl Transaction {
             #[cfg(test)]
             publication_audit_hit,
         })
+    }
+
+    fn layer_package(&self) -> Result<OwnedPackage> {
+        let mut package = self.layer_base_package()?;
+        for operation in &self.layer_operations {
+            package =
+                OwnedPackage::from_bytes(crate::authoring::layer::apply(&package, operation)?)?;
+        }
+        Ok(package)
+    }
+
+    fn layer_base_package(&self) -> Result<OwnedPackage> {
+        if self.changed {
+            OwnedPackage::from_bytes(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)
+        } else {
+            Ok(self.source.package.clone())
+        }
+    }
+
+    fn stage_layer(&mut self, operation: crate::authoring::layer::Operation) -> Result<()> {
+        self.check_no_slide_order_change("drawing-layer")?;
+        let baseline = self.layer_base_package()?;
+        let package = self.layer_package()?;
+        let output = crate::authoring::layer::apply(&package, &operation)?;
+        if output == package.as_bytes() {
+            return Ok(());
+        }
+        if output.len() > MAX_PACKAGE_BYTES {
+            return invalid("ODP drawing-layer transaction exceeds the 128 MiB package limit");
+        }
+        let candidate = OwnedPackage::from_bytes(output)?;
+        if crate::authoring::layer::same_parts(&candidate, &baseline)? {
+            self.layer_operations.clear();
+        } else {
+            self.layer_operations.push(operation);
+        }
+        Ok(())
     }
 
     fn ensure_rdf(&mut self) -> Result<()> {
@@ -2816,9 +3028,11 @@ impl Transaction {
     }
 
     fn has_page_indexed_operations(&self) -> bool {
-        self.charts
-            .as_ref()
-            .is_some_and(|draft| !draft.operations.is_empty())
+        !self.layer_operations.is_empty()
+            || self
+                .charts
+                .as_ref()
+                .is_some_and(|draft| !draft.operations.is_empty())
             || self
                 .design
                 .as_ref()

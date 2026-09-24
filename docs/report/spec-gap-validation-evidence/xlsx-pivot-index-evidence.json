@@ -1,0 +1,256 @@
+{
+  "ecma": {
+    "archive": "3rdparty/specs/ECMA-376/ECMA-376-4_5th_edition_december_2016.zip",
+    "archive_sha256": "bd25da1109f73762356596918bf5ff8b74a1331642dba5f1c1d1dfc6bed34ecd",
+    "nested_archive": "OfficeOpenXML-XMLSchema-Transitional.zip",
+    "nested_sha256": "d34187520749998af306faf1b730e568b0ca6d88ad24638a407c0a9bb4ca04fc",
+    "schema": "sml.xsd",
+    "schema_sha256": "495debc8fa967b77ed37799747b049832f2c95b2ecdb9f19ddcd68f8c9f96ab9",
+    "types": {
+      "CT_CacheField": {
+        "attributes": [
+          {
+            "name": "name",
+            "type": "s:ST_Xstring",
+            "use": "required"
+          },
+          {
+            "name": "caption",
+            "type": "s:ST_Xstring",
+            "use": "optional"
+          },
+          {
+            "name": "propertyName",
+            "type": "s:ST_Xstring",
+            "use": "optional"
+          },
+          {
+            "default": "false",
+            "name": "serverField",
+            "type": "xsd:boolean",
+            "use": "optional"
+          },
+          {
+            "default": "true",
+            "name": "uniqueList",
+            "type": "xsd:boolean",
+            "use": "optional"
+          },
+          {
+            "name": "numFmtId",
+            "type": "ST_NumFmtId",
+            "use": "optional"
+          },
+          {
+            "name": "formula",
+            "type": "s:ST_Xstring",
+            "use": "optional"
+          },
+          {
+            "default": "0",
+            "name": "sqlType",
+            "type": "xsd:int",
+            "use": "optional"
+          },
+          {
+            "default": "0",
+            "name": "hierarchy",
+            "type": "xsd:int",
+            "use": "optional"
+          },
+          {
+            "default": "0",
+            "name": "level",
+            "type": "xsd:unsignedInt",
+            "use": "optional"
+          },
+          {
+            "default": "true",
+            "name": "databaseField",
+            "type": "xsd:boolean"
+          },
+          {
+            "name": "mappingCount",
+            "type": "xsd:unsignedInt",
+            "use": "optional"
+          },
+          {
+            "default": "false",
+            "name": "memberPropertyField",
+            "type": "xsd:boolean",
+            "use": "optional"
+          }
+        ],
+        "children": [
+          {
+            "maxOccurs": "1",
+            "minOccurs": "0",
+            "name": "sharedItems",
+            "type": "CT_SharedItems"
+          },
+          {
+            "minOccurs": "0",
+            "name": "fieldGroup",
+            "type": "CT_FieldGroup"
+          },
+          {
+            "maxOccurs": "unbounded",
+            "minOccurs": "0",
+            "name": "mpMap",
+            "type": "CT_X"
+          },
+          {
+            "minOccurs": "0",
+            "name": "extLst",
+            "type": "CT_ExtensionList"
+          }
+        ]
+      },
+      "CT_Items": {
+        "attributes": [
+          {
+            "name": "count",
+            "type": "xsd:unsignedInt"
+          }
+        ],
+        "children": [
+          {
+            "maxOccurs": "unbounded",
+            "name": "item",
+            "type": "CT_Item"
+          }
+        ]
+      },
+      "CT_SharedItems": {
+        "attributes": [
+          {
+            "default": "true",
+            "name": "containsSemiMixedTypes",
+            "type": "xsd:boolean",
+            "use": "optional"
+          },
+          {
+            "default": "true",
+            "name": "containsNonDate",
+            "type": "xsd:boolean",
+            "use": "optional"
+          },
+          {
+            "default": "false",
+            "name": "containsDate",
+            "type": "xsd:boolean",
+            "use": "optional"
+          },
+          {
+            "default": "true",
+            "name": "containsString",
+            "type": "xsd:boolean",
+            "use": "optional"
+          },
+          {
+            "default": "false",
+            "name": "containsBlank",
+            "type": "xsd:boolean",
+            "use": "optional"
+          },
+          {
+            "default": "false",
+            "name": "containsMixedTypes",
+            "type": "xsd:boolean",
+            "use": "optional"
+          },
+          {
+            "default": "false",
+            "name": "containsNumber",
+            "type": "xsd:boolean",
+            "use": "optional"
+          },
+          {
+            "default": "false",
+            "name": "containsInteger",
+            "type": "xsd:boolean",
+            "use": "optional"
+          },
+          {
+            "name": "minValue",
+            "type": "xsd:double",
+            "use": "optional"
+          },
+          {
+            "name": "maxValue",
+            "type": "xsd:double",
+            "use": "optional"
+          },
+          {
+            "name": "minDate",
+            "type": "xsd:dateTime",
+            "use": "optional"
+          },
+          {
+            "name": "maxDate",
+            "type": "xsd:dateTime",
+            "use": "optional"
+          },
+          {
+            "name": "count",
+            "type": "xsd:unsignedInt",
+            "use": "optional"
+          },
+          {
+            "default": "false",
+            "name": "longText",
+            "type": "xsd:boolean",
+            "use": "optional"
+          }
+        ],
+        "children": [
+          {
+            "maxOccurs": "1",
+            "minOccurs": "1",
+            "name": "m",
+            "type": "CT_Missing"
+          },
+          {
+            "maxOccurs": "1",
+            "minOccurs": "1",
+            "name": "n",
+            "type": "CT_Number"
+          },
+          {
+            "maxOccurs": "1",
+            "minOccurs": "1",
+            "name": "b",
+            "type": "CT_Boolean"
+          },
+          {
+            "maxOccurs": "1",
+            "minOccurs": "1",
+            "name": "e",
+            "type": "CT_Error"
+          },
+          {
+            "maxOccurs": "1",
+            "minOccurs": "1",
+            "name": "s",
+            "type": "CT_String"
+          },
+          {
+            "maxOccurs": "1",
+            "minOccurs": "1",
+            "name": "d",
+            "type": "CT_DateTime"
+          }
+        ]
+      }
+    }
+  },
+  "finding": "CT_CacheField declares sharedItems of CT_SharedItems, not an items child of CT_Items. A literal cacheField/items fixture is not justified by this schema.",
+  "ms_xlsx": {
+    "index_rule_summary": "The item index must be below CT_Items count associated with the ancestor CT_CacheField and unique in the collection.",
+    "path": "3rdparty/specs/[MS-XLSX]/2 Structures/2.6 Complex Types.md",
+    "section": "2.6.127 CT_CachedUniqueName",
+    "sha256": "7f3f51fc0d2827eb7075afe39c1ad2109e067612f87cb2fc949967ba2e71a2e3"
+  },
+  "next_step": "Establish whether the prose intends sharedItems using independent normative or producer evidence before claiming the item-index dependency is resolved.",
+  "scope": "Source-name discrepancy only; no producer acceptance or inferred index binding is asserted."
+}

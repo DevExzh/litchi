@@ -1,0 +1,16 @@
+{
+  "base_commit": "55e147bfa0676ce6ecdc609efc682b98568b8a5f",
+  "selected_files": {
+    "crates/litchi-ods/src/codec/formula/evaluation.rs": "fb9ebd5e684fa2cde84d5fce5960e77184571bffc47ec3ef8bcbe73a8dc40ed4",
+    "crates/litchi-ods/src/codec/formula/evaluation/statistical.rs": "1045c81b8d7780b6d4edd5073f66240701b2f7e6c4a2ad3b894e326f9eb0328a",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/statistical.rs": "6d6b1d1432d4a9367c4c29e1a672aed0e92368fb149c8615df8bd03292fcdbf3",
+    "crates/litchi-ods/tests/ods_formula_dispersion_evaluation.rs": "ab89fb34f4053444320b00d2a3479bee50cf7c7171fe9c211b442edc1ad34693",
+    "crates/litchi-ods/tests/ods_formula_dispersion_limits.rs": "1d20d12e1c99d2e926f9993880bc96035411bbd3d48d4544f93a1739208d9244",
+    "crates/litchi-ods/tests/ods_formula_dispersion_native.rs": "223f05af0b81613059fc49b0f5b20e3e6e2ed82f566eb9e78b263ed0b9ed2fc0",
+    "crates/litchi-ods/tests/ods_formula_dispersion_oracle.rs": "f42a9a96b5bb26b82b623b4c26b8e6fa22c4459c59a280ddadd5701cdc687825",
+    "docs/report/spec-gap-validation-evidence/ods-formula-dispersion/numeric-goldens.json": "0a5a52c6f38e045f0221038d4563a845b4730845579068e7a042532469df9e8b",
+    "docs/report/spec-gap-validation-evidence/ods-formula-dispersion/native/cached-results.json": "88c785f9b36e98a8b7e88f0bbfc76ad99b845d1592070ea1c32feea7e46f02f5",
+    "docs/report/spec-gap-validation-evidence/ods-formula-dispersion/native/provenance.json": "d1f1e0317ae44a7b03178d0a0b4fe19bac6d9561f439123eee53522d2cf8ef35",
+    "Cargo.lock": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3"
+  }
+}

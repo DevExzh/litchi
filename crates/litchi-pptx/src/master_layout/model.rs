@@ -2,6 +2,8 @@
 
 use litchi_opc::packuri::PackURI;
 
+use crate::shape::PlaceholderTypeExtension;
+
 /// ECMA-376 Part 1: slide master and slide layout IDs start at 2^31.
 pub const MIN_MASTER_OR_LAYOUT_ID: u32 = 2_147_483_648;
 
@@ -174,6 +176,8 @@ pub struct PlaceholderSpec {
     pub name: Option<String>,
     /// Prompt text written as a single run into the placeholder text body.
     pub text: Option<String>,
+    /// Optional PowerPoint 2023 placeholder type extension.
+    pub type_extension: Option<PlaceholderTypeExtension>,
 }
 
 impl PlaceholderSpec {
@@ -185,6 +189,7 @@ impl PlaceholderSpec {
             index: None,
             name: None,
             text: None,
+            type_extension: None,
         }
     }
 
@@ -206,6 +211,13 @@ impl PlaceholderSpec {
     #[must_use]
     pub fn with_text(mut self, text: impl Into<String>) -> Self {
         self.text = Some(text.into());
+        self
+    }
+
+    /// Set the PowerPoint 2023 placeholder type extension.
+    #[must_use]
+    pub const fn with_type_extension(mut self, extension: PlaceholderTypeExtension) -> Self {
+        self.type_extension = Some(extension);
         self
     }
 

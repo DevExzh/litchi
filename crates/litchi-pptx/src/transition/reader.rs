@@ -1,26 +1,34 @@
 //! Bounded `PresentationML` transition reader.
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
-use litchi_ooxml_common::mce::{Capabilities, process_markup_compatibility};
-use litchi_ooxml_common::xml::unqualified_attribute_value;
+use litchi_ooxml_common::mce::{Capabilities, InScopeNamespaces, process_markup_compatibility};
+use litchi_ooxml_common::private::in_scope_declarations;
+use litchi_ooxml_common::xml::{unqualified_attribute_value, xsd_token_atom};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
+use crate::time::Offset;
 use crate::{Error, Result};
 
 use super::model::{
-    Axis, Corner, InOut, Kind, Ms, Origin, Preserved, Raw, Ripple, Shape, Side, Speed, Spokes,
-    Transition,
+    Axis, Corner, FlyThrough, Glitter, GlitterPattern, InOut, Kind, LeftRight,
+    MAX_PRESET_NAME_BYTES, Morph, Ms, Origin, Preserved, Preset, Prism, Raw, Reveal, Ripple, Shape,
+    Shred, ShredPattern, Side, Speed, Spokes, Transition,
 };
 
 const PRESENTATIONML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PRESENTATIONML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
 pub(super) const P14: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
+pub(super) const P15: &str = "http://schemas.microsoft.com/office/powerpoint/2012/main";
+pub(super) const P159: &str = "http://schemas.microsoft.com/office/powerpoint/2015/09/main";
 const P14_BYTES: &[u8] = P14.as_bytes();
+const P15_BYTES: &[u8] = P15.as_bytes();
+const P159_BYTES: &[u8] = P159.as_bytes();
 
 /// Resource limits for one transition read.
 ///
@@ -121,6 +129,9 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
 
     let mut capabilities = Capabilities::ooxml_baseline();
     capabilities.understand_namespace(P14);
+    capabilities
+        .understand_namespace(P15)
+        .understand_namespace(P159);
     let mce_limits = litchi_ooxml_common::mce::Limits {
         max_input_bytes: limits.input_bytes,
         max_output_bytes: limits.input_bytes,
@@ -134,6 +145,15 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
             limit: limits.input_bytes,
         });
     }
+    // Until change 0653 the preprocessor re-declared every in-scope binding on
+    // every start tag of a document it rewrote, so each retained child of such
+    // a document was self-contained, while a document it passed through
+    // unchanged kept its children's exact source bytes. The preprocessor now
+    // declares each namespace once, so that property is restored here, at the
+    // slice boundary, for exactly the documents it used to hold for: a child
+    // of an untouched document that relies on an ancestor-only prefix stays
+    // inspectable but non-portable, as `Raw` documents.
+    let redeclare = matches!(processed, Cow::Owned(_));
 
     let bytes = processed.as_ref();
     let mut reader = NsReader::from_reader(bytes);
@@ -175,7 +195,15 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
                         start,
                         depth: event_depth,
                         role,
+                        inherited: inherited_bindings(redeclare, &resolver),
                     });
+                } else if capture
+                    .as_ref()
+                    .is_some_and(|active| matches!(active.role, Role::Known))
+                {
+                    return Err(Error::Invalid(
+                        "typed transition effects cannot contain nested elements".into(),
+                    ));
                 }
 
                 depth = event_depth;
@@ -201,12 +229,24 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
                     let raw = bytes.get(start..end).ok_or_else(|| {
                         Error::Invalid("transition child byte range is outside its XML part".into())
                     })?;
+                    let raw = self_contained_child(
+                        raw,
+                        inherited_bindings(redeclare, &resolver),
+                        &mce_limits,
+                    )?;
                     draft
                         .as_mut()
                         .ok_or_else(|| {
                             Error::Invalid("transition parser lost its selected value".into())
                         })?
-                        .finish_raw(role, raw, limits.retained_bytes)?;
+                        .finish_raw(role, &raw, limits.retained_bytes)?;
+                } else if capture
+                    .as_ref()
+                    .is_some_and(|active| matches!(active.role, Role::Known))
+                {
+                    return Err(Error::Invalid(
+                        "typed transition effects cannot contain nested elements".into(),
+                    ));
                 }
             },
             Event::End(_) => {
@@ -223,12 +263,13 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
                     let raw = bytes.get(active.start..end).ok_or_else(|| {
                         Error::Invalid("transition child byte range is outside its XML part".into())
                     })?;
+                    let raw = self_contained_child(raw, active.inherited, &mce_limits)?;
                     draft
                         .as_mut()
                         .ok_or_else(|| {
                             Error::Invalid("transition parser lost its selected value".into())
                         })?
-                        .finish_raw(active.role, raw, limits.retained_bytes)?;
+                        .finish_raw(active.role, &raw, limits.retained_bytes)?;
                 }
 
                 if selected_depth == Some(depth) {
@@ -239,6 +280,25 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
             Event::DocType(_) => {
                 return Err(Error::Invalid(
                     "DOCTYPE is forbidden in transition XML".into(),
+                ));
+            },
+            Event::Text(text)
+                if capture
+                    .as_ref()
+                    .is_some_and(|active| matches!(active.role, Role::Known))
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
+                return Err(Error::Invalid(
+                    "typed transition effects cannot contain text".into(),
+                ));
+            },
+            Event::Comment(_) | Event::CData(_) | Event::PI(_) | Event::GeneralRef(_)
+                if capture
+                    .as_ref()
+                    .is_some_and(|active| matches!(active.role, Role::Known)) =>
+            {
+                return Err(Error::Invalid(
+                    "typed transition effects cannot contain nested markup".into(),
                 ));
             },
             Event::Eof => break,
@@ -334,6 +394,35 @@ struct Capture {
     start: usize,
     depth: usize,
     role: Role,
+    /// Namespace bindings the captured child re-declares: those in scope at
+    /// its start tag when the preprocessor rewrote the document, else none.
+    inherited: Vec<(Box<[u8]>, Box<[u8]>)>,
+}
+
+/// The bindings a captured child inherits, when they are to be re-declared.
+fn inherited_bindings(
+    redeclare: bool,
+    resolver: &NamespaceResolver,
+) -> Vec<(Box<[u8]>, Box<[u8]>)> {
+    if redeclare {
+        in_scope_declarations(resolver)
+    } else {
+        Vec::new()
+    }
+}
+
+/// Re-declare on a captured child the namespace bindings it inherits.
+///
+/// The markup-compatibility preprocessor declares each namespace once, where
+/// XML requires it, so a child span sliced from its output carries only the
+/// declarations its own subtree makes (change 0653). With no bindings to add
+/// the child is returned borrowed, byte for byte.
+fn self_contained_child<'a>(
+    raw: &'a [u8],
+    inherited: Vec<(Box<[u8]>, Box<[u8]>)>,
+    limits: &litchi_ooxml_common::mce::Limits,
+) -> Result<Cow<'a, [u8]>> {
+    Ok(InScopeNamespaces::from_declarations(inherited).make_self_contained(raw, limits)?)
 }
 
 fn classify_child(
@@ -417,14 +506,17 @@ fn parse_attributes(
             let (namespace, _) = resolver.resolve_attribute(key);
             if is_p14_namespace(&namespace) && key.local_name().as_ref() == b"dur" {
                 reject_duplicate(&mut seen_extended_duration, "p14:dur")?;
-                extended_duration = Some(parse_ms(value, "transition duration")?);
+                extended_duration = Some(parse_offset(value, "transition duration")?);
             }
         }
     }
 
     let mut value = Transition::new(Kind::None);
     value.speed = speed;
-    value.duration = extended_duration.or(legacy_duration);
+    value.set_duration_offset(
+        extended_duration
+            .or_else(|| legacy_duration.map(|value| Offset::ms(u64::from(value.get())))),
+    );
     value.click = click;
     value.after = after;
     Ok(value)
@@ -439,6 +531,107 @@ fn parse_kind(
         let value = unqualified_attribute_value(element, b"dir", decoder)?
             .unwrap_or_else(|| "center".to_string());
         return Ok(Some(Kind::Ripple(parse_ripple(&value)?)));
+    }
+
+    if is_p14_name(namespace, element.name(), b"conveyor") {
+        return Ok(Some(Kind::Conveyor(parse_left_right(element, decoder)?)));
+    }
+
+    if is_p14_name(namespace, element.name(), b"doors") {
+        return Ok(Some(Kind::Doors(parse_axis(element, b"dir", decoder)?)));
+    }
+
+    if is_p14_name(namespace, element.name(), b"ferris") {
+        return Ok(Some(Kind::Ferris(parse_left_right(element, decoder)?)));
+    }
+
+    if is_p14_name(namespace, element.name(), b"flash") {
+        return Ok(Some(Kind::Flash));
+    }
+
+    if is_p14_name(namespace, element.name(), b"flip") {
+        return Ok(Some(Kind::Flip(parse_left_right(element, decoder)?)));
+    }
+
+    if is_p14_name(namespace, element.name(), b"flythrough") {
+        let direction = parse_in_out(element, b"dir", "in", decoder)?;
+        let bounce = parse_optional_bool(element, b"hasBounce", decoder)?.unwrap_or(false);
+        return Ok(Some(Kind::FlyThrough(FlyThrough::new(direction, bounce))));
+    }
+
+    if is_p14_name(namespace, element.name(), b"gallery") {
+        return Ok(Some(Kind::Gallery(parse_left_right(element, decoder)?)));
+    }
+
+    if is_p14_name(namespace, element.name(), b"glitter") {
+        let direction = parse_side(element, decoder)?;
+        let pattern = parse_glitter_pattern(element, decoder)?;
+        return Ok(Some(Kind::Glitter(Glitter::new(direction, pattern))));
+    }
+
+    if is_p14_name(namespace, element.name(), b"honeycomb") {
+        return Ok(Some(Kind::Honeycomb));
+    }
+
+    if is_p14_name(namespace, element.name(), b"pan") {
+        return Ok(Some(Kind::Pan(parse_side(element, decoder)?)));
+    }
+
+    if is_p14_name(namespace, element.name(), b"prism") {
+        let direction = parse_side(element, decoder)?;
+        let content = parse_optional_bool(element, b"isContent", decoder)?.unwrap_or(false);
+        let inverted = parse_optional_bool(element, b"isInverted", decoder)?.unwrap_or(false);
+        return Ok(Some(Kind::Prism(Prism::new(direction, content, inverted))));
+    }
+
+    if is_p14_name(namespace, element.name(), b"reveal") {
+        let direction = parse_reveal_direction(element, decoder)?;
+        let through_black = parse_optional_bool(element, b"thruBlk", decoder)?.unwrap_or(false);
+        return Ok(Some(Kind::Reveal(Reveal::new(direction, through_black))));
+    }
+
+    if is_p14_name(namespace, element.name(), b"shred") {
+        let pattern = parse_shred_pattern(element, decoder)?;
+        let direction = parse_in_out(element, b"dir", "in", decoder)?;
+        return Ok(Some(Kind::Shred(Shred::new(pattern, direction))));
+    }
+
+    if is_p14_name(namespace, element.name(), b"switch") {
+        return Ok(Some(Kind::Switch(parse_left_right(element, decoder)?)));
+    }
+
+    if is_p14_name(namespace, element.name(), b"vortex") {
+        return Ok(Some(Kind::Vortex(parse_side(element, decoder)?)));
+    }
+
+    if is_p14_name(namespace, element.name(), b"warp") {
+        return Ok(Some(Kind::Warp(parse_in_out(
+            element, b"dir", "in", decoder,
+        )?)));
+    }
+
+    if is_p14_name(namespace, element.name(), b"wheelReverse") {
+        return Ok(Some(Kind::WheelReverse(parse_spokes(element, decoder)?)));
+    }
+
+    if is_p14_name(namespace, element.name(), b"window") {
+        return Ok(Some(Kind::Window(parse_axis(element, b"dir", decoder)?)));
+    }
+
+    if is_p15_name(namespace, element.name(), b"prstTrans") {
+        let name = bounded_attribute_value(element, b"prst", decoder)?;
+        let invert_x = parse_optional_bool(element, b"invX", decoder)?.unwrap_or(false);
+        let invert_y = parse_optional_bool(element, b"invY", decoder)?.unwrap_or(false);
+        return Ok(Some(Kind::Preset(Preset::from_parts(
+            name, invert_x, invert_y,
+        )?)));
+    }
+
+    if is_p159_name(namespace, element.name(), b"morph") {
+        let value = unqualified_attribute_value(element, b"option", decoder)?.ok_or_else(|| {
+            Error::Invalid("morph transition requires an option attribute".into())
+        })?;
+        return Ok(Some(Kind::Morph(parse_morph(&value)?)));
     }
 
     let local = element.local_name();
@@ -481,10 +674,10 @@ fn parse_kind(
 }
 
 fn parse_speed(value: &str) -> Result<Speed> {
-    match value {
-        "slow" => Ok(Speed::Slow),
-        "med" => Ok(Speed::Medium),
-        "fast" => Ok(Speed::Fast),
+    match xsd_token_atom(value) {
+        Some("slow") => Ok(Speed::Slow),
+        Some("med") => Ok(Speed::Medium),
+        Some("fast") => Ok(Speed::Fast),
         _ => Err(Error::Invalid(format!(
             "invalid transition speed '{value}'"
         ))),
@@ -492,8 +685,14 @@ fn parse_speed(value: &str) -> Result<Speed> {
 }
 
 fn parse_ms(value: &str, field: &str) -> Result<Ms> {
+    let value = xsd_token_atom(value).unwrap_or("");
     let digits = value.strip_suffix("ms").unwrap_or(value);
     parse_bounded_ms(digits, field)
+}
+
+fn parse_offset(value: &str, field: &str) -> Result<Offset> {
+    Offset::parse(value)
+        .map_err(|error| Error::Invalid(format!("invalid {field} '{value}': {error}")))
 }
 
 fn parse_advance_ms(value: &str) -> Result<Ms> {
@@ -501,6 +700,7 @@ fn parse_advance_ms(value: &str) -> Result<Ms> {
 }
 
 fn parse_bounded_ms(value: &str, field: &str) -> Result<Ms> {
+    let value = xsd_token_atom(value).unwrap_or("");
     let parsed = value
         .parse::<u64>()
         .map_err(|_err| Error::Invalid(format!("invalid {field} '{value}'")))?;
@@ -510,9 +710,9 @@ fn parse_bounded_ms(value: &str, field: &str) -> Result<Ms> {
 }
 
 fn parse_bool(value: &str, attribute: &str) -> Result<bool> {
-    match value {
-        "1" | "true" => Ok(true),
-        "0" | "false" => Ok(false),
+    match xsd_token_atom(value) {
+        Some("1" | "true") => Ok(true),
+        Some("0" | "false") => Ok(false),
         _ => Err(Error::Invalid(format!(
             "invalid boolean value '{value}' for transition attribute '{attribute}'"
         ))),
@@ -532,21 +732,42 @@ fn parse_optional_bool(
 fn parse_side(element: &BytesStart<'_>, decoder: Decoder) -> Result<Side> {
     let value =
         unqualified_attribute_value(element, b"dir", decoder)?.unwrap_or_else(|| "l".to_string());
-    match value.as_str() {
-        "l" => Ok(Side::Left),
-        "r" => Ok(Side::Right),
-        "u" => Ok(Side::Up),
-        "d" => Ok(Side::Down),
+    match xsd_token_atom(&value) {
+        Some("l") => Ok(Side::Left),
+        Some("r") => Ok(Side::Right),
+        Some("u") => Ok(Side::Up),
+        Some("d") => Ok(Side::Down),
         _ => invalid_direction("side", &value),
+    }
+}
+
+fn parse_left_right(element: &BytesStart<'_>, decoder: Decoder) -> Result<LeftRight> {
+    let Some(value) = unqualified_attribute_value(element, b"dir", decoder)? else {
+        return Ok(LeftRight::Unspecified);
+    };
+    match xsd_token_atom(&value) {
+        Some("l") => Ok(LeftRight::Left),
+        Some("r") => Ok(LeftRight::Right),
+        _ => invalid_direction("left/right", &value),
+    }
+}
+
+fn parse_reveal_direction(element: &BytesStart<'_>, decoder: Decoder) -> Result<LeftRight> {
+    let value =
+        unqualified_attribute_value(element, b"dir", decoder)?.unwrap_or_else(|| "l".to_string());
+    match xsd_token_atom(&value) {
+        Some("l") => Ok(LeftRight::Left),
+        Some("r") => Ok(LeftRight::Right),
+        _ => invalid_direction("left/right", &value),
     }
 }
 
 fn parse_axis(element: &BytesStart<'_>, attribute: &[u8], decoder: Decoder) -> Result<Axis> {
     let value = unqualified_attribute_value(element, attribute, decoder)?
         .unwrap_or_else(|| "horz".to_string());
-    match value.as_str() {
-        "horz" => Ok(Axis::Horizontal),
-        "vert" => Ok(Axis::Vertical),
+    match xsd_token_atom(&value) {
+        Some("horz") => Ok(Axis::Horizontal),
+        Some("vert") => Ok(Axis::Vertical),
         _ => invalid_direction("axis", &value),
     }
 }
@@ -554,11 +775,11 @@ fn parse_axis(element: &BytesStart<'_>, attribute: &[u8], decoder: Decoder) -> R
 fn parse_corner(element: &BytesStart<'_>, decoder: Decoder) -> Result<Corner> {
     let value =
         unqualified_attribute_value(element, b"dir", decoder)?.unwrap_or_else(|| "lu".to_string());
-    match value.as_str() {
-        "lu" => Ok(Corner::LeftUp),
-        "ru" => Ok(Corner::RightUp),
-        "ld" => Ok(Corner::LeftDown),
-        "rd" => Ok(Corner::RightDown),
+    match xsd_token_atom(&value) {
+        Some("lu") => Ok(Corner::LeftUp),
+        Some("ru") => Ok(Corner::RightUp),
+        Some("ld") => Ok(Corner::LeftDown),
+        Some("rd") => Ok(Corner::RightDown),
         _ => invalid_direction("corner", &value),
     }
 }
@@ -566,15 +787,15 @@ fn parse_corner(element: &BytesStart<'_>, decoder: Decoder) -> Result<Corner> {
 fn parse_origin(element: &BytesStart<'_>, decoder: Decoder) -> Result<Origin> {
     let value =
         unqualified_attribute_value(element, b"dir", decoder)?.unwrap_or_else(|| "l".to_string());
-    match value.as_str() {
-        "l" => Ok(Origin::Left),
-        "r" => Ok(Origin::Right),
-        "u" => Ok(Origin::Up),
-        "d" => Ok(Origin::Down),
-        "lu" => Ok(Origin::LeftUp),
-        "ru" => Ok(Origin::RightUp),
-        "ld" => Ok(Origin::LeftDown),
-        "rd" => Ok(Origin::RightDown),
+    match xsd_token_atom(&value) {
+        Some("l") => Ok(Origin::Left),
+        Some("r") => Ok(Origin::Right),
+        Some("u") => Ok(Origin::Up),
+        Some("d") => Ok(Origin::Down),
+        Some("lu") => Ok(Origin::LeftUp),
+        Some("ru") => Ok(Origin::RightUp),
+        Some("ld") => Ok(Origin::LeftDown),
+        Some("rd") => Ok(Origin::RightDown),
         _ => invalid_direction("origin", &value),
     }
 }
@@ -587,9 +808,9 @@ fn parse_in_out(
 ) -> Result<InOut> {
     let value = unqualified_attribute_value(element, attribute, decoder)?
         .unwrap_or_else(|| default.to_string());
-    match value.as_str() {
-        "in" => Ok(InOut::In),
-        "out" => Ok(InOut::Out),
+    match xsd_token_atom(&value) {
+        Some("in") => Ok(InOut::In),
+        Some("out") => Ok(InOut::Out),
         _ => invalid_direction("in/out", &value),
     }
 }
@@ -600,34 +821,105 @@ fn parse_optional_in_out(
     decoder: Decoder,
 ) -> Result<Option<InOut>> {
     unqualified_attribute_value(element, attribute, decoder)?
-        .map(|value| match value.as_str() {
-            "in" => Ok(InOut::In),
-            "out" => Ok(InOut::Out),
+        .map(|value| match xsd_token_atom(&value) {
+            Some("in") => Ok(InOut::In),
+            Some("out") => Ok(InOut::Out),
             _ => invalid_direction("in/out", &value),
         })
         .transpose()
 }
 
 fn parse_ripple(value: &str) -> Result<Ripple> {
-    match value {
-        "center" => Ok(Ripple::Center),
-        "lu" => Ok(Ripple::LeftUp),
-        "ru" => Ok(Ripple::RightUp),
-        "ld" => Ok(Ripple::LeftDown),
-        "rd" => Ok(Ripple::RightDown),
+    match xsd_token_atom(value) {
+        Some("center") => Ok(Ripple::Center),
+        Some("lu") => Ok(Ripple::LeftUp),
+        Some("ru") => Ok(Ripple::RightUp),
+        Some("ld") => Ok(Ripple::LeftDown),
+        Some("rd") => Ok(Ripple::RightDown),
         _ => invalid_direction("PowerPoint 2010 ripple", value),
+    }
+}
+
+fn parse_glitter_pattern(element: &BytesStart<'_>, decoder: Decoder) -> Result<GlitterPattern> {
+    let value = unqualified_attribute_value(element, b"pattern", decoder)?
+        .unwrap_or_else(|| "diamond".to_string());
+    match xsd_token_atom(&value) {
+        Some("diamond") => Ok(GlitterPattern::Diamond),
+        Some("hexagon") => Ok(GlitterPattern::Hexagon),
+        _ => Err(Error::Invalid(format!(
+            "invalid glitter transition pattern '{value}'"
+        ))),
+    }
+}
+
+fn parse_shred_pattern(element: &BytesStart<'_>, decoder: Decoder) -> Result<ShredPattern> {
+    let value = unqualified_attribute_value(element, b"pattern", decoder)?
+        .unwrap_or_else(|| "strip".to_string());
+    match xsd_token_atom(&value) {
+        Some("strip") => Ok(ShredPattern::Strip),
+        Some("rectangle") => Ok(ShredPattern::Rectangle),
+        _ => Err(Error::Invalid(format!(
+            "invalid shred transition pattern '{value}'"
+        ))),
+    }
+}
+
+fn bounded_attribute_value(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+) -> Result<Option<String>> {
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.prefix().is_none() && attribute.key.local_name().as_ref() == name {
+            if value.is_some() {
+                return Err(Error::Invalid(format!(
+                    "duplicate transition attribute '{}'",
+                    String::from_utf8_lossy(name)
+                )));
+            }
+            if attribute.value.len() > MAX_PRESET_NAME_BYTES {
+                return Err(Error::Limit {
+                    resource: "preset transition name bytes",
+                    limit: MAX_PRESET_NAME_BYTES,
+                });
+            }
+            let decoded = attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            if decoded.len() > MAX_PRESET_NAME_BYTES {
+                return Err(Error::Limit {
+                    resource: "preset transition name bytes",
+                    limit: MAX_PRESET_NAME_BYTES,
+                });
+            }
+            value = Some(decoded.into_owned());
+        }
+    }
+    Ok(value)
+}
+
+fn parse_morph(value: &str) -> Result<Morph> {
+    match xsd_token_atom(value) {
+        Some("byObject") => Ok(Morph::ByObject),
+        Some("byWord") => Ok(Morph::ByWord),
+        Some("byChar") => Ok(Morph::ByChar),
+        _ => Err(Error::Invalid(format!(
+            "invalid morph transition option '{value}'"
+        ))),
     }
 }
 
 fn parse_spokes(element: &BytesStart<'_>, decoder: Decoder) -> Result<Spokes> {
     let value = unqualified_attribute_value(element, b"spokes", decoder)?
         .unwrap_or_else(|| "4".to_string());
-    match value.as_str() {
-        "1" => Ok(Spokes::One),
-        "2" => Ok(Spokes::Two),
-        "3" => Ok(Spokes::Three),
-        "4" => Ok(Spokes::Four),
-        "8" => Ok(Spokes::Eight),
+    match xsd_token_atom(&value) {
+        Some("1") => Ok(Spokes::One),
+        Some("2") => Ok(Spokes::Two),
+        Some("3") => Ok(Spokes::Three),
+        Some("4") => Ok(Spokes::Four),
+        Some("8") => Ok(Spokes::Eight),
         _ => Err(Error::Invalid(format!(
             "wheel transition spoke count '{value}' is not supported by PowerPoint"
         ))),
@@ -709,8 +1001,24 @@ fn is_p14_namespace(namespace: &ResolveResult<'_>) -> bool {
     matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == P14_BYTES)
 }
 
+fn is_p15_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == P15_BYTES)
+}
+
+fn is_p159_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == P159_BYTES)
+}
+
 fn is_p14_name(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool {
     name.local_name().as_ref() == local && is_p14_namespace(namespace)
+}
+
+fn is_p15_name(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool {
+    name.local_name().as_ref() == local && is_p15_namespace(namespace)
+}
+
+fn is_p159_name(namespace: &ResolveResult<'_>, name: QName<'_>, local: &[u8]) -> bool {
+    name.local_name().as_ref() == local && is_p159_namespace(namespace)
 }
 
 fn raw_is_portable(xml: &str) -> Result<bool> {

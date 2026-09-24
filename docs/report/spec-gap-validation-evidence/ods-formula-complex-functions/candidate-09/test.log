@@ -1,0 +1,50 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+    Finished `test` profile [unoptimized] target(s) in 6.87s
+     Running tests/ods_formula_complex_arrays.rs (/home/zhuhe/code/litchi-array-target/debug/deps/ods_formula_complex_arrays-a9fe1d481acb0aab)
+
+running 8 tests
+test complex_array_work_and_cancellation_fail_before_publishing_storage ... ok
+test complex_sequence_ignores_unconvertible_text_but_preserves_first_formula_error ... ok
+test matrix_complex_arrays_retain_components_and_suffixes ... ok
+test complex_sequence_folds_reference_lists_in_order_with_duplicates ... ok
+test complex_array_values_have_structural_equality_and_component_safety ... ok
+test owned_complex_arrays_survive_input_drop_and_release_storage_on_drop ... ok
+test single_cell_sequences_omit_logicals_and_empty_but_keep_numbers ... ok
+test nested_lazy_if_and_transpose_retain_complex_elements_without_reading_unused_refs ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_complex_evaluation.rs (/home/zhuhe/code/litchi-array-target/debug/deps/ods_formula_complex_evaluation-fa948e27b3ffb998)
+
+running 10 tests
+test complex_evaluation_honors_cancellation_and_local_text_limits ... ok
+test complex_errors_are_values_and_if_keeps_unselected_branches_lazy ... ok
+test complex_zero_axis_components_preserve_sign ... ok
+test complex_constructor_errors_and_numeric_equality_are_explicit ... ok
+test complex_arity_empty_products_and_scalar_logicals_follow_the_profile ... ok
+test complex_reference_sequences_omit_empty_and_logical_but_keep_text_and_errors ... ok
+test complex_function_names_and_suffixes_follow_the_case_profile ... ok
+test complex_text_forms_accept_exponents_and_both_imaginary_suffixes ... ok
+test complex_domains_nonfinite_values_and_extreme_finite_values_are_typed ... ok
+test every_complex_function_has_a_numeric_projection_vector ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_complex_limits.rs (/home/zhuhe/code/litchi-array-target/debug/deps/ods_formula_complex_limits-a4eee3220fcb66ee)
+
+running 12 tests
+test complex_real_and_imaginary_projections_are_finite_numbers ... ok
+test non_finite_complex_inputs_remain_formula_number_errors ... ok
+test complex_sequence_reads_charge_work_and_mid_read_cancellation_is_atomic ... ok
+test long_malformed_complex_text_charges_work_before_returning_a_formula_error ... ok
+test owned_numeric_complex_retains_components_without_text_storage ... ok
+test complex_sequence_references_omit_empty_logical_and_malformed_text ... ok
+test scalar_complex_zero_work_and_storage_limits_are_typed_and_atomic ... ok
+test owned_complex_text_survives_source_and_resolver_drop_until_result_drop ... ok
+test value_complex_zero_work_and_storage_limits_are_typed_and_atomic ... ok
+test scalar_product_preserves_an_earlier_numeric_failure_over_later_bad_text ... ok
+test value_product_preserves_numeric_failure_and_original_formula_error_precedence ... ok
+test scalar_product_has_a_bounded_work_cost_for_each_aggregate_argument ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

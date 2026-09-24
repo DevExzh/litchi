@@ -1,0 +1,25 @@
+{
+  "head": "5b6a9be5c945a9d83ae171a8642e71aeebccbcc5",
+  "evidence": {
+    "author-rustdoc.log.gz": "78dfea17c739bd7e68cefd88899eafcfe70ad57e956b278090d573a8ca6d7749",
+    "root-test-counts.json.gz": "3f2e054aa4a2f6f3d4819ffb9c1533e0e85aea713480bfb75838e99fabb32212",
+    "author-tests.log.gz": "eeb6993be95590530fd6a5a7b14f5df5293c07b1c36502a3589fb3c4e31c2101",
+    "author-clippy.log.gz": "ba2f9569d459672a06e84eb9669031d73b42eb66c1d26ca9345e4c16c396bd98",
+    "root-source-after.json.gz": "96f880a43c3cb57e37a1d0e1a3f8ac2777ccc0b850445d4dd9a0eed1b5019b19",
+    "root-rustfmt.log.gz": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+    "frozen-manifest.json.gz": "66247b767bc90b40e9f132b481fbcd44614aef79705b5abd2df84cf7192c3bbf",
+    "README.md": "6c892d4c11de9a5b98d7e38e2ed18249dc8020f6e3940c7270e35185143fbaa9",
+    "author-focused.log.gz": "5844fb2b045ff0b94a37f86b7a754272d76eca1a57c5d5c4f939973438e2f729",
+    "author-check.log.gz": "3fb34ba58275bbcdd6224fa96cdcc37065db3c0ff31b3302af3bebd7b98d9fd8",
+    "root-gates.json.gz": "ec1d9045f56fee8177d4907c6d1c4167116cba730533fd7ecf01e03f6778901c",
+    "independent-review.json.gz": "17600aa8659f2b39e7e27a9f8a603f2119d6bf76e0af8444016ec79b09c5d21a",
+    "root-rustdoc.log.gz": "4bb2108d29250b0a5f52add326c438f18ca77d52e319219d2968f537a905e8b6",
+    "root-matrix-preservation.json.gz": "00cf3dd93bcc3141cff8e5e67bcc2130609e11d31d3bbec4a3be8152b038fad2",
+    "root-build-Cargo.lock.gz": "2c8869b97a69bec7ee92d15087aa3eac0fe8cc16c4d59c399c929644d971d7fe",
+    "root-clippy.log.gz": "be3973b3c53dfe5bc4178773bb2b189b16eeee2f02c49a70f994c7b2d8422854",
+    "integration-manifest.json.gz": "b7749819102b39a05314ca6f303ec819572bda8f5df2ed4a7671b214f2c964a5",
+    "root-integration.json.gz": "d70179551412b45d10d7dc1f6d1ea206810a21d4cf0a3887b89775057be051c4",
+    "pending-matrix-preimage.md.gz": "d04c762306e55c5de75ed6745052fdf3615dd990b260d8a2b46e21c5906c3b2d",
+    "root-test.log.gz": "6753260fc347862647ffc40285f6931939cc090c30615048e840dda0b7607dd5"
+  }
+}

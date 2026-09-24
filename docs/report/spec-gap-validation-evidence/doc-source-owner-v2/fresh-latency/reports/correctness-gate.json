@@ -1,0 +1,14 @@
+{
+  "control": {
+    "all_boolean_checks_true": true,
+    "boolean_checks": 34,
+    "source_commit": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+    "timed": false
+  },
+  "candidate": {
+    "all_boolean_checks_true": true,
+    "boolean_checks": 34,
+    "source_commit": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+    "timed": false
+  }
+}

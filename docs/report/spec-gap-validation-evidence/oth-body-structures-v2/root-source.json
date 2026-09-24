@@ -1,0 +1,79 @@
+{
+  "candidate": "/var/tmp/litchi-odf-oth-structures-candidate-v2-20260910",
+  "base_commit": "fdd2b80dfa9efc246a5983a3fec64de25e5c4f63",
+  "paths": [
+    {
+      "path": "crates/litchi-oth/docs/FEATURE_MATRIX.md",
+      "sha256": "cf227c6cdfbd72da763805f6581e69337a6c1b7ede01019dbdb120f2eaee58a7"
+    },
+    {
+      "path": "crates/litchi-oth/src/codec/content.rs",
+      "sha256": "07c6dee6d445b5aed472811c44508e81bcd69ff12615273f595c94c704db9f4d"
+    },
+    {
+      "path": "crates/litchi-oth/src/codec/mod.rs",
+      "sha256": "88bfc3169ebe6de036d04f68acf1803ec760ad74ec2a70d7cd779ecb7135069b"
+    },
+    {
+      "path": "crates/litchi-oth/src/facade/mod.rs",
+      "sha256": "7ee94326b723ae5e474de615089eb17043a053e9cc45c2e8e49051830e771761"
+    },
+    {
+      "path": "crates/litchi-oth/src/lib.rs",
+      "sha256": "2fd877212da7b1921bcede687e52777667c54c76322fa56a6465822ac3aed5c4"
+    },
+    {
+      "path": "crates/litchi-oth/src/model/mod.rs",
+      "sha256": "4750e6d7022e832d4f914b355ed1487b21ce3236de19e294efedb3cbfa844da5"
+    },
+    {
+      "path": "crates/litchi-oth/src/package/snapshot.rs",
+      "sha256": "bf1a0a872ec02430150a3fee86f9fe2a99af2592c05c0f72318fa0a7a4025388"
+    },
+    {
+      "path": "crates/litchi-oth/src/codec/structure.rs",
+      "sha256": "345293ed81daf8838d2ac112336b068355a44484d57cacd2ef94ba7aa6453d7a"
+    },
+    {
+      "path": "crates/litchi-oth/src/model/annotation.rs",
+      "sha256": "a884dea8c5d766675d9e9a661e72a33a90625235390fb7b4a14cd000db130391"
+    },
+    {
+      "path": "crates/litchi-oth/src/model/change.rs",
+      "sha256": "059ed229d4152ab72242f47a09e4ccb5e193f85bedd338cc792db1f75be9ab69"
+    },
+    {
+      "path": "crates/litchi-oth/src/model/frame.rs",
+      "sha256": "1c0ec861172bcc2b600ccd7a729b695a96ab3bc1ffcc267f8c178e4d86324ca4"
+    },
+    {
+      "path": "crates/litchi-oth/src/model/index.rs",
+      "sha256": "e404741e9e4f9f222792311921592adf8334c3ad6d4ce25e1c1adf7a3916bac1"
+    },
+    {
+      "path": "crates/litchi-oth/src/model/note.rs",
+      "sha256": "9ac5e13336436fd366a6e9b6ece2ae6c8fc05a7d86ed2f2e9bb7839699becfd5"
+    },
+    {
+      "path": "crates/litchi-oth/src/model/ruby.rs",
+      "sha256": "f137e8ccb5733668302b2ee990af981af015d83983f9a5491ce2faa0527322cd"
+    },
+    {
+      "path": "crates/litchi-oth/src/model/section.rs",
+      "sha256": "7b477ac0d7a26005cc47a990f85e40d5ae284c4cae74e2bf93004d5ad800c6a7"
+    },
+    {
+      "path": "crates/litchi-oth/src/model/table.rs",
+      "sha256": "bd5008b46c4a27aea26277ca9ce176040686dd169e3ff11fabad945474567520"
+    },
+    {
+      "path": "crates/litchi-oth/tests/body_structures.rs",
+      "sha256": "98b2490597b8129d0aa9db71a965e4fd86f19b6ac097ee8bd92e1b3e99085c6a"
+    },
+    {
+      "path": "crates/litchi-oth/tests/structure_edits.rs",
+      "sha256": "5615c40c971ef6fcae626bca5e5855e77326c2e1df9c7c8b4f2a35c1a52587d2"
+    }
+  ],
+  "root_tests_exit_code": 0
+}

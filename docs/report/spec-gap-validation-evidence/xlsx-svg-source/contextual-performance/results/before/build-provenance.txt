@@ -1,0 +1,28 @@
+snapshot_label=before-8b5838c59
+git_head=8b5838c591775990747b2cbce82fb2eea372b58b
+binary=/var/tmp/litchi-xlsx-contextual-before-final-target/release/xlsx-svg-contextual-profile
+1c0df3243a09ec02fc7699d99eccedd7413d4a62ab2eda5fc1392ba20b5aea0d  /var/tmp/litchi-xlsx-contextual-before-final-target/release/xlsx-svg-contextual-profile
+rustc -vV:
+rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: x86_64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2
+cargo=cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+target=/var/tmp/litchi-xlsx-contextual-before-final-target
+fresh_target=1
+cargo_incremental=0
+allocator=CountingAllocator (process-local GlobalAlloc observer)
+source_api=SourceDrawing::scan + SvgOwner::value + NamespaceContext::shares_storage
+os=Linux 7.0.0-1012-aws x86_64
+cpu_model=AMD EPYC 9R45
+core_count=32
+memory_total=129447068 kB
+storage=/dev/root       2033087068 665558600 1367512084      33% /
+environment=CARGO_TARGET_DIR=/var/tmp/litchi-xlsx-contextual-before-final-target CARGO_INCREMENTAL=0
+source_sha256:
+1d8e6adf127a00dc25cd801bd90835f41442220ce944ba005cfdfa28e6dd62c2  /var/tmp/litchi-xlsx-contextual-before/crates/litchi-xlsx/src/drawing/source.rs
+03c67af436e218156cd48df52de1963bff97006025bc9f2d1848122f910bcc89  /var/tmp/litchi-xlsx-contextual-before/crates/litchi-xlsx/src/drawing/source_tests.rs
+e8a1e480d249b834f286e0deec083f8044257faf3b95905fb5b771e83f71605a  /var/tmp/litchi-xlsx-contextual-before/crates/litchi-drawingml/src/svg_blip.rs

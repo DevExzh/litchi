@@ -3,6 +3,7 @@
 use super::worksheet::{self, Commit, Snapshot};
 use crate::external_link::ExternalLinkLimits;
 use crate::package::error::{Error, Result};
+use crate::workbook::DrawingLoadPolicy;
 use litchi_opc::{OpcPackage, PackURI, Part};
 
 const WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
@@ -60,7 +61,31 @@ pub fn apply_with_external_link_limits(
     commit: &Commit,
     external_link_limits: ExternalLinkLimits,
 ) -> Result<Snapshot> {
-    let applied = apply_retaining_parse(package, worksheet, commit, external_link_limits)?;
+    apply_with_external_link_limits_and_drawing_policy(
+        package,
+        worksheet,
+        commit,
+        external_link_limits,
+        DrawingLoadPolicy::Eager,
+    )
+}
+
+/// Apply a cell-watch commit while retaining the workbook's drawing
+/// projection boundary.
+pub(crate) fn apply_with_external_link_limits_and_drawing_policy(
+    package: &mut OpcPackage,
+    worksheet: &PackURI,
+    commit: &Commit,
+    external_link_limits: ExternalLinkLimits,
+    drawing_load_policy: DrawingLoadPolicy,
+) -> Result<Snapshot> {
+    let applied = apply_retaining_parse(
+        package,
+        worksheet,
+        commit,
+        external_link_limits,
+        drawing_load_policy,
+    )?;
     match applied {
         Applied::Unchanged(snapshot) => Ok(snapshot),
         Applied::Published { snapshot, workbook } => {
@@ -87,12 +112,13 @@ pub(crate) enum Applied {
 }
 
 /// Apply a cell-watch commit and retain the complete workbook parse used for
-/// candidate validation.
+/// candidate validation, parsed under the caller's drawing policy.
 pub(crate) fn apply_retaining_parse(
     package: &OpcPackage,
     worksheet: &PackURI,
     commit: &Commit,
     external_link_limits: ExternalLinkLimits,
+    drawing_load_policy: DrawingLoadPolicy,
 ) -> Result<Applied> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
@@ -103,11 +129,13 @@ pub(crate) fn apply_retaining_parse(
 
     let snapshot = worksheet::read(&updated)?;
     let mut candidate = package.clone();
+    crate::worksheet_index::maintain(&mut candidate, worksheet, part.blob(), &updated)?;
     candidate.get_part_mut(worksheet)?.set_blob(updated);
     candidate.unsign();
-    let workbook = crate::Workbook::from_opc_package_with_external_link_limits(
+    let workbook = crate::Workbook::reparse_candidate_with_policy(
         candidate,
         external_link_limits,
+        drawing_load_policy,
     )?;
     Ok(Applied::Published {
         snapshot,

@@ -1,0 +1,15 @@
+[package]
+name = "svg-strict-namespace-evidence"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+litchi-opc = { path = "../../../../../crates/litchi-opc" }
+litchi-pptx = { path = "../../../../../crates/litchi-pptx" }
+
+[[bin]]
+name = "svg-strict-namespace-evidence"
+path = "main.rs"

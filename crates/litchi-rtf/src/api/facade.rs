@@ -242,6 +242,22 @@ impl Document {
         self.inner.model.fields()
     }
 
+    /// Borrow inert SmartTag/factoid ranges in body source order.
+    #[must_use]
+    pub fn smart_tags(&self) -> &[crate::SmartTag<'_>] {
+        self.inner.model.smart_tags()
+    }
+
+    /// Borrow complete inert main-body tracked-move start/end ranges in source order.
+    ///
+    /// Equal tags with opposite kinds identify the two move locations, but the
+    /// bounded model does not expose a cross-location pair index or execute
+    /// move/deleted/inserted semantics.
+    #[must_use]
+    pub fn move_bookmarks(&self) -> &[crate::MoveBookmark<'_>] {
+        self.inner.model.move_bookmarks()
+    }
+
     /// Borrow inert embedded and linked object records in body order.
     #[must_use]
     pub fn objects(&self) -> &[crate::EmbeddedObject<'_>] {

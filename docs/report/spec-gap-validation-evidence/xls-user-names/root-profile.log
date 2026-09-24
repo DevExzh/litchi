@@ -1,0 +1,26 @@
+   Compiling litchi-xls v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-xls)
+   Compiling litchi-xls-profiler-v5 v0.0.0 (/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xls-user-names/performance/harness)
+    Finished `release` profile [optimized] target(s) in 13.46s
+     Running `/var/tmp/litchi-xls-user-names-root-profile-target/release/litchi-xls-profiler-v5`
+build=release
+CASE users=1 name_len=8 bytes=580 runs=300
+  parse_slice   us/op=      0.85 alloc/op=    7.00 alloc_bytes/op=   10188.0 dealloc/op=    7.00 dealloc_bytes/op=   10188.0 peak_live_delta=    9600.0
+  parse_shared  us/op=      0.80 alloc/op=    5.00 alloc_bytes/op=    9008.0 dealloc/op=    5.00 dealloc_bytes/op=    9008.0 peak_live_delta=    9000.0
+  edit_create   us/op=      0.04 alloc/op=    0.00 alloc_bytes/op=       0.0 dealloc/op=    0.00 dealloc_bytes/op=       0.0 peak_live_delta=       0.0
+  noop_commit   us/op=      0.10 alloc/op=    0.00 alloc_bytes/op=       0.0 dealloc/op=    0.00 dealloc_bytes/op=       0.0 peak_live_delta=       0.0
+  rename_commit us/op=      1.34 alloc/op=   15.00 alloc_bytes/op=   11299.0 dealloc/op=   15.00 dealloc_bytes/op=   11299.0 peak_live_delta=    9598.0
+
+CASE users=16 name_len=16 bytes=1368 runs=300
+  parse_slice   us/op=      2.98 alloc/op=   37.00 alloc_bytes/op=   13096.0 dealloc/op=   37.00 dealloc_bytes/op=   13096.0 peak_live_delta=   11472.0
+  parse_shared  us/op=      2.88 alloc/op=   35.00 alloc_bytes/op=   10344.0 dealloc/op=   35.00 dealloc_bytes/op=   10344.0 peak_live_delta=   10088.0
+  edit_create   us/op=      0.04 alloc/op=    0.00 alloc_bytes/op=       0.0 dealloc/op=    0.00 dealloc_bytes/op=       0.0 peak_live_delta=       0.0
+  noop_commit   us/op=      0.09 alloc/op=    0.00 alloc_bytes/op=       0.0 dealloc/op=    0.00 dealloc_bytes/op=       0.0 peak_live_delta=       0.0
+  rename_commit us/op=      3.47 alloc/op=   45.00 alloc_bytes/op=   14199.0 dealloc/op=   45.00 dealloc_bytes/op=   14199.0 peak_live_delta=   11470.0
+
+CASE users=255 name_len=54 bytes=23486 runs=60
+  parse_slice   us/op=     60.69 alloc/op=  515.00 alloc_bytes/op=   97746.0 dealloc/op=  515.00 dealloc_bytes/op=   97746.0 peak_live_delta=   60490.0
+  parse_shared  us/op=     59.62 alloc/op=  513.00 alloc_bytes/op=   50756.0 dealloc/op=  513.00 dealloc_bytes/op=   50756.0 peak_live_delta=   36986.0
+  edit_create   us/op=      0.04 alloc/op=    0.00 alloc_bytes/op=       0.0 dealloc/op=    0.00 dealloc_bytes/op=       0.0 peak_live_delta=       0.0
+  noop_commit   us/op=      0.09 alloc/op=    0.00 alloc_bytes/op=       0.0 dealloc/op=    0.00 dealloc_bytes/op=       0.0 peak_live_delta=       0.0
+  rename_commit us/op=     61.35 alloc/op=  523.00 alloc_bytes/op=   98771.0 dealloc/op=  523.00 dealloc_bytes/op=   98771.0 peak_live_delta=   60448.0
+

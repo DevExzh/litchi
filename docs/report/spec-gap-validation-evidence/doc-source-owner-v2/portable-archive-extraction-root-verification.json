@@ -1,0 +1,12 @@
+{
+  "archive_sha256": "ee6f6ab9d6634740b763bf9d3abd1d13a7bef1f7fcf6be9ab17fa29a659e402a",
+  "extracted_directory": "/var/tmp/litchi-source-owner-extracted-root-cgtp_i9e",
+  "regular_tar_members": 101,
+  "verification": {
+    "manifest": "archive-manifest.json",
+    "manifest_sha256": "c0476ed94b8d48cbe0a8165299b5c20aaf0a06b171620006455da1e3254c4c83",
+    "members_checked": 100,
+    "self_excluded": true
+  },
+  "bytecode_created": false
+}

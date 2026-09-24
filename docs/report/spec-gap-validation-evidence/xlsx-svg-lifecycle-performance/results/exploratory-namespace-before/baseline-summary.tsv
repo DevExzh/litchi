@@ -1,0 +1,2 @@
+lane	input_bytes	elapsed_ns	requested_alloc_bytes	peak_live_delta	max_rss_kb	semantic_ok	output_exact	alloc_balance_ok
+inventory_shared_root_namespace_32	21872	28185256	66017653	10026620	16256	true	true	true

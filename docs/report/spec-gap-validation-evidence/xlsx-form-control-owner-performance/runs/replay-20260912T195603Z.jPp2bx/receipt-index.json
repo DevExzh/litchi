@@ -1,0 +1,36 @@
+{
+  "status": "pass",
+  "receipt_count": 560,
+  "correctness_record_count": 8,
+  "iterations_per_fixture": 7,
+  "fixtures": [
+    "button-form-control",
+    "checkbox-form-control",
+    "singlecontrol",
+    "tdf120301_xmlSpaceParsing",
+    "tdf134769",
+    "tdf161365",
+    "tdf60673",
+    "unrelated-opaque-1MiB"
+  ],
+  "lanes": [
+    "eager_cheap_clone",
+    "eager_many_query",
+    "eager_owner_projection",
+    "eager_package_open",
+    "eager_single_query",
+    "source_cheap_clone",
+    "source_many_query",
+    "source_owner_projection",
+    "source_package_open",
+    "source_single_query"
+  ],
+  "allocator_metric_definition": {
+    "requested_event_bytes": "cumulative alloc/realloc requested sizes during the phase",
+    "live_bytes_delta": "phase-end live-byte change from the pre-phase global allocator baseline",
+    "peak_live_bytes": "maximum live-byte increase above the pre-phase baseline during the phase",
+    "rss": "separate process VmRSS snapshots where available"
+  },
+  "speedup_claim": false,
+  "baseline_claim": false
+}

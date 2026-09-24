@@ -5,15 +5,57 @@ use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::{
     compact_xml,
     core::{
-        AuthoredXmlFragment, OwnedPackage, PackageWriter, XmlSourcePart, XmlSplicePublication,
-        family::Package,
+        AuthoredXmlFragment, OwnedPackage, PackageWriter, SourcePackageLimits, XmlSourcePart,
+        XmlSplicePublication, family::Package,
     },
 };
 use std::{fs, io::Write, path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.chart";
+pub(crate) const TEMPLATE_MIMETYPE: &str = "application/vnd.oasis.opendocument.chart-template";
+
+/// The two ODF chart package kinds defined by the normative MIME contract.
+///
+/// A chart template uses the same content and styles grammar as a chart, but
+/// its package identity is observable through both `mimetype` and the root
+/// manifest entry.  Retaining this distinction lets an ordinary open/edit/
+/// save cycle preserve the producer's package kind.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ChartPackageKind {
+    /// An ordinary OpenDocument Chart package.
+    Chart,
+    /// An OpenDocument Chart Template package.
+    Template,
+}
+
+impl ChartPackageKind {
+    #[must_use]
+    pub const fn mime_type(self) -> &'static str {
+        match self {
+            Self::Chart => MIMETYPE,
+            Self::Template => TEMPLATE_MIMETYPE,
+        }
+    }
+
+    #[must_use]
+    pub const fn is_template(self) -> bool {
+        matches!(self, Self::Template)
+    }
+
+    fn from_mime(mimetype: &str) -> Result<Self> {
+        match mimetype {
+            MIMETYPE => Ok(Self::Chart),
+            TEMPLATE_MIMETYPE => Ok(Self::Template),
+            _ => Err(Error::InvalidFormat(format!(
+                "ODC package has unsupported MIME type '{mimetype}'"
+            ))),
+        }
+    }
+}
+
 struct State {
     package: Package,
+    kind: ChartPackageKind,
     content: FlatChart,
     limits: crate::Limits,
     resources: Vec<crate::Resource>,
@@ -31,6 +73,7 @@ pub(crate) struct ResourceReplacement<'a> {
 pub(crate) enum StylesReplacement<'a> {
     Unchanged,
     Replace(&'a str),
+    SourceSplice(&'a [crate::style_format::StyleSplice]),
     Remove,
 }
 
@@ -57,13 +100,26 @@ impl Snapshot {
                 "ODC package exceeds the caller-selected byte limit".into(),
             ));
         }
+        let archive = OwnedPackage::from_bytes_with_limits(bytes, SourcePackageLimits::default())?;
+        let mimetype = archive.mimetype()?.to_owned();
+        let kind = ChartPackageKind::from_mime(&mimetype)?;
+        let owned_manifest = archive.package()?;
+        validate_manifest_contract(owned_manifest.manifest(), kind)?;
         // The chart reader performs namespace-aware content validation after
         // the package MIME check; a lexical body marker would reject valid
         // producer documents that use a different namespace prefix.
-        Self::from_package(Package::from_bytes(bytes, MIMETYPE, "", "ODC")?, limits)
+        Self::from_package(
+            Package::from_owned_package(archive, kind.mime_type(), "", "ODC")?,
+            kind,
+            limits,
+        )
     }
 
-    fn from_package(package: Package, limits: crate::Limits) -> Result<Self> {
+    fn from_package(
+        package: Package,
+        kind: ChartPackageKind,
+        limits: crate::Limits,
+    ) -> Result<Self> {
         if let Some(styles) = package.styles_xml() {
             crate::codec::validate_styles(styles, limits)?;
         }
@@ -73,6 +129,7 @@ impl Snapshot {
         let (signed, encrypted) = scan_security(&package)?;
         Ok(Self(Arc::new(State {
             package,
+            kind,
             content,
             limits,
             resources,
@@ -83,6 +140,10 @@ impl Snapshot {
 
     pub(crate) fn content_xml(&self) -> &str {
         self.0.package.content_xml()
+    }
+
+    pub(crate) fn package_kind(&self) -> ChartPackageKind {
+        self.0.kind
     }
 
     pub(crate) fn styles_xml(&self) -> Option<&str> {
@@ -162,7 +223,7 @@ impl Snapshot {
         }
         crate::codec::validate(content)?;
         let mut writer = PackageWriter::new_bounded(self.0.limits.max_package_bytes());
-        writer.set_mimetype(MIMETYPE)?;
+        writer.set_mimetype(self.0.kind.mime_type())?;
         if let Some(patch) = content_splice {
             publish_content_splice(self.0.package.package(), patch, content, &mut writer)?;
         } else {
@@ -179,6 +240,31 @@ impl Snapshot {
                     .map_err(Error::from)?;
                 crate::codec::validate_styles(xml, self.0.limits)?;
                 writer.add_file("styles.xml", xml.as_bytes())?;
+            },
+            StylesReplacement::SourceSplice(splices) => {
+                let source_styles = self
+                    .0
+                    .package
+                    .styles_xml()
+                    .ok_or_else(|| Error::InvalidFormat("ODC styles.xml is missing".into()))?;
+                crate::style_format::checked_splice_output_size(
+                    source_styles.len(),
+                    splices,
+                    self.0.limits,
+                )?;
+                let source_part = XmlSourcePart::load(self.0.package.package(), "styles.xml")?;
+                let mut publication = XmlSplicePublication::new(source_part.clone());
+                for splice in splices {
+                    let proof =
+                        source_part.checked_range(splice.range.clone(), &splice.expected)?;
+                    let fragment = if splice.replacement.is_empty() {
+                        AuthoredXmlFragment::deletion()
+                    } else {
+                        AuthoredXmlFragment::text(splice.replacement.clone())?
+                    };
+                    publication.replace(proof, fragment)?;
+                }
+                publication.publish(&mut writer)?;
             },
             StylesReplacement::Remove => {},
         }
@@ -205,6 +291,27 @@ impl Snapshot {
         }
         Self::from_bytes_with_limits(writer.finish_to_bounded_bytes()?, self.0.limits)
     }
+}
+
+fn validate_manifest_contract(
+    manifest: &litchi_odf_common::core::Manifest,
+    kind: ChartPackageKind,
+) -> Result<()> {
+    if manifest.get_media_type("/") != Some(kind.mime_type()) {
+        return Err(Error::InvalidFormat(
+            "ODC manifest root media type does not match the package MIME type".into(),
+        ));
+    }
+    if manifest
+        .get_media_type("content.xml")
+        .is_some_and(|media_type| media_type != "text/xml")
+        || (manifest.get_media_type("content.xml").is_none() && !manifest.has_encrypted_entries())
+    {
+        return Err(Error::InvalidFormat(
+            "ODC manifest content.xml entry must use text/xml".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn publish_content_splice<W: Write>(

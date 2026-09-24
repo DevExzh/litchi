@@ -187,6 +187,13 @@ impl Package {
     /// properties, and custom properties are validated and facade-owned state
     /// is reloaded. Committing a raw edit disables the legacy document writer
     /// so it cannot later erase the edit.
+    /// Signature state is preserved. Changed signed sources require an explicit
+    /// [`Self::unsign`] or a signing/disposition operation inside the closure;
+    /// deleting signature parts alone does not authorize publication.
+    /// Replacing a signed candidate with a separately opened or constructed
+    /// package requires calling [`Self::unsign`] before entering the closure.
+    /// Opaque non-Part entries in the signature directory permit exact no-op
+    /// publication only; `unsign` does not remove those retained archive entries.
     ///
     /// # Errors
     ///
@@ -224,9 +231,16 @@ impl Package {
             });
         }
 
+        if !raw && (self.opc.is_signed() || self.opc.requires_signature_edit_policy()) {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation,
+                reason: "changed signed content requires explicit Package::unsign before publication",
+            });
+        }
         let mut candidate = self.opc.clone();
-        candidate.unsign();
         let value = edit(&mut candidate)?;
+        candidate.validate_signature_edit_from(&self.opc)?;
 
         let main_part = candidate
             .main_document_part()

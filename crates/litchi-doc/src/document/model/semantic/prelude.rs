@@ -12,6 +12,7 @@ pub(super) use crate::parts::associated_strings::DocumentAssociatedStrings;
 pub(super) use crate::parts::auto_summary::DocumentAutoSummary;
 pub(super) use crate::parts::captions::CaptionTables;
 pub(super) use crate::parts::document_properties::DocumentProperties;
+pub(super) use crate::parts::dofr::DofrArray;
 pub(super) use crate::parts::embedded_fonts::DocumentEmbeddedFonts;
 pub(super) use crate::parts::fib::FileInformationBlock;
 pub(super) use crate::parts::fields::{
@@ -37,12 +38,17 @@ pub(super) use crate::parts::mail_merge::DocumentMailMerge;
 pub(super) use crate::parts::numbering::{ListTables, ParagraphListBinding};
 pub(super) use crate::parts::ole_controls::RgxOcxInfo;
 pub(super) use crate::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
+pub(super) use crate::parts::paragraph_groups::PgpArray;
+pub(super) use crate::parts::print_environment::{
+    DocumentPrintEnvironment, PrintDriver, PrintEnvironment,
+};
 pub(super) use crate::parts::proofing::ProofingTables;
 pub(super) use crate::parts::protection::Ranges;
 pub(super) use crate::parts::repair_bookmarks::DocumentRepairBookmarks;
 pub(super) use crate::parts::rmd_threading::DocumentRmdThreading;
 pub(super) use crate::parts::rsids::DocumentRsids;
 pub(super) use crate::parts::saved_by::SavedByTable;
+pub(super) use crate::parts::saved_selection::SavedSelection;
 pub(super) use crate::parts::smart_tags::DocumentSmartTags;
 pub(super) use crate::parts::structured_tags::DocumentStructuredTags;
 pub(super) use crate::parts::styles::StyleSheet;
@@ -50,6 +56,7 @@ pub(super) use crate::parts::subdocuments::Collection;
 pub(super) use crate::parts::table_char_cache::TableCharacterCache;
 pub(super) use crate::parts::text_services::TextServicesTables;
 pub(super) use crate::parts::textbox_breaks::TextBoxBreakTables;
+pub(super) use crate::parts::vba_signature::DocumentVbaSignatures;
 pub(super) use crate::table::Table;
 pub(super) use litchi_core::Position;
 pub(super) use std::sync::Arc;

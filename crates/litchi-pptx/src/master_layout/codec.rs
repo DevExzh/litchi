@@ -1,11 +1,13 @@
 use super::model::{PlaceholderSpec, SlideLayoutKind};
+use crate::shape::{PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderTypeExtension};
 use crate::{Error, Result};
 use quick_xml::Reader;
 use quick_xml::events::Event;
-use std::fmt::Write as FmtWrite;
+use std::fmt::{self, Write as FmtWrite};
 
 pub(super) const P_NS: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 pub(super) const A_NS: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
+pub(super) const P232_NS: &str = "http://schemas.microsoft.com/office/powerpoint/2023/02/main";
 pub(super) const R_NS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 pub(super) const STRICT_SLIDE_MASTER_REL: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/slideMaster";
@@ -37,6 +39,24 @@ pub(super) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
+#[derive(Default)]
+struct LengthWriter {
+    length: usize,
+}
+
+impl LengthWriter {
+    fn add(&mut self, length: usize) -> fmt::Result {
+        self.length = self.length.checked_add(length).ok_or(fmt::Error)?;
+        Ok(())
+    }
+}
+
+impl FmtWrite for LengthWriter {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        self.add(value.len())
+    }
+}
+
 pub(super) fn escape_xml(value: &str) -> String {
     let mut escaped = String::with_capacity(value.len());
     for character in value.chars() {
@@ -50,6 +70,74 @@ pub(super) fn escape_xml(value: &str) -> String {
         }
     }
     escaped
+}
+
+/// Check the XML 1.0 fifth-edition `Char` production before any authored
+/// value is copied into an output buffer. Rust strings cannot contain UTF-16
+/// surrogate code points, so the scalar-value check covers the remaining
+/// ranges directly.
+pub(super) fn validate_xml10_chars(value: &str, resource: &'static str) -> Result<()> {
+    if let Some(character) = value.chars().find(|character| {
+        let code = u32::from(*character);
+        !matches!(code, 0x09 | 0x0A | 0x0D)
+            && !(0x20..=0xD7FF).contains(&code)
+            && !(0xE000..=0xFFFD).contains(&code)
+            && !(0x10000..=0x10FFFF).contains(&code)
+    }) {
+        return Err(Error::Invalid(format!(
+            "{resource} contains XML 1.0-invalid character U+{:04X}",
+            u32::from(character)
+        )));
+    }
+    Ok(())
+}
+
+fn escaped_xml_len(value: &str) -> Result<usize> {
+    validate_xml10_chars(value, "authored XML text")?;
+    value.chars().try_fold(0usize, |length, character| {
+        let extra = match character {
+            '&' => 5,
+            '<' | '>' => 4,
+            '"' | '\'' => 6,
+            '\t' | '\n' | '\r' => 5,
+            _ => character.len_utf8(),
+        };
+        length.checked_add(extra).ok_or(Error::Limit {
+            resource: "generated slide layout escaped XML bytes",
+            limit: MAX_PART_XML_BYTES,
+        })
+    })
+}
+
+fn escape_xml_fallible(value: &str) -> Result<String> {
+    let length = escaped_xml_len(value)?;
+    if length > MAX_PART_XML_BYTES {
+        return Err(Error::Limit {
+            resource: "generated slide layout escaped XML bytes",
+            limit: MAX_PART_XML_BYTES,
+        });
+    }
+    let mut escaped = String::new();
+    escaped
+        .try_reserve_exact(length)
+        .map_err(|source| Error::Allocation {
+            resource: "generated slide layout escaped XML bytes",
+            source,
+        })?;
+    for character in value.chars() {
+        match character {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '"' => escaped.push_str("&quot;"),
+            '\'' => escaped.push_str("&apos;"),
+            '\t' => escaped.push_str("&#x9;"),
+            '\n' => escaped.push_str("&#xA;"),
+            '\r' => escaped.push_str("&#xD;"),
+            _ => escaped.push(character),
+        }
+    }
+    Ok(escaped)
 }
 
 // ============================================================================
@@ -96,29 +184,120 @@ pub(super) fn layout_xml(
     name: &str,
     placeholders: &[PlaceholderSpec],
 ) -> Result<String> {
-    let mut xml = String::with_capacity(2048);
-    xml.push_str(XML_DECL);
-    let _result = write!(
-        xml,
-        "<p:sldLayout xmlns:a=\"{A_NS}\" xmlns:r=\"{R_NS}\" xmlns:p=\"{P_NS}\" type=\"{}\" matchingName=\"{}\"><p:cSld name=\"{}\">",
-        kind.as_str(),
-        escape_xml(name),
-        escape_xml(name)
-    );
+    validate_layout_inputs(name, placeholders)?;
+    let escaped_name = escape_xml_fallible(name)?;
+
+    let mut length = LengthWriter::default();
+    write_layout_header(
+        &mut length,
+        kind,
+        &escaped_name,
+        placeholders
+            .iter()
+            .any(|placeholder| placeholder.type_extension.is_some()),
+    )
+    .map_err(|_| Error::Limit {
+        resource: "generated slide layout bytes",
+        limit: MAX_PART_XML_BYTES,
+    })?;
+    length.write_str(SP_TREE_HEADER).map_err(|_| Error::Limit {
+        resource: "generated slide layout bytes",
+        limit: MAX_PART_XML_BYTES,
+    })?;
+    for (offset, spec) in placeholders.iter().enumerate() {
+        length
+            .add(placeholder_shape_xml_len(
+                FIRST_SHAPE_ID + offset as u32,
+                spec,
+                false,
+            )?)
+            .map_err(|_| Error::Limit {
+                resource: "generated slide layout bytes",
+                limit: MAX_PART_XML_BYTES,
+            })?;
+    }
+    length
+        .write_str(
+            "</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>",
+        )
+        .map_err(|_| Error::Limit {
+            resource: "generated slide layout bytes",
+            limit: MAX_PART_XML_BYTES,
+        })?;
+    if length.length > MAX_PART_XML_BYTES {
+        return Err(Error::Limit {
+            resource: "generated slide layout bytes",
+            limit: MAX_PART_XML_BYTES,
+        });
+    }
+
+    let mut xml = String::new();
+    xml.try_reserve_exact(length.length)
+        .map_err(|source| Error::Allocation {
+            resource: "generated slide layout bytes",
+            source,
+        })?;
+    write_layout_header(
+        &mut xml,
+        kind,
+        &escaped_name,
+        placeholders
+            .iter()
+            .any(|placeholder| placeholder.type_extension.is_some()),
+    )
+    .map_err(|_| invalid("generated slide layout formatting failed"))?;
     xml.push_str(SP_TREE_HEADER);
     for (offset, spec) in placeholders.iter().enumerate() {
         let shape_id = FIRST_SHAPE_ID + offset as u32;
-        xml.push_str(&placeholder_shape_xml(shape_id, spec, false));
+        xml.push_str(&placeholder_shape_xml(shape_id, spec, false)?);
     }
     xml.push_str(
         "</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>",
     );
-    if xml.len() > MAX_PART_XML_BYTES {
-        return Err(invalid(
-            "generated slide layout exceeds the part size limit",
-        ));
+    if xml.len() != length.length {
+        return Err(invalid("generated slide layout length preflight disagreed"));
     }
     Ok(xml)
+}
+
+fn write_layout_header<W: FmtWrite>(
+    output: &mut W,
+    kind: SlideLayoutKind,
+    escaped_name: &str,
+    declares_p232: bool,
+) -> fmt::Result {
+    output.write_str(XML_DECL)?;
+    write!(
+        output,
+        "<p:sldLayout xmlns:a=\"{A_NS}\" xmlns:r=\"{R_NS}\" xmlns:p=\"{P_NS}\""
+    )?;
+    if declares_p232 {
+        write!(output, " xmlns:p232=\"{P232_NS}\"")?;
+    }
+    write!(
+        output,
+        " type=\"{}\" matchingName=\"{}\"><p:cSld name=\"{}\">",
+        kind.as_str(),
+        escaped_name,
+        escaped_name
+    )
+}
+
+/// Check every user supplied string before a generated layout buffer is allocated.
+pub(crate) fn validate_layout_inputs(name: &str, placeholders: &[PlaceholderSpec]) -> Result<()> {
+    validate_xml10_chars(name, "slide layout name")?;
+    let _name_length = escaped_xml_len(name)?;
+    for spec in placeholders {
+        if let Some(value) = spec.name.as_deref() {
+            validate_xml10_chars(value, "placeholder name")?;
+            let _ = escaped_xml_len(value)?;
+        }
+        if let Some(value) = spec.text.as_deref() {
+            validate_xml10_chars(value, "placeholder text")?;
+            let _ = escaped_xml_len(value)?;
+        }
+    }
+    Ok(())
 }
 
 /// Serialize one placeholder shape.
@@ -130,31 +309,142 @@ pub(super) fn placeholder_shape_xml(
     shape_id: u32,
     spec: &PlaceholderSpec,
     declare_namespaces: bool,
-) -> String {
+) -> Result<String> {
+    let (escaped_name, escaped_text) = escaped_placeholder_values(shape_id, spec)?;
+    let length = placeholder_shape_len_from_escaped(
+        shape_id,
+        spec,
+        declare_namespaces,
+        &escaped_name,
+        escaped_text.as_deref(),
+    )?;
+    let mut xml = String::new();
+    xml.try_reserve_exact(length)
+        .map_err(|source| Error::Allocation {
+            resource: "generated placeholder shape bytes",
+            source,
+        })?;
+    write_placeholder_shape(
+        &mut xml,
+        shape_id,
+        spec,
+        declare_namespaces,
+        &escaped_name,
+        escaped_text.as_deref(),
+    )
+    .map_err(|_| invalid("generated placeholder shape formatting failed"))?;
+    if xml.len() != length {
+        return Err(invalid(
+            "generated placeholder shape length preflight disagreed",
+        ));
+    }
+    Ok(xml)
+}
+
+fn placeholder_shape_xml_len(
+    shape_id: u32,
+    spec: &PlaceholderSpec,
+    declare_namespaces: bool,
+) -> Result<usize> {
+    let (escaped_name, escaped_text) = escaped_placeholder_values(shape_id, spec)?;
+    placeholder_shape_len_from_escaped(
+        shape_id,
+        spec,
+        declare_namespaces,
+        &escaped_name,
+        escaped_text.as_deref(),
+    )
+}
+
+fn escaped_placeholder_values(
+    shape_id: u32,
+    spec: &PlaceholderSpec,
+) -> Result<(String, Option<String>)> {
+    if let Some(name) = spec.name.as_deref() {
+        validate_xml10_chars(name, "placeholder name")?;
+    }
+    if let Some(text) = spec.text.as_deref() {
+        validate_xml10_chars(text, "placeholder text")?;
+    }
     let name = spec
         .name
         .clone()
         .unwrap_or_else(|| format!("{} Placeholder {shape_id}", spec.kind.label()));
-    let mut xml = String::with_capacity(512);
-    xml.push_str("<p:sp");
+    let escaped_name = escape_xml_fallible(&name)?;
+    let escaped_text = spec.text.as_deref().map(escape_xml_fallible).transpose()?;
+    Ok((escaped_name, escaped_text))
+}
+
+fn placeholder_shape_len_from_escaped(
+    shape_id: u32,
+    spec: &PlaceholderSpec,
+    declare_namespaces: bool,
+    escaped_name: &str,
+    escaped_text: Option<&str>,
+) -> Result<usize> {
+    let mut length = LengthWriter::default();
+    write_placeholder_shape(
+        &mut length,
+        shape_id,
+        spec,
+        declare_namespaces,
+        escaped_name,
+        escaped_text,
+    )
+    .map_err(|_| Error::Limit {
+        resource: "generated placeholder shape bytes",
+        limit: MAX_PART_XML_BYTES,
+    })?;
+    if length.length > MAX_PART_XML_BYTES {
+        return Err(Error::Limit {
+            resource: "generated placeholder shape bytes",
+            limit: MAX_PART_XML_BYTES,
+        });
+    }
+    Ok(length.length)
+}
+
+fn write_placeholder_shape<W: FmtWrite>(
+    output: &mut W,
+    shape_id: u32,
+    spec: &PlaceholderSpec,
+    declare_namespaces: bool,
+    escaped_name: &str,
+    escaped_text: Option<&str>,
+) -> fmt::Result {
+    output.write_str("<p:sp")?;
     if declare_namespaces {
-        let _result = write!(xml, " xmlns:p=\"{P_NS}\" xmlns:a=\"{A_NS}\"");
+        write!(output, " xmlns:p=\"{P_NS}\" xmlns:a=\"{A_NS}\"")?;
+        if spec.type_extension.is_some() {
+            write!(output, " xmlns:p232=\"{P232_NS}\"")?;
+        }
     }
-    let _result = write!(
-        xml,
-        "><p:nvSpPr><p:cNvPr id=\"{shape_id}\" name=\"{}\"/><p:cNvSpPr><a:spLocks noGrp=\"1\"/></p:cNvSpPr><p:nvPr><p:ph type=\"{}\"",
-        escape_xml(&name),
+    write!(
+        output,
+        "><p:nvSpPr><p:cNvPr id=\"{shape_id}\" name=\"{escaped_name}\"/><p:cNvSpPr><a:spLocks noGrp=\"1\"/></p:cNvSpPr><p:nvPr><p:ph type=\"{}\"",
         spec.kind.as_str()
-    );
+    )?;
     if let Some(index) = spec.index {
-        let _result = write!(xml, " idx=\"{index}\"");
+        write!(output, " idx=\"{index}\"")?;
     }
-    xml.push_str("/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p>");
-    if let Some(text) = &spec.text {
-        let _result = write!(xml, "<a:r><a:t>{}</a:t></a:r>", escape_xml(text));
+    if let Some(extension) = spec.type_extension {
+        write!(
+            output,
+            "><p:extLst><p:ext uri=\"{PLACEHOLDER_TYPE_EXTENSION_URI}\"><p232:phTypeExt><p232:type>"
+        )?;
+        match extension {
+            PlaceholderTypeExtension::Cameo => output.write_str("<p232:cameo/>")?,
+            PlaceholderTypeExtension::Unknown => output.write_str("<p232:unknown/>")?,
+        }
+        output.write_str("</p232:type></p232:phTypeExt></p:ext></p:extLst></p:ph>")?;
+    } else {
+        output.write_str("/>")?;
     }
-    xml.push_str("<a:endParaRPr lang=\"en-US\"/></a:p></p:txBody></p:sp>");
-    xml
+    output.write_str("</p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p>")?;
+    if let Some(text) = escaped_text {
+        write!(output, "<a:r><a:t>{text}</a:t></a:r>")?;
+    }
+    output.write_str("<a:endParaRPr lang=\"en-US\"/></a:p></p:txBody></p:sp>")
 }
 
 // ============================================================================
@@ -162,8 +452,6 @@ pub(super) fn placeholder_shape_xml(
 // ============================================================================
 
 pub(super) const SPTREE_DEPTH: usize = 3;
-/// Depth of `p:sp` shapes inside the shape tree.
-pub(super) const SHAPE_DEPTH: usize = 4;
 
 /// Byte span of an XML element.
 #[derive(Debug, Clone, Copy)]
@@ -409,167 +697,6 @@ pub(super) fn element_relationship_id(
     Ok(None)
 }
 
-/// Find the direct `p:sp` child of the shape tree whose `p:ph` matches
-/// `kind` and `index`.
-pub(super) fn find_placeholder_span(
-    xml: &[u8],
-    kind: &str,
-    index: u32,
-) -> Result<Option<ElementSpan>> {
-    check_size(xml)?;
-    let mut reader = Reader::from_reader(xml);
-    let mut depth = 0usize;
-    let mut shape_start = None;
-    let mut nodes = 0usize;
-    loop {
-        let before = reader.buffer_position() as usize;
-        match reader.read_event() {
-            Ok(Event::Start(element)) => {
-                nodes += 1;
-                depth += 1;
-                if nodes > MAX_SCAN_NODES || depth > MAX_SCAN_DEPTH {
-                    return Err(invalid("part XML resource limit exceeded"));
-                }
-                let local = local_name(element.name().as_ref()).to_vec();
-                if depth == SHAPE_DEPTH && local == b"sp" {
-                    shape_start = Some(before);
-                } else if local == b"ph"
-                    && shape_start.is_some()
-                    && placeholder_matches(&element, kind, index)?
-                {
-                    let start = shape_start.ok_or_else(|| invalid("missing placeholder shape"))?;
-                    return Ok(Some(ElementSpan {
-                        start,
-                        end: shape_end(xml, start)?,
-                        close_start: start,
-                        empty: false,
-                    }));
-                }
-            },
-            Ok(Event::Empty(element)) => {
-                nodes += 1;
-                if nodes > MAX_SCAN_NODES {
-                    return Err(invalid("part XML resource limit exceeded"));
-                }
-                if local_name(element.name().as_ref()) == b"ph"
-                    && shape_start.is_some()
-                    && placeholder_matches(&element, kind, index)?
-                {
-                    let start = shape_start.ok_or_else(|| invalid("missing placeholder shape"))?;
-                    return Ok(Some(ElementSpan {
-                        start,
-                        end: shape_end(xml, start)?,
-                        close_start: start,
-                        empty: false,
-                    }));
-                }
-            },
-            Ok(Event::End(_)) => {
-                if depth == SHAPE_DEPTH {
-                    shape_start = None;
-                }
-                if depth == 0 {
-                    return Err(invalid("unexpected closing element in part XML"));
-                }
-                depth -= 1;
-            },
-            Ok(Event::DocType(_) | Event::PI(_)) => {
-                return Err(invalid("DTDs and processing instructions are rejected"));
-            },
-            Ok(Event::Eof) => break,
-            Err(error) => return Err(Error::Xml(error.to_string())),
-            _ => {},
-        }
-    }
-    if depth != 0 {
-        return Err(invalid("unterminated part XML"));
-    }
-    Ok(None)
-}
-
-/// Whether a `p:ph` element matches the requested type and index.
-pub(super) fn placeholder_matches(
-    element: &quick_xml::events::BytesStart<'_>,
-    kind: &str,
-    index: u32,
-) -> Result<bool> {
-    let mut ph_type = None;
-    let mut ph_index = 0u32;
-    for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-        match attribute.key.as_ref() {
-            b"type" => {
-                ph_type = Some(
-                    std::str::from_utf8(attribute.value.as_ref())
-                        .map_err(|error| Error::Xml(error.to_string()))?
-                        .to_owned(),
-                );
-            },
-            b"idx" => {
-                let value = std::str::from_utf8(attribute.value.as_ref())
-                    .map_err(|error| Error::Xml(error.to_string()))?;
-                ph_index = value
-                    .parse::<u32>()
-                    .map_err(|_err| invalid(format!("invalid placeholder index '{value}'")))?;
-            },
-            _ => {},
-        }
-    }
-    // ECMA defaults: type "obj", idx 0.
-    Ok(ph_type.as_deref().unwrap_or("obj") == kind && ph_index == index)
-}
-
-/// Compute the end offset of the `p:sp` element starting at `start`.
-pub(super) fn shape_end(xml: &[u8], start: usize) -> Result<usize> {
-    let mut reader = Reader::from_reader(&xml[start..]);
-    let mut depth = 0usize;
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(_)) => depth += 1,
-            Ok(Event::Empty(_)) if depth == 0 => {
-                return Ok(start + reader.buffer_position() as usize);
-            },
-            Ok(Event::End(_)) => {
-                depth -= 1;
-                if depth == 0 {
-                    return Ok(start + reader.buffer_position() as usize);
-                }
-            },
-            Ok(Event::Eof) => return Err(invalid("unterminated placeholder shape")),
-            Err(error) => return Err(Error::Xml(error.to_string())),
-            _ => {},
-        }
-    }
-}
-
-/// Extract the `p:cNvPr/@id` shape ID from a shape byte range.
-pub(super) fn shape_id_within(bytes: &[u8]) -> Result<u32> {
-    let mut reader = Reader::from_reader(bytes);
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(element) | Event::Empty(element))
-                if local_name(element.name().as_ref()) == b"cNvPr" =>
-            {
-                for attribute in element.attributes().with_checks(true) {
-                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-                    if attribute.key.as_ref() == b"id" {
-                        let value = std::str::from_utf8(attribute.value.as_ref())
-                            .map_err(|error| Error::Xml(error.to_string()))?;
-                        return value
-                            .parse::<u32>()
-                            .map_err(|_err| invalid("invalid shape ID in placeholder"));
-                    }
-                }
-                return Err(invalid("placeholder shape has no shape ID"));
-            },
-            Ok(Event::Eof) => break,
-            Err(error) => return Err(Error::Xml(error.to_string())),
-            _ => {},
-        }
-    }
-    Err(invalid("placeholder shape has no non-visual properties"))
-}
-
 /// Allocate the next free shape ID for a part (max existing + 1, starting at 2).
 pub(super) fn next_shape_id(xml: &[u8]) -> Result<u32> {
     check_size(xml)?;
@@ -611,19 +738,59 @@ pub(super) fn next_shape_id(xml: &[u8]) -> Result<u32> {
 }
 
 pub(super) fn replace_span(xml: &[u8], span: &ElementSpan, replacement: &[u8]) -> Result<Vec<u8>> {
-    let mut output = Vec::with_capacity(xml.len() + replacement.len());
+    if span.start > span.end || span.end > xml.len() {
+        return Err(invalid("replacement span is outside the owner XML"));
+    }
+    let target_len = xml
+        .len()
+        .checked_sub(span.end - span.start)
+        .and_then(|length| length.checked_add(replacement.len()))
+        .ok_or(Error::Limit {
+            resource: "generated slide layout bytes",
+            limit: MAX_PART_XML_BYTES,
+        })?;
+    if target_len > MAX_PART_XML_BYTES {
+        return Err(Error::Limit {
+            resource: "generated slide layout bytes",
+            limit: MAX_PART_XML_BYTES,
+        });
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(target_len)
+        .map_err(|source| Error::Allocation {
+            resource: "generated slide layout bytes",
+            source,
+        })?;
     output.extend_from_slice(&xml[..span.start]);
     output.extend_from_slice(replacement);
     output.extend_from_slice(&xml[span.end..]);
-    check_size(&output)?;
     Ok(output)
 }
 
 pub(super) fn insert_bytes(xml: &[u8], offset: usize, value: &[u8]) -> Result<Vec<u8>> {
-    let mut output = Vec::with_capacity(xml.len() + value.len());
+    if offset > xml.len() {
+        return Err(invalid("insertion offset is outside the owner XML"));
+    }
+    let target_len = xml.len().checked_add(value.len()).ok_or(Error::Limit {
+        resource: "generated slide layout bytes",
+        limit: MAX_PART_XML_BYTES,
+    })?;
+    if target_len > MAX_PART_XML_BYTES {
+        return Err(Error::Limit {
+            resource: "generated slide layout bytes",
+            limit: MAX_PART_XML_BYTES,
+        });
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(target_len)
+        .map_err(|source| Error::Allocation {
+            resource: "generated slide layout bytes",
+            source,
+        })?;
     output.extend_from_slice(&xml[..offset]);
     output.extend_from_slice(value);
     output.extend_from_slice(&xml[offset..]);
-    check_size(&output)?;
     Ok(output)
 }

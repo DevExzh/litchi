@@ -22,16 +22,18 @@ pub(super) fn encode(format_identifier: Guid) -> BindingName {
     let mut bytes = [0u8; MAX_NAME_BYTES];
     bytes[0] = PREFIX;
     let raw = format_identifier.as_bytes();
+    // GUID (Packet Version) bits are consumed in packet-byte order, from the
+    // least significant bit to the most significant bit of each byte.
     for group in 0..GUID_SUFFIX_BYTES {
         let mut value = 0u8;
         for bit in 0..5 {
             let position = group * 5 + bit;
             let bit_value = if position < 128 {
-                (raw[position / 8] >> (7 - position % 8)) & 1
+                (raw[position / 8] >> (position % 8)) & 1
             } else {
                 0
             };
-            value = (value << 1) | bit_value;
+            value |= bit_value << bit;
         }
         bytes[group + 1] = ALPHABET[usize::from(value)];
     }
@@ -46,32 +48,22 @@ pub(super) fn decode(name: &str) -> Result<Guid, OleError> {
     }
 
     let mut raw = [0u8; 16];
-    let mut accumulator = 0u16;
-    let mut available = 0usize;
-    let mut written = 0usize;
-    for byte in name.as_bytes()[1..].iter().copied() {
+    for (group, byte) in name.as_bytes()[1..].iter().copied().enumerate() {
         let value = suffix_value(byte).ok_or_else(|| {
             super::super::model::invalid("Invalid GUID-derived Property Set binding character")
         })?;
-        accumulator = (accumulator << 5) | u16::from(value);
-        available += 5;
-        while available >= 8 && written < raw.len() {
-            available -= 8;
-            raw[written] = u8::try_from(accumulator >> available).map_err(|_conversion_error| {
-                super::super::model::invalid("GUID-derived Property Set binding byte is invalid")
-            })?;
-            written += 1;
-            if available == 0 {
-                accumulator = 0;
-            } else {
-                accumulator &= (1u16 << available) - 1;
+        for bit in 0..5 {
+            let position = group * 5 + bit;
+            if position >= 128 {
+                if value & (1u8 << bit) != 0 {
+                    return Err(super::super::model::invalid(
+                        "GUID-derived Property Set binding name has nonzero trailing bits",
+                    ));
+                }
+            } else if value & (1u8 << bit) != 0 {
+                raw[position / 8] |= 1u8 << (position % 8);
             }
         }
-    }
-    if written != raw.len() || available != 2 || accumulator != 0 {
-        return Err(super::super::model::invalid(
-            "GUID-derived Property Set binding name has nonzero trailing bits",
-        ));
     }
     Ok(Guid::from_bytes(raw))
 }

@@ -17,14 +17,15 @@ use super::text::{parse_short_text, parse_string, parse_xl_unicode_string};
 use super::validate;
 use super::validate::valid_props;
 use super::wire::{
-    AREA, AREA_FORMAT, AXES_USED, AXIS, AXIS_LINE, AXIS_PARENT, BAR, BEGIN, BRAI, CAT_SER_RANGE,
-    CELL_LABEL, CHART_FORMAT, CHART_REC, CONTINUE, CRT_LINE, CRT_LINK, DATA_FORMAT, DATA_LAB_EXT,
-    DATA_LAB_EXT_CONTENTS, DEFAULT_TEXT, DIMENSIONS, DROP_BAR, END, EXCEL_BOOL_ERR, FONT_X, FRAME,
-    LEGEND, LINE, LINE_FORMAT, MARKER_FORMAT, OBJECT_LINK, PIE, PIE_FORMAT, PLOT_AREA, PLOT_GROWTH,
-    POS, RADAR, RADAR_AREA, SCATTER, SCL, SER_AUX_ERR_BAR, SER_AUX_TREND, SER_PARENT, SER_TO_CRT,
-    SERIES, SERIES_LIST, SERIES_TEXT, SHT_PROPS, SI_INDEX, SURFACE, TEXT, TICK, VALUE_RANGE,
-    array4_at, byte_at, check_add, copy, count_at, exact, f64_at, i16_at, i32_at, invalid,
-    invalid_model, limit, push, u16_at, u32_at,
+    AREA, AREA_FORMAT, AXC_EXT, AXES_USED, AXIS, AXIS_LINE, AXIS_PARENT, BAR, BEGIN, BOF_DATASHEET,
+    BRAI, CAT_SER_RANGE, CELL_LABEL, CHART_FORMAT, CHART_REC, CONTINUE, COUNTRY, CRT_LINE,
+    CRT_LINK, DATA_FORMAT, DATA_LAB_EXT, DATA_LAB_EXT_CONTENTS, DEFAULT_TEXT, DIMENSIONS, DROP_BAR,
+    END, EXCEL_BOOL_ERR, EXCLUDE_COLUMNS, EXCLUDE_ROWS, FONT_X, FRAME, LEGEND, LINE, LINE_FORMAT,
+    MAIN_WINDOW, MARKER_FORMAT, MAX_STATUS, OBJECT_LINK, ORIENT, PIE, PIE_FORMAT, PLOT_AREA,
+    PLOT_GROWTH, POS, RADAR, RADAR_AREA, SCATTER, SCL, SELECTION, SER_AUX_ERR_BAR, SER_AUX_TREND,
+    SER_PARENT, SER_TO_CRT, SERIES, SERIES_LIST, SERIES_TEXT, SHT_PROPS, SI_INDEX, SURFACE, TEXT,
+    TICK, UNITS, VALUE_RANGE, WIN_DOC, WINDOW1, WINDOW2_GRAPH, array4_at, byte_at, check_add, copy,
+    count_at, exact, f64_at, i16_at, i32_at, invalid, invalid_model, limit, push, u16_at, u32_at,
 };
 use crate::{Error, Limits, Result};
 use litchi_biff::RecordRef;
@@ -58,6 +59,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
         dirty: false,
         limits,
         authoring_proven: false,
+        graph_authoring_profile: false,
     };
     let mut depth = 0usize;
     let mut current_series = None;
@@ -84,6 +86,27 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
     let mut zoom_seen = false;
     let mut growth_seen = false;
     let mut dimensions_seen = false;
+    let mut datasheet_seen = false;
+    let mut datasheet_pending = false;
+    let mut datasheet_active = false;
+    let mut country_seen = false;
+    let mut font_x_seen = false;
+    let mut exclude_rows_seen = false;
+    let mut exclude_columns_seen = false;
+    let mut orient_seen = false;
+    let mut windoc_seen = false;
+    let mut main_window_seen = false;
+    let mut window1_seen = false;
+    let mut window2_seen = false;
+    let mut max_status_seen = false;
+    let mut selection_seen = false;
+    let mut units_seen = false;
+    let mut attached_label_pending = false;
+    let mut attached_label_active = false;
+    let mut attached_label_depth = None;
+    let mut attached_label_brai_seen = false;
+    let mut attached_label_text = None;
+    let mut attached_label_link_object = None;
     let mut axes_used = None;
     let mut chart_seen = false;
     let mut props_seen = false;
@@ -170,6 +193,12 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
         if record.kind() == EOF {
             break;
         }
+        if datasheet_pending && record.kind() != BEGIN {
+            return invalid(record, "BOFDatasheet is not followed immediately by Begin");
+        }
+        if attached_label_pending && record.kind() != BEGIN {
+            return invalid(record, "attached Text is not followed immediately by Begin");
+        }
         if pending_begin && record.kind() != BEGIN {
             return invalid(
                 record,
@@ -177,9 +206,32 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
             );
         }
         let data = record.payload();
+        let graph_cache_open = context.kind() == ChartKind::Graph
+            && ((datasheet_active && depth == 1 && orient_seen && !windoc_seen)
+                || (!datasheet_active && depth == 0 && dimensions_seen));
         match record.kind() {
             BEGIN => {
                 exact(record, 0)?;
+                if datasheet_pending {
+                    if context.kind() != ChartKind::Graph || depth != 0 || datasheet_active {
+                        return invalid(record, "datasheet Begin is misplaced");
+                    }
+                    datasheet_pending = false;
+                    datasheet_active = true;
+                } else if datasheet_active {
+                    return invalid(record, "datasheet collection cannot contain nested Begin");
+                }
+                if attached_label_pending {
+                    if depth != 1 || attached_label_active {
+                        return invalid(record, "attached-label Begin is misplaced");
+                    }
+                    attached_label_pending = false;
+                    attached_label_active = true;
+                    attached_label_depth = depth.checked_add(1);
+                    attached_label_brai_seen = false;
+                    attached_label_text = None;
+                    attached_label_link_object = None;
+                }
                 if strict_excel && depth == 0 && !pending_begin {
                     return invalid(record, "Begin record has no chart-level collection owner");
                 }
@@ -198,6 +250,44 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 exact(record, 0)?;
                 if depth == 0 {
                     return invalid(record, "End record has no matching Begin");
+                }
+                if datasheet_active && depth == 1 {
+                    if !orient_seen
+                        || !country_seen
+                        || !font_x_seen
+                        || !exclude_rows_seen
+                        || !exclude_columns_seen
+                        || !windoc_seen
+                        || !main_window_seen
+                        || !window1_seen
+                        || !window2_seen
+                        || !max_status_seen
+                        || !selection_seen
+                    {
+                        return invalid(
+                            record,
+                            "datasheet is missing Orient or mandatory window/selection records",
+                        );
+                    }
+                    datasheet_active = false;
+                    depth -= 1;
+                    continue;
+                }
+                if attached_label_active && attached_label_depth == Some(depth) {
+                    if attached_label_link_object == Some(1)
+                        && attached_label_brai_seen
+                        && attached_label_text.is_some()
+                    {
+                        if chart.title.is_some() {
+                            return invalid(record, "chart contains more than one title label");
+                        }
+                        chart.title = attached_label_text.take();
+                    }
+                    attached_label_active = false;
+                    attached_label_depth = None;
+                    attached_label_brai_seen = false;
+                    attached_label_text = None;
+                    attached_label_link_object = None;
                 }
                 if pending_drop
                     .as_ref()
@@ -298,8 +388,222 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 }
                 depth -= 1;
             },
+            BOF_DATASHEET if context.kind() == ChartKind::Graph => {
+                if datasheet_seen
+                    || datasheet_pending
+                    || datasheet_active
+                    || chart_seen
+                    || depth != 0
+                {
+                    return invalid(record, "BOFDatasheet is duplicated or misplaced");
+                }
+                exact(record, 4)?;
+                datasheet_seen = true;
+                datasheet_pending = true;
+            },
+            COUNTRY if context.kind() == ChartKind::Graph => {
+                if !datasheet_active
+                    || depth != 1
+                    || country_seen
+                    || font_x_seen
+                    || exclude_rows_seen
+                    || exclude_columns_seen
+                    || orient_seen
+                {
+                    return invalid(record, "Country is duplicated or out of Datasheet order");
+                }
+                exact(record, 4)?;
+                country_seen = true;
+            },
+            FONT_X if context.kind() == ChartKind::Graph && datasheet_active => {
+                if depth != 1
+                    || !country_seen
+                    || font_x_seen
+                    || exclude_rows_seen
+                    || exclude_columns_seen
+                    || orient_seen
+                {
+                    return invalid(record, "Datasheet FontX is duplicated or out of order");
+                }
+                exact(record, 2)?;
+                font_x_seen = true;
+            },
+            EXCLUDE_ROWS if context.kind() == ChartKind::Graph => {
+                if !datasheet_active
+                    || depth != 1
+                    || !font_x_seen
+                    || exclude_rows_seen
+                    || exclude_columns_seen
+                    || orient_seen
+                {
+                    return invalid(
+                        record,
+                        "ExcludeRows is duplicated or out of Datasheet order",
+                    );
+                }
+                if data.len() % 2 != 0 || data.len() / 2 > 255 {
+                    return invalid(record, "ExcludeRows has an invalid transition array");
+                }
+                exclude_rows_seen = true;
+            },
+            EXCLUDE_COLUMNS if context.kind() == ChartKind::Graph => {
+                if !datasheet_active
+                    || depth != 1
+                    || !exclude_rows_seen
+                    || exclude_columns_seen
+                    || orient_seen
+                {
+                    return invalid(
+                        record,
+                        "ExcludeColumns is duplicated or out of Datasheet order",
+                    );
+                }
+                if data.len() % 2 != 0 {
+                    return invalid(record, "ExcludeColumns has an invalid transition array");
+                }
+                exclude_columns_seen = true;
+            },
+            ORIENT if context.kind() == ChartKind::Graph => {
+                if !datasheet_active
+                    || depth != 1
+                    || !country_seen
+                    || !font_x_seen
+                    || !exclude_rows_seen
+                    || !exclude_columns_seen
+                    || orient_seen
+                {
+                    return invalid(record, "Orient is duplicated or outside Datasheet");
+                }
+                exact(record, 6)?;
+                let rows = byte_at(data, 0, record)?;
+                if rows > 1 || byte_at(data, 5, record)? != 1 {
+                    return invalid(record, "Orient Boolean or reserved field is invalid");
+                }
+                let row_series = u16_at(data, 1, record)?;
+                let col_series = u16_at(data, 3, record)?;
+                if row_series > 0x0F9F || col_series > 0x0F9F {
+                    return invalid(record, "Orient series coordinate exceeds the Graph grid");
+                }
+                orient_seen = true;
+            },
+            WIN_DOC if context.kind() == ChartKind::Graph => {
+                if !datasheet_active || depth != 1 || !orient_seen || windoc_seen {
+                    return invalid(record, "WinDoc is duplicated or out of Datasheet order");
+                }
+                exact(record, 1)?;
+                if byte_at(data, 0, record)? > 1 {
+                    return invalid(record, "WinDoc Boolean is invalid");
+                }
+                windoc_seen = true;
+            },
+            MAIN_WINDOW if context.kind() == ChartKind::Graph => {
+                if !datasheet_active || depth != 1 || !windoc_seen || main_window_seen {
+                    return invalid(record, "MainWindow is duplicated or out of Datasheet order");
+                }
+                exact(record, 4)?;
+                if i16_at(data, 0, record)? < 1 || i16_at(data, 2, record)? < 1 {
+                    return invalid(record, "MainWindow scale must be positive");
+                }
+                main_window_seen = true;
+            },
+            WINDOW1 if context.kind() == ChartKind::Graph => {
+                if !datasheet_active || depth != 1 || !main_window_seen || window1_seen {
+                    return invalid(record, "Window1_10 is duplicated or out of Datasheet order");
+                }
+                exact(record, 10)?;
+                if u16_at(data, 2, record)? == 0
+                    || u16_at(data, 4, record)? == 0
+                    || u16_at(data, 8, record)? != 0
+                {
+                    return invalid(
+                        record,
+                        "Window1_10 dimensions or reserved bytes are invalid",
+                    );
+                }
+                window1_seen = true;
+            },
+            WINDOW2_GRAPH if context.kind() == ChartKind::Graph => {
+                if !datasheet_active || depth != 1 || !window1_seen || window2_seen {
+                    return invalid(
+                        record,
+                        "Window2Graph is duplicated or out of Datasheet order",
+                    );
+                }
+                exact(record, 14)?;
+                if data.get(0..5) != Some(&[1, 1, 1, 0, 1])
+                    || byte_at(data, 9, record)? != 1
+                    || u16_at(data, 10, record)? != 0
+                    || u16_at(data, 12, record)? != 0
+                    || u16_at(data, 5, record)? < 1
+                    || u16_at(data, 7, record)? < 1
+                {
+                    return invalid(record, "Window2Graph fields are invalid");
+                }
+                window2_seen = true;
+            },
+            MAX_STATUS if context.kind() == ChartKind::Graph => {
+                if !datasheet_active || depth != 1 || !window2_seen || max_status_seen {
+                    return invalid(record, "MaxStatus is duplicated or out of Datasheet order");
+                }
+                exact(record, 2)?;
+                max_status_seen = true;
+            },
+            SELECTION if context.kind() == ChartKind::Graph => {
+                if !datasheet_active || depth != 1 || !max_status_seen || selection_seen {
+                    return invalid(record, "Selection is duplicated or out of Datasheet order");
+                }
+                exact(record, 17)?;
+                if byte_at(data, 0, record)? != 3 || u16_at(data, 5, record)? != 0 {
+                    return invalid(
+                        record,
+                        "Selection discriminator or reserved fields are invalid",
+                    );
+                }
+                let rw_act = u16_at(data, 1, record)?;
+                let col_act = u16_at(data, 3, record)?;
+                let rw_first = u16_at(data, 9, record)?;
+                let rw_last = u16_at(data, 11, record)?;
+                let col_first = u16_at(data, 13, record)?;
+                let col_last = u16_at(data, 15, record)?;
+                if rw_first > rw_last
+                    || col_first > col_last
+                    || rw_act < rw_first
+                    || rw_act > rw_last
+                    || col_act < col_first
+                    || col_act > col_last
+                    || RowCol::new(rw_last).is_none()
+                    || RowCol::new(col_last).is_none()
+                {
+                    return invalid(
+                        record,
+                        "Selection range is reversed or outside the Graph grid",
+                    );
+                }
+                selection_seen = true;
+            },
+            UNITS if context.kind() == ChartKind::Graph => {
+                if !datasheet_seen
+                    || datasheet_pending
+                    || datasheet_active
+                    || units_seen
+                    || chart_seen
+                    || depth != 0
+                {
+                    return invalid(record, "Units is duplicated or misplaced");
+                }
+                exact(record, 2)?;
+                if data.iter().any(|value| *value != 0) {
+                    return invalid(record, "Units reserved field is nonzero");
+                }
+                units_seen = true;
+            },
             CHART_REC => {
-                if chart_seen || depth != 0 {
+                if chart_seen
+                    || depth != 0
+                    || datasheet_pending
+                    || datasheet_active
+                    || (datasheet_seen && !units_seen)
+                {
                     return invalid(record, "Chart must occur once at chart-substream level");
                 }
                 exact(record, 16)?;
@@ -394,6 +698,22 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     // other text collection. It is not one of this semantic
                     // chart model's four series bindings, so preserve it
                     // losslessly instead of rejecting the host chart.
+                    if attached_label_active && attached_label_depth == Some(depth) {
+                        if attached_label_brai_seen {
+                            return invalid(
+                                record,
+                                "attached label contains more than one AI binding",
+                            );
+                        }
+                        let link = links::parse_link(record, context, limits)?;
+                        if link.role() != Role::Name {
+                            return invalid(
+                                record,
+                                "chart title attached label does not use a Name AI",
+                            );
+                        }
+                        attached_label_brai_seen = true;
+                    }
                     add_raw(&mut chart, record, &mut unknown_bytes, limits)?;
                     continue;
                 }
@@ -529,6 +849,12 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                             reason: "one AI has more than one SeriesText",
                         })?;
                 } else {
+                    if attached_label_active && attached_label_depth == Some(depth) {
+                        if !attached_label_brai_seen || attached_label_text.is_some() {
+                            return invalid(record, "attached label SeriesText is out of AI order");
+                        }
+                        attached_label_text = Some(parse_short_text(record)?);
+                    }
                     add_raw(&mut chart, record, &mut unknown_bytes, limits)?;
                 }
             },
@@ -824,6 +1150,20 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 };
                 parent_needs_pos = false;
             },
+            AXC_EXT if context.kind() == ChartKind::Graph => {
+                if axis_depth != Some(depth)
+                    || current_axis
+                        .and_then(|index| chart.axes.get(index))
+                        .is_none_or(|axis| axis.kind != axis::Kind::Category)
+                {
+                    return invalid(record, "AxcExt appears outside a category Axis collection");
+                }
+                exact(record, 18)?;
+                let flags = u16_at(data, 16, record)?;
+                if flags & 0xFF00 != 0 {
+                    return invalid(record, "AxcExt reserved flags are nonzero");
+                }
+            },
             VALUE_RANGE => {
                 exact(record, 42)?;
                 if axis_depth != Some(depth) {
@@ -986,6 +1326,12 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 chart.props.plot_area = true;
             },
             DATA_LAB_EXT | DATA_LAB_EXT_CONTENTS | TEXT => {
+                if record.kind() == TEXT && context.kind() == ChartKind::Graph && depth == 1 {
+                    if attached_label_pending || attached_label_active {
+                        return invalid(record, "chart attached labels overlap");
+                    }
+                    attached_label_pending = true;
+                }
                 let data = copy(data, "data-label payload", limits.biff.max_record_bytes)?;
                 push(
                     &mut chart.labels,
@@ -997,7 +1343,12 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 )?;
             },
             DIMENSIONS => {
-                if dimensions_seen || (strict_excel && (depth != 0 || !chart_closed)) {
+                if dimensions_seen
+                    || (strict_excel && (depth != 0 || !chart_closed))
+                    || (context.kind() == ChartKind::Graph
+                        && datasheet_seen
+                        && (!units_seen || depth != 0 || !chart_closed))
+                {
                     return invalid(record, "Dimensions must occur once before SERIESDATA cells");
                 }
                 exact(record, 14)?;
@@ -1082,7 +1433,9 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 );
             },
             kind if kind == number_kind(context.kind()) => {
-                if depth != 0 || !dimensions_seen {
+                if (context.kind() == ChartKind::Graph && !graph_cache_open)
+                    || (context.kind() == ChartKind::Excel && (depth != 0 || !dimensions_seen))
+                {
                     return invalid(record, "cached Number must follow Dimensions in SERIESDATA");
                 }
                 let value = match context.kind() {
@@ -1120,7 +1473,9 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 push(&mut chart.caches, value, "chart cache")?;
             },
             CELL_LABEL => {
-                if depth != 0 || !dimensions_seen {
+                if (context.kind() == ChartKind::Graph && !graph_cache_open)
+                    || (context.kind() == ChartKind::Excel && (depth != 0 || !dimensions_seen))
+                {
                     return invalid(record, "cached Label must follow Dimensions in SERIESDATA");
                 }
                 let value = match context.kind() {
@@ -1170,7 +1525,9 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 push(&mut chart.caches, value, "chart cache")?;
             },
             kind if kind == blank_kind(context.kind()) => {
-                if depth != 0 || !dimensions_seen {
+                if (context.kind() == ChartKind::Graph && !graph_cache_open)
+                    || (context.kind() == ChartKind::Excel && (depth != 0 || !dimensions_seen))
+                {
                     return invalid(record, "cached Blank must follow Dimensions in SERIESDATA");
                 }
                 let value = match context.kind() {
@@ -1249,8 +1606,14 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 push(&mut chart.caches, value, "chart cache")?;
             },
             BOF => return invalid(record, "nested BOF in chart substream"),
-            CONTINUE | SERIES_LIST | CAT_SER_RANGE | DEFAULT_TEXT | FONT_X | OBJECT_LINK
-            | FRAME | POS => {
+            OBJECT_LINK => {
+                if attached_label_active && attached_label_depth == Some(depth) {
+                    exact(record, 6)?;
+                    attached_label_link_object = Some(u16_at(data, 0, record)?);
+                }
+                add_raw(&mut chart, record, &mut unknown_bytes, limits)?;
+            },
+            CONTINUE | SERIES_LIST | CAT_SER_RANGE | DEFAULT_TEXT | FONT_X | FRAME | POS => {
                 add_raw(&mut chart, record, &mut unknown_bytes, limits)?;
             },
             _ => add_raw(&mut chart, record, &mut unknown_bytes, limits)?,
@@ -1260,6 +1623,34 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
         return Err(Error::InvalidChart {
             offset: input.as_bytes().len(),
             reason: "chart Begin/End collections are unbalanced",
+        });
+    }
+    if datasheet_pending || datasheet_active || attached_label_pending || attached_label_active {
+        return Err(Error::InvalidChart {
+            offset: input.as_bytes().len(),
+            reason: "Datasheet or attached-label collection is incomplete",
+        });
+    }
+    if datasheet_seen
+        && (!units_seen
+            || !orient_seen
+            || !country_seen
+            || !font_x_seen
+            || !exclude_rows_seen
+            || !exclude_columns_seen
+            || !windoc_seen
+            || !main_window_seen
+            || !window1_seen
+            || !window2_seen
+            || !max_status_seen
+            || !selection_seen
+            || !chart_seen
+            || !chart_closed
+            || !dimensions_seen)
+    {
+        return Err(Error::InvalidChart {
+            offset: input.as_bytes().len(),
+            reason: "Graph chart sheet is missing a mandatory Datasheet or chart record",
         });
     }
     if pending_begin

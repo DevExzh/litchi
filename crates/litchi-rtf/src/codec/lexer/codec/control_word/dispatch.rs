@@ -1,6 +1,15 @@
 use super::ControlWord;
 use crate::codec::error::{RtfError, RtfResult};
 
+fn reject_numeric_parameter(word: &str, param: Option<i32>) -> RtfResult<()> {
+    if param.is_some() {
+        return Err(RtfError::MalformedDocument(format!(
+            "RTF \\{word} does not accept a numeric parameter"
+        )));
+    }
+    Ok(())
+}
+
 /// Match a control-word spelling and optional parameter to its typed token.
 ///
 /// This is the RTF specification's flat control-word dispatch table. Keeping
@@ -427,12 +436,44 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
         "pararsid" => ControlWord::ParagraphRsid(param_value),
         "sectrsid" => ControlWord::SectionRsid(param_value),
         "tblrsid" => ControlWord::TableRsid(param_value),
-        "xmlnstbl" => ControlWord::XmlNamespaceTable,
-        "xmlns" => ControlWord::XmlNamespace(param_value),
-        "xmlopen" => ControlWord::XmlOpen,
-        "xmlclose" => ControlWord::XmlClose,
-        "xmlattrname" => ControlWord::XmlAttributeName,
-        "xmlattrvalue" => ControlWord::XmlAttributeValue,
+        "xmlnstbl" => {
+            reject_numeric_parameter("xmlnstbl", param)?;
+            ControlWord::XmlNamespaceTable
+        },
+        "xmlns" => ControlWord::XmlNamespace(param.ok_or_else(|| {
+            RtfError::MalformedDocument(
+                "RTF \\xmlns control requires a namespace parameter".to_string(),
+            )
+        })?),
+        "xmlopen" => {
+            reject_numeric_parameter("xmlopen", param)?;
+            ControlWord::XmlOpen
+        },
+        "xmlclose" => {
+            reject_numeric_parameter("xmlclose", param)?;
+            ControlWord::XmlClose
+        },
+        "xmlattr" => match param {
+            Some(value) => ControlWord::XmlAttribute(value),
+            None => ControlWord::XmlAttributeGroup,
+        },
+        "xmlattrns" => ControlWord::XmlAttributeNamespace(param.ok_or_else(|| {
+            RtfError::MalformedDocument(
+                "RTF \\xmlattrns control requires a namespace parameter".to_string(),
+            )
+        })?),
+        "xmlattrname" => {
+            reject_numeric_parameter("xmlattrname", param)?;
+            ControlWord::XmlAttributeName
+        },
+        "xmlattrvalue" => {
+            reject_numeric_parameter("xmlattrvalue", param)?;
+            ControlWord::XmlAttributeValue
+        },
+        "factoidname" => {
+            reject_numeric_parameter("factoidname", param)?;
+            ControlWord::FactoidName
+        },
         "mmath" | "moMath" => ControlWord::MathZoneInline,
         "mmathPara" | "moMathPara" => ControlWord::MathZoneDisplay,
         "mmathParaPr" | "moMathParaPr" => ControlWord::MathZoneParagraphProperties,
@@ -667,6 +708,10 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
         "enforceprot" => ControlWord::EnforceProtection(param),
         "protlevel" => ControlWord::ProtectionLevel(param),
         "password" => ControlWord::Password,
+        "passwordhash" => {
+            reject_numeric_parameter("passwordhash", param)?;
+            ControlWord::PasswordHash
+        },
         "protusertbl" => ControlWord::ProtectionUserTable,
         "hyphauto" => ControlWord::HyphenateAutomatically(param),
         "hyphcaps" => ControlWord::HyphenateCapitalizedWords(param),
@@ -1026,6 +1071,46 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
         "faroman" => ControlWord::FontAlignRoman(param),
         "favar" => ControlWord::FontAlignVariable(param),
         "fafixed" => ControlWord::FontAlignFixed(param),
+
+        // Positioned paragraph objects and frames
+        "absw" => ControlWord::FrameAbsoluteWidth(param),
+        "absh" => ControlWord::FrameAbsoluteHeight(param),
+        "phmrg" => ControlWord::FrameHorizontalMargin(param),
+        "phpg" => ControlWord::FrameHorizontalPage(param),
+        "phcol" => ControlWord::FrameHorizontalColumn(param),
+        "posx" => ControlWord::FrameHorizontalOffset(param),
+        "posnegx" => ControlWord::FrameHorizontalNegativeOffset(param),
+        "posxc" => ControlWord::FrameHorizontalCenter(param),
+        "posxi" => ControlWord::FrameHorizontalInside(param),
+        "posxo" => ControlWord::FrameHorizontalOutside(param),
+        "posxl" => ControlWord::FrameHorizontalLeft(param),
+        "posxr" => ControlWord::FrameHorizontalRight(param),
+        "pvmrg" => ControlWord::FrameVerticalMargin(param),
+        "pvpg" => ControlWord::FrameVerticalPage(param),
+        "pvpara" => ControlWord::FrameVerticalParagraph(param),
+        "posy" => ControlWord::FrameVerticalOffset(param),
+        "posnegy" => ControlWord::FrameVerticalNegativeOffset(param),
+        "posyil" => ControlWord::FrameVerticalInline(param),
+        "posyt" => ControlWord::FrameVerticalTop(param),
+        "posyc" => ControlWord::FrameVerticalCenter(param),
+        "posyb" => ControlWord::FrameVerticalBottom(param),
+        "posyin" => ControlWord::FrameVerticalInside(param),
+        "posyout" => ControlWord::FrameVerticalOutside(param),
+        "abslock" => ControlWord::FrameAbsoluteLock(param),
+        "nowrap" => ControlWord::FrameNoWrap(param),
+        "dxfrtext" => ControlWord::FrameHorizontalTextDistance(param),
+        "dfrmtxtx" => ControlWord::FrameHorizontalTextOffset(param),
+        "dfrmtxty" => ControlWord::FrameVerticalTextOffset(param),
+        "wraparound" => ControlWord::FrameWrapAround(param),
+        "wraptight" => ControlWord::FrameWrapTight(param),
+        "wrapthrough" => ControlWord::FrameWrapThrough(param),
+        "overlay" => ControlWord::FrameOverlay(param),
+        "absnoovrlp" => ControlWord::FrameNoOverlap(param),
+        "frmtxlrtb" => ControlWord::FrameTextFlowLrtb(param),
+        "frmtxtbrl" => ControlWord::FrameTextFlowTbrl(param),
+        "frmtxbtlr" => ControlWord::FrameTextFlowBtlr(param),
+        "frmtxlrtbv" => ControlWord::FrameTextFlowLrtbv(param),
+        "frmtxtbrlv" => ControlWord::FrameTextFlowTbrlv(param),
 
         // Tables
         "trowd" => ControlWord::TableRowDefaults,
@@ -2226,6 +2311,24 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
         "bkmkcolf" => ControlWord::BookmarkFirstColumn(param_value),
         "bkmkcoll" => ControlWord::BookmarkLastColumn(param_value),
         "bkmkpub" => ControlWord::BookmarkPublic,
+
+        // Tracked move bookmarks
+        "mvfmf" => {
+            reject_numeric_parameter("mvfmf", param)?;
+            ControlWord::MoveFromStart
+        },
+        "mvfml" => {
+            reject_numeric_parameter("mvfml", param)?;
+            ControlWord::MoveFromEnd
+        },
+        "mvtof" => {
+            reject_numeric_parameter("mvtof", param)?;
+            ControlWord::MoveToStart
+        },
+        "mvtol" => {
+            reject_numeric_parameter("mvtol", param)?;
+            ControlWord::MoveToEnd
+        },
 
         // Annotations
         "atn" | "annotation" => ControlWord::Annotation,

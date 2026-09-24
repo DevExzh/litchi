@@ -11,6 +11,7 @@ pub mod content_parts;
 pub mod controls;
 pub mod excel;
 pub mod ink;
+pub mod ink_actions;
 pub mod ole;
 #[cfg(feature = "vba-inspection")]
 pub mod vba;

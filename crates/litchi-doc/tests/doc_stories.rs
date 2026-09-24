@@ -238,6 +238,15 @@ fn reads_range_comment_with_author_and_metadata() {
         (comment.range_start, comment.range_end),
         (Some(2), Some(19))
     );
+    let tags = document
+        .annotation_bookmarks()
+        .unwrap()
+        .expect("ranged comment has annotation-bookmark tags");
+    assert_eq!(tags.len(), 1);
+    assert_eq!(
+        tags.entries()[0].id().raw(),
+        comment.bookmark_tag.expect("comment annotation tag")
+    );
     assert!(!comment.paragraphs.is_empty());
 
     let metadata = comment.extended_metadata.expect("ATRDPost10 metadata");
@@ -249,6 +258,14 @@ fn reads_range_comment_with_author_and_metadata() {
         (modified.year, modified.month, modified.day),
         (2014, 12, 29)
     );
+}
+
+#[test]
+fn annotation_bookmark_facade_reports_absent_table_without_reopening_cfb() {
+    let mut package = open(fixture("empty.doc"));
+    let document = package.document().unwrap();
+
+    assert!(document.annotation_bookmarks().unwrap().is_none());
 }
 
 #[test]

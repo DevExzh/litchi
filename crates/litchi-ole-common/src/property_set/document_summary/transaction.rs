@@ -12,6 +12,7 @@ use super::model::{
     Version,
 };
 use super::validation::validate_section;
+use crate::vba_signature;
 use litchi_cfb::OleError;
 
 /// A source-bound, isolated Document Summary Information edit.
@@ -300,6 +301,41 @@ impl Edit<'_> {
     /// the section has no code page.
     pub fn set_document_version(&mut self, value: &str) -> Result<(), OleError> {
         self.set_string(DOCUMENT_VERSION, value, "document version")
+    }
+
+    /// Replaces PIDDSI `DigitalSignature` with an already validated inert
+    /// `DigSigBlob` snapshot.
+    ///
+    /// The snapshot must use the `Property` container kind. The nested PKCS#7
+    /// `SignedData` and `SpcIndirectDataContent` versus
+    /// `SpcIndirectDataContentV2` `contentInfo` form are retained as an
+    /// opaque blob; this method never verifies trust or activates a VBA
+    /// project.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `signature` is a `WordSigBlob` or if the property
+    /// cannot be stored in this section.
+    pub fn set_vba_signature(
+        &mut self,
+        signature: &vba_signature::Snapshot,
+    ) -> Result<(), OleError> {
+        if signature.kind() != vba_signature::Kind::Property {
+            return Err(invalid(
+                "PIDDSI DigitalSignature requires a DigSigBlob snapshot",
+            ));
+        }
+        self.set_value(
+            super::model::DIGITAL_SIGNATURE,
+            Value::Blob(signature.bytes().to_vec()),
+        )
+    }
+
+    /// Removes PIDDSI `DigitalSignature`, if present.
+    pub fn remove_vba_signature(&mut self) -> bool {
+        self.section
+            .remove(super::model::DIGITAL_SIGNATURE)
+            .is_some()
     }
 
     /// Removes an optional property while protecting the required `CodePage`.

@@ -1,0 +1,89 @@
+{
+  "lxml_version": [
+    6,
+    0,
+    2,
+    0
+  ],
+  "reports": [
+    {
+      "path": "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/native.xml",
+      "member": null,
+      "bytes": 8390,
+      "input_sha256": "50b662d8ff0e562157ff80aa19c85ff214cd21357d66457661d070f50c6fdc59",
+      "sha256": "50b662d8ff0e562157ff80aa19c85ff214cd21357d66457661d070f50c6fdc59",
+      "valid": true,
+      "families": [
+        {
+          "extension_uri": "{05A4C25C-085E-4340-85A3-A5531E510DB2}",
+          "attributes": {
+            "name": "Office Theme",
+            "id": "{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}",
+            "vid": "{4A3C46E8-61CC-4603-A589-7422A47A8E4A}"
+          }
+        }
+      ],
+      "family_schema_source_sha256": "72b596afed7fcbb72ebc17a142219493f67564ee2910169ef1067e9838713914",
+      "conformance": "Transitional",
+      "schema_archive_sha256": "d34187520749998af306faf1b730e568b0ca6d88ad24638a407c0a9bb4ca04fc",
+      "main_schema_sha256": "6978ba7e889070b0c3cb5b546b23e5a6c3516134afc53b87a21f482ca33f3858"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/updated.xml",
+      "member": null,
+      "bytes": 8396,
+      "input_sha256": "18d00f349b190e417fe0c00c5ca4f36a6fed08bc599c6ee7f891493eff0c8ce9",
+      "sha256": "18d00f349b190e417fe0c00c5ca4f36a6fed08bc599c6ee7f891493eff0c8ce9",
+      "valid": true,
+      "families": [
+        {
+          "extension_uri": "{05A4C25C-085E-4340-85A3-A5531E510DB2}",
+          "attributes": {
+            "name": "Audit Edited Theme",
+            "id": "{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}",
+            "vid": "{4A3C46E8-61CC-4603-A589-7422A47A8E4A}"
+          }
+        }
+      ],
+      "family_schema_source_sha256": "72b596afed7fcbb72ebc17a142219493f67564ee2910169ef1067e9838713914",
+      "conformance": "Transitional",
+      "schema_archive_sha256": "d34187520749998af306faf1b730e568b0ca6d88ad24638a407c0a9bb4ca04fc",
+      "main_schema_sha256": "6978ba7e889070b0c3cb5b546b23e5a6c3516134afc53b87a21f482ca33f3858"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/removed.xml",
+      "member": null,
+      "bytes": 8112,
+      "input_sha256": "fa8c8865c4fd4a5d60bd740f68b5a34783f81e4d4e5490fc0329a5e181bd2aae",
+      "sha256": "fa8c8865c4fd4a5d60bd740f68b5a34783f81e4d4e5490fc0329a5e181bd2aae",
+      "valid": true,
+      "families": [],
+      "family_schema_source_sha256": "72b596afed7fcbb72ebc17a142219493f67564ee2910169ef1067e9838713914",
+      "conformance": "Transitional",
+      "schema_archive_sha256": "d34187520749998af306faf1b730e568b0ca6d88ad24638a407c0a9bb4ca04fc",
+      "main_schema_sha256": "6978ba7e889070b0c3cb5b546b23e5a6c3516134afc53b87a21f482ca33f3858"
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/added.xml",
+      "member": null,
+      "bytes": 8469,
+      "input_sha256": "46659db8a572eeb2e4d9aefd8c8f7f00cdad6cf9c96b360c1b2a16d1cf904c79",
+      "sha256": "46659db8a572eeb2e4d9aefd8c8f7f00cdad6cf9c96b360c1b2a16d1cf904c79",
+      "valid": true,
+      "families": [
+        {
+          "extension_uri": "http://schemas.microsoft.com/office/thememl/2012/main",
+          "attributes": {
+            "name": "Office Theme",
+            "id": "{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}",
+            "vid": "{4A3C46E8-61CC-4603-A589-7422A47A8E4A}"
+          }
+        }
+      ],
+      "family_schema_source_sha256": "72b596afed7fcbb72ebc17a142219493f67564ee2910169ef1067e9838713914",
+      "conformance": "Transitional",
+      "schema_archive_sha256": "d34187520749998af306faf1b730e568b0ca6d88ad24638a407c0a9bb4ca04fc",
+      "main_schema_sha256": "6978ba7e889070b0c3cb5b546b23e5a6c3516134afc53b87a21f482ca33f3858"
+    }
+  ]
+}

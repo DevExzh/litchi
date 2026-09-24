@@ -1,0 +1,16 @@
+[
+  "crates/litchi-ods/src/codec/formula/evaluation.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value/scalar.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/text.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/text/core.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/text/format.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/text/fraction.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/text/search.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/text/unicode.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/text/width.rs",
+  "crates/litchi-ods/tests/ods_formula_text_evaluation.rs",
+  "crates/litchi-ods/tests/ods_formula_text_limits.rs",
+  "crates/litchi-ods/tests/ods_formula_text_native.rs",
+  "crates/litchi-ods/tests/ods_formula_text_oracle.rs"
+]

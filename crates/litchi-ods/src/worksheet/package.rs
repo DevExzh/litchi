@@ -6,7 +6,7 @@
 //! discarding producer data.
 
 use super::{Cell, CellValue, Sheet, codec, validation};
-use litchi_core::{Error, Result};
+use litchi_core::{Error, Result, xml::escape_xml};
 use litchi_odf_common::{
     constants,
     core::{AuthoredXmlFragment, OwnedPackage, XmlSourcePart, XmlSplicePublication},
@@ -66,6 +66,7 @@ pub(crate) fn replace_tables(xml: &str, sheets: &[Sheet]) -> Result<String> {
 fn replace_tables_bounded(xml: &str, sheets: &[Sheet], max_output_bytes: usize) -> Result<String> {
     validation::validate_content_xml_size(xml)?;
     validation::validate_sheets(sheets)?;
+    let mut source_sheets = None;
     if sheets.iter().any(|sheet| {
         sheet
             .rows
@@ -74,16 +75,41 @@ fn replace_tables_bounded(xml: &str, sheets: &[Sheet], max_output_bytes: usize) 
     }) {
         let source = codec::parse(xml)?;
         validate_owned_link_delta(&source, sheets)?;
+        source_sheets = Some(source);
     }
     let spans = scan(xml)?;
     let spreadsheet = one_spreadsheet(&spans)?;
     let mut tables = direct_children(&spans, spreadsheet, TABLE_NAMESPACE, "table");
     tables.sort_unstable_by_key(|index| spans[*index].start);
 
+    // Sheet title/description edits do not need to rebuild a complete table.
+    // Keep this narrow path ahead of the canonical table writer so a metadata
+    // edit retains unrelated cell markup, entity spelling, attribute order,
+    // and producer extensions byte-for-byte.  A full table replacement below
+    // remains deliberately strict for edits that change modeled worksheet
+    // content.
+    let source_sheets = match source_sheets {
+        Some(source) => source,
+        None => codec::parse(xml)?,
+    };
+    if let Some(updated) = replace_table_metadata(
+        xml,
+        &spans,
+        &tables,
+        &source_sheets,
+        sheets,
+        max_output_bytes,
+    )? {
+        return Ok(updated);
+    }
+
     for table in &tables {
         validate_rewritable_table_content(xml, &spans, *table)?;
         for child in direct_children_any(&spans, *table) {
-            if !is_element(&spans[child], TABLE_NAMESPACE, "table-row") {
+            if !is_element(&spans[child], TABLE_NAMESPACE, "table-row")
+                && !is_element(&spans[child], TABLE_NAMESPACE, "title")
+                && !is_element(&spans[child], TABLE_NAMESPACE, "desc")
+            {
                 return Err(Error::InvalidFormat(
                     "ODS worksheet edit cannot replace a table containing unmodeled direct children"
                         .to_string(),
@@ -203,6 +229,166 @@ fn replace_tables_bounded(xml: &str, sheets: &[Sheet], max_output_bytes: usize) 
     Ok(updated)
 }
 
+/// Patch only direct `table:title` and `table:desc` children when they are the
+/// complete semantic delta.  Returning `None` asks the ordinary table writer
+/// to handle a structural or cell edit.
+fn replace_table_metadata(
+    xml: &str,
+    spans: &[Span],
+    tables: &[usize],
+    source: &[Sheet],
+    candidate: &[Sheet],
+    max_output_bytes: usize,
+) -> Result<Option<String>> {
+    if source.len() != candidate.len() || source.len() != tables.len() {
+        return Ok(None);
+    }
+
+    let mut changed = false;
+    for (before, after) in source.iter().zip(candidate) {
+        let mut expected = before.clone();
+        expected.title = after.title.clone();
+        expected.description = after.description.clone();
+        if expected != *after {
+            return Ok(None);
+        }
+        changed |= before.title != after.title || before.description != after.description;
+    }
+    if !changed {
+        return Ok(Some(xml.to_owned()));
+    }
+
+    let mut edits = Vec::new();
+    for ((before, after), table_index) in source.iter().zip(candidate).zip(tables) {
+        let table = spans
+            .get(*table_index)
+            .ok_or_else(|| invalid("ODS metadata table span is invalid"))?;
+        let title = direct_metadata_child(spans, *table_index, "title");
+        let description = direct_metadata_child(spans, *table_index, "desc");
+
+        if before.title != after.title {
+            if let Some(title) = title {
+                validate_rewritable_table_metadata(xml, spans, title)?;
+            }
+        }
+        if before.description != after.description {
+            if let Some(description) = description {
+                validate_rewritable_table_metadata(xml, spans, description)?;
+            }
+        }
+
+        let prefix = table.qname.split_once(':').map_or("", |(prefix, _)| prefix);
+        let mut additions = String::new();
+        patch_metadata_child(
+            spans,
+            title,
+            "title",
+            prefix,
+            before.title != after.title,
+            after.title.as_deref(),
+            &mut additions,
+            &mut edits,
+        )?;
+        patch_metadata_child(
+            spans,
+            description,
+            "desc",
+            prefix,
+            before.description != after.description,
+            after.description.as_deref(),
+            &mut additions,
+            &mut edits,
+        )?;
+        if !additions.is_empty() {
+            if table.empty {
+                let opening = xml
+                    .get(table.start..table.tag_end)
+                    .ok_or_else(|| invalid("ODS metadata table opening span is invalid"))?
+                    .trim_end()
+                    .strip_suffix("/>")
+                    .ok_or_else(|| invalid("ODS metadata table self-closing span is invalid"))?;
+                edits.push(RowEdit {
+                    start: table.start,
+                    end: table.end,
+                    replacement: format!("{opening}>{additions}</{}>", table.qname),
+                });
+            } else {
+                let insertion = match (title, after.title.as_ref(), description) {
+                    (None, Some(_), Some(description)) => spans[description].start,
+                    _ => direct_children_any(spans, *table_index)
+                        .into_iter()
+                        .filter(|child| {
+                            !is_element(&spans[*child], TABLE_NAMESPACE, "title")
+                                && !is_element(&spans[*child], TABLE_NAMESPACE, "desc")
+                        })
+                        .map(|child| spans[child].start)
+                        .min()
+                        .unwrap_or(table.close_start),
+                };
+                edits.push(RowEdit {
+                    start: insertion,
+                    end: insertion,
+                    replacement: additions,
+                });
+            }
+        }
+    }
+
+    let updated = apply_edits_bounded(xml, edits, max_output_bytes)?;
+    crate::authoring::validate_content_xml(&updated)?;
+    codec::parse(&updated)?;
+    Ok(Some(updated))
+}
+
+fn direct_metadata_child(spans: &[Span], table: usize, local: &str) -> Option<usize> {
+    spans.iter().enumerate().find_map(|(index, span)| {
+        (span.parent == Some(table) && is_element(span, TABLE_NAMESPACE, local)).then_some(index)
+    })
+}
+
+fn patch_metadata_child(
+    spans: &[Span],
+    existing: Option<usize>,
+    local: &str,
+    prefix: &str,
+    changed: bool,
+    value: Option<&str>,
+    additions: &mut String,
+    edits: &mut Vec<RowEdit>,
+) -> Result<()> {
+    if !changed {
+        return Ok(());
+    }
+    if let Some(index) = existing {
+        let span = spans
+            .get(index)
+            .ok_or_else(|| invalid("ODS metadata child span is invalid"))?;
+        let replacement = value
+            .map(|value| render_metadata_element(&span.qname, value))
+            .unwrap_or_default();
+        edits.push(RowEdit {
+            start: span.start,
+            end: span.end,
+            replacement,
+        });
+        return Ok(());
+    }
+    let Some(value) = value else {
+        return Ok(());
+    };
+    let qname = if prefix.is_empty() {
+        local.to_owned()
+    } else {
+        format!("{prefix}:{local}")
+    };
+    additions.push_str(&render_metadata_element(&qname, value));
+    Ok(())
+}
+
+fn render_metadata_element(qname: &str, value: &str) -> String {
+    format!("<{qname}>{}</{qname}>", escape_xml(value))
+}
+
 fn validate_rewritable_table_content(xml: &str, spans: &[Span], span_index: usize) -> Result<()> {
     let table = spans
         .get(span_index)
@@ -216,9 +402,94 @@ fn validate_rewritable_table_content(xml: &str, spans: &[Span], span_index: usiz
     let mut cursor = table.tag_end;
     for child in children {
         validate_ignorable_table_gap(xml, cursor, spans[child].start)?;
+        if is_element(&spans[child], TABLE_NAMESPACE, "title")
+            || is_element(&spans[child], TABLE_NAMESPACE, "desc")
+        {
+            validate_rewritable_table_metadata(xml, spans, child)?;
+        }
         cursor = spans[child].end;
     }
     validate_ignorable_table_gap(xml, cursor, table.close_start)
+}
+
+/// Canonical worksheet serialization owns the title/description text but does
+/// not retain the source lexical children.  Refuse a table rewrite whenever a
+/// title or description contains lexical markup or a local namespace binding
+/// that the typed `Sheet` model cannot carry losslessly.
+fn validate_rewritable_table_metadata(xml: &str, spans: &[Span], span_index: usize) -> Result<()> {
+    let span = spans
+        .get(span_index)
+        .ok_or_else(|| invalid("flat ODS table metadata span is invalid"))?;
+    if span.empty {
+        return Err(invalid(
+            "flat ODS table metadata rewrite would normalize an empty title or description",
+        ));
+    }
+    let source = xml
+        .get(span.start..span.end)
+        .ok_or_else(|| invalid("flat ODS table metadata source span is invalid"))?;
+    let mut reader = NsReader::from_str(source);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    loop {
+        let (_, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| invalid(&format!("invalid flat ODS table metadata: {error}")))?;
+        match event {
+            Event::Start(element) => {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("flat ODS table metadata depth overflows"))?;
+                if depth == 1 {
+                    for attribute in element.attributes().with_checks(true) {
+                        let attribute = attribute.map_err(|error| {
+                            invalid(&format!(
+                                "invalid flat ODS table metadata attribute: {error}"
+                            ))
+                        })?;
+                        if attribute.key.as_ref() == b"xmlns"
+                            || attribute.key.as_ref().starts_with(b"xmlns:")
+                        {
+                            return Err(invalid(
+                                "flat ODS table metadata rewrite would discard a local namespace binding",
+                            ));
+                        }
+                    }
+                } else {
+                    return Err(invalid(
+                        "flat ODS table metadata rewrite would discard nested markup",
+                    ));
+                }
+            },
+            Event::End(_) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("flat ODS table metadata element stack underflow"))?;
+            },
+            Event::Text(_) => {},
+            Event::GeneralRef(_) => {},
+            Event::Empty(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_) => {
+                return Err(invalid(
+                    "flat ODS table metadata rewrite would discard lexical markup",
+                ));
+            },
+            Event::Eof => break,
+        }
+        buffer.clear();
+    }
+    if depth != 0 {
+        return Err(invalid(
+            "flat ODS table metadata has an unfinished XML element",
+        ));
+    }
+    Ok(())
 }
 
 fn validate_rewritable_table_attributes(
@@ -301,7 +572,18 @@ fn validate_rewritable_table_attributes(
                         let attribute_local =
                             decode(attribute_local.as_ref(), "table attribute local name")?;
                         if attribute_namespace.as_deref() != Some(TABLE_NAMESPACE)
-                            || !matches!(attribute_local.as_str(), "name" | "style-name")
+                            || !matches!(
+                                attribute_local.as_str(),
+                                "name"
+                                    | "style-name"
+                                    | "template-name"
+                                    | "use-first-row-styles"
+                                    | "use-last-row-styles"
+                                    | "use-first-column-styles"
+                                    | "use-last-column-styles"
+                                    | "use-banding-rows-styles"
+                                    | "use-banding-columns-styles"
+                            )
                         {
                             return Err(Error::InvalidFormat(format!(
                                 "flat ODS edit would discard unmodeled table attribute '{attribute_local}'"
@@ -544,6 +826,18 @@ fn changed_row_edits(
                 return Ok((None, None));
             }
             return Err(invalid("flat ODS row transaction cannot rename worksheets"));
+        }
+        if before.template_name != after.template_name
+            || before.style_usage != after.style_usage
+            || before.title != after.title
+            || before.description != after.description
+        {
+            if allow_ineligible {
+                return Ok((None, None));
+            }
+            return Err(invalid(
+                "flat ODS row transaction cannot combine row edits with table metadata changes",
+            ));
         }
         if rows.len() != before.rows.len() {
             return Err(Error::InvalidFormat(format!(
@@ -792,6 +1086,14 @@ fn validate_rewritable_row(
             || !is_element(child, codec::TEXT_NAMESPACE, "p")
             || paragraph_owner == Some(parent_index)
         {
+            if is_element(child, TABLE_NAMESPACE, "cell-range-source")
+                && parent.parent == Some(span_index)
+                && (is_element(parent, TABLE_NAMESPACE, "table-cell")
+                    || is_element(parent, TABLE_NAMESPACE, "covered-table-cell"))
+            {
+                validate_cell_range_source_lexical(xml, child)?;
+                continue;
+            }
             if child.namespace.as_deref() == Some(codec::TEXT_NAMESPACE) && child.local != "p" {
                 return Err(invalid(&format!(
                     "flat ODS edit would discard unsupported inline content '{}'",
@@ -848,6 +1150,11 @@ fn validate_rewritable_row(
             Event::Start(element) => {
                 let namespace = resolve_namespace(&namespace)?;
                 let local = decode(element.local_name().as_ref(), "row element local name")?;
+                if namespace.as_deref() == Some(TABLE_NAMESPACE) && local == "cell-range-source" {
+                    return Err(invalid(
+                        "flat ODS cell-range-source must be an empty direct cell child",
+                    ));
+                }
                 if row_depth == 0 {
                     if is_element_name(namespace.as_deref(), &local, TABLE_NAMESPACE, "table-row") {
                         validate_modeled_attributes(
@@ -956,6 +1263,74 @@ fn validate_rewritable_row(
     Ok(())
 }
 
+/// Validate that a modeled cell-range-source is already in the exact lexical
+/// form emitted by the worksheet writer.  The model intentionally does not
+/// retain namespace aliases, attribute order, quote style, or entity spelling;
+/// a row rewrite therefore refuses a source fragment that would be normalized.
+fn validate_cell_range_source_lexical(xml: &str, span: &Span) -> Result<()> {
+    let source = xml
+        .get(span.start..span.end)
+        .ok_or_else(|| invalid("flat ODS cell-range-source span is invalid"))?;
+    let mut wrapped = String::new();
+    wrapped
+        .try_reserve(source.len().saturating_add(192))
+        .map_err(|_| invalid("flat ODS cell-range-source wrapper allocation failed"))?;
+    wrapped.push_str("<wrapper xmlns:table=\"");
+    wrapped.push_str(TABLE_NAMESPACE);
+    wrapped.push_str("\" xmlns:xlink=\"");
+    wrapped.push_str(codec::XLINK_NAMESPACE);
+    wrapped.push_str("\">");
+    wrapped.push_str(source);
+    wrapped.push_str("</wrapper>");
+
+    let mut reader = NsReader::from_str(&wrapped);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    let mut parsed = None;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| {
+                invalid(&format!(
+                    "invalid ODS cell-range-source lexical fragment: {error}"
+                ))
+            })?;
+        match event {
+            Event::Empty(element)
+                if namespace_matches(&namespace, TABLE_NAMESPACE)
+                    && element.local_name().as_ref() == b"cell-range-source" =>
+            {
+                parsed = Some(codec::parse_cell_range_source(
+                    &element,
+                    reader.resolver(),
+                    reader.decoder(),
+                )?);
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    let Some(source_model) = parsed else {
+        return Err(invalid(
+            "flat ODS cell-range-source lexical fragment has no empty source element",
+        ));
+    };
+    let mut canonical = String::new();
+    crate::model::source::write_cell_range_source(&mut canonical, &source_model);
+    if canonical != source {
+        return Err(invalid(
+            "flat ODS row rewrite would normalize table:cell-range-source lexical markup",
+        ));
+    }
+    Ok(())
+}
+
+fn namespace_matches(namespace: &ResolveResult<'_>, expected: &str) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == expected.as_bytes())
+}
+
 fn is_element_name(
     namespace: Option<&str>,
     local: &str,
@@ -967,7 +1342,10 @@ fn is_element_name(
 
 fn is_modeled_row_element(namespace: Option<&str>, local: &str, mode: RowRewriteMode) -> bool {
     (namespace == Some(TABLE_NAMESPACE)
-        && matches!(local, "table-row" | "table-cell" | "covered-table-cell"))
+        && matches!(
+            local,
+            "table-row" | "table-cell" | "covered-table-cell" | "cell-range-source"
+        ))
         || (namespace == Some(codec::TEXT_NAMESPACE)
             && (local == "p" || (allows_direct_hyperlinks(mode) && local == "a")))
 }
@@ -986,6 +1364,10 @@ fn validate_modeled_attributes(
     local: &str,
     mode: RowRewriteMode,
 ) -> Result<()> {
+    if element_namespace == Some(TABLE_NAMESPACE) && local == "cell-range-source" {
+        codec::parse_cell_range_source(element, reader.resolver(), reader.decoder())?;
+        return Ok(());
+    }
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(|error| {
             Error::InvalidFormat(format!("invalid flat ODS attribute: {error}"))

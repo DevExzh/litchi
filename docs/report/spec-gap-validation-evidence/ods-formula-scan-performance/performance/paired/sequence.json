@@ -1,0 +1,74 @@
+{
+  "harness": "/var/tmp/ods-scan-worktree/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/harness/run.py",
+  "warmups": 3,
+  "iterations": 15,
+  "jobs": [
+    {
+      "label": "baseline-comparable",
+      "group": "comparable",
+      "status": 0,
+      "binary_sha256": "421a788fe9c2199bc4b224f4bcc05bb19c15c0ea6d0b61bf56ffe45f764bd274",
+      "raw_sha256": "308b44c049904353a6a37a178bcef89d5203377072705296c68fc1560e486180",
+      "row_count": 12,
+      "elapsed_seconds": 0.148,
+      "started_at": "2026-09-13T08:27:41Z",
+      "finished_at": "2026-09-13T08:27:42Z"
+    },
+    {
+      "label": "candidate-comparable",
+      "group": "comparable",
+      "status": 0,
+      "binary_sha256": "507c989691190554711c023ebe19796e62388bdc27fe942ab8015e862c49689f",
+      "raw_sha256": "ff0ec3dbab8b1a96e0e75fd9a5306b03666f082b7ea0b1318ecf8e6770a0d915",
+      "row_count": 12,
+      "elapsed_seconds": 0.148,
+      "started_at": "2026-09-13T08:27:42Z",
+      "finished_at": "2026-09-13T08:27:42Z"
+    },
+    {
+      "label": "baseline-coverage",
+      "group": "coverage",
+      "status": 0,
+      "binary_sha256": "421a788fe9c2199bc4b224f4bcc05bb19c15c0ea6d0b61bf56ffe45f764bd274",
+      "raw_sha256": "1d53c1a5efd4cb070f943b52f34c51e1cfdff31a82c016a79131711e5d5b77a4",
+      "row_count": 16,
+      "elapsed_seconds": 0.937,
+      "started_at": "2026-09-13T08:27:42Z",
+      "finished_at": "2026-09-13T08:27:43Z"
+    },
+    {
+      "label": "candidate-coverage",
+      "group": "coverage",
+      "status": 0,
+      "binary_sha256": "507c989691190554711c023ebe19796e62388bdc27fe942ab8015e862c49689f",
+      "raw_sha256": "86abfa1038fbc808ea0e65bd7ae83825aa69bd662dc494d4a1f2924791e47dc4",
+      "row_count": 16,
+      "elapsed_seconds": 0.909,
+      "started_at": "2026-09-13T08:27:43Z",
+      "finished_at": "2026-09-13T08:27:44Z"
+    },
+    {
+      "label": "baseline-scaling",
+      "group": "scaling",
+      "status": 0,
+      "binary_sha256": "421a788fe9c2199bc4b224f4bcc05bb19c15c0ea6d0b61bf56ffe45f764bd274",
+      "raw_sha256": "b4a1d8e40777c52fd730409137f4e9b6dae6bac38ae91124cc666feb275cde79",
+      "row_count": 8,
+      "elapsed_seconds": 9.044,
+      "started_at": "2026-09-13T08:27:44Z",
+      "finished_at": "2026-09-13T08:27:53Z"
+    },
+    {
+      "label": "candidate-scaling",
+      "group": "scaling",
+      "status": 0,
+      "binary_sha256": "507c989691190554711c023ebe19796e62388bdc27fe942ab8015e862c49689f",
+      "raw_sha256": "b5d602ea6141835b605ae7733b2f0ecf96a479b3136ffc4e26a2fc61caea83c4",
+      "row_count": 8,
+      "elapsed_seconds": 0.266,
+      "started_at": "2026-09-13T08:27:53Z",
+      "finished_at": "2026-09-13T08:27:53Z"
+    }
+  ],
+  "order": "baseline,candidate for each comparable/coverage/scaling group"
+}

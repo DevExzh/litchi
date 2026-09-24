@@ -1,0 +1,12 @@
+{
+  "binary": "/var/tmp/ods-logical-worktree/docs/report/spec-gap-validation-evidence/ods-formula-logical-evaluation/performance/baseline/ods-formula-logical-evaluation-profile",
+  "target_binary": "/var/tmp/ods-logical-target/release/ods-formula-logical-evaluation-profile",
+  "sha256": "412287de2566991d60f494fb0deffd768deb238c0ad5f020d8d72979ed544cc2",
+  "size_bytes": 1236720,
+  "base_commit": "3f907e9e1",
+  "source_manifest": "source-sha256.json",
+  "harness_manifest": "harness-sha256.txt",
+  "build_command": "build-command.json",
+  "build_status": 0,
+  "captured_at": "2026-09-13T12:11:36.153220Z"
+}

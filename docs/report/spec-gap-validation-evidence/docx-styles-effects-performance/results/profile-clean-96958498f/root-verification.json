@@ -1,0 +1,18 @@
+{
+  "git_head": "96958498f88e263b3bc7f0a9e544f2144ff156c5",
+  "manifest": {
+    "extras": 29,
+    "files": 790,
+    "packages": 9
+  },
+  "passed": true,
+  "processes": 3,
+  "rss": "one /usr/bin/time -v process maximum marker per fresh process",
+  "samples_per_process": 20,
+  "schema": "docx-styles-effects-profile-verification-v1",
+  "source_commit": "d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119",
+  "specs": 31,
+  "timed_claim": "bounded absolute observations only; no before-after or speedup claim",
+  "total_samples": 1860,
+  "warmup": 2
+}

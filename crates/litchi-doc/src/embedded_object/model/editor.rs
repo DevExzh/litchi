@@ -1,6 +1,7 @@
 //! Internal snapshot state for the transactional embedded-object editor.
 
 use super::super::Limits;
+use crate::parts::protection::{EditProtection, ProtectionPolicy};
 use litchi_ole_common::object::Editor as ObjectEditor;
 
 #[derive(Clone, Debug)]
@@ -25,6 +26,8 @@ pub struct Editor {
     pub(in crate::embedded_object) package: ObjectEditor,
     pub(in crate::embedded_object) object_pool_exists: bool,
     pub(in crate::embedded_object) limits: Limits,
+    pub(in crate::embedded_object) protection: EditProtection,
+    pub(in crate::embedded_object) protection_policy: ProtectionPolicy,
     pub(in crate::embedded_object) word_path: Vec<String>,
     pub(in crate::embedded_object) table_path: Vec<String>,
     pub(in crate::embedded_object) data_path: Vec<String>,

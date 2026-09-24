@@ -1,0 +1,522 @@
+{
+  "format": "litchi-doc-source-owner-portable-allocation/1",
+  "publication": "portable source-owner bundle",
+  "sources": {
+    "control": "/var/tmp/litchi-doc-source-owner-control-c4aa19e-20260909",
+    "candidate": "/var/tmp/litchi-doc-source-owner-final-validation-20260909",
+    "control_commit": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+    "candidate_overlay_commit": null
+  },
+  "preflight": {
+    "source_manifest_sha256": "24c6246c0c2fc166d8d63291227806f7f7411ef979f9f3ebfe7b35e769e81345",
+    "fixture_manifest_sha256": "0fd601a0e774b6873b4d358e10fac2e552e0e9e357e0b10d52828c17b5d5f6be",
+    "source_base_commit": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+    "candidate_overlay_commit": null,
+    "source_files_verified_per_side": {
+      "control": 780,
+      "candidate": 780
+    },
+    "fixture_count": 8,
+    "fixture_files_verified_per_side": {
+      "control": 8,
+      "candidate": 8
+    }
+  },
+  "build": {
+    "toolchain": "+1.95.0",
+    "release": true,
+    "locked": true,
+    "features": [
+      "candidate"
+    ],
+    "allocator_instrumentation": true,
+    "control": {
+      "side": "control",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--release",
+        "--locked",
+        "--features",
+        "candidate",
+        "--manifest-path",
+        "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/control/Cargo.toml"
+      ],
+      "manifest": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/control/Cargo.toml",
+      "target_dir": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/target-control",
+      "binary": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/target-control/release/litchi-embedded-doc-allocation-v2",
+      "binary_bytes": 3223360,
+      "binary_sha256": "7d697afe9d919494554ad767b933bac194a1f0a9f2719d578741f54754ec97fd",
+      "built_by_wrapper": true
+    },
+    "candidate": {
+      "side": "candidate",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--release",
+        "--locked",
+        "--features",
+        "candidate",
+        "--manifest-path",
+        "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/candidate/Cargo.toml"
+      ],
+      "manifest": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/candidate/Cargo.toml",
+      "target_dir": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/target-candidate",
+      "binary": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/target-candidate/release/litchi-embedded-doc-allocation-v2",
+      "binary_bytes": 3227496,
+      "binary_sha256": "d93477a0f4580d2675fbbca092cda47a19dfb0b6d00e2da3560245fd772ba9a9",
+      "built_by_wrapper": true
+    },
+    "jobs": 4,
+    "jobs_enforcement": "temporary external Cargo PATH shim inserted --jobs 4; sanitized CARGO_BUILD_JOBS was cleared by the publication runner",
+    "cargo_shim_invocations": "cargo-shim-invocations.jsonl",
+    "toolchain_version": "toolchain-version.json"
+  },
+  "commands": [
+    {
+      "name": "control-build",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--release",
+        "--locked",
+        "--features",
+        "candidate",
+        "--manifest-path",
+        "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/control/Cargo.toml"
+      ],
+      "cwd": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/control",
+      "log": "/var/tmp/litchi-doc-source-owner-portable-allocation-reproduction-20260910/build-control.log",
+      "environment": {
+        "cleared_environment_names": [
+          "CARGO_BUILD_JOBS"
+        ],
+        "cleared_environment_values": {
+          "CARGO_BUILD_JOBS": "4"
+        },
+        "cargo_profile_overrides": {
+          "all_present": [],
+          "release_present": []
+        },
+        "cargo_build_overrides_present": [
+          "CARGO_BUILD_JOBS"
+        ],
+        "cargo_target_overrides_present": [],
+        "target_cpu_related_names_present": [],
+        "checked_relevant_environment_values": {
+          "CARGO_BUILD_JOBS": "4",
+          "CARGO_BUILD_PIPELINING": null,
+          "CARGO_BUILD_RUSTC": null,
+          "CARGO_BUILD_RUSTFLAGS": null,
+          "CARGO_BUILD_TARGET": null,
+          "CARGO_ENCODED_RUSTFLAGS": null,
+          "CARGO_INCREMENTAL": null,
+          "CARGO_TARGET_CPU": null,
+          "CARGO_TARGET_DIR": null,
+          "RUSTC": null,
+          "RUSTC_BOOTSTRAP": null,
+          "RUSTC_WORKSPACE_WRAPPER": null,
+          "RUSTC_WRAPPER": null,
+          "RUSTFLAGS": null,
+          "RUSTUP_TOOLCHAIN": null
+        },
+        "overrides": {
+          "CARGO_TARGET_DIR": {
+            "before": null,
+            "after": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/target-control"
+          }
+        },
+        "release_profile_overrides_cleared": true,
+        "target_cpu_overrides_cleared": true
+      }
+    },
+    {
+      "name": "candidate-build",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--release",
+        "--locked",
+        "--features",
+        "candidate",
+        "--manifest-path",
+        "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/candidate/Cargo.toml"
+      ],
+      "cwd": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/candidate",
+      "log": "/var/tmp/litchi-doc-source-owner-portable-allocation-reproduction-20260910/build-candidate.log",
+      "environment": {
+        "cleared_environment_names": [
+          "CARGO_BUILD_JOBS"
+        ],
+        "cleared_environment_values": {
+          "CARGO_BUILD_JOBS": "4"
+        },
+        "cargo_profile_overrides": {
+          "all_present": [],
+          "release_present": []
+        },
+        "cargo_build_overrides_present": [
+          "CARGO_BUILD_JOBS"
+        ],
+        "cargo_target_overrides_present": [],
+        "target_cpu_related_names_present": [],
+        "checked_relevant_environment_values": {
+          "CARGO_BUILD_JOBS": "4",
+          "CARGO_BUILD_PIPELINING": null,
+          "CARGO_BUILD_RUSTC": null,
+          "CARGO_BUILD_RUSTFLAGS": null,
+          "CARGO_BUILD_TARGET": null,
+          "CARGO_ENCODED_RUSTFLAGS": null,
+          "CARGO_INCREMENTAL": null,
+          "CARGO_TARGET_CPU": null,
+          "CARGO_TARGET_DIR": null,
+          "RUSTC": null,
+          "RUSTC_BOOTSTRAP": null,
+          "RUSTC_WORKSPACE_WRAPPER": null,
+          "RUSTC_WRAPPER": null,
+          "RUSTFLAGS": null,
+          "RUSTUP_TOOLCHAIN": null
+        },
+        "overrides": {
+          "CARGO_TARGET_DIR": {
+            "before": null,
+            "after": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/target-candidate"
+          }
+        },
+        "release_profile_overrides_cleared": true,
+        "target_cpu_overrides_cleared": true
+      }
+    },
+    {
+      "name": "control-correctness",
+      "argv": [
+        "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/target-control/release/litchi-embedded-doc-allocation-v2",
+        "correctness"
+      ],
+      "cwd": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/control",
+      "log": "/var/tmp/litchi-doc-source-owner-portable-allocation-reproduction-20260910/correctness-control.log",
+      "environment": {
+        "cleared_environment_names": [
+          "CARGO_BUILD_JOBS"
+        ],
+        "cleared_environment_values": {
+          "CARGO_BUILD_JOBS": "4"
+        },
+        "cargo_profile_overrides": {
+          "all_present": [],
+          "release_present": []
+        },
+        "cargo_build_overrides_present": [
+          "CARGO_BUILD_JOBS"
+        ],
+        "cargo_target_overrides_present": [],
+        "target_cpu_related_names_present": [],
+        "checked_relevant_environment_values": {
+          "CARGO_BUILD_JOBS": "4",
+          "CARGO_BUILD_PIPELINING": null,
+          "CARGO_BUILD_RUSTC": null,
+          "CARGO_BUILD_RUSTFLAGS": null,
+          "CARGO_BUILD_TARGET": null,
+          "CARGO_ENCODED_RUSTFLAGS": null,
+          "CARGO_INCREMENTAL": null,
+          "CARGO_TARGET_CPU": null,
+          "CARGO_TARGET_DIR": null,
+          "RUSTC": null,
+          "RUSTC_BOOTSTRAP": null,
+          "RUSTC_WORKSPACE_WRAPPER": null,
+          "RUSTC_WRAPPER": null,
+          "RUSTFLAGS": null,
+          "RUSTUP_TOOLCHAIN": null
+        },
+        "overrides": {
+          "HARNESS_ROOT": {
+            "before": null,
+            "after": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/control"
+          }
+        },
+        "release_profile_overrides_cleared": true,
+        "target_cpu_overrides_cleared": true
+      }
+    },
+    {
+      "name": "candidate-correctness",
+      "argv": [
+        "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/target-candidate/release/litchi-embedded-doc-allocation-v2",
+        "correctness"
+      ],
+      "cwd": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/candidate",
+      "log": "/var/tmp/litchi-doc-source-owner-portable-allocation-reproduction-20260910/correctness-candidate.log",
+      "environment": {
+        "cleared_environment_names": [
+          "CARGO_BUILD_JOBS"
+        ],
+        "cleared_environment_values": {
+          "CARGO_BUILD_JOBS": "4"
+        },
+        "cargo_profile_overrides": {
+          "all_present": [],
+          "release_present": []
+        },
+        "cargo_build_overrides_present": [
+          "CARGO_BUILD_JOBS"
+        ],
+        "cargo_target_overrides_present": [],
+        "target_cpu_related_names_present": [],
+        "checked_relevant_environment_values": {
+          "CARGO_BUILD_JOBS": "4",
+          "CARGO_BUILD_PIPELINING": null,
+          "CARGO_BUILD_RUSTC": null,
+          "CARGO_BUILD_RUSTFLAGS": null,
+          "CARGO_BUILD_TARGET": null,
+          "CARGO_ENCODED_RUSTFLAGS": null,
+          "CARGO_INCREMENTAL": null,
+          "CARGO_TARGET_CPU": null,
+          "CARGO_TARGET_DIR": null,
+          "RUSTC": null,
+          "RUSTC_BOOTSTRAP": null,
+          "RUSTC_WORKSPACE_WRAPPER": null,
+          "RUSTC_WRAPPER": null,
+          "RUSTFLAGS": null,
+          "RUSTUP_TOOLCHAIN": null
+        },
+        "overrides": {
+          "HARNESS_ROOT": {
+            "before": null,
+            "after": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/candidate"
+          }
+        },
+        "release_profile_overrides_cleared": true,
+        "target_cpu_overrides_cleared": true
+      }
+    },
+    {
+      "name": "control-measure",
+      "argv": [
+        "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/target-control/release/litchi-embedded-doc-allocation-v2",
+        "measure",
+        "/var/tmp/litchi-doc-source-owner-portable-allocation-reproduction-20260910/allocation-control.jsonl"
+      ],
+      "cwd": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/control",
+      "log": "/var/tmp/litchi-doc-source-owner-portable-allocation-reproduction-20260910/measure-control.log",
+      "environment": {
+        "cleared_environment_names": [
+          "CARGO_BUILD_JOBS"
+        ],
+        "cleared_environment_values": {
+          "CARGO_BUILD_JOBS": "4"
+        },
+        "cargo_profile_overrides": {
+          "all_present": [],
+          "release_present": []
+        },
+        "cargo_build_overrides_present": [
+          "CARGO_BUILD_JOBS"
+        ],
+        "cargo_target_overrides_present": [],
+        "target_cpu_related_names_present": [],
+        "checked_relevant_environment_values": {
+          "CARGO_BUILD_JOBS": "4",
+          "CARGO_BUILD_PIPELINING": null,
+          "CARGO_BUILD_RUSTC": null,
+          "CARGO_BUILD_RUSTFLAGS": null,
+          "CARGO_BUILD_TARGET": null,
+          "CARGO_ENCODED_RUSTFLAGS": null,
+          "CARGO_INCREMENTAL": null,
+          "CARGO_TARGET_CPU": null,
+          "CARGO_TARGET_DIR": null,
+          "RUSTC": null,
+          "RUSTC_BOOTSTRAP": null,
+          "RUSTC_WORKSPACE_WRAPPER": null,
+          "RUSTC_WRAPPER": null,
+          "RUSTFLAGS": null,
+          "RUSTUP_TOOLCHAIN": null
+        },
+        "overrides": {
+          "HARNESS_ROOT": {
+            "before": null,
+            "after": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/control"
+          }
+        },
+        "release_profile_overrides_cleared": true,
+        "target_cpu_overrides_cleared": true
+      }
+    },
+    {
+      "name": "candidate-measure",
+      "argv": [
+        "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/target-candidate/release/litchi-embedded-doc-allocation-v2",
+        "measure",
+        "/var/tmp/litchi-doc-source-owner-portable-allocation-reproduction-20260910/allocation-candidate.jsonl"
+      ],
+      "cwd": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/candidate",
+      "log": "/var/tmp/litchi-doc-source-owner-portable-allocation-reproduction-20260910/measure-candidate.log",
+      "environment": {
+        "cleared_environment_names": [
+          "CARGO_BUILD_JOBS"
+        ],
+        "cleared_environment_values": {
+          "CARGO_BUILD_JOBS": "4"
+        },
+        "cargo_profile_overrides": {
+          "all_present": [],
+          "release_present": []
+        },
+        "cargo_build_overrides_present": [
+          "CARGO_BUILD_JOBS"
+        ],
+        "cargo_target_overrides_present": [],
+        "target_cpu_related_names_present": [],
+        "checked_relevant_environment_values": {
+          "CARGO_BUILD_JOBS": "4",
+          "CARGO_BUILD_PIPELINING": null,
+          "CARGO_BUILD_RUSTC": null,
+          "CARGO_BUILD_RUSTFLAGS": null,
+          "CARGO_BUILD_TARGET": null,
+          "CARGO_ENCODED_RUSTFLAGS": null,
+          "CARGO_INCREMENTAL": null,
+          "CARGO_TARGET_CPU": null,
+          "CARGO_TARGET_DIR": null,
+          "RUSTC": null,
+          "RUSTC_BOOTSTRAP": null,
+          "RUSTC_WORKSPACE_WRAPPER": null,
+          "RUSTC_WRAPPER": null,
+          "RUSTFLAGS": null,
+          "RUSTUP_TOOLCHAIN": null
+        },
+        "overrides": {
+          "HARNESS_ROOT": {
+            "before": null,
+            "after": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/candidate"
+          }
+        },
+        "release_profile_overrides_cleared": true,
+        "target_cpu_overrides_cleared": true
+      }
+    }
+  ],
+  "correctness": {
+    "control": {
+      "report": "/var/tmp/litchi-doc-source-owner-portable-allocation-reproduction-20260910/correctness-control.json",
+      "boolean_checks": 32,
+      "all_boolean_checks_true": true,
+      "timed": false,
+      "allocation_only": true,
+      "binary_sha256_before_measure": "7d697afe9d919494554ad767b933bac194a1f0a9f2719d578741f54754ec97fd"
+    },
+    "candidate": {
+      "report": "/var/tmp/litchi-doc-source-owner-portable-allocation-reproduction-20260910/correctness-candidate.json",
+      "boolean_checks": 32,
+      "all_boolean_checks_true": true,
+      "timed": false,
+      "allocation_only": true,
+      "binary_sha256_before_measure": "d93477a0f4580d2675fbbca092cda47a19dfb0b6d00e2da3560245fd772ba9a9"
+    }
+  },
+  "measure": {
+    "control": {
+      "output": "/var/tmp/litchi-doc-source-owner-portable-allocation-reproduction-20260910/allocation-control.jsonl",
+      "rows": 240,
+      "unique_operations": [
+        "common_editor_open_snapshot_noop_finish",
+        "common_editor_open_unique_noop_finish",
+        "embedded_object_replace_storage_malformed_replacement",
+        "embedded_object_replace_storage_oversized_replacement",
+        "embedded_object_replace_storage_success_commit",
+        "embedded_object_snapshot_open",
+        "embedded_object_snapshot_open_malformed_admission",
+        "embedded_object_snapshot_open_noop_finish"
+      ],
+      "profiles": [
+        "large",
+        "small"
+      ],
+      "samples_per_operation_profile": 15,
+      "binary_sha256_after_measure": "7d697afe9d919494554ad767b933bac194a1f0a9f2719d578741f54754ec97fd"
+    },
+    "candidate": {
+      "output": "/var/tmp/litchi-doc-source-owner-portable-allocation-reproduction-20260910/allocation-candidate.jsonl",
+      "rows": 240,
+      "unique_operations": [
+        "common_editor_open_snapshot_noop_finish",
+        "common_editor_open_unique_noop_finish",
+        "embedded_object_replace_storage_malformed_replacement",
+        "embedded_object_replace_storage_oversized_replacement",
+        "embedded_object_replace_storage_success_commit",
+        "embedded_object_snapshot_open",
+        "embedded_object_snapshot_open_malformed_admission",
+        "embedded_object_snapshot_open_noop_finish"
+      ],
+      "profiles": [
+        "large",
+        "small"
+      ],
+      "samples_per_operation_profile": 15,
+      "binary_sha256_after_measure": "d93477a0f4580d2675fbbca092cda47a19dfb0b6d00e2da3560245fd772ba9a9"
+    }
+  },
+  "measurement_executed": true,
+  "source_copy_mode": "recursive copy with .git ignored; symlinks rejected",
+  "copied_preflight": {
+    "source_manifest_sha256": "24c6246c0c2fc166d8d63291227806f7f7411ef979f9f3ebfe7b35e769e81345",
+    "fixture_manifest_sha256": "0fd601a0e774b6873b4d358e10fac2e552e0e9e357e0b10d52828c17b5d5f6be",
+    "source_base_commit": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+    "candidate_overlay_commit": null,
+    "source_files_verified_per_side": {
+      "control": 780,
+      "candidate": 780
+    },
+    "fixture_count": 8,
+    "fixture_files_verified_per_side": {
+      "control": 8,
+      "candidate": 8
+    }
+  },
+  "allocation_fixture_files_verified_per_side": {
+    "control": 8,
+    "candidate": 8
+  },
+  "completed": true,
+  "execution_provenance": {
+    "toolchain_selector": "+1.95.0",
+    "cargo_jobs": 4,
+    "actual_build_argv": {
+      "control": [
+        "/home/zhuhe/.cargo/bin/cargo",
+        "+1.95.0",
+        "build",
+        "--jobs",
+        "4",
+        "--release",
+        "--locked",
+        "--features",
+        "candidate",
+        "--manifest-path",
+        "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/control/Cargo.toml"
+      ],
+      "candidate": [
+        "/home/zhuhe/.cargo/bin/cargo",
+        "+1.95.0",
+        "build",
+        "--jobs",
+        "4",
+        "--release",
+        "--locked",
+        "--features",
+        "candidate",
+        "--manifest-path",
+        "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/allocation/candidate/Cargo.toml"
+      ]
+    },
+    "actual_build_argv_sha256_source": "cargo-shim-invocations.jsonl",
+    "temporary_targets": {
+      "control": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/target-control",
+      "candidate": "/var/tmp/litchi-doc-source-owner-allocation-pmgti3u4/bundle/target-candidate"
+    },
+    "temporary_work_tree_removed_after_run": true
+  }
+}

@@ -210,6 +210,121 @@ fn authored_extension_lists_validate_namespace_placement_and_security() {
             )
             .is_err()
         );
+    assert!(
+            ExtList::from_xml(
+                br#"<we:extLst xmlns:we="http://schemas.microsoft.com/office/webextensions/webextension/2010/11">&amp;</we:extLst>"#
+            )
+            .is_err()
+        );
+}
+
+#[test]
+fn parses_and_mutates_owexml_custom_function_metadata_inertly() {
+    let mut empty = ExtList::empty(ExtKind::AddIn).unwrap();
+    let empty_source = empty.xml().to_owned();
+    empty
+        .set_custom_functions(Some(CustomFunctions::new()))
+        .unwrap();
+    assert_eq!(empty.xml(), empty_source);
+
+    let xml = format!(
+        r#"<we:extLst xmlns:we="{WEB_EXTENSION_NAMESPACE}" xmlns:a="{DRAWINGML_NAMESPACE}" xmlns:v="urn:vendor"><a:ext uri="urn:custom"><v:opaque attr="kept"/><we:containsCustomFunctions/><we:backgroundAppData state="-2" runtimeId="runtime&amp;one"/><we:customFunctionList><we:customFunctionIds>foo&#x26;bar</we:customFunctionIds><we:customFunctionIds><![CDATA[baz]]></we:customFunctionIds></we:customFunctionList></a:ext></we:extLst>"#
+    );
+    let mut ext = ExtList::from_xml(xml.as_bytes()).unwrap();
+    let metadata = ext.custom_functions().unwrap();
+    assert_eq!(
+        metadata
+            .contains_custom_functions()
+            .unwrap()
+            .explicit_value(),
+        None
+    );
+    assert!(!metadata.contains_custom_functions().unwrap().value());
+    assert_eq!(metadata.background_app_data().unwrap().state(), -2);
+    assert_eq!(
+        metadata.background_app_data().unwrap().runtime_id(),
+        "runtime&one"
+    );
+    assert_eq!(
+        metadata.custom_function_list().unwrap().ids(),
+        &["foo&bar".to_owned(), "baz".to_owned()]
+    );
+    assert!(ext.xml().contains("<v:opaque attr=\"kept\"/>"));
+    let source = ext.xml().to_owned();
+
+    let mut changed = CustomFunctions::new();
+    changed.set_contains_custom_functions(Some(ContainsCustomFunctions::new(Some(true))));
+    changed.set_background_app_data(Some(BackgroundAppData::new(7, "runtime-two").unwrap()));
+    let mut list = CustomFunctionList::new();
+    list.push_id("new-id").unwrap();
+    changed.set_custom_function_list(Some(list));
+    ext.set_custom_functions(Some(changed.clone())).unwrap();
+    assert!(ext.xml().contains("<v:opaque attr=\"kept\"/>"));
+    assert_eq!(ext.custom_functions(), Some(&changed));
+    assert_ne!(ext.xml(), source);
+    let reparsed = ExtList::from_xml(ext.as_xml()).unwrap();
+    assert_eq!(reparsed, ext);
+
+    let unchanged = ext.xml().to_owned();
+    ext.set_custom_functions(Some(changed)).unwrap();
+    assert_eq!(ext.xml(), unchanged);
+    ext.clear_custom_functions().unwrap();
+    assert!(ext.custom_functions().is_none());
+    assert!(ext.xml().contains("<v:opaque attr=\"kept\"/>"));
+}
+
+#[test]
+fn custom_function_metadata_rejects_wrong_namespaces_duplicates_and_missing_values() {
+    let foreign = format!(
+        r#"<we:extLst xmlns:we="{WEB_EXTENSION_NAMESPACE}" xmlns:a="{DRAWINGML_NAMESPACE}" xmlns:foreign="urn:foreign"><a:ext uri="urn:test"><foreign:containsCustomFunctions/></a:ext></we:extLst>"#
+    );
+    assert!(
+        ExtList::from_xml(foreign.as_bytes())
+            .unwrap()
+            .custom_functions()
+            .is_none()
+    );
+    for xml in [
+        format!(
+            r#"<we:extLst xmlns:we="{WEB_EXTENSION_NAMESPACE}" xmlns:a="{DRAWINGML_NAMESPACE}"><a:ext uri="urn:test"><we:containsCustomFunctions/><we:containsCustomFunctions/></a:ext></we:extLst>"#
+        ),
+        format!(
+            r#"<we:extLst xmlns:we="{WEB_EXTENSION_NAMESPACE}" xmlns:a="{DRAWINGML_NAMESPACE}"><a:ext uri="urn:test"><we:backgroundAppData runtimeId="runtime"/></a:ext></we:extLst>"#
+        ),
+        format!(
+            r#"<we:extLst xmlns:we="{WEB_EXTENSION_NAMESPACE}" xmlns:a="{DRAWINGML_NAMESPACE}"><a:ext uri="urn:test"><we:customFunctionList><we:customFunctionIds>one<we:nested/></we:customFunctionIds></we:customFunctionList></a:ext></we:extLst>"#
+        ),
+    ] {
+        assert!(ExtList::from_xml(xml.as_bytes()).is_err(), "{xml}");
+    }
+}
+
+#[test]
+fn custom_function_metadata_respects_item_bounds() {
+    let xml = format!(
+        r#"<we:extLst xmlns:we="{WEB_EXTENSION_NAMESPACE}" xmlns:a="{DRAWINGML_NAMESPACE}"><a:ext uri="urn:test"><we:customFunctionList><we:customFunctionIds>one</we:customFunctionIds><we:customFunctionIds>two</we:customFunctionIds></we:customFunctionList></a:ext></we:extLst>"#
+    );
+    let ext = ExtList::from_xml(xml.as_bytes()).unwrap();
+    let mut extension = sample_extension();
+    extension.extension_list = Some(ext);
+    let panes = Panes {
+        panes: vec![Pane {
+            dock_state: Dock::Right,
+            visible: true,
+            width: 320.0,
+            row: 0,
+            locked: false,
+            relationship_id: "rId1".into(),
+            add_in: extension,
+            snapshot_resources: vec![],
+            extension_list: None,
+        }],
+    };
+    let tight = Limits {
+        items: 1,
+        ..Limits::standard()
+    };
+    assert!(write_panes_with(&panes, Conformance::Transitional, &tight).is_err());
 }
 
 #[test]
@@ -418,6 +533,58 @@ fn byte_identical_put_is_a_signature_preserving_no_op() {
 }
 
 #[test]
+fn custom_function_metadata_package_patch_is_exact_noop_inverse_and_stale_atomic() {
+    let mut metadata = CustomFunctions::new();
+    metadata.set_contains_custom_functions(Some(ContainsCustomFunctions::new(Some(true))));
+    metadata.set_background_app_data(Some(BackgroundAppData::new(1, "runtime-one").unwrap()));
+    let mut functions = CustomFunctionList::new();
+    functions.push_id("one").unwrap();
+    metadata.set_custom_function_list(Some(functions));
+
+    let mut authored = sample_task_panes();
+    authored.panes[0]
+        .add_in
+        .set_custom_functions(Some(metadata.clone()))
+        .unwrap();
+    let mut package = OpcPackage::new();
+    put(&mut package, authored.clone(), Conformance::Transitional).unwrap();
+    let loaded = load(&package).unwrap().unwrap();
+    assert_eq!(loaded.panes[0].add_in.custom_functions(), Some(&metadata));
+
+    let noop = plan_put(&package, loaded.clone(), Conformance::Transitional).unwrap();
+    assert!(noop.is_empty());
+    assert!(!noop.apply(&mut package).unwrap());
+
+    let mut changed = loaded.clone();
+    changed.panes[0].add_in.set_custom_functions(None).unwrap();
+    let patch = plan_put(&package, changed.clone(), Conformance::Transitional).unwrap();
+    assert!(!patch.is_empty());
+    let inverse = patch.inverse();
+    assert!(patch.apply(&mut package).unwrap());
+    assert_eq!(load(&package).unwrap(), Some(changed.clone()));
+    assert!(inverse.apply(&mut package).unwrap());
+    assert_eq!(load(&package).unwrap(), Some(authored.clone()));
+
+    let stale = plan_put(&package, changed, Conformance::Transitional).unwrap();
+    package
+        .get_part_mut(&PackURI::new("/webextensions/taskpanes.xml").unwrap())
+        .unwrap()
+        .set_blob(b"<stale/>".to_vec());
+    let stale_before = package
+        .get_part(&PackURI::new("/webextensions/taskpanes.xml").unwrap())
+        .unwrap()
+        .blob_arc();
+    assert!(stale.apply(&mut package).is_err());
+    assert!(Arc::ptr_eq(
+        &package
+            .get_part(&PackURI::new("/webextensions/taskpanes.xml").unwrap())
+            .unwrap()
+            .blob_arc(),
+        &stale_before
+    ));
+}
+
+#[test]
 fn put_patch_is_exact_reversible_and_arc_shared() {
     let mut package = OpcPackage::new();
     let original = sample_task_panes();
@@ -448,6 +615,20 @@ fn put_patch_is_exact_reversible_and_arc_shared() {
             .unwrap()
     );
 
+    let signed_patch = plan_put(&package, replacement.clone(), Conformance::Transitional).unwrap();
+    assert!(!signed_patch.is_empty());
+    let signed_before = package.get_part(&image_name).unwrap().blob_arc();
+    assert!(signed_patch.apply(&mut package).is_err());
+    assert!(package.is_signed());
+    assert!(Arc::ptr_eq(
+        &package.get_part(&image_name).unwrap().blob_arc(),
+        &signed_before
+    ));
+
+    // A changed signed package requires an explicit unsigned disposition;
+    // removing signatures changes the guarded source, so the edit is planned
+    // again before it is published.
+    package.unsign();
     let patch = plan_put(&package, replacement.clone(), Conformance::Transitional).unwrap();
     assert!(!patch.is_empty());
     let image_change = patch
@@ -521,6 +702,16 @@ fn remove_patch_restores_exact_shared_parts() {
     let original_image = package.get_part(&image_name).unwrap().blob_arc();
     package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
 
+    let signed_patch = plan_remove(&package).unwrap();
+    let signed_before = package.get_part(&image_name).unwrap().blob_arc();
+    assert!(signed_patch.apply(&mut package).is_err());
+    assert!(package.is_signed());
+    assert!(Arc::ptr_eq(
+        &package.get_part(&image_name).unwrap().blob_arc(),
+        &signed_before
+    ));
+
+    package.unsign();
     let patch = plan_remove(&package).unwrap();
     let inverse = patch.inverse();
     let restored_image = inverse

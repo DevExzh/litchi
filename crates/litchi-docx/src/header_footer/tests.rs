@@ -105,6 +105,46 @@ fn namespace_aliases_cdata_and_foreign_elements_are_handled() {
 }
 
 #[test]
+fn word_2023_revision_utc_is_retained_through_story_mce_selection() {
+    let word = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    let mce = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+    let date_utc = crate::revision::WORD_2023_DATE_UTC_NAMESPACE;
+    let xml = format!(
+        r#"<h:hdr xmlns:h="{word}" xmlns:mc="{mce}" xmlns:du="{date_utc}" mc:Ignorable="du"><h:p><h:ins h:id="1" h:author="Alice" du:dateUtc="2026-07-17T00:00:00Z"><h:r><h:t>added</h:t></h:r></h:ins></h:p></h:hdr>"#
+    );
+    let header = story(xml.as_bytes(), Kind::Primary);
+    let paragraphs = header.paragraphs().unwrap();
+    let revisions = paragraphs[0].revisions().unwrap();
+    assert_eq!(revisions.len(), 1);
+    assert_eq!(revisions[0].text(), "added");
+    assert_eq!(revisions[0].date_utc(), Some("2026-07-17T00:00:00Z"));
+    assert!(
+        header
+            .xml_bytes()
+            .windows(b"du:dateUtc".len())
+            .any(|window| { window == b"du:dateUtc" })
+    );
+
+    let wrong_namespace = xml.replace(date_utc, "urn:foreign");
+    let wrong = story(wrong_namespace.as_bytes(), Kind::Primary);
+    let wrong_revision = wrong.paragraphs().unwrap()[0].revisions().unwrap();
+    assert_eq!(wrong_revision.len(), 1);
+    assert_eq!(wrong_revision[0].date_utc(), None);
+
+    let inactive = format!(
+        r#"<h:hdr xmlns:h="{word}" xmlns:mc="{mce}" xmlns:du="{date_utc}" xmlns:f="urn:future"><mc:AlternateContent><mc:Choice Requires="f"><h:p><h:ins h:id="2" h:author="Future" du:dateUtc="2026-07-18T00:00:00Z"><h:r><h:t>future</h:t></h:r></h:ins></h:p></mc:Choice><mc:Fallback><h:p><h:r><h:t>fallback</h:t></h:r></h:p></mc:Fallback></mc:AlternateContent></h:hdr>"#
+    );
+    let fallback = story(inactive.as_bytes(), Kind::Primary);
+    assert_eq!(fallback.text().unwrap(), "fallback");
+    assert!(
+        fallback.paragraphs().unwrap()[0]
+            .revisions()
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
 fn malformed_story_is_rejected_at_the_codec_boundary() {
     assert!(Story::from_xml_bytes(
         br#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r/>"#.to_vec(),

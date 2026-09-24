@@ -28,6 +28,7 @@ use crate::web::{Binding as WebBinding, Bindings as WebBindings};
 use super::super::model::{
     PartChange, StyleGuard, defaults_after, ensure_merge_area, merge_conflicts, project_merges,
 };
+use super::super::svg::{PictureSelector, SvgInput};
 use super::super::validation::{
     Added, FinalOrder, MergeIntent, MoveIntent, OrderPlan, PanesAction, Placement, SheetActions,
     TabAction, Target, pending_merge,
@@ -96,7 +97,106 @@ pub struct WorksheetEdit<'a> {
     pub(super) position: usize,
 }
 
+/// Transaction-scoped scalar editor for one existing worksheet form control.
+///
+/// Staging validates the selected control and paired properties/VML edits.
+/// The surrounding workbook transaction publishes them atomically at commit.
+/// One control per worksheet batch is supported; independent form-control
+/// branches on the same worksheet conflict when joined. In-memory patches
+/// require the exact immutable source workbook; durable patches check the
+/// complete serialized source.
+#[derive(Debug)]
+pub struct FormControlEdit<'a> {
+    pub(super) edit: &'a mut Edit,
+    pub(super) position: usize,
+    pub(super) selector: crate::form_control::OwnedSelector,
+}
+
+impl FormControlEdit<'_> {
+    /// Stage one typed scalar on the selected control.
+    pub fn set_scalar(
+        &mut self,
+        field: crate::form_control::ScalarField,
+        value: Option<crate::form_control::ScalarValue>,
+    ) -> Result<&mut Self> {
+        self.edit.stage_form_control_scalar(
+            self.position,
+            self.selector.selector(),
+            field,
+            value,
+        )?;
+        Ok(self)
+    }
+}
+
 impl WorksheetEdit<'_> {
+    /// Stage one selector-first scalar on an existing form control.
+    pub fn set_form_control_scalar<'a>(
+        &mut self,
+        selector: impl Into<crate::form_control::ControlSelector<'a>>,
+        field: crate::form_control::ScalarField,
+        value: Option<crate::form_control::ScalarValue>,
+    ) -> Result<&mut Self> {
+        self.edit
+            .stage_form_control_scalar(self.position, selector, field, value)?;
+        Ok(self)
+    }
+
+    /// Borrow a scalar editor pinned to one existing form-control selector.
+    pub fn edit_form_control<'e, 's>(
+        &'e mut self,
+        selector: impl Into<crate::form_control::ControlSelector<'s>>,
+    ) -> Result<FormControlEdit<'e>> {
+        let selector = selector.into();
+        let target = crate::form_control::owned_selector(selector);
+        {
+            let data = self
+                .edit
+                .base
+                .inner
+                .sheets
+                .get(self.position)
+                .ok_or_else(|| invalid("form-control worksheet disappeared"))?;
+            if data.kind != WorksheetKind::Worksheet {
+                return Err(Error::NotWorksheet {
+                    sheet: data.name.clone(),
+                });
+            }
+            crate::form_control::validate_ordinary_form_control_selector(
+                &self.edit.base.inner.package,
+                &data.part_uri,
+                target.selector(),
+            )?;
+        }
+        Ok(FormControlEdit {
+            edit: self.edit,
+            position: self.position,
+            selector: target,
+        })
+    }
+
+    /// Attach one borrowed SVG payload to an existing direct worksheet
+    /// picture selected by source-order drawing and picture ordinals.
+    ///
+    /// The payload is validated against the transaction's finite input limit
+    /// before a staged copy is allocated. Package IDs, relationship IDs, and
+    /// media names remain transaction-owned.
+    pub fn attach_svg<'svg>(
+        &mut self,
+        picture: PictureSelector,
+        input: SvgInput<'svg>,
+    ) -> Result<&mut Self> {
+        self.edit.stage_svg_attach(self.position, picture, input)?;
+        Ok(self)
+    }
+
+    /// Detach the admitted embedded SVG owner from one existing direct
+    /// worksheet picture while retaining its raster fallback.
+    pub fn detach_svg(&mut self, picture: PictureSelector) -> Result<&mut Self> {
+        let _ = self.edit.stage_svg_detach(self.position, picture)?;
+        Ok(self)
+    }
+
     /// Replace all worksheet Office Add-in range bindings by moving one
     /// already-validated collection into the transaction.
     pub fn set_bindings(&mut self, bindings: WebBindings) -> &mut Self {

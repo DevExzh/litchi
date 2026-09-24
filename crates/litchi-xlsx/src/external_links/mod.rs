@@ -15,8 +15,8 @@ pub mod validation;
 
 pub use codec::parse_external_link;
 pub use model::{
-    Cell, CellType, Conformance, Dde, DdeItem, DdeValue, DdeValueType, DdeValues, DefinedName,
-    ItemSource, Link, Ole, OleItem, Row, SheetData, Target, Workbook,
+    AlternateUrl, AlternateUrls, Cell, CellType, Conformance, Dde, DdeItem, DdeValue, DdeValueType,
+    DdeValues, DefinedName, ItemSource, Link, Ole, OleItem, Row, SheetData, Target, Workbook,
 };
 pub use package::{
     Entry, add_external_link, build_external_link_part, build_external_link_part_with_conformance,

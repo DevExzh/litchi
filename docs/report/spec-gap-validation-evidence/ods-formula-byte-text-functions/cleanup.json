@@ -1,0 +1,11 @@
+{
+  "gate_checkout": "/tmp/litchi-ods-byte-gates-2_yywd4d",
+  "gate_checkout_removed": true,
+  "gate_target_removed": true,
+  "python_cache_directories_removed": [
+    "docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/__pycache__",
+    "docs/report/spec-gap-validation-evidence/ods-formula-byte-text-functions/performance/__pycache__"
+  ],
+  "raw_evidence_retained": true,
+  "harness_preflight_target_removed": true
+}

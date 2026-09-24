@@ -1,0 +1,45 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+    Finished `test` profile [unoptimized] target(s) in 6.78s
+     Running tests/ods_formula_matrix_evaluation.rs (/home/zhuhe/code/litchi-array-target/debug/deps/ods_formula_matrix_evaluation-332bda0e297d348e)
+
+running 22 tests
+test explicit_matrix_errors_precede_generated_element_type_errors ... ok
+test force_array_matrix_functions_consume_lazy_if_arrays_and_nested_transpose ... ok
+test force_array_arguments_are_fully_materialized_in_scalar_context ... ok
+test matrix_function_names_are_case_insensitive ... ok
+test computed_identity_size_does_not_replace_its_callers_shape_continuations ... ok
+test matrix_functions_return_value_errors_for_invalid_arity ... ok
+test matrix_if_plans_computed_identity_dimensions ... ok
+test minverse_returns_a_square_inverse_with_finite_numeric_results ... ok
+test matrix_numeric_operations_propagate_element_errors_as_formula_values ... ok
+test mdeterm_returns_the_determinant_of_a_square_numeric_array ... ok
+test mmult_returns_the_rectangular_product_in_row_major_order ... ok
+test munit_converts_logical_parameters_and_truncates_fractional_sizes ... ok
+test matrix_if_broadcasts_a_scalar_branch_against_a_transposed_array ... ok
+test matrix_functions_reject_invalid_shapes_singular_inverse_and_nonpositive_units ... ok
+test matrix_if_restores_outer_state_after_force_array_inner_if ... ok
+test nested_scalar_if_and_error_handler_keep_the_selected_array_shape ... ok
+test munit_returns_an_identity_array_and_uses_the_first_scalar_array_element ... ok
+test scalar_if_evaluates_a_selected_matrix_function_without_touching_unselected_reference ... ok
+test reference_operators_distinguish_successful_inverse_from_error_fallback ... ok
+test numeric_matrix_functions_reject_text_and_logical_elements_while_transpose_preserves_types ... ok
+test transpose_exchanges_rectangular_axes_and_can_feed_matrix_broadcasting ... ok
+test scalar_if_selects_the_matrix_function_in_the_else_branch_lazily ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ods_formula_matrix_limits.rs (/home/zhuhe/code/litchi-array-target/debug/deps/ods_formula_matrix_limits-0791628bee6f77e1)
+
+running 9 tests
+test matrix_function_families_enforce_max_array_cells_before_allocation ... ok
+test matrix_work_and_storage_limits_are_typed_separately_from_formula_errors ... ok
+test matrix_domain_errors_remain_formula_values ... ok
+test owned_result_survives_expression_and_resolver_drop_and_releases_budget ... ok
+test resolver_mid_read_cancellation_is_not_published ... ok
+test pre_cancelled_value_evaluation_stops_before_resolver_access ... ok
+test unselected_huge_munit_is_lazy_while_selected_munit_refuses ... ok
+test multiplication_charges_arithmetic_after_materializing_its_inputs ... ok
+test nested_matrix_shape_probes_have_a_finite_depth_limit ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

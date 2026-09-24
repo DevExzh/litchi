@@ -1,0 +1,160 @@
+{
+  "integration_base": "97a97feb55f94f1c4a220a93cfda27805b003d84",
+  "source_sha256": {
+    "docs/performance/CRUD_COVERAGE.md": {
+      "bytes": 216639,
+      "sha256": "196537c1c96f9b80aba5e3766ffe4b1e0bad09271942913c274326569422e7dd"
+    },
+    "docs/performance/GOAL_AUDIT.md": {
+      "bytes": 86502,
+      "sha256": "c2a09868e43d31507e7d9a72fd7b960e1ad7f50827f02f041bdd735e7a566733"
+    },
+    "docs/performance/crud-coverage-index-v2.json": {
+      "bytes": 111713,
+      "sha256": "9cf59827db359c8f83b2225e796f1611a63e3cd11eae92963e038c6a6d45a21a"
+    },
+    "tools/perf-baseline/README.md": {
+      "bytes": 267123,
+      "sha256": "c37fb44ba1b8a23fd9f598026a85a29672bd480fec7f1a761b8bd749ccc5ae1a"
+    },
+    "tools/test_crud_coverage_index.py": {
+      "bytes": 27732,
+      "sha256": "2162755c883aa56355a8e9d0916f2e68788d938a1fc7ad6c1f90b51a1fa81d74"
+    },
+    "tools/validate_crud_coverage_index.py": {
+      "bytes": 84570,
+      "sha256": "b3f808bccb38a60b0d2d772db8cbdf695dc6859009407e6d273e92840a01bd19"
+    }
+  },
+  "validation": "110 Python tests; current and historical index validation; Python compilation; diff check; no timing runs",
+  "independent_review": "Functional CLEAR in actual V2 review. Original V1 receipt remains historical; root verifies the additive V2 supersession binding corrects its stale identity without rewriting evidence.",
+  "probe_digest_correction": "Original review omits one zero in the probe Python source SHA (63 hex). Actual source digest verified and archived: 673701c3b7772eee8f039a95785cb4aa9090eaad67260cbf9080f2d9c18bc28d. Original receipt retained.",
+  "scope": "Exact ordered registry of 443 selectors: 33 mapped, 410 explicitly excluded from representative matrix. 11 measured and 22 correctness-only mappings are historical coverage, not full goal completion or current performance evidence.",
+  "production_registry_unchanged": {
+    "base_source_sha256": "3175625ac6bc32909e9a8c72cb958e8fadaf0c0c9f7832252208a3bc192cefe7",
+    "edited": false,
+    "path": "tools/perf-baseline/src/lib.rs",
+    "source_bytes": 2877908,
+    "source_sha256": "3175625ac6bc32909e9a8c72cb958e8fadaf0c0c9f7832252208a3bc192cefe7"
+  },
+  "historical_index_unchanged": {
+    "path": "docs/performance/crud-coverage-index-v1.json",
+    "sha256": "59619a61f9d7b7558cc33be61ad097314120416c39078c654d284b0d472802b2"
+  },
+  "evidence": [
+    {
+      "file": "author-candidate.patch.gz",
+      "source": "/var/tmp/litchi-crud-selector-exact-v2-candidate-20260910-evidence/candidate.patch",
+      "uncompressed_sha256": "76710f748911d17e72593eab077fce4a2dfd2ac5b2e4645814f3d991ba930602",
+      "sha256": "ecccc6f70e12a45e04c2d0e3b5156582329279d188488330bfae35929ffbcdc8"
+    },
+    {
+      "file": "author-verification.log.gz",
+      "source": "/var/tmp/litchi-crud-selector-exact-v2-candidate-20260910-evidence/verification.log",
+      "uncompressed_sha256": "53074f7bd65d3232d18b383094ac6b04ded742d5f18c0733de7543fca5b1df0c",
+      "sha256": "a5fe4b7ae3bb423ea7cd8a37d7c51d3c15c92b3327636f8e622f3fb56b1d38de"
+    },
+    {
+      "file": "author-independent-review-receipt.json.gz",
+      "source": "/var/tmp/litchi-crud-selector-exact-v2-candidate-20260910-evidence/independent-review-receipt.json",
+      "uncompressed_sha256": "42e3e9169ce286c034c713247560e112d6507b32e6f82384a5097f94dd365fb2",
+      "sha256": "2748fdff2e4ba43a5d8fcda2068ed00a4e9b061b406ae4732c8acc36928d09d8"
+    },
+    {
+      "file": "author-README.md.gz",
+      "source": "/var/tmp/litchi-crud-selector-exact-v2-candidate-20260910-evidence/README.md",
+      "uncompressed_sha256": "498dc58424c9767d77c3099181acf04d71c0afdea7d7c1f26c5a4a5df5cdd925",
+      "sha256": "eb916641dbfb341735c2bb010f43f05c216fd0c0e619ee87d38e71cf29383654"
+    },
+    {
+      "file": "author-independent-review-v2-receipt.md.gz",
+      "source": "/var/tmp/litchi-crud-selector-exact-v2-candidate-20260910-evidence/independent-review-v2-receipt.md",
+      "uncompressed_sha256": "78c6936364173462da959ec0ae0cca4c049bcdd526315e28ddddffd198abd93d",
+      "sha256": "820898cf6d2240a3f191e0bc3df0cee88d228f1dd6eba37687ab5491dbda3794"
+    },
+    {
+      "file": "author-v2-probe-digest-correction-addendum-20260910.md.gz",
+      "source": "/var/tmp/litchi-crud-selector-exact-v2-candidate-20260910-evidence/v2-probe-digest-correction-addendum-20260910.md",
+      "uncompressed_sha256": "3cb9f8b0ea93e374a896a415c4a457658460aa946af0ee8ac167cd8f84dc3ce4",
+      "sha256": "33bc88bf4bf05030a4a771a2ab0e79b7d080183f70282bfa0b495c55c7fb243a"
+    },
+    {
+      "file": "author-SHA256SUMS.gz",
+      "source": "/var/tmp/litchi-crud-selector-exact-v2-candidate-20260910-evidence/SHA256SUMS",
+      "uncompressed_sha256": "3cadab6e83ac73e177260a514cd9664a45310a7d2b443e675bbda3c79beb0913",
+      "sha256": "7ee9ab08466dd6359441e3f397144f00dd6f78260e5fa6c1941e06a34a0e56cb"
+    },
+    {
+      "file": "author-v2-supersession-binding.json.gz",
+      "source": "/var/tmp/litchi-crud-selector-exact-v2-candidate-20260910-evidence/v2-supersession-binding.json",
+      "uncompressed_sha256": "2680bf599d3ad1ef348b36ce41bf4d091130000ed4d8119d88a03e43bd46ce60",
+      "sha256": "cb2e6e7da247adf99112a1151ffd999eb43d054f5553e89f689b8c2882207686"
+    },
+    {
+      "file": "author-candidate-manifest.json.gz",
+      "source": "/var/tmp/litchi-crud-selector-exact-v2-candidate-20260910-evidence/candidate-manifest.json",
+      "uncompressed_sha256": "2aa05aa7fa0f73c82f1b5ec3c4f219a485ca736fedf2607ded2acc10a946e329",
+      "sha256": "d6c01628bc6e873bf1a08eb01ef9a2c037cd9d60b47c1f1d32d05d35768c1c63"
+    },
+    {
+      "file": "root-gates.json.gz",
+      "source": "/var/tmp/litchi-selector-v2-root-97-20260910/gates.json",
+      "uncompressed_sha256": "9a12425d8738d340504adbff8b47be0c7f3c3ee607497aa2a11675e5d17dd35f",
+      "sha256": "2b4d5a57692bd4f6d3792598ff94fad9a5cb9fc94954d5ba71ae62f66ebd6489"
+    },
+    {
+      "file": "root-gate-0.log.gz",
+      "source": "/var/tmp/litchi-selector-v2-root-97-20260910/gate-0.log",
+      "uncompressed_sha256": "535b7bdb98f827d621096a7422f0be94632b8cf83e71a3ff5384219f3738b05d",
+      "sha256": "c7ec0345993e95668dfadd1cc0219214d4ec12740127d0dd83b8ae2c2f6aa122"
+    },
+    {
+      "file": "root-source-after.json.gz",
+      "source": "/var/tmp/litchi-selector-v2-root-97-20260910/source-after.json",
+      "uncompressed_sha256": "98e53b490d47d37f550be2392b44838ef309789b64436226ca538327991cdba3",
+      "sha256": "4e545e0d5d0840bf5318063905452ec1911a24a251317057c267c3a74be78780"
+    },
+    {
+      "file": "root-integration.json.gz",
+      "source": "/var/tmp/litchi-selector-v2-root-97-20260910/integration.json",
+      "uncompressed_sha256": "9c331e78206f2029c09a4cd1395b54f1b3a94eae0caf274751a65a0dc60e94a7",
+      "sha256": "df135befde96768e9380fd874f1df41617c94fbb022af86d846c231e41f0979b"
+    },
+    {
+      "file": "root-gate-4.log.gz",
+      "source": "/var/tmp/litchi-selector-v2-root-97-20260910/gate-4.log",
+      "uncompressed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "file": "root-gate-2.log.gz",
+      "source": "/var/tmp/litchi-selector-v2-root-97-20260910/gate-2.log",
+      "uncompressed_sha256": "8aca872b7ca7e412eeebb9ef857aa185c20ebc608a98373c4970f8ea79662bfb",
+      "sha256": "a15c8702e3d3331ea31d3511eee9b0e6cc4951cb21de2ddce5f6b3330925b65c"
+    },
+    {
+      "file": "root-gate-1.log.gz",
+      "source": "/var/tmp/litchi-selector-v2-root-97-20260910/gate-1.log",
+      "uncompressed_sha256": "535b7bdb98f827d621096a7422f0be94632b8cf83e71a3ff5384219f3738b05d",
+      "sha256": "c7ec0345993e95668dfadd1cc0219214d4ec12740127d0dd83b8ae2c2f6aa122"
+    },
+    {
+      "file": "root-gate-3.log.gz",
+      "source": "/var/tmp/litchi-selector-v2-root-97-20260910/gate-3.log",
+      "uncompressed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "file": "independent-probes.json.gz",
+      "source": "/var/tmp/litchi-crud-selector-v2-independent-probes-20260910.json",
+      "uncompressed_sha256": "cbe635c64054ec2b350a079fd5f8c320d59ee2f4143eaed8d010882937b1ede7",
+      "sha256": "57ac7ba01452e9562d50f86c52d480ec848a743185dec80bd046e344d222398f"
+    },
+    {
+      "file": "independent-probes.py.gz",
+      "source": "/var/tmp/litchi-crud-selector-v2-independent-probes-20260910.py",
+      "uncompressed_sha256": "673701c3b7772eee8f039a95785cb4aa9090eaad67260cbf9080f2d9c18bc28d",
+      "sha256": "f6b5822d6dc3d1c9f20e7240c6565a44dc17893e53c8c6ec4159d2fa6f060339"
+    }
+  ]
+}

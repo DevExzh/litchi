@@ -1,0 +1,42 @@
+{
+  "schema": "xlsx-svg-contextual-corpus-v1",
+  "source_boundary": "borrowed ordinary worksheet SpreadsheetDrawing XML; direct xdr:pic owners only",
+  "regular": {
+    "picture_counts": [16, 32, 128],
+    "namespace_declaration_counts": [0, 32, 128],
+    "namespace_uri_payload_bytes": 1000,
+    "anchor_form": "twoCellAnchor",
+    "opaque_qname_attribute": "future:qname=\"q:Opaque\"",
+    "opaque_qname_element": "<future:opaque>q:QName</future:opaque>",
+    "scenarios": [
+      "contextual_read",
+      "standalone_export",
+      "scalar_reference_edit",
+      "small_cap_refusal"
+    ],
+    "output_cap_bytes": 128
+  },
+  "original": {
+    "name": "original_149433",
+    "bytes": 149433,
+    "pictures": 32,
+    "namespace_declarations": 128,
+    "namespace_uri_payload_bytes": 1000,
+    "anchor_form": "twoCellAnchor",
+    "sha256": "emitted by every harness receipt and repeated in results/*/corpus-sha256.tsv",
+    "scenarios": [
+      "contextual_read",
+      "standalone_export",
+      "small_cap_refusal"
+    ]
+  },
+  "measurement": {
+    "fresh_processes_per_lane": 3,
+    "warmup_samples_per_process": 2,
+    "measured_samples_per_process": 20,
+    "wall_time": "/usr/bin/time -v elapsed wall clock",
+    "rss": "/usr/bin/time -v Maximum resident set size",
+    "allocator": "process-local CountingAllocator GlobalAlloc observer",
+    "status": "exploratory; no lifecycle or native acceptance claim"
+  }
+}

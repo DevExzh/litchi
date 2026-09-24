@@ -1,0 +1,18 @@
+{
+  "status": "setup-failure",
+  "timestamp_utc": "2026-09-20T09:28:31.056867+00:00",
+  "command": [
+    "python3",
+    "performance/run_profile.py",
+    "--candidate-root",
+    "/var/tmp/litchi-reference-metadata-gates-7d9uic94/checkout",
+    "--candidate-freeze",
+    "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/gates/freeze.json",
+    "--warmups",
+    "3",
+    "--samples",
+    "15"
+  ],
+  "cwd": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata",
+  "error": "FileNotFoundError: freeze path resolved as batch-root/docs/report/.../gates/freeze.json; no build, preflight, or timing started."
+}

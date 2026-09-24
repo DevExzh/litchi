@@ -1,0 +1,928 @@
+{
+  "accounting": {
+    "baseline_groups": 56,
+    "candidate_checksum_stable_groups": 216,
+    "candidate_groups": 272,
+    "candidate_only_groups": 216,
+    "expected_baseline_records": 840,
+    "expected_candidate_records": 4080,
+    "matched_control_groups": 56,
+    "preflight": {
+      "baseline_cases": 28,
+      "baseline_status": "ok",
+      "candidate_cases": 136,
+      "candidate_status": "ok"
+    },
+    "target_cleanup": {
+      "baseline_removed": true,
+      "baseline_worktree": "/var/tmp/litchi-ods-reference-metadata-baseline-cjunaglp"
+    },
+    "typed_metadata_outcomes_by_group": {
+      "error:#N/A": 2,
+      "error:#REF!": 10,
+      "error:#VALUE!": 80,
+      "failure:cancelled": 2,
+      "failure:reference-cells": 4,
+      "failure:unsupported-reference": 16,
+      "finite-number": 78,
+      "logical": 24
+    }
+  },
+  "audit": {
+    "accounting_sets_unchanged": true,
+    "bootstrap": {
+      "method": "independent unpaired median ratios; percentile interval",
+      "resamples": 5000,
+      "review_threshold_percent": 5.0,
+      "seed": 5554865353495640424
+    },
+    "path": "root-performance-audit.json",
+    "read_bound_correction": {
+      "captured_verifier_failure": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/performance/results/candidate-final ('reference-metadata-row-computed-if-matrix', 'evaluate'): reads 2 outside expected bounds (0, 0)",
+      "corrected": true,
+      "corrected_cases": [
+        "reference-metadata-column-computed-if-matrix",
+        "reference-metadata-column-computed-iferror-matrix",
+        "reference-metadata-column-computed-ifna-matrix",
+        "reference-metadata-row-computed-if-matrix",
+        "reference-metadata-row-computed-iferror-matrix",
+        "reference-metadata-row-computed-ifna-matrix",
+        "reference-metadata-sheet-computed-scalar"
+      ],
+      "raw_reference_read_totals": {
+        "reference-metadata-areas-3d": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-areas-arity": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-areas-array-refusal": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-areas-duplicate-list": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-areas-list": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-areas-range": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-areas-refusal": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-areas-resource": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-column-3d-cell": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-column-array-refusal": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-column-cell": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-column-computed-if-matrix": {
+          "expected": 60,
+          "observed": 60,
+          "rows": 30
+        },
+        "reference-metadata-column-computed-iferror-matrix": {
+          "expected": 60,
+          "observed": 60,
+          "rows": 30
+        },
+        "reference-metadata-column-computed-ifna-matrix": {
+          "expected": 60,
+          "observed": 60,
+          "rows": 30
+        },
+        "reference-metadata-column-current": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-column-list-refusal": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-column-matrix": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-column-one-entry-list": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-column-projected": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-column-scalar-vector": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-columns-3d": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-columns-arity": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-columns-array": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-columns-formula-error": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-columns-list-refusal": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-columns-one-entry-list": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-columns-projected": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-columns-range": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-columns-scalar-refusal": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-arity": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-array": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-error": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-iferror-source": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-iferror-source-arithmetic": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-iferror-source-fallback": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-ifna-source": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-ifna-source-arithmetic": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-ifna-source-fallback": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-list": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-number": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-reference": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-selected-local": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-selected-source": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-source": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-source-array-false-matrix": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-isref-source-array-true-matrix": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-large-range": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-row-3d-cell": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-row-array-refusal": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-row-cell": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-row-computed-if-matrix": {
+          "expected": 60,
+          "observed": 60,
+          "rows": 30
+        },
+        "reference-metadata-row-computed-iferror-matrix": {
+          "expected": 60,
+          "observed": 60,
+          "rows": 30
+        },
+        "reference-metadata-row-computed-ifna-matrix": {
+          "expected": 60,
+          "observed": 60,
+          "rows": 30
+        },
+        "reference-metadata-row-current": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-row-list-refusal": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-row-matrix": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-row-one-entry-list": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-row-projected": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-row-scalar-vector": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-rows-3d": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-rows-array": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-rows-list-refusal": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-rows-one-entry-list": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-rows-projected": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-rows-range": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-rows-resource": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-rows-scalar-refusal": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-3d": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-array-matrix": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-array-refusal": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-cancel": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-computed-if-matrix": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-computed-iferror-matrix": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-computed-ifna-matrix": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-computed-scalar": {
+          "expected": 30,
+          "observed": 30,
+          "rows": 30
+        },
+        "reference-metadata-sheet-current": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-hidden-text": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-iferror-source": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-iferror-source-fallback": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-ifna-source": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-ifna-source-fallback": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-list-refusal": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-logical-coercion": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-number-coercion": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-reference": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-selected-local": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-selected-source": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-source": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-source-array-false-matrix": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-source-array-true-matrix": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-text": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheet-unknown-text": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-3d": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-array-refusal": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-current": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-formula-error": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-iferror-source": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-iferror-source-fallback": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-ifna-source": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-ifna-source-fallback": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-list-refusal": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-one-entry-list": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-reference": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-selected-local": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-selected-source": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-source": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-source-array-false-matrix": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        },
+        "reference-metadata-sheets-source-array-true-matrix": {
+          "expected": 0,
+          "observed": 0,
+          "rows": 30
+        }
+      }
+    },
+    "status": "verified; individual performance flags retained",
+    "sumifs_index_in_sorted_matched_groups": 28,
+    "verified_complete_samples": 4920
+  },
+  "candidate_metadata": {
+    "cancellation": {
+      "case": "reference-metadata-sheet-cancel",
+      "expected": "failure:cancelled",
+      "raw_and_normalized_reads": 0,
+      "repeat": 4
+    },
+    "case_count": 108,
+    "group_count": 216,
+    "normalized_reference_read_groups": {
+      "0": 202,
+      "1": 2,
+      "2": 12
+    },
+    "one_read_groups": 2,
+    "one_read_lane": "reference-metadata-sheet-computed-scalar: ABS child performs one scalar-intersection read before SHEET metadata evaluation",
+    "p50_metric_extrema": {
+      "allocator_calls": {
+        "max": {
+          "case": "reference-metadata-sheet-computed-ifna-matrix",
+          "phase": "parse-evaluate",
+          "value": 105
+        },
+        "min": {
+          "case": "reference-metadata-sheet-cancel",
+          "phase": "evaluate",
+          "value": 0
+        }
+      },
+      "bytes_per_repeat_p50": {
+        "max": {
+          "case": "reference-metadata-sheet-computed-iferror-matrix",
+          "phase": "parse-evaluate",
+          "value": 78
+        },
+        "min": {
+          "case": "reference-metadata-row-current",
+          "phase": "evaluate",
+          "value": 6
+        }
+      },
+      "peak_live_bytes": {
+        "max": {
+          "case": "reference-metadata-row-projected",
+          "phase": "parse-evaluate",
+          "value": 7964
+        },
+        "min": {
+          "case": "reference-metadata-sheet-cancel",
+          "phase": "evaluate",
+          "value": 0
+        }
+      },
+      "reference_reads": {
+        "max": {
+          "case": "reference-metadata-row-computed-ifna-matrix",
+          "phase": "parse-evaluate",
+          "value": 2
+        },
+        "min": {
+          "case": "reference-metadata-areas-3d",
+          "phase": "evaluate",
+          "value": 0
+        }
+      },
+      "requested_bytes": {
+        "max": {
+          "case": "reference-metadata-areas-resource",
+          "phase": "parse-evaluate",
+          "value": 16956
+        },
+        "min": {
+          "case": "reference-metadata-sheet-cancel",
+          "phase": "evaluate",
+          "value": 0
+        }
+      },
+      "result_live_budget": {
+        "max": {
+          "case": "reference-metadata-row-projected",
+          "phase": "parse-evaluate",
+          "value": 264
+        },
+        "min": {
+          "case": "reference-metadata-areas-3d",
+          "phase": "evaluate",
+          "value": 0
+        }
+      },
+      "rss_kib": {
+        "max": {
+          "case": "reference-metadata-column-computed-if-matrix",
+          "phase": "evaluate",
+          "value": 3820
+        },
+        "min": {
+          "case": "reference-metadata-sheet-cancel",
+          "phase": "evaluate",
+          "value": 2996
+        }
+      },
+      "time_ns_per_repeat": {
+        "max": {
+          "case": "reference-metadata-sheet-computed-iferror-matrix",
+          "phase": "parse-evaluate",
+          "value": 20200
+        },
+        "min": {
+          "case": "reference-metadata-sheet-cancel",
+          "phase": "evaluate",
+          "value": 12
+        }
+      },
+      "work_per_repeat": {
+        "max": {
+          "case": "reference-metadata-sheet-computed-iferror-matrix",
+          "phase": "parse-evaluate",
+          "value": 346
+        },
+        "min": {
+          "case": "reference-metadata-sheet-cancel",
+          "phase": "evaluate",
+          "value": 0
+        }
+      }
+    },
+    "timed_rows": 3240,
+    "two_read_groups": 12,
+    "two_read_lanes": [
+      "reference-metadata-row-computed-if-matrix",
+      "reference-metadata-row-computed-iferror-matrix",
+      "reference-metadata-row-computed-ifna-matrix",
+      "reference-metadata-column-computed-if-matrix",
+      "reference-metadata-column-computed-iferror-matrix",
+      "reference-metadata-column-computed-ifna-matrix"
+    ],
+    "zero_read_groups": 202
+  },
+  "capture": {
+    "audit_manifest_sha256": {
+      "baseline-049c09cdde3978593149079c4257df047a3fa419": "83b21afc6fa1838a66e734a92df9d0470126099274aa5c7fc10dd6baddfe3a7f",
+      "candidate-final": "a02ac1db99df1722cbb93985b2b44aff5a2c3278f4d029962c8c88edf257f5fb"
+    },
+    "baseline_commit": "049c09cdde3978593149079c4257df047a3fa419",
+    "baseline_records": 840,
+    "binary_sha256": {
+      "baseline": "b405a8e2796585b913ef443722224e73e8d42ed2f981fd79b4acbf41bb07b8c3",
+      "candidate": "944ef1ad41d46f1238829bec1faf16846edf7c772051bfb6389fbd0cf7816180"
+    },
+    "candidate_freeze": "docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/gates/freeze.json",
+    "candidate_freeze_sha256": "b4a0f0c9665e10f67fafa1b179bfbfdd8be2c65e6ec897bac86db1b2afc9330a",
+    "candidate_records": 4080,
+    "candidate_root": "/var/tmp/litchi-reference-metadata-gates-7d9uic94/checkout",
+    "command": "python3 docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/performance/run_profile.py --candidate-root /var/tmp/litchi-reference-metadata-gates-7d9uic94/checkout --candidate-freeze docs/report/spec-gap-validation-evidence/ods-formula-reference-metadata/gates/freeze.json --warmups 3 --samples 15",
+    "contract_sha256": "87f20c419139bf721221d06c8714edd900ae7a57cbedecf070878e4f6cf64d8a",
+    "gate_lock_sha256": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3",
+    "phases": [
+      "evaluate",
+      "parse-evaluate"
+    ],
+    "profile_input_sha256": {
+      "PLAN.md": "b68442a688f7292d6aa257e84bc1aa197948e63ce04200aed994670c080aa365",
+      "README.md": "6f6242aadc6f72245827c62a5c2487f29619e664895456cb7235f8cd856160ba",
+      "case-matrix.json": "82d0de712d4c3791abdc54e0cd5f6afda533215048c5681eba13f251fcf4e60b",
+      "harness/Cargo.lock": "8b7bb5e9930f11ca4d3e625aa18758a7ce1c0ef13ab034bdb2c6b94f84f3e749",
+      "harness/Cargo.toml": "a9c0277e9bcb7c2733ae51d1efad1c88d5a23ef928d86ce8a2df268f9841ca30",
+      "harness/src/main.rs": "59fa1da203864a12d93ee4c22e9e6355ee0ac0ea94d1be52da2bc46fa13834f7",
+      "run_profile.py": "ac0f7a016349eb2be82752bb585e5ebe0d059175d3e833c33d29da3aeb881009",
+      "summarize.py": "45ac7c8273a6de7599287fcf0b2a8de005f6766d642be16e24d5fddd161d3f7e",
+      "verify.py": "b55fd98a932b43c8d08a795a8ec2abef4d8b376aaf28768d49968f403d46160b"
+    },
+    "profile_inputs_unchanged": true,
+    "samples_per_group": 15,
+    "session_id": 38187,
+    "warmups_per_child": 3
+  },
+  "diagnostics": {
+    "setup_failure": "performance/results/diagnostic-revised-freeze-path-failure: relative freeze path was resolved from batch cwd; no build, preflight, or timed rows.",
+    "stale_verifier": "performance/results/diagnostic-stale-read-bound-verifier: retained verify.py failed before root correction because its generic metadata bound expected zero reads; root-performance-audit.json records corrected exact read totals and PASS4920.",
+    "superseded_complete_capture": "diagnostics/computed-array-preflight/performance-results: 840 baseline + 3810 candidate rows, pre-revised 99 metadata cases; its SUMIFS evaluate observation was +5.865% with descriptive bootstrap interval [+0.528%, +6.831%]."
+  },
+  "generated_at_utc": "2026-09-20T09:40:41.930431+00:00",
+  "historical_complete_capture_rows": {
+    "combined": 9570,
+    "revised": 4920,
+    "superseded": 4650
+  },
+  "host_context": {
+    "capture_context_before_file": null,
+    "cpu_count_recorded": 32,
+    "isolation": "not isolated; no pre-capture load/affinity snapshot was retained for this revised run; root observed unrelated preparation workload.",
+    "limitation": "Do not attribute timing or RSS deltas to the evaluator from this host context alone."
+  },
+  "limitations": [
+    "Rows are p50 values from fifteen fresh child processes per phase and case.",
+    "The retained environment manifests record the 32-CPU host, but no revised capture-context-before.json was retained; timing was not isolated.",
+    "RSS is an observation and no causal attribution is made from unchanged allocator counters.",
+    "The profile measures evaluator/typed resource paths, not save, recalculation, native producer acceptance, or cross-platform timing identity."
+  ],
+  "matched_control_deltas": {
+    "accounting_mismatch_groups": {
+      "allocator_calls": [],
+      "bytes_per_repeat_p50": [],
+      "input_bytes": [],
+      "output_bytes_p50": [],
+      "peak_live_bytes": [],
+      "reference_reads": [],
+      "released_bytes": [],
+      "requested_bytes": [],
+      "result_live_budget": [],
+      "work_per_repeat": []
+    },
+    "latency": {
+      "group_count": 56,
+      "max": {
+        "baseline": 83060.5,
+        "candidate": 88280.0,
+        "case": "reference-conditional-256x4-sumifs",
+        "delta_pct": 6.283973729991987,
+        "phase": "evaluate"
+      },
+      "min": {
+        "baseline": 1388.977,
+        "candidate": 1325.486,
+        "case": "concat-owned-right",
+        "delta_pct": -4.5710620118259655,
+        "phase": "parse-evaluate"
+      },
+      "over_5pct": 1,
+      "under_minus_5pct": 0
+    },
+    "normalization": {
+      "rounded_report_fields_not_used_for_flags": true,
+      "source": "raw sample elapsed_ns_p50 divided by each sample repeat before median/delta"
+    },
+    "rss": {
+      "group_count": 56,
+      "max": {
+        "baseline": 3304,
+        "candidate": 3460,
+        "case": "scalar-control-arithmetic",
+        "delta_pct": 4.721549636803868,
+        "phase": "parse-evaluate"
+      },
+      "min": {
+        "baseline": 3532,
+        "candidate": 3340,
+        "case": "array-control-4x4-arithmetic",
+        "delta_pct": -5.436013590033973,
+        "phase": "evaluate"
+      },
+      "over_5pct": 0,
+      "under_minus_5pct": 1
+    },
+    "sumifs_evaluate": {
+      "accounting": {
+        "allocator_calls": 42,
+        "bytes_per_repeat_p50": 52,
+        "reference_reads": 1792,
+        "work_per_repeat": 1839
+      },
+      "baseline_child_p50_ns_per_repeat": [
+        77545,
+        77680,
+        77885,
+        82035,
+        82395,
+        82450,
+        82520,
+        83060,
+        83295,
+        83360,
+        87940,
+        88125,
+        88385,
+        92995,
+        93825
+      ],
+      "baseline_p50_ns_per_repeat": 83060.5,
+      "bootstrap": {
+        "canonical_root_audit": {
+          "interval_pct": [
+            -0.9367322738594419,
+            12.013774608398853
+          ],
+          "method": "independent unpaired median ratios; percentile interval",
+          "resamples": 5000,
+          "seed": 5554865353495640452
+        },
+        "confidence_level": 0.95,
+        "interpretation": "descriptive variability interval; not a causal regression claim",
+        "interval_pct": [
+          -0.7277689333636594,
+          12.032077542721066
+        ],
+        "method": "independent unpaired median ratios; percentile interval; exact elapsed_ns_p50/repeat floats",
+        "resamples": 100000,
+        "seed": 5554865353495640452
+      },
+      "candidate_child_p50_ns_per_repeat": [
+        79150,
+        83065,
+        83310,
+        83365,
+        83425,
+        83445,
+        87300,
+        88280,
+        88325,
+        88435,
+        91890,
+        93390,
+        93795,
+        94535,
+        98085
+      ],
+      "candidate_p50_ns_per_repeat": 88280.0,
+      "case": "reference-conditional-256x4-sumifs",
+      "delta_pct": 6.283973729991987,
+      "parse_evaluate_delta_pct": -1.8519459547967076,
+      "phase": "evaluate"
+    }
+  },
+  "schema": "ods-formula-reference-metadata-performance-analysis-v2",
+  "source_hotpath_interpretation": {
+    "disposition": "retain as an observed review flag; no causal regression claim",
+    "evidence": "SUMIFS evaluate shows +6.2846% p50 while work=1839, resolver reads=1792, allocator calls=42, and bytes/repeat=52 remain identical; parse-evaluate is -1.852%. These counters do not establish a cause or rule one out; code layout/shared evaluator effects remain possible.",
+    "observation": "The candidate adds reference-metadata dispatch and RuntimeValue/reference-shape state; conditional.rs also adds SourceReference policy arms. The SUMIFS fixture uses ordinary references and does not enter the SourceReference branch."
+  }
+}

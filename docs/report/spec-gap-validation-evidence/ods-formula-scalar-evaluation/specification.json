@@ -1,0 +1,8 @@
+{
+  "base_commit": "9072e969e34263be73d5b8d2eb2700478d182101",
+  "source": "3rdparty/specs/OpenDocument-v1.4-os.zip",
+  "entry": "part4-formula/OpenDocument-v1.4-os-part4-formula.html",
+  "entry_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+  "scope": "Explicit scalar execution over an immutable OpenFormula tree. Function families, reference resolution, array evaluation, dependency scheduling, and cache publication remain separate incomplete requirements.",
+  "performance_hypothesis": "ASCII XML-name classes can return from a character predicate without searching the historical range tables; non-ASCII range membership remains exact."
+}

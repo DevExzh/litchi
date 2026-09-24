@@ -2,6 +2,36 @@
 
 use super::super::*;
 
+fn embedded_formula() -> Vec<u8> {
+    vec![
+        0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00,
+    ]
+}
+
+fn embedded_object(formula: Vec<u8>, storage: Option<u32>, buffer: Option<u32>) -> OleObjectRecord {
+    OleObjectRecord {
+        subrecords: vec![
+            ObjSubrecord::Common(FtCmo {
+                object_type: 8,
+                object_id: 1,
+                flags: 0,
+                reserved: [0; 12],
+            }),
+            ObjSubrecord::PictureFormat(FtCf {
+                format: FtCf::UNSPECIFIED,
+            }),
+            ObjSubrecord::PictureFlags(FtPioGrbit { raw: 0 }),
+            ObjSubrecord::PictureFormula(FtPictFmla {
+                formula,
+                storage_position: storage,
+                control_buffer_size: buffer,
+            }),
+            ObjSubrecord::End,
+        ],
+        text_object: None,
+    }
+}
+
 #[test]
 fn ole_obj_rejects_conflicting_link_and_control_flags() {
     let value = OleObjectRecord {
@@ -11,6 +41,9 @@ fn ole_obj_rejects_conflicting_link_and_control_flags() {
                 object_id: 1,
                 flags: 0,
                 reserved: [0; 12],
+            }),
+            ObjSubrecord::PictureFormat(FtCf {
+                format: FtCf::UNSPECIFIED,
             }),
             ObjSubrecord::PictureFlags(FtPioGrbit { raw: 0x0012 }),
             ObjSubrecord::PictureFormula(FtPictFmla {
@@ -23,6 +56,157 @@ fn ole_obj_rejects_conflicting_link_and_control_flags() {
         text_object: None,
     };
     assert!(value.validate().is_err());
+}
+
+#[test]
+fn ole_obj_requires_a_valid_picture_format() {
+    let value = OleObjectRecord {
+        subrecords: vec![
+            ObjSubrecord::Common(FtCmo {
+                object_type: 8,
+                object_id: 1,
+                flags: 0,
+                reserved: [0; 12],
+            }),
+            ObjSubrecord::PictureFlags(FtPioGrbit { raw: 0 }),
+            ObjSubrecord::PictureFormula(FtPictFmla {
+                formula: vec![0x05, 0, 0, 0, 0],
+                storage_position: Some(1),
+                control_buffer_size: None,
+            }),
+            ObjSubrecord::End,
+        ],
+        text_object: None,
+    };
+    assert!(value.validate().is_err());
+}
+
+#[test]
+fn ole_obj_rejects_a_second_malformed_ftcf() {
+    let mut value = embedded_object(embedded_formula(), Some(1), None);
+    value
+        .subrecords
+        .insert(2, ObjSubrecord::ClipboardFormat(vec![0x02]));
+    assert!(value.validate().is_err());
+}
+
+#[test]
+fn ole_obj_rejects_all_control_specific_subrecords() {
+    let control_subrecords = [
+        ObjSubrecord::CheckBoxData(FtCblsData {
+            state: CheckState::Unchecked,
+            accelerator: 0,
+            reserved: 0,
+            flags: 0,
+        }),
+        ObjSubrecord::RadioButtonData(FtRboData {
+            next_radio_button_id: 0,
+            first_in_group: false,
+        }),
+        ObjSubrecord::EditBoxData(FtEdoData {
+            validation: EditBoxValidation::AnyString,
+            multi_line: false,
+            vertical_scroll_bar: false,
+            list_control_id: 0,
+        }),
+        ObjSubrecord::GroupBoxData(FtGboData {
+            accelerator: 0,
+            reserved: 0,
+            flags: 0,
+        }),
+        ObjSubrecord::ScrollBarData(valid_sbs()),
+        ObjSubrecord::ListBoxData(FtLbsData::default()),
+    ];
+    for control_subrecord in control_subrecords {
+        let mut value = embedded_object(embedded_formula(), Some(1), None);
+        value.subrecords.insert(3, control_subrecord);
+        assert!(value.validate().is_err());
+    }
+}
+
+#[test]
+fn ole_obj_rejects_malformed_known_control_record_kinds() {
+    for kind in [
+        FT_CBLS_DATA,
+        FT_RBO_DATA,
+        FT_EDO_DATA,
+        FT_GBO_DATA,
+        FT_SBS,
+        FT_LBS_DATA,
+    ] {
+        let mut value = embedded_object(embedded_formula(), Some(1), None);
+        value.subrecords.insert(
+            3,
+            ObjSubrecord::Unknown {
+                kind,
+                data: vec![0xA5],
+            },
+        );
+        assert!(
+            value.validate().is_err(),
+            "kind {kind:#06X} should be rejected"
+        );
+    }
+}
+
+#[test]
+fn ole_obj_requires_ms_xls_picture_field_order() {
+    let valid = embedded_object(embedded_formula(), Some(1), None);
+    let common = valid.subrecords[0].clone();
+    let format = valid.subrecords[1].clone();
+    let flags = valid.subrecords[2].clone();
+    let formula = valid.subrecords[3].clone();
+    let end = valid.subrecords[4].clone();
+    let reordered = OleObjectRecord {
+        subrecords: vec![common, formula, format, flags, end],
+        text_object: None,
+    };
+    assert!(reordered.validate().is_err());
+}
+
+#[test]
+fn ole_obj_requires_even_cce_ptgtbl_and_conditional_storage_tail() {
+    let mut odd = embedded_formula();
+    odd.pop();
+    assert!(embedded_object(odd, Some(1), None).validate().is_err());
+
+    let mut wrong_cce = embedded_formula();
+    wrong_cce[0] = 4;
+    assert!(
+        embedded_object(wrong_cce, Some(1), None)
+            .validate()
+            .is_err()
+    );
+
+    let mut wrong_token = embedded_formula();
+    wrong_token[6] = 1;
+    assert!(
+        embedded_object(wrong_token, Some(1), None)
+            .validate()
+            .is_err()
+    );
+
+    assert!(
+        embedded_object(embedded_formula(), None, None)
+            .validate()
+            .is_err()
+    );
+    assert!(
+        embedded_object(embedded_formula(), Some(1), Some(0))
+            .validate()
+            .is_err()
+    );
+    embedded_object(embedded_formula(), Some(1), None)
+        .validate()
+        .expect("embedding formula tail should match fPrstm=0");
+}
+
+#[test]
+fn ole_obj_rejects_truncated_high_byte_class_string() {
+    let mut formula = embedded_formula();
+    formula[12] = 2; // cbClass: fHighByte plus one byte of rgb.
+    formula.extend_from_slice(&[1, 0x41]);
+    assert!(embedded_object(formula, Some(1), None).validate().is_err());
 }
 
 #[test]

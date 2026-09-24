@@ -1,0 +1,45 @@
+{
+  "base_commit": "e7f39166bbce03d63eb23452d8a34cf58c269da0",
+  "sources": {
+    "crates/litchi-cfb/src/directory_name.rs": "6deba63a8824e702e87fc2bacb4d1cf63cdc2d9960bf9cc1da46b0012406116b",
+    "crates/litchi-cfb/src/lib.rs": "67c653b6c653f4fe3049e8097a1ff5eb1284aa0ed88d63dacd69149c15f40bf2"
+  },
+  "toolchain": "1.95.0",
+  "commands": [
+    "cargo +1.95.0 test --offline --locked -p litchi-cfb --all-features",
+    "cargo +1.95.0 clippy --offline --locked -p litchi-cfb --all-targets --all-features -- -D warnings",
+    "rustfmt --edition 2024 --config skip_children=true --check crates/litchi-cfb/src/directory_name.rs crates/litchi-cfb/src/lib.rs",
+    "git diff --check"
+  ],
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  },
+  "tests": {
+    "passed": 321,
+    "failed": 0,
+    "ignored": 0
+  },
+  "doctests": {
+    "passed": 14,
+    "failed": 0,
+    "ignored": 1
+  },
+  "clippy": "pass",
+  "format": "pass",
+  "whitespace": "pass",
+  "cargo_lock_sha256": "b5a7e7c78d8211439da193dfc56967df23321e53d96e44350b54769efb01d83a",
+  "independent_review": "cfb_boundary_tests: final bounded validation and normative supplementary/27 BMP simple-uppercase mapping delta clear",
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "5006643bd6463fef35a224d8fff630ea403a53c54b0c50a8ec70ff831a401b88",
+      "raw_sha256": "56b17ba0fc520c54a93b72f429f5d98184a522336431da147863bb7b3880aa1b"
+    },
+    "clippy.log.gz": {
+      "sha256": "72fae74df5ff7c35c11d0de4b2749b6ce4063814d362afe6040b4bff4f0282ef",
+      "raw_sha256": "457d221abded780cf570b75c57b9a5363d4ce7370f02bd79de27dfed7fb7a37b"
+    }
+  }
+}

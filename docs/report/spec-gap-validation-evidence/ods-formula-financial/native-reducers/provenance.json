@@ -1,0 +1,74 @@
+{
+  "schema": "ods-formula-financial-reducer-native-provenance-v1",
+  "status": "captured compatibility fixture",
+  "contract_sha256": "fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b",
+  "oracle": "oracle-reducer-vectors.json",
+  "oracle_sha256": "9701fb0e3f6917be16f538189245c1ae3fe53af956aa98241ce1aa4605ee7a26",
+  "normative_source": {
+    "archive": "3rdparty/specs/OpenDocument-v1.4-os.zip",
+    "archive_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+    "member": "part4-formula/OpenDocument-v1.4-os-part4-formula.html",
+    "member_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+    "sections": "6.12.11-6.12.12, 6.12.21, 6.12.27, 6.12.30, 6.12.52 plus repository profiles"
+  },
+  "fixture": {
+    "input": "financial-reducers-native.fods",
+    "input_sha256": "354a75748511cb611e3dec5ac17e05876a7df641469be4e4b5ee0efd21c325c7",
+    "recalculated_output": "recalculated.ods",
+    "recalculated_output_sha256": "727e399baf014ff54e1ead157ac680f16affccae59fd7814b22e56c1c64129ac",
+    "content_xml": "content.xml",
+    "content_xml_sha256": "3059b7b906370de3bf0ce53872c537b70c4c07e3acef7b78591d0a53cd7c2d04",
+    "rows": 41
+  },
+  "converter": {
+    "executable": "/usr/bin/libreoffice",
+    "version": "LibreOffice 26.2.5.2 620(Build:2)",
+    "locale": "C.UTF-8",
+    "headless": true,
+    "fresh_profile": true
+  },
+  "command": [
+    "/usr/bin/libreoffice",
+    "--headless",
+    "-env:UserInstallation=file://<temporary-profile>",
+    "--convert-to",
+    "ods",
+    "--outdir",
+    "<temporary-output>",
+    "financial-reducers-native.fods"
+  ],
+  "temporary_profile_cleaned": true,
+  "comparison_counts": {
+    "numeric-tolerance": 15,
+    "divergence": 12,
+    "error-kind-match": 13,
+    "error-code-match": 1
+  },
+  "native_results_sha256": "b7f97583d7ca0e59ffdcf02207186f64f81a517307ee1ec0670523dd13b802dd",
+  "capture_log": "capture.log",
+  "capture_log_sha256": "9bb23c97f57c7bae8ed360dc00e5c26ed7717fa936ae8a1ab07c6d082a9db0d2",
+  "source_transformations": {
+    "npv.scaled_underflow_rescue": {
+      "corpus_descriptor": "2000 repeated zero values followed by 1e300",
+      "native_formula": "expanded to an explicit 2001-element one-column array literal",
+      "geometry": {
+        "rows": 2001,
+        "columns": 1
+      }
+    },
+    "mirr.text_empty_logical_compact": {
+      "corpus_descriptor": "[-100, Text, Empty, Logical TRUE, 110]",
+      "native_formula": "Data.A1:Data.E1 reference",
+      "geometry": {
+        "rows": 1,
+        "columns": 5
+      },
+      "reason": "inline EMPTY is not valid LibreOffice formula syntax; the retained blank Data.C1 cell preserves the Empty element"
+    }
+  },
+  "observation_policy": {
+    "numeric_tolerance": "Corpus relative tolerance 1e-12; zero-valued rows require exact zero.",
+    "error_kind_match": "Both sides are formula errors; LibreOffice raw Err codes are retained without relabeling to profile codes.",
+    "native_divergence": "Numeric/type mismatches are compatibility observations and do not alter the normative corpus."
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "archive_sha256": "a7bd6bdc48312f90391871f4d0594a34e3c9dbe148e5f94d7fa6f2c7477afd31",
+  "verifier_sha256": "246bb07404ce78e6bf0455ded10c0115ed731a8cfe3dfb43902af7e2ef312f88",
+  "command": [
+    "taskset",
+    "-c",
+    "8-31",
+    "python3",
+    "/var/tmp/litchi-xlsx-v8-root-portable-extraction-20260910/litchi-xlsx-v8-portable-historical-bundle-v2-20260910/verifier/verify-v8-portable.py",
+    "--bundle-root",
+    "/var/tmp/litchi-xlsx-v8-root-portable-extraction-20260910/litchi-xlsx-v8-portable-historical-bundle-v2-20260910",
+    "--output-dir",
+    "/var/tmp/litchi-xlsx-v8-root-portable-verification-20260910"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 1.3002429008483887,
+  "bundle_files": 60,
+  "bundle_unchanged": true,
+  "workload_executed": false,
+  "log_sha256": "21557ec9bf7ed8b537a41f2946173ddc3995c93a5f2c558f40ac815c3f18a40b"
+}

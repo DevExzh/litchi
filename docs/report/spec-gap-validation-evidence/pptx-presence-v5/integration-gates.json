@@ -1,0 +1,78 @@
+[
+  {
+    "gate": "tests",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--all-targets",
+      "--no-fail-fast"
+    ],
+    "log": "/var/tmp/litchi-pptx-presence-root-overlay-v5-20260910-tests.log",
+    "sha256": "21d2ebfbbeb7b841871a54384cdda669fc439a012c4c3baf5b5e7c3a490e832a"
+  },
+  {
+    "gate": "doctests",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--doc"
+    ],
+    "log": "/var/tmp/litchi-pptx-presence-root-overlay-v5-20260910-doctests.log",
+    "sha256": "bdb408c0c953b116bd1674b8fee9321fa15a3e2fa05a1d8844352a07af25eddb"
+  },
+  {
+    "gate": "clippy",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "log": "/var/tmp/litchi-pptx-presence-root-overlay-v5-20260910-clippy.log",
+    "sha256": "f740c0942df0e33eb2d36c1a98aae19d2f01cb252f0068f3ef9f2f8b45634e29"
+  },
+  {
+    "gate": "rustdoc",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "doc",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--no-deps"
+    ],
+    "log": "/var/tmp/litchi-pptx-presence-root-overlay-v5-20260910-rustdoc.log",
+    "sha256": "d5ba8c51b4f759d7264fa79bd99dbba25f2e845500ac826a4bebd79a5ca0bb3c"
+  }
+]

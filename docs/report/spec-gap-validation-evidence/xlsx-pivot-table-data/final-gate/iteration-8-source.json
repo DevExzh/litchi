@@ -1,0 +1,17 @@
+{
+  "base_head": "f2c8fa7ee8b76c8cd87230bbe0f912c0f18c432b",
+  "files": {
+    "crates/litchi-xlsx/src/lib.rs": "c36383131cdff8e0076439383b0286e92b1c6e3a7c8d8db62de920459d00517f",
+    "crates/litchi-xlsx/src/pivot/mod.rs": "fc9997a94b2c952495b29e4dfffe4327aa6a50800e1ad37ebdba10e4802bcc63",
+    "crates/litchi-xlsx/src/pivot/server_formats/mod.rs": "12a0c44c890033edc99666f6acf7d0a58dc9e7133ce086bb74742b3e3e71dd77",
+    "crates/litchi-xlsx/src/pivot/server_formats/cached_unique_names.rs": "0c1b846cadb4e708ca6fc2bbde98b61a3a6e193f90ddf0563d9aafcaa23db5fe",
+    "crates/litchi-xlsx/src/pivot/server_formats/cached_unique_names/tests.rs": "147100132f349f7f1a6663604625834e6f1f7339e299a962e108aa98f1a3d3bf",
+    "crates/litchi-xlsx/src/pivot/server_formats/table_data.rs": "39022b0e41515c5a89d4403b9ac1372970ee97b511090a1b31a466883c12c944",
+    "crates/litchi-xlsx/src/pivot/server_formats/tests.rs": "909a5fe89dff6903c2176814aef45788510544dd79135d42ae2d2e9c8dcaccdb",
+    "crates/litchi-xlsx/src/raw/catalog.rs": "2f1a6a7a56aa7515b71aab443c95eb504e61788da685c4c9740c8961dc74cbcb",
+    "crates/litchi-xlsx/tests/pivot_table_data.rs": "4cecb1828ef3d5cf97cdebcc51d147839c565d9890c69550e7aa193f3be85c42",
+    "crates/litchi-xlsx/tests/pivot_server_formats.rs": "8c0312e2474c6b8cef458a4a4380a313716d5921ff3e2c738e407452757c16d0",
+    "crates/litchi-xlsx/tests/cached_unique_names.rs": "a9b012d8e05bf1c2dd841198cf9e1ac098487fdaa9dc323861d3b09d80e69818",
+    "crates/litchi-xlsx/src/workbook/model.rs": "9dd9593edf3839d7eb81b06fad834c9f1975c5f4fd8bc8c8f8a97a83a3ef5d40"
+  }
+}

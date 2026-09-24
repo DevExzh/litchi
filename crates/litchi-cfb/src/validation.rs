@@ -75,12 +75,12 @@ pub fn validate_source(source: Arc<dyn ReadAt>) -> Result<ValidateReport, CfbVal
 /// Validates a positional CFB source under explicit finite source and report
 /// limits without changing it.
 ///
-/// An input or directory stream exceeding `source_limits` produces a complete
-/// report value whose ingress capability is `Blocked`; it is not treated as
-/// malformed CFB. A structural parser rejection instead produces a `Complete`
-/// capability plus one deterministic error issue. Source I/O, source-version
-/// changes, and allocation failures remain errors because no honest report can
-/// be made.
+/// Input, directory, or allocation-table data exceeding `source_limits`
+/// produces a complete report value whose ingress capability is `Blocked`; it
+/// is not treated as malformed CFB. A structural parser rejection instead
+/// produces a `Complete` capability plus one deterministic error issue. Source
+/// I/O, source-version changes, and allocation failures remain errors because
+/// no honest report can be made.
 ///
 /// # Errors
 ///
@@ -107,6 +107,10 @@ pub fn validate_source_with_limits(
         Ok(_validated) => complete_report(report_limits),
         Err(error) if is_directory_limit_error(&error) => blocked_report(
             "directory stream exceeds the configured CFB validation ceiling",
+            report_limits,
+        ),
+        Err(error) if is_allocation_table_limit_error(&error) => blocked_report(
+            "allocation tables exceed the configured CFB validation ceiling",
             report_limits,
         ),
         Err(error) if is_structural_rejection(&error) => {
@@ -142,6 +146,9 @@ impl SharedOleFile {
             .map_err(CfbValidationError::Ingress)?;
         let source_limits = SharedOleFileLimits::new(self.file_size())
             .and_then(|limits| limits.with_max_directory_bytes(self.limits.max_directory_bytes()))
+            .and_then(|limits| {
+                limits.with_max_allocation_table_bytes(self.limits.max_allocation_table_bytes())
+            })
             .map_err(CfbValidationError::Ingress)?;
         let report =
             validate_source_with_limits(self.source.clone(), source_limits, report_limits)?;
@@ -241,6 +248,16 @@ fn is_directory_limit_error(error: &OleError) -> bool {
         error,
         OleError::LimitExceeded {
             resource: "directory bytes",
+            ..
+        }
+    )
+}
+
+fn is_allocation_table_limit_error(error: &OleError) -> bool {
+    matches!(
+        error,
+        OleError::LimitExceeded {
+            resource: "allocation table bytes",
             ..
         }
     )

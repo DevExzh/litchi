@@ -7,16 +7,26 @@
 mod codec;
 mod model;
 mod package;
+mod removal;
 
 pub use codec::{parse_data_model, write_data_model};
-pub use model::{Definition, Model, OpaqueXml, Payload, Relationship, Table};
-pub use package::{load_data_model, store_data_model};
+pub use codec::{parse_model_time_groupings, write_model_time_groupings};
+pub use model::{
+    CalculatedTimeColumn, Definition, Model, ModelTimeGrouping, ModelTimeGroupingContentType,
+    ModelTimeGroupings, ModelView, OpaqueXml, Payload, Relationship, Table,
+};
+pub use package::{Commit, Patch, Snapshot, Transaction, load_data_model, store_data_model};
 
 /// OPC content type for an MS-XLDM payload.
 pub const DATA_MODEL_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.model+data";
 /// Workbook extension URI identifying the Data Model descriptor.
 pub const DATA_MODEL_EXTENSION_URI: &str = "{FCE2AD5D-F65C-4FA6-A056-5C36A1767C68}";
+/// Extension URI assigned by [MS-XLSX] §2.2.4.11 to `ModelTimeGroupings`.
+pub const MODEL_TIME_GROUPINGS_EXTENSION_URI: &str = "{9835A34E-60A6-4A7C-AAB8-D5F71C897F49}";
+/// Namespace assigned by [MS-XLSX] §2.4.71 to `modelTimeGroupings`.
+pub const MODEL_TIME_GROUPINGS_NAMESPACE: &str =
+    "http://schemas.microsoft.com/office/spreadsheetml/2014/11/main";
 /// The only valid XLSX Data Model payload part name.
 pub const DATA_MODEL_PART_NAME: &str = "/xl/model/item.data";
 
@@ -40,6 +50,8 @@ pub(crate) const MAX_NODES: usize = 200_000;
 pub(crate) const MAX_DEPTH: usize = 128;
 pub(crate) const MAX_TABLES: usize = 65_536;
 pub(crate) const MAX_RELATIONSHIPS: usize = 65_536;
+pub(crate) const MAX_TIME_GROUPINGS: usize = 65_536;
+pub(crate) const MAX_CALCULATED_TIME_COLUMNS: usize = 65_536;
 
 pub(crate) fn invalid(message: impl Into<String>) -> crate::Error {
     crate::Error::Invalid(message.into())

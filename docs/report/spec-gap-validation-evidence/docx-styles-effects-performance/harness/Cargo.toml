@@ -1,0 +1,20 @@
+[package]
+name = "litchi-docx-styles-effects-smoke"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.89"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "docx-styles-effects-smoke"
+path = "main.rs"
+
+[dependencies]
+litchi-docx = { path = "../../../../../crates/litchi-docx" }
+litchi-opc = { path = "../../../../../crates/litchi-opc" }
+quick-xml = "0.41"
+serde_json = "1"
+sha2 = "0.11"
+zip = { version = "8", default-features = false, features = ["deflate"] }

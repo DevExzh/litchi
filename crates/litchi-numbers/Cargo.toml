@@ -7,6 +7,103 @@ authors.workspace      = true
 license.workspace      = true
 repository.workspace   = true
 rust-version.workspace = true
+autoexamples = false
+
+[[example]]
+name = "numbers_edit_chart_arrangement"
+path = "examples/edit_chart_arrangement.rs"
+
+[[example]]
+name = "numbers_edit_image_adjustments"
+path = "examples/edit_image_adjustments.rs"
+
+[[example]]
+name = "edit_names"
+path = "examples/edit_names.rs"
+
+[[example]]
+name = "edit_sheet_chart_data"
+path = "examples/edit_sheet_chart_data.rs"
+
+[[example]]
+name = "edit_sheet_order"
+path = "examples/edit_sheet_order.rs"
+
+[[example]]
+name = "edit_table_cell_currency_format"
+path = "examples/edit_table_cell_currency_format.rs"
+
+[[example]]
+name = "edit_table_cell_custom_format"
+path = "examples/edit_table_cell_custom_format.rs"
+
+[[example]]
+name = "edit_table_cell_date_time_format"
+path = "examples/edit_table_cell_date_time_format.rs"
+
+[[example]]
+name = "edit_table_cell_duration_format"
+path = "examples/edit_table_cell_duration_format.rs"
+
+[[example]]
+name = "edit_table_cell_fraction_format"
+path = "examples/edit_table_cell_fraction_format.rs"
+
+[[example]]
+name = "numbers_edit_table_cell_number_format"
+path = "examples/edit_table_cell_number_format.rs"
+
+[[example]]
+name = "edit_table_cell_percentage_format"
+path = "examples/edit_table_cell_percentage_format.rs"
+
+[[example]]
+name = "edit_table_cell_scientific_format"
+path = "examples/edit_table_cell_scientific_format.rs"
+
+[[example]]
+name = "edit_table_cell_text_format"
+path = "examples/edit_table_cell_text_format.rs"
+
+[[example]]
+name = "edit_table_cells"
+path = "examples/edit_table_cells.rs"
+
+[[example]]
+name = "edit_table_dimension"
+path = "examples/edit_table_dimension.rs"
+
+[[example]]
+name = "edit_table_headers"
+path = "examples/edit_table_headers.rs"
+
+[[example]]
+name = "edit_table_lock"
+path = "examples/edit_table_lock.rs"
+
+[[example]]
+name = "edit_table_sort_order"
+path = "examples/edit_table_sort_order.rs"
+
+[[example]]
+name = "edit_table_title"
+path = "examples/edit_table_title.rs"
+
+[[example]]
+name = "extract_structured"
+path = "examples/extract_structured.rs"
+
+[[example]]
+name = "move_table"
+path = "examples/move_table.rs"
+
+[[example]]
+name = "read_numbers"
+path = "examples/read_numbers.rs"
+
+[[example]]
+name = "numbers_save_package"
+path = "examples/save_package.rs"
 
 [features]
 default = []

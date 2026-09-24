@@ -1,0 +1,14 @@
+{
+  "base": "8b2cca3c7559be36e96cc1b862ed5fafbc93f634",
+  "readme": {
+    "path": "crates/litchi-opc/README.md",
+    "preimage_commit_sha256": "33bb795481f235cc87a16faff0645cd9cd70bf4a2d2c83bace106874141b734e",
+    "postimage_pending_sha256": "44ec111b12d296995017e6301da71cf93ed10f0e91a60e1a5db69d1cbdd56276",
+    "delta_sha256": "f637dd9c05993d6831d7f7a1aeebd48a298b6b5ccc808e6bdd688b1f9640f190",
+    "added_lines": "136-148 (13 lines)",
+    "status": "pending working-tree delta; unchanged by this review"
+  },
+  "review_json_sha256": "2f3a0fc6299dd6afefe7c0de3a6197f4e9a7e9114d159e466804c8d028081c43",
+  "review_markdown_sha256": "ab6d336662ec1a2f86bbfd15b502848e3c2156f6cb91e483dc53fcb4423ac003",
+  "validation": "Independent source/test claim review; root verified all 12 cited committed file hashes, README pre/postimage and exact delta. Documentation-only; no runtime changes or new test run."
+}

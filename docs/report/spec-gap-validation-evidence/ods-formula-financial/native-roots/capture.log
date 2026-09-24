@@ -1,0 +1,12 @@
+LibreOffice financial root compatibility capture
+executable=/usr/bin/libreoffice
+version=LibreOffice 26.2.5.2 620(Build:2)
+locale=C.UTF-8
+headless=true
+fresh_profile=true
+command=/usr/bin/libreoffice --headless -env:UserInstallation=file://<temporary-profile> --convert-to ods --outdir <temporary-output> financial-roots-native.fods
+returncode=0
+stdout=convert financial-roots-native.fods as a Calc document -> <temporary-output>/financial-roots-native.ods using filter : calc8
+stderr=
+rows=31
+host_observation_ids=irr.multiple_root_mid_guess_bounded

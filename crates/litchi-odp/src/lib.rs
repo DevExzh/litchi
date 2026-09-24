@@ -18,6 +18,7 @@ pub mod model;
 pub mod package;
 pub mod streaming;
 
+pub use facade::layer;
 pub use facade::settings as show;
 pub use facade::slide::{Shape, Slide};
 pub use facade::{

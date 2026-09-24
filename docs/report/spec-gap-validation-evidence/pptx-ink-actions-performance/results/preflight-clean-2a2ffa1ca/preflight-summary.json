@@ -1,0 +1,43 @@
+{
+  "build_run": false,
+  "cargo_metadata_sha256": "181cf8cdd698118ace825abe196f926f5ee31dab7c4efad0cbe1130da59054c1",
+  "clean_source_gate": true,
+  "corpus_preflight": {
+    "build_run": false,
+    "corpus": "/var/tmp/litchi-pptx-ink-actions-profiler-2a2ffa1c/docs/report/spec-gap-validation-evidence/pptx-ink-actions-performance/corpus-manifest.json",
+    "generator_sha256": "fcdc83652e17a51fa91d47cab304461aef0559a7afd918cdeae3fd506330dc19",
+    "head": "2a2ffa1cae4e6b7070082768ce84483e5d411dc8",
+    "lane_count": 42,
+    "lock_sha256": "3c773b848134c52df596034ffbbe8688dde9924fb741dee8bc8bce0eaa772f2e",
+    "matrix_run": false,
+    "owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+    "recipe_count": 23,
+    "schema": "pptx-ink-actions-preflight-v1",
+    "timing_run": false,
+    "worktree": "/var/tmp/litchi-pptx-ink-actions-profiler-2a2ffa1c"
+  },
+  "git_status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "head": "2a2ffa1cae4e6b7070082768ce84483e5d411dc8",
+  "head_expected": "2a2ffa1cae4e6b7070082768ce84483e5d411dc8",
+  "local_source_manifest_exit": 0,
+  "local_source_manifest_sha256": "ae84ae6e089dd1e58dcb19a540d5e33f28ba6446683ff98d54d003e7172832ae",
+  "matrix_run": false,
+  "owner_gate_blocking_paths": [
+    "crates/litchi-opc/src/lib.rs",
+    "crates/litchi-opc/src/package.rs",
+    "crates/litchi-opc/src/package/relationships.rs",
+    "crates/litchi-opc/src/source_backed.rs",
+    "crates/litchi-opc/src/xml_splice.rs",
+    "crates/litchi-opc/src/xml_splice/owned.rs",
+    "crates/litchi-opc/tests/prepared_topology.rs",
+    "crates/litchi-pptx/src/presentation/order.rs",
+    "crates/litchi-pptx/src/presentation/source.rs",
+    "crates/litchi-pptx/src/presentation/source/svg_lifecycle/owner.rs",
+    "crates/litchi-pptx/src/presentation/source_cross_copy.rs"
+  ],
+  "owner_pinned_committed_inputs_exit": 1,
+  "owner_pinned_source_manifest_exit": 1,
+  "schema": "pptx-ink-actions-preflight-summary-v1",
+  "timing_run": false,
+  "worktree": "/var/tmp/litchi-pptx-ink-actions-profiler-2a2ffa1c"
+}

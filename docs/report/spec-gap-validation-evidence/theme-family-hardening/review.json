@@ -1,0 +1,23 @@
+{
+  "verdict": "approved",
+  "scope": "Bounded Theme-family host hardening and declared namespace-prefix correction; not whole-library production certification.",
+  "reviewer": "/root/theme_hardening_review",
+  "revision": "4814a84d7a52f31733409c48997691fc4e6f303c",
+  "review_basis": [
+    "Read-only current-source review at f4f29c930; residual standalone prefix-limit finding identified.",
+    "Prefix correction re-reviewed at 4814a84d7; scoped APPROVED with focused checks."
+  ],
+  "excluded": [
+    "Unrelated OPC import-order change",
+    "Untracked documentation and evidence files"
+  ],
+  "source_hashes": {
+    "crates/litchi-drawingml/src/theme/family/codec.rs": "3671ef78454309c45039741414d5385a400fd9c8a736fdfac974e704e577a910",
+    "crates/litchi-drawingml/src/theme/family/part.rs": "cb3f384a6798a343b0e92c994d982a6e196bf50311a18d5441db3fa6678e6f79",
+    "crates/litchi-drawingml/tests/theme_family.rs": "229443c8ee633a2637568420d5e4223cfc6a5f3c8033047f2904478eabe8b2f7",
+    "crates/litchi-drawingml/tests/theme_part.rs": "19ec1d9f75a57a505f0c8eae8338691f3eb2467bdebe8f4e16773b26785fb040",
+    "crates/litchi-xlsb/src/theme.rs": "9193d579c2951940b4943b396fd6249a35a0c1743dff183e168f3556a5a0a8f8",
+    "crates/litchi-xlsb/src/theme/lifecycle.rs": "c663b8cde2191539a554cadf78987c3f2d51a9faddbc2bd5813aecbad685dd70",
+    "crates/litchi-xlsb/tests/theme_family.rs": "583f321a2a67f301c1ee4b2e4f80ab55da32f0b1cc4e43df1b5582e0ca574b9f"
+  }
+}

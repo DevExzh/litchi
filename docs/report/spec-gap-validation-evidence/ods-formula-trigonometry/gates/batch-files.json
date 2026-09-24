@@ -1,0 +1,9 @@
+[
+  "crates/litchi-ods/src/codec/formula/evaluation.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/trigonometry.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value.rs",
+  "crates/litchi-ods/src/codec/formula/evaluation/value/scalar.rs",
+  "crates/litchi-ods/tests/ods_formula_trigonometry_evaluation.rs",
+  "crates/litchi-ods/tests/ods_formula_trigonometry_arrays.rs",
+  "crates/litchi-ods/tests/ods_formula_trigonometry_native.rs"
+]

@@ -6,8 +6,10 @@ use super::{
         Key, Order, Orientation, Range, Rule, Rules, Sort, SortGroups, Source,
     },
     validation::{
-        FilterParent, MAX_FILTER_DEPTH, invalid, missing, unexpected_eof,
-        validate_database_range_collection, xml_error,
+        FilterParent, MAX_DATABASE_ITEMS, MAX_DATABASE_RANGES, MAX_DATABASE_VALUE_BYTES,
+        MAX_FILTER_DEPTH, invalid, missing, unexpected_eof, validate_database_range_collection,
+        validate_filter_for_output, validate_range_for_output, validate_source_for_output,
+        xml_error,
     },
 };
 use litchi_core::{Error, Result, xml::escape_xml};
@@ -109,6 +111,9 @@ impl DataType {
         match value {
             "text" => Ok(Self::Text),
             "number" => Ok(Self::Number),
+            "text-color" => Ok(Self::TextColor),
+            "data-style-color" => Ok(Self::DataStyleColor),
+            "background-color" => Ok(Self::BackgroundColor),
             _ => Err(invalid("table:data-type", value)),
         }
     }
@@ -117,6 +122,9 @@ impl DataType {
         match self {
             Self::Text => "text",
             Self::Number => "number",
+            Self::TextColor => "text-color",
+            Self::DataStyleColor => "data-style-color",
+            Self::BackgroundColor => "background-color",
         }
     }
 }
@@ -131,6 +139,7 @@ pub fn parse_database_ranges(xml: &str) -> Result<Vec<Range>> {
         ));
     }
     let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
     let mut buf = Vec::new();
     let mut in_ranges = false;
     let mut ranges = Vec::new();
@@ -145,6 +154,11 @@ pub fn parse_database_ranges(xml: &str) -> Result<Vec<Range>> {
             Event::Start(ref element)
                 if in_ranges && is_table(&namespace, element, b"database-range") =>
             {
+                if ranges.len() >= MAX_DATABASE_RANGES {
+                    return Err(Error::InvalidFormat(
+                        "database ranges exceed the supported resource limit".to_string(),
+                    ));
+                }
                 let range = parse_database_range(&mut reader, element)?;
                 range.validate()?;
                 ranges.push(range);
@@ -152,6 +166,11 @@ pub fn parse_database_ranges(xml: &str) -> Result<Vec<Range>> {
             Event::Empty(ref element)
                 if in_ranges && is_table(&namespace, element, b"database-range") =>
             {
+                if ranges.len() >= MAX_DATABASE_RANGES {
+                    return Err(Error::InvalidFormat(
+                        "database ranges exceed the supported resource limit".to_string(),
+                    ));
+                }
                 let range = database_range_from_start(&reader, element)?;
                 range.validate()?;
                 ranges.push(range);
@@ -179,55 +198,143 @@ pub fn parse_database_ranges(xml: &str) -> Result<Vec<Range>> {
 
 fn parse_database_range(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Range> {
     let mut range = database_range_from_start(reader, start)?;
+    let mut child_stage = 0u8;
     let mut buf = Vec::new();
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buf)
             .map_err(xml_error)?;
         match event {
-            Event::Start(ref element) | Event::Empty(ref element)
-                if is_table(&namespace, element, b"database-source-sql") =>
-            {
+            Event::Start(ref element) if is_table(&namespace, element, b"database-source-sql") => {
+                if child_stage != 0 {
+                    return Err(Error::InvalidFormat(
+                        "database-range children are out of order".to_string(),
+                    ));
+                }
                 ensure_absent(&range.source, "database source")?;
                 range.source = Some(parse_source_sql(reader, element)?);
+                reject_leaf_children(reader, b"database-source-sql")?;
+                child_stage = 1;
             },
-            Event::Start(ref element) | Event::Empty(ref element)
+            Event::Empty(ref element) if is_table(&namespace, element, b"database-source-sql") => {
+                if child_stage != 0 {
+                    return Err(Error::InvalidFormat(
+                        "database-range children are out of order".to_string(),
+                    ));
+                }
+                ensure_absent(&range.source, "database source")?;
+                range.source = Some(parse_source_sql(reader, element)?);
+                child_stage = 1;
+            },
+            Event::Start(ref element)
                 if is_table(&namespace, element, b"database-source-table") =>
             {
+                if child_stage != 0 {
+                    return Err(Error::InvalidFormat(
+                        "database-range children are out of order".to_string(),
+                    ));
+                }
                 ensure_absent(&range.source, "database source")?;
                 range.source = Some(parse_source_table(reader, element)?);
+                reject_leaf_children(reader, b"database-source-table")?;
+                child_stage = 1;
             },
-            Event::Start(ref element) | Event::Empty(ref element)
+            Event::Empty(ref element)
+                if is_table(&namespace, element, b"database-source-table") =>
+            {
+                if child_stage != 0 {
+                    return Err(Error::InvalidFormat(
+                        "database-range children are out of order".to_string(),
+                    ));
+                }
+                ensure_absent(&range.source, "database source")?;
+                range.source = Some(parse_source_table(reader, element)?);
+                child_stage = 1;
+            },
+            Event::Start(ref element)
                 if is_table(&namespace, element, b"database-source-query") =>
             {
+                if child_stage != 0 {
+                    return Err(Error::InvalidFormat(
+                        "database-range children are out of order".to_string(),
+                    ));
+                }
                 ensure_absent(&range.source, "database source")?;
                 range.source = Some(parse_source_query(reader, element)?);
+                reject_leaf_children(reader, b"database-source-query")?;
+                child_stage = 1;
+            },
+            Event::Empty(ref element)
+                if is_table(&namespace, element, b"database-source-query") =>
+            {
+                if child_stage != 0 {
+                    return Err(Error::InvalidFormat(
+                        "database-range children are out of order".to_string(),
+                    ));
+                }
+                ensure_absent(&range.source, "database source")?;
+                range.source = Some(parse_source_query(reader, element)?);
+                child_stage = 1;
             },
             Event::Start(ref element) if is_table(&namespace, element, b"filter") => {
+                if child_stage > 1 {
+                    return Err(Error::InvalidFormat(
+                        "database-range children are out of order".to_string(),
+                    ));
+                }
                 ensure_absent(&range.filter, "database filter")?;
                 range.filter = Some(parse_filter(reader, element)?);
+                child_stage = 2;
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"filter") => {
+                if child_stage > 1 {
+                    return Err(Error::InvalidFormat(
+                        "database-range children are out of order".to_string(),
+                    ));
+                }
                 return Err(Error::InvalidFormat(
                     "table:filter has no expression".to_string(),
                 ));
             },
             Event::Start(ref element) if is_table(&namespace, element, b"sort") => {
+                if child_stage > 2 {
+                    return Err(Error::InvalidFormat(
+                        "database-range children are out of order".to_string(),
+                    ));
+                }
                 ensure_absent(&range.sort, "database sort")?;
                 range.sort = Some(parse_sort(reader, element)?);
+                child_stage = 3;
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"sort") => {
+                if child_stage > 2 {
+                    return Err(Error::InvalidFormat(
+                        "database-range children are out of order".to_string(),
+                    ));
+                }
                 return Err(Error::InvalidFormat(
                     "database sort requires at least one sort key".to_string(),
                 ));
             },
             Event::Start(ref element) if is_table(&namespace, element, b"subtotal-rules") => {
+                if child_stage > 3 {
+                    return Err(Error::InvalidFormat(
+                        "database-range children are out of order".to_string(),
+                    ));
+                }
                 ensure_absent(&range.subtotals, "subtotal rules")?;
                 range.subtotals = Some(parse_subtotals(reader, element)?);
+                child_stage = 4;
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"subtotal-rules") => {
+                if child_stage > 3 {
+                    return Err(Error::InvalidFormat(
+                        "database-range children are out of order".to_string(),
+                    ));
+                }
                 ensure_absent(&range.subtotals, "subtotal rules")?;
                 range.subtotals = Some(Rules::default());
+                child_stage = 4;
             },
             Event::End(ref element) if is_table(&namespace, element, b"database-range") => break,
             Event::Eof => return Err(unexpected_eof("table:database-range")),
@@ -304,10 +411,97 @@ pub fn parse_source_query(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) ->
     })
 }
 
+/// Consume a source element's matching end tag while refusing content that
+/// the source vocabulary cannot represent.  The source elements are leaves;
+/// silently walking over nested known elements would otherwise drop authored
+/// metadata before a later write.
+fn reject_leaf_children(reader: &mut NsReader<&[u8]>, local: &[u8]) -> Result<()> {
+    let mut buf = Vec::new();
+    let mut unknown_depth = 0usize;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buf)
+            .map_err(xml_error)?;
+        match event {
+            Event::End(ref element)
+                if unknown_depth == 0 && is_table(&namespace, element, local) =>
+            {
+                return Ok(());
+            },
+            Event::Start(ref element)
+                if unknown_depth == 0
+                    && is_table(&namespace, element, element.local_name().as_ref())
+                    && is_known_leaf_element(element.local_name().as_ref()) =>
+            {
+                return Err(Error::InvalidFormat(
+                    "database-range leaf elements cannot contain known nested children".to_string(),
+                ));
+            },
+            Event::Empty(ref element)
+                if unknown_depth == 0
+                    && is_table(&namespace, element, element.local_name().as_ref())
+                    && is_known_leaf_element(element.local_name().as_ref()) =>
+            {
+                return Err(Error::InvalidFormat(
+                    "database-range leaf elements cannot contain known nested children".to_string(),
+                ));
+            },
+            Event::Start(_) => {
+                unknown_depth = unknown_depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("database-range nested depth overflow".to_string())
+                })?;
+            },
+            Event::Empty(_) => {},
+            Event::End(_) if unknown_depth > 0 => {
+                unknown_depth -= 1;
+            },
+            Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::PI(_) => {},
+            Event::GeneralRef(_) => {},
+            Event::Eof => return Err(unexpected_eof("database source element")),
+            Event::Decl(_) | Event::DocType(_) => {
+                return Err(Error::InvalidFormat(
+                    "database source elements cannot contain declarations".to_string(),
+                ));
+            },
+            Event::End(_) => {
+                if unknown_depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "database source element has an unexpected end tag".to_string(),
+                    ));
+                }
+            },
+        }
+        buf.clear();
+    }
+}
+
+fn is_known_leaf_element(local: &[u8]) -> bool {
+    matches!(
+        local,
+        b"database-ranges"
+            | b"database-range"
+            | b"database-source-sql"
+            | b"database-source-table"
+            | b"database-source-query"
+            | b"filter"
+            | b"filter-condition"
+            | b"filter-and"
+            | b"filter-or"
+            | b"filter-set-item"
+            | b"sort"
+            | b"sort-by"
+            | b"subtotal-rules"
+            | b"sort-groups"
+            | b"subtotal-rule"
+            | b"subtotal-field"
+    )
+}
+
 /// # Errors
 ///
 /// Returns an error when the input is malformed or exceeds the parser's resource limits.
 pub fn parse_filter(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Filter> {
+    reader.config_mut().check_end_names = true;
     let target_range_address = optional_attr(reader, start, b"target-range-address")?;
     let condition_source = optional_attr(reader, start, b"condition-source")?
         .map(|value| ConditionSource::parse(&value))
@@ -383,9 +577,19 @@ fn parse_filter_group(
             .map_err(xml_error)?;
         match event {
             Event::Start(ref element) if is_table(&namespace, element, b"filter-condition") => {
+                if children.len() >= MAX_DATABASE_ITEMS {
+                    return Err(Error::InvalidFormat(
+                        "filter expressions exceed the supported resource limit".to_string(),
+                    ));
+                }
                 children.push(Expression::Condition(parse_condition(reader, element)?));
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"filter-condition") => {
+                if children.len() >= MAX_DATABASE_ITEMS {
+                    return Err(Error::InvalidFormat(
+                        "filter expressions exceed the supported resource limit".to_string(),
+                    ));
+                }
                 children.push(Expression::Condition(condition_from_start(
                     reader, element,
                 )?));
@@ -393,11 +597,21 @@ fn parse_filter_group(
             Event::Start(ref element)
                 if kind == FilterParent::And && is_table(&namespace, element, b"filter-or") =>
             {
+                if children.len() >= MAX_DATABASE_ITEMS {
+                    return Err(Error::InvalidFormat(
+                        "filter expressions exceed the supported resource limit".to_string(),
+                    ));
+                }
                 children.push(parse_filter_group(reader, FilterParent::Or, depth + 1)?);
             },
             Event::Start(ref element)
                 if kind == FilterParent::Or && is_table(&namespace, element, b"filter-and") =>
             {
+                if children.len() >= MAX_DATABASE_ITEMS {
+                    return Err(Error::InvalidFormat(
+                        "filter expressions exceed the supported resource limit".to_string(),
+                    ));
+                }
                 children.push(parse_filter_group(reader, FilterParent::And, depth + 1)?);
             },
             Event::Start(ref element)
@@ -448,9 +662,23 @@ fn parse_condition(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Resu
             .read_resolved_event_into(&mut buf)
             .map_err(xml_error)?;
         match event {
-            Event::Empty(ref element) | Event::Start(ref element)
-                if is_table(&namespace, element, b"filter-set-item") =>
-            {
+            Event::Start(ref element) if is_table(&namespace, element, b"filter-set-item") => {
+                if condition.set_items.len() >= MAX_DATABASE_ITEMS {
+                    return Err(Error::InvalidFormat(
+                        "filter set items exceed the supported resource limit".to_string(),
+                    ));
+                }
+                condition
+                    .set_items
+                    .push(required_attr(reader, element, b"value")?);
+                reject_leaf_children(reader, b"filter-set-item")?;
+            },
+            Event::Empty(ref element) if is_table(&namespace, element, b"filter-set-item") => {
+                if condition.set_items.len() >= MAX_DATABASE_ITEMS {
+                    return Err(Error::InvalidFormat(
+                        "filter set items exceed the supported resource limit".to_string(),
+                    ));
+                }
                 condition
                     .set_items
                     .push(required_attr(reader, element, b"value")?);
@@ -507,9 +735,27 @@ fn parse_sort(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<So
             .read_resolved_event_into(&mut buf)
             .map_err(xml_error)?;
         match event {
-            Event::Empty(ref element) | Event::Start(ref element)
-                if is_table(&namespace, element, b"sort-by") =>
-            {
+            Event::Start(ref element) if is_table(&namespace, element, b"sort-by") => {
+                if sort.keys.len() >= MAX_DATABASE_ITEMS {
+                    return Err(Error::InvalidFormat(
+                        "database sort keys exceed the supported resource limit".to_string(),
+                    ));
+                }
+                sort.keys.push(Key {
+                    field_number: required_u64(reader, element, b"field-number")?,
+                    data_type: optional_attr(reader, element, b"data-type")?,
+                    order: optional_attr(reader, element, b"order")?
+                        .map(|value| Order::parse(&value))
+                        .transpose()?,
+                });
+                reject_leaf_children(reader, b"sort-by")?;
+            },
+            Event::Empty(ref element) if is_table(&namespace, element, b"sort-by") => {
+                if sort.keys.len() >= MAX_DATABASE_ITEMS {
+                    return Err(Error::InvalidFormat(
+                        "database sort keys exceed the supported resource limit".to_string(),
+                    ));
+                }
                 sort.keys.push(Key {
                     field_number: required_u64(reader, element, b"field-number")?,
                     data_type: optional_attr(reader, element, b"data-type")?,
@@ -549,15 +795,34 @@ fn parse_subtotals(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Resu
         sort_groups: None,
         rules: Vec::new(),
     };
+    let mut saw_rule = false;
     let mut buf = Vec::new();
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buf)
             .map_err(xml_error)?;
         match event {
-            Event::Empty(ref element) | Event::Start(ref element)
-                if is_table(&namespace, element, b"sort-groups") =>
-            {
+            Event::Start(ref element) if is_table(&namespace, element, b"sort-groups") => {
+                if saw_rule {
+                    return Err(Error::InvalidFormat(
+                        "subtotal children are out of order".to_string(),
+                    ));
+                }
+                ensure_absent(&subtotals.sort_groups, "subtotal sort-groups")?;
+                subtotals.sort_groups = Some(SortGroups {
+                    data_type: optional_attr(reader, element, b"data-type")?,
+                    order: optional_attr(reader, element, b"order")?
+                        .map(|value| Order::parse(&value))
+                        .transpose()?,
+                });
+                reject_leaf_children(reader, b"sort-groups")?;
+            },
+            Event::Empty(ref element) if is_table(&namespace, element, b"sort-groups") => {
+                if saw_rule {
+                    return Err(Error::InvalidFormat(
+                        "subtotal children are out of order".to_string(),
+                    ));
+                }
                 ensure_absent(&subtotals.sort_groups, "subtotal sort-groups")?;
                 subtotals.sort_groups = Some(SortGroups {
                     data_type: optional_attr(reader, element, b"data-type")?,
@@ -567,9 +832,21 @@ fn parse_subtotals(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Resu
                 });
             },
             Event::Start(ref element) if is_table(&namespace, element, b"subtotal-rule") => {
+                if subtotals.rules.len() >= MAX_DATABASE_ITEMS {
+                    return Err(Error::InvalidFormat(
+                        "database subtotal rules exceed the supported resource limit".to_string(),
+                    ));
+                }
+                saw_rule = true;
                 subtotals.rules.push(parse_subtotal_rule(reader, element)?);
             },
             Event::Empty(ref element) if is_table(&namespace, element, b"subtotal-rule") => {
+                if subtotals.rules.len() >= MAX_DATABASE_ITEMS {
+                    return Err(Error::InvalidFormat(
+                        "database subtotal rules exceed the supported resource limit".to_string(),
+                    ));
+                }
+                saw_rule = true;
                 subtotals.rules.push(Rule {
                     group_by_field_number: required_u64(reader, element, b"group-by-field-number")?,
                     fields: Vec::new(),
@@ -604,9 +881,24 @@ fn parse_subtotal_rule(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> 
             .read_resolved_event_into(&mut buf)
             .map_err(xml_error)?;
         match event {
-            Event::Empty(ref element) | Event::Start(ref element)
-                if is_table(&namespace, element, b"subtotal-field") =>
-            {
+            Event::Start(ref element) if is_table(&namespace, element, b"subtotal-field") => {
+                if rule.fields.len() >= MAX_DATABASE_ITEMS {
+                    return Err(Error::InvalidFormat(
+                        "database subtotal fields exceed the supported resource limit".to_string(),
+                    ));
+                }
+                rule.fields.push(Field {
+                    field_number: required_u64(reader, element, b"field-number")?,
+                    function: required_attr(reader, element, b"function")?,
+                });
+                reject_leaf_children(reader, b"subtotal-field")?;
+            },
+            Event::Empty(ref element) if is_table(&namespace, element, b"subtotal-field") => {
+                if rule.fields.len() >= MAX_DATABASE_ITEMS {
+                    return Err(Error::InvalidFormat(
+                        "database subtotal fields exceed the supported resource limit".to_string(),
+                    ));
+                }
                 rule.fields.push(Field {
                     field_number: required_u64(reader, element, b"field-number")?,
                     function: required_attr(reader, element, b"function")?,
@@ -630,17 +922,366 @@ fn parse_subtotal_rule(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> 
     Ok(rule)
 }
 
-/// # Errors
-///
-/// Returns an error when the value cannot be serialized.
-pub fn write_database_ranges(output: &mut String, ranges: &[Range]) -> Result<()> {
+const MAX_DATABASE_XML_BYTES: usize = 64 * 1_048_576;
+
+fn checked_size_add(total: &mut usize, amount: usize) -> Result<()> {
+    *total = total
+        .checked_add(amount)
+        .ok_or_else(|| Error::InvalidFormat("database-range XML size overflow".to_string()))?;
+    Ok(())
+}
+
+fn escaped_xml_size(value: &str) -> Result<usize> {
+    let mut size = 0usize;
+    for byte in value.bytes() {
+        checked_size_add(
+            &mut size,
+            match byte {
+                b'&' => 5,
+                b'<' | b'>' => 4,
+                b'"' | b'\'' => 6,
+                _ => 1,
+            },
+        )?;
+    }
+    Ok(size)
+}
+
+fn sized_literal(total: &mut usize, literal: &str) -> Result<()> {
+    checked_size_add(total, literal.len())
+}
+
+fn sized_attr(total: &mut usize, name: &str, value: Option<&str>) -> Result<()> {
+    if let Some(value) = value {
+        checked_size_add(total, name.len() + 4)?;
+        checked_size_add(total, escaped_xml_size(value)?)?;
+    }
+    Ok(())
+}
+
+fn sized_bool_attr(total: &mut usize, name: &str, value: Option<bool>) -> Result<()> {
+    sized_attr(
+        total,
+        name,
+        value.map(|value| if value { "true" } else { "false" }),
+    )
+}
+
+fn sized_u64_attr(total: &mut usize, name: &str, value: u64) -> Result<()> {
+    checked_size_add(total, name.len() + 4)?;
+    checked_size_add(total, value.to_string().len())
+}
+
+fn size_source(source: &Source) -> Result<usize> {
+    let mut size = 0;
+    match source {
+        Source::Sql {
+            database_name,
+            statement,
+            parse_statement,
+        } => {
+            sized_literal(&mut size, "<table:database-source-sql")?;
+            sized_attr(&mut size, "table:database-name", Some(database_name))?;
+            sized_attr(&mut size, "table:sql-statement", Some(statement))?;
+            sized_bool_attr(&mut size, "table:parse-sql-statement", *parse_statement)?;
+        },
+        Source::Table {
+            database_name,
+            table_name,
+        } => {
+            sized_literal(&mut size, "<table:database-source-table")?;
+            sized_attr(&mut size, "table:database-name", Some(database_name))?;
+            sized_attr(&mut size, "table:database-table-name", Some(table_name))?;
+        },
+        Source::Query {
+            database_name,
+            query_name,
+        } => {
+            sized_literal(&mut size, "<table:database-source-query")?;
+            sized_attr(&mut size, "table:database-name", Some(database_name))?;
+            sized_attr(&mut size, "table:query-name", Some(query_name))?;
+        },
+    }
+    sized_literal(&mut size, "/>")?;
+    Ok(size)
+}
+
+fn size_expression(expression: &Expression) -> Result<usize> {
+    let mut size = 0;
+    match expression {
+        Expression::Condition(condition) => {
+            sized_literal(&mut size, "<table:filter-condition")?;
+            sized_u64_attr(&mut size, "table:field-number", condition.field_number)?;
+            sized_attr(&mut size, "table:value", Some(&condition.value))?;
+            sized_attr(&mut size, "table:operator", Some(&condition.operator))?;
+            sized_bool_attr(&mut size, "table:case-sensitive", condition.case_sensitive)?;
+            sized_attr(
+                &mut size,
+                "table:data-type",
+                condition.data_type.map(DataType::as_str),
+            )?;
+            if condition.set_items.is_empty() {
+                sized_literal(&mut size, "/>")?;
+            } else {
+                sized_literal(&mut size, ">")?;
+                for item in &condition.set_items {
+                    sized_literal(&mut size, "<table:filter-set-item")?;
+                    sized_attr(&mut size, "table:value", Some(item))?;
+                    sized_literal(&mut size, "/>")?;
+                }
+                sized_literal(&mut size, "</table:filter-condition>")?;
+            }
+        },
+        Expression::And(children) => {
+            sized_literal(&mut size, "<table:filter-and>")?;
+            for child in children {
+                checked_size_add(&mut size, size_expression(child)?)?;
+            }
+            sized_literal(&mut size, "</table:filter-and>")?;
+        },
+        Expression::Or(children) => {
+            sized_literal(&mut size, "<table:filter-or>")?;
+            for child in children {
+                checked_size_add(&mut size, size_expression(child)?)?;
+            }
+            sized_literal(&mut size, "</table:filter-or>")?;
+        },
+    }
+    Ok(size)
+}
+
+fn size_filter(filter: &Filter) -> Result<usize> {
+    let mut size = 0;
+    sized_literal(&mut size, "<table:filter")?;
+    sized_attr(
+        &mut size,
+        "table:target-range-address",
+        filter.target_range_address.as_deref(),
+    )?;
+    sized_attr(
+        &mut size,
+        "table:condition-source",
+        filter.condition_source.map(ConditionSource::as_str),
+    )?;
+    sized_attr(
+        &mut size,
+        "table:condition-source-range-address",
+        filter.condition_source_range_address.as_deref(),
+    )?;
+    sized_bool_attr(
+        &mut size,
+        "table:display-duplicates",
+        filter.display_duplicates,
+    )?;
+    sized_literal(&mut size, ">")?;
+    checked_size_add(&mut size, size_expression(&filter.expression)?)?;
+    sized_literal(&mut size, "</table:filter>")?;
+    Ok(size)
+}
+
+fn size_sort(sort: &Sort) -> Result<usize> {
+    let mut size = 0;
+    sized_literal(&mut size, "<table:sort")?;
+    sized_bool_attr(
+        &mut size,
+        "table:bind-styles-to-content",
+        sort.bind_styles_to_content,
+    )?;
+    sized_attr(
+        &mut size,
+        "table:target-range-address",
+        sort.target_range_address.as_deref(),
+    )?;
+    sized_bool_attr(&mut size, "table:case-sensitive", sort.case_sensitive)?;
+    sized_attr(&mut size, "table:language", sort.language.as_deref())?;
+    sized_attr(&mut size, "table:country", sort.country.as_deref())?;
+    sized_attr(&mut size, "table:script", sort.script.as_deref())?;
+    sized_attr(
+        &mut size,
+        "table:rfc-language-tag",
+        sort.rfc_language_tag.as_deref(),
+    )?;
+    sized_attr(&mut size, "table:algorithm", sort.algorithm.as_deref())?;
+    sized_attr(
+        &mut size,
+        "table:embedded-number-behavior",
+        sort.embedded_number_behavior
+            .map(EmbeddedNumberBehavior::as_str),
+    )?;
+    sized_literal(&mut size, ">")?;
+    for key in &sort.keys {
+        sized_literal(&mut size, "<table:sort-by")?;
+        sized_u64_attr(&mut size, "table:field-number", key.field_number)?;
+        sized_attr(&mut size, "table:data-type", key.data_type.as_deref())?;
+        sized_attr(&mut size, "table:order", key.order.map(Order::as_str))?;
+        sized_literal(&mut size, "/>")?;
+    }
+    sized_literal(&mut size, "</table:sort>")?;
+    Ok(size)
+}
+
+fn size_subtotals(subtotals: &Rules) -> Result<usize> {
+    let mut size = 0;
+    sized_literal(&mut size, "<table:subtotal-rules")?;
+    sized_bool_attr(
+        &mut size,
+        "table:bind-styles-to-content",
+        subtotals.bind_styles_to_content,
+    )?;
+    sized_bool_attr(&mut size, "table:case-sensitive", subtotals.case_sensitive)?;
+    sized_bool_attr(
+        &mut size,
+        "table:page-breaks-on-group-change",
+        subtotals.page_breaks_on_group_change,
+    )?;
+    if subtotals.sort_groups.is_none() && subtotals.rules.is_empty() {
+        sized_literal(&mut size, "/>")?;
+        return Ok(size);
+    }
+    sized_literal(&mut size, ">")?;
+    if let Some(groups) = &subtotals.sort_groups {
+        sized_literal(&mut size, "<table:sort-groups")?;
+        sized_attr(&mut size, "table:data-type", groups.data_type.as_deref())?;
+        sized_attr(&mut size, "table:order", groups.order.map(Order::as_str))?;
+        sized_literal(&mut size, "/>")?;
+    }
+    for rule in &subtotals.rules {
+        sized_literal(&mut size, "<table:subtotal-rule")?;
+        sized_u64_attr(
+            &mut size,
+            "table:group-by-field-number",
+            rule.group_by_field_number,
+        )?;
+        if rule.fields.is_empty() {
+            sized_literal(&mut size, "/>")?;
+            continue;
+        }
+        sized_literal(&mut size, ">")?;
+        for field in &rule.fields {
+            sized_literal(&mut size, "<table:subtotal-field")?;
+            sized_u64_attr(&mut size, "table:field-number", field.field_number)?;
+            sized_attr(&mut size, "table:function", Some(&field.function))?;
+            sized_literal(&mut size, "/>")?;
+        }
+        sized_literal(&mut size, "</table:subtotal-rule>")?;
+    }
+    sized_literal(&mut size, "</table:subtotal-rules>")?;
+    Ok(size)
+}
+
+fn size_database_range(range: &Range) -> Result<usize> {
+    let mut size = 0;
+    sized_literal(&mut size, "<table:database-range")?;
+    sized_attr(&mut size, "table:name", range.name.as_deref())?;
+    sized_bool_attr(&mut size, "table:is-selection", range.is_selection)?;
+    sized_bool_attr(
+        &mut size,
+        "table:on-update-keep-styles",
+        range.on_update_keep_styles,
+    )?;
+    sized_bool_attr(
+        &mut size,
+        "table:on-update-keep-size",
+        range.on_update_keep_size,
+    )?;
+    sized_bool_attr(
+        &mut size,
+        "table:has-persistent-data",
+        range.has_persistent_data,
+    )?;
+    sized_attr(
+        &mut size,
+        "table:orientation",
+        range.orientation.map(Orientation::as_str),
+    )?;
+    sized_bool_attr(&mut size, "table:contains-header", range.contains_header)?;
+    sized_bool_attr(
+        &mut size,
+        "table:display-filter-buttons",
+        range.display_filter_buttons,
+    )?;
+    sized_attr(
+        &mut size,
+        "table:target-range-address",
+        Some(&range.target_range_address),
+    )?;
+    sized_attr(
+        &mut size,
+        "table:refresh-delay",
+        range.refresh_delay.as_deref(),
+    )?;
+    if range.source.is_none()
+        && range.filter.is_none()
+        && range.sort.is_none()
+        && range.subtotals.is_none()
+    {
+        sized_literal(&mut size, "/>")?;
+        return Ok(size);
+    }
+    sized_literal(&mut size, ">")?;
+    if let Some(source) = &range.source {
+        checked_size_add(&mut size, size_source(source)?)?;
+    }
+    if let Some(filter) = &range.filter {
+        checked_size_add(&mut size, size_filter(filter)?)?;
+    }
+    if let Some(sort) = &range.sort {
+        checked_size_add(&mut size, size_sort(sort)?)?;
+    }
+    if let Some(subtotals) = &range.subtotals {
+        checked_size_add(&mut size, size_subtotals(subtotals)?)?;
+    }
+    sized_literal(&mut size, "</table:database-range>")?;
+    Ok(size)
+}
+
+fn reserve_output(output: &mut String, additional: usize) -> Result<()> {
+    let final_len = output.len().checked_add(additional).ok_or_else(|| {
+        Error::InvalidFormat("database-range XML output size overflow".to_string())
+    })?;
+    if final_len > MAX_DATABASE_XML_BYTES {
+        return Err(Error::InvalidFormat(
+            "database-range XML output exceeds 64 MiB".to_string(),
+        ));
+    }
+    output
+        .try_reserve(additional)
+        .map_err(|source| Error::Allocation {
+            resource: "ODS database-range XML output",
+            source,
+        })
+}
+
+pub(crate) fn database_ranges_serialized_size(ranges: &[Range]) -> Result<usize> {
     validate_database_range_collection(ranges)?;
     if ranges.is_empty() {
+        return Ok(0);
+    }
+    let mut additional = "<table:database-ranges>".len();
+    for range in ranges {
+        checked_size_add(&mut additional, size_database_range(range)?)?;
+    }
+    checked_size_add(&mut additional, "</table:database-ranges>".len())?;
+    if additional > MAX_DATABASE_XML_BYTES {
+        return Err(Error::InvalidFormat(
+            "database-range XML output exceeds 64 MiB".to_string(),
+        ));
+    }
+    Ok(additional)
+}
+
+/// # Errors
+///
+/// Returns an error when the value cannot be serialized within the bounded
+/// XML output budget. The complete output size is planned before mutation.
+pub fn write_database_ranges(output: &mut String, ranges: &[Range]) -> Result<()> {
+    let additional = database_ranges_serialized_size(ranges)?;
+    if additional == 0 {
         return Ok(());
     }
+    reserve_output(output, additional)?;
     output.push_str("<table:database-ranges>");
     for range in ranges {
-        range.validate()?;
         write_database_range(output, range);
     }
     output.push_str("</table:database-ranges>");
@@ -649,22 +1290,24 @@ pub fn write_database_ranges(output: &mut String, ranges: &[Range]) -> Result<()
 
 /// # Errors
 ///
-/// Returns an error when the value cannot be serialized.
-///
+/// Returns an error when the value cannot be serialized within the bounded
+/// XML output budget.
 pub fn write_database_range_fragment(range: &Range) -> Result<String> {
-    range.validate()?;
-    let mut output = String::with_capacity(512);
-    output.push_str(
-        "<table:database-ranges xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\">",
-    );
+    validate_range_for_output(range)?;
+    let prefix =
+        "<table:database-ranges xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\">";
+    let suffix = "</table:database-ranges>";
+    let range_size = size_database_range(range)?;
+    let mut output = String::new();
+    let mut additional = prefix.len();
+    checked_size_add(&mut additional, range_size)?;
+    checked_size_add(&mut additional, suffix.len())?;
+    reserve_output(&mut output, additional)?;
+    output.push_str(prefix);
     write_database_range(&mut output, range);
-    output.push_str("</table:database-ranges>");
-    let start = output.find('>').ok_or_else(|| {
-        Error::InvalidFormat("database-range wrapper start is missing".to_string())
-    })? + 1;
-    let end = output
-        .rfind("</table:database-ranges>")
-        .ok_or_else(|| Error::InvalidFormat("database-range wrapper end is missing".to_string()))?;
+    output.push_str(suffix);
+    let start = prefix.len();
+    let end = output.len() - suffix.len();
     Ok(output[start..end].to_string())
 }
 
@@ -718,10 +1361,10 @@ fn write_database_range(output: &mut String, range: &Range) {
     }
     output.push('>');
     if let Some(source) = &range.source {
-        write_database_source(output, source);
+        write_database_source_inner(output, source);
     }
     if let Some(filter) = &range.filter {
-        write_filter(output, filter);
+        write_filter_inner(output, filter);
     }
     if let Some(sort) = &range.sort {
         write_sort(output, sort);
@@ -732,7 +1375,15 @@ fn write_database_range(output: &mut String, range: &Range) {
     output.push_str("</table:database-range>");
 }
 
-pub fn write_database_source(output: &mut String, source: &Source) {
+pub fn write_database_source(output: &mut String, source: &Source) -> Result<()> {
+    validate_source_for_output(source)?;
+    let additional = size_source(source)?;
+    reserve_output(output, additional)?;
+    write_database_source_inner(output, source);
+    Ok(())
+}
+
+fn write_database_source_inner(output: &mut String, source: &Source) {
     match source {
         Source::Sql {
             database_name,
@@ -764,7 +1415,15 @@ pub fn write_database_source(output: &mut String, source: &Source) {
     output.push_str("/>");
 }
 
-pub fn write_filter(output: &mut String, filter: &Filter) {
+pub fn write_filter(output: &mut String, filter: &Filter) -> Result<()> {
+    validate_filter_for_output(filter)?;
+    let additional = size_filter(filter)?;
+    reserve_output(output, additional)?;
+    write_filter_inner(output, filter);
+    Ok(())
+}
+
+fn write_filter_inner(output: &mut String, filter: &Filter) {
     output.push_str("<table:filter");
     attr(
         output,
@@ -928,6 +1587,11 @@ fn optional_attr(
         let attribute = attribute.map_err(|error| {
             Error::InvalidFormat(format!("invalid database-range attribute: {error}"))
         })?;
+        if attribute.value.len() > MAX_DATABASE_VALUE_BYTES {
+            return Err(Error::InvalidFormat(
+                "database-range attribute exceeds the size limit".to_string(),
+            ));
+        }
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == TABLE_NAMESPACE)
             && local.as_ref() == local_name

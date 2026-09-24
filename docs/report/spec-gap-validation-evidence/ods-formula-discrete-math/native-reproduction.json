@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "docs/report/spec-gap-validation-evidence/ods-formula-discrete-math/native/reproduce.py"
+  ],
+  "exit_code": 0,
+  "stdout": "{\"commit\": \"d804d6aff49054bad1719ec3c2d136b545bbc7e7\", \"files\": 11, \"selected_observations\": 77, \"temporary_tree_cleaned\": true}\n",
+  "stderr": "",
+  "before": {
+    "native/reproduce.py": "9d326b495ba00f7cd29ed53508f5a11d69bc2c6987f15ee04af1ad7ef5a5f763",
+    "native/extract.py": "e087235627011a88cb24dbae1e77ce30ce7a0297eae30b8d3be8b44cdca789c7",
+    "native/cached-results.json": "cf13ae7aa07b3145125f89380849f5337b1eee5bbea04662a11253cd7ecf05e9",
+    "native/provenance.json": "9250d1ff02a422637962ec04c44f84702c2725098ac869d7f75f03f3db4ed50c"
+  },
+  "after": {
+    "native/reproduce.py": "9d326b495ba00f7cd29ed53508f5a11d69bc2c6987f15ee04af1ad7ef5a5f763",
+    "native/extract.py": "e087235627011a88cb24dbae1e77ce30ce7a0297eae30b8d3be8b44cdca789c7",
+    "native/cached-results.json": "cf13ae7aa07b3145125f89380849f5337b1eee5bbea04662a11253cd7ecf05e9",
+    "native/provenance.json": "9250d1ff02a422637962ec04c44f84702c2725098ac869d7f75f03f3db4ed50c"
+  }
+}

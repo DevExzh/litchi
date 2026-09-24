@@ -1,0 +1,88 @@
+{
+  "base": "fdd2b80dfa9efc246a5983a3fec64de25e5c4f63",
+  "status": " M crates/litchi-pptx/docs/FEATURE_MATRIX.md\n M crates/litchi-pptx/src/comments/codec.rs\n M crates/litchi-pptx/src/comments/mod.rs\n M crates/litchi-pptx/src/lib.rs\n?? crates/litchi-pptx/src/comments/collaboration.rs\n?? crates/litchi-pptx/src/comments/collaboration/codec.rs\n?? crates/litchi-pptx/src/comments/collaboration/package.rs\n?? crates/litchi-pptx/src/comments/collaboration/tests.rs\n?? crates/litchi-pptx/src/comments/collaboration/transaction.rs\n",
+  "paths": [
+    {
+      "path": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "v4_sha256": "2b5988a32c35b9e564f40b1803f63102adf41e4386ea0de6093394f93c8edb90",
+      "v5_sha256": "2b5988a32c35b9e564f40b1803f63102adf41e4386ea0de6093394f93c8edb90",
+      "v4_size_bytes": 22399,
+      "v5_size_bytes": 22399,
+      "changed_from_v4": false,
+      "status_expected": " M"
+    },
+    {
+      "path": "crates/litchi-pptx/src/comments/codec.rs",
+      "v4_sha256": "4bb62ff19e3c761e5731b6ff08fe41167adecf5412a26df90e716b4b68c7374b",
+      "v5_sha256": "4bb62ff19e3c761e5731b6ff08fe41167adecf5412a26df90e716b4b68c7374b",
+      "v4_size_bytes": 21782,
+      "v5_size_bytes": 21782,
+      "changed_from_v4": false,
+      "status_expected": " M"
+    },
+    {
+      "path": "crates/litchi-pptx/src/comments/mod.rs",
+      "v4_sha256": "dafd0fef635a496d336ad105ba992004c5aad28972817347a5de49af4df4f28a",
+      "v5_sha256": "dafd0fef635a496d336ad105ba992004c5aad28972817347a5de49af4df4f28a",
+      "v4_size_bytes": 3355,
+      "v5_size_bytes": 3355,
+      "changed_from_v4": false,
+      "status_expected": " M"
+    },
+    {
+      "path": "crates/litchi-pptx/src/lib.rs",
+      "v4_sha256": "68b570b44fb965d7f8e7cb8d4305e84221716667d6b6ac6dc6e306a779ebddb7",
+      "v5_sha256": "68b570b44fb965d7f8e7cb8d4305e84221716667d6b6ac6dc6e306a779ebddb7",
+      "v4_size_bytes": 8278,
+      "v5_size_bytes": 8278,
+      "changed_from_v4": false,
+      "status_expected": " M"
+    },
+    {
+      "path": "crates/litchi-pptx/src/comments/collaboration.rs",
+      "v4_sha256": "06ab6b756d60b656717117d652f6af200084e31939d83601907fa394d70b1bf5",
+      "v5_sha256": "06ab6b756d60b656717117d652f6af200084e31939d83601907fa394d70b1bf5",
+      "v4_size_bytes": 4363,
+      "v5_size_bytes": 4363,
+      "changed_from_v4": false,
+      "status_expected": "??"
+    },
+    {
+      "path": "crates/litchi-pptx/src/comments/collaboration/codec.rs",
+      "v4_sha256": "5fe70481ec2d7352e34b42566fa26c56078dbc8e4600ee4895d46c0f58294b2b",
+      "v5_sha256": "e9338115e47298d7bab43cdc7b06f909c75cfa29205cb5bef40add5228bdb720",
+      "v4_size_bytes": 83121,
+      "v5_size_bytes": 83213,
+      "changed_from_v4": true,
+      "status_expected": "??"
+    },
+    {
+      "path": "crates/litchi-pptx/src/comments/collaboration/package.rs",
+      "v4_sha256": "050d2053b2812d32208652f7a2253fcc7b219a7363c06464a1354a3daa8a599a",
+      "v5_sha256": "050d2053b2812d32208652f7a2253fcc7b219a7363c06464a1354a3daa8a599a",
+      "v4_size_bytes": 10224,
+      "v5_size_bytes": 10224,
+      "changed_from_v4": false,
+      "status_expected": "??"
+    },
+    {
+      "path": "crates/litchi-pptx/src/comments/collaboration/tests.rs",
+      "v4_sha256": "f4889dab52800a1e8475fdb623cb9e65c889847446339f9311afcba4c9d6f2fc",
+      "v5_sha256": "9cfc6bbf657292b18b83932e8f8b52b65bde95ef32ac152a3b9bf24606c956c8",
+      "v4_size_bytes": 22254,
+      "v5_size_bytes": 24325,
+      "changed_from_v4": true,
+      "status_expected": "??"
+    },
+    {
+      "path": "crates/litchi-pptx/src/comments/collaboration/transaction.rs",
+      "v4_sha256": "0f64954a2c80ac18c4c8eca3ccd72ea5c48334161754df6ac0b49b28772d3547",
+      "v5_sha256": "0f64954a2c80ac18c4c8eca3ccd72ea5c48334161754df6ac0b49b28772d3547",
+      "v4_size_bytes": 19521,
+      "v5_size_bytes": 19521,
+      "changed_from_v4": false,
+      "status_expected": "??"
+    }
+  ],
+  "manifest_sha256": "797c553dea9c0df2644cd17a790ff8f83cba2f2af6f3802df931364125b8ae15"
+}

@@ -1,0 +1,84 @@
+{
+  "publication_head": "52ec1bcf658919058ff1f4264cc58ec3ab0dbf18",
+  "owned_paths": [
+    {
+      "baseline_present": true,
+      "baseline_sha256": "83abb577e5ce787e2fdaa00f9adb6aca7df84fbaad9f55c44f94dd2390a1ca0c",
+      "candidate_source_sha256": "f560fb38a79198fde545df96f15d26dfe0c9979b0ec38d36232f8cbd210bc09b",
+      "integration_sha256": "f560fb38a79198fde545df96f15d26dfe0c9979b0ec38d36232f8cbd210bc09b",
+      "path": "crates/litchi-crypto/Cargo.toml"
+    },
+    {
+      "baseline_present": true,
+      "baseline_sha256": "2c00223272a054a510d9483cbc94dfde955342c3acdf8f70375ed83107337a05",
+      "candidate_source_sha256": "e2fd8b07bfc6232f9dcdd8890a96ff4611c4047f675ced5514ea0ad040651f22",
+      "integration_sha256": "e2fd8b07bfc6232f9dcdd8890a96ff4611c4047f675ced5514ea0ad040651f22",
+      "path": "crates/litchi-crypto/src/lib.rs"
+    },
+    {
+      "baseline_present": false,
+      "baseline_sha256": null,
+      "candidate_source_sha256": "fa69b72850d653879ba200a486dd772b729f658d87ea16b1b9df92a98e7c581a",
+      "integration_sha256": "fa69b72850d653879ba200a486dd772b729f658d87ea16b1b9df92a98e7c581a",
+      "path": "crates/litchi-crypto/src/legacy_rc4.rs"
+    },
+    {
+      "baseline_present": true,
+      "baseline_sha256": "ab81c896059f0606d252c4c6c65c7b7b583f5bd381f58f66573858deb48db1cc",
+      "candidate_source_sha256": "6060db8ae26a2258085cddaecc442c35d4aac75380f296eb76981ece4de55320",
+      "integration_sha256": "6060db8ae26a2258085cddaecc442c35d4aac75380f296eb76981ece4de55320",
+      "path": "crates/litchi-doc/Cargo.toml"
+    },
+    {
+      "baseline_present": true,
+      "baseline_sha256": "4f1d9df5026e04d088ba6668ed9d573a497d31854600eaeb75674eca9e447428",
+      "candidate_source_sha256": "be9b641edb825a2ad7b5eb86c941780060c1a834ceba6898aae5cdb1535917e7",
+      "integration_sha256": "be9b641edb825a2ad7b5eb86c941780060c1a834ceba6898aae5cdb1535917e7",
+      "path": "crates/litchi-doc/src/encryption/codec.rs"
+    },
+    {
+      "baseline_present": true,
+      "baseline_sha256": "ce8efd81a0f1e67b4bd308a95836762cb3349b395957c9d349d6f721715d642d",
+      "candidate_source_sha256": "45df2b54be739d571be4abeb68c15cacdce6d10cca70c428975f15b7dba9fd93",
+      "integration_sha256": "45df2b54be739d571be4abeb68c15cacdce6d10cca70c428975f15b7dba9fd93",
+      "path": "crates/litchi-doc/src/encryption/tests.rs"
+    },
+    {
+      "baseline_present": true,
+      "baseline_sha256": "92f1eeb7c84753d780831d0e3bc638e2b03e8dd86259611370a607fa851604d2",
+      "candidate_source_sha256": "627720b2568a31e7ba081449749835b74f222f2b858d46b33345a3c32cd06a95",
+      "integration_sha256": "627720b2568a31e7ba081449749835b74f222f2b858d46b33345a3c32cd06a95",
+      "path": "crates/litchi-xls/Cargo.toml"
+    },
+    {
+      "baseline_present": true,
+      "baseline_sha256": "d0fef2642d94b8240a7aaf5752d2f46f615e6c2d7631e47f971fcfef46631f20",
+      "candidate_source_sha256": "4ecab4cb8facc4ba0a7e83a39a0073f6040be058f40df92fb25e53e1413d6b41",
+      "integration_sha256": "4ecab4cb8facc4ba0a7e83a39a0073f6040be058f40df92fb25e53e1413d6b41",
+      "path": "crates/litchi-xls/src/encryption.rs"
+    }
+  ],
+  "evidence": {
+    "root-test-counts.json.gz": "94524d78c46b3f359cf8b3bbb311c2b70a709eb4a209bd5df325d71e1036eac7",
+    "root-source-after.json.gz": "5d240a87c1d7e96c7564b5a7568ef7300332c5d6d00fcada11d6428508cebd87",
+    "independent-review-REPORT.md.gz": "8d9a1c83fa740223899780ea15531a3f309f078060db776ce3eede29bf6d77c9",
+    "author-REPORT.md.gz": "a3d42363183a0c34f1e4817b16d29f1202a1a909a16b4442b79bba7628398f0d",
+    "root-rustfmt.log.gz": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+    "root-Cargo.lock.after.gz": "2c8869b97a69bec7ee92d15087aa3eac0fe8cc16c4d59c399c929644d971d7fe",
+    "root-lock-reconciliation.json.gz": "c4eff6316d65759174984ce7f287230b6f7057a60adcb46f19d0c87dd5a72df5",
+    "root-metadata.log.gz": "d33ad5593e76f81546aa71df3ab3eea17cd91869d92e062229f88e0689495830",
+    "README.md": "f322b38c4acb9254d430861e3a715a8e56cc806b6f93dabf53be21650b7637c2",
+    "root-gates.json.gz": "8edaad2e4d5d13367ccf5e782bef6ecaa560b34f0e72604548baaf1677c537ac",
+    "root-Cargo.lock.before.gz": "25230a3ef600e690e686929c05c1e3cc61ae2a62e0e60b3f4c237ee719334c0c",
+    "root-rustdoc.log.gz": "a2164a609b26285f5e3f66496096986a595c7b8cd79c33a62b0a50b111b64e44",
+    "integration-vs-git-archive-diff.txt.gz": "3f08b40595f6acf7e5f030528b657f1368fea0baa091b11fd623eb993c4a94bb",
+    "root-clippy.log.gz": "44dd52341c62d5f55f5690e13ea650235669eed3d313fef449f943cbc6a1d6ae",
+    "root-setup.json.gz": "4918f46134f8bc912064047b88a328202b8e514256c1cf9c64ee98dbf724d9b1",
+    "integration-manifest-r1.json.gz": "145d58b5992bf8c244b10c86b82be9d7b4c569c898f6cce71a89ad0e650c84b5",
+    "integration-manifest.json.gz": "3077ef63fa8d0946e4993d1d44f2c7575447e69335d50a3d088694f00a3c5edf",
+    "legacy-rc4-owned-overlay.tar.gz": "eda0fb99e8387579f3e41dfe99b865cedd3c3d0869ed2a1f9c86b11f33a45718",
+    "root-source-before.json.gz": "5d240a87c1d7e96c7564b5a7568ef7300332c5d6d00fcada11d6428508cebd87",
+    "root-test.log.gz": "123b467d8fa1fcbf9e02420faa63ff29fc004a19e5449b4603dca558d85b38d9",
+    "primary-status.txt.gz": "a574ce8e37e804be1b788763364084688e5f83c8c3564f6f13d2bbefb81ec2a6"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "label": "candidate-literals",
+  "group": "literals",
+  "binary_sha256": "d9dcf284a1b311191bbd1b959ec9c0c6915dec5a585f4c5e588ef29e570839d5",
+  "harness": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/harness/run.py",
+  "output": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/candidate-literals",
+  "warmups": 3,
+  "iterations": 15,
+  "finished_at": "2026-09-13T09:04:56Z",
+  "status": 0,
+  "raw_sha256": "46efada5ae823288c30aeb3deb82e1df7dec7cde6d1f339fd0aaff048de5f17f",
+  "row_count": 9
+}

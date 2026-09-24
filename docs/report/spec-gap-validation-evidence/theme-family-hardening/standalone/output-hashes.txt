@@ -1,0 +1,10 @@
+46659db8a572eeb2e4d9aefd8c8f7f00cdad6cf9c96b360c1b2a16d1cf904c79  docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/added.xml
+50b662d8ff0e562157ff80aa19c85ff214cd21357d66457661d070f50c6fdc59  docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/native.xml
+553ddb0fd0e59e84d844b427b2df9943af0d54526f58c481b40632c775d62678  docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/opaque-preserved-diagnostic.xml
+ca8fedc77e7f05d88ae996b5b17e699cae89c95eb123952b6f0ba265871b50d0  docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/probe-results.tsv
+fa8c8865c4fd4a5d60bd740f68b5a34783f81e4d4e5490fc0329a5e181bd2aae  docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/removed.xml
+18d00f349b190e417fe0c00c5ca4f36a6fed08bc599c6ee7f891493eff0c8ce9  docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/updated.xml
+ba181f89a21a261e7ba9f335214dc3b238dfd99404a1cab7c512a039cf1b4d04  docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/schema-validation.json
+1d53042fbbfb20d9e39011d1c8279fce1c9e74ba56b37c39ef454cc3456104c3  docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/probe.log
+8e6d255f58d7a1f3e50f5f614977688dc572aa6d44844906f088cc0ed1eb0bb9  docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/check.log
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/fmt.log

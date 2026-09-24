@@ -1,0 +1,88 @@
+{
+  "schema": "litchi.odg.v8.pending-preservation-review.v1",
+  "reviewed_utc": "2026-09-10",
+  "candidate_root": "/var/tmp/litchi-odg-v8-integration-base-clean-20260910",
+  "candidate_base_commit": "5953a2ed1a036179042b55f96a4ee333e554b659",
+  "conclusion": "clean V8 supersedes the primary's 12 owned pending ODG paths; no mixed preservation is required for those paths",
+  "scope": {
+    "primary": "/home/zhuhe/code/litchi-spec-gaps",
+    "primary_observed_head": "8076d72455ecebb4bfbe3d479f9f219aeaa1550e",
+    "primary_owned_pending_count": 12,
+    "candidate_overlay_count": 17,
+    "primary_status_unchanged": true,
+    "primary_pending_content_unchanged": true,
+    "source_edits": false,
+    "staging_or_commit": false,
+    "full_tests_run": false
+  },
+  "owned_pending_paths": [
+    "crates/litchi-odg/docs/FEATURE_MATRIX.md",
+    "crates/litchi-odg/src/facade/mod.rs",
+    "crates/litchi-odg/src/lib.rs",
+    "crates/litchi-odg/src/model/auxiliary.rs",
+    "crates/litchi-odg/src/model/enhanced.rs",
+    "crates/litchi-odg/src/model/mod.rs",
+    "crates/litchi-odg/src/model/page.rs",
+    "crates/litchi-odg/src/model/shape.rs",
+    "crates/litchi-odg/src/model/transition.rs",
+    "crates/litchi-odg/src/package/mod.rs",
+    "crates/litchi-odg/src/package/snapshot.rs",
+    "crates/litchi-odg/tests/page_transitions.rs"
+  ],
+  "comparison": {
+    "full_primary_vs_v8_diff": "/var/tmp/litchi-odg-primary-v8-diff-20260910.patch",
+    "full_primary_vs_v8_diff_sha256": "b9f8110d4ed00e4730724ce647c4c862df58ed01f9d2a71b8056ee2b617517e4",
+    "owned_semantic_comparison": "/var/tmp/litchi-odg-v8-integration-base-clean-evidence-20260910/owned-semantic-comparison.json",
+    "owned_semantic_comparison_sha256": "de59fa900cb91ca3d16c49a0071990635977d0a5a4a4984e848a84a70ce3bc86",
+    "mismatch_summary": {
+      "identical_pending_paths": 4,
+      "pending_paths_with_differences": 8,
+      "primary_only_api_symbols_detected": [],
+      "primary_only_feature_tests_detected": [],
+      "candidate_only_changes_are": [
+        "bounded XML/source admission and checked transfer budgets",
+        "namespace-closed source-preserving transfer",
+        "strict auxiliary/3D/enhanced-geometry ownership and lexical validation",
+        "detached/source-backed shape provenance",
+        "bounded transition/URI/NCName/duration handling",
+        "page-transition style ownership and expanded regression coverage"
+      ]
+    },
+    "path_assessment": {
+      "FEATURE_MATRIX.md": "V8 documentation supersedes the primary wording; it changes auxiliary ownership from nested draw:image to direct draw:frame, matching V8 parser ownership checks.",
+      "model/auxiliary.rs": "V8 replaces unconditional non-empty value validation with bounded_optional for optional image-map values; no primary-only behavior is removed.",
+      "model/enhanced.rs": "V8 retains enhanced geometry and adds empty-value allowance, child order, Boolean, and coordinate-pair validation; no primary-only API is removed.",
+      "model/page.rs": "V8 adds crate-private set_style_name needed for detached page transition style ownership.",
+      "model/shape.rs": "V8 adds source_backed provenance, semantic equality independent of provenance, and direct-owner documentation; parsed shapes use checked transfer instead of unsafe direct insertion.",
+      "model/transition.rs": "V8 preserves transition model while adding empty anyURI/optional values, Unicode NCName, and stricter XSD duration parsing.",
+      "package/snapshot.rs": "V8 is a strict superset at the symbol/API level and replaces unbounded ownership/serialization paths with precharged borrowed admission, namespace closure, checked output, shape/auxiliary/3D validation, and source-safe page/transition/transfer publication.",
+      "tests/page_transitions.rs": "V8 retains existing transition, auxiliary, enhanced, and 3D coverage while adding admission, ownership, transfer, lexical, and detached-page regressions; fixture edits follow stricter schema order/shape rules."
+    }
+  },
+  "non_pending_overlay_paths": [
+    "crates/litchi-odf-common/src/core/family.rs",
+    "crates/litchi-odf-common/src/core/package.rs",
+    "crates/litchi-odg/src/flat.rs",
+    "crates/litchi-odg/tests/allocation_admission.rs",
+    "crates/litchi-odg/tests/package_snapshot.rs"
+  ],
+  "evidence": {
+    "integration_manifest": "/var/tmp/litchi-odg-v8-integration-base-clean-evidence-20260910/integration-candidate-manifest.json",
+    "integration_manifest_sha256": "b9e5a086d1de1a437059b72b3fb177e6aa68d3140aac3866f19aa080471e45d3",
+    "preimages_and_base": "/var/tmp/litchi-odg-v8-integration-base-clean-evidence-20260910/owned-preimages-and-base.json",
+    "preimages_and_base_sha256": "83c0de49b8c7b081bb9be01c58fe4fb42fbdc1e473c057f2c23c4afee247fe62",
+    "overlay_receipt": "/var/tmp/litchi-odg-v8-integration-base-clean-evidence-20260910/owned-path-overlay-receipt.json",
+    "overlay_receipt_sha256": "b0262c251aec580e3b38adcad6c3671b948a8befd695268ececcf843b7d38bc0",
+    "primary_content_drift": "/var/tmp/litchi-odg-v8-integration-base-clean-evidence-20260910/primary-content-drift.json",
+    "primary_content_drift_sha256": "8ff103c55d211acf2d96181aac26d5e03860f9927e49136728331fb7250da70b",
+    "primary_status_drift": "/var/tmp/litchi-odg-v8-integration-base-clean-evidence-20260910/primary-status-drift.json",
+    "primary_status_drift_sha256": "bb39b81689d3d77c158c7d5ac0a54497d0f1e61b5bdb1aff94ff0b060d22d960",
+    "frozen_v8_manifest": "/var/tmp/litchi-odg-v8-clean-evidence-20260910/manifest-v8.json",
+    "frozen_v8_manifest_sha256": "958c5fea4a4e40d6fbf43bd68b0aa464b23f331f5fea0ac58e8367b08569615c"
+  },
+  "review_notes": [
+    "The mixed /var/tmp/litchi-odg-v8-integration-clean-20260910 tree was not used.",
+    "Candidate is a clean archive of base 5953 followed by exact 17-path V8 overlay; all 17 candidate hashes match frozen V8.",
+    "Root must use its combined-gate receipt for build/test status; this review makes no independent green-gate claim."
+  ]
+}

@@ -1,0 +1,470 @@
+{
+  "lxml_version": [
+    6,
+    0,
+    2,
+    0
+  ],
+  "reports": [
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/gates/../generated-xml/inserted-name-theme.xml",
+      "part": null,
+      "bytes": 2128,
+      "sha256": "08d4754679e697b723a85b4a3bdc5f9db7a0567c2fb6561fada18cc188aa3f66",
+      "valid": true,
+      "semantic": {
+        "name": "Named",
+        "palette_name": "Office",
+        "colors": {
+          "dk1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "lt1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "dk2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "lt2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent3": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent4": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent5": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent6": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "hlink": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "folHlink": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ]
+        },
+        "font_scheme_name": "Office",
+        "major_latin": "Aptos",
+        "minor_latin": "Aptos"
+      },
+      "conformance": "Transitional",
+      "schema_archive_sha256": "d34187520749998af306faf1b730e568b0ca6d88ad24638a407c0a9bb4ca04fc",
+      "main_schema_sha256": "6978ba7e889070b0c3cb5b546b23e5a6c3516134afc53b87a21f482ca33f3858"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/gates/../generated-xml/multiple-edits-theme.xml",
+      "part": null,
+      "bytes": 2275,
+      "sha256": "e77e34ed7bd530f0a455fe540e01f1d0ec24ed429cc804c9c8373fc1284f0216",
+      "valid": true,
+      "semantic": {
+        "name": "Longer name",
+        "palette_name": "Office",
+        "colors": {
+          "dk1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "lt1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "dk2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "lt2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "ABCDEF"
+              }
+            }
+          ],
+          "accent2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent3": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent4": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent5": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent6": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "hlink": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "folHlink": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ]
+        },
+        "font_scheme_name": "Different fonts",
+        "major_latin": "Cambria",
+        "minor_latin": "Calibri"
+      },
+      "conformance": "Transitional",
+      "schema_archive_sha256": "d34187520749998af306faf1b730e568b0ca6d88ad24638a407c0a9bb4ca04fc",
+      "main_schema_sha256": "6978ba7e889070b0c3cb5b546b23e5a6c3516134afc53b87a21f482ca33f3858"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/gates/../generated-xml/renamed-theme.xml",
+      "part": null,
+      "bytes": 2169,
+      "sha256": "892b9b8a16780ed7b5cc7b08df50d337d42657b9b49263055da0ec6facea450e",
+      "valid": true,
+      "semantic": {
+        "name": "A 'quoted' &\r\n\t theme",
+        "palette_name": "Office",
+        "colors": {
+          "dk1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "lt1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "dk2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "lt2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent3": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent4": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent5": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent6": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "hlink": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "folHlink": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ]
+        },
+        "font_scheme_name": "Office",
+        "major_latin": "Aptos",
+        "minor_latin": "Aptos"
+      },
+      "conformance": "Transitional",
+      "schema_archive_sha256": "d34187520749998af306faf1b730e568b0ca6d88ad24638a407c0a9bb4ca04fc",
+      "main_schema_sha256": "6978ba7e889070b0c3cb5b546b23e5a6c3516134afc53b87a21f482ca33f3858"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/gates/../generated-xml/strict-edited-theme.xml",
+      "part": null,
+      "bytes": 2264,
+      "sha256": "84d70d9372fcb6fbe69c540290d89ab546fb97bd5921825c19e5194c59059a39",
+      "valid": true,
+      "semantic": {
+        "name": "Office",
+        "palette_name": "Office",
+        "colors": {
+          "dk1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "lt1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "dk2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "lt2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent3": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent4": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent5": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent6": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "hlink": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "folHlink": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ]
+        },
+        "font_scheme_name": "http://schemas.openxmlformats.org/drawingml/2006/main",
+        "major_latin": "http://schemas.openxmlformats.org/drawingml/2006/main",
+        "minor_latin": "Aptos"
+      },
+      "conformance": "Strict",
+      "schema_archive_sha256": "73fab4b04ddd93da020ed07583f755466dcaf69f115b2ff6649af7ae16a816f7",
+      "main_schema_sha256": "078871240cff323ddd22a395281421b737fa61508fd39ffaa2947ba2bc01175e"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "contract_sha256": "cc77d41f487993b3438f817dd62a359ba4ec4b3ca2359a893b31aecc79bc2c7f",
+  "freeze_sha256": "461a76708e36b2a716cd622df45f014e009186223bd1db511c3e0ff0f7fa3561",
+  "proofs": [
+    {
+      "id": "timestamp.explicit_capability",
+      "requirements": [
+        "validated explicit calculation timestamp for NOW/TODAY/EASTERSUNDAY"
+      ],
+      "source": {
+        "path": "crates/litchi-ods/src/codec/formula/evaluation/timestamp.rs",
+        "root": "repo",
+        "sha256": "c8ec12c46a116f48a60387e61e339f362770831b07b1c8e03c84958f134c60e7"
+      }
+    }
+  ],
+  "report": {
+    "path": "spec-review.md",
+    "root": "evidence",
+    "sha256": "6b29d4eb13b8f726952005e84c5d8f29baab530ac02bd160c49dbc3a12513171"
+  },
+  "review_receipt": {
+    "path": "review-receipt.json",
+    "root": "evidence",
+    "sha256": "af38cc90788e881cc36032c1bd7462f395441e698f02d064d0c7e4e04adbf4e5"
+  },
+  "reviewer": "independent_date_time_semantic_review",
+  "schema": "ods-formula-date-time-source-review-v1"
+}

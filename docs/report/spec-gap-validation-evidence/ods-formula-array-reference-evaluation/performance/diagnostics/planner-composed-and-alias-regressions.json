@@ -1,0 +1,14 @@
+{
+  "scope": "Composed endpoints: draft18 passes51/fails2 shape tests. Alias-stack regression: production6def537ca fails Objects33>32, draft18 passes output64/stack32 with64reads. Diagnostic tests only; general reference composition still pending.",
+  "source": "Draft18 main retained in planner-drafts-17-18.tar.gz; other production inputs unchanged from union-count fix. Exact53/54test variants retained here.",
+  "command": "cargo test --locked --offline -p litchi-ods --all-features --test ods_formula_array_reference_evaluation [scalar_condition_broadcast_over_reference_shape_does_not_consume_alias_stack for alias runs]",
+  "archive": "planner-composed-and-alias-regressions.tar.gz",
+  "sha256": "2bd989d4ec800ad82d4e50804042e18a37d9035310d1b505cce9cdecdd6ce677",
+  "members": {
+    "planner-draft-18-composed-tests.log": "e86c00b358941ec2f01f0979dba6b8e9f834ff03330fbc49e6a43396b9ffaff3",
+    "planner-draft-18-alias-test.log": "d5772b33cae3921c3a7fc47b0a55730aa512eb8c5596ff09c5635e2f8dc2f827",
+    "planner-baseline-alias-test.log": "7cfda1478613f8080720c1e40861d42eff9c93a1fdb56518d09d00a27c708d42",
+    "tests-54.rs": "1e12acffc99a97987fce1b8494a9da8a4bdcf77d5bb92b7d4fba945053ebbc42",
+    "tests-53.rs": "39bb39cc80ba23247929a1d2c1c056aa87f33d11c81183c809dbcc8de1fe56a3"
+  }
+}

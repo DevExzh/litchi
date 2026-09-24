@@ -1,0 +1,19 @@
+{
+  "removed_paths": [
+    "/tmp/litchi-ods-paired-gate-target-vqswaf44",
+    "/tmp/litchi-ods-paired-gates-ckzigjh1",
+    "/tmp/litchi-ods-paired-statistics-baseline-n1ofq9ri",
+    "/tmp/litchi-ods-paired-statistics-baseline-x2p4l775",
+    "/var/tmp/litchi-ods-paired-statistics-baseline-aa48eee68cb6ee0904523394d4ff8015dce6e595-6_v77a2s",
+    "/var/tmp/litchi-ods-paired-statistics-baseline-aa48eee68cb6ee0904523394d4ff8015dce6e595-w4_t52yt",
+    "/var/tmp/litchi-ods-paired-statistics-candidate-final-ja36hxdw",
+    "/var/tmp/litchi-ods-paired-statistics-candidate-final-pz_ajie0",
+    "/var/tmp/litchi-ods-paired-statistics-candidate-preflight-sxgodlg8",
+    "/var/tmp/litchi-ods-paired-statistics-candidate-preflight-w9bx4fqs"
+  ],
+  "all_absent": true,
+  "evidence_python_caches_absent": true,
+  "evidence_targets_absent": true,
+  "gate_preparation_intermediates_removed": true,
+  "unrelated_workspace_files_preserved": true
+}

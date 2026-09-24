@@ -1,0 +1,18 @@
+{
+  "schema": "financial-roots-oracle-root-check-v1",
+  "scope": "Independent IRR/RATE/XIRR corpus only; no Rust replay, resource, native, or performance PASS. One bounded-search row does not guarantee success/selection.",
+  "files": {
+    "contract.md": "fbe2283886326582b0e34fd277b38e6fb3e1bdeb2ecfbec5522da0f6f1467e4b",
+    "oracle_roots.py": "a482f8158e8ae904dc0a2aa7a3b0a1914175e61480b16ba86b27ee2b4998bf29",
+    "oracle-root-vectors.json": "7ccf4912d470a8d895d92343952d34c199f746d25ab1d88e5df2d9a019501c2e"
+  },
+  "vector_count": 31,
+  "command": "python3 -B docs/report/spec-gap-validation-evidence/ods-formula-financial/oracle_roots.py --check",
+  "exit_code": 0,
+  "corruption_checks": {
+    "duplicate": "rejected",
+    "expected": "rejected",
+    "contract": "rejected",
+    "missing": "rejected"
+  }
+}

@@ -1,0 +1,4 @@
+# Unified patches require a space on empty context lines.
+*.patch -whitespace
+# Captured tool output retains its original terminal newlines.
+*.log -whitespace

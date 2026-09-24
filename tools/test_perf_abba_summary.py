@@ -1638,6 +1638,39 @@ def with_xlsx_repeat_store_evidence(
 
 
 class PerfAbbaSummaryTests(unittest.TestCase):
+    def test_cold_verified_post_observation_schema_is_strict(self):
+        digest = "a" * 64
+        sample = {
+            "status": "eligible",
+            "fincore_post": {
+                "status": "eligible",
+                "size_bytes": 8192,
+                "resident_bytes": 4096,
+                "dirty_bytes": 0,
+                "writeback_bytes": 0,
+                "fincore_tool": "fincore",
+                "fincore_sha256": digest,
+                "fincore_version": "fincore from util-linux 2.41.3",
+                "fincore_method": "external_fincore_json_columns",
+                "fincore_fallback": "none",
+            },
+        }
+        perf_abba_summary._validate_cold_verified_sample(sample, "sample")
+
+        unknown = copy.deepcopy(sample)
+        unknown["fincore_post"]["unexpected"] = "value"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "unknown keys"
+        ):
+            perf_abba_summary._validate_cold_verified_sample(unknown, "sample")
+
+        missing = copy.deepcopy(sample)
+        del missing["fincore_post"]["size_bytes"]
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "missing required keys"
+        ):
+            perf_abba_summary._validate_cold_verified_sample(missing, "sample")
+
     def test_recomputes_statistics_and_emits_every_multi_shape_row(self):
         summary = perf_abba_summary.summarize_reports(four_legs())
         self.assertEqual(summary["verification"]["result_count"], 2)

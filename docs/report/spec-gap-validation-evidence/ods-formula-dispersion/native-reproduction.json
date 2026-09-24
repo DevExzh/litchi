@@ -1,0 +1,21 @@
+{
+  "before": {
+    "native/LICENSE-MPL-2.0.txt": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
+    "native/README.md": "02b71e78578c5593da81b6c152bc8fc8f445a132149bb332e8f4859bc861c001",
+    "native/cached-results.json": "88c785f9b36e98a8b7e88f0bbfc76ad99b845d1592070ea1c32feea7e46f02f5",
+    "native/extract.py": "00c4149b97f4dce1e9e4e362f69f560c053bc4cda1929704ce1814ae04377007",
+    "native/provenance.json": "d1f1e0317ae44a7b03178d0a0b4fe19bac6d9561f439123eee53522d2cf8ef35",
+    "native/reproduce.py": "7d7ba4b553399e812566bdb5e3f6039555bccb02fde6bc170d7c4eaa376f3512"
+  },
+  "after": {
+    "native/LICENSE-MPL-2.0.txt": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
+    "native/README.md": "02b71e78578c5593da81b6c152bc8fc8f445a132149bb332e8f4859bc861c001",
+    "native/cached-results.json": "88c785f9b36e98a8b7e88f0bbfc76ad99b845d1592070ea1c32feea7e46f02f5",
+    "native/extract.py": "00c4149b97f4dce1e9e4e362f69f560c053bc4cda1929704ce1814ae04377007",
+    "native/provenance.json": "d1f1e0317ae44a7b03178d0a0b4fe19bac6d9561f439123eee53522d2cf8ef35",
+    "native/reproduce.py": "7d7ba4b553399e812566bdb5e3f6039555bccb02fde6bc170d7c4eaa376f3512"
+  },
+  "exit_code": 0,
+  "stdout": "{\"commit\": \"d804d6aff49054bad1719ec3c2d136b545bbc7e7\", \"converter\": false, \"files\": 8, \"selected_observations\": 48, \"temporary_tree_cleaned\": true}\n",
+  "stderr": ""
+}

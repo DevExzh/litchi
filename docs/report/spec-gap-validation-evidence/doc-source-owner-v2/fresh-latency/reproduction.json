@@ -1,0 +1,370 @@
+{
+  "format": "litchi-doc-source-owner-portable-reproduction/1",
+  "publication": {
+    "manifest": "archive-manifest.json",
+    "manifest_sha256": "eae0bf3722547acbabee76841625d2f99717122e847e9c7aed183ba78105b649",
+    "members_checked": 99,
+    "self_excluded": true
+  },
+  "sources": {
+    "control": "/var/tmp/litchi-doc-source-owner-control-c4aa19e-20260909",
+    "candidate": "/var/tmp/litchi-doc-source-owner-final-validation-20260909",
+    "control_commit": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+    "candidate_overlay_commit": null
+  },
+  "build": {
+    "toolchain": "+1.95.0",
+    "release": true,
+    "locked": true,
+    "allocator_instrumentation": false,
+    "control": {
+      "side": "control",
+      "source_commit": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+      "candidate_overlay_commit": null,
+      "manifest": "control/Cargo.toml",
+      "lockfile": "control/Cargo.lock",
+      "target_dir": "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/target-control",
+      "binary": "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/target-control/release/litchi-embedded-doc-allocation-v2",
+      "binary_bytes": 1938920,
+      "binary_sha256": "db3964f59c7e2fb6ab2d899665b2d3e3ae00139668135c1a705cf4234e45a3e8",
+      "built_by_wrapper": true,
+      "build_command_index": 0
+    },
+    "candidate": {
+      "side": "candidate",
+      "source_commit": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+      "candidate_overlay_commit": null,
+      "manifest": "candidate/Cargo.toml",
+      "lockfile": "candidate/Cargo.lock",
+      "target_dir": "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/target-candidate",
+      "binary": "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/target-candidate/release/litchi-embedded-doc-allocation-v2",
+      "binary_bytes": 1899232,
+      "binary_sha256": "dd59cf4c811646cbbc085546b675366d3a7d0fc765ca0227806c13147d1cb8f4",
+      "built_by_wrapper": true,
+      "build_command_index": 1
+    }
+  },
+  "commands": [
+    {
+      "name": "control-build",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--release",
+        "--locked",
+        "--jobs",
+        "4",
+        "--features",
+        "candidate",
+        "--manifest-path",
+        "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/control/Cargo.toml"
+      ],
+      "cwd": "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/control",
+      "log": "/var/tmp/litchi-doc-source-owner-portable-root-reproduction-20260909/build-control.log",
+      "environment": {
+        "cleared_environment_names": [],
+        "cleared_environment_values": {},
+        "checked_relevant_environment_values": {
+          "CARGO_BUILD_JOBS": null,
+          "CARGO_BUILD_PIPELINING": null,
+          "CARGO_BUILD_RUSTC": null,
+          "CARGO_BUILD_RUSTFLAGS": null,
+          "CARGO_BUILD_TARGET": null,
+          "CARGO_ENCODED_RUSTFLAGS": null,
+          "CARGO_INCREMENTAL": null,
+          "CARGO_TARGET_CPU": null,
+          "CARGO_TARGET_DIR": null,
+          "RUSTC": null,
+          "RUSTC_BOOTSTRAP": null,
+          "RUSTC_WORKSPACE_WRAPPER": null,
+          "RUSTC_WRAPPER": null,
+          "RUSTFLAGS": null,
+          "RUSTUP_TOOLCHAIN": null
+        },
+        "cargo_profile_overrides": {
+          "all_present": [],
+          "release_present": []
+        },
+        "cargo_build_overrides_present": [],
+        "cargo_target_overrides_present": [],
+        "target_cpu_related_names_present": [],
+        "overridden_environment_values": {
+          "CARGO_TARGET_DIR": {
+            "before": null,
+            "after": "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/target-control"
+          }
+        },
+        "target_cpu_overrides_cleared": true,
+        "release_profile_overrides_cleared": true
+      }
+    },
+    {
+      "name": "candidate-build",
+      "argv": [
+        "cargo",
+        "+1.95.0",
+        "build",
+        "--release",
+        "--locked",
+        "--jobs",
+        "4",
+        "--features",
+        "candidate",
+        "--manifest-path",
+        "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/candidate/Cargo.toml"
+      ],
+      "cwd": "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/candidate",
+      "log": "/var/tmp/litchi-doc-source-owner-portable-root-reproduction-20260909/build-candidate.log",
+      "environment": {
+        "cleared_environment_names": [],
+        "cleared_environment_values": {},
+        "checked_relevant_environment_values": {
+          "CARGO_BUILD_JOBS": null,
+          "CARGO_BUILD_PIPELINING": null,
+          "CARGO_BUILD_RUSTC": null,
+          "CARGO_BUILD_RUSTFLAGS": null,
+          "CARGO_BUILD_TARGET": null,
+          "CARGO_ENCODED_RUSTFLAGS": null,
+          "CARGO_INCREMENTAL": null,
+          "CARGO_TARGET_CPU": null,
+          "CARGO_TARGET_DIR": null,
+          "RUSTC": null,
+          "RUSTC_BOOTSTRAP": null,
+          "RUSTC_WORKSPACE_WRAPPER": null,
+          "RUSTC_WRAPPER": null,
+          "RUSTFLAGS": null,
+          "RUSTUP_TOOLCHAIN": null
+        },
+        "cargo_profile_overrides": {
+          "all_present": [],
+          "release_present": []
+        },
+        "cargo_build_overrides_present": [],
+        "cargo_target_overrides_present": [],
+        "target_cpu_related_names_present": [],
+        "overridden_environment_values": {
+          "CARGO_TARGET_DIR": {
+            "before": null,
+            "after": "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/target-candidate"
+          }
+        },
+        "target_cpu_overrides_cleared": true,
+        "release_profile_overrides_cleared": true
+      }
+    },
+    {
+      "name": "control-correctness",
+      "argv": [
+        "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/target-control/release/litchi-embedded-doc-allocation-v2",
+        "correctness"
+      ],
+      "cwd": "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/control",
+      "log": "/var/tmp/litchi-doc-source-owner-portable-root-reproduction-20260909/correctness-control.log",
+      "environment": {
+        "cleared_environment_names": [],
+        "cleared_environment_values": {},
+        "checked_relevant_environment_values": {
+          "CARGO_BUILD_JOBS": null,
+          "CARGO_BUILD_PIPELINING": null,
+          "CARGO_BUILD_RUSTC": null,
+          "CARGO_BUILD_RUSTFLAGS": null,
+          "CARGO_BUILD_TARGET": null,
+          "CARGO_ENCODED_RUSTFLAGS": null,
+          "CARGO_INCREMENTAL": null,
+          "CARGO_TARGET_CPU": null,
+          "CARGO_TARGET_DIR": null,
+          "RUSTC": null,
+          "RUSTC_BOOTSTRAP": null,
+          "RUSTC_WORKSPACE_WRAPPER": null,
+          "RUSTC_WRAPPER": null,
+          "RUSTFLAGS": null,
+          "RUSTUP_TOOLCHAIN": null
+        },
+        "cargo_profile_overrides": {
+          "all_present": [],
+          "release_present": []
+        },
+        "cargo_build_overrides_present": [],
+        "cargo_target_overrides_present": [],
+        "target_cpu_related_names_present": [],
+        "set_environment_values": {
+          "HARNESS_ROOT": "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/control"
+        }
+      }
+    },
+    {
+      "name": "candidate-correctness",
+      "argv": [
+        "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/target-candidate/release/litchi-embedded-doc-allocation-v2",
+        "correctness"
+      ],
+      "cwd": "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/candidate",
+      "log": "/var/tmp/litchi-doc-source-owner-portable-root-reproduction-20260909/correctness-candidate.log",
+      "environment": {
+        "cleared_environment_names": [],
+        "cleared_environment_values": {},
+        "checked_relevant_environment_values": {
+          "CARGO_BUILD_JOBS": null,
+          "CARGO_BUILD_PIPELINING": null,
+          "CARGO_BUILD_RUSTC": null,
+          "CARGO_BUILD_RUSTFLAGS": null,
+          "CARGO_BUILD_TARGET": null,
+          "CARGO_ENCODED_RUSTFLAGS": null,
+          "CARGO_INCREMENTAL": null,
+          "CARGO_TARGET_CPU": null,
+          "CARGO_TARGET_DIR": null,
+          "RUSTC": null,
+          "RUSTC_BOOTSTRAP": null,
+          "RUSTC_WORKSPACE_WRAPPER": null,
+          "RUSTC_WRAPPER": null,
+          "RUSTFLAGS": null,
+          "RUSTUP_TOOLCHAIN": null
+        },
+        "cargo_profile_overrides": {
+          "all_present": [],
+          "release_present": []
+        },
+        "cargo_build_overrides_present": [],
+        "cargo_target_overrides_present": [],
+        "target_cpu_related_names_present": [],
+        "set_environment_values": {
+          "HARNESS_ROOT": "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/candidate"
+        }
+      }
+    },
+    {
+      "name": "latency-runner",
+      "argv": [
+        "/usr/bin/python3",
+        "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/run_latency.py",
+        "--control-source",
+        "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/source-checkouts/control",
+        "--candidate-source",
+        "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/source-checkouts/candidate",
+        "--control-target",
+        "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/target-control",
+        "--candidate-target",
+        "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle/target-candidate",
+        "--run-dir",
+        "/var/tmp/litchi-doc-source-owner-portable-root-reproduction-20260909/latency"
+      ],
+      "cwd": "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle",
+      "log": "/var/tmp/litchi-doc-source-owner-portable-root-reproduction-20260909/latency-runner.log",
+      "environment": {
+        "cleared_environment_names": [],
+        "cleared_environment_values": {},
+        "checked_relevant_environment_values": {
+          "CARGO_BUILD_JOBS": null,
+          "CARGO_BUILD_PIPELINING": null,
+          "CARGO_BUILD_RUSTC": null,
+          "CARGO_BUILD_RUSTFLAGS": null,
+          "CARGO_BUILD_TARGET": null,
+          "CARGO_ENCODED_RUSTFLAGS": null,
+          "CARGO_INCREMENTAL": null,
+          "CARGO_TARGET_CPU": null,
+          "CARGO_TARGET_DIR": null,
+          "RUSTC": null,
+          "RUSTC_BOOTSTRAP": null,
+          "RUSTC_WORKSPACE_WRAPPER": null,
+          "RUSTC_WRAPPER": null,
+          "RUSTFLAGS": null,
+          "RUSTUP_TOOLCHAIN": null
+        },
+        "cargo_profile_overrides": {
+          "all_present": [],
+          "release_present": []
+        },
+        "cargo_build_overrides_present": [],
+        "cargo_target_overrides_present": [],
+        "target_cpu_related_names_present": [],
+        "set_environment_values": {
+          "HARNESS_ROOT": "/var/tmp/litchi-doc-latency-v2-work-8g9bocew/bundle"
+        }
+      }
+    }
+  ],
+  "fresh_correctness": {
+    "control": {
+      "side": "control",
+      "report": "/var/tmp/litchi-doc-source-owner-portable-root-reproduction-20260909/fresh-correctness-control.json",
+      "boolean_checks": 34,
+      "all_boolean_checks_true": true,
+      "source_commit": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+      "timed": false,
+      "binary_sha256_before_latency": "db3964f59c7e2fb6ab2d899665b2d3e3ae00139668135c1a705cf4234e45a3e8"
+    },
+    "candidate": {
+      "side": "candidate",
+      "report": "/var/tmp/litchi-doc-source-owner-portable-root-reproduction-20260909/fresh-correctness-candidate.json",
+      "boolean_checks": 34,
+      "all_boolean_checks_true": true,
+      "source_commit": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+      "timed": false,
+      "binary_sha256_before_latency": "dd59cf4c811646cbbc085546b675366d3a7d0fc765ca0227806c13147d1cb8f4"
+    }
+  },
+  "latency": {
+    "executed": true,
+    "runner": "run_latency.py",
+    "output": "/var/tmp/litchi-doc-source-owner-portable-root-reproduction-20260909/latency",
+    "binary_sha256_before_and_after": {
+      "control": "db3964f59c7e2fb6ab2d899665b2d3e3ae00139668135c1a705cf4234e45a3e8",
+      "candidate": "dd59cf4c811646cbbc085546b675366d3a7d0fc765ca0227806c13147d1cb8f4"
+    },
+    "binary_provenance": {
+      "control": {
+        "built_by_wrapper": true,
+        "build_command_index": 0,
+        "sha256": "db3964f59c7e2fb6ab2d899665b2d3e3ae00139668135c1a705cf4234e45a3e8"
+      },
+      "candidate": {
+        "built_by_wrapper": true,
+        "build_command_index": 1,
+        "sha256": "dd59cf4c811646cbbc085546b675366d3a7d0fc765ca0227806c13147d1cb8f4"
+      }
+    }
+  },
+  "work_bundle": "throwaway bundle copy",
+  "throwaway_archive": {
+    "manifest": "archive-manifest.json",
+    "manifest_sha256": "eae0bf3722547acbabee76841625d2f99717122e847e9c7aed183ba78105b649",
+    "members_checked": 99,
+    "self_excluded": true
+  },
+  "preflight": {
+    "source_manifest": "reports/source-manifest.json",
+    "source_manifest_sha256": "24c6246c0c2fc166d8d63291227806f7f7411ef979f9f3ebfe7b35e769e81345",
+    "source_base_commit": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+    "candidate_overlay_commit": null,
+    "source_files_verified_per_side": {
+      "control": 780,
+      "candidate": 780
+    },
+    "fixture_manifest": "reports/fixture-manifest.json",
+    "fixture_manifest_sha256": "0fd601a0e774b6873b4d358e10fac2e552e0e9e357e0b10d52828c17b5d5f6be",
+    "fixture_files_verified_per_side": {
+      "control": 8,
+      "candidate": 8
+    },
+    "fixture_count": 8
+  },
+  "copied_source_preflight": {
+    "source_manifest": "reports/source-manifest.json",
+    "source_manifest_sha256": "24c6246c0c2fc166d8d63291227806f7f7411ef979f9f3ebfe7b35e769e81345",
+    "source_base_commit": "c4aa19e1930b79bec7db499a9248fe711ac3cf43",
+    "candidate_overlay_commit": null,
+    "source_files_verified_per_side": {
+      "control": 780,
+      "candidate": 780
+    },
+    "fixture_manifest": "reports/fixture-manifest.json",
+    "fixture_manifest_sha256": "0fd601a0e774b6873b4d358e10fac2e552e0e9e357e0b10d52828c17b5d5f6be",
+    "fixture_files_verified_per_side": {
+      "control": 8,
+      "candidate": 8
+    },
+    "fixture_count": 8
+  },
+  "completed": true
+}

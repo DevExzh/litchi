@@ -1,0 +1,49 @@
+{
+  "status": "pass",
+  "source_root": "/var/tmp/litchi-form-owner-restored.qDtdrt",
+  "base": "047d14953b4b2e674abb7c0783367225258aa287",
+  "source_hashes": {
+    "crates/litchi-xlsx/src/form_control/owner.rs": "aaf52b76c731e581f5855b40842a3d6ab360bdfcf4426d45258a123735715ac4",
+    "crates/litchi-xlsx/src/form_control/mod.rs": "4dfa086c58654bd42ff9425bac03f871c99c4159f2a876b8793d0c920ba5dbec",
+    "crates/litchi-xlsx/src/workbook/model.rs": "77deff8bbc5c98fe64145ab494c0602e4d909d595a1703c19b4aa3c8caec5224",
+    "crates/litchi-xlsx/src/workbook/source.rs": "740160b04b3b6e6f986c6e6449decb1b1bf3bf55446cabbbacac307bde312bfa",
+    "crates/litchi-xlsx/tests/form_control_owner_read.rs": "c1a531396d07cfe492d59a2b415644e4313054cb8c7349e1b84ced837a87b8a2"
+  },
+  "source_Cargo_lock_sha256": "9886ab7f4458ddcf4286fa686a420d9351f4cfc278552484c64791dd159fc282",
+  "harness_hashes": {
+    "Cargo.toml": "a08b24dd9ea2f204e0cc5082e1a3e21a37085877062694301420eb1a734d5167",
+    "src/main.rs": "03fccd1b22ca2db0a381b6a28f8ccbcf0b571ec625517aabbf016edefda81ec9",
+    "run.sh": "ab14cd9308b292b3505bab0dbed274975253e19eb26596b163475a6fde806b1d",
+    "Cargo.lock": "5f0b89fff7b7f745eada3424a9d958a0a45fa302ef43b6eaf53edd7a25715c6f"
+  },
+  "source_manifest_count": 5840,
+  "source_manifest_sha256": "969e9d110772713bc6e86c159e39f5d3d1ba12ff8782ee7cc436b56e57315d2d",
+  "source_build_config_manifest_count": 4,
+  "harness_manifest_count": 4,
+  "provenance_hashes": {
+    "source-bundle.tar": "3a9043d9e18c118e96569abae401e3150bf5bf2f73b8429e4f6d58553cbaf7c9",
+    "source-delta.patch": "332ac5fb0bed6e3fdba924bec91996ab222c9c666ab3fc52e99dc6d1c9ef9e99",
+    "source-Cargo.lock": "9886ab7f4458ddcf4286fa686a420d9351f4cfc278552484c64791dd159fc282",
+    "harness/Cargo.lock": "5f0b89fff7b7f745eada3424a9d958a0a45fa302ef43b6eaf53edd7a25715c6f",
+    "source-manifest.sha256": "969e9d110772713bc6e86c159e39f5d3d1ba12ff8782ee7cc436b56e57315d2d",
+    "source-build-config.sha256": "dc3555d9104c5622eee9bcfa83df5c8f7e78befe182940df7d3d5619fbc66ba5",
+    "harness-manifest.sha256": "e058f774320cdf55f390119a10760d11724a00aa62bd51f93060674d6bbf8ea8"
+  },
+  "compiler": {
+    "rustc_vv": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+    "cargo_v": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "rustup_active_toolchain": "1.95.0-x86_64-unknown-linux-gnu (overridden by '/var/tmp/litchi-form-owner-restored.qDtdrt/rust-toolchain.toml')"
+  },
+  "environment": {
+    "TMPDIR": "/var/tmp",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-form-owner-target.T3pDo9",
+    "CARGO_HOME": null,
+    "RUSTFLAGS": null,
+    "RUSTC_WRAPPER": null,
+    "RUSTUP_TOOLCHAIN": null,
+    "LITCHI_FORM_OWNER_SOURCE_ROOT": "/var/tmp/litchi-form-owner-restored.qDtdrt",
+    "LITCHI_FORM_OWNER_FIXTURE_ROOT": "/var/tmp/litchi-form-owner-restored.qDtdrt/crates/litchi-xlsx/tests/fixtures/form_control_properties"
+  },
+  "git": null,
+  "errors": []
+}

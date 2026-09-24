@@ -1,0 +1,59 @@
+{
+  "baseline_commit": "892441d95db29da4351390716ef5c65b4c7c97de",
+  "expected_success": false,
+  "fixture_kind": "synthetic",
+  "input_bytes": 15306,
+  "input_hash_fnv1a64": 10292893147852520033,
+  "input_sha256": "760058ac565711661ddba93ef86c345e18b7711b7775b6c892c600b6defea0b8",
+  "lane": "exact_inverse_batch_64",
+  "opc_baseline_label": "OPC57680dc86",
+  "owners": 64,
+  "sample_count": 1,
+  "samples": [
+    {
+      "actual_success": false,
+      "alloc_balance_ok": true,
+      "alloc_invalid": false,
+      "allocation_calls": 1470730,
+      "allocation_failed": 0,
+      "deallocated_bytes": 115181284,
+      "deallocation_calls": 1470728,
+      "direct_allocated_bytes": 105579148,
+      "elapsed_ns": 125374358,
+      "error": {
+        "class": "topology_part_bound",
+        "message": "OPC error: source-backed OPC Part overlay is unavailable: topology addition set exceeds the 64-Part bound",
+        "typed_match": true
+      },
+      "exact_inverse_ok": true,
+      "lazy_media_cold_ok": true,
+      "live_after": 19769,
+      "live_before": 19634,
+      "opaque_ok": true,
+      "output_bytes": 0,
+      "peak_live_delta": 1183047,
+      "phases": {
+        "capture_ns": 1441134,
+        "commit_ns": 3383061,
+        "inverse_ns": 0,
+        "inverse_reopen_ns": 0,
+        "payload_ns": 0,
+        "publish_ns": 0,
+        "readback_ns": 3683081,
+        "reopen_ns": 0,
+        "stage_ns": 116292360,
+        "validation_ns": 456332
+      },
+      "realloc_new_bytes": 19760883,
+      "realloc_old_bytes": 10158612,
+      "reallocation_calls": 56113,
+      "requested_alloc_bytes": 125340031,
+      "semantic_ok": true,
+      "source_readback_metadata_ok": true,
+      "source_readback_physical_ok": true
+    }
+  ],
+  "schema": "docx-svg-lifecycle-profile-v1",
+  "source_backed_api": true,
+  "warmup": 0
+}

@@ -1,0 +1,6 @@
+{
+  "scope": "All six operand variants: four nested literal-array variants incorrectly succeed; six top-level and two nested reference-input variants correctly typed-refuse",
+  "archive": "planner-handler-26.tar.gz",
+  "sha256": "afd96b750ab15b569f459bdc5b15899bafdb0d8445ea0da15042e050acdcafa4",
+  "status": 101
+}

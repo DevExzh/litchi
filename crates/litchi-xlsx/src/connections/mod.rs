@@ -5,7 +5,9 @@
 //! remain inert data and are never dereferenced.
 
 mod codec;
+pub(crate) mod embedded_data;
 mod model;
+mod namespace;
 mod package;
 
 /// Source snapshots for the contextual connections owner.

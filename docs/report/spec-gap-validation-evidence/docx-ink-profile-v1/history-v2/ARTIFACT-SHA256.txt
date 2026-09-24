@@ -1,0 +1,5 @@
+e986f9f71f53882dcb0023dcec9bd5a71867037eacb527807e7afa6acbd11606  /var/tmp/litchi-docx-ink-profile-publication-evidence-v2-20260910/README.md
+ac5ac890fe6016966b336be7f3ffae44f428e1c77f1a781d27f508563935f64c  /var/tmp/litchi-docx-ink-profile-publication-evidence-v2-20260910/NORMATIVE-SCOPE.md
+1cc34c0aabe252a25173d9af5d848e29cf30f111ea40370002aed5aa0f5477bb  /var/tmp/litchi-docx-ink-profile-publication-evidence-v2-20260910/LOG-HASHES.txt
+5d746acb7dd8eccb0120e8a45fda415ed34ac06cb23720da69d348b009872fb0  /var/tmp/litchi-docx-ink-profile-publication-evidence-v2-20260910/v2/patch-manifest.json
+4fd7ed4202a3d1d176bb786d4bbbb50d635a359dc70e57907e9566562c1e60c1  /var/tmp/litchi-docx-ink-profile-publication-evidence-v2-20260910/v2/patch-v2.patch.gz

@@ -106,6 +106,9 @@ pub struct Cell {
     pub formula: Option<String>,
     /// Direct `table:style-name`, if present.
     pub style_name: Option<String>,
+    /// Inert external range metadata carried by the first cell of an
+    /// externally linked range.
+    pub range_source: Option<crate::model::source::CellRange>,
     /// Ordered inert `text:a` links over the cell's canonical UTF-8 text.
     pub hyperlinks: Vec<Link>,
     /// Merge/covered-cell role for this physical cell run.
@@ -122,6 +125,7 @@ impl Cell {
             text: text.into(),
             formula: None,
             style_name: None,
+            range_source: None,
             hyperlinks: Vec::new(),
             merge: Merge::None,
             repeat: NonZeroUsize::MIN,
@@ -141,6 +145,7 @@ impl Cell {
             text: text.into(),
             formula: None,
             style_name: None,
+            range_source: None,
             hyperlinks: Vec::new(),
             merge: Merge::None,
             repeat,
@@ -199,6 +204,22 @@ impl Cell {
     /// Remove the direct cell style reference.
     pub fn clear_style_name(&mut self) {
         self.style_name = None;
+    }
+
+    /// Return the inert external range declaration, if present.
+    #[must_use]
+    pub fn range_source(&self) -> Option<&crate::model::source::CellRange> {
+        self.range_source.as_ref()
+    }
+
+    /// Attach an inert external range declaration without dereferencing it.
+    pub fn set_range_source(&mut self, source: crate::model::source::CellRange) {
+        self.range_source = Some(source);
+    }
+
+    /// Remove and return the inert external range declaration.
+    pub fn take_range_source(&mut self) -> Option<crate::model::source::CellRange> {
+        self.range_source.take()
     }
 
     /// Return all direct cell hyperlinks in document order.
@@ -433,6 +454,7 @@ impl Cell {
             && self.text == other.text
             && self.formula == other.formula
             && self.style_name == other.style_name
+            && self.range_source == other.range_source
             && self.hyperlinks == other.hyperlinks
             && self.merge == other.merge
     }
@@ -566,6 +588,14 @@ pub struct Sheet {
     pub rows: Vec<Row>,
     /// Direct `table:style-name`, if present.
     pub style_name: Option<String>,
+    /// Direct `table:template-name`, if present.
+    pub template_name: Option<String>,
+    /// Direct table-level selection flags for the referenced template.
+    pub style_usage: crate::model::structure::StyleUsage,
+    /// Optional accessibility title from the direct `table:title` child.
+    pub title: Option<String>,
+    /// Optional accessibility description from the direct `table:desc` child.
+    pub description: Option<String>,
 }
 
 impl Sheet {
@@ -578,6 +608,10 @@ impl Sheet {
             name: name.into(),
             rows: Vec::new(),
             style_name: None,
+            template_name: None,
+            style_usage: crate::model::structure::StyleUsage::default(),
+            title: None,
+            description: None,
         };
         sheet.validate()?;
         Ok(sheet)
@@ -598,6 +632,50 @@ impl Sheet {
             .map(Row::logical_cell_count)
             .max()
             .unwrap_or(0)
+    }
+
+    /// Return the optional accessibility title.
+    #[must_use]
+    pub fn title(&self) -> Option<&str> {
+        self.title.as_deref()
+    }
+
+    /// Set or clear the accessibility title.
+    pub fn set_title(&mut self, title: Option<String>) -> Result<()> {
+        if let Some(title) = &title {
+            super::validation::validate_text(title, "table title")?;
+        }
+        self.title = title;
+        Ok(())
+    }
+
+    /// Return the optional accessibility description.
+    #[must_use]
+    pub fn description(&self) -> Option<&str> {
+        self.description.as_deref()
+    }
+
+    /// Set or clear the accessibility description.
+    pub fn set_description(&mut self, description: Option<String>) -> Result<()> {
+        if let Some(description) = &description {
+            super::validation::validate_text(description, "table description")?;
+        }
+        self.description = description;
+        Ok(())
+    }
+
+    /// Set or clear the direct table-template reference.
+    pub fn set_template_name(&mut self, template_name: Option<String>) -> Result<()> {
+        if let Some(template_name) = &template_name {
+            super::validation::validate_non_empty_text(template_name, "table template name")?;
+        }
+        self.template_name = template_name;
+        Ok(())
+    }
+
+    /// Replace the direct table-template style-selection flags.
+    pub fn set_style_usage(&mut self, style_usage: crate::model::structure::StyleUsage) {
+        self.style_usage = style_usage;
     }
 
     /// Return the physical row run covering a logical row.

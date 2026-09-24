@@ -6,7 +6,7 @@
 
 //! OPC package assembly for XLSB workbooks.
 
-use super::model::{SheetSlot, WorkbookWriter, XLSB_WORKSHEET_BINARY_INDEX_EMPTY};
+use super::model::{SheetSlot, WorkbookWriter};
 use crate::package::error::{Error, Result};
 use crate::package::formula::{
     CompilationContext, Context, DefinedName, ExternalSheet, SupportingLink,
@@ -17,7 +17,6 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rel};
 use litchi_opc::part::Part;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use std::io::{Seek, Write};
-#[cfg(feature = "vba-inspection")]
 use std::sync::Arc;
 
 pub(super) fn checked_capacity(resource: &'static str, terms: &[usize]) -> Result<usize> {
@@ -43,6 +42,9 @@ impl WorkbookWriter {
     ///
     /// * `writer` - A writer that implements `Write` and `Seek`
     pub fn save<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
+        if let Some(model) = self.data_model.as_ref() {
+            crate::data_model::validate_model_for_write(model, self.connections.as_ref())?;
+        }
         self.validate_formula_metadata()?;
         let mut xml_maps_plan = crate::writer::xml_maps::stage(
             self.xml_maps.as_ref(),
@@ -54,7 +56,9 @@ impl WorkbookWriter {
         // Add document properties (required by Excel)
         self.add_doc_props(&mut package)?;
 
-        // Add theme (REQUIRED by Excel)
+        // Add the writer's default Theme template.  The package grammar
+        // permits zero or one Theme part; this writer keeps the template as a
+        // producer policy and replaces it when `set_theme` supplied one.
         self.add_theme(&mut package)?;
 
         // Add worksheets first so that shared_strings is fully populated before we
@@ -237,15 +241,31 @@ impl WorkbookWriter {
         crate::package::template::core()
     }
 
-    /// Add theme (REQUIRED by Excel to open file)
+    /// Add the writer-selected Theme part.
     fn add_theme(&self, package: &mut OpcPackage) -> Result<()> {
-        // Create minimal Office theme
-        let theme_xml = self.create_minimal_theme();
+        let mut theme_xml = if let Some(theme) = self.theme.as_ref() {
+            litchi_drawingml::theme::codec::encode_part(&theme.name, &theme.colors, &theme.fonts)?
+        } else {
+            self.create_minimal_theme().as_bytes().to_vec()
+        };
+        if let Some(family) = self.theme_family.as_ref() {
+            let has_family =
+                litchi_drawingml::theme::family::part::read_family(&theme_xml)?.is_some();
+            theme_xml = if has_family {
+                litchi_drawingml::theme::family::part::replace_family(&theme_xml, family)?
+            } else {
+                litchi_drawingml::theme::family::part::add_family_with_uri(
+                    &theme_xml,
+                    family,
+                    litchi_drawingml::theme::family::part::NATIVE_EXTENSION_URI,
+                )?
+            };
+        }
         let theme_uri = PackURI::new("/xl/theme/theme1.xml")?;
         let theme_part = BlobPart::new(
             theme_uri,
             "application/vnd.openxmlformats-officedocument.theme+xml".to_string(),
-            theme_xml.as_bytes().to_vec(),
+            theme_xml,
         );
         package.add_part(Box::new(theme_part));
 
@@ -358,6 +378,17 @@ impl WorkbookWriter {
 
         // Add part to package
         package.add_part(Box::new(workbook_part));
+
+        // The Data Model payload is an implicit, relationship-free model part
+        // (MS-XLSB 2.1.7.35 and MS-XLSX 2.1.6). It is discovered by content
+        // type; no workbook or package relationship is emitted.
+        if let Some(model) = &self.data_model {
+            package.add_part(Box::new(BlobPart::new_shared(
+                PackURI::new(crate::data_model::DATA_MODEL_PART_NAME)?,
+                crate::data_model::DATA_MODEL_CONTENT_TYPE.to_string(),
+                Arc::clone(&model.part.bytes),
+            )));
+        }
 
         // Add relationship from root to workbook
         package.relate_to(
@@ -549,10 +580,10 @@ impl WorkbookWriter {
                 let binary_index_name = format!("binaryIndex{}.bin", i + 1);
                 let binary_index_uri =
                     PackURI::new(format!("/xl/worksheets/{}", binary_index_name))?;
-                let binary_index_part = BlobPart::new(
+                let mut binary_index_part = BlobPart::new(
                     binary_index_uri,
                     "application/vnd.ms-excel.binIndexWs".to_string(),
-                    XLSB_WORKSHEET_BINARY_INDEX_EMPTY.to_vec(),
+                    Vec::new(),
                 );
 
                 {
@@ -775,6 +806,16 @@ impl WorkbookWriter {
                 };
                 worksheet_write_result?;
                 sheet_part.set_blob(sheet_data);
+                let binary_index = crate::binary_index::encode_for_worksheet(
+                    sheet_part.blob(),
+                    crate::binary_index::Limits::publication_default(),
+                )
+                .map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "unable to generate worksheet binary index: {error}"
+                    ))
+                })?;
+                binary_index_part.set_blob(binary_index);
 
                 package.add_part(Box::new(sheet_part));
                 package.add_part(Box::new(binary_index_part));

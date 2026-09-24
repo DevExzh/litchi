@@ -1,0 +1,27 @@
+{
+  "build_command": [
+    "rustc",
+    "--edition=2024",
+    "-D",
+    "warnings",
+    "-O",
+    "--crate-name",
+    "ods_iri_probe",
+    "docs/report/spec-gap-validation-evidence/ods-formula-references/iri-probe.rs",
+    "-o",
+    "/var/tmp/ods-reference-iri-root-probe"
+  ],
+  "build_exit_code": 0,
+  "run_command": [
+    "/var/tmp/ods-reference-iri-root-probe"
+  ],
+  "run_exit_code": 0,
+  "source_sha256": {
+    "crates/litchi-ods/src/codec/formula/reference/iri.rs": "a09fa610c25de63e5665f9de88698d7578f8b80c70ca027382ddb4d13ae05961",
+    "docs/report/spec-gap-validation-evidence/ods-formula-references/iri-probe.rs": "a37b07b0c5c79e5dbfb31e4bcfdb3baa6fd7fee7e559287cb168ded418f9133e"
+  },
+  "cases": 37,
+  "observations": 37016,
+  "long_input_bytes": 65536,
+  "allocation_calls": 0
+}

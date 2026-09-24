@@ -1,0 +1,12 @@
+{
+  "schema": "financial-kernel-oracle-probe-v1",
+  "scope": "Standalone pure kernel snapshot only; evaluator admission/resource/cache/native/performance not exercised. Harness supplies declared Integer truncation and omitted defaults.",
+  "kernel_sha256": "142ab9fb8d4b6200ebbe31ba1177354cfba2dc116835e492645aa035014a85d2",
+  "corpus_sha256": "15bb7e32bd47dc64de2656cb24a8995f59916a9d87d13fffaa836aa82c302531",
+  "command": "rustc --edition=2024 --test temporary-probe.rs; temporary-probe --quiet",
+  "oracle_vectors_passed": 65,
+  "existing_kernel_tests_passed": 4,
+  "failed": 0,
+  "temporary_files": "removed after execution",
+  "stdout": "\nrunning 69 tests\n.....................................................................\ntest result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n"
+}

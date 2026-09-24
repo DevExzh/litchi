@@ -1,0 +1,200 @@
+{
+  "candidate_root": "/var/tmp/litchi-xlsx-custom-final-validation-20260909",
+  "candidate_head": "b2e2ff8e1fdabd4ab16a67ddf077e6968bf5e668",
+  "base_commit": "b2e2ff8e1fdabd4ab16a67ddf077e6968bf5e668",
+  "current_head": "463ab2a5989bba49ffd95277dc29422a363de7f8",
+  "manifest_source_count": 17,
+  "source_blobs": [
+    {
+      "path": "crates/litchi-xlsx/src/custom_data/codec.rs",
+      "candidate_sha256": "a7da42b790d1fc370de07853a7ce5494053beb97e43a468db9658aa696fcab6d",
+      "candidate_size": 25451,
+      "current_head_present": true,
+      "current_head_sha256": "08889315801c72c68471136c5138cd402625dfd1af1bde0d2c2b7d6c39faf77a",
+      "matches_current_head": false,
+      "relation": "frozen_overlay_modification"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/custom_data/model.rs",
+      "candidate_sha256": "6429a1a6993176b70eb54614423c432e2f158792a1840c23a0e94c8adb1076ef",
+      "candidate_size": 2617,
+      "current_head_present": true,
+      "current_head_sha256": "a2932b167ad84d3bcea2e3a135511bb29052486384741f66880e67171cf05ab0",
+      "matches_current_head": false,
+      "relation": "frozen_overlay_modification"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/custom_data/package.rs",
+      "candidate_sha256": "dfce2bb14e62fed803c555cffbb4deafed0899a34926a5a8c899a09fac21acd5",
+      "candidate_size": 98673,
+      "current_head_present": false,
+      "current_head_sha256": null,
+      "matches_current_head": false,
+      "relation": "frozen_overlay_addition"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/custom_data/mod.rs",
+      "candidate_sha256": "aed3bf47fa6077ee3743dcf0b0be6e48154be30b4b983a298cb55cda20592bb5",
+      "candidate_size": 1110,
+      "current_head_present": true,
+      "current_head_sha256": "598839eb59514aa861d3c73939ceea4d3695b92399420c94f2894a42dcca7c61",
+      "matches_current_head": false,
+      "relation": "frozen_overlay_modification"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/connections/embedded_data.rs",
+      "candidate_sha256": "2b77488a524981818714e9b2ced654bd78edd3ae5a2d9a0c0e29ca3e0b2e26c8",
+      "candidate_size": 22548,
+      "current_head_present": false,
+      "current_head_sha256": null,
+      "matches_current_head": false,
+      "relation": "frozen_overlay_addition"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/connections/mod.rs",
+      "candidate_sha256": "e81e58ab2a6570c09edac737c420335f3cedfaf32e8fcbd79636cf76793f3972",
+      "candidate_size": 1587,
+      "current_head_present": true,
+      "current_head_sha256": "f97e98080840841967e92b83ddb6be6e987be5a4fbdbd6084f7ab183f6c5100d",
+      "matches_current_head": false,
+      "relation": "frozen_overlay_modification"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/error.rs",
+      "candidate_sha256": "f7e93b6086464e15fe48ba631757849ce89eef8306ba130103386e4938a62783",
+      "candidate_size": 18535,
+      "current_head_present": true,
+      "current_head_sha256": "e1108a043d45c1435a17b5c1551a5652146d9ca4a3edb9c633c58bb46ce19c14",
+      "matches_current_head": false,
+      "relation": "frozen_overlay_modification"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/lib.rs",
+      "candidate_sha256": "38b3c8eff9e2791f4a0e46bcb5a902a48c7f73dbb50d78bcd14aa7eb821b3e68",
+      "candidate_size": 14539,
+      "current_head_present": true,
+      "current_head_sha256": "7d02582efed4afac7ed6ee4dea8652058c87b933cf0836875aba6a64118ce9a8",
+      "matches_current_head": false,
+      "relation": "frozen_overlay_modification"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/package.rs",
+      "candidate_sha256": "5264f7089917b451d7b29604ff3abaa4522a612c1397f92133759e59fe2c9a04",
+      "candidate_size": 32035,
+      "current_head_present": true,
+      "current_head_sha256": "ea8648944c06da6513571284afbc5d791f4b944086067950ca59ab855336d131",
+      "matches_current_head": false,
+      "relation": "frozen_overlay_modification"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/source_attributes.rs",
+      "candidate_sha256": "eac9cbc9e8e755de3a1bc6118e2e98c4a8518145e7e903b1cd8dcbd6f2999dc3",
+      "candidate_size": 2499,
+      "current_head_present": true,
+      "current_head_sha256": "138a32d47243cd1f2bd13b510beb881a055d7f5961cda83210566d4e25449d81",
+      "matches_current_head": false,
+      "relation": "frozen_overlay_modification"
+    },
+    {
+      "path": "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+      "candidate_sha256": "482cb4bf0e375d2e016e4a8e13a1d487281551fe8d2c8803c7214fe139826fab",
+      "candidate_size": 23911,
+      "current_head_present": true,
+      "current_head_sha256": "9c5968d96624a736988f7fa990a164cd83971599877d1253781bf5dca8993995",
+      "matches_current_head": false,
+      "relation": "frozen_overlay_modification"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/connections/codec.rs",
+      "candidate_sha256": "6cbee2a0da6c7e91b3a824bea871e5a7550bb1e86f3efbe5569de859fcac79cb",
+      "candidate_size": 161636,
+      "current_head_present": true,
+      "current_head_sha256": "b4f5eba4e0c68d0c5ea3b79b23a366dd95b7afd506e50202ef3b3ee718e37cf6",
+      "matches_current_head": false,
+      "relation": "frozen_overlay_modification"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/connections/package.rs",
+      "candidate_sha256": "55ec1361794046c07412458257777e2bc946975c0e6ebd98529bfe21b0b2c102",
+      "candidate_size": 36875,
+      "current_head_present": true,
+      "current_head_sha256": "947128d4e2c9e381e60f98c08c972e5f6e95f92c73204290bc41ed64a4abd1bf",
+      "matches_current_head": false,
+      "relation": "frozen_overlay_modification"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/connections/tests.rs",
+      "candidate_sha256": "43d1d5978c872f5653b9e272fad3ec243145fd9818b2766f60bbeb052683365d",
+      "candidate_size": 28328,
+      "current_head_present": true,
+      "current_head_sha256": "0dea97f54601766bddffb975d28c7ff95ce1f6376dd5b5ba6d18f92d402a336c",
+      "matches_current_head": false,
+      "relation": "frozen_overlay_modification"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/connections/codec/source_offsets_tests.rs",
+      "candidate_sha256": "98c94b65a62eab075f4bf50b2b8d596beabca1d45b4d34d31bc36cbf7c99b490",
+      "candidate_size": 2047,
+      "current_head_present": false,
+      "current_head_sha256": null,
+      "matches_current_head": false,
+      "relation": "frozen_overlay_addition"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/connections/namespace.rs",
+      "candidate_sha256": "62af6e3bff94056ac9438e65904e9843b45b7dbe76a47a1b4cbc295aaf8017f3",
+      "candidate_size": 14679,
+      "current_head_present": false,
+      "current_head_sha256": null,
+      "matches_current_head": false,
+      "relation": "frozen_overlay_addition"
+    },
+    {
+      "path": "crates/litchi-xlsx/src/connections/model.rs",
+      "candidate_sha256": "4ef228ec8db5aa646e650f3a16aa0f90aabb465afdb5e0e24aa768f573e9fa56",
+      "candidate_size": 17878,
+      "current_head_present": true,
+      "current_head_sha256": "ec11cfc71f617ea9da875ad9a81cc66716b28e74f015873bf6b2ce85ca46ce99",
+      "matches_current_head": false,
+      "relation": "frozen_overlay_modification"
+    }
+  ],
+  "current_head_tracked_xlsx_file_count": 538,
+  "missing_current_head_tracked_xlsx_paths": [],
+  "base_to_current_xlsx_changes": [],
+  "committed_survey_paths": [
+    {
+      "path": "crates/litchi-xlsx/src/survey.rs",
+      "candidate_sha256": "62502b977885a0ac731a648de7d332e37074cbc5cf6389243a8055d84b448c11",
+      "current_head_sha256": "62502b977885a0ac731a648de7d332e37074cbc5cf6389243a8055d84b448c11",
+      "matches_current_head": true
+    },
+    {
+      "path": "crates/litchi-xlsx/src/survey/source.rs",
+      "candidate_sha256": "08529bc8d7c99b8f5a99d23cca67a00ee4ae1d72d9074920e30415f07bcbff45",
+      "current_head_sha256": "08529bc8d7c99b8f5a99d23cca67a00ee4ae1d72d9074920e30415f07bcbff45",
+      "matches_current_head": true
+    },
+    {
+      "path": "crates/litchi-xlsx/src/survey/source/properties.rs",
+      "candidate_sha256": "418a7b659a3953d96c7c1a9c9ecd84f6a74ffce4dc35356527985b90f6902344",
+      "current_head_sha256": "418a7b659a3953d96c7c1a9c9ecd84f6a74ffce4dc35356527985b90f6902344",
+      "matches_current_head": true
+    },
+    {
+      "path": "crates/litchi-xlsx/src/survey/source/questions.rs",
+      "candidate_sha256": "62550d406a920ef6a524df6c52b6866ef695df5d0cddfe64d3664c75cb28077f",
+      "current_head_sha256": "62550d406a920ef6a524df6c52b6866ef695df5d0cddfe64d3664c75cb28077f",
+      "matches_current_head": true
+    }
+  ],
+  "deletion_hazard": {
+    "status": "none_detected",
+    "checks": [
+      "Every tracked crates/litchi-xlsx file at current HEAD exists in the isolated candidate.",
+      "Current HEAD has no crates/litchi-xlsx changes after the frozen base commit.",
+      "Committed Survey files are present and byte-identical to current HEAD.",
+      "The 17 manifest blobs are verified against source-manifest-v7.json."
+    ]
+  }
+}

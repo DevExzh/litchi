@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "lanes": 28,
+  "processes_per_lane": 3,
+  "samples_per_process": 20,
+  "source_manifest_sha256": "8940055076744f349cb97b4034ad8d52dd9f59668c2b0464c4f3a0c3360160ca",
+  "manifest_inputs_checked": 4260,
+  "source_hashes_checked": 8,
+  "expected_rejections": [
+    "attribute_near_limit_malformed",
+    "attribute_small_malformed",
+    "element_near_limit_malformed",
+    "element_small_malformed"
+  ],
+  "report_recomputed_from_samples": true
+}

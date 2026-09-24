@@ -1,0 +1,14 @@
+{
+  "removed_directories": [
+    "/home/zhuhe/code/litchi-radix-worktree",
+    "/home/zhuhe/code/litchi-radix-target",
+    "/home/zhuhe/code/litchi-radix-tmp"
+  ],
+  "all_removed_paths_absent": true,
+  "remaining_process_references": [],
+  "reclaimed_allocated_bytes": 1571692544,
+  "unique_archive": "/home/zhuhe/code/litchi-tmp-recovery-20260913/radix-final-r1/unique-scratch.tar.gz",
+  "unique_archive_sha256": "08319730b82f9b727d3c96f1c7fabe98f672bdf3628e1134859c978925c91e1b",
+  "unique_file_count": 22,
+  "finished_at": "2026-09-13T14:02:51.902727+00:00"
+}

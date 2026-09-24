@@ -22,3 +22,9 @@ pub use transaction::{Commit, Error as TransactionError, Patch, Snapshot, Transa
 
 /// FIB index of `fcSttbfAtnBkmk`/`lcbSttbfAtnBkmk`.
 pub const FIB_INDEX: usize = validation::FIB_INDEX;
+
+/// Maximum annotation-bookmark count permitted by MS-DOC §2.9.277.
+pub(crate) const MAX_ENTRIES: usize = validation::MAX_ENTRIES;
+
+/// Maximum bounded payload retained by the document-level deferred reader.
+pub(crate) const MAX_TABLE_BYTES: usize = validation::MAX_TABLE_BYTES;

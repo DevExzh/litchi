@@ -1,0 +1,36 @@
+{
+  "schema": "litchi.ods.v4.pending-preservation-review.v1",
+  "reviewed_utc": "2026-09-10T13:15:12.371776+00:00",
+  "candidate_root": "/var/tmp/litchi-ods-database-range-validation-v4-integration-clean-20260910",
+  "primary_root": "/home/zhuhe/code/litchi-spec-gaps",
+  "base_commit": "52519031b4c877032553bf5d4ea4393f3e0e60d1",
+  "conclusion": "clean archive candidate contains only committed base content plus the exact 22-path ODS V4 overlay; primary pending content remains separate and unimported",
+  "scope": {
+    "primary_observed_head": "52519031b4c877032553bf5d4ea4393f3e0e60d1",
+    "primary_pending_status_records": 134,
+    "primary_pending_expanded_files": 4202,
+    "primary_pending_owned_overlap": 0,
+    "primary_pending_odg_common_status_count": 0,
+    "primary_pending_odg_common_file_count": 0,
+    "primary_status_unchanged": true,
+    "primary_pending_content_unchanged": true,
+    "candidate_owned_overlay_exact": true,
+    "candidate_excludes_or_preserves_pending_preimages": true,
+    "staging_or_commit": false,
+    "source_edits": false
+  },
+  "reconciliation": {
+    "committed_odg_common_path_count": 17,
+    "candidate_committed_odg_common_hashes_match_base": true,
+    "committed_odg_common_owned_overlay_overlap": 0,
+    "note": "ODG and ODF-common changes are already present in base commit 52519031b; no dirty-primary ODG/common paths were copied into the candidate"
+  },
+  "evidence": {
+    "clean_base_generation": "/var/tmp/litchi-ods-database-range-validation-v4-integration-evidence-20260910/clean-base-generation.json",
+    "owned_preimages_and_base": "/var/tmp/litchi-ods-database-range-validation-v4-integration-evidence-20260910/owned-preimages-and-base.json",
+    "primary_pending_preimages": "/var/tmp/litchi-ods-database-range-validation-v4-integration-evidence-20260910/primary-pending-preimages.json",
+    "committed_odg_common": "/var/tmp/litchi-ods-database-range-validation-v4-integration-evidence-20260910/committed-odg-common-preservation.json",
+    "primary_status_drift": "/var/tmp/litchi-ods-database-range-validation-v4-integration-evidence-20260910/primary-status-drift.json",
+    "primary_content_drift": "/var/tmp/litchi-ods-database-range-validation-v4-integration-evidence-20260910/primary-content-drift.json"
+  }
+}

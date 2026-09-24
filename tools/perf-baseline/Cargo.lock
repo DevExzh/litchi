@@ -27,6 +27,7 @@ dependencies = [
  "cipher 0.5.2",
  "cpubits",
  "cpufeatures 0.3.0",
+ "zeroize",
 ]
 
 [[package]]
@@ -977,14 +978,22 @@ dependencies = [
 name = "litchi-crypto"
 version = "0.0.1"
 dependencies = [
+ "aes",
+ "base64",
  "bitflags",
+ "cbc",
+ "hmac 0.13.0",
  "litchi-cfb",
  "litchi-core",
  "litchi-ole-common",
+ "md-5",
  "quick-xml",
+ "rand 0.10.2",
  "rc4",
  "sha1 0.11.0",
+ "sha2 0.11.0",
  "subtle",
+ "thiserror",
  "zeroize",
 ]
 
@@ -1003,9 +1012,7 @@ dependencies = [
  "litchi-ole-common",
  "litchi-sign",
  "litchi-vba",
- "md-5",
  "rand 0.10.2",
- "rc4",
  "serde_json",
  "smallvec",
  "subtle",
@@ -1141,6 +1148,7 @@ dependencies = [
  "quick-xml",
  "rand 0.10.2",
  "rsa",
+ "same-file",
  "serde_json",
  "sha1 0.11.0",
  "sha2 0.11.0",
@@ -1148,6 +1156,7 @@ dependencies = [
  "smallvec",
  "soapberry-zip",
  "subtle",
+ "tempfile",
  "x509-cert",
  "xml-minifier",
  "zeroize",
@@ -1185,6 +1194,8 @@ dependencies = [
  "memchr",
  "quick-xml",
  "ryu",
+ "serde_json",
+ "sha2 0.11.0",
  "thiserror",
  "unicode-normalization",
  "url",
@@ -1215,6 +1226,7 @@ dependencies = [
  "litchi",
  "litchi-cfb",
  "litchi-core",
+ "litchi-crypto",
  "litchi-doc",
  "litchi-docx",
  "litchi-odf-common",
@@ -1347,6 +1359,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "litchi-xldm"
+version = "0.0.1"
+dependencies = [
+ "memchr",
+ "quick-xml",
+ "thiserror",
+]
+
+[[package]]
 name = "litchi-xls"
 version = "0.0.1"
 dependencies = [
@@ -1362,9 +1383,7 @@ dependencies = [
  "litchi-ole-common",
  "litchi-sign",
  "litchi-vba",
- "md-5",
  "rand 0.10.2",
- "rc4",
  "serde_json",
  "zerocopy",
  "zeroize",
@@ -1382,6 +1401,7 @@ dependencies = [
  "litchi-opc",
  "litchi-sheet",
  "litchi-spreadsheet-drawing",
+ "litchi-xldm",
  "once_cell",
  "quick-xml",
  "thiserror",
@@ -1402,6 +1422,7 @@ dependencies = [
  "litchi-opc",
  "litchi-sheet",
  "litchi-spreadsheet-drawing",
+ "litchi-xldm",
  "memchr",
  "once_cell",
  "quick-xml",
@@ -1823,6 +1844,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
+name = "same-file"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
+dependencies = [
+ "winapi-util",
+]
+
+[[package]]
 name = "sec1"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2229,6 +2259,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc1b4cb0cc549fcf58d7dfc081778139b3d283a081644e833e84682ad71cea24"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "winapi-util"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
+dependencies = [
+ "windows-sys",
 ]
 
 [[package]]

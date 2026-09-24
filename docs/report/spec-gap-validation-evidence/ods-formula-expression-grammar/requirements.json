@@ -1,0 +1,23 @@
+{
+  "tests": 852,
+  "targets": 51,
+  "subprocess_tests": 1,
+  "doctests": 1,
+  "note": "852 tests across 51 cargo target summaries, plus one filtered child-process replay of the hard-depth test; the child replay is not counted as an extra target.",
+  "required_integration_groups": [
+    "strict_expression_consumes_the_entire_input",
+    "precedence_and_associativity_are_retained_in_the_tree",
+    "reference_operators_follow_their_distinct_precedence",
+    "function_calls_have_strict_parenthesis_and_separator_grammar",
+    "inline_arrays_preserve_rows_columns_and_nested_expression_nodes",
+    "names_sheets_sources_and_labels_are_inert_typed_nodes",
+    "numbers_strings_and_errors_keep_lexical_boundaries",
+    "exact_formula_source_and_forced_recalculation_spelling_are_retained",
+    "explicit_resource_limits_fail_atomically_at_the_boundary",
+    "deep_parentheses_and_long_left_chains_are_bounded_without_recursive_drop",
+    "malformed_short_inputs_are_bounded_and_panic_free",
+    "every_parser_reservation_propagates_a_single_injected_allocation_failure",
+    "hard_depth_cap_is_checked_in_a_subprocess_before_stack_overflow",
+    "whitespace_between_nonterminating_components_is_preserved_and_typed"
+  ]
+}

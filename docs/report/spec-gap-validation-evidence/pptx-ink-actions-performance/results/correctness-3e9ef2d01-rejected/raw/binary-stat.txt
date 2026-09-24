@@ -1,0 +1,2 @@
+binary_size_bytes=4237256
+binary_mode=775

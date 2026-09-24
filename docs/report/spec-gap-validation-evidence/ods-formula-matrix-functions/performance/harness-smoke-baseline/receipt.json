@@ -1,0 +1,38 @@
+{
+  "scope": "debug harness compilation and parsing only; no matrix execution or performance acceptance",
+  "source_basis": "../../baseline-04/source.tar.gz",
+  "harness_sources": {
+    "docs/report/spec-gap-validation-evidence/ods-formula-matrix-functions/performance/harness/Cargo.lock": "a93a232fb624a1cb18ac5c6ce22a86e26fa23c359c0f185ab6b913cd2789630d",
+    "docs/report/spec-gap-validation-evidence/ods-formula-matrix-functions/performance/harness/Cargo.toml": "7c9f1e22ab4aabe73aad71b0451ff82d371c0482fb9c8782067616d53e1fea66",
+    "docs/report/spec-gap-validation-evidence/ods-formula-matrix-functions/performance/harness/src/main.rs": "4f91298f1625a55ee43c378f6a8f48494faa65d3ff3eed9a150671f9338de59d"
+  },
+  "commands": [
+    [
+      "cargo",
+      "build",
+      "--offline",
+      "--manifest-path",
+      "docs/report/spec-gap-validation-evidence/ods-formula-matrix-functions/performance/harness/Cargo.toml"
+    ],
+    [
+      "ods-formula-matrix-functions-performance",
+      "--phase",
+      "parse",
+      "--warmups",
+      "0",
+      "--iterations",
+      "1",
+      "--repeat",
+      "1"
+    ]
+  ],
+  "build_status": 0,
+  "parse_status": 0,
+  "rows": 33,
+  "binary_sha256": "03e536c8d9dc46c74a06caf8f369cc427bcddf545eeacb3e85d2a5c5da58df3e",
+  "artifacts": {
+    "build.log": "87bea710329b9fa0d0aae853e689f14c41ed9a9cdffd7eda6443c5d2256f95c6",
+    "parse.jsonl": "613c53033c26503b37413159ac9e19c0713d163c3f9f4a0a825ba75224923e70"
+  },
+  "harness_archive_sha256": "b8fdb76a1e9d7dcd5410d6127ab5dbae358e3bfd89bf40d3094adc1da85af1a2"
+}

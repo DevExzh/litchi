@@ -1,0 +1,15 @@
+source_manifest_before_sha256=5720486c5de6c77ff2ef3ea16cbe21e788ee2ea7d33a5e913286c1934d786b72
+source_manifest_after_sha256=5720486c5de6c77ff2ef3ea16cbe21e788ee2ea7d33a5e913286c1934d786b72
+source_manifest_match=true
+git_head=75d705536d76eac81f228c08dcea7da0dc7f93e2
+git_status_relevant= M crates/litchi-drawingml/src/theme/mod.rs|?? crates/litchi-drawingml/src/theme/family/|?? crates/litchi-drawingml/tests/fixtures/theme-family-native.provenance|?? crates/litchi-drawingml/tests/fixtures/theme-family-native.xml|?? crates/litchi-drawingml/tests/theme_family.rs|
+dirty_theme_source_sha256:
+6d8d469883abb520605b0d4412755fc8c14fc84369f099986bdaa4f738ad0ca3  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/mod.rs
+92040d89baf779b7111e38e91468e5505ab772232a966b497bec6dc2b967940e  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/family/codec.rs
+5c0186d40c15ad5da178543ec1b9dbcb9f89fe87ef5f3763cbb35eb77ee2ef26  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/family/mod.rs
+62243e4f33d5c6996609ac46b84741915556a2e50ba8ef0f8440e9ca2fd7f635  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/family/model.rs
+006472620192f0561529a2f38809381fef45c4ba07080501f40bb5a40c52b1cf  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/family/transaction.rs
+validation_source_sha256:
+21b2878b78fe607e45d3d1593b05ab019a33470cafe21f2aa7b392f3173a420f  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/tests/theme_family.rs
+fc3629eb8c47a9665d56152c54d52112621b889581f6ceb1299ac5ed8cfc264f  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/tests/fixtures/theme-family-native.xml
+2dcb3859e970ed169df59b40acf6d1709b3ac33a234b7e5a1a3324b4564be41d  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/tests/fixtures/theme-family-native.provenance

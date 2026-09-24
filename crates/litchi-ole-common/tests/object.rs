@@ -15,6 +15,7 @@ use litchi_cfb::{
 };
 use litchi_core::OwnedSource;
 use litchi_ole_common::object::{Editor, EntryKind, Limits, Snapshot, Target, Targets, discover};
+use litchi_ole_common::property_set::Guid;
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -325,6 +326,314 @@ fn commit_exposes_snapshot_and_reversible_patch() {
 }
 
 #[test]
+fn editor_edit_preserves_directory_metadata_for_unchanged_entries() {
+    let original = write_cfb(|writer| {
+        writer.set_root_state_bits(0x1020_3040);
+        writer.set_root_creation_time_from_source(0x0102_0304_0506_0708);
+        writer.set_root_modified_time(0x1112_1314_1516_1718);
+        writer.create_storage(&["ObjectPool"]).unwrap();
+        writer
+            .set_storage_metadata(
+                &["ObjectPool"],
+                0xA1A2_A3A4,
+                0x2122_2324_2526_2728,
+                0x3132_3334_3536_3738,
+            )
+            .unwrap();
+        writer.create_storage(&["ObjectPool", "_42"]).unwrap();
+        writer
+            .set_storage_metadata(
+                &["ObjectPool", "_42"],
+                0xB1B2_B3B4,
+                0x4142_4344_4546_4748,
+                0x5152_5354_5556_5758,
+            )
+            .unwrap();
+        writer
+            .create_stream(&["WordDocument"], b"unchanged host bytes")
+            .unwrap();
+        writer
+            .create_stream(&["ObjectPool", "_42", "\u{3}PRINT"], b"preview")
+            .unwrap();
+        writer
+            .set_stream_metadata(
+                &["ObjectPool", "_42", "\u{3}PRINT"],
+                0xC1C2_C3C4,
+                0x6162_6364_6566_6768,
+                0x7172_7374_7576_7778,
+            )
+            .unwrap();
+    });
+    let selected = targets("object", &["ObjectPool", "_42"]);
+    let mut editor = Editor::open(original, selected, Limits::default()).expect("editor opens");
+    editor
+        .put_stream(&["WordDocument".into()], b"edited host bytes".to_vec())
+        .expect("unrelated stream edit should commit");
+    let output = editor.finish().expect("edited package should finish");
+    let file = OleFile::open(Cursor::new(output)).expect("edited CFB should open");
+
+    let root = file.root_entry().expect("root entry");
+    assert_eq!(root.state_bits, 0x1020_3040);
+    assert_eq!(root.creation_time, 0x0102_0304_0506_0708);
+    assert_eq!(root.modified_time, 0x1112_1314_1516_1718);
+    let object_pool = file
+        .list_directory_entries(&[])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "ObjectPool")
+        .unwrap();
+    assert_eq!(object_pool.state_bits, 0xA1A2_A3A4);
+    assert_eq!(object_pool.creation_time, 0x2122_2324_2526_2728);
+    assert_eq!(object_pool.modified_time, 0x3132_3334_3536_3738);
+    let object = file
+        .list_directory_entries(&["ObjectPool"])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "_42")
+        .unwrap();
+    assert_eq!(object.state_bits, 0xB1B2_B3B4);
+    assert_eq!(object.creation_time, 0x4142_4344_4546_4748);
+    assert_eq!(object.modified_time, 0x5152_5354_5556_5758);
+    let preview = file
+        .list_directory_entries(&["ObjectPool", "_42"])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "\u{3}PRINT")
+        .unwrap();
+    assert_eq!(preview.state_bits, 0xC1C2_C3C4);
+    assert_eq!(preview.creation_time, 0x6162_6364_6566_6768);
+    assert_eq!(preview.modified_time, 0x7172_7374_7576_7778);
+}
+
+#[test]
+fn selected_storage_metadata_stays_on_object_while_promoted_root_uses_defaults() {
+    let source = write_cfb(|writer| {
+        writer.create_storage(&["Pool", "Object"]).unwrap();
+        writer
+            .set_storage_metadata(
+                &["Pool", "Object"],
+                0xA1A2_A3A4,
+                0x0102_0304_0506_0708,
+                0x1112_1314_1516_1718,
+            )
+            .unwrap();
+        writer
+            .create_stream(&["Pool", "Object", "Payload"], b"payload")
+            .unwrap();
+    });
+    let mut ole = OleFile::open(Cursor::new(source.clone())).expect("source CFB should open");
+    let objects = discover(
+        &mut ole,
+        &targets("object", &["Pool", "Object"]),
+        Limits::default(),
+    )
+    .expect("object discovery should pass");
+    let object = objects.get("object").expect("object should be present");
+    let source_storage = object.storage().directory();
+    assert_eq!(source_storage.kind(), EntryKind::Storage);
+    assert_eq!(source_storage.state_bits(), 0xA1A2_A3A4);
+    assert_eq!(source_storage.creation_time(), 0x0102_0304_0506_0708);
+    assert_eq!(source_storage.modified_time(), 0x1112_1314_1516_1718);
+
+    let promoted = OleFile::open(Cursor::new(object.compound().to_vec()))
+        .expect("promoted object CFB should open");
+    let root = promoted.root_entry().expect("promoted root should exist");
+    assert_eq!(root.entry_type, EntryKind::Root.raw());
+    assert_eq!(root.state_bits, 0);
+    assert_eq!(root.creation_time, 0);
+    assert_eq!(root.modified_time, 0);
+
+    let editor = Editor::open(
+        source,
+        targets("object", &["Pool", "Object"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    let editor_object = editor.objects().get("object").expect("object should exist");
+    assert_eq!(
+        editor_object.storage().directory().creation_time(),
+        0x0102_0304_0506_0708
+    );
+    let editor_promoted = OleFile::open(Cursor::new(editor_object.compound().to_vec()))
+        .expect("editor-promoted object CFB should open");
+    let editor_root = editor_promoted
+        .root_entry()
+        .expect("editor-promoted root should exist");
+    assert_eq!(editor_root.state_bits, 0);
+    assert_eq!(editor_root.creation_time, 0);
+    assert_eq!(editor_root.modified_time, 0);
+}
+
+#[test]
+fn replacement_preserves_target_storage_metadata_while_mapping_clsid() {
+    const REPLACEMENT_CLSID: [u8; 16] = [
+        0x06, 0x09, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x46,
+    ];
+    let original = write_cfb(|writer| {
+        writer.create_storage(&["Pool", "Object"]).unwrap();
+        writer
+            .set_storage_metadata(
+                &["Pool", "Object"],
+                0xA1A2_A3A4,
+                0x0102_0304_0506_0708,
+                0x1112_1314_1516_1718,
+            )
+            .unwrap();
+        writer
+            .create_stream(&["Pool", "Object", "Payload"], b"old")
+            .unwrap();
+    });
+    let replacement = write_cfb(|writer| {
+        writer.set_root_clsid(REPLACEMENT_CLSID);
+        writer.set_root_state_bits(0xB1B2_B3B4);
+        writer.set_root_creation_time_from_source(0x2122_2324_2526_2728);
+        writer.set_root_modified_time(0x3132_3334_3536_3738);
+        writer.create_stream(&["Payload"], b"new").unwrap();
+    });
+    let mut editor = Editor::open(
+        original,
+        targets("object", &["Pool", "Object"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    editor
+        .replace("object", replacement)
+        .expect("replacement should commit");
+    let output = editor.finish().expect("edited package should finish");
+    let mut file = OleFile::open(Cursor::new(output)).expect("edited CFB should open");
+    let target = file
+        .list_directory_entries(&["Pool"])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "Object")
+        .unwrap();
+    assert_eq!(target.state_bits, 0xA1A2_A3A4);
+    assert_eq!(target.creation_time, 0x0102_0304_0506_0708);
+    assert_eq!(target.modified_time, 0x1112_1314_1516_1718);
+    assert_eq!(target.clsid, "00020906-0000-0000-C000-000000000046");
+    let objects = discover(
+        &mut file,
+        &targets("object", &["Pool", "Object"]),
+        Limits::default(),
+    )
+    .expect("replaced object should rediscover");
+    assert_eq!(
+        objects
+            .get("object")
+            .expect("replaced object should exist")
+            .storage()
+            .class_id(),
+        Some(Guid::from_bytes(REPLACEMENT_CLSID))
+    );
+    assert_eq!(
+        file.open_stream(&["Pool", "Object", "Payload"]).unwrap(),
+        b"new"
+    );
+}
+
+#[test]
+fn added_storage_uses_zero_metadata_for_nonzero_source_root() {
+    let mut editor = Editor::open(
+        doc_with_object(&[0, 0, 0, 0]),
+        targets("first", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    let replacement = write_cfb(|writer| {
+        writer.set_root_state_bits(0xA1A2_A3A4);
+        writer.set_root_creation_time_from_source(0x0102_0304_0506_0708);
+        writer.set_root_modified_time(0x1112_1314_1516_1718);
+        writer
+            .create_stream(&["CONTENTS"], b"new object")
+            .expect("nested payload should write");
+    });
+    editor
+        .add_storage(target("second", &["ObjectPool", "_43"]), replacement)
+        .expect("explicit storage should be added");
+
+    let added = editor
+        .objects()
+        .get("second")
+        .expect("storage should be present");
+    let metadata = added.storage().directory();
+    assert_eq!(metadata.kind(), EntryKind::Storage);
+    assert_eq!(metadata.state_bits(), 0);
+    assert_eq!(metadata.creation_time(), 0);
+    assert_eq!(metadata.modified_time(), 0);
+    assert_eq!(added.stream(&["CONTENTS"]), Some(&b"new object"[..]));
+
+    let output = editor.finish().expect("edited package should finish");
+    let file = OleFile::open(Cursor::new(output)).expect("edited CFB should open");
+    let target = file
+        .list_directory_entries(&["ObjectPool"])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "_43")
+        .expect("added storage should be serialized");
+    assert_eq!(target.state_bits, 0);
+    assert_eq!(target.creation_time, 0);
+    assert_eq!(target.modified_time, 0);
+}
+
+#[test]
+fn object_add_and_replace_preflight_limits_are_failure_atomic() {
+    let replacement = write_cfb(|writer| {
+        writer
+            .create_storage(&["A"])
+            .expect("first replacement storage should write");
+        writer
+            .create_storage(&["B"])
+            .expect("second replacement storage should write");
+    });
+    let limits = Limits {
+        max_objects: 2,
+        max_storage_depth: 2,
+        ..Limits::default()
+    };
+
+    let original = write_cfb(|writer| {
+        writer
+            .create_storage(&["ObjectPool", "_42"])
+            .expect("selected storage should write");
+        writer
+            .create_storage(&["Other"])
+            .expect("unrelated storage should write");
+    });
+    let mut editor = Editor::open(
+        original.clone(),
+        targets("object", &["ObjectPool", "_42"]),
+        limits,
+    )
+    .expect("source should fit aggregate storage limits");
+    let prepared = editor
+        .prepare_replacement("object", replacement.clone())
+        .expect("replacement should be admitted independently")
+        .expect("replacement should change the selected object");
+    assert!(editor.replace_prepared(prepared).is_err());
+    assert!(!editor.is_changed());
+    assert_eq!(
+        editor.finish().expect("failed replacement stays exact"),
+        original
+    );
+
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let mut editor = Editor::open(
+        original.clone(),
+        targets("first", &["ObjectPool", "_42"]),
+        limits,
+    )
+    .expect("source should fit aggregate storage limits");
+    assert!(
+        editor
+            .add_storage(target("second", &["ObjectPool", "_43"]), replacement)
+            .is_err()
+    );
+    assert!(!editor.is_changed());
+    assert_eq!(editor.finish().expect("failed add stays exact"), original);
+}
+
+#[test]
 fn failed_replacement_is_transactional() {
     let original = doc_with_object(&[0, 0, 0, 0]);
     let mut editor = Editor::open(
@@ -336,6 +645,220 @@ fn failed_replacement_is_transactional() {
     assert!(editor.replace("object", vec![1, 2, 3]).is_err());
     assert!(!editor.is_changed());
     assert_eq!(editor.finish().expect("editor should finish"), original);
+}
+
+#[test]
+fn uniquely_owned_noop_editor_retains_the_consumed_vec_allocation() {
+    let mut source = doc_with_object(&[0, 0, 0, 0]);
+    source.reserve(4096);
+    let expected = source.clone();
+    let allocation = source.as_ptr();
+    let capacity = source.capacity();
+    let editor = Editor::open(
+        source,
+        targets("object", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should admit the owned source");
+    let retained = editor.source_shared();
+    assert_eq!(retained.as_ptr(), allocation);
+    assert_eq!(retained.capacity(), capacity);
+    drop(retained);
+    let output = editor.finish().expect("unique no-op should finish");
+    assert_eq!(output.as_ptr(), allocation);
+    assert_eq!(output.capacity(), capacity);
+    assert_eq!(output, expected);
+}
+
+#[test]
+fn prepared_replacement_admission_is_bounded_and_source_bound() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let selected = targets("object", &["ObjectPool", "_42"]);
+    let replacement = write_cfb(|writer| {
+        writer
+            .create_stream(&["CONTENTS"], b"prepared replacement")
+            .expect("replacement stream should write");
+    });
+
+    let editor = Editor::open(original.clone(), selected.clone(), Limits::default())
+        .expect("editor should open");
+    let original_object_size = editor
+        .objects()
+        .get("object")
+        .expect("object should exist")
+        .compound()
+        .len() as u64;
+    assert!(
+        editor
+            .prepare_replacement(
+                "object",
+                editor.objects().get("object").unwrap().compound().to_vec()
+            )
+            .expect("exact replacement should be admitted")
+            .is_none()
+    );
+    assert!(!editor.is_changed());
+    assert_eq!(
+        editor
+            .clone()
+            .finish()
+            .expect("no-op should finish exactly"),
+        original
+    );
+
+    let bounded_limits = Limits {
+        max_object_size: original_object_size,
+        ..Limits::default()
+    };
+    let bounded = Editor::open(original.clone(), selected.clone(), bounded_limits)
+        .expect("bounded source should open");
+    let oversized = write_cfb(|writer| {
+        writer
+            .create_stream(
+                &["Large"],
+                &vec![0u8; usize::try_from(original_object_size).unwrap()],
+            )
+            .expect("oversized replacement should write");
+    });
+    assert!(bounded.prepare_replacement("object", oversized).is_err());
+    assert!(!bounded.is_changed());
+    assert_eq!(
+        bounded.finish().expect("failed admission stays exact"),
+        original
+    );
+
+    let object_count_limits = Limits {
+        max_streams_per_object: 4,
+        max_storage_depth: 2,
+        ..Limits::default()
+    };
+    let object_count_editor = Editor::open(original.clone(), selected.clone(), object_count_limits)
+        .expect("source should fit per-object limits");
+    let too_many_streams = write_cfb(|writer| {
+        for name in ["A", "B", "C", "D", "E"] {
+            writer
+                .create_stream(&[name], b"replacement")
+                .expect("replacement stream should write");
+        }
+    });
+    assert!(
+        object_count_editor
+            .prepare_replacement("object", too_many_streams)
+            .is_err()
+    );
+
+    let too_many_storages = write_cfb(|writer| {
+        writer.create_storage(&["A"]).expect("storage should write");
+        writer.create_storage(&["B"]).expect("storage should write");
+        writer.create_storage(&["C"]).expect("storage should write");
+    });
+    assert!(
+        object_count_editor
+            .prepare_replacement("object", too_many_storages)
+            .is_err()
+    );
+    assert!(!object_count_editor.is_changed());
+    assert_eq!(
+        object_count_editor
+            .finish()
+            .expect("per-object rejection stays exact"),
+        original
+    );
+
+    let mut stale = Editor::open(original.clone(), selected.clone(), Limits::default())
+        .expect("editor should open");
+    let prepared = stale
+        .prepare_replacement("object", replacement.clone())
+        .expect("replacement should be admitted")
+        .expect("replacement should change the object");
+    stale
+        .put_stream(
+            &[
+                "ObjectPool".to_owned(),
+                "_42".to_owned(),
+                "\u{3}PRINT".to_owned(),
+            ],
+            b"changed selected stream".to_vec(),
+        )
+        .expect("host edit should commit");
+    let changed_source = stale.clone().finish().expect("host edit should finish");
+    assert!(stale.replace_prepared(prepared).is_err());
+    assert_eq!(
+        stale.clone().finish().expect("stale admission stays exact"),
+        changed_source
+    );
+
+    let mut different_limits = Limits::default();
+    different_limits.max_total_size -= 1;
+    let mut other = Editor::open(original.clone(), selected, different_limits)
+        .expect("different limits should still admit the fixture");
+    let prepared = editor
+        .prepare_replacement("object", replacement.clone())
+        .expect("replacement should be admitted")
+        .expect("replacement should change the object");
+    assert!(other.replace_prepared(prepared).is_err());
+    assert!(!other.is_changed());
+    assert_eq!(
+        other.finish().expect("limit mismatch stays exact"),
+        original
+    );
+
+    let mut same_limit_other = Editor::open(
+        original.clone(),
+        targets("object", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("same-limit editor should open");
+    let prepared = editor
+        .prepare_replacement("object", replacement)
+        .expect("replacement should be admitted")
+        .expect("replacement should change the object");
+    assert!(same_limit_other.replace_prepared(prepared).is_err());
+    assert!(!same_limit_other.is_changed());
+    assert_eq!(
+        same_limit_other
+            .finish()
+            .expect("cross-editor rejection stays exact"),
+        original
+    );
+}
+
+#[test]
+fn prepared_replacement_commit_supports_forward_and_inverse_patch() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let replacement = write_cfb(|writer| {
+        writer
+            .create_stream(&["CONTENTS"], b"forward replacement")
+            .expect("replacement stream should write");
+    });
+    let mut editor = Editor::open(
+        original.clone(),
+        targets("object", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    let prepared = editor
+        .prepare_replacement("object", replacement)
+        .expect("replacement should be admitted")
+        .expect("replacement should change the object");
+    editor
+        .replace_prepared(prepared)
+        .expect("prepared replacement should publish");
+
+    let committed = editor.commit().expect("replacement should commit");
+    let forward = committed
+        .patch()
+        .apply(&original)
+        .expect("forward replacement patch should apply");
+    assert_eq!(forward, committed.patch().after());
+    assert_eq!(
+        committed
+            .patch()
+            .inverse()
+            .apply(&forward)
+            .expect("inverse replacement patch should apply"),
+        original
+    );
 }
 
 #[test]

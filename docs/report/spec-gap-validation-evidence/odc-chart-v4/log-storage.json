@@ -1,0 +1,27 @@
+[
+  {
+    "log": "tests",
+    "raw_sha256": "9a26f0129d4a88e0f6b41c37372c13f9be4c561cbdd944a87f41eee82afc1035",
+    "gzip_sha256": "c7cf3f9b23ddbf305f6edd9a80a2d99a570336b6e1d2103a3f3fdf224efb29f3"
+  },
+  {
+    "log": "doctests",
+    "raw_sha256": "fdda3221a7d46d5a2f4f62c1e0cf491d83ed0ebbfe749ecfe3d473e4aa67f082",
+    "gzip_sha256": "3b220d09c26a5d19aca65430d437abcb31c4ce7740ed25004a9103a586984d5f"
+  },
+  {
+    "log": "clippy",
+    "raw_sha256": "9d892c5778d0c975f64a671e66ea5a753502353da3addd1dfdf3825225e406a2",
+    "gzip_sha256": "5733bd3f53618c36fb2f2ff2f55d81e46e325ea5e7044caa66476cc05490aed9"
+  },
+  {
+    "log": "rustdoc",
+    "raw_sha256": "5568ac016eb9c7d3fc9483c31c47725996a87d487b1b67436b6b815cde647e9b",
+    "gzip_sha256": "2d2d66a8abcbe0edcac1703d6d8c97dca410e4be587fe77471084f5f68291a39"
+  },
+  {
+    "log": "fmt",
+    "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  }
+]

@@ -1,0 +1,21 @@
+{
+  "commit": "1ae5d7b4504a248ea24ac52cb2bdd1f08859ddd7",
+  "checkout": "exact detached clean checkout",
+  "manifest_entries": 5841,
+  "files": [
+    "crates/litchi-xlsx/src/form_control/codec.rs",
+    "crates/litchi-xlsx/src/form_control/mod.rs",
+    "crates/litchi-xlsx/src/form_control/owner.rs",
+    "crates/litchi-xlsx/src/workbook/model.rs",
+    "crates/litchi-xlsx/src/workbook/source.rs",
+    "crates/litchi-xlsx/tests/form_control_owner_read.rs"
+  ],
+  "sha256": {
+    "crates/litchi-xlsx/src/form_control/codec.rs": "70edb91080a9f14716b27efb8c31e34468f3ce5f5cb993a795530911ac51011f",
+    "crates/litchi-xlsx/src/form_control/mod.rs": "4dfa086c58654bd42ff9425bac03f871c99c4159f2a876b8793d0c920ba5dbec",
+    "crates/litchi-xlsx/src/form_control/owner.rs": "ac8f6dfadd81d1a584488d0dcb3fcb3ef6ceaba75d51f99dc9fab0843df0bb3a",
+    "crates/litchi-xlsx/src/workbook/model.rs": "77deff8bbc5c98fe64145ab494c0602e4d909d595a1703c19b4aa3c8caec5224",
+    "crates/litchi-xlsx/src/workbook/source.rs": "740160b04b3b6e6f986c6e6449decb1b1bf3bf55446cabbbacac307bde312bfa",
+    "crates/litchi-xlsx/tests/form_control_owner_read.rs": "82f63c55571eb38184cc6dc6ae2082fc4bb089dba44481bc5130cc78af1528fb"
+  }
+}

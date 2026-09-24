@@ -1,0 +1,14 @@
+[package]
+name = "ods-data-style-source-performance"
+version = "0.0.0"
+edition = "2024"
+
+[workspace]
+
+[[bin]]
+name = "ods-data-style-source-performance"
+path = "main.rs"
+
+[dependencies]
+litchi-ods = { path = "../../../../../crates/litchi-ods" }
+zip = { version = "8", default-features = false, features = ["deflate"] }

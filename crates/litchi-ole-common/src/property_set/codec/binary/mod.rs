@@ -49,6 +49,14 @@ impl Stream {
     pub fn to_bytes(&self) -> Result<Vec<u8>, OleError> {
         validation::serialize_stream(self)
     }
+
+    /// Serializes this stream while refusing any canonical output larger than
+    /// the caller's CONTENTS ceiling.  The size preflight runs before the
+    /// encoder retains payload bytes, and the same ceiling remains active on
+    /// every bounded output sink during serialization.
+    pub(crate) fn to_bytes_with_limit(&self, maximum: u64) -> Result<Vec<u8>, OleError> {
+        validation::serialize_stream_with_limit(self, maximum)
+    }
 }
 
 pub(crate) fn parse_typed_property(
@@ -59,6 +67,10 @@ pub(crate) fn parse_typed_property(
     semantic::parse_typed_property(data, codepage, property_offset)
 }
 
+pub(crate) fn parse_non_simple_stream(data: &[u8]) -> Result<Stream, OleError> {
+    validation::parse_non_simple_stream(data)
+}
+
 pub(crate) fn parse_typed_property_for_property(
     data: &[u8],
     codepage: u16,
@@ -66,6 +78,20 @@ pub(crate) fn parse_typed_property_for_property(
     property_identifier: u32,
 ) -> Result<Value, OleError> {
     semantic::parse_typed_property_for_property(
+        data,
+        codepage,
+        property_offset,
+        property_identifier,
+    )
+}
+
+pub(crate) fn parse_typed_property_for_non_simple_property(
+    data: &[u8],
+    codepage: u16,
+    property_offset: usize,
+    property_identifier: u32,
+) -> Result<Value, OleError> {
+    semantic::parse_typed_property_for_non_simple_property(
         data,
         codepage,
         property_offset,

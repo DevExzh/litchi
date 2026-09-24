@@ -1,0 +1,17 @@
+{
+  "status": "PASS",
+  "freeze_sha256": "b4a0f0c9665e10f67fafa1b179bfbfdd8be2c65e6ec897bac86db1b2afc9330a",
+  "contract_sha256": "87f20c419139bf721221d06c8714edd900ae7a57cbedecf070878e4f6cf64d8a",
+  "reviews": {
+    "semantic": {
+      "path": "semantic-review.md",
+      "sha256": "e9ac76dd4407852ef7cd0609aabfb1139e78c43e29cb2561346a05d0a375c7c4",
+      "status": "PASS"
+    },
+    "resource": {
+      "path": "resource-review.md",
+      "sha256": "5f2329ffcfccc8ecce0e7a1b4a5c44537b66c29b77cfd8488d10d42383e53a40",
+      "status": "PASS"
+    }
+  }
+}

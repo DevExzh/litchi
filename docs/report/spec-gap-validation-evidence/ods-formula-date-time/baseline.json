@@ -1,0 +1,19 @@
+{
+  "schema": "ods-formula-date-time-baseline-v1",
+  "production_commit": "6fa3b8af6aa6b5cdce348609a40a34a30cf94fd6",
+  "preparation_commit": "45e56928edfc334b45132330d405bc4c7b6f7b4c",
+  "selected_baseline_sources": {
+    "crates/litchi-ods/src/codec/formula/evaluation.rs": "4e2f383e9fa6a9aa80457b8b7b440957a01a45de625bfc765fb50038a4b18882",
+    "crates/litchi-ods/src/codec/formula/evaluation/calendar.rs": "fe1034f1b22537bf8407b36fdbd76b96c84a2ba691268942519016320d519b37",
+    "crates/litchi-ods/src/codec/formula/evaluation/inspection.rs": "594fa0a8110296259532e20e7901685eeea9502eb8927f2915d58bfdf52d8918",
+    "crates/litchi-ods/src/codec/formula/evaluation/inspection/parse_value.rs": "f29a42e77912a7dd65acc92a82f306fd9875e7d6a3410974029e940276ebf504",
+    "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "8c0fb5ade784a02bb46268dba93c4141ff787cae2dd70cc286abae9cfc32f12c",
+    "crates/litchi-ods/src/codec/formula/evaluation/value/scalar.rs": "cd882fa914bffa26ede20c51a4483c53fc36f4070e37cfbfef2bfec6e2db69f3"
+  },
+  "isolated_lock": {
+    "path": "docs/report/spec-gap-validation-evidence/ods-formula-lookups/gates/Cargo.lock",
+    "sha256": "58b4be6cf88d7f7c5c2b16bd069a589e261e2a68e45a808a5cf3f12e1340a3e3"
+  },
+  "ambient_lock_sha256_observed": "aa945c79965460e74a64063e1c45396eaae7a68e71072730e2bc426cded22f02",
+  "status": "baseline identity only; candidate freeze, builds, tests and performance pending"
+}

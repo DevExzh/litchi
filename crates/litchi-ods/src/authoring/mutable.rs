@@ -127,6 +127,136 @@ impl MutableSpreadsheet {
         self.spreadsheet.remove_metadata()
     }
 
+    /// Capture the standalone table-template catalog.
+    pub fn table_templates(&self) -> Result<crate::styles::table_template::Snapshot> {
+        self.spreadsheet.table_templates()
+    }
+
+    /// Apply an exact-source table-template patch atomically.
+    pub fn apply_table_template_patch(
+        &mut self,
+        patch: &crate::styles::table_template::Patch,
+    ) -> Result<()> {
+        self.spreadsheet.apply_table_template_patch(patch)
+    }
+
+    /// Stage and publish one source-checked table-template edit.
+    pub fn edit_table_templates<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::styles::table_template::Edit) -> Result<()>,
+    {
+        self.spreadsheet.edit_table_templates(update)
+    }
+
+    /// Capture inert DDE source declarations and cached tables.
+    pub fn dde(&self) -> Result<crate::dde::Snapshot> {
+        self.spreadsheet.dde()
+    }
+
+    /// Capture DDE metadata under explicit limits and execution policy.
+    pub fn dde_with(
+        &self,
+        limits: crate::dde::Limits,
+        context: &litchi_core::ExecutionContext,
+    ) -> Result<crate::dde::Snapshot> {
+        self.spreadsheet.dde_with(limits, context)
+    }
+
+    /// Publish a failure-atomic inert DDE metadata edit.
+    pub fn edit_dde<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::dde::Edit) -> Result<()>,
+    {
+        self.spreadsheet.edit_dde(update)
+    }
+
+    /// Edit DDE metadata with explicit parsing, staging, and readback budgets.
+    /// Package replacement and rehydration retain the package policy.
+    pub fn edit_dde_with_context<F>(
+        &mut self,
+        limits: crate::dde::Limits,
+        context: &litchi_core::ExecutionContext,
+        update: F,
+    ) -> Result<()>
+    where
+        F: FnOnce(&mut crate::dde::Edit) -> Result<()>,
+    {
+        self.spreadsheet
+            .edit_dde_with_context(limits, context, update)
+    }
+
+    /// Apply an exact-source DDE patch atomically.
+    pub fn apply_dde_patch(&mut self, patch: &crate::dde::Patch) -> Result<()> {
+        self.spreadsheet.apply_dde_patch(patch)
+    }
+
+    /// Capture the inert, source-bound scenario metadata catalog.
+    pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
+        self.spreadsheet.scenarios()
+    }
+
+    /// Apply an exact-source scenario metadata patch atomically.
+    pub fn apply_scenario_patch(&mut self, patch: &crate::scenario::Patch) -> Result<()> {
+        self.spreadsheet.apply_scenario_patch(patch)
+    }
+
+    /// Stage and publish one failure-atomic scenario metadata edit.
+    pub fn edit_scenarios<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::scenario::Edit) -> Result<()>,
+    {
+        self.spreadsheet.edit_scenarios(update)
+    }
+
+    /// Capture the source-backed sheet metadata catalog.
+    pub fn sheet_metadata(&self) -> Result<crate::sheet_metadata::Snapshot> {
+        self.spreadsheet.sheet_metadata()
+    }
+
+    /// Capture sheet metadata under explicit finite limits and context.
+    pub fn sheet_metadata_with(
+        &self,
+        limits: crate::sheet_metadata::Limits,
+        context: &litchi_core::ExecutionContext,
+    ) -> Result<crate::sheet_metadata::Snapshot> {
+        self.spreadsheet.sheet_metadata_with(limits, context)
+    }
+
+    /// Stage and publish one failure-atomic sheet metadata edit.
+    pub fn edit_sheet_metadata<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::sheet_metadata::Edit) -> Result<()>,
+    {
+        self.spreadsheet.edit_sheet_metadata(update)
+    }
+
+    /// Stage and publish sheet metadata under explicit limits and context.
+    ///
+    /// The supplied context governs metadata parsing, staging, candidate
+    /// rendering, and target readback. Owned package replacement and facade
+    /// rehydration use the package's own bounded policy; the context is
+    /// checked again before the attached spreadsheet is replaced.
+    pub fn edit_sheet_metadata_with_context<F>(
+        &mut self,
+        limits: crate::sheet_metadata::Limits,
+        context: &litchi_core::ExecutionContext,
+        update: F,
+    ) -> Result<()>
+    where
+        F: FnOnce(&mut crate::sheet_metadata::Edit) -> Result<()>,
+    {
+        self.spreadsheet
+            .edit_sheet_metadata_with_context(limits, context, update)
+    }
+
+    /// Apply an exact source sheet metadata patch atomically.
+    pub fn apply_sheet_metadata_patch(
+        &mut self,
+        patch: &crate::sheet_metadata::Patch,
+    ) -> Result<()> {
+        self.spreadsheet.apply_sheet_metadata_patch(patch)
+    }
+
     /// Borrow spreadsheet calculation settings, if present.
     #[must_use]
     pub fn settings(&self) -> Option<&crate::settings::Settings> {
@@ -343,6 +473,40 @@ impl MutableSpreadsheet {
         Ok(())
     }
 
+    /// Discover inert database-range declarations in the current package.
+    ///
+    /// No database, query, refresh, or filter execution occurs.
+    pub fn database_ranges(&self) -> Result<crate::database_range::Catalog<'_>> {
+        self.spreadsheet.database_ranges()
+    }
+
+    /// Capture an immutable, exact-source database-range snapshot.
+    pub fn database_range_snapshot(&self) -> Result<crate::database_range::Snapshot> {
+        self.spreadsheet.database_range_snapshot()
+    }
+
+    /// Alias for [`Self::database_range_snapshot`].
+    pub fn database_ranges_snapshot(&self) -> Result<crate::database_range::Snapshot> {
+        self.database_range_snapshot()
+    }
+
+    /// Apply an exact-source database-range patch and rehydrate the facade.
+    pub fn apply_database_range_patch(
+        &mut self,
+        patch: &crate::database_range::Patch,
+    ) -> Result<()> {
+        self.spreadsheet.apply_database_range_patch(patch)
+    }
+
+    /// Clone-stage inert database-range CRUD and publish one atomic package
+    /// edit.
+    pub fn edit_database_ranges<F>(&mut self, edit: F) -> Result<()>
+    where
+        F: for<'source> FnOnce(&mut crate::database_range::Editor<'_, 'source>) -> Result<()>,
+    {
+        self.spreadsheet.edit_database_ranges(edit)
+    }
+
     /// Find a worksheet by its exact ODF name.
     #[must_use]
     pub fn sheet(&self, name: &str) -> Option<&Sheet> {
@@ -446,6 +610,20 @@ impl MutableSpreadsheet {
         self.edit_sheet(sheet_name, move |sheet| {
             sheet.set_cell_style(row, column, style_name)
         })
+    }
+
+    /// Set or clear one worksheet's direct table title.
+    pub fn set_sheet_title(&mut self, sheet_name: &str, title: Option<String>) -> Result<()> {
+        self.edit_sheet(sheet_name, |sheet| sheet.set_title(title))
+    }
+
+    /// Set or clear one worksheet's direct table description.
+    pub fn set_sheet_description(
+        &mut self,
+        sheet_name: &str,
+        description: Option<String>,
+    ) -> Result<()> {
+        self.edit_sheet(sheet_name, |sheet| sheet.set_description(description))
     }
 
     fn edit_sheets<F>(&mut self, operation: F) -> Result<()>

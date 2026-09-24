@@ -904,24 +904,6 @@ pub(super) fn parse_cp_table(
     }))
 }
 
-pub(super) fn reject_protection(word: &[u8], table: &[u8]) -> Result<()> {
-    let (offset, length) = fib_pair(word, DOP)?;
-    if length == 0 {
-        return Ok(());
-    }
-    let dop = slice(table, offset, length, "DOP")?;
-    if dop.len() < 84 {
-        return Err(corrupted("DOP is truncated"));
-    }
-    let protected = dop[6] & 0x10 != 0
-        || dop[7] & (0x02 | 0x20 | 0x40) != 0
-        || i32::from_le_bytes(array_at(dop, 78, "DOP protection key")?) != 0;
-    if protected {
-        return Err(corrupted("protected DOC cannot be edited"));
-    }
-    Ok(())
-}
-
 pub(super) fn read_units(
     word: &[u8],
     pieces: &[RawPiece],

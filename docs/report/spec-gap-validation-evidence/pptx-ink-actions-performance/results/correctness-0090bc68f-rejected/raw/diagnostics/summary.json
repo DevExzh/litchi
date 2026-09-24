@@ -1,0 +1,103 @@
+{
+  "binary": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/target/release/pptx-ink-actions-performance",
+  "capture_head": "0090bc68f949a5b80342bc3be696b7609a1c3325",
+  "lanes": [
+    {
+      "command": [
+        "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/target/release/pptx-ink-actions-performance",
+        "--lane",
+        "package_read_large_distinct",
+        "--warmup",
+        "1",
+        "--samples",
+        "1"
+      ],
+      "cwd": "/var/tmp/pptx-ink-actions-correctness-0090bc68f-clean",
+      "exit_code": 0,
+      "lane": "package_read_large_distinct",
+      "stderr": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_read_large_distinct/stderr.txt",
+      "stdout": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_read_large_distinct/stdout.json"
+    },
+    {
+      "command": [
+        "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/target/release/pptx-ink-actions-performance",
+        "--lane",
+        "package_read_near_distinct",
+        "--warmup",
+        "1",
+        "--samples",
+        "1"
+      ],
+      "cwd": "/var/tmp/pptx-ink-actions-correctness-0090bc68f-clean",
+      "exit_code": 0,
+      "lane": "package_read_near_distinct",
+      "stderr": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_read_near_distinct/stderr.txt",
+      "stdout": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_read_near_distinct/stdout.json"
+    },
+    {
+      "command": [
+        "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/target/release/pptx-ink-actions-performance",
+        "--lane",
+        "package_apply_medium_distinct",
+        "--warmup",
+        "1",
+        "--samples",
+        "1"
+      ],
+      "cwd": "/var/tmp/pptx-ink-actions-correctness-0090bc68f-clean",
+      "exit_code": 0,
+      "lane": "package_apply_medium_distinct",
+      "stderr": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_apply_medium_distinct/stderr.txt",
+      "stdout": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_apply_medium_distinct/stdout.json"
+    },
+    {
+      "command": [
+        "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/target/release/pptx-ink-actions-performance",
+        "--lane",
+        "package_inverse_small_shared",
+        "--warmup",
+        "1",
+        "--samples",
+        "1"
+      ],
+      "cwd": "/var/tmp/pptx-ink-actions-correctness-0090bc68f-clean",
+      "exit_code": 0,
+      "lane": "package_inverse_small_shared",
+      "stderr": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_inverse_small_shared/stderr.txt",
+      "stdout": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_inverse_small_shared/stdout.json"
+    },
+    {
+      "command": [
+        "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/target/release/pptx-ink-actions-performance",
+        "--lane",
+        "package_inverse_case_equivalent",
+        "--warmup",
+        "1",
+        "--samples",
+        "1"
+      ],
+      "cwd": "/var/tmp/pptx-ink-actions-correctness-0090bc68f-clean",
+      "exit_code": 0,
+      "lane": "package_inverse_case_equivalent",
+      "stderr": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_inverse_case_equivalent/stderr.txt",
+      "stdout": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_inverse_case_equivalent/stdout.json"
+    },
+    {
+      "command": [
+        "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/target/release/pptx-ink-actions-performance",
+        "--lane",
+        "stale_content_type",
+        "--warmup",
+        "1",
+        "--samples",
+        "1"
+      ],
+      "cwd": "/var/tmp/pptx-ink-actions-correctness-0090bc68f-clean",
+      "exit_code": 0,
+      "lane": "stale_content_type",
+      "stderr": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/stale_content_type/stderr.txt",
+      "stdout": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/stale_content_type/stdout.json"
+    }
+  ],
+  "timing_wrapper": false
+}

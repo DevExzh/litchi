@@ -1,0 +1,7 @@
+status=invalid-exploratory-build
+valid_baseline=no
+reason=the production source manifest changed during the second fresh release build
+observed_changes=svg_lifecycle.rs hash and the litchi-xlsx package tree hash differed between source-manifest-before.txt and source-manifest-after-build.txt
+binary=not retained; the output was not source-bound
+receipts=none collected
+next_step=wait for the production detach path to settle, then recapture and rebuild

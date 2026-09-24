@@ -1,0 +1,715 @@
+{
+  "base_commit": "fdd2b80dfa9efc246a5983a3fec64de25e5c4f63",
+  "clean_merge": {
+    "crates/litchi-cfb/src/file.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/object/cfb_path.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/object/codec.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/object/discovery.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/object/editor.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/object/model.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/object/target.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/property_set/codec/editor.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/protection.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/tests/object.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/docs/FEATURE_MATRIX.md": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/lib.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/codec/mod.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/codec/obj.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/edit/transaction.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/package/transaction.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/semantic/metadata.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/semantic/mod.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/semantic/obj.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/semantic/payload.rs": {
+      "conflicts": 0,
+      "mode": "add"
+    },
+    "crates/litchi-xls/src/ole_object/tests/codec.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/tests/package.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/tests/transaction.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/tests/validation.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/validation/mod.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/validation/obj.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/tests/v7_review_probe.rs": {
+      "conflicts": 0,
+      "mode": "add"
+    },
+    "crates/litchi-xls/tests/xls_form_controls.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/tests/xls_ole_objects.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    }
+  },
+  "clean_overlay": "/var/tmp/litchi-xls-embedded-payload-v8-clean-fd95-20260910",
+  "head_commit": "fd95ae50a6ee30b95c52dc2ded7440d6b59d5de7",
+  "head_preimages": "/var/tmp/litchi-xls-embedded-payload-v8-overlay-fd95-20260910-preimages/head",
+  "mixed_merge": {
+    "crates/litchi-cfb/src/file.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/object/cfb_path.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/object/codec.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/object/discovery.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/object/editor.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/object/model.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/object/target.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/property_set/codec/editor.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/src/protection.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-ole-common/tests/object.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/docs/FEATURE_MATRIX.md": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/lib.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/codec/mod.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/codec/obj.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/edit/transaction.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/package/transaction.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/semantic/metadata.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/semantic/mod.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/semantic/obj.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/semantic/payload.rs": {
+      "conflicts": 0,
+      "mode": "add"
+    },
+    "crates/litchi-xls/src/ole_object/tests/codec.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/tests/package.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/tests/transaction.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/tests/validation.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/validation/mod.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/src/ole_object/validation/obj.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/tests/v7_review_probe.rs": {
+      "conflicts": 0,
+      "mode": "add"
+    },
+    "crates/litchi-xls/tests/xls_form_controls.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    },
+    "crates/litchi-xls/tests/xls_ole_objects.rs": {
+      "conflicts": 0,
+      "mode": "merge"
+    }
+  },
+  "mixed_overlay": "/var/tmp/litchi-xls-embedded-payload-v8-overlay-fd95-20260910",
+  "patches": {
+    "clean_current_head": {
+      "bytes": 180248,
+      "path": "/var/tmp/litchi-xls-embedded-payload-v8-clean-fd95-20260910.patch",
+      "sha256": "c3eb8e14402fe2bc3c5585dee4c0194c1ddfdfde497d249cd6299d7e84730bf8"
+    },
+    "pending_preserving_delta": {
+      "bytes": 180567,
+      "path": "/var/tmp/litchi-xls-embedded-payload-v8-pending-preserving-delta-20260910.patch",
+      "sha256": "77b2001dce9d7f5d2e4ac5c6915446f8c56d625b6a2cc849351a22299b0df162"
+    }
+  },
+  "paths": {
+    "crates/litchi-cfb/src/file.rs": {
+      "head": {
+        "bytes": 170707,
+        "exists": true,
+        "sha256": "334b3f9a0a6a59d1d4f511eaa5ee292eb614b219861e004caf03f5674fab38f9"
+      },
+      "v8": {
+        "bytes": 181793,
+        "sha256": "6d281b6fb04b4608eca0cdbeaf943a3f866c24a9e490aff51bb8891b0a7d3642"
+      },
+      "working_tree": {
+        "bytes": 170707,
+        "exists": true,
+        "sha256": "334b3f9a0a6a59d1d4f511eaa5ee292eb614b219861e004caf03f5674fab38f9"
+      }
+    },
+    "crates/litchi-ole-common/src/object/cfb_path.rs": {
+      "head": {
+        "bytes": 7966,
+        "exists": true,
+        "sha256": "18dd8ac03c8da1bd3aabd07eaf13212f02bdd80e8b71a9203709b5b725eeca35"
+      },
+      "v8": {
+        "bytes": 8102,
+        "sha256": "645f3b2d38607f12de0209061400042a2cf29afd4ad2e1e8934c44af717d2c11"
+      },
+      "working_tree": {
+        "bytes": 7966,
+        "exists": true,
+        "sha256": "18dd8ac03c8da1bd3aabd07eaf13212f02bdd80e8b71a9203709b5b725eeca35"
+      }
+    },
+    "crates/litchi-ole-common/src/object/codec.rs": {
+      "head": {
+        "bytes": 27321,
+        "exists": true,
+        "sha256": "33d138224c5d0fcb26d37c14a85ac1467a4ccfe62ea9202934c7b9b46b111da9"
+      },
+      "v8": {
+        "bytes": 37379,
+        "sha256": "50c138dda17d354f4efc47bef18c58bcb9f3f1e969d98481f3f1d62570742450"
+      },
+      "working_tree": {
+        "bytes": 27321,
+        "exists": true,
+        "sha256": "33d138224c5d0fcb26d37c14a85ac1467a4ccfe62ea9202934c7b9b46b111da9"
+      }
+    },
+    "crates/litchi-ole-common/src/object/discovery.rs": {
+      "head": {
+        "bytes": 2335,
+        "exists": true,
+        "sha256": "27f84fdc6a50740f65b5afa2143913aaf362515356c385c42758751c78c2a7da"
+      },
+      "v8": {
+        "bytes": 2375,
+        "sha256": "830fa39ca65ef5073d14dabcc60513bca6a1f221eaaa1e28e62e9644bbeffdea"
+      },
+      "working_tree": {
+        "bytes": 2335,
+        "exists": true,
+        "sha256": "27f84fdc6a50740f65b5afa2143913aaf362515356c385c42758751c78c2a7da"
+      }
+    },
+    "crates/litchi-ole-common/src/object/editor.rs": {
+      "head": {
+        "bytes": 34049,
+        "exists": true,
+        "sha256": "6f5c529bd40a6b5aec3ed83ef47e86f78a7eb81734995ce2fb3910d02e1a526b"
+      },
+      "v8": {
+        "bytes": 34494,
+        "sha256": "cbbc9bcde202316efb8b56eb61fc1623dad6a0c145315fb0eed778c478c11e2c"
+      },
+      "working_tree": {
+        "bytes": 34049,
+        "exists": true,
+        "sha256": "6f5c529bd40a6b5aec3ed83ef47e86f78a7eb81734995ce2fb3910d02e1a526b"
+      }
+    },
+    "crates/litchi-ole-common/src/object/model.rs": {
+      "head": {
+        "bytes": 17971,
+        "exists": true,
+        "sha256": "46b7c03590d68b7812ad279c5c1ae37c9d92a40b24bc0910bfe9631beca31402"
+      },
+      "v8": {
+        "bytes": 19315,
+        "sha256": "83389ca205916eb65b36607bb2f15f13541821989f20abfd1e6b3236ef6aa352"
+      },
+      "working_tree": {
+        "bytes": 17971,
+        "exists": true,
+        "sha256": "46b7c03590d68b7812ad279c5c1ae37c9d92a40b24bc0910bfe9631beca31402"
+      }
+    },
+    "crates/litchi-ole-common/src/object/target.rs": {
+      "head": {
+        "bytes": 5836,
+        "exists": true,
+        "sha256": "5cef1a597aa4ac4db0e761457af839e4d1f5e42ee7fec58e591aa812bdd391e2"
+      },
+      "v8": {
+        "bytes": 5900,
+        "sha256": "6296e06b7c1276caf05ccc6f932e65f2ed94082c7b425e837d4d408243c57d69"
+      },
+      "working_tree": {
+        "bytes": 5836,
+        "exists": true,
+        "sha256": "5cef1a597aa4ac4db0e761457af839e4d1f5e42ee7fec58e591aa812bdd391e2"
+      }
+    },
+    "crates/litchi-ole-common/src/property_set/codec/editor.rs": {
+      "head": {
+        "bytes": 8115,
+        "exists": true,
+        "sha256": "f3435eed736cc4faebac82a0ff7249218410c9d290292c1f3e0c9809f03881b8"
+      },
+      "v8": {
+        "bytes": 8144,
+        "sha256": "4d3054b85ca61cc288ae8bea6931483625f6f35ccfef505517b864db0b1909ae"
+      },
+      "working_tree": {
+        "bytes": 8115,
+        "exists": true,
+        "sha256": "f3435eed736cc4faebac82a0ff7249218410c9d290292c1f3e0c9809f03881b8"
+      }
+    },
+    "crates/litchi-ole-common/src/protection.rs": {
+      "head": {
+        "bytes": 3522,
+        "exists": true,
+        "sha256": "55d6196da1bfbe39c2b9e26cc8f2392067452601cd16c7ce2acea05c431202e4"
+      },
+      "v8": {
+        "bytes": 5010,
+        "sha256": "4d58bd0a51d6020702f3f4098e3389ae8410c873f37da66f5314f0a1f68b618c"
+      },
+      "working_tree": {
+        "bytes": 3522,
+        "exists": true,
+        "sha256": "55d6196da1bfbe39c2b9e26cc8f2392067452601cd16c7ce2acea05c431202e4"
+      }
+    },
+    "crates/litchi-ole-common/tests/object.rs": {
+      "head": {
+        "bytes": 34686,
+        "exists": true,
+        "sha256": "7ed89df82311dcde1eb6a02c233116280075daf8d78de5f0bd7dc3b1ef3ee2fd"
+      },
+      "v8": {
+        "bytes": 36537,
+        "sha256": "770b94894decab0b28681d1a65c1b0e683d45a466fc4cd105ba9ad701eec9482"
+      },
+      "working_tree": {
+        "bytes": 34686,
+        "exists": true,
+        "sha256": "7ed89df82311dcde1eb6a02c233116280075daf8d78de5f0bd7dc3b1ef3ee2fd"
+      }
+    },
+    "crates/litchi-xls/docs/FEATURE_MATRIX.md": {
+      "head": {
+        "bytes": 20099,
+        "exists": true,
+        "sha256": "5e44341e6bfb7d568a2d33a98e1891dd6953eb796dba6fb0a493714b617691d9"
+      },
+      "v8": {
+        "bytes": 20807,
+        "sha256": "2a3a9de268e58ca5c92280ebb3290801820c74d4a28c73c006a15ab18ae0f26a"
+      },
+      "working_tree": {
+        "bytes": 20099,
+        "exists": true,
+        "sha256": "5e44341e6bfb7d568a2d33a98e1891dd6953eb796dba6fb0a493714b617691d9"
+      }
+    },
+    "crates/litchi-xls/src/lib.rs": {
+      "head": {
+        "bytes": 26008,
+        "exists": true,
+        "sha256": "99dea709bb6bc0bc6afd224f9052da97640ba1c39eeceb565e93bbb41307fd55"
+      },
+      "v8": {
+        "bytes": 26056,
+        "sha256": "98edf44c1231439297a2cd81a0d4cc00acbee85b3b3f6a53abe731b362bff386"
+      },
+      "working_tree": {
+        "bytes": 26345,
+        "exists": true,
+        "sha256": "3c4407037cba676a3eecfc4e493e50c8f2f294d54e4669174c26e1d313cba8a5"
+      }
+    },
+    "crates/litchi-xls/src/ole_object/codec/mod.rs": {
+      "head": {
+        "bytes": 149,
+        "exists": true,
+        "sha256": "66884f4e25cd98ee6f7f410a6eb858aea8af62c3f8d89bec31f6b09a09a6ee00"
+      },
+      "v8": {
+        "bytes": 187,
+        "sha256": "c8cfff8d0ee770efa3692a774072149a0b54b1a63c9087fc326092a324057d1b"
+      },
+      "working_tree": {
+        "bytes": 149,
+        "exists": true,
+        "sha256": "66884f4e25cd98ee6f7f410a6eb858aea8af62c3f8d89bec31f6b09a09a6ee00"
+      }
+    },
+    "crates/litchi-xls/src/ole_object/codec/obj.rs": {
+      "head": {
+        "bytes": 22650,
+        "exists": true,
+        "sha256": "b6ec3ab60e3ef0a9adda7bc77cee1bc726ab91ce0cd0a3f0da1715f835028700"
+      },
+      "v8": {
+        "bytes": 23576,
+        "sha256": "161ac9b57d6463e9c5bd38d23d0296f9eacabd3bba476012978fa7f850631854"
+      },
+      "working_tree": {
+        "bytes": 22650,
+        "exists": true,
+        "sha256": "b6ec3ab60e3ef0a9adda7bc77cee1bc726ab91ce0cd0a3f0da1715f835028700"
+      }
+    },
+    "crates/litchi-xls/src/ole_object/edit/transaction.rs": {
+      "head": {
+        "bytes": 6295,
+        "exists": true,
+        "sha256": "1effebab5705115b62a4961f44c614fba7a3c65c35afbef4a0f1e14fde4030f7"
+      },
+      "v8": {
+        "bytes": 8522,
+        "sha256": "4624b5894a8e0c93676860aaacf4be68d838ab044d2d75c03f8650cd0e173d97"
+      },
+      "working_tree": {
+        "bytes": 6295,
+        "exists": true,
+        "sha256": "1effebab5705115b62a4961f44c614fba7a3c65c35afbef4a0f1e14fde4030f7"
+      }
+    },
+    "crates/litchi-xls/src/ole_object/package/transaction.rs": {
+      "head": {
+        "bytes": 19597,
+        "exists": true,
+        "sha256": "45faa1e210ec8920d58abea69ce28d44ee6c13963a9593b19bb38bcaa6d9eddd"
+      },
+      "v8": {
+        "bytes": 42033,
+        "sha256": "b3818082fb6d00d820e761d253f8e12146b21bd583d25e268c9c9f6d5e76979b"
+      },
+      "working_tree": {
+        "bytes": 19597,
+        "exists": true,
+        "sha256": "45faa1e210ec8920d58abea69ce28d44ee6c13963a9593b19bb38bcaa6d9eddd"
+      }
+    },
+    "crates/litchi-xls/src/ole_object/semantic/metadata.rs": {
+      "head": {
+        "bytes": 3669,
+        "exists": true,
+        "sha256": "63a888d0b35ddc0367d045a5134523592307b283bf7783556ebe42fe9a2052e4"
+      },
+      "v8": {
+        "bytes": 4096,
+        "sha256": "d26ba7cee35bc582a7527b1c72f09fb1a6826eefe2ebf78acff5cbd552b291e1"
+      },
+      "working_tree": {
+        "bytes": 3669,
+        "exists": true,
+        "sha256": "63a888d0b35ddc0367d045a5134523592307b283bf7783556ebe42fe9a2052e4"
+      }
+    },
+    "crates/litchi-xls/src/ole_object/semantic/mod.rs": {
+      "head": {
+        "bytes": 455,
+        "exists": true,
+        "sha256": "bdce971636f19c036d4110d17339ae762e10e8e3019f555140b02c4498069189"
+      },
+      "v8": {
+        "bytes": 595,
+        "sha256": "af0e1c78bad6cb7e670952f4ed89f4b128544ba01b2ca26d27b30065bdf4a52d"
+      },
+      "working_tree": {
+        "bytes": 455,
+        "exists": true,
+        "sha256": "bdce971636f19c036d4110d17339ae762e10e8e3019f555140b02c4498069189"
+      }
+    },
+    "crates/litchi-xls/src/ole_object/semantic/obj.rs": {
+      "head": {
+        "bytes": 6488,
+        "exists": true,
+        "sha256": "81146a211516644978cbc8e0d26d4b84143df3e5afcdf403fcd9d3ceefd439ce"
+      },
+      "v8": {
+        "bytes": 8323,
+        "sha256": "a0cec6ff0c26cc608117844d09d603081aa58a3358fbd9fbfa76b431133e9565"
+      },
+      "working_tree": {
+        "bytes": 6488,
+        "exists": true,
+        "sha256": "81146a211516644978cbc8e0d26d4b84143df3e5afcdf403fcd9d3ceefd439ce"
+      }
+    },
+    "crates/litchi-xls/src/ole_object/semantic/payload.rs": {
+      "head": {
+        "exists": false
+      },
+      "v8": {
+        "bytes": 15688,
+        "sha256": "9cc6669e8527df1c1803d559f18d77b79714ae0b7a79bac7f210cd1e4aaa58aa"
+      },
+      "working_tree": {
+        "exists": false
+      }
+    },
+    "crates/litchi-xls/src/ole_object/tests/codec.rs": {
+      "head": {
+        "bytes": 2402,
+        "exists": true,
+        "sha256": "a08bb1578717cbd20be3012e03919b5383f359c254a6f6c17f7108ce7873f5d0"
+      },
+      "v8": {
+        "bytes": 6644,
+        "sha256": "bff987200a32faf31fcc37f8cfdd552e6b9c0b5f193c2792a79ac04564700ab8"
+      },
+      "working_tree": {
+        "bytes": 2402,
+        "exists": true,
+        "sha256": "a08bb1578717cbd20be3012e03919b5383f359c254a6f6c17f7108ce7873f5d0"
+      }
+    },
+    "crates/litchi-xls/src/ole_object/tests/package.rs": {
+      "head": {
+        "bytes": 6837,
+        "exists": true,
+        "sha256": "0773a12f53fc01cdcfe0099719b8a0046c990625c2de1db714478c878c441e07"
+      },
+      "v8": {
+        "bytes": 11679,
+        "sha256": "68efc5e9b7395ad484a1b2243c7385dcebbc6acd250ab3395829655c121b6c09"
+      },
+      "working_tree": {
+        "bytes": 6837,
+        "exists": true,
+        "sha256": "0773a12f53fc01cdcfe0099719b8a0046c990625c2de1db714478c878c441e07"
+      }
+    },
+    "crates/litchi-xls/src/ole_object/tests/transaction.rs": {
+      "head": {
+        "bytes": 10755,
+        "exists": true,
+        "sha256": "be7f5afb1b233e1acd122bfebd74e3f93f13413ad8041a5e0b870fd8d41f80b1"
+      },
+      "v8": {
+        "bytes": 40392,
+        "sha256": "d447e420a20285915caaa4a2631d3c432107aacf727e6c7caa5d5b69a01c7e3e"
+      },
+      "working_tree": {
+        "bytes": 10755,
+        "exists": true,
+        "sha256": "be7f5afb1b233e1acd122bfebd74e3f93f13413ad8041a5e0b870fd8d41f80b1"
+      }
+    },
+    "crates/litchi-xls/src/ole_object/tests/validation.rs": {
+      "head": {
+        "bytes": 4344,
+        "exists": true,
+        "sha256": "dd5a738b147adbdb0108a8f4b7187a3ff3b6491a86867cb9481aca5aaa2c1e1b"
+      },
+      "v8": {
+        "bytes": 9779,
+        "sha256": "6c2ba4ba4099391407f4dcea7ea64a3a169762036313931a7d36890da557970b"
+      },
+      "working_tree": {
+        "bytes": 4344,
+        "exists": true,
+        "sha256": "dd5a738b147adbdb0108a8f4b7187a3ff3b6491a86867cb9481aca5aaa2c1e1b"
+      }
+    },
+    "crates/litchi-xls/src/ole_object/validation/mod.rs": {
+      "head": {
+        "bytes": 91,
+        "exists": true,
+        "sha256": "d36f823882bf300e294726d143fcab57d9fcd8858bce36e6bd07c817850d3eda"
+      },
+      "v8": {
+        "bytes": 138,
+        "sha256": "ea054ebd3fe2ffc97d2067772d9411986c8cb5008e04db39a31abf94527f894b"
+      },
+      "working_tree": {
+        "bytes": 91,
+        "exists": true,
+        "sha256": "d36f823882bf300e294726d143fcab57d9fcd8858bce36e6bd07c817850d3eda"
+      }
+    },
+    "crates/litchi-xls/src/ole_object/validation/obj.rs": {
+      "head": {
+        "bytes": 2417,
+        "exists": true,
+        "sha256": "fa8d056df35282436ea803be79ca93804bf371bd0fc43244ea1b297790a22029"
+      },
+      "v8": {
+        "bytes": 10852,
+        "sha256": "aa76a03529b13f2efb265db5b179de02c5fc60e9bd66c5391ffb279350daf5cb"
+      },
+      "working_tree": {
+        "bytes": 2417,
+        "exists": true,
+        "sha256": "fa8d056df35282436ea803be79ca93804bf371bd0fc43244ea1b297790a22029"
+      }
+    },
+    "crates/litchi-xls/tests/v7_review_probe.rs": {
+      "head": {
+        "exists": false
+      },
+      "v8": {
+        "bytes": 2797,
+        "sha256": "acb684f6e97b681193205f25bcf0ee9cd4ed8a6cb85a1bc3c380803b5a6ec30b"
+      },
+      "working_tree": {
+        "exists": false
+      }
+    },
+    "crates/litchi-xls/tests/xls_form_controls.rs": {
+      "head": {
+        "bytes": 20749,
+        "exists": true,
+        "sha256": "f7d77ca442d4438c19fdf4c42e88ef591b4c72320e5f7f8043bdf7127213e85c"
+      },
+      "v8": {
+        "bytes": 20992,
+        "sha256": "8e8d2c5211a4529cc890293c66e34478920cec36e82377ff6d72740328711a74"
+      },
+      "working_tree": {
+        "bytes": 20749,
+        "exists": true,
+        "sha256": "f7d77ca442d4438c19fdf4c42e88ef591b4c72320e5f7f8043bdf7127213e85c"
+      }
+    },
+    "crates/litchi-xls/tests/xls_ole_objects.rs": {
+      "head": {
+        "bytes": 6522,
+        "exists": true,
+        "sha256": "ffee0720d20db11c966e96c3a2ced99a7a9e965bb3a7f2de74d22650dae00b4e"
+      },
+      "v8": {
+        "bytes": 6716,
+        "sha256": "3cb31abfea1559f4b151e1f1e77954f27d22e6985204ce4f19d3832ebde04f40"
+      },
+      "working_tree": {
+        "bytes": 6522,
+        "exists": true,
+        "sha256": "ffee0720d20db11c966e96c3a2ced99a7a9e965bb3a7f2de74d22650dae00b4e"
+      }
+    }
+  },
+  "preimages": "/var/tmp/litchi-xls-embedded-payload-v8-overlay-fd95-20260910-preimages",
+  "source_worktree": "/home/zhuhe/code/litchi-spec-gaps"
+}

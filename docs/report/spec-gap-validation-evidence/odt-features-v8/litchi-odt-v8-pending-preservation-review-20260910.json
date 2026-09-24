@@ -1,0 +1,124 @@
+{
+  "candidate": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910",
+  "candidate_head": "ed0a5c7e54a38804ad7c13e5d7f03569fc50d4e6",
+  "comparison": [
+    {
+      "candidate_sha256": "948dc9d82e3718204af90336ba55f74b83557e7bdf7fc0fcce5aeb400045c075",
+      "classification": "superseded",
+      "path": "crates/litchi-odt/docs/FEATURE_MATRIX.md",
+      "primary_sha256": "bf7d6051ffd60260014e8bdf3a20a4796ee81d57f75972046c80e4f7480ae35f",
+      "reason": "Candidate updates the same feature claims to expose text:number fallback labels and schema-approved text:soft-page-break support added by V8.",
+      "same": false
+    },
+    {
+      "candidate_sha256": "f8fff4bfe721efe26395d4b1b711bbbba15fb80b8e73ae91a9ab25abdd0be9f7",
+      "classification": "preserved-exact",
+      "path": "crates/litchi-odt/src/document/semantic.rs",
+      "primary_sha256": "f8fff4bfe721efe26395d4b1b711bbbba15fb80b8e73ae91a9ab25abdd0be9f7",
+      "reason": "Primary and candidate bytes are identical.",
+      "same": true
+    },
+    {
+      "candidate_sha256": "5c576710e7e1edc1cdf9c48e91cc651b7a244320201f905b2ca38c89400dafa5",
+      "classification": "superseded",
+      "path": "crates/litchi-odt/src/document/source.rs",
+      "primary_sha256": "105b8e909b68396093ee817d7d3b1f099fecf9509befd60064d1fd93d96216ca",
+      "reason": "Only removes an unnecessary closure around parse_parts; the parts, parser call, and prefer_current behavior are identical.",
+      "same": false
+    },
+    {
+      "candidate_sha256": "a49b609f2f1c024adbc8585224bb49177fa40eaddfc024c67905a80e220e3f7b",
+      "classification": "preserved-exact",
+      "path": "crates/litchi-odt/src/elements/field/model/metadata.rs",
+      "primary_sha256": "a49b609f2f1c024adbc8585224bb49177fa40eaddfc024c67905a80e220e3f7b",
+      "reason": "Primary and candidate bytes are identical.",
+      "same": true
+    },
+    {
+      "candidate_sha256": "683772a3c7cc774380375e4ff7440703980f9707fd9e1c7680e63c715041d617",
+      "classification": "preserved-exact",
+      "path": "crates/litchi-odt/src/generic/flat.rs",
+      "primary_sha256": "683772a3c7cc774380375e4ff7440703980f9707fd9e1c7680e63c715041d617",
+      "reason": "Primary and candidate bytes are identical.",
+      "same": true
+    },
+    {
+      "candidate_sha256": "0fc0591a6090e32bc22483339d2b64356ba8df52d2548a1f518c7e0def2c013b",
+      "classification": "preserved-exact",
+      "path": "crates/litchi-odt/src/generic/package.rs",
+      "primary_sha256": "0fc0591a6090e32bc22483339d2b64356ba8df52d2548a1f518c7e0def2c013b",
+      "reason": "Primary and candidate bytes are identical.",
+      "same": true
+    },
+    {
+      "candidate_sha256": "1fbbf9b483a65538edb2a345d4794b6cc9115703bfddf3ec06230a4095afe407",
+      "classification": "superseded",
+      "path": "crates/litchi-odt/src/lib.rs",
+      "primary_sha256": "231e30843e61eff06b8ffc76b6ae6769400e1a8c075046c057d2d4080a10005b",
+      "reason": "Candidate adds the public NumberLabel and SoftPageBreak exports required by its text-element feature; no primary-only deletion.",
+      "same": false
+    },
+    {
+      "candidate_sha256": "38cb9d93db8bf291144f2359ff9bc481cc0146b02c970f71ff56a00b071fd32f",
+      "classification": "preserved-exact",
+      "path": "crates/litchi-odt/src/mutable/codec/semantic/mod.rs",
+      "primary_sha256": "38cb9d93db8bf291144f2359ff9bc481cc0146b02c970f71ff56a00b071fd32f",
+      "reason": "Primary and candidate bytes are identical.",
+      "same": true
+    },
+    {
+      "candidate_sha256": "a212fe8e7b058de05c45b9d0aff2f1ddd3345d04c99d9a3b982c264500a23a97",
+      "classification": "preserved-exact",
+      "path": "crates/litchi-odt/src/mutable/semantic/content.rs",
+      "primary_sha256": "a212fe8e7b058de05c45b9d0aff2f1ddd3345d04c99d9a3b982c264500a23a97",
+      "reason": "Primary and candidate bytes are identical.",
+      "same": true
+    },
+    {
+      "candidate_sha256": "9983cb7a752ddd8eba0cc86c7f019cbd77a616dc2ab02e8718df7b0b6bdc3ae5",
+      "classification": "superseded",
+      "path": "crates/litchi-odt/src/content_metadata.rs",
+      "primary_sha256": "a284f1ef2cb1d556767676e460483a2c962c6f221d0f98b0e125b6cd592b4fc8",
+      "reason": "Candidate replaces the same pending metadata codec with bounded/fallible aggregate parsing, attribute/node limits, checked output sizing, semantic no-op replacement, namespace-aware serialization, and tests. Removed lines are the old unbounded allocations/splices.",
+      "same": false
+    },
+    {
+      "candidate_sha256": "2ce8057c5901f6f334d1b675d3ea7c080c925277ab86e6f14077770dab608932",
+      "classification": "preserved-exact",
+      "path": "crates/litchi-odt/src/mutable/codec/semantic/metadata.rs",
+      "primary_sha256": "2ce8057c5901f6f334d1b675d3ea7c080c925277ab86e6f14077770dab608932",
+      "reason": "Primary and candidate bytes are identical.",
+      "same": true
+    },
+    {
+      "candidate_sha256": "2a82fe628ab45789f711b384a544d241f3ef7ad7df03885d0f19dca6879a4621",
+      "classification": "preserved-exact",
+      "path": "crates/litchi-odt/src/mutable/codec/semantic/xforms.rs",
+      "primary_sha256": "2a82fe628ab45789f711b384a544d241f3ef7ad7df03885d0f19dca6879a4621",
+      "reason": "Primary and candidate bytes are identical.",
+      "same": true
+    },
+    {
+      "candidate_sha256": "21ad999c01c4c6fc5a9dbb2298e112898771b4bc730d586c1568872154d5c201",
+      "classification": "superseded",
+      "path": "crates/litchi-odt/src/xforms.rs",
+      "primary_sha256": "b550ac2540b9348233f315225cb2aad4a55958060d50a57a6a34ed0168470ed8",
+      "reason": "Candidate replaces the same pending XForms codec with bounded/fallible output, model/ID/reference graph validation, extension-root identity checks, depth/count/attribute limits, source-lexical preservation checks, no-op replacement, and reparsing after mutation.",
+      "same": false
+    },
+    {
+      "candidate_sha256": "c97c7aca619daa97bf533abe6b1e0b64e622badc26a621b4c5e90787e4da1819",
+      "classification": "preserved-exact",
+      "path": "crates/litchi-odt/tests/in_content_metadata.rs",
+      "primary_sha256": "c97c7aca619daa97bf533abe6b1e0b64e622badc26a621b4c5e90787e4da1819",
+      "reason": "Primary and candidate bytes are identical.",
+      "same": true
+    }
+  ],
+  "conclusion": "Candidate semantically supersedes all five differing pending paths. No mixed overlay is required. Nine paths are byte-identical; the five differences contain only the candidate V8 follow-up replacements/additions described per path. All 14 pending paths are accounted for.",
+  "patch": "/var/tmp/litchi-odt-root-v8-pending-to-reviewed-20260910.patch",
+  "patch_sha256": "3e9f4aeab8083aa9093acbab2e616f12f1e81d4300a51026a218313804ae0ed0",
+  "primary": "/home/zhuhe/code/litchi-spec-gaps",
+  "primary_head": "784805185ef60f3127883c0f9744fdf9335b9ea4",
+  "schema": "litchi.odt.v8.pending-preservation-review.v1"
+}

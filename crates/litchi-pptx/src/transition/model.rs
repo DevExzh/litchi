@@ -3,12 +3,15 @@
 use std::fmt;
 use std::sync::Arc;
 
-/// Largest millisecond value accepted by `PowerPoint`'s transition timing
-/// attributes.
+use crate::time::Offset;
+use crate::{Error, Result as PptxResult};
+
+/// Largest millisecond value accepted by the legacy integral transition
+/// timing attributes.
 ///
 /// Microsoft documents `advTm` as the inclusive range `0..=2_147_483_647`.
-/// The same conservative bound is used for the Office 2010 transition
-/// duration extension so both timing values remain accepted by `PowerPoint`.
+/// Exact Office 2010 `p14:dur` values use [`crate::time::Offset`] and are
+/// bounded by that type's lexical safety limit instead.
 pub const MAX_MS: u32 = i32::MAX as u32;
 
 /// A checked `PowerPoint` transition time in milliseconds.
@@ -95,6 +98,37 @@ pub enum Side {
     Down,
 }
 
+/// A horizontal side used by the PowerPoint 2010 effects whose schema only
+/// accepts `l` or `r`.
+///
+/// This is deliberately separate from [`Side`].  Passing `Up` or `Down` to a
+/// conveyor, ferris, flip, gallery, reveal, or switch effect would produce an
+/// invalid `ST_TransitionLeftRightDirectionType` value, so the narrower type
+/// keeps those combinations out of the authoring API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LeftRight {
+    /// Left.
+    Left,
+    /// Right.
+    Right,
+    /// The optional `dir` attribute was omitted.
+    ///
+    /// This is accepted by the `CT_LeftRightDirectionTransition` effects.
+    /// `Reveal` also permits the omitted form and applies its schema default
+    /// when played by PowerPoint.
+    Unspecified,
+}
+
+impl LeftRight {
+    pub(crate) const fn wire(self) -> Option<&'static str> {
+        match self {
+            Self::Left => Some("l"),
+            Self::Right => Some("r"),
+            Self::Unspecified => None,
+        }
+    }
+}
+
 /// A slide axis.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Axis {
@@ -171,6 +205,493 @@ pub enum Ripple {
     LeftDown,
     /// Lower-right corner.
     RightDown,
+}
+
+/// A geometric pattern used by a PowerPoint 2010 glitter transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GlitterPattern {
+    /// Diamond tiles.
+    Diamond,
+    /// Hexagonal tiles.
+    Hexagon,
+}
+
+impl GlitterPattern {
+    pub(crate) const fn wire(self) -> &'static str {
+        match self {
+            Self::Diamond => "diamond",
+            Self::Hexagon => "hexagon",
+        }
+    }
+}
+
+/// A geometric pattern used by a PowerPoint 2010 shred transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ShredPattern {
+    /// Vertical strips.
+    Strip,
+    /// Small rectangles.
+    Rectangle,
+}
+
+impl ShredPattern {
+    pub(crate) const fn wire(self) -> &'static str {
+        match self {
+            Self::Strip => "strip",
+            Self::Rectangle => "rectangle",
+        }
+    }
+}
+
+/// Parameters for a PowerPoint 2010 fly-through transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FlyThrough {
+    direction: InOut,
+    bounce: bool,
+}
+
+impl FlyThrough {
+    /// Creates a fly-through with its direction and bounce setting.
+    #[must_use]
+    pub const fn new(direction: InOut, bounce: bool) -> Self {
+        Self { direction, bounce }
+    }
+
+    /// Returns the slide movement direction.
+    #[must_use]
+    pub const fn direction(self) -> InOut {
+        self.direction
+    }
+
+    /// Returns whether the slide movement bounces.
+    #[must_use]
+    pub const fn bounce(self) -> bool {
+        self.bounce
+    }
+
+    /// Sets the slide movement direction.
+    pub const fn set_direction(&mut self, direction: InOut) {
+        self.direction = direction;
+    }
+
+    /// Sets the slide movement direction in a builder chain.
+    #[must_use]
+    pub const fn with_direction(mut self, direction: InOut) -> Self {
+        self.set_direction(direction);
+        self
+    }
+
+    /// Sets whether the slide movement bounces.
+    pub const fn set_bounce(&mut self, bounce: bool) {
+        self.bounce = bounce;
+    }
+
+    /// Sets the bounce flag in a builder chain.
+    #[must_use]
+    pub const fn with_bounce(mut self, bounce: bool) -> Self {
+        self.set_bounce(bounce);
+        self
+    }
+}
+
+/// Parameters for a PowerPoint 2010 glitter transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Glitter {
+    direction: Side,
+    pattern: GlitterPattern,
+}
+
+impl Glitter {
+    /// Creates a glitter transition with a direction and tile pattern.
+    #[must_use]
+    pub const fn new(direction: Side, pattern: GlitterPattern) -> Self {
+        Self { direction, pattern }
+    }
+
+    /// Returns the slide movement direction.
+    #[must_use]
+    pub const fn direction(self) -> Side {
+        self.direction
+    }
+
+    /// Returns the tile pattern.
+    #[must_use]
+    pub const fn pattern(self) -> GlitterPattern {
+        self.pattern
+    }
+
+    /// Sets the slide movement direction.
+    pub const fn set_direction(&mut self, direction: Side) {
+        self.direction = direction;
+    }
+
+    /// Sets the slide movement direction in a builder chain.
+    #[must_use]
+    pub const fn with_direction(mut self, direction: Side) -> Self {
+        self.set_direction(direction);
+        self
+    }
+
+    /// Sets the tile pattern.
+    pub const fn set_pattern(&mut self, pattern: GlitterPattern) {
+        self.pattern = pattern;
+    }
+
+    /// Sets the tile pattern in a builder chain.
+    #[must_use]
+    pub const fn with_pattern(mut self, pattern: GlitterPattern) -> Self {
+        self.set_pattern(pattern);
+        self
+    }
+}
+
+/// Parameters for a PowerPoint 2010 prism transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Prism {
+    direction: Side,
+    content: bool,
+    inverted: bool,
+}
+
+impl Prism {
+    /// Creates a prism transition with its direction and rendering flags.
+    #[must_use]
+    pub const fn new(direction: Side, content: bool, inverted: bool) -> Self {
+        Self {
+            direction,
+            content,
+            inverted,
+        }
+    }
+
+    /// Returns the slide movement direction.
+    #[must_use]
+    pub const fn direction(self) -> Side {
+        self.direction
+    }
+
+    /// Returns whether content and the background are drawn separately.
+    #[must_use]
+    pub const fn content(self) -> bool {
+        self.content
+    }
+
+    /// Returns whether the prism is concave.
+    #[must_use]
+    pub const fn inverted(self) -> bool {
+        self.inverted
+    }
+
+    /// Sets the slide movement direction.
+    pub const fn set_direction(&mut self, direction: Side) {
+        self.direction = direction;
+    }
+
+    /// Sets the slide movement direction in a builder chain.
+    #[must_use]
+    pub const fn with_direction(mut self, direction: Side) -> Self {
+        self.set_direction(direction);
+        self
+    }
+
+    /// Sets whether content and the background are drawn separately.
+    pub const fn set_content(&mut self, content: bool) {
+        self.content = content;
+    }
+
+    /// Sets the content-separation flag in a builder chain.
+    #[must_use]
+    pub const fn with_content(mut self, content: bool) -> Self {
+        self.set_content(content);
+        self
+    }
+
+    /// Sets whether the prism is concave.
+    pub const fn set_inverted(&mut self, inverted: bool) {
+        self.inverted = inverted;
+    }
+
+    /// Sets the concavity flag in a builder chain.
+    #[must_use]
+    pub const fn with_inverted(mut self, inverted: bool) -> Self {
+        self.set_inverted(inverted);
+        self
+    }
+}
+
+/// Parameters for a PowerPoint 2010 reveal transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Reveal {
+    direction: LeftRight,
+    through_black: bool,
+}
+
+impl Reveal {
+    /// Creates a reveal transition with its direction and black-screen flag.
+    #[must_use]
+    pub const fn new(direction: LeftRight, through_black: bool) -> Self {
+        Self {
+            direction: normalize_reveal_direction(direction),
+            through_black,
+        }
+    }
+
+    /// Returns the slide movement direction.
+    #[must_use]
+    pub const fn direction(self) -> LeftRight {
+        self.direction
+    }
+
+    /// Returns whether the transition fades through black.
+    #[must_use]
+    pub const fn through_black(self) -> bool {
+        self.through_black
+    }
+
+    /// Sets the slide movement direction.
+    pub const fn set_direction(&mut self, direction: LeftRight) {
+        self.direction = normalize_reveal_direction(direction);
+    }
+
+    /// Sets the slide movement direction in a builder chain.
+    #[must_use]
+    pub const fn with_direction(mut self, direction: LeftRight) -> Self {
+        self.set_direction(direction);
+        self
+    }
+
+    /// Sets whether the transition fades through black.
+    pub const fn set_through_black(&mut self, through_black: bool) {
+        self.through_black = through_black;
+    }
+
+    /// Sets the black-screen flag in a builder chain.
+    #[must_use]
+    pub const fn with_through_black(mut self, through_black: bool) -> Self {
+        self.set_through_black(through_black);
+        self
+    }
+}
+
+/// Parameters for a PowerPoint 2010 shred transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Shred {
+    pattern: ShredPattern,
+    direction: InOut,
+}
+
+impl Shred {
+    /// Creates a shred transition with its tile pattern and direction.
+    #[must_use]
+    pub const fn new(pattern: ShredPattern, direction: InOut) -> Self {
+        Self { pattern, direction }
+    }
+
+    /// Returns the tile pattern.
+    #[must_use]
+    pub const fn pattern(self) -> ShredPattern {
+        self.pattern
+    }
+
+    /// Returns the slide movement direction.
+    #[must_use]
+    pub const fn direction(self) -> InOut {
+        self.direction
+    }
+
+    /// Sets the tile pattern.
+    pub const fn set_pattern(&mut self, pattern: ShredPattern) {
+        self.pattern = pattern;
+    }
+
+    /// Sets the tile pattern in a builder chain.
+    #[must_use]
+    pub const fn with_pattern(mut self, pattern: ShredPattern) -> Self {
+        self.set_pattern(pattern);
+        self
+    }
+
+    /// Sets the slide movement direction.
+    pub const fn set_direction(&mut self, direction: InOut) {
+        self.direction = direction;
+    }
+
+    /// Sets the slide movement direction in a builder chain.
+    #[must_use]
+    pub const fn with_direction(mut self, direction: InOut) -> Self {
+        self.set_direction(direction);
+        self
+    }
+}
+
+/// Matching granularity for a PowerPoint Morph transition.
+///
+/// The values are the complete `ST_TransitionMorphOption` vocabulary from
+/// `[MS-PPTX]` 2.6.4.1. Keeping this as a closed value prevents a malformed
+/// token from being emitted by the ordinary transition writer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Morph {
+    /// Match and move whole objects.
+    ByObject,
+    /// Match and move objects and individual words.
+    ByWord,
+    /// Match and move objects and individual characters.
+    ByChar,
+}
+
+/// Maximum UTF-8 bytes retained for one preset transition name.
+pub const MAX_PRESET_NAME_BYTES: usize = 64 * 1024;
+
+impl Morph {
+    pub(crate) const fn wire(self) -> &'static str {
+        match self {
+            Self::ByObject => "byObject",
+            Self::ByWord => "byWord",
+            Self::ByChar => "byChar",
+        }
+    }
+}
+
+/// A typed PowerPoint preset transition (`p15:prstTrans`).
+///
+/// `prst` is intentionally retained as a checked string because the
+/// Microsoft schema declares it as `xsd:string`, while the specification only
+/// documents the presets known to a particular Office release. This keeps
+/// newer producer names readable and writable without guessing their visual
+/// meaning. The optional value also preserves the schema's omitted-attribute
+/// form.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Preset {
+    name: Option<Box<str>>,
+    invert_x: bool,
+    invert_y: bool,
+}
+
+impl Preset {
+    /// Creates a preset with the supplied `prst` name and default inversion.
+    ///
+    /// The value is checked for XML 1.0 characters before it is retained.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the name is too large or contains an invalid XML
+    /// 1.0 character.
+    pub fn new(name: impl AsRef<str>) -> PptxResult<Self> {
+        Self::with_options(name.as_ref(), false, false)
+    }
+
+    /// Creates a preset with all three schema attributes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the name is too large or contains an invalid XML
+    /// 1.0 character.
+    pub fn with_options(name: impl AsRef<str>, invert_x: bool, invert_y: bool) -> PptxResult<Self> {
+        Ok(Self {
+            name: Some(validate_preset_name(name.as_ref())?),
+            invert_x,
+            invert_y,
+        })
+    }
+
+    /// Creates the schema-valid form with an omitted `prst` attribute.
+    #[must_use]
+    pub const fn without_name() -> Self {
+        Self {
+            name: None,
+            invert_x: false,
+            invert_y: false,
+        }
+    }
+
+    /// Returns the optional `prst` name.
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// Returns the `invX` value.
+    #[must_use]
+    pub const fn invert_x(&self) -> bool {
+        self.invert_x
+    }
+
+    /// Returns the `invY` value.
+    #[must_use]
+    pub const fn invert_y(&self) -> bool {
+        self.invert_y
+    }
+
+    /// Sets whether the preset's X coordinates are inverted.
+    pub fn set_invert_x(&mut self, value: bool) {
+        self.invert_x = value;
+    }
+
+    /// Sets whether the preset's Y coordinates are inverted.
+    pub fn set_invert_y(&mut self, value: bool) {
+        self.invert_y = value;
+    }
+
+    /// Sets X inversion in a builder chain.
+    pub fn with_invert_x(mut self, value: bool) -> Self {
+        self.set_invert_x(value);
+        self
+    }
+
+    /// Sets Y inversion in a builder chain.
+    pub fn with_invert_y(mut self, value: bool) -> Self {
+        self.set_invert_y(value);
+        self
+    }
+
+    pub(crate) fn from_parts(
+        name: Option<String>,
+        invert_x: bool,
+        invert_y: bool,
+    ) -> PptxResult<Self> {
+        Ok(Self {
+            name: name.map(validate_owned_preset_name).transpose()?,
+            invert_x,
+            invert_y,
+        })
+    }
+}
+
+impl Default for Preset {
+    fn default() -> Self {
+        Self::without_name()
+    }
+}
+
+fn validate_preset_name(name: &str) -> PptxResult<Box<str>> {
+    validate_preset_name_bytes(name)?;
+    Ok(name.into())
+}
+
+fn validate_owned_preset_name(name: String) -> PptxResult<Box<str>> {
+    validate_preset_name_bytes(&name)?;
+    Ok(name.into_boxed_str())
+}
+
+fn validate_preset_name_bytes(name: &str) -> PptxResult<()> {
+    if name.len() > MAX_PRESET_NAME_BYTES {
+        return Err(Error::Limit {
+            resource: "preset transition name bytes",
+            limit: MAX_PRESET_NAME_BYTES,
+        });
+    }
+    if name.chars().any(|character| {
+        let value = character as u32;
+        !matches!(
+            value,
+            0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF
+        )
+    }) {
+        return Err(Error::Invalid(
+            "preset transition name contains an invalid XML character".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// PowerPoint-supported wheel spoke counts.
@@ -313,6 +834,46 @@ pub enum Kind {
     Newsflash,
     /// `PowerPoint` 2010 ripple with a standard fade fallback.
     Ripple(Ripple),
+    /// PowerPoint 2010 conveyor transition.
+    Conveyor(LeftRight),
+    /// PowerPoint 2010 doors transition.
+    Doors(Axis),
+    /// PowerPoint 2010 ferris transition.
+    Ferris(LeftRight),
+    /// PowerPoint 2010 flash transition.
+    Flash,
+    /// PowerPoint 2010 flip transition.
+    Flip(LeftRight),
+    /// PowerPoint 2010 fly-through transition.
+    FlyThrough(FlyThrough),
+    /// PowerPoint 2010 gallery transition.
+    Gallery(LeftRight),
+    /// PowerPoint 2010 glitter transition.
+    Glitter(Glitter),
+    /// PowerPoint 2010 honeycomb transition.
+    Honeycomb,
+    /// PowerPoint 2010 pan transition.
+    Pan(Side),
+    /// PowerPoint 2010 prism transition.
+    Prism(Prism),
+    /// PowerPoint 2010 reveal transition.
+    Reveal(Reveal),
+    /// PowerPoint 2010 shred transition.
+    Shred(Shred),
+    /// PowerPoint 2010 switch transition.
+    Switch(LeftRight),
+    /// PowerPoint 2010 vortex transition.
+    Vortex(Side),
+    /// PowerPoint 2010 warp transition.
+    Warp(InOut),
+    /// PowerPoint 2010 reverse-wheel transition.
+    WheelReverse(Spokes),
+    /// PowerPoint 2010 window transition.
+    Window(Axis),
+    /// PowerPoint Morph transition with a standard fade fallback.
+    Morph(Morph),
+    /// PowerPoint 2012 preset transition with a standard fade fallback.
+    Preset(Preset),
     /// Diagonal strips from a corner.
     Strips(Corner),
     /// Comb along an axis.
@@ -328,7 +889,7 @@ pub enum Kind {
 pub struct Transition {
     pub(crate) kind: Kind,
     pub(crate) speed: Speed,
-    pub(crate) duration: Option<Ms>,
+    pub(crate) duration_offset: Option<Arc<Offset>>,
     pub(crate) click: bool,
     pub(crate) after: Option<Ms>,
     pub(crate) preserved: Option<Arc<Preserved>>,
@@ -358,7 +919,7 @@ impl Transition {
         Self {
             kind,
             speed: Speed::Medium,
-            duration: None,
+            duration_offset: None,
             click: true,
             after: None,
             preserved: None,
@@ -379,7 +940,7 @@ impl Transition {
     pub fn same_semantics(&self, other: &Self) -> bool {
         self.kind == other.kind
             && self.speed == other.speed
-            && self.duration == other.duration
+            && self.duration_offset == other.duration_offset
             && self.click == other.click
             && self.after == other.after
     }
@@ -420,20 +981,48 @@ impl Transition {
         self
     }
 
-    /// Returns the custom duration, if present.
+    /// Returns an integral custom duration when it fits the v1 millisecond
+    /// domain. Fractional or larger exact values are available through
+    /// [`Self::duration_offset`].
     #[must_use]
-    pub const fn duration(&self) -> Option<Ms> {
-        self.duration
+    pub fn duration(&self) -> Option<Ms> {
+        self.duration_offset.as_deref().and_then(offset_as_ms)
     }
 
     /// Sets or clears the custom duration.
     pub fn set_duration(&mut self, duration: Option<Ms>) {
-        self.duration = duration;
+        self.set_duration_offset(duration.map(|value| Offset::ms(u64::from(value.get()))));
     }
 
     /// Sets a custom duration in a builder chain.
     pub fn with_duration(mut self, duration: Ms) -> Self {
         self.set_duration(Some(duration));
+        self
+    }
+
+    /// Returns the exact custom duration, if present.
+    ///
+    /// The value is normalized to decimal milliseconds, but fractional
+    /// milliseconds are retained. Use this accessor when handling the
+    /// Office 2010 `p14:dur` extension; [`Self::duration`] remains the v1
+    /// integral-millisecond view.
+    #[must_use]
+    pub fn duration_offset(&self) -> Option<&Offset> {
+        self.duration_offset.as_deref()
+    }
+
+    /// Sets or clears the exact custom duration.
+    ///
+    /// Integral values that fit the v1 [`Ms`] domain are also exposed through
+    /// [`Self::duration`]. Larger or fractional values remain available only
+    /// through [`Self::duration_offset`] so no precision is discarded.
+    pub fn set_duration_offset(&mut self, duration: Option<Offset>) {
+        self.duration_offset = duration.map(Arc::new);
+    }
+
+    /// Sets an exact custom duration in a builder chain.
+    pub fn with_duration_offset(mut self, duration: Offset) -> Self {
+        self.set_duration_offset(Some(duration));
         self
     }
 
@@ -471,12 +1060,23 @@ impl Transition {
         self
     }
 
-    /// Returns the effective duration, preferring a custom duration.
-    pub const fn effective_duration(&self) -> Ms {
-        match self.duration {
+    /// Returns the effective integral duration, preferring a custom duration
+    /// that fits the v1 millisecond domain. Use
+    /// [`Self::effective_duration_offset`] for exact p14 timing.
+    pub fn effective_duration(&self) -> Ms {
+        match self.duration() {
             Some(duration) => duration,
             None => self.speed.duration(),
         }
+    }
+
+    /// Returns the exact effective duration, including fractional
+    /// milliseconds from `p14:dur`.
+    pub fn effective_duration_offset(&self) -> Offset {
+        self.duration_offset
+            .as_deref()
+            .cloned()
+            .unwrap_or_else(|| Offset::ms(u64::from(self.speed.duration().get())))
     }
 
     /// Iterates over inert extension children retained around the effect.
@@ -512,12 +1112,19 @@ impl Transition {
     }
 }
 
-pub(crate) fn preserved_effect_xml(value: &Transition) -> Option<&str> {
-    value.effect_xml().map(Raw::xml)
+fn offset_as_ms(offset: &Offset) -> Option<Ms> {
+    let value = offset.as_str();
+    if value.contains('.') {
+        return None;
+    }
+    let value = value.parse::<u64>().ok()?;
+    let value = u32::try_from(value).ok()?;
+    Ms::new(value).ok()
 }
 
-pub(crate) fn semantic_clone(value: &Transition) -> Transition {
-    let mut value = value.clone();
-    value.preserved = None;
-    value
+const fn normalize_reveal_direction(direction: LeftRight) -> LeftRight {
+    match direction {
+        LeftRight::Unspecified => LeftRight::Left,
+        direction => direction,
+    }
 }

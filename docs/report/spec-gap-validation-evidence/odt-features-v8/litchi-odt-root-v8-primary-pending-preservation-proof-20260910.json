@@ -1,0 +1,245 @@
+{
+  "purpose": "Authoritative preservation proof before applying reviewed V8 ODT closure to dirty primary; no primary files were modified.",
+  "primary_root": "/home/zhuhe/code/litchi-spec-gaps",
+  "primary_head": "784805185ef60f3127883c0f9744fdf9335b9ea4",
+  "reviewed_candidate": "/var/tmp/litchi-odt-feature-work-v8-final-integration-20260910",
+  "reviewed_candidate_base_commit": "ed0a5c7e5",
+  "reviewed_manifest": "/var/tmp/litchi-odt-feature-manifest-v8-final-20260910.json",
+  "reviewed_manifest_sha256": "6e0fc2afa0345188cbc8bc1d13167fcc05a33a7ca9169d580e4cd8ac245ea9a8",
+  "primary_pending_status_count": 14,
+  "primary_pending_status": [
+    " M crates/litchi-odt/docs/FEATURE_MATRIX.md",
+    " M crates/litchi-odt/src/document/semantic.rs",
+    " M crates/litchi-odt/src/document/source.rs",
+    " M crates/litchi-odt/src/elements/field/model/metadata.rs",
+    " M crates/litchi-odt/src/generic/flat.rs",
+    " M crates/litchi-odt/src/generic/package.rs",
+    " M crates/litchi-odt/src/lib.rs",
+    " M crates/litchi-odt/src/mutable/codec/semantic/mod.rs",
+    " M crates/litchi-odt/src/mutable/semantic/content.rs",
+    "?? crates/litchi-odt/src/content_metadata.rs",
+    "?? crates/litchi-odt/src/mutable/codec/semantic/metadata.rs",
+    "?? crates/litchi-odt/src/mutable/codec/semantic/xforms.rs",
+    "?? crates/litchi-odt/src/xforms.rs",
+    "?? crates/litchi-odt/tests/in_content_metadata.rs"
+  ],
+  "comparison_receipt": "/var/tmp/litchi-odt-root-v8-primary-pending-comparison-20260910.json",
+  "comparison_receipt_sha256": "fc29b7bb18899315a58f63153dc558d266e6cceb51d3c5727b8efb725d834b59",
+  "pending_paths_count": 14,
+  "byte_identical_pending_paths": [
+    "crates/litchi-odt/src/document/semantic.rs",
+    "crates/litchi-odt/src/elements/field/model/metadata.rs",
+    "crates/litchi-odt/src/generic/flat.rs",
+    "crates/litchi-odt/src/generic/package.rs",
+    "crates/litchi-odt/src/mutable/codec/semantic/mod.rs",
+    "crates/litchi-odt/src/mutable/semantic/content.rs",
+    "crates/litchi-odt/src/mutable/codec/semantic/metadata.rs",
+    "crates/litchi-odt/src/mutable/codec/semantic/xforms.rs",
+    "crates/litchi-odt/tests/in_content_metadata.rs"
+  ],
+  "divergent_pending_paths": [
+    "crates/litchi-odt/docs/FEATURE_MATRIX.md",
+    "crates/litchi-odt/src/document/source.rs",
+    "crates/litchi-odt/src/lib.rs",
+    "crates/litchi-odt/src/content_metadata.rs",
+    "crates/litchi-odt/src/xforms.rs"
+  ],
+  "classifications": {
+    "crates/litchi-odt/docs/FEATURE_MATRIX.md": {
+      "kind": "feature-preimage-preserved-and-reviewed-doc-delta",
+      "evidence": "Primary pending rows for XForms and in-content RDFa/text:meta are present verbatim in the reviewed candidate; candidate additionally carries the reviewed V8 numbered-paragraph and soft-page-break documentation rows.",
+      "mixed_action": "Use reviewed candidate content; no primary pending row is dropped."
+    },
+    "crates/litchi-odt/src/document/source.rs": {
+      "kind": "unrelated-trivial-primary-hunk-preserved",
+      "evidence": "The only primary-versus-reviewed difference is `let result = (|| { ... })();` versus an equivalent block `let result = { ... };`; public APIs, checks, and behavior are unchanged.",
+      "mixed_action": "Mixed candidate retains the exact primary source.rs bytes."
+    },
+    "crates/litchi-odt/src/lib.rs": {
+      "kind": "feature-preimage-preserved-and-reviewed-api-extension",
+      "evidence": "Primary pending content_metadata/xforms module declarations and public reexports are present in the reviewed candidate; candidate adds the reviewed NumberLabel and SoftPageBreak exports.",
+      "mixed_action": "Use reviewed candidate content; primary pending exports remain."
+    },
+    "crates/litchi-odt/src/content_metadata.rs": {
+      "kind": "feature-preimage-superseded-by-reviewed-bounded-implementation",
+      "evidence": "Primary is an untracked feature preimage. The reviewed candidate retains the same public and crate-visible API signatures and adds bounded output sizing, fallible reserves, aggregate limits, namespace-aware serialization, and exact-no-op handling. The primary-only lines are replaced unbounded implementation forms, not independent API/hunk work.",
+      "mixed_action": "Use reviewed candidate content; no independent primary behavior is discarded."
+    },
+    "crates/litchi-odt/src/xforms.rs": {
+      "kind": "feature-preimage-superseded-by-reviewed-bounded-implementation",
+      "evidence": "Primary is an untracked feature preimage. The reviewed candidate retains the same public and crate-visible API signatures and adds aggregate preflight, model/reference closure checks, extension-root validation, bounded fragments/spans, and source-safe replacement. The primary-only lines are replaced unbounded implementation forms, not independent API/hunk work.",
+      "mixed_action": "Use reviewed candidate content; no independent primary behavior is discarded."
+    }
+  },
+  "diff_evidence": {
+    "crates/litchi-odt/docs/FEATURE_MATRIX.md": {
+      "artifact": "/var/tmp/litchi-odt-root-v8-primary-pending-diffs-20260910/crates_litchi-odt_docs_FEATURE_MATRIX.md.diff",
+      "sha256": "ce5bbbe369c71f0f985e00daa7a4e782b1ce467c98d21417fe841342ccff197c",
+      "primary_only_lines": 2,
+      "reviewed_only_lines": 2
+    },
+    "crates/litchi-odt/src/document/source.rs": {
+      "artifact": "/var/tmp/litchi-odt-root-v8-primary-pending-diffs-20260910/crates_litchi-odt_src_document_source.rs.diff",
+      "sha256": "82a364d8c8583d00e478cae11237dc9cd85fad9ffcfdbe0174834d55026ba78d",
+      "primary_only_lines": 2,
+      "reviewed_only_lines": 2
+    },
+    "crates/litchi-odt/src/lib.rs": {
+      "artifact": "/var/tmp/litchi-odt-root-v8-primary-pending-diffs-20260910/crates_litchi-odt_src_lib.rs.diff",
+      "sha256": "f9273a99d12b737388adb9ef92d06352cee10eb84c76e8f42ca97e4249c5c4de",
+      "primary_only_lines": 0,
+      "reviewed_only_lines": 1
+    },
+    "crates/litchi-odt/src/content_metadata.rs": {
+      "artifact": "/var/tmp/litchi-odt-root-v8-primary-pending-diffs-20260910/crates_litchi-odt_src_content_metadata.rs.diff",
+      "sha256": "bb44854c3ef5127ac4d1db35b9d3fcd97909b9119cf640d6cbfda955940b7255",
+      "primary_only_lines": 29,
+      "reviewed_only_lines": 536
+    },
+    "crates/litchi-odt/src/xforms.rs": {
+      "artifact": "/var/tmp/litchi-odt-root-v8-primary-pending-diffs-20260910/crates_litchi-odt_src_xforms.rs.diff",
+      "sha256": "a1dfdb685e73b4ed7dd5fd163d548e64ef038b1ce4df84eff049d8f195184944",
+      "primary_only_lines": 39,
+      "reviewed_only_lines": 592
+    }
+  },
+  "public_api_signature_equality": {
+    "content_metadata.rs": {
+      "primary_signature_count": 22,
+      "reviewed_signature_count": 22,
+      "same_signature_lines": true
+    },
+    "xforms.rs": {
+      "primary_signature_count": 27,
+      "reviewed_signature_count": 27,
+      "same_signature_lines": true
+    }
+  },
+  "v8_paths_not_pending_in_primary": [
+    "crates/litchi-odt/src/elements/bookmark/writing.rs",
+    "crates/litchi-odt/src/elements/element.rs",
+    "crates/litchi-odt/src/elements/text.rs"
+  ],
+  "mixed_candidate": {
+    "worktree": "/var/tmp/litchi-odt-feature-v8-primary-mixed-20260910",
+    "base_commit": "ed0a5c7e5",
+    "owned_path_count": 17,
+    "primary_source_path_preserved": "crates/litchi-odt/src/document/source.rs",
+    "primary_source_sha256": "105b8e909b68396093ee817d7d3b1f099fecf9509befd60064d1fd93d96216ca",
+    "mixed_paths": [
+      {
+        "path": "crates/litchi-odt/docs/FEATURE_MATRIX.md",
+        "sha256": "948dc9d82e3718204af90336ba55f74b83557e7bdf7fc0fcce5aeb400045c075",
+        "reviewed_v8_sha256": "948dc9d82e3718204af90336ba55f74b83557e7bdf7fc0fcce5aeb400045c075",
+        "primary_source_preserved": false
+      },
+      {
+        "path": "crates/litchi-odt/src/content_metadata.rs",
+        "sha256": "9983cb7a752ddd8eba0cc86c7f019cbd77a616dc2ab02e8718df7b0b6bdc3ae5",
+        "reviewed_v8_sha256": "9983cb7a752ddd8eba0cc86c7f019cbd77a616dc2ab02e8718df7b0b6bdc3ae5",
+        "primary_source_preserved": false
+      },
+      {
+        "path": "crates/litchi-odt/src/document/semantic.rs",
+        "sha256": "f8fff4bfe721efe26395d4b1b711bbbba15fb80b8e73ae91a9ab25abdd0be9f7",
+        "reviewed_v8_sha256": "f8fff4bfe721efe26395d4b1b711bbbba15fb80b8e73ae91a9ab25abdd0be9f7",
+        "primary_source_preserved": false
+      },
+      {
+        "path": "crates/litchi-odt/src/document/source.rs",
+        "sha256": "105b8e909b68396093ee817d7d3b1f099fecf9509befd60064d1fd93d96216ca",
+        "reviewed_v8_sha256": "5c576710e7e1edc1cdf9c48e91cc651b7a244320201f905b2ca38c89400dafa5",
+        "primary_source_preserved": true
+      },
+      {
+        "path": "crates/litchi-odt/src/elements/bookmark/writing.rs",
+        "sha256": "eaff4d11432d47c3118224a3dc99c52e6f3eaa480732597c778c55127c965520",
+        "reviewed_v8_sha256": "eaff4d11432d47c3118224a3dc99c52e6f3eaa480732597c778c55127c965520",
+        "primary_source_preserved": false
+      },
+      {
+        "path": "crates/litchi-odt/src/elements/element.rs",
+        "sha256": "2e6b7af29b26c65067befee6f391b00bdd886fac235062b42461e209cccb2c7f",
+        "reviewed_v8_sha256": "2e6b7af29b26c65067befee6f391b00bdd886fac235062b42461e209cccb2c7f",
+        "primary_source_preserved": false
+      },
+      {
+        "path": "crates/litchi-odt/src/elements/field/model/metadata.rs",
+        "sha256": "a49b609f2f1c024adbc8585224bb49177fa40eaddfc024c67905a80e220e3f7b",
+        "reviewed_v8_sha256": "a49b609f2f1c024adbc8585224bb49177fa40eaddfc024c67905a80e220e3f7b",
+        "primary_source_preserved": false
+      },
+      {
+        "path": "crates/litchi-odt/src/elements/text.rs",
+        "sha256": "712aeee5723d32ed5def21eba08b0dab51028a7ddab466fd1fa5ce7dcc26244b",
+        "reviewed_v8_sha256": "712aeee5723d32ed5def21eba08b0dab51028a7ddab466fd1fa5ce7dcc26244b",
+        "primary_source_preserved": false
+      },
+      {
+        "path": "crates/litchi-odt/src/generic/flat.rs",
+        "sha256": "683772a3c7cc774380375e4ff7440703980f9707fd9e1c7680e63c715041d617",
+        "reviewed_v8_sha256": "683772a3c7cc774380375e4ff7440703980f9707fd9e1c7680e63c715041d617",
+        "primary_source_preserved": false
+      },
+      {
+        "path": "crates/litchi-odt/src/generic/package.rs",
+        "sha256": "0fc0591a6090e32bc22483339d2b64356ba8df52d2548a1f518c7e0def2c013b",
+        "reviewed_v8_sha256": "0fc0591a6090e32bc22483339d2b64356ba8df52d2548a1f518c7e0def2c013b",
+        "primary_source_preserved": false
+      },
+      {
+        "path": "crates/litchi-odt/src/lib.rs",
+        "sha256": "1fbbf9b483a65538edb2a345d4794b6cc9115703bfddf3ec06230a4095afe407",
+        "reviewed_v8_sha256": "1fbbf9b483a65538edb2a345d4794b6cc9115703bfddf3ec06230a4095afe407",
+        "primary_source_preserved": false
+      },
+      {
+        "path": "crates/litchi-odt/src/mutable/codec/semantic/metadata.rs",
+        "sha256": "2ce8057c5901f6f334d1b675d3ea7c080c925277ab86e6f14077770dab608932",
+        "reviewed_v8_sha256": "2ce8057c5901f6f334d1b675d3ea7c080c925277ab86e6f14077770dab608932",
+        "primary_source_preserved": false
+      },
+      {
+        "path": "crates/litchi-odt/src/mutable/codec/semantic/mod.rs",
+        "sha256": "38cb9d93db8bf291144f2359ff9bc481cc0146b02c970f71ff56a00b071fd32f",
+        "reviewed_v8_sha256": "38cb9d93db8bf291144f2359ff9bc481cc0146b02c970f71ff56a00b071fd32f",
+        "primary_source_preserved": false
+      },
+      {
+        "path": "crates/litchi-odt/src/mutable/codec/semantic/xforms.rs",
+        "sha256": "2a82fe628ab45789f711b384a544d241f3ef7ad7df03885d0f19dca6879a4621",
+        "reviewed_v8_sha256": "2a82fe628ab45789f711b384a544d241f3ef7ad7df03885d0f19dca6879a4621",
+        "primary_source_preserved": false
+      },
+      {
+        "path": "crates/litchi-odt/src/mutable/semantic/content.rs",
+        "sha256": "a212fe8e7b058de05c45b9d0aff2f1ddd3345d04c99d9a3b982c264500a23a97",
+        "reviewed_v8_sha256": "a212fe8e7b058de05c45b9d0aff2f1ddd3345d04c99d9a3b982c264500a23a97",
+        "primary_source_preserved": false
+      },
+      {
+        "path": "crates/litchi-odt/src/xforms.rs",
+        "sha256": "21ad999c01c4c6fc5a9dbb2298e112898771b4bc730d586c1568872154d5c201",
+        "reviewed_v8_sha256": "21ad999c01c4c6fc5a9dbb2298e112898771b4bc730d586c1568872154d5c201",
+        "primary_source_preserved": false
+      },
+      {
+        "path": "crates/litchi-odt/tests/in_content_metadata.rs",
+        "sha256": "c97c7aca619daa97bf533abe6b1e0b64e622badc26a621b4c5e90787e4da1819",
+        "reviewed_v8_sha256": "c97c7aca619daa97bf533abe6b1e0b64e622badc26a621b4c5e90787e4da1819",
+        "primary_source_preserved": false
+      }
+    ],
+    "metadata_log": "/var/tmp/litchi-odt-primary-mixed-metadata-20260910.json",
+    "metadata_log_sha256": "4955b5fcf6b03a166e147bb0539aa83546ec5c1606dbdffe6be951d3a2ccaddc",
+    "check_log": "/var/tmp/litchi-odt-primary-mixed-check-20260910.log",
+    "check_log_sha256": "9c46f5ef8004bb0dbfc8911bfd094ac028a62819475c5b5ca8a3a46e1b2057f7",
+    "dependency_checks": "cargo metadata --locked --offline --no-deps and cargo check -p litchi-odt --all-features --locked --offline passed",
+    "diff_check": "git diff --check passed",
+    "owned_delta_patch": "/var/tmp/litchi-odt-feature-v8-primary-mixed-owned-delta-20260910.patch",
+    "owned_delta_patch_bytes": 280682,
+    "owned_delta_patch_sha256": "0906c8781a3b3e67b483aa1ea6213899666b53bbfabcee5117882a48682cf15b",
+    "owned_delta_apply_check": "passed in a fresh ed0a5c7e5 worktree"
+  },
+  "conclusion": "The only independent primary pending hunk outside the reviewed feature implementation is the equivalent source.rs closure-to-block spelling; the mixed candidate preserves it exactly. The other four divergent paths either already retain primary feature rows/exports or replace unbounded feature-preimage implementations with the reviewed bounded implementations. No unrelated primary ODT hunk is silently overwritten."
+}

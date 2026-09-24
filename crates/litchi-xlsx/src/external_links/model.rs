@@ -18,6 +18,15 @@ pub(crate) const TRANSITIONAL_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 pub(crate) const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 pub(crate) const MAX_EXTERNAL_TARGET_BYTES: usize = 32 * 1024;
+/// Maximum bytes retained for either service-provided alternate-URL ID.
+///
+/// The normative type is `xsd:string` and does not impose a useful Office
+/// lexical limit.  This package boundary therefore applies a deterministic
+/// bound before retaining or emitting either inert identifier.
+pub(crate) const MAX_ALTERNATE_URL_METADATA_BYTES: usize = 64 * 1024;
+/// 2021 external-links extension namespace from [MS-XLSX] §5.34.
+pub(crate) const ALTERNATE_URLS_NAMESPACE: &[u8] =
+    b"http://schemas.microsoft.com/office/spreadsheetml/2021/extlinks2021";
 /// Highest column index addressable by a `SpreadsheetML` cell reference (`XFD`).
 pub(crate) const MAX_CELL_COLUMN: u32 = 16_384;
 /// Highest row index addressable by a `SpreadsheetML` cell reference.
@@ -60,6 +69,7 @@ impl Conformance {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)] // public API; boxing would break existing callers
 pub enum Link {
     Workbook(Workbook),
     Dde(Dde),
@@ -140,6 +150,47 @@ pub struct Workbook {
     pub sheet_names: Vec<String>,
     pub defined_names: Vec<DefinedName>,
     pub cached_sheets: Vec<SheetData>,
+    /// Optional service-provided alternate URLs for the external workbook.
+    ///
+    /// The URLs remain inert relationship metadata.  Loading and editing this
+    /// value never opens, fetches, or refreshes an external target.
+    pub alternate_urls: Option<AlternateUrls>,
+}
+
+impl Workbook {
+    /// Borrow the optional inert alternate-URL extension.
+    #[must_use]
+    pub fn alternate_urls(&self) -> Option<&AlternateUrls> {
+        self.alternate_urls.as_ref()
+    }
+}
+
+/// One inert relationship-backed URL from `CT_AlternateUrl`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AlternateUrl {
+    pub relationship_id: String,
+    pub target: String,
+    pub relationship_type: String,
+}
+
+/// The bounded `CT_ExternalBookAlternateUrls` semantic projection.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct AlternateUrls {
+    pub drive_id: Option<String>,
+    pub item_id: Option<String>,
+    pub absolute_url: Option<AlternateUrl>,
+    pub relative_url: Option<AlternateUrl>,
+}
+
+impl AlternateUrls {
+    /// Whether this extension carries no service identifiers or URL entries.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.drive_id.is_none()
+            && self.item_id.is_none()
+            && self.absolute_url.is_none()
+            && self.relative_url.is_none()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,0 +1,27 @@
+{
+  "source_sha256": "b0bc22e3411edacdc71e14837576d3f3ba6afdd48fb8ef0f2130498494798456",
+  "ordinary_tests": 1367,
+  "doc_tests": 9,
+  "gates": {
+    "tests": {
+      "exit_code": 0,
+      "log": "/var/tmp/litchi-rtf-smarttags-root-tests-v4-git-20260910.log",
+      "sha256": "6f083768ec3fe0baf54781f439684a0b4dd12afd452a8622195ae3cac8ea17c9"
+    },
+    "clippy": {
+      "exit_code": 0,
+      "log": "/var/tmp/litchi-rtf-smarttags-root-clippy-v4-git-20260910.log",
+      "sha256": "f3e51046cf080ffe68c531a2f5be6cdac03c5714537c92db00fa2bb93ec17d16"
+    },
+    "rustdoc": {
+      "exit_code": 0,
+      "log": "/var/tmp/litchi-rtf-smarttags-root-rustdoc-v4-git-20260910.log",
+      "sha256": "7f82969c1e5e299c8e4016bc9f1b4750d81aa93f256b7a66a9a534bff15c754c"
+    },
+    "rustfmt": {
+      "exit_code": 0,
+      "log": "/var/tmp/litchi-rtf-smarttags-root-rustfmt-v4-git-20260910.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

@@ -4,8 +4,10 @@ use super::super::validation::{
     validate_binding, validate_extension_list, validate_model, validate_store_reference,
 };
 use super::{
-    Binding, ExtKind, ExtList, MAX_WEB_EXTENSION_ITEMS, Property, Reference, Selector, Snapshot,
+    Binding, CustomFunctions, ExtKind, ExtList, MAX_WEB_EXTENSION_ITEMS, Property, Reference,
+    Selector, Snapshot,
 };
+use crate::Error;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AddIn {
     pub(in crate::web) id: String,
@@ -363,6 +365,50 @@ impl AddIn {
     #[must_use]
     pub const fn ext(&self) -> Option<&ExtList> {
         self.extension_list.as_ref()
+    }
+
+    /// Return inert `[MS-OWEXML]` custom-function/background metadata from the
+    /// web-extension extension list, if present.
+    #[must_use]
+    pub fn custom_functions(&self) -> Option<&CustomFunctions> {
+        self.extension_list
+            .as_ref()
+            .and_then(ExtList::custom_functions)
+    }
+
+    /// Replace inert `[MS-OWEXML]` custom-function/background metadata.  This
+    /// only edits persisted XML; it never activates an add-in runtime.
+    pub fn set_custom_functions(&mut self, value: Option<CustomFunctions>) -> Result<&mut Self> {
+        self.set_custom_functions_with_limits(value, &super::Limits::standard())
+    }
+
+    pub(in crate::web) fn set_custom_functions_with_limits(
+        &mut self,
+        value: Option<CustomFunctions>,
+        limits: &super::Limits,
+    ) -> Result<&mut Self> {
+        let value = value.filter(|value| !value.is_empty());
+        if self.extension_list.is_none() {
+            if value.is_none() {
+                return Ok(self);
+            }
+            let mut extension = ExtList::empty(ExtKind::AddIn)?;
+            extension.set_custom_functions_with_limits(value, limits)?;
+            self.extension_list = Some(extension);
+            return Ok(self);
+        }
+        let extension = self
+            .extension_list
+            .as_mut()
+            .ok_or_else(|| Error::Invalid("web extension list was not initialized".into()))?;
+        extension.set_custom_functions_with_limits(value, limits)?;
+        Ok(self)
+    }
+
+    /// Remove inert custom-function/background metadata while retaining the
+    /// surrounding extension list and unknown vendor payloads.
+    pub fn clear_custom_functions(&mut self) -> Result<&mut Self> {
+        self.set_custom_functions(None)
     }
 
     /// # Errors

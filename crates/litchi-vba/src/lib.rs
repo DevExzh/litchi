@@ -20,6 +20,8 @@ const DEFAULT_MAX_CFB_BYTES: usize = 256 * 1024 * 1024;
 const DEFAULT_MAX_COMPRESSED_STREAM_BYTES: usize = 32 * 1024 * 1024;
 const DEFAULT_MAX_DECOMPRESSED_STREAM_BYTES: usize = 64 * 1024 * 1024;
 const DEFAULT_MAX_MODULES: usize = 4_096;
+const DEFAULT_MAX_REFERENCES: usize = 4_096;
+const DEFAULT_MAX_LICENSES: usize = 4_096;
 const DEFAULT_MAX_STRING_BYTES: usize = 1024 * 1024;
 const DEFAULT_MAX_TOTAL_SOURCE_BYTES: usize = 128 * 1024 * 1024;
 
@@ -34,6 +36,10 @@ pub struct Limits {
     pub max_decompressed_stream_bytes: usize,
     /// Maximum module count accepted from the `dir` stream.
     pub max_modules: usize,
+    /// Maximum external-reference count accepted from the `dir` stream.
+    pub max_references: usize,
+    /// Maximum ActiveX license-record count accepted from `PROJECTlk`.
+    pub max_licenses: usize,
     /// Maximum byte length of one string record.
     pub max_string_bytes: usize,
     /// Maximum aggregate decompressed module-source size.
@@ -47,6 +53,8 @@ impl Default for Limits {
             max_compressed_stream_bytes: DEFAULT_MAX_COMPRESSED_STREAM_BYTES,
             max_decompressed_stream_bytes: DEFAULT_MAX_DECOMPRESSED_STREAM_BYTES,
             max_modules: DEFAULT_MAX_MODULES,
+            max_references: DEFAULT_MAX_REFERENCES,
+            max_licenses: DEFAULT_MAX_LICENSES,
             max_string_bytes: DEFAULT_MAX_STRING_BYTES,
             max_total_source_bytes: DEFAULT_MAX_TOTAL_SOURCE_BYTES,
         }

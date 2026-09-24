@@ -1,0 +1,1 @@
+Error: "expected Number or Text, got Array(ArrayView { shape: Shape { rows: 1, columns: 1 }, cells: [Present(Error(Value))] })"

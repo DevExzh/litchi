@@ -1,0 +1,46 @@
+{
+  "schema": "pptx-ink-actions-profile-contract-v1",
+  "semantic_owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+  "production_source_baseline_commit": "2a2ffa1cae4e6b7070082768ce84483e5d411dc8",
+  "semantic_owner_design": {
+    "commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+    "git_blob": "597400950b1027c47cd6e4cbbedd23915bc0980e",
+    "path": "docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md",
+    "sha256": "30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d"
+  },
+  "owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+  "source_commit_alias": {
+    "value": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+    "meaning": "legacy alias for semantic_owner_commit",
+    "not_production_pin": true,
+    "not_capture_head": true
+  },
+  "plan": "PLAN.md",
+  "goal_reference": {
+    "path": "docs/GOAL.md",
+    "committed_at_owner_pin": false,
+    "profile_input": false,
+    "reason": "The workspace GOAL file is untracked; the committed PLAN and accepted ADR/design inputs are the reproducible contract."
+  },
+  "capture_head": {
+    "field": "git_commit",
+    "source": "runtime source manifest and command environment",
+    "rule": "record the exact current checkout HEAD; never hardcode the capture commit into the runner"
+  },
+  "context_inputs": {
+    "accepted_adrs": [
+      "docs/adr/0001-priorities-and-api-layers.md",
+      "docs/adr/0003-snapshots-edits-and-patches.md",
+      "docs/adr/0005-io-memory-and-performance.md",
+      "docs/adr/0006-validation-security-and-compatibility.md"
+    ],
+    "authority": "capture_head",
+    "semantic_owner_input": false,
+    "reason": "ADRs describe the current capture context; the pinned design document is the semantic owner authority."
+  },
+  "scope": {
+    "native_powerpoint": false,
+    "timing_capture": "review-and-authorization-gated",
+    "matrix": "23 recipes, 42 lanes"
+  }
+}

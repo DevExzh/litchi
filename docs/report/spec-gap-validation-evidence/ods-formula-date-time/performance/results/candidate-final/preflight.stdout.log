@@ -1,0 +1,360 @@
+preflight-json {"case":"scalar-control-arithmetic","source":"=0.17+1.25","evaluation_path":"scalar","expected":1.41999999999999993,"shape":"scalar","reference_reads":0}
+preflight case=scalar-control-arithmetic reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"scalar-control-sin","source":"=SIN(0.17)","evaluation_path":"scalar","expected":0.16918234906699603,"shape":"scalar","reference_reads":0}
+preflight case=scalar-control-sin reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"scalar-control-imsum","source":"=IMREAL(IMSUM(COMPLEX(2;3);COMPLEX(1;4)))","evaluation_path":"scalar","expected":3.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=scalar-control-imsum reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"database-control-dsum","source":"=DSUM([.A1:.B4];2;[.D1:.D2])","evaluation_path":"value","expected":12.00000000000000000,"shape":"scalar","reference_reads":7}
+preflight case=database-control-dsum reference_reads=7
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"scalar-control-average","source":"=AVERAGE(1.25;2.5;3.75)","evaluation_path":"scalar","expected":2.50000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=scalar-control-average reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"scalar-control-counta","source":"=COUNTA(1.25;\"x\";TRUE())","evaluation_path":"scalar","expected":3.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=scalar-control-counta reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"scalar-control-var","source":"=VAR(1.25;2.5;3.75)","evaluation_path":"scalar","expected":1.56250000000000000,"shape":"scalar","reference_reads":0}
+preflight case=scalar-control-var reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"scalar-control-stdev","source":"=STDEV(1.25;2.5;3.75)","evaluation_path":"scalar","expected":1.25000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=scalar-control-stdev reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"database-control-dvar","source":"=DVAR([.A1:.B4];2;[.D1:.D2])","evaluation_path":"value","expected":9.00000000000000000,"shape":"scalar","reference_reads":7}
+preflight case=database-control-dvar reference_reads=7
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"database-control-dstdev","source":"=DSTDEV([.A1:.B4];2;[.D1:.D2])","evaluation_path":"value","expected":3.00000000000000000,"shape":"scalar","reference_reads":7}
+preflight case=database-control-dstdev reference_reads=7
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"array-control-4x4-arithmetic","source":"={0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000}+1.25","evaluation_path":"value","expected":[[1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994],[1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011],[1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001],[1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996]],"shape":"4x4","reference_reads":0}
+preflight case=array-control-4x4-arithmetic reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"array-control-4x4-sin","source":"=SIN({0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000})","evaluation_path":"value","expected":[[0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150],[0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706],[0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872],[0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150]],"shape":"4x4","reference_reads":0}
+preflight case=array-control-4x4-sin reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"array-control-16x16-arithmetic","source":"={0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000|0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000|0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000}+1.25","evaluation_path":"value","expected":[[1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996],[1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010],[1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001],[1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993],[1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011],[1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003],[1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994],[1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008],[1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004],[1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996],[1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010],[1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001],[1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993],[1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011],[1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003],[1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994,1.60800000000000010,1.65500000000000003,1.70199999999999996,1.74900000000000011,1.79600000000000004,1.41999999999999993,1.46700000000000008,1.51400000000000001,1.56099999999999994]],"shape":"16x16","reference_reads":0}
+preflight case=array-control-16x16-arithmetic reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"array-control-16x16-sin","source":"=SIN({0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000|0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000|0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000|0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000|0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000|0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000|0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000|0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000|0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000|0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000;0.358000;0.405000;0.452000;0.499000;0.546000;0.170000;0.217000;0.264000;0.311000})","evaluation_path":"value","expected":[[0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150],[0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460],[0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872],[0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603],[0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706],[0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043],[0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150],[0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674],[0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265],[0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150],[0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460],[0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872],[0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603],[0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706],[0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043],[0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150,0.35040173632736460,0.39401876037078043,0.43676555718456150,0.47854771647582706,0.51927295844375265,0.16918234906699603,0.21530095309184674,0.26094404485486872,0.30601081732530150]],"shape":"16x16","reference_reads":0}
+preflight case=array-control-16x16-sin reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"reference-array-16x4-arithmetic","source":"=[.A1:.D16]+1.25","evaluation_path":"value","expected":[[2.25999999999999979,2.26100000000000012,2.26200000000000001,2.26299999999999990],[2.26400000000000023,2.26499999999999968,2.26600000000000001,2.26699999999999990],[2.26799999999999979,2.26900000000000013,2.27000000000000002,2.27099999999999991],[2.27200000000000024,2.27299999999999969,2.27400000000000002,2.27499999999999991],[2.27599999999999980,2.25999999999999979,2.26100000000000012,2.26200000000000001],[2.26299999999999990,2.26400000000000023,2.26499999999999968,2.26600000000000001],[2.26699999999999990,2.26799999999999979,2.26900000000000013,2.27000000000000002],[2.27099999999999991,2.27200000000000024,2.27299999999999969,2.27400000000000002],[2.27499999999999991,2.27599999999999980,2.25999999999999979,2.26100000000000012],[2.26200000000000001,2.26299999999999990,2.26400000000000023,2.26499999999999968],[2.26600000000000001,2.26699999999999990,2.26799999999999979,2.26900000000000013],[2.27000000000000002,2.27099999999999991,2.27200000000000024,2.27299999999999969],[2.27400000000000002,2.27499999999999991,2.27599999999999980,2.25999999999999979],[2.26100000000000012,2.26200000000000001,2.26299999999999990,2.26400000000000023],[2.26499999999999968,2.26600000000000001,2.26699999999999990,2.26799999999999979],[2.26900000000000013,2.27000000000000002,2.27099999999999991,2.27200000000000024]],"shape":"16x4","reference_reads":64}
+preflight case=reference-array-16x4-arithmetic reference_reads=64
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"scalar-aggregate-sum","source":"=SUM(1.25)","evaluation_path":"scalar","expected":1.25000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=scalar-aggregate-sum reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"literal-aggregate-4x1-sum","source":"=SUM({1|2|3|4})","evaluation_path":"value","expected":10.00000000000000000,"shape":"1x1","reference_reads":0}
+preflight case=literal-aggregate-4x1-sum reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"reference-aggregate-64x4-sum","source":"=SUM([.A1:.D64])","evaluation_path":"value","expected":260.59999999999990905,"shape":"scalar","reference_reads":256}
+preflight case=reference-aggregate-64x4-sum reference_reads=256
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"reference-conditional-256x4-sumifs","source":"=SUMIFS([.I1:.L256];[.A1:.D256];\">=2\";[.E1:.H256];1)","evaluation_path":"value","expected":4232.00000000000000000,"shape":"scalar","reference_reads":1792}
+preflight case=reference-conditional-256x4-sumifs reference_reads=1792
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"reference-control-average","source":"=AVERAGE([.A1:.D64])","evaluation_path":"value","expected":1.01796874999999964,"shape":"scalar","reference_reads":256}
+preflight case=reference-control-average reference_reads=256
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"reference-control-counta","source":"=COUNTA([.E1:.H64])","evaluation_path":"value","expected":256.00000000000000000,"shape":"scalar","reference_reads":256}
+preflight case=reference-control-counta reference_reads=256
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"representative-median","source":"=MEDIAN(1;2;4;8)","evaluation_path":"scalar","expected":3.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=representative-median reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"representative-rank","source":"=RANK(8;8;1)","evaluation_path":"scalar","expected":1.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=representative-rank reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"representative-percentrank","source":"=PERCENTRANK(8;8;3)","evaluation_path":"scalar","expected":1.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=representative-percentrank reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"concat-borrowed-literals","source":"=\"left\"&\"right\"","evaluation_path":"scalar","expected":"leftright","shape":"scalar","reference_reads":0}
+preflight case=concat-borrowed-literals reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"concat-owned-left","source":"=(\"left\"&\"mid\")&\"right\"","evaluation_path":"scalar","expected":"leftmidright","shape":"scalar","reference_reads":0}
+preflight case=concat-owned-left reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"concat-owned-right","source":"\"left\"&(\"mid\"&\"right\")","evaluation_path":"scalar","expected":"leftmidright","shape":"scalar","reference_reads":0}
+preflight case=concat-owned-right reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"concat-growth-chain","source":"=\"a\"&\"b\"&\"c\"&\"d\"&\"e\"&\"f\"&\"g\"&\"h\"","evaluation_path":"scalar","expected":"abcdefgh","shape":"scalar","reference_reads":0}
+preflight case=concat-growth-chain reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"value-date-fraction-value-date","source":"=VALUE(\"2024-01-02\")","evaluation_path":"scalar","expected":45293.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=value-date-fraction-value-date reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"value-date-fraction-value-time","source":"=VALUE(\"12:34:56\")","evaluation_path":"scalar","expected":0.52425925925925931,"shape":"scalar","reference_reads":0}
+preflight case=value-date-fraction-value-time reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"value-date-fraction-value-mixed-fraction","source":"=VALUE(\"3 1/2\")","evaluation_path":"scalar","expected":3.50000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=value-date-fraction-value-mixed-fraction reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"lazy-if-cache-isnumber","source":"=IF({TRUE()|TRUE()};ISNUMBER([.A3:.A4]);FALSE())","evaluation_path":"value","expected":[true,false],"shape":"2x1","reference_reads":2}
+preflight case=lazy-if-cache-isnumber reference_reads=2
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"lazy-if-cache-isblank","source":"=IF({TRUE()|TRUE()};ISBLANK([.A1:.A2]);FALSE())","evaluation_path":"value","expected":[true,false],"shape":"2x1","reference_reads":2}
+preflight case=lazy-if-cache-isblank reference_reads=2
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"lazy-if-cache-istext","source":"=IF({TRUE()|TRUE()};ISTEXT([.A1:.A2]);FALSE())","evaluation_path":"value","expected":[false,true],"shape":"2x1","reference_reads":2}
+preflight case=lazy-if-cache-istext reference_reads=2
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-date","source":"=DATE(2020;13;1)","evaluation_path":"scalar","expected":44197.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-date reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-datedif","source":"=DATEDIF(DATE(2020;1;31);DATE(2021;3;1);\"Y\")","evaluation_path":"scalar","expected":1.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-datedif reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-datevalue","source":"=DATEVALUE(\"2024-03-31T12:34:56\")","evaluation_path":"scalar","expected":45382.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-datevalue reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-day","source":"=DAY(DATE(2024;3;31)+0.75)","evaluation_path":"scalar","expected":31.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-day reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-days","source":"=DAYS(DATE(2024;4;1)+0.5;DATE(2024;3;31)+0.5)","evaluation_path":"scalar","expected":1.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-days reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-days360","source":"=DAYS360(DATE(2024;1;31);DATE(2024;2;29))","evaluation_path":"scalar","expected":29.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-days360 reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-eastersunday","source":"=EASTERSUNDAY(2024)","evaluation_path":"scalar","expected":45382.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-eastersunday reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-edate","source":"=EDATE(DATE(2024;1;31);1)","evaluation_path":"scalar","expected":45351.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-edate reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-eomonth","source":"=EOMONTH(DATE(2024;2;10);0)","evaluation_path":"scalar","expected":45351.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-eomonth reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-hour","source":"=HOUR(0.75)","evaluation_path":"scalar","expected":18.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-hour reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-isoweeknum","source":"=ISOWEEKNUM(DATE(2024;1;1))","evaluation_path":"scalar","expected":1.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-isoweeknum reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-minute","source":"=MINUTE(-1/256)","evaluation_path":"scalar","expected":54.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-minute reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-month","source":"=MONTH(DATE(2024;3;31)+0.5)","evaluation_path":"scalar","expected":3.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-month reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-networkdays","source":"=NETWORKDAYS(DATE(2024;3;29);DATE(2024;4;1))","evaluation_path":"scalar","expected":2.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-networkdays reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-now","source":"=NOW()","evaluation_path":"scalar","expected":45382.50000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-now reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-second","source":"=SECOND(-1/256)","evaluation_path":"scalar","expected":22.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-second reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-time","source":"=TIME(12;30;0)","evaluation_path":"scalar","expected":0.52083333333333337,"shape":"scalar","reference_reads":0}
+preflight case=date-core-time reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-timevalue","source":"=TIMEVALUE(\"12:30:00\")","evaluation_path":"scalar","expected":0.52083333333333337,"shape":"scalar","reference_reads":0}
+preflight case=date-core-timevalue reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-today","source":"=TODAY()","evaluation_path":"scalar","expected":45382.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-today reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-weekday","source":"=WEEKDAY(DATE(2024;1;1);2)","evaluation_path":"scalar","expected":1.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-weekday reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-weeknum","source":"=WEEKNUM(DATE(2024;1;1);21)","evaluation_path":"scalar","expected":1.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-weeknum reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-workday","source":"=WORKDAY(DATE(2024;3;29);1)","evaluation_path":"scalar","expected":45383.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-workday reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-year","source":"=YEAR(DATE(2024;3;31)+0.5)","evaluation_path":"scalar","expected":2024.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-core-year reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-core-yearfrac","source":"=YEARFRAC(DATE(2024;1;1);DATE(2025;1;1);3)","evaluation_path":"scalar","expected":1.00273972602739736,"shape":"scalar","reference_reads":0}
+preflight case=date-core-yearfrac reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-parser-datevalue-iso","source":"=DATEVALUE(\"2024-03-31\")","evaluation_path":"scalar","expected":45382.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-parser-datevalue-iso reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-parser-datevalue-datetime","source":"=DATEVALUE(\"2024-03-31 12:34:56\")","evaluation_path":"scalar","expected":45382.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-parser-datevalue-datetime reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-parser-datevalue-enus","source":"=DATEVALUE(\"3/31/2024\")","evaluation_path":"scalar","expected":45382.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-parser-datevalue-enus reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-parser-datevalue-month","source":"=DATEVALUE(\"Mar 31, 2024\")","evaluation_path":"scalar","expected":45382.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-parser-datevalue-month reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-parser-timevalue-clock","source":"=TIMEVALUE(\"12:30:00\")","evaluation_path":"scalar","expected":0.52083333333333337,"shape":"scalar","reference_reads":0}
+preflight case=date-parser-timevalue-clock reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-parser-timevalue-datetime","source":"=TIMEVALUE(\"2020-01-02T03:04:05\")","evaluation_path":"scalar","expected":0.12783564814814816,"shape":"scalar","reference_reads":0}
+preflight case=date-parser-timevalue-datetime reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-parser-timevalue-fraction","source":"=TIMEVALUE(\"12:30:00.5\")","evaluation_path":"scalar","expected":0.52083912037037039,"shape":"scalar","reference_reads":0}
+preflight case=date-parser-timevalue-fraction reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-parser-datevalue-number","source":"=DATEVALUE(\"123\")","evaluation_path":"scalar","expected":123.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-parser-datevalue-number reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-parser-timevalue-number","source":"=TIMEVALUE(\"0.5\")","evaluation_path":"scalar","expected":0.50000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-parser-timevalue-number reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-boundary-date-rollover","source":"=DATE(2020;2;30)","evaluation_path":"scalar","expected":43891.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-boundary-date-rollover reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-boundary-date-1900","source":"=DATE(1900;3;1)","evaluation_path":"scalar","expected":61.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-boundary-date-1900 reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-boundary-days360-eu","source":"=DAYS360(DATE(2024;1;31);DATE(2024;2;29);TRUE())","evaluation_path":"scalar","expected":29.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-boundary-days360-eu reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-boundary-edate-clamp","source":"=EDATE(DATE(2024;1;31);1)","evaluation_path":"scalar","expected":45351.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-boundary-edate-clamp reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-boundary-eomonth-clamp","source":"=EOMONTH(DATE(2024;2;10);0)","evaluation_path":"scalar","expected":45351.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-boundary-eomonth-clamp reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-boundary-yearfrac-basis1","source":"=YEARFRAC(DATE(2024;1;1);DATE(2025;1;1);1)","evaluation_path":"scalar","expected":1.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-boundary-yearfrac-basis1 reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-boundary-weeknum-noninteger","source":"=WEEKNUM(44199;21.5)","evaluation_path":"scalar","expected":"#NUM!","shape":"scalar","reference_reads":0}
+preflight case=date-boundary-weeknum-noninteger reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-boundary-weekday-17","source":"=WEEKDAY(DATE(2024;1;7);17)","evaluation_path":"scalar","expected":1.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-boundary-weekday-17 reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-networkdays-holidays-0","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;31))","evaluation_path":"value","expected":262.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-networkdays-holidays-0 reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-networkdays-holidays-1","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;31);[.A1:.A1])","evaluation_path":"value","expected":261.00000000000000000,"shape":"scalar","reference_reads":1}
+preflight case=date-networkdays-holidays-1 reference_reads=1
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-networkdays-holidays-16","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;31);[.A1:.A16])","evaluation_path":"value","expected":250.00000000000000000,"shape":"scalar","reference_reads":16}
+preflight case=date-networkdays-holidays-16 reference_reads=16
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-networkdays-holidays-64","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;31);[.A1:.A64])","evaluation_path":"value","expected":246.00000000000000000,"shape":"scalar","reference_reads":64}
+preflight case=date-networkdays-holidays-64 reference_reads=64
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-networkdays-holidays-256","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;31);[.A1:.A256])","evaluation_path":"value","expected":246.00000000000000000,"shape":"scalar","reference_reads":256}
+preflight case=date-networkdays-holidays-256 reference_reads=256
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-workday-holidays-0","source":"=WORKDAY(DATE(2024;1;1);64)","evaluation_path":"value","expected":45380.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-workday-holidays-0 reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-workday-holidays-1","source":"=WORKDAY(DATE(2024;1;1);64;[.A1:.A1])","evaluation_path":"value","expected":45380.00000000000000000,"shape":"scalar","reference_reads":1}
+preflight case=date-workday-holidays-1 reference_reads=1
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-workday-holidays-16","source":"=WORKDAY(DATE(2024;1;1);64;[.A1:.A16])","evaluation_path":"value","expected":45385.00000000000000000,"shape":"scalar","reference_reads":16}
+preflight case=date-workday-holidays-16 reference_reads=16
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-workday-holidays-64","source":"=WORKDAY(DATE(2024;1;1);64;[.A1:.A64])","evaluation_path":"value","expected":45385.00000000000000000,"shape":"scalar","reference_reads":64}
+preflight case=date-workday-holidays-64 reference_reads=64
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-workday-holidays-256","source":"=WORKDAY(DATE(2024;1;1);64;[.A1:.A256])","evaluation_path":"value","expected":45385.00000000000000000,"shape":"scalar","reference_reads":256}
+preflight case=date-workday-holidays-256 reference_reads=256
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-networkdays-workweek-default","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);;[.B1:.B7])","evaluation_path":"value","expected":24.00000000000000000,"shape":"scalar","reference_reads":7}
+preflight case=date-networkdays-workweek-default reference_reads=7
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-networkdays-workweek-custom","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);;[.B1:.B7])","evaluation_path":"value","expected":32.00000000000000000,"shape":"scalar","reference_reads":7}
+preflight case=date-networkdays-workweek-custom reference_reads=7
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-networkdays-workweek-alloff","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);;[.B1:.B7])","evaluation_path":"value","expected":0.00000000000000000,"shape":"scalar","reference_reads":7}
+preflight case=date-networkdays-workweek-alloff reference_reads=7
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-networkdays-workweek-malformed","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);;[.B1:.B7])","evaluation_path":"value","expected":"#VALUE!","shape":"scalar","reference_reads":7}
+preflight case=date-networkdays-workweek-malformed reference_reads=7
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-workday-workweek-default","source":"=WORKDAY(DATE(2024;1;1);64;;[.B1:.B7])","evaluation_path":"value","expected":45380.00000000000000000,"shape":"scalar","reference_reads":7}
+preflight case=date-workday-workweek-default reference_reads=7
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-workday-workweek-custom","source":"=WORKDAY(DATE(2024;1;1);64;;[.B1:.B7])","evaluation_path":"value","expected":45356.00000000000000000,"shape":"scalar","reference_reads":7}
+preflight case=date-workday-workweek-custom reference_reads=7
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-workday-workweek-alloff","source":"=WORKDAY(DATE(2024;1;1);1;;[.B1:.B7])","evaluation_path":"value","expected":"#NUM!","shape":"scalar","reference_reads":7}
+preflight case=date-workday-workweek-alloff reference_reads=7
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-workday-workweek-malformed","source":"=WORKDAY(DATE(2024;1;1);64;;[.B1:.B7])","evaluation_path":"value","expected":"#VALUE!","shape":"scalar","reference_reads":7}
+preflight case=date-workday-workweek-malformed reference_reads=7
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-networkdays-interval-7","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;1;7))","evaluation_path":"scalar","expected":5.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-networkdays-interval-7 reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-networkdays-interval-31","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;1;31))","evaluation_path":"scalar","expected":23.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-networkdays-interval-31 reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-networkdays-interval-365","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;12;30))","evaluation_path":"scalar","expected":261.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-networkdays-interval-365 reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-networkdays-interval-4096","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2035;3;19))","evaluation_path":"scalar","expected":2926.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-networkdays-interval-4096 reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-workday-offset-0","source":"=WORKDAY(DATE(2024;1;1);0)","evaluation_path":"scalar","expected":45292.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-workday-offset-0 reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-workday-offset-1","source":"=WORKDAY(DATE(2024;1;1);1)","evaluation_path":"scalar","expected":45293.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-workday-offset-1 reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-workday-offset-64","source":"=WORKDAY(DATE(2024;1;1);64)","evaluation_path":"scalar","expected":45380.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-workday-offset-64 reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-workday-offset-256","source":"=WORKDAY(DATE(2024;1;1);256)","evaluation_path":"scalar","expected":45650.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-workday-offset-256 reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-workday-offset-1024","source":"=WORKDAY(DATE(2024;1;1);1024)","evaluation_path":"scalar","expected":46724.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-workday-offset-1024 reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-sequence-networkdays-projection","source":"=IF({TRUE()|TRUE()};NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.A1:.A16];[.B1:.B7]);0)","evaluation_path":"value","expected":[22.00000000000000000,22.00000000000000000],"shape":"2x1","reference_reads":46}
+preflight case=date-sequence-networkdays-projection reference_reads=46
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-sequence-workday-projection","source":"=IF({TRUE()|TRUE()};WORKDAY(DATE(2024;1;1);64;[.A1:.A16];[.B1:.B7]);0)","evaluation_path":"value","expected":[45385.00000000000000000,45385.00000000000000000],"shape":"2x1","reference_reads":46}
+preflight case=date-sequence-workday-projection reference_reads=46
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-projected-day","source":"=DAY({43890|43891})","evaluation_path":"value","expected":[29.00000000000000000,1.00000000000000000],"shape":"2x1","reference_reads":0}
+preflight case=date-projected-day reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-lazy-unselected","source":"=IF({FALSE()|FALSE()};NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.A1:.A256];[.B1:.B7]);0)","evaluation_path":"value","expected":[0.00000000000000000,0.00000000000000000],"shape":"2x1","reference_reads":0}
+preflight case=date-lazy-unselected reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-timestamp-now","source":"=NOW()","evaluation_path":"scalar","expected":45382.50000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-timestamp-now reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-timestamp-today","source":"=TODAY()","evaluation_path":"scalar","expected":45382.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-timestamp-today reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-timestamp-eastersunday","source":"=EASTERSUNDAY()","evaluation_path":"scalar","expected":45767.00000000000000000,"shape":"scalar","reference_reads":0}
+preflight case=date-timestamp-eastersunday reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-missing-now","source":"=NOW()","evaluation_path":"scalar","expected":{"failure":"CalculationClock"},"shape":"scalar","reference_reads":0}
+preflight case=date-missing-now reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-missing-today","source":"=TODAY()","evaluation_path":"scalar","expected":{"failure":"CalculationClock"},"shape":"scalar","reference_reads":0}
+preflight case=date-missing-today reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-missing-eastersunday","source":"=EASTERSUNDAY()","evaluation_path":"scalar","expected":{"failure":"CalculationClock"},"shape":"scalar","reference_reads":0}
+preflight case=date-missing-eastersunday reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-list-refusal","source":"=DAY([.A1:.A2]~[.A3:.A4])","evaluation_path":"value","expected":"#VALUE!","shape":"scalar","reference_reads":0}
+preflight case=date-list-refusal reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-direct-sequence-refusal","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.A1:.A2]~[.A3:.A4])","evaluation_path":"value","expected":"#VALUE!","shape":"scalar","reference_reads":0}
+preflight case=date-direct-sequence-refusal reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-cancel-networkdays","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.A1:.A16])","evaluation_path":"value","expected":{"failure":"Cancelled"},"shape":"scalar","reference_reads":1}
+preflight case=date-cancel-networkdays reference_reads=1
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-cancel-workday","source":"=WORKDAY(DATE(2024;1;1);64;[.A1:.A16])","evaluation_path":"value","expected":{"failure":"Cancelled"},"shape":"scalar","reference_reads":1}
+preflight case=date-cancel-workday reference_reads=1
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-resource-networkdays","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.A1:.A16])","evaluation_path":"value","expected":{"failure":"ReferenceCells"},"shape":"scalar","reference_reads":0}
+preflight case=date-resource-networkdays reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-work-limit-networkdays","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2035;3;19))","evaluation_path":"scalar","expected":{"failure":"Work"},"shape":"scalar","reference_reads":0}
+preflight case=date-work-limit-networkdays reference_reads=0
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-formula-error-sequence","source":"=NETWORKDAYS(DATE(2024;1;1);DATE(2024;2;1);[.C1:.C16])","evaluation_path":"value","expected":"#N/A","shape":"scalar","reference_reads":16}
+preflight case=date-formula-error-sequence reference_reads=16
+preflight-ok cases=1 phase=evaluate
+preflight-json {"case":"date-dateparam-error","source":"=DAY([.C1])","evaluation_path":"value","expected":"#N/A","shape":"1x1","reference_reads":1}
+preflight case=date-dateparam-error reference_reads=1
+preflight-ok cases=1 phase=evaluate

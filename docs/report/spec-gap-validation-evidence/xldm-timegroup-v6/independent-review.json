@@ -1,0 +1,18 @@
+{
+  "reviewer": "model_time_grouping_final_review",
+  "verdict": "CLEAR for V5 semantic blockers and V6 physical fixture",
+  "reviewed_manifest_sha256": "c39f44fdf198556375b370871d6385c83242efddeddddf0205e95b7bcfd74f9a",
+  "evidence": [
+    "Parsed physical native/generated IDF, metadata, OLAP and FileGroup closure positive fixture",
+    "Typed binder and XLSX/XLSB writer paths require complete OLAP proof",
+    "All XLSB payload/model replacement, transaction, set_data_model and save paths reprove retained groupings",
+    "No-op, inverse, bounded memory and malformed closure probes"
+  ],
+  "scope": "Descriptor supplies source-to-calculated edge; XLDM corroborates identities and storage. No formula derivation, value regeneration or variable structural writer claim.",
+  "focused_tests": {
+    "xldm": 103,
+    "physical_fixture": 1,
+    "xlsx_data_model": 50,
+    "xlsb_data_model": 17
+  }
+}

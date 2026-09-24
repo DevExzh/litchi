@@ -1,0 +1,318 @@
+{
+  "schema": "litchi-security-corpus-v3-current-publication-receipt/v1",
+  "created_utc": "2026-09-10T11:37:38Z",
+  "authoritative_head": "9821676451bf098cd0794fd177702bd82f27d826",
+  "overlay": "/var/tmp/litchi-security-corpus-v3-integration-982-20260910",
+  "payload_manifest_sha256": "6b11e461d3bf61a4fbd4be3008ea0795139f38af59968e393a615438e4695a84",
+  "concrete_path_count": 60,
+  "feature_payload_count": 58,
+  "integration_evidence_count": 2,
+  "paths": [
+    {
+      "path": "crates/litchi-ole-common/src/object/editor.rs",
+      "bytes": 35430,
+      "sha256": "0e3d136ff167f82cb960f37766e996b2aa1f6450008d2b4ba364814e69a42542"
+    },
+    {
+      "path": "crates/litchi-opc/src/limits.rs",
+      "bytes": 22633,
+      "sha256": "2c8ef7a5081ced8a81429ac26cca308d874aa12422745ebfc1c3701589976a32"
+    },
+    {
+      "path": "crates/litchi-opc/src/phys_pkg.rs",
+      "bytes": 82719,
+      "sha256": "0ea390fee12dc461401cdc2d887854a32f96bd3d3f526f376b34e9bbebef38a2"
+    },
+    {
+      "path": "crates/litchi-xls/src/cell_values/mod.rs",
+      "bytes": 272654,
+      "sha256": "b7e9d4fa191c52fa3760020d10e931200fad4e43a0c8b723f900967dfc54746e"
+    },
+    {
+      "path": "crates/soapberry-zip/src/office.rs",
+      "bytes": 557468,
+      "sha256": "a6f8fd14aed46468063455467e808b40ac1272901548d1bde325b35e4711cb34"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/README.md",
+      "bytes": 2354,
+      "sha256": "c9cb2590957bf882eea04073697790e3b89cdf3b529e0ad376d91f9205134d24"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/catalog.json",
+      "bytes": 134726,
+      "sha256": "52c9b13976614004d2b80a8a7941763c04ea18528cfb8e63352ce270f0967e76"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/oracles.json",
+      "bytes": 27903,
+      "sha256": "57441f97e2a070ff89aad2268cf7f97f18a1989cf11895da7529aa32f44dd36b"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/README.md",
+      "bytes": 3576,
+      "sha256": "77c3039bf1c4c691845de2da1e487122421a5d2c1bf731193d3935a79b5ca030"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/catalog.json",
+      "bytes": 174749,
+      "sha256": "6c6d01e1cfda59f78f497ded3315fa6053aae9f93fd03edb880eb0d0642ff33e"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/logs/catalog-build.log.gz",
+      "bytes": 38,
+      "sha256": "a5b5fd1eb4a117ecd00eea4fcdd3fdae57a592384d00015a12f548d794116dd7"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/logs/catalog-module-validation.log.gz",
+      "bytes": 160,
+      "sha256": "57d9cba77b875160098bbd94fbdb4985b50e2bd6756cd012994d6e86291f6e3e"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/logs/catalog-test-compile.log.gz",
+      "bytes": 45,
+      "sha256": "7ae24045b18b067d4e98c2c5a38820b00704dd6c17958756efa1136abb63940d"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/logs/catalog-unit-tests.log.gz",
+      "bytes": 216,
+      "sha256": "e5d28ee6b7e6998be06b25a189304657bbbad9e027e62f6be57d5d65895ec34e"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/logs/catalog-validation.log.gz",
+      "bytes": 153,
+      "sha256": "d5db7d0595eee66f24f37956a2a95d12808a093dbd7ab055a59f2368c1d77b06"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/logs/ooxml-interoperability.log.gz",
+      "bytes": 1692,
+      "sha256": "a0ead7007cc3e9f2fb8855cbe23f939d7d9955176eb2c9ab2ba9780cefdf9ddd"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/logs/python-compile.log.gz",
+      "bytes": 39,
+      "sha256": "3ff7f9d8ab013a8c696295c2f1a425f31149592ab5e0715313684cb812e9f6d9"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/logs/security-corpus-tests.log.gz",
+      "bytes": 316,
+      "sha256": "07a01da1a96588993e56763300b64b664c287fd71a841fd2c9ae9d475fdf0365"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/oracles.json",
+      "bytes": 12884,
+      "sha256": "2209d0d3069e61c338316d142fe45e89d6812658fd06287e464a82e203d65e4e"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/prior-receipts/xls-embedded-payload-v1-receipt.json",
+      "bytes": 2149,
+      "sha256": "a8e3c3bcf8eb1f930621eed6dcb3971233ed0e6d957603da8243b6ba4f34ac1f"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/profile.json",
+      "bytes": 501,
+      "sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/receipt.json",
+      "bytes": 5975,
+      "sha256": "dcd888beac928299e7d7853e67b25697d25b62957082b42bd8d79424fdd9a2c3"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/prior-v1/source-manifest.json",
+      "bytes": 4045,
+      "sha256": "7a4b1fc78ad9ad4981b8fbbf8d75a088c9ffb767e16db6b50dd08c9a25c72294"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/profile.json",
+      "bytes": 1033,
+      "sha256": "ad8b200df07a7161c3b288345e345b3341759350d5ca5d65d26ca58870fdcf12"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/receipt.json",
+      "bytes": 3814,
+      "sha256": "9cae5a75165d714f5dbc9890b717c134198f61112e3bdcae3299c77bb57a3899"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v2/source-manifest.json",
+      "bytes": 6844,
+      "sha256": "a30f06adf88b4093630146adae83a2a00fbd35e4d9e3a15b3b640c1decbeff0c"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/README.md",
+      "bytes": 3372,
+      "sha256": "9f5f9226750c73b8c2bf15aa54ccf6ccce524e105f0278b20f8c700818267a80"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/catalog.json",
+      "bytes": 135550,
+      "sha256": "4b1d7d0d1cf1f345191c698e1d3ecd1b490d4f9cdac24712369567682201d797"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/integration-preimages.json",
+      "bytes": 29307,
+      "sha256": "8ce5b6b246d14e3cbff93194ab20282a6338bff7218365b59eba8b7e7cfa205b"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/integration-provenance.json",
+      "bytes": 6968,
+      "sha256": "813d3b6057c273f78faaf39c96e7c89b56221d6cf0916bcb947e57f72701e28c"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/integration-source-manifest.json",
+      "bytes": 27755,
+      "sha256": "a9216e527e14e4b38d22f35690959c139f36ee2348eece646d9b24e4c91e7ab9"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/oracles.json",
+      "bytes": 28050,
+      "sha256": "aa2e636dbd3454a39c41b5e7026ce43970582d3657d537fd285df466894943b6"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/README.md",
+      "bytes": 2354,
+      "sha256": "c9cb2590957bf882eea04073697790e3b89cdf3b529e0ad376d91f9205134d24"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/catalog.json",
+      "bytes": 134726,
+      "sha256": "52c9b13976614004d2b80a8a7941763c04ea18528cfb8e63352ce270f0967e76"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/oracles.json",
+      "bytes": 27903,
+      "sha256": "57441f97e2a070ff89aad2268cf7f97f18a1989cf11895da7529aa32f44dd36b"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/prior-v1/README.md",
+      "bytes": 3576,
+      "sha256": "77c3039bf1c4c691845de2da1e487122421a5d2c1bf731193d3935a79b5ca030"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/prior-v1/catalog.json",
+      "bytes": 174749,
+      "sha256": "6c6d01e1cfda59f78f497ded3315fa6053aae9f93fd03edb880eb0d0642ff33e"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/prior-v1/logs/catalog-build.log.gz",
+      "bytes": 38,
+      "sha256": "a5b5fd1eb4a117ecd00eea4fcdd3fdae57a592384d00015a12f548d794116dd7"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/prior-v1/logs/catalog-module-validation.log.gz",
+      "bytes": 160,
+      "sha256": "57d9cba77b875160098bbd94fbdb4985b50e2bd6756cd012994d6e86291f6e3e"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/prior-v1/logs/catalog-test-compile.log.gz",
+      "bytes": 45,
+      "sha256": "7ae24045b18b067d4e98c2c5a38820b00704dd6c17958756efa1136abb63940d"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/prior-v1/logs/catalog-unit-tests.log.gz",
+      "bytes": 216,
+      "sha256": "e5d28ee6b7e6998be06b25a189304657bbbad9e027e62f6be57d5d65895ec34e"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/prior-v1/logs/catalog-validation.log.gz",
+      "bytes": 153,
+      "sha256": "d5db7d0595eee66f24f37956a2a95d12808a093dbd7ab055a59f2368c1d77b06"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/prior-v1/logs/ooxml-interoperability.log.gz",
+      "bytes": 1692,
+      "sha256": "a0ead7007cc3e9f2fb8855cbe23f939d7d9955176eb2c9ab2ba9780cefdf9ddd"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/prior-v1/logs/python-compile.log.gz",
+      "bytes": 39,
+      "sha256": "3ff7f9d8ab013a8c696295c2f1a425f31149592ab5e0715313684cb812e9f6d9"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/prior-v1/logs/security-corpus-tests.log.gz",
+      "bytes": 316,
+      "sha256": "07a01da1a96588993e56763300b64b664c287fd71a841fd2c9ae9d475fdf0365"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/prior-v1/oracles.json",
+      "bytes": 12884,
+      "sha256": "2209d0d3069e61c338316d142fe45e89d6812658fd06287e464a82e203d65e4e"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/prior-v1/prior-receipts/xls-embedded-payload-v1-receipt.json",
+      "bytes": 2149,
+      "sha256": "a8e3c3bcf8eb1f930621eed6dcb3971233ed0e6d957603da8243b6ba4f34ac1f"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/prior-v1/profile.json",
+      "bytes": 501,
+      "sha256": "070bea08ce6ff5a30b701c55c25062e2943a30eebab46e2f5655a302f52d6239"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/prior-v1/receipt.json",
+      "bytes": 5975,
+      "sha256": "dcd888beac928299e7d7853e67b25697d25b62957082b42bd8d79424fdd9a2c3"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/prior-v1/source-manifest.json",
+      "bytes": 4045,
+      "sha256": "7a4b1fc78ad9ad4981b8fbbf8d75a088c9ffb767e16db6b50dd08c9a25c72294"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/profile.json",
+      "bytes": 1033,
+      "sha256": "ad8b200df07a7161c3b288345e345b3341759350d5ca5d65d26ca58870fdcf12"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/receipt.json",
+      "bytes": 3814,
+      "sha256": "9cae5a75165d714f5dbc9890b717c134198f61112e3bdcae3299c77bb57a3899"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/prior-v2/source-manifest.json",
+      "bytes": 6844,
+      "sha256": "a30f06adf88b4093630146adae83a2a00fbd35e4d9e3a15b3b640c1decbeff0c"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/profile.json",
+      "bytes": 1728,
+      "sha256": "55724c7634b666136823faa242b100046edbba4954a4af05f8bc229a0a0630d1"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/receipt.json",
+      "bytes": 8837,
+      "sha256": "8146b2a08739d0c162fe7eb514e4bdb06035ce254ce9e47aa0ac999b0099bc07"
+    },
+    {
+      "path": "docs/performance/results/security-corpus-v3/source-manifest.json",
+      "bytes": 9290,
+      "sha256": "5d123954ea614f9bb9a011628fd8336293764618ab1b45f8d866577812746493"
+    },
+    {
+      "path": "tools/perf-baseline/Cargo.lock",
+      "bytes": 56394,
+      "sha256": "577ca67feffe8866fb061b82dca0e36203d66f72e913fb7861c2332e38427562"
+    },
+    {
+      "path": "tools/perf-baseline/Cargo.toml",
+      "bytes": 2101,
+      "sha256": "9692ba054ce1ae07cd0d8d585a2d30e28f8e294175895f3eb7477e5de8180470"
+    },
+    {
+      "path": "tools/perf-baseline/src/bin/security_corpus.rs",
+      "bytes": 77926,
+      "sha256": "124e77b4543e6820417f23e689c8415ed0a6019d187a56453763c2449f0b7348"
+    },
+    {
+      "path": "tools/perf-baseline/src/security_corpus.rs",
+      "bytes": 22162,
+      "sha256": "6d7c5d798d7d172e2a87559c880f2abc85a9fb06829425c6561fe94bb05261cb"
+    }
+  ],
+  "source_manifest_sha256": "a9216e527e14e4b38d22f35690959c139f36ee2348eece646d9b24e4c91e7ab9",
+  "preimages_manifest_sha256": "8ce5b6b246d14e3cbff93194ab20282a6338bff7218365b59eba8b7e7cfa205b",
+  "provenance_manifest_sha256": "f08ad864c3259bf75ce7c613fd9fc2e75361a0c8f03b5f9f3e84ce8081cb5b7d",
+  "tracked_patch_sha256": "d82cc841df6f0ac3d3c4ffaf8c823a32e1d7461c969ddd9b9945acb52c9bfa6e",
+  "correctness_json_sha256": "03d655e44b3182c30f7a928f38d7252826415f59063305eb8d8bfb32f93057d9",
+  "reconciliation_manifest": "/var/tmp/litchi-security-corpus-v3-current982-mixed-primary-reconciliation-20260910.json"
+}

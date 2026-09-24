@@ -13,6 +13,9 @@ fn entry(entry_type: u8) -> DirectoryEntry {
         sid_right: 9,
         sid_child: 0xFFFF_FFFF,
         clsid: "00112233-4455-6677-8899-AABBCCDDEEFF".into(),
+        state_bits: 0,
+        creation_time: 0,
+        modified_time: 0,
         start_sector: 12,
         size: 42,
         is_minifat: true,
@@ -46,6 +49,48 @@ fn decodes_storage_class_id_and_rejects_stream_only_fields() {
     assert_eq!(metadata.kind(), EntryKind::Storage);
     assert_eq!(metadata.class_id(), parse_class_id(&source.clsid).unwrap());
     assert!(decode(&entry(0x01)).is_err());
+}
+
+#[test]
+fn projects_raw_state_and_filetimes_without_conversion() {
+    let mut source = entry(0x01);
+    source.sid_child = 0xFFFF_FFFF;
+    source.start_sector = 0;
+    source.size = 0;
+    source.is_minifat = false;
+    source.state_bits = 0xA5A5_5A5A;
+    source.creation_time = 0xFEDC_BA98_7654_3210;
+    source.modified_time = 0x0123_4567_89AB_CDEF;
+    let metadata = decode(&source).expect("storage metadata should decode");
+    assert_eq!(metadata.state_bits(), source.state_bits);
+    assert_eq!(metadata.creation_time(), source.creation_time);
+    assert_eq!(metadata.modified_time(), source.modified_time);
+}
+
+#[test]
+fn projects_nonzero_stream_filetimes_without_conversion() {
+    let mut source = entry(0x02);
+    source.clsid.clear();
+    source.creation_time = 1;
+    source.modified_time = 1;
+    let metadata = decode(&source).expect("legacy stream metadata should decode");
+    assert_eq!(metadata.creation_time(), 1);
+    assert_eq!(metadata.modified_time(), 1);
+}
+
+#[test]
+fn preserves_a_nonzero_storage_start_sector_until_a_typed_edit() {
+    let mut source = entry(0x01);
+    source.size = 0;
+    source.is_minifat = false;
+    source.sid_child = 0xFFFF_FFFF;
+    source.start_sector = litchi_cfb::consts::ENDOFCHAIN;
+    let metadata = decode(&source).expect("source metadata should remain readable");
+    assert_eq!(metadata.start_sector(), litchi_cfb::consts::ENDOFCHAIN);
+
+    let mut typed = metadata;
+    typed.set_start_sector(litchi_cfb::consts::ENDOFCHAIN);
+    assert!(super::validation::validate(typed).is_err());
 }
 
 #[test]
@@ -98,6 +143,9 @@ fn catalog_entries() -> Vec<DirectoryEntry> {
             sid_right: super::NOSTREAM,
             sid_child: 1,
             clsid: "00112233-4455-6677-8899-AABBCCDDEEFF".into(),
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
             start_sector: litchi_cfb::consts::ENDOFCHAIN,
             size: 0,
             is_minifat: false,
@@ -111,6 +159,9 @@ fn catalog_entries() -> Vec<DirectoryEntry> {
             sid_right: super::NOSTREAM,
             sid_child: 2,
             clsid: String::new(),
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
             start_sector: 0,
             size: 0,
             is_minifat: false,
@@ -124,6 +175,9 @@ fn catalog_entries() -> Vec<DirectoryEntry> {
             sid_right: super::NOSTREAM,
             sid_child: super::NOSTREAM,
             clsid: String::new(),
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
             start_sector: 12,
             size: 42,
             is_minifat: true,
@@ -137,6 +191,9 @@ fn catalog_entries() -> Vec<DirectoryEntry> {
             sid_right: super::NOSTREAM,
             sid_child: super::NOSTREAM,
             clsid: "producer-defined".into(),
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
             start_sector: 91,
             size: 7,
             is_minifat: false,
@@ -148,6 +205,9 @@ fn catalog_entries() -> Vec<DirectoryEntry> {
                 sid_right: super::NOSTREAM,
                 sid_child: super::NOSTREAM,
                 clsid: "raw".into(),
+                state_bits: 0,
+                creation_time: 0,
+                modified_time: 0,
                 start_sector: 0,
                 size: 0,
                 is_minifat: false,
@@ -222,6 +282,44 @@ fn metadata_and_containment_edits_are_typed_and_raw_preserving() {
 }
 
 #[test]
+fn sid_zero_root_name_and_kind_are_immutable() {
+    let source = catalog_snapshot();
+    let mut transaction = source.edit();
+    assert!(transaction.set_name(Sid::new(0).unwrap(), "Other").is_err());
+    assert!(
+        transaction
+            .set_kind(Sid::new(0).unwrap(), EntryKind::Storage)
+            .is_err()
+    );
+    assert_eq!(transaction.catalog().raw_entries()[0].name, "Root Entry");
+    assert_eq!(
+        transaction.catalog().raw_entries()[0].entry_type,
+        EntryKind::Root.raw()
+    );
+}
+
+#[test]
+fn typed_metadata_edit_preserves_filetime_lexical_values() {
+    let source = catalog_snapshot();
+    let storage = Sid::new(1).unwrap();
+    let mut transaction = source.edit();
+    transaction
+        .update_metadata(storage, |metadata| {
+            metadata
+                .set_state_bits(0xDEAD_BEEF)
+                .set_creation_time(0xFEDC_BA98_7654_3210)
+                .set_modified_time(0x0123_4567_89AB_CDEF);
+            Ok(())
+        })
+        .unwrap();
+    let snapshot = transaction.snapshot().unwrap();
+    let metadata = snapshot.metadata(storage).unwrap();
+    assert_eq!(metadata.state_bits(), 0xDEAD_BEEF);
+    assert_eq!(metadata.creation_time(), 0xFEDC_BA98_7654_3210);
+    assert_eq!(metadata.modified_time(), 0x0123_4567_89AB_CDEF);
+}
+
+#[test]
 fn directory_patch_rejects_stale_sources_and_round_trips_inverse() {
     let source = catalog_snapshot();
     let payload = Sid::new(2).unwrap();
@@ -286,4 +384,8 @@ fn catalog_validation_is_bounded_and_failure_atomic() {
         transaction.catalog().raw_entries(),
         &before
     ));
+
+    let mut no_root = entries.clone();
+    no_root[0].sid = 9;
+    assert!(Catalog::parse(&no_root, Limits::default()).is_err());
 }

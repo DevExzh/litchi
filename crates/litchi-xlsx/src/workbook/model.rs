@@ -854,6 +854,164 @@ impl Workbook {
         &self.inner.pivot_caches
     }
 
+    /// Return a semantic handle for one workbook PivotCache.  Cache and field
+    /// resolution remains fallible at the typed read boundary; no OPC
+    /// relationship or Part identity is accepted here.
+    #[must_use]
+    pub fn pivot_cache(
+        &self,
+        selector: impl Into<crate::pivot::PivotCacheSelector>,
+    ) -> crate::pivot::PivotCacheHandle {
+        crate::pivot::cached_unique_names::workbook_cache(self, selector)
+    }
+
+    /// Begin an ordinary semantic edit handle for one workbook PivotCache.
+    /// Select the cache field with [`crate::pivot::PivotCacheEdit::field`]
+    /// before staging an existing-name replacement.
+    #[must_use]
+    pub fn edit_pivot_cache(
+        &self,
+        selector: impl Into<crate::pivot::PivotCacheSelector>,
+    ) -> crate::pivot::PivotCacheEdit {
+        crate::pivot::cached_unique_names::edit_workbook(self, selector)
+    }
+
+    /// Resolve the typed `pivotTableServerFormats` metadata for one semantic
+    /// workbook PivotTable.  XML source ranges and package identities remain
+    /// behind the low-level `pivot_table_server_formats_source` method.
+    pub fn pivot_table_server_formats<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotTableView> {
+        crate::pivot::server_formats::view_workbook(self, selector)
+    }
+
+    /// Read the source-bound owner for low-level diagnostics and exact source
+    /// patch construction.  Ordinary callers should use
+    /// [`Self::pivot_table_server_formats`].
+    pub fn pivot_table_server_formats_source<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotServerFormatsSnapshot> {
+        crate::pivot::load_pivot_server_formats(&self.inner.package, selector)
+    }
+
+    /// Resolve one semantic PivotTable through the ordinary workbook facade.
+    ///
+    /// The returned view exposes only typed server-format values.  Source XML,
+    /// relationship IDs, and Part names remain behind the source-bound owner.
+    pub fn pivot_table<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotTableView> {
+        crate::pivot::server_formats::view_workbook(self, selector)
+    }
+
+    /// Start an ordinary semantic PivotTable server-format edit.
+    pub fn edit_pivot_table<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotTableServerFormatsEdit> {
+        self.ensure_mutation_allowed("edit_pivot_table")?;
+        crate::pivot::server_formats::edit_workbook(self, selector)
+    }
+
+    /// Alias spelling that includes the edited extension name.
+    pub fn edit_pivot_table_server_formats<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotTableServerFormatsEdit> {
+        self.edit_pivot_table(selector)
+    }
+
+    /// Apply an exact ordinary Workbook server-format patch.
+    pub fn apply_pivot_table_server_formats_patch(
+        &self,
+        patch: &crate::pivot::PivotTableServerFormatsWorkbookPatch,
+    ) -> Result<crate::pivot::PivotTableServerFormatsWorkbookCommit> {
+        self.ensure_mutation_allowed("apply_pivot_table_server_formats_patch")?;
+        patch.apply(self)
+    }
+
+    /// Alias spelling for the pivot server-format owner.
+    pub fn apply_pivot_server_formats_patch(
+        &self,
+        patch: &crate::pivot::PivotTableServerFormatsWorkbookPatch,
+    ) -> Result<crate::pivot::PivotTableServerFormatsWorkbookCommit> {
+        self.apply_pivot_table_server_formats_patch(patch)
+    }
+
+    /// Alias for the typed extension collection view.
+    pub fn pivot_server_formats<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotTableView> {
+        self.pivot_table_server_formats(selector)
+    }
+
+    /// Low-level source-bound alias for the extension collection view.
+    pub fn pivot_server_formats_source<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotServerFormatsSnapshot> {
+        self.pivot_table_server_formats_source(selector)
+    }
+
+    /// Resolve the typed `pivotTableData` payload for one semantic
+    /// non-worksheet PivotTable.  A missing C444 owner is reported as `None`;
+    /// malformed or ambiguous owners remain fallible diagnostics.
+    pub fn pivot_table_data<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<Option<crate::pivot::PivotTableDataView>> {
+        crate::pivot::server_formats::table_data::view_workbook(self, selector)
+    }
+
+    /// Resolve C444 with a caller-lowered semantic resource policy.
+    pub fn pivot_table_data_with_limits<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+        limits: &crate::pivot::PivotTableDataLimits,
+    ) -> Result<Option<crate::pivot::PivotTableDataView>> {
+        crate::pivot::server_formats::table_data::view_workbook_with_limits(self, selector, limits)
+    }
+
+    /// Begin an ordinary semantic scalar edit of one `pivotTableData` owner.
+    pub fn edit_pivot_table_data<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotTableDataEdit> {
+        self.ensure_mutation_allowed("edit_pivot_table_data")?;
+        crate::pivot::server_formats::table_data::edit_workbook(self, selector)
+    }
+
+    /// Start a C444 edit with a caller-lowered semantic resource policy.
+    pub fn edit_pivot_table_data_with_limits<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+        limits: &crate::pivot::PivotTableDataLimits,
+    ) -> Result<crate::pivot::PivotTableDataEdit> {
+        self.ensure_mutation_allowed("edit_pivot_table_data_with_limits")?;
+        crate::pivot::server_formats::table_data::edit_workbook_with_limits(self, selector, limits)
+    }
+
+    /// Apply an exact ordinary Workbook `pivotTableData` patch.
+    pub fn apply_pivot_table_data_patch(
+        &self,
+        patch: &crate::pivot::PivotTableDataWorkbookPatch,
+    ) -> Result<crate::pivot::PivotTableDataWorkbookCommit> {
+        self.ensure_mutation_allowed("apply_pivot_table_data_patch")?;
+        patch.apply(self)
+    }
+
+    pub(crate) fn pivot_package(&self) -> &OpcPackage {
+        &self.inner.package
+    }
+
+    pub(crate) fn adopt_published_package(&self, package: OpcPackage) -> Result<Self> {
+        Self::from_package_with_styles(package, Some(self))
+    }
+
     /// Inert external-workbook relationship IDs, for package diagnostics.
     #[must_use]
     pub fn external_reference_ids(&self) -> &[String] {
@@ -1067,7 +1225,7 @@ impl Workbook {
         Ok(())
     }
 
-    fn ensure_mutation_allowed(&self, operation: &'static str) -> Result<()> {
+    pub(crate) fn ensure_mutation_allowed(&self, operation: &'static str) -> Result<()> {
         self.ensure_ordinary_output(operation)
     }
 
@@ -1143,6 +1301,55 @@ impl Worksheet {
     /// Parse this worksheet's typed inert hyperlinks.
     pub fn hyperlinks(&self) -> Result<Vec<crate::hyperlinks::Hyperlink>> {
         worksheet::hyperlinks(self)
+    }
+
+    /// Read the worksheet's admitted SpreadsheetML form controls.
+    pub fn form_controls(&self) -> Result<crate::form_control::FormControlCollection> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name.clone(),
+            });
+        }
+        crate::form_control::eager_form_controls_for_sheet(&self.owner.package, &self.data.part_uri)
+    }
+
+    /// Read this worksheet's form controls under a caller-owned bounded
+    /// owner policy.
+    pub fn form_controls_with_limits(
+        &self,
+        limits: crate::form_control::OwnerLimits,
+    ) -> Result<crate::form_control::FormControlCollection> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name.clone(),
+            });
+        }
+        crate::form_control::eager_form_controls_for_sheet_with_limits(
+            &self.owner.package,
+            &self.data.part_uri,
+            limits,
+        )
+        .map_err(crate::form_control::owner_to_xlsx)
+    }
+
+    /// Resolve one form control by checked position or exact authored name.
+    pub fn form_control<'a>(
+        &self,
+        selector: impl Into<crate::form_control::ControlSelector<'a>>,
+    ) -> Result<Option<crate::form_control::FormControlView>> {
+        Ok(self.form_controls()?.get(selector)?.cloned())
+    }
+
+    /// Resolve one form control under a caller-owned bounded owner policy.
+    pub fn form_control_with_limits<'a>(
+        &self,
+        selector: impl Into<crate::form_control::ControlSelector<'a>>,
+        limits: crate::form_control::OwnerLimits,
+    ) -> Result<Option<crate::form_control::FormControlView>> {
+        Ok(self
+            .form_controls_with_limits(limits)?
+            .get(selector)?
+            .cloned())
     }
 
     /// Borrow this worksheet's Office Add-in range bindings.

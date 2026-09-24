@@ -461,6 +461,8 @@ pub enum Error {
     StreamNotFound(String),
     /// Corrupted file
     Corrupted(String),
+    /// A changed DOC publication was blocked by its active protection state.
+    ProtectionDenied(crate::parts::protection::EditProtection),
     /// A caller-selected finite parsing limit was exceeded.
     ResourceLimit(ResourceLimit),
     /// The document is encrypted and no password was supplied.
@@ -510,6 +512,12 @@ impl std::fmt::Display for Error {
             Error::InvalidFormat(s) => write!(f, "Invalid format: {s}"),
             Error::StreamNotFound(s) => write!(f, "Stream not found: {s}"),
             Error::Corrupted(s) => write!(f, "Corrupted file: {s}"),
+            Error::ProtectionDenied(state) => {
+                write!(
+                    f,
+                    "protected DOC publication requires explicit authorization ({state:?})"
+                )
+            },
             Error::ResourceLimit(error) => error.fmt(f),
             Error::PasswordRequired => write!(f, "a password is required to open this document"),
             Error::InvalidPassword => write!(f, "the document password is invalid"),
@@ -568,6 +576,9 @@ impl From<Error> for litchi_core::Error {
             Error::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             Error::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
             Error::Corrupted(s) => litchi_core::Error::CorruptedFile(s),
+            Error::ProtectionDenied(state) => litchi_core::Error::InvalidFormat(format!(
+                "protected DOC publication requires explicit authorization ({state:?})"
+            )),
             Error::ResourceLimit(limit) => litchi_core::Error::ResourceLimit(limit.into()),
             Error::PasswordRequired => {
                 litchi_core::Error::InvalidFormat("DOC password required".to_string())

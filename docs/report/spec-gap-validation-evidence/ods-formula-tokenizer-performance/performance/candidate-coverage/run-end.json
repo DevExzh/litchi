@@ -1,0 +1,18 @@
+{
+  "label": "candidate-coverage",
+  "group": "coverage",
+  "binary": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/candidate/ods-formula-reference-profile",
+  "binary_sha256": "30a7da005fdb3c18ac06f1c8a7328a6755cadd64abee02b97a4b869612c6effd",
+  "harness": "/var/tmp/ods-tokenizer-baseline-20260913/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/harness/run.py",
+  "output": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-tokenizer-performance/performance/candidate-coverage",
+  "warmups": 3,
+  "iterations": 15,
+  "finished_at": "2026-09-13T08:03:39Z",
+  "elapsed_seconds": 1.468712568283081,
+  "status": 0,
+  "raw_sha256": "38eba23e72e22254e45b8fa4bcb69d240b7a6552177d4009cace2e428fa72cb6",
+  "row_count": 16,
+  "expected_statuses": [
+    "0"
+  ]
+}

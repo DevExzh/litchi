@@ -55,6 +55,11 @@ def content_set(catalog: dict) -> dict:
                 "case": binding["case"],
                 "corpus_id": binding["corpus_id"],
                 "role": binding["role"],
+                **(
+                    {"dimensions": binding["dimensions"]}
+                    if binding.get("dimensions")
+                    else {}
+                ),
             }
             for binding in catalog["case_bindings"]
         ],
@@ -71,6 +76,16 @@ class CorpusManifestV2Tests(unittest.TestCase):
         schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
         self.assertEqual(schema["$schema"], "https://json-schema.org/draft/2020-12/schema")
         self.assertEqual(schema["properties"]["manifest_version"]["const"], 2)
+        self.assertEqual(
+            schema["$defs"]["legacy"]["properties"]["package_format"]["pattern"],
+            "[A-Za-z0-9]",
+        )
+        dimensions = schema["$defs"]["caseBinding"]["properties"]["dimensions"]
+        self.assertFalse(dimensions["additionalProperties"])
+        self.assertEqual(
+            set(dimensions["properties"]),
+            {"cache_state"},
+        )
 
     def test_v1_identity_is_unchanged(self):
         self.assertEqual(self.v1["schema_version"], 1)
@@ -286,6 +301,12 @@ class CorpusManifestV2Tests(unittest.TestCase):
                 worktree_dirty=True,
             )["build"]["git_worktree_dirty"]
         )
+
+    def test_generator_rejects_empty_normalized_package_format(self):
+        v1 = copy.deepcopy(self.v1)
+        next(iter(v1["corpora"].values()))["package_format"] = "!!!"
+        with self.assertRaisesRegex(ValueError, "ASCII letter or digit"):
+            generate(v1, "test-revision")
 
     def test_migration_keeps_unknowns_explicit(self):
         for corpus in self.v2["corpora"]:

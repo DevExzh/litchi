@@ -38,9 +38,13 @@ pub use model::query::{
     QueryRelation, QueryRelationRole, QueryStatementKind, QueryUpdateTarget,
 };
 pub use model::{
-    ActiveContentEntry, ActiveContentInventory, ActiveContentKind, Catalog, Column, Component,
+    ActiveContentEntry, ActiveContentInventory, ActiveContentKind, ApplicationConnectionSettings,
+    AutoIncrementSettings, BooleanComparisonMode, Catalog, CharacterSetSettings, Column, Component,
     ComponentDependency, ComponentDependencyInventory, ComponentDependencyKind, ComponentKind,
-    ComponentLinkKind, ComponentTransferRefusal, ComponentTransferSupport, DataType, Index,
-    IndexColumn, Key, KeyColumn, KeyKind, Limits, OwnedCatalog, ProducerExtension,
-    ReferentialAction, Relation, RelationResolution, Table, TableKind, connection, query,
+    ComponentLinkKind, ComponentTransferRefusal, ComponentTransferSupport, DataSourceSetting,
+    DataSourceSettingType, DataType, DatabaseSettings, DelimiterSettings, DriverSettings,
+    FileDatabaseTarget, Index, IndexColumn, Key, KeyColumn, KeyKind, Limits, LoginSettings,
+    OwnedCatalog, ProducerExtension, ReferentialAction, Relation, RelationResolution,
+    ServerDatabaseAddress, ServerDatabaseTarget, Settings, Table, TableFilter, TableKind,
+    TableSetting, TableTypeFilter, connection, query,
 };

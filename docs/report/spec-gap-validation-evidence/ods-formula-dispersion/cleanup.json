@@ -1,0 +1,17 @@
+{
+  "removed_paths": {
+    "/tmp/litchi-dispersion-native-source": true,
+    "docs/report/spec-gap-validation-evidence/ods-formula-dispersion/native/__pycache__": true,
+    "/tmp/litchi-ods-dispersion": true,
+    "/tmp/litchi-ods-dispersion-target": true,
+    "/tmp/check_dispersion.py": true,
+    "/var/tmp/litchi-ods-dispersion-baseline-55e147bfa0676ce6ecdc609efc682b98568b8a5f-mba40qsa": true,
+    "/tmp/litchi-ods-dispersion-baseline-vrngdtvw": true,
+    "/tmp/litchi-ods-dispersion/docs/report/spec-gap-validation-evidence/ods-formula-dispersion/performance/harness": true,
+    "/var/tmp/litchi-ods-dispersion-candidate-final-z7i4x4zh": true,
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-dispersion/performance/__pycache__": true
+  },
+  "status": "complete",
+  "shared_default_target_preserved": true,
+  "retained_evidence_has_no_target_or_python_cache": true
+}

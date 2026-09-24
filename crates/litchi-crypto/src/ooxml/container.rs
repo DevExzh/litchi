@@ -3,14 +3,14 @@
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
 use litchi_cfb::writer::OleWriter;
-use litchi_cfb::{OleError, OleFile};
+use litchi_cfb::{OleError, OleFile, OleFileLimits};
 
 use crate::spaces::{
     self, Definition, ENCRYPTION_ID, ENCRYPTION_NAME, EncryptionTransform, Header, Map, MapEntry,
     PRIMARY, Reference, ReferenceKind, STORAGE, Version, VersionInfo,
 };
 
-use super::{Error, Limits, Mode, Result, malformed, mode};
+use super::{Error, Limits, Mode, Result, malformed};
 
 const DATA_SPACE: &str = "StrongEncryptionDataSpace";
 const TRANSFORM: &str = "StrongEncryptionTransform";
@@ -136,7 +136,8 @@ impl Seek for Bounded {
 /// Read only the bounded `EncryptionInfo` stream for password-free classification.
 pub(super) fn read_info(bytes: &[u8], limits: &Limits) -> Result<Vec<u8>> {
     Limits::bytes("compound input", bytes.len(), limits.max_input_bytes)?;
-    let mut ole = OleFile::open(Cursor::new(bytes)).map_err(map_reader_error)?;
+    let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits(limits)?)
+        .map_err(map_reader_error)?;
     let info_len = ole
         .stream_len(&["EncryptionInfo"])
         .map_err(map_reader_error)?;
@@ -156,7 +157,11 @@ pub(super) fn write(info: &[u8], encrypted: Vec<u8>, limits: &Limits) -> Result<
         limits.max_encrypted_bytes,
     )?;
 
-    let mode = mode(info)?;
+    // The wrapper can preserve a schema-legal input descriptor that omits
+    // Agile dataIntegrity. Public authoring never reaches this path with such
+    // a descriptor: `agile::build_info` always emits authenticated metadata.
+    let mode =
+        super::profile_with_policy(info, limits, super::IntegrityPolicy::AllowUnauthenticated)?;
     let map = spaces::write_map(&expected_map()).map_err(|error| map_spaces_error(&error))?;
     let definition = spaces::write_definition(&Definition {
         transforms: vec![TRANSFORM.to_string()],
@@ -170,9 +175,15 @@ pub(super) fn write(info: &[u8], encrypted: Vec<u8>, limits: &Limits) -> Result<
             updater: Version::V1_0,
             writer: Version::V1_0,
         },
-        encryption_name: match mode {
-            Mode::Standard => Some("AES 128".to_string()),
-            Mode::Agile => None,
+        encryption_name: if mode.is_standard() {
+            Some(match mode {
+                Mode::Standard => "AES 128".to_string(),
+                Mode::StandardAes192 => "AES 192".to_string(),
+                Mode::StandardAes256 => "AES 256".to_string(),
+                _ => unreachable!("standard mode is exhaustive"),
+            })
+        } else {
+            None
         },
         encryption_block_size: 16,
         cipher_mode: 0,
@@ -223,7 +234,8 @@ pub(super) fn write(info: &[u8], encrypted: Vec<u8>, limits: &Limits) -> Result<
 /// Read and validate the two encryption streams from a bounded compound file.
 pub(super) fn read(bytes: Vec<u8>, limits: &Limits) -> Result<(Vec<u8>, Vec<u8>)> {
     Limits::bytes("compound input", bytes.len(), limits.max_input_bytes)?;
-    let mut ole = OleFile::open(Cursor::new(bytes)).map_err(map_reader_error)?;
+    let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits(limits)?)
+        .map_err(map_reader_error)?;
 
     let info_len = ole
         .stream_len(&["EncryptionInfo"])
@@ -232,12 +244,12 @@ pub(super) fn read(bytes: Vec<u8>, limits: &Limits) -> Result<(Vec<u8>, Vec<u8>)
     let info = ole
         .open_stream(&["EncryptionInfo"])
         .map_err(map_reader_error)?;
-    let mode = mode(&info)?;
+    let mode = super::family_mode(&info)?;
 
     // LibreOffice has emitted otherwise valid encrypted packages without the
     // DataSpaces storage. Retain that narrow read compatibility, but when the
     // graph exists require the complete StrongEncryption profile.
-    match spaces::inspect(&mut ole).map_err(|error| map_spaces_error(&error))? {
+    match spaces::inspect_ooxml(&mut ole).map_err(|error| map_spaces_error(&error))? {
         Some(graph) => validate_graph(&graph, mode)?,
         None if limits.allow_missing_data_spaces => {},
         None => {
@@ -278,6 +290,21 @@ fn declared_bytes(resource: &'static str, actual: u64, maximum: usize) -> Result
     Ok(())
 }
 
+fn cfb_limits(limits: &Limits) -> Result<OleFileLimits> {
+    let input = u64::try_from(limits.max_input_bytes)
+        .map_err(|_err| Error::InvalidLimit("max_input_bytes does not fit the CFB limit type"))?;
+    let directory = u64::try_from(limits.max_cfb_directory_bytes).map_err(|_err| {
+        Error::InvalidLimit("max_cfb_directory_bytes does not fit the CFB limit type")
+    })?;
+    let allocation = u64::try_from(limits.max_cfb_allocation_table_bytes).map_err(|_err| {
+        Error::InvalidLimit("max_cfb_allocation_table_bytes does not fit the CFB limit type")
+    })?;
+    OleFileLimits::new(input)
+        .and_then(|value| value.with_max_directory_bytes(directory))
+        .and_then(|value| value.with_max_allocation_table_bytes(allocation))
+        .map_err(map_reader_error)
+}
+
 fn validate_graph(graph: &spaces::Graph, mode: Mode) -> Result<()> {
     if graph.map != expected_map() {
         return Err(malformed(
@@ -313,7 +340,7 @@ fn validate_graph(graph: &spaces::Graph, mode: Mode) -> Result<()> {
     };
     // EncryptionInfo is authoritative when these advisory parameters disagree.
     // Agile is the one exception: its EncryptionName MUST be a null string.
-    if mode == Mode::Agile && encryption.encryption_name.is_some() {
+    if mode.is_agile() && encryption.encryption_name.is_some() {
         return Err(malformed(
             "Agile StrongEncryptionTransform EncryptionName is not null",
         ));
@@ -418,11 +445,33 @@ mod tests {
     use super::*;
     use crate::spaces::{ENCRYPTION_ID, inspect_bytes};
 
+    fn standard_info(mode: Mode, limits: &Limits) -> Vec<u8> {
+        let compound = super::super::standard::encrypt(
+            b"PK\x03\x04container graph test".to_vec(),
+            "container password",
+            mode,
+            limits,
+        )
+        .expect("standard profile");
+        read_info(&compound, limits).expect("standard EncryptionInfo")
+    }
+
+    fn agile_info(mode: Mode, limits: &Limits) -> Vec<u8> {
+        let compound = super::super::agile::encrypt(
+            b"PK\x03\x04container graph test".to_vec(),
+            "container password",
+            mode,
+            limits,
+        )
+        .expect("Agile profile");
+        read_info(&compound, limits).expect("Agile EncryptionInfo")
+    }
+
     #[test]
     fn wrapper_has_the_normative_strong_encryption_graph() {
-        let info = [3, 0, 2, 0, 0x24, 0, 0, 0];
-        let encrypted = [4, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4];
         let limits = Limits::default();
+        let info = standard_info(Mode::Standard, &limits);
+        let encrypted = [4, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4];
         let bytes = write(&info, encrypted.to_vec(), &limits).expect("valid wrapper");
 
         let graph = inspect_bytes(&bytes)
@@ -444,8 +493,9 @@ mod tests {
 
     #[test]
     fn standard_encryption_info_overrides_mismatched_transform_parameters() {
-        let info = [3, 0, 2, 0, 0x24, 0, 0, 0];
-        let bytes = write(&info, vec![0; 8], &Limits::default()).expect("valid wrapper");
+        let limits = Limits::default();
+        let info = standard_info(Mode::Standard, &limits);
+        let bytes = write(&info, vec![0; 8], &limits).expect("valid wrapper");
         let mut graph = inspect_bytes(&bytes)
             .expect("valid DataSpaces")
             .expect("present DataSpaces");
@@ -462,9 +512,33 @@ mod tests {
     }
 
     #[test]
+    fn standard_transform_name_follows_the_selected_aes_profile() {
+        let limits = Limits::default();
+        for (mode, expected_name) in [
+            (Mode::Standard, "AES 128"),
+            (Mode::StandardAes192, "AES 192"),
+            (Mode::StandardAes256, "AES 256"),
+        ] {
+            let info = standard_info(mode, &limits);
+            let bytes = write(&info, vec![0; 8], &limits).expect("valid wrapper");
+            let graph = inspect_bytes(&bytes)
+                .expect("valid DataSpaces")
+                .expect("present DataSpaces");
+            assert_eq!(
+                graph.transforms[0]
+                    .encryption
+                    .as_ref()
+                    .and_then(|encryption| encryption.encryption_name.as_deref()),
+                Some(expected_name)
+            );
+        }
+    }
+
+    #[test]
     fn agile_encryption_name_must_remain_null() {
-        let info = [4, 0, 4, 0, 0x40, 0, 0, 0];
-        let bytes = write(&info, vec![0; 8], &Limits::default()).expect("valid wrapper");
+        let limits = Limits::default();
+        let info = agile_info(Mode::Agile, &limits);
+        let bytes = write(&info, vec![0; 8], &limits).expect("valid wrapper");
         let mut graph = inspect_bytes(&bytes)
             .expect("valid DataSpaces")
             .expect("present DataSpaces");
@@ -553,6 +627,48 @@ mod tests {
     }
 
     #[test]
+    fn explicit_cfb_directory_limit_reaches_the_container_reader() {
+        let info = [3, 0, 2, 0, 0x24, 0, 0, 0, 1, 2, 3, 4, 5];
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["EncryptionInfo"], &info)
+            .expect("EncryptionInfo");
+        let mut bytes = Cursor::new(Vec::new());
+        writer.write_to(&mut bytes).expect("write CFB");
+
+        let limits = Limits {
+            max_cfb_directory_bytes: 511,
+            ..Limits::default()
+        };
+        let error = read_info(bytes.get_ref(), &limits).expect_err("directory limit");
+        assert!(matches!(
+            error,
+            Error::Container(message) if message.contains("directory")
+        ));
+    }
+
+    #[test]
+    fn explicit_cfb_allocation_table_limit_reaches_the_container_reader() {
+        let info = [3, 0, 2, 0, 0x24, 0, 0, 0, 1, 2, 3, 4, 5];
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["EncryptionInfo"], &info)
+            .expect("EncryptionInfo");
+        let mut bytes = Cursor::new(Vec::new());
+        writer.write_to(&mut bytes).expect("write CFB");
+
+        let limits = Limits {
+            max_cfb_allocation_table_bytes: 511,
+            ..Limits::default()
+        };
+        let error = read_info(bytes.get_ref(), &limits).expect_err("allocation-table limit");
+        assert!(matches!(
+            error,
+            Error::Container(message) if message.contains("allocation")
+        ));
+    }
+
+    #[test]
     fn encrypted_package_declared_size_is_limited_before_materialization() {
         let info = [3, 0, 2, 0, 0x24, 0, 0, 0];
         let encrypted = [0; 25];
@@ -611,8 +727,9 @@ mod tests {
             max_output_bytes: 512,
             ..Limits::default()
         };
-        let error = write(&[3, 0, 2, 0, 0x24, 0, 0, 0], vec![0; 16], &limits)
-            .expect_err("compound file exceeds one sector");
+        let info = standard_info(Mode::Standard, &Limits::default());
+        let error =
+            write(&info, vec![0; 16], &limits).expect_err("compound file exceeds one sector");
         assert!(matches!(
             error,
             Error::Limit {

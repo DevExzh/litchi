@@ -1,0 +1,64 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+error[E0618]: expected function, found `ExecutionContext`
+   --> crates/litchi-ods/tests/ods_formula_complex_limits.rs:237:46
+    |
+129 | fn execution(scope: &str) -> (Budget, CancellationSource, ExecutionContext) {
+    | --------------------------------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+...
+224 |     let (budget, _cancellation, execution) = execution("ods-formula-complex-scalar-work");
+    |                                 --------- `execution` has type `ExecutionContext`
+...
+237 |     let (budget, _cancellation, execution) = execution("ods-formula-complex-scalar-storage");
+    |                                              ^^^^^^^^^--------------------------------------
+    |                                              |
+    |                                              call expression requires function
+
+error[E0599]: no method named `with_scalar` found for struct `litchi_ods::codec::formula::evaluation::value::Limits` in the current scope
+   --> crates/litchi-ods/tests/ods_formula_complex_limits.rs:257:41
+    |
+257 |     let limits = ValueLimits::default().with_scalar(EvaluationLimits::default().with_max_steps(0));
+    |                                         ^^^^^^^^^^^ method not found in `litchi_ods::codec::formula::evaluation::value::Limits`
+
+error[E0618]: expected function, found `ExecutionContext`
+   --> crates/litchi-ods/tests/ods_formula_complex_limits.rs:266:46
+    |
+129 | fn execution(scope: &str) -> (Budget, CancellationSource, ExecutionContext) {
+    | --------------------------------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+...
+256 |     let (budget, _cancellation, execution) = execution("ods-formula-complex-value-work");
+    |                                 --------- `execution` has type `ExecutionContext`
+...
+266 |     let (budget, _cancellation, execution) = execution("ods-formula-complex-value-storage");
+    |                                              ^^^^^^^^^-------------------------------------
+    |                                              |
+    |                                              call expression requires function
+
+error[E0599]: no method named `with_scalar` found for struct `litchi_ods::codec::formula::evaluation::value::Limits` in the current scope
+   --> crates/litchi-ods/tests/ods_formula_complex_limits.rs:268:32
+    |
+268 |         ValueLimits::default().with_scalar(EvaluationLimits::default().with_max_storage_bytes(0));
+    |                                ^^^^^^^^^^^ method not found in `litchi_ods::codec::formula::evaluation::value::Limits`
+
+error[E0618]: expected function, found `ExecutionContext`
+   --> crates/litchi-ods/tests/ods_formula_complex_limits.rs:332:46
+    |
+129 | fn execution(scope: &str) -> (Budget, CancellationSource, ExecutionContext) {
+    | --------------------------------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+...
+317 |     let (budget, cancellation, execution) = execution("ods-formula-complex-sequence-cancel");
+    |                                --------- `execution` has type `ExecutionContext`
+...
+332 |     let (budget, _cancellation, execution) = execution("ods-formula-complex-sequence-work");
+    |                                              ^^^^^^^^^-------------------------------------
+    |                                              |
+    |                                              call expression requires function
+
+error[E0599]: no method named `with_scalar` found for struct `litchi_ods::codec::formula::evaluation::value::Limits` in the current scope
+   --> crates/litchi-ods/tests/ods_formula_complex_limits.rs:339:33
+    |
+339 |         &ValueLimits::default().with_scalar(EvaluationLimits::default().with_max_steps(8)),
+    |                                 ^^^^^^^^^^^ method not found in `litchi_ods::codec::formula::evaluation::value::Limits`
+
+Some errors have detailed explanations: E0599, E0618.
+For more information about an error, try `rustc --explain E0599`.
+error: could not compile `litchi-ods` (test "ods_formula_complex_limits") due to 6 previous errors

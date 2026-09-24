@@ -1,0 +1,9 @@
+Generator: caller-example/main.rs
+Command: cargo run --manifest-path docs/report/spec-gap-validation-evidence/drawingml-theme-family/caller-example/Cargo.toml --quiet
+Authored output: caller-authored.xml
+Authored output SHA-256: 1831bb0a0da747963d5158fa65288b6873429685e8312aa7c1a4f969ba2ec1a2
+Edited native output: caller-edited-native.xml
+Edited native output SHA-256: e5904be29a8056341b633deb227fe901bf6f6b2e936505d1f76344a6ffb30332
+Input native fixture: crates/litchi-drawingml/tests/fixtures/theme-family-native.xml
+Input native fixture SHA-256: fc3629eb8c47a9665d56152c54d52112621b889581f6ceb1299ac5ed8cfc264f
+Schema validation: caller-schema-validation.json (lxml, vendored ECMA-376 and MS-ODRAWXML source)

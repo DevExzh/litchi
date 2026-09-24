@@ -1,0 +1,85 @@
+{
+  "baseline_head": "e0a7ef2dbab08aa3debc6262e8aad10957adb09c",
+  "source_sha256": {
+    "crates/litchi-drawingml/src/ink/actions.rs": "3bd9f07f0d98da52575976e3bfb0584e817913e42b4e0579d1dea9af04002b39",
+    "crates/litchi-drawingml/src/ink/tests.rs": "a3d4f880aa1d39bec0757c8bf2fc1d84819e2ad44d6b64a11302ae264f0e0767",
+    "crates/litchi-drawingml/tests/ink_action_profile.rs": "3aab291717314d982d8f78d9e221d6199234f5beb0cc98f05f7c7d61a1aab9c5"
+  },
+  "checks": [
+    {
+      "log": "focused-final.log",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-drawingml",
+        "--test",
+        "ink_action_profile"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "clippy-final.log",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-drawingml",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    },
+    {
+      "log": "doc-final.log",
+      "command": [
+        "cargo",
+        "doc",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-drawingml",
+        "--no-deps"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "broad_tests": {
+    "command": "cargo test --locked --offline -q -p litchi-drawingml",
+    "result": "passed; 166 library tests plus all integration and documentation targets",
+    "test_source_note": "Broad run preceded test-only replacement of useless format! with a string literal; focused final run covers that change."
+  },
+  "initial_clippy": "Failed one test-only useless_format lint; fixed and all-target Clippy rerun passed. Initial failure log retained.",
+  "rustdoc_environment": {
+    "RUSTDOCFLAGS": "-D warnings"
+  },
+  "logs": {
+    "tests.log.gz": {
+      "raw_sha256": "f9e4531d82d5f80f5e62abfe00cb7e784202b20f120a1bcbca7f4d2966b4b1fd",
+      "gzip_sha256": "41e71d0df6e12b9e4f93909c173fcea61f26858a39370ee758238f0328490d2b"
+    },
+    "clippy.log.gz": {
+      "raw_sha256": "20e8d7540e28084717092d6f64754113dbc4e67af95841004c10559d8bc37542",
+      "gzip_sha256": "643ffb35e732a22b49d089f0cc6e552427793a28c2340b5a16ed9f1c8a6b0061"
+    },
+    "focused-final.log.gz": {
+      "raw_sha256": "54aad02357ec20d93bed856777eec1a30cc4ca2fb1bf364d008d53fc532101bb",
+      "gzip_sha256": "ca12a8baaac3dd641010868ef9a25f9cf492ff09082217e55df4276248340c60"
+    },
+    "clippy-final.log.gz": {
+      "raw_sha256": "d6a30c0c056bea875492ad6d88ee61dc1fa456380061eb95c00e5dc012ca56d9",
+      "gzip_sha256": "d709e70571d6eec6e8db0bb4aecc5c10c546ff59895646d85483ff2cf51f3b4f"
+    },
+    "doc-final.log.gz": {
+      "raw_sha256": "4ec92250b1fc09d05853e2018bf7cbc349beb508c6dc58ddb8e59583b36148a4",
+      "gzip_sha256": "a5efd9544549c743b18998a225d926421466547eb2a9996c03d429e90141dc88"
+    }
+  },
+  "review": "Independent bounded structural profile review approved actions.rs hash recorded above; no full InkML payload XSD or host lifecycle claim."
+}

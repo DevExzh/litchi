@@ -1,0 +1,15 @@
+{
+  "label": "candidate-expression",
+  "group": "expression",
+  "binary_sha256": "b0e2585b7d6791123a018085283e872c36c513b0cf70957fe7d6919ffd680746",
+  "harness": "expression-harness/run.py",
+  "output": "expression/raw.csv",
+  "warmups": 3,
+  "iterations": 15,
+  "started_at": null,
+  "finished_at": null,
+  "elapsed_seconds": null,
+  "status": 0,
+  "raw_sha256": "6aff9ae45b2481903e474801e504f0b9d2c5cc66a956ecb7281b152c3ef65bf3",
+  "row_count": 24
+}

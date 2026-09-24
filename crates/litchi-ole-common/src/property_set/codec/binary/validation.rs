@@ -8,10 +8,14 @@ use super::super::super::model::{
 };
 use super::super::semantic::{MAX_PROPERTY_COUNT, validate_section};
 use super::super::support::allocation;
-use super::semantic::serialize_typed_for_property;
+use super::semantic::{
+    append_typed_for_property, serialize_typed_for_property,
+    serialize_typed_for_property_with_limit,
+};
 use super::wire::{
-    ValueReader, append_u32, checked_range, decode_ansi, decode_utf16, encode_ansi, pad4,
-    read_guid, read_u16, read_u32, reserve_bytes, try_zeroed_vec,
+    ByteSink, ByteWriter, CountingWriter, ValueReader, append_ansi, append_bytes, append_u32,
+    checked_range, decode_ansi, decode_utf16, encoded_ansi_len, pad4, read_guid, read_u16,
+    read_u32, reserve_bytes,
 };
 use super::{parse_typed_property, parse_typed_property_for_property};
 use litchi_cfb::OleError;
@@ -24,6 +28,14 @@ const SECTION_HEADER_SIZE: usize = 8;
 const PROPERTY_DESCRIPTOR_SIZE: usize = 8;
 
 pub(super) fn parse_stream(data: &[u8]) -> Result<Stream, OleError> {
+    parse_stream_with_mode(data, false)
+}
+
+pub(super) fn parse_non_simple_stream(data: &[u8]) -> Result<Stream, OleError> {
+    parse_stream_with_mode(data, true)
+}
+
+fn parse_stream_with_mode(data: &[u8], allow_indirect: bool) -> Result<Stream, OleError> {
     if data.len() < PROPERTY_SET_HEADER_SIZE + SECTION_DESCRIPTOR_SIZE {
         return Err(invalid("Property Set stream is too short"));
     }
@@ -94,6 +106,7 @@ pub(super) fn parse_stream(data: &[u8]) -> Result<Stream, OleError> {
             &data[start..end],
             format_identifier,
             version,
+            allow_indirect,
         )?);
     }
     Ok(Stream {
@@ -105,6 +118,21 @@ pub(super) fn parse_stream(data: &[u8]) -> Result<Stream, OleError> {
 }
 
 pub(super) fn serialize_stream(stream: &Stream) -> Result<Vec<u8>, OleError> {
+    let descriptor_end = validate_stream(stream)?;
+    serialize_stream_impl(stream, descriptor_end, None)
+}
+
+pub(super) fn serialize_stream_with_limit(
+    stream: &Stream,
+    maximum: u64,
+) -> Result<Vec<u8>, OleError> {
+    let descriptor_end = validate_stream(stream)?;
+    let expected = serialized_stream_len(stream, descriptor_end)?;
+    ensure_limit(expected, maximum, "serialized Property Set stream")?;
+    serialize_stream_impl(stream, descriptor_end, Some(maximum))
+}
+
+fn validate_stream(stream: &Stream) -> Result<usize, OleError> {
     if !matches!(stream.version, Stream::VERSION_0 | Stream::VERSION_1)
         || !(1..=2).contains(&stream.sections.len())
     {
@@ -119,7 +147,7 @@ pub(super) fn serialize_stream(stream: &Stream) -> Result<Vec<u8>, OleError> {
         }
         validate_section(section, stream.version)?;
     }
-    let descriptor_end = checked_add(
+    checked_add(
         PROPERTY_SET_HEADER_SIZE,
         checked_mul(
             stream.sections.len(),
@@ -127,10 +155,17 @@ pub(super) fn serialize_stream(stream: &Stream) -> Result<Vec<u8>, OleError> {
             "Property Set descriptor table",
         )?,
         "Property Set descriptor table",
-    )?;
+    )
+}
+
+fn serialize_stream_impl(
+    stream: &Stream,
+    descriptor_end: usize,
+    maximum: Option<u64>,
+) -> Result<Vec<u8>, OleError> {
     let mut sections = try_vec_with_capacity(stream.sections.len(), "serialized sections")?;
     for section in &stream.sections {
-        sections.push(serialize_section(section)?);
+        sections.push(serialize_section(section, maximum)?);
     }
     let descriptor_size = align4_len(descriptor_end, "Property Set descriptor table")?;
     let mut offsets = try_vec_with_capacity(sections.len(), "section offsets")?;
@@ -142,12 +177,13 @@ pub(super) fn serialize_stream(stream: &Stream) -> Result<Vec<u8>, OleError> {
             "Property Set size",
         )?;
     }
-    let mut out = try_zeroed_vec(cursor, "serialized Property Set stream")?;
-    out[0..2].copy_from_slice(&0xfffeu16.to_le_bytes());
-    out[2..4].copy_from_slice(&stream.version.to_le_bytes());
-    out[4..8].copy_from_slice(&stream.system_identifier.to_le_bytes());
-    out[8..24].copy_from_slice(stream.class_identifier.as_bytes());
-    out[24..28]
+    let mut out = ByteWriter::zeroed(cursor, maximum, "serialized Property Set stream")?;
+    let bytes = out.as_mut_slice();
+    bytes[0..2].copy_from_slice(&0xfffeu16.to_le_bytes());
+    bytes[2..4].copy_from_slice(&stream.version.to_le_bytes());
+    bytes[4..8].copy_from_slice(&stream.system_identifier.to_le_bytes());
+    bytes[8..24].copy_from_slice(stream.class_identifier.as_bytes());
+    bytes[24..28]
         .copy_from_slice(&checked_u32(stream.sections.len(), "section count")?.to_le_bytes());
     for (index, section) in stream.sections.iter().enumerate() {
         let base = checked_add(
@@ -155,34 +191,37 @@ pub(super) fn serialize_stream(stream: &Stream) -> Result<Vec<u8>, OleError> {
             checked_mul(index, SECTION_DESCRIPTOR_SIZE, "section descriptor")?,
             "section descriptor",
         )?;
-        out[base..base + 16].copy_from_slice(section.format_identifier.as_bytes());
-        out[base + 16..base + 20]
+        bytes[base..base + 16].copy_from_slice(section.format_identifier.as_bytes());
+        bytes[base + 16..base + 20]
             .copy_from_slice(&checked_u32(offsets[index], "Section offset")?.to_le_bytes());
     }
     for (index, section) in sections.iter().enumerate() {
         let start = offsets[index];
         let end = checked_add(start, section.len(), "Property Set section")?;
-        out[start..end].copy_from_slice(section);
+        bytes[start..end].copy_from_slice(section);
     }
-    Ok(out)
+    Ok(out.into_bytes())
 }
 
-fn serialize_section(section: &Section) -> Result<Vec<u8>, OleError> {
-    let mut order = try_clone_vec(&section.property_order, "property order")?;
+fn serialization_order(
+    property_order: &[u32],
+    properties: &HashMap<u32, Value>,
+    dictionary: &HashMap<u32, String>,
+) -> Result<Vec<u32>, OleError> {
+    let mut order = try_clone_vec(property_order, "property order")?;
     order
-        .try_reserve(section.properties.len())
+        .try_reserve(properties.len())
         .map_err(|source| allocation("property order", source))?;
-    if !section.dictionary.is_empty() && !order.contains(&PID_DICTIONARY) {
+    if !dictionary.is_empty() && !order.contains(&PID_DICTIONARY) {
         order.insert(0, PID_DICTIONARY);
     }
-    for id in section.properties.keys() {
+    for id in properties.keys() {
         if !order.contains(id) {
             order.push(*id);
         }
     }
     order.retain(|id| {
-        *id == PID_DICTIONARY && !section.dictionary.is_empty()
-            || section.properties.contains_key(id)
+        *id == PID_DICTIONARY && !dictionary.is_empty() || properties.contains_key(id)
     });
     let mut order_ids = try_hash_set_with_capacity(order.len(), "property order set")?;
     for identifier in order.iter().copied() {
@@ -191,6 +230,15 @@ fn serialize_section(section: &Section) -> Result<Vec<u8>, OleError> {
     if order_ids.len() != order.len() {
         return Err(invalid("Duplicate property order identifier"));
     }
+    Ok(order)
+}
+
+fn serialize_section(section: &Section, maximum: Option<u64>) -> Result<Vec<u8>, OleError> {
+    let order = serialization_order(
+        &section.property_order,
+        &section.properties,
+        &section.dictionary,
+    )?;
     let table_end = checked_add(
         SECTION_HEADER_SIZE,
         checked_mul(
@@ -204,13 +252,18 @@ fn serialize_section(section: &Section) -> Result<Vec<u8>, OleError> {
     let codepage = section.codepage.unwrap_or(CodePage::WINDOWS_1252).id();
     for id in &order {
         values.push(if *id == PID_DICTIONARY {
-            serialize_dictionary(section, codepage)?
+            serialize_dictionary(section, codepage, maximum)?
         } else {
             let value = section
                 .properties
                 .get(id)
                 .ok_or_else(|| invalid(format!("Property order references missing PID {id}")))?;
-            serialize_typed_for_property(*id, value, codepage)?
+            match maximum {
+                Some(maximum) => {
+                    serialize_typed_for_property_with_limit(*id, value, codepage, maximum)?
+                },
+                None => serialize_typed_for_property(*id, value, codepage)?,
+            }
         });
     }
     let table_size = align4_len(table_end, "property descriptor table")?;
@@ -223,29 +276,34 @@ fn serialize_section(section: &Section) -> Result<Vec<u8>, OleError> {
             "Property Set section size",
         )?;
     }
-    let mut out = try_zeroed_vec(cursor, "serialized Property Set section")?;
-    out[4..8].copy_from_slice(&checked_u32(order.len(), "property count")?.to_le_bytes());
+    let mut out = ByteWriter::zeroed(cursor, maximum, "serialized Property Set section")?;
+    let bytes = out.as_mut_slice();
+    bytes[4..8].copy_from_slice(&checked_u32(order.len(), "property count")?.to_le_bytes());
     for (index, id) in order.iter().enumerate() {
         let base = checked_add(
             SECTION_HEADER_SIZE,
             checked_mul(index, PROPERTY_DESCRIPTOR_SIZE, "property descriptor")?,
             "property descriptor",
         )?;
-        out[base..base + 4].copy_from_slice(&id.to_le_bytes());
-        out[base + 4..base + 8]
+        bytes[base..base + 4].copy_from_slice(&id.to_le_bytes());
+        bytes[base + 4..base + 8]
             .copy_from_slice(&checked_u32(offsets[index], "Property offset")?.to_le_bytes());
     }
     for (index, value) in values.iter().enumerate() {
         let start = offsets[index];
         let end = checked_add(start, value.len(), "Property Set value")?;
-        out[start..end].copy_from_slice(value);
+        bytes[start..end].copy_from_slice(value);
     }
-    let section_len = checked_u32(out.len(), "Section length")?;
-    out[0..4].copy_from_slice(&section_len.to_le_bytes());
-    Ok(out)
+    let section_len = checked_u32(bytes.len(), "Section length")?;
+    bytes[0..4].copy_from_slice(&section_len.to_le_bytes());
+    Ok(out.into_bytes())
 }
 
-fn serialize_dictionary(section: &Section, codepage: u16) -> Result<Vec<u8>, OleError> {
+fn append_dictionary<S: ByteSink + ?Sized>(
+    out: &mut S,
+    section: &Section,
+    codepage: u16,
+) -> Result<(), OleError> {
     let mut order = try_clone_vec(&section.dictionary_order, "dictionary order")?;
     order
         .try_reserve(section.dictionary.len())
@@ -263,9 +321,8 @@ fn serialize_dictionary(section: &Section, codepage: u16) -> Result<Vec<u8>, Ole
     if order_ids.len() != order.len() {
         return Err(invalid("Duplicate dictionary order identifier"));
     }
-    let mut out = try_vec_with_capacity(4, "serialized property dictionary")?;
     append_u32(
-        &mut out,
+        out,
         checked_u32(order.len(), "dictionary entry count")?,
         "serialized property dictionary",
     )?;
@@ -274,38 +331,178 @@ fn serialize_dictionary(section: &Section, codepage: u16) -> Result<Vec<u8>, Ole
             .dictionary
             .get(&id)
             .ok_or_else(|| invalid(format!("Dictionary order references missing PID {id}")))?;
-        append_u32(&mut out, id, "serialized property dictionary")?;
+        append_u32(out, id, "serialized property dictionary")?;
         if codepage == UNICODE_CODEPAGE {
             let units = checked_add(name.encode_utf16().count(), 1, "Dictionary name length")?;
             let byte_len = checked_mul(units, 2, "Dictionary name length")?;
             append_u32(
-                &mut out,
+                out,
                 checked_u32(units, "Dictionary name length")?,
                 "serialized property dictionary",
             )?;
-            reserve_bytes(&mut out, byte_len, "serialized property dictionary")?;
+            reserve_bytes(out, byte_len, "serialized property dictionary")?;
             for unit in name.encode_utf16() {
-                out.extend_from_slice(&unit.to_le_bytes());
+                append_bytes(out, &unit.to_le_bytes(), "serialized property dictionary")?;
             }
-            out.extend_from_slice(&0u16.to_le_bytes());
-            pad4(&mut out)?;
+            append_bytes(out, &0u16.to_le_bytes(), "serialized property dictionary")?;
+            pad4(out)?;
         } else {
-            let bytes = encode_ansi(name, codepage)?;
-            let byte_len = checked_add(bytes.len(), 1, "Dictionary name length")?;
+            let byte_len = checked_add(
+                encoded_ansi_len(name, codepage)?,
+                1,
+                "Dictionary name length",
+            )?;
             append_u32(
-                &mut out,
+                out,
                 checked_u32(byte_len, "Dictionary name length")?,
                 "serialized property dictionary",
             )?;
-            reserve_bytes(&mut out, byte_len, "serialized property dictionary")?;
-            out.extend_from_slice(&bytes);
-            out.push(0);
+            reserve_bytes(out, byte_len, "serialized property dictionary")?;
+            append_ansi(out, name, codepage, "serialized property dictionary")?;
+            out.push_zero("serialized property dictionary")?;
         }
     }
-    Ok(out)
+    Ok(())
 }
 
-fn parse_section(data: &[u8], format_identifier: Guid, version: u16) -> Result<Section, OleError> {
+fn serialize_dictionary(
+    section: &Section,
+    codepage: u16,
+    maximum: Option<u64>,
+) -> Result<Vec<u8>, OleError> {
+    let mut out = ByteWriter::new(4, maximum, "serialized property dictionary")?;
+    append_dictionary(&mut out, section, codepage)?;
+    Ok(out.into_bytes())
+}
+
+fn serialized_stream_len(stream: &Stream, descriptor_end: usize) -> Result<usize, OleError> {
+    serialized_stream_layout_len(
+        stream.sections.len(),
+        descriptor_end,
+        stream.sections.iter().map(serialized_section_len),
+    )
+}
+
+fn serialized_section_len(section: &Section) -> Result<usize, OleError> {
+    let order = serialization_order(
+        &section.property_order,
+        &section.properties,
+        &section.dictionary,
+    )?;
+    let table_end = checked_add(
+        SECTION_HEADER_SIZE,
+        checked_mul(
+            order.len(),
+            PROPERTY_DESCRIPTOR_SIZE,
+            "property descriptor table",
+        )?,
+        "property descriptor table",
+    )?;
+    let codepage = section.codepage.unwrap_or(CodePage::WINDOWS_1252).id();
+    serialized_section_layout_len(
+        order.len(),
+        table_end,
+        order.into_iter().map(|id| {
+            if id == PID_DICTIONARY {
+                serialized_dictionary_len(section, codepage)
+            } else {
+                let value = section.properties.get(&id).ok_or_else(|| {
+                    invalid(format!("Property order references missing PID {id}"))
+                })?;
+                serialized_typed_for_property_len(id, value, codepage)
+            }
+        }),
+    )
+}
+
+pub(super) fn serialized_stream_layout_len<I>(
+    section_count: usize,
+    descriptor_end: usize,
+    section_lengths: I,
+) -> Result<usize, OleError>
+where
+    I: IntoIterator<Item = Result<usize, OleError>>,
+{
+    checked_u32(section_count, "section count")?;
+    let descriptor_size = align4_len(descriptor_end, "Property Set descriptor table")?;
+    let mut cursor = descriptor_size;
+    let mut seen = 0usize;
+    for section_len in section_lengths {
+        let section_len = section_len?;
+        checked_u32(cursor, "Section offset")?;
+        cursor = align4_len(
+            checked_add(cursor, section_len, "Property Set size")?,
+            "Property Set size",
+        )?;
+        seen = checked_add(seen, 1, "Property Set section count")?;
+    }
+    if seen != section_count {
+        return Err(invalid("Property Set section length count mismatch"));
+    }
+    Ok(cursor)
+}
+
+pub(super) fn serialized_section_layout_len<I>(
+    property_count: usize,
+    table_end: usize,
+    value_lengths: I,
+) -> Result<usize, OleError>
+where
+    I: IntoIterator<Item = Result<usize, OleError>>,
+{
+    checked_u32(property_count, "property count")?;
+    let mut cursor = align4_len(table_end, "property descriptor table")?;
+    let mut seen = 0usize;
+    for value_len in value_lengths {
+        let value_len = value_len?;
+        checked_u32(cursor, "Property offset")?;
+        cursor = align4_len(
+            checked_add(cursor, value_len, "Property Set section size")?,
+            "Property Set section size",
+        )?;
+        seen = checked_add(seen, 1, "Property count")?;
+    }
+    if seen != property_count {
+        return Err(invalid("Property value length count mismatch"));
+    }
+    checked_u32(cursor, "Section length")?;
+    Ok(cursor)
+}
+
+fn serialized_dictionary_len(section: &Section, codepage: u16) -> Result<usize, OleError> {
+    let mut out = CountingWriter::new();
+    append_dictionary(&mut out, section, codepage)?;
+    Ok(out.len())
+}
+
+fn serialized_typed_for_property_len(
+    property_identifier: u32,
+    value: &Value,
+    codepage: u16,
+) -> Result<usize, OleError> {
+    let mut out = CountingWriter::new();
+    append_typed_for_property(&mut out, property_identifier, value, codepage)?;
+    Ok(out.len())
+}
+
+fn ensure_limit(observed: usize, maximum: u64, resource: &'static str) -> Result<(), OleError> {
+    let observed = u64::try_from(observed).unwrap_or(u64::MAX);
+    if observed > maximum {
+        return Err(OleError::LimitExceeded {
+            resource,
+            observed,
+            maximum,
+        });
+    }
+    Ok(())
+}
+
+fn parse_section(
+    data: &[u8],
+    format_identifier: Guid,
+    version: u16,
+    allow_indirect: bool,
+) -> Result<Section, OleError> {
     checked_range(data, 0, SECTION_HEADER_SIZE, "section header")?;
     let declared_size = usize::try_from(read_u32(data, 0, "section size")?)
         .map_err(|_conversion_error| invalid("Property Set section size is too large"))?;
@@ -413,13 +610,21 @@ fn parse_section(data: &[u8], format_identifier: Guid, version: u16) -> Result<S
             .get(index + 1)
             .map_or(data.len(), |(offset, _)| *offset);
         let bytes = &data[*start..end];
-        let value =
+        let value = if allow_indirect {
+            super::parse_typed_property_for_non_simple_property(
+                bytes,
+                effective_codepage,
+                *start,
+                *identifier,
+            )
+        } else {
             parse_typed_property_for_property(bytes, effective_codepage, *start, *identifier)
-                .map_err(|error| {
-                    invalid(format!(
-                        "Property {identifier} at section offset {start} is invalid: {error}"
-                    ))
-                })?;
+        }
+        .map_err(|error| {
+            invalid(format!(
+                "Property {identifier} at section offset {start} is invalid: {error}"
+            ))
+        })?;
         properties.insert(*identifier, value);
     }
     let mut property_order = try_vec_with_capacity(descriptors.len(), "property order")?;

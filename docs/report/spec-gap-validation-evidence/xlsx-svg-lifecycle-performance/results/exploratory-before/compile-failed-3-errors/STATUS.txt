@@ -1,0 +1,8 @@
+status=compile-failed-snapshot
+valid_baseline=no
+reason=the first fresh release-build attempt reached the captured source but failed before producing a usable executable
+source_snapshot=capture/source-preimage/
+source_hashes=capture/source-preimage.sha256
+build_log=capture/build.log
+errors=CachedPicture Copy bound; Edit pattern missing svg_preflight; ProjectedSvgOwner missing Debug
+superseded_by=the later source snapshot after the main coder's compile fixes; this record is retained for audit and is not a measurement bundle

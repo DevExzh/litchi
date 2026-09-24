@@ -1,0 +1,1250 @@
+--- a/crates/litchi-xls/docs/FEATURE_MATRIX.md
++++ b/crates/litchi-xls/docs/FEATURE_MATRIX.md
+@@ -73,6 +73,7 @@
+ | Web publishing | 🟡 | ✅ | 🟡 | Web publication destinations, ranges, source types, and page metadata are modeled; publishing and network I/O are not performed. |
+ | Real-time data and RTD topics | 🟡 | ✅ | 🟡 | Contextual `real_time_data::{Snapshot, Transaction, Commit, Patch}` edits bounded BIFF8 RTD topics, shared-prefix framing, cells, and cached values; all ProgIDs, servers, and topics remain inert and no refresh or execution occurs. |
+ | Revision log and shared-workbook collaboration | 🟡 | ✅ | 🟡 | `revision_records::{Snapshot, Transaction, Commit, Patch}` provides source-checked BIFF8 Revision Log edits for accepted/undo flags and selected header metadata while preserving unknown records; conflict resolution, shared locking, formula replay, and collaboration behavior are not implemented. |
++| User Names stream and shared-workbook user log | 🟡 | ✅ | 🟡 | `user_names::{Snapshot, Transaction, Commit, Patch}` and `user_names::publication` provide bounded stream and package metadata edits, exact no-ops, reversible source-checked patches, and `UsrInfo.guid` validation against the required Revision Log. Publication preserves unrelated CFB streams and directory metadata. Shared locking, revision replay, collaboration, and native-producer interoperability are not established; current coverage uses synthetic BIFF/CFB fixtures. |
+ | Custom views and workbook environment options | 🟡 | ✅ | 🟡 | Custom views, link-update modes, object-display modes, access/write strings, backup flags, and related behavior options are exposed as metadata. They do not cause host actions. |
+ | Office Toolbars stream (`XCB`) | 🟡 | ✅ | ✅ | `Workbook::toolbar` reads and `Writer::set_toolbar` emits typed `CTBWRAPPER`/`CTBS`/`CTB` metadata through the root `XCB` stream, preserving reserved fields, optional visual bytes, `TBCCmd`, and bounded shared `TBCGeneralInfo`/`TBCExtraInfo` payloads for non-ActiveX controls. Ambiguous or malformed variable boundaries are rejected, and macros/UI/ActiveX are never executed. |
+ 
+--- a/crates/litchi-xls/src/revision_log.rs
++++ b/crates/litchi-xls/src/revision_log.rs
+@@ -37,6 +37,8 @@
+ const MAX_REVISION_RECORDS: usize = 1_000_000;
+ /// Maximum BIFF8 record payload (MS-XLS 2.1.4).
+ const MAX_BIFF_RECORD_PAYLOAD: usize = 8_224;
++/// Maximum workbook sheet count for which MS-XLS requires an RRTabId record.
++const MAX_RRTABID_SHEETS: usize = 4_112;
+ 
+ fn invalid(record_type: u16, message: impl Into<String>) -> Error {
+     Error::InvalidRecord {
+@@ -76,12 +78,27 @@
+ /// header counts and validates the outer revision-log sequence, and the
+ /// second retains only header GUIDs. Opaque revision payloads remain owned by
+ /// the exact source bytes retained by User Names and are never discarded.
++#[cfg(test)]
+ pub(crate) fn scan_revision_header_guids(
+     data: &[u8],
+     max_stream_bytes: usize,
+     max_records: usize,
+     max_guids: usize,
+ ) -> Result<Arc<[[u8; 16]]>> {
++    scan_revision_header_guids_with_sheet_count(data, max_stream_bytes, max_records, max_guids, 0)
++}
++
++/// Scan a Revision Log while applying the RRTabId omission rule using the
++/// authoritative number of `BoundSheet8` records in the containing workbook.
++/// A zero sheet count means that the workbook context is unknown, so the
++/// normal RRTabId requirement is enforced.
++pub(crate) fn scan_revision_header_guids_with_sheet_count(
++    data: &[u8],
++    max_stream_bytes: usize,
++    max_records: usize,
++    max_guids: usize,
++    workbook_sheet_count: usize,
++) -> Result<Arc<[[u8; 16]]>> {
+     if data.len() > max_stream_bytes {
+         return Err(Error::UnsafeEdit(format!(
+             "Revision Log stream has {} bytes; maximum is {max_stream_bytes}",
+@@ -94,7 +111,8 @@
+         ));
+     }
+ 
+-    let (record_count, header_count) = scan_revision_header_counts(data, max_records, max_guids)?;
++    let (record_count, header_count) =
++        scan_revision_header_counts(data, max_records, max_guids, workbook_sheet_count)?;
+     debug_assert!(record_count >= 2);
+     let guid_bytes = header_count
+         .checked_mul(16)
+@@ -131,6 +149,7 @@
+     data: &[u8],
+     max_records: usize,
+     max_guids: usize,
++    workbook_sheet_count: usize,
+ ) -> Result<(usize, usize)> {
+     let mut scan = RevisionScan::new(data, max_records);
+     let mut header_count = 0usize;
+@@ -190,9 +209,24 @@
+                     .peek_type()?
+                     .is_some_and(|kind| kind == RR_TAB_ID_RECORD_TYPE)
+                 {
++                    if workbook_sheet_count > MAX_RRTABID_SHEETS {
++                        return Err(invalid(
++                            RR_TAB_ID_RECORD_TYPE,
++                            "RRTabId must be absent when the workbook has more than 4112 sheets",
++                        ));
++                    }
+                     let (_, payload) = scan.next()?;
+                     RrTabId::validate_payload_borrowed(payload)?;
+-                } else if !RrdHead::allows_missing_tab_id(payload)? {
++                    let identifiers = payload.len() / 2;
++                    if workbook_sheet_count != 0 && identifiers != workbook_sheet_count {
++                        return Err(invalid(
++                            RR_TAB_ID_RECORD_TYPE,
++                            format!(
++                                "RRTabId contains {identifiers} sheet identifiers; workbook has {workbook_sheet_count} BoundSheet8 records"
++                            ),
++                        ));
++                    }
++                } else if workbook_sheet_count <= MAX_RRTABID_SHEETS {
+                     return Err(invalid(
+                         RRD_HEAD_RECORD_TYPE,
+                         "RRDHead must be followed by RRTabId unless the workbook has more than 4112 sheets",
+@@ -837,10 +871,29 @@
+ ///
+ /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+ pub fn parse_revision_log_stream(data: &[u8]) -> Result<RevisionLog> {
++    parse_revision_log_stream_with_sheet_count(data, 0)
++}
++
++/// Parse a Revision Log with the containing workbook's authoritative
++/// `BoundSheet8` count for the RRTabId omission rule. A zero sheet count means
++/// that the workbook context is unknown, so a missing RRTabId is rejected and
++/// table cardinality cannot be checked. A nonzero count must match the table.
++/// # Errors
++///
++/// Returns an error if validation, decoding, encoding, or the requested operation fails.
++pub fn parse_revision_log_stream_with_sheet_count(
++    data: &[u8],
++    workbook_sheet_count: usize,
++) -> Result<RevisionLog> {
+     // Run the same borrowed grammar and field admission used by the bounded
+     // User Names owner before retaining the complete typed projection. This
+     // keeps full parsing and package admission on one normative boundary.
+-    scan_revision_header_counts(data, MAX_REVISION_RECORDS, MAX_REVISION_RECORDS)?;
++    scan_revision_header_counts(
++        data,
++        MAX_REVISION_RECORDS,
++        MAX_REVISION_RECORDS,
++        workbook_sheet_count,
++    )?;
+     let stream = frame_records(data)?;
+     if stream.len() < 2 {
+         return Err(invalid(
+@@ -901,13 +954,19 @@
+             .get(cursor)
+             .is_some_and(|next| next.record_type == RR_TAB_ID_RECORD_TYPE)
+         {
++            if workbook_sheet_count > MAX_RRTABID_SHEETS {
++                return Err(invalid(
++                    RR_TAB_ID_RECORD_TYPE,
++                    "RRTabId must be absent when the workbook has more than 4112 sheets",
++                ));
++            }
+             Some(RrTabId::parse_payload(expect_framed_record(
+                 &stream,
+                 &mut cursor,
+                 RR_TAB_ID_RECORD_TYPE,
+                 "RRTabId",
+             )?)?)
+-        } else if RrdHead::allows_missing_tab_id(head_payload)? {
++        } else if workbook_sheet_count > MAX_RRTABID_SHEETS {
+             None
+         } else {
+             return Err(invalid(
+@@ -1141,9 +1200,10 @@
+         stream.extend_from_slice(&conflict());
+         stream.extend_from_slice(&record(RR_AUTO_FMT_RECORD_TYPE, &[1]));
+ 
+-        // Second header (no RRTabId): deletion group, move group, inserted
+-        // sheet, custom view, defined name, note, and query-table trash.
++        // Second header: deletion group, move group, inserted sheet, custom
++        // view, defined name, note, and query-table trash.
+         stream.extend_from_slice(&rrd_head_with_next_tab("Bob", 0x02, 4113));
++        stream.extend_from_slice(&rr_tab_id(&[1, 2, 3]));
+         stream.extend_from_slice(&record(RRD_INS_DEL_BEGIN_RECORD_TYPE, &[]));
+         stream.extend_from_slice(&ins_del(0x0002, 0));
+         stream.extend_from_slice(&record(RRD_INS_DEL_END_RECORD_TYPE, &[]));
+@@ -1181,7 +1241,7 @@
+ 
+     #[test]
+     fn parses_full_revision_log_stream() {
+-        let log = parse_revision_log_stream(&full_stream()).unwrap();
++        let log = parse_revision_log_stream_with_sheet_count(&full_stream(), 3).unwrap();
+ 
+         let info = log.info();
+         assert!(info.is_shared());
+@@ -1246,7 +1306,7 @@
+ 
+         let second = &log.headers()[1];
+         assert_eq!(second.head().user_name(), "Bob");
+-        assert!(second.sheet_ids().is_none());
++        assert_eq!(second.sheet_ids().unwrap().sheet_ids(), &[1, 2, 3]);
+         assert_eq!(second.revisions().len(), 8);
+         match &second.revisions()[0] {
+             Revision::InsDel(ins_del) => {
+@@ -1313,67 +1373,87 @@
+         stream.extend_from_slice(&eof());
+ 
+         assert!(parse_revision_log_stream(&stream).is_err());
+-        assert!(scan_revision_header_guids(&stream, 64 * 1024 * 1024, 1_000_000, 1_000_000)
+-            .is_err());
++        assert!(
++            scan_revision_header_guids(&stream, 64 * 1024 * 1024, 1_000_000, 1_000_000).is_err()
++        );
+     }
+ 
+     #[test]
+     fn validates_rrdhead_code_page_and_rrtabid_uniqueness_in_both_paths() {
+         let mut invalid_code_page = rrd_info();
+         let mut head = header("BadCodePage", 0x0A);
+-        head[4 + 14 + 16..4 + 14 + 16 + 2]
+-            .copy_from_slice(&0xFFFFu16.to_le_bytes());
++        head[4 + 14 + 16..4 + 14 + 16 + 2].copy_from_slice(&0xFFFFu16.to_le_bytes());
+         invalid_code_page.extend_from_slice(&head);
+         invalid_code_page.extend_from_slice(&eof());
+         assert!(parse_revision_log_stream(&invalid_code_page).is_err());
+-        assert!(scan_revision_header_guids(
+-            &invalid_code_page,
+-            64 * 1024 * 1024,
+-            1_000_000,
+-            1_000_000,
+-        )
+-        .is_err());
++        assert!(
++            scan_revision_header_guids(&invalid_code_page, 64 * 1024 * 1024, 1_000_000, 1_000_000,)
++                .is_err()
++        );
+ 
+         let mut duplicate_ids = rrd_info();
+         duplicate_ids.extend_from_slice(&rrd_head("Duplicate", 0x0B));
+         duplicate_ids.extend_from_slice(&rr_tab_id(&[1, 1]));
+         duplicate_ids.extend_from_slice(&eof());
+         assert!(parse_revision_log_stream(&duplicate_ids).is_err());
+-        assert!(scan_revision_header_guids(
+-            &duplicate_ids,
+-            64 * 1024 * 1024,
+-            1_000_000,
+-            1_000_000,
+-        )
+-        .is_err());
++        assert!(
++            scan_revision_header_guids(&duplicate_ids, 64 * 1024 * 1024, 1_000_000, 1_000_000,)
++                .is_err()
++        );
+     }
+ 
+     #[test]
+-    fn requires_rrtabid_except_for_the_more_than_4112_sheet_case() {
++    fn requires_rrtabid_from_authoritative_workbook_sheet_count() {
+         let mut ordinary_missing = rrd_info();
+         ordinary_missing.extend_from_slice(&rrd_head("MissingTabIds", 0x0C));
+         ordinary_missing.extend_from_slice(&eof());
+         assert!(parse_revision_log_stream(&ordinary_missing).is_err());
+-        assert!(scan_revision_header_guids(
+-            &ordinary_missing,
+-            64 * 1024 * 1024,
+-            1_000_000,
+-            1_000_000,
+-        )
+-        .is_err());
++        assert!(
++            scan_revision_header_guids(&ordinary_missing, 64 * 1024 * 1024, 1_000_000, 1_000_000,)
++                .is_err()
++        );
+ 
+         let mut many_sheets = rrd_info();
+         many_sheets.extend_from_slice(&rrd_head_with_next_tab("ManySheets", 0x0D, 4113));
+         many_sheets.extend_from_slice(&eof());
+-        let log = parse_revision_log_stream(&many_sheets).unwrap();
++        // The RRTabId exception is determined by BoundSheet8 count. The
++        // header's next-tab-id is only revision metadata and cannot establish
++        // how many sheets the workbook contains.
++        assert!(parse_revision_log_stream(&many_sheets).is_err());
++        assert!(
++            scan_revision_header_guids(&many_sheets, 64 * 1024 * 1024, 1_000_000, 1_000_000,)
++                .is_err()
++        );
++
++        let log = parse_revision_log_stream_with_sheet_count(&many_sheets, 4_113).unwrap();
+         assert!(log.headers()[0].sheet_ids().is_none());
+-        assert!(scan_revision_header_guids(
+-            &many_sheets,
+-            64 * 1024 * 1024,
+-            1_000_000,
+-            1_000_000,
+-        )
+-        .is_ok());
++        assert!(
++            scan_revision_header_guids_with_sheet_count(
++                &many_sheets,
++                64 * 1024 * 1024,
++                1_000_000,
++                1_000_000,
++                4_113,
++            )
++            .is_ok()
++        );
++
++        let mut present_at_limit = rrd_info();
++        present_at_limit.extend_from_slice(&rrd_head_with_next_tab("AtLimit", 0x0E, 4113));
++        present_at_limit.extend_from_slice(&rr_tab_id(&(1..=4_112).collect::<Vec<u16>>()));
++        present_at_limit.extend_from_slice(&eof());
++        assert!(parse_revision_log_stream_with_sheet_count(&present_at_limit, 4_112).is_ok());
++        assert!(parse_revision_log_stream_with_sheet_count(&present_at_limit, 4_113).is_err());
++        assert!(
++            scan_revision_header_guids_with_sheet_count(
++                &present_at_limit,
++                64 * 1024 * 1024,
++                1_000_000,
++                1_000_000,
++                4_113,
++            )
++            .is_err()
++        );
+     }
+ 
+     #[test]
+--- a/crates/litchi-xls/src/revision_records/codec.rs
++++ b/crates/litchi-xls/src/revision_records/codec.rs
+@@ -1,7 +1,6 @@
+ //! Binary BIFF8 codecs for typed shared-workbook revision records.
+ 
+ use crate::{Error, Result};
+-use litchi_codepage::Mbcs;
+ 
+ use super::{
+     model::{
+@@ -147,16 +146,33 @@
+     ])
+ }
+ 
++// CODEPG identifiers referenced by MS-XLS 2.4.226. This validates inert
++// metadata, independently of the smaller set of available text decoders.
++// https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers
+ fn validate_code_page(record_type: u16, code_page: u16, context: &str) -> Result<()> {
+-    if code_page == 1200 || Mbcs::new(u32::from(code_page)).is_some() {
++    if matches!(
++        code_page,
++        37 | 437 | 500 | 708..=710 | 720 | 737 | 775 | 850 | 852 | 855 | 857 | 858
++            | 860..=866 | 869 | 870 | 874 | 875 | 932 | 936 | 949 | 950 | 1026 | 1047
++            | 1140..=1149 | 1200 | 1201 | 1250..=1258 | 1361 | 10000..=10008
++            | 10010 | 10017 | 10021 | 10029 | 10079 | 10081 | 10082 | 12000 | 12001
++            | 20000..=20005 | 20105..=20108 | 20127 | 20261 | 20269 | 20273 | 20277
++            | 20278 | 20280 | 20284 | 20285 | 20290 | 20297 | 20420 | 20423 | 20424
++            | 20833 | 20838 | 20866 | 20871 | 20880 | 20905 | 20924 | 20932 | 20936
++            | 20949 | 21025 | 21027 | 21866 | 28591..=28599 | 28603 | 28605 | 29001
++            | 38598 | 50220..=50222 | 50225 | 50227 | 50229 | 50930 | 50931 | 50933
++            | 50935..=50937 | 50939 | 51932 | 51936 | 51949 | 51950 | 52936 | 54936
++            | 57002..=57011 | 65000 | 65001
++    ) {
+         Ok(())
+     } else {
+         Err(invalid(
+             record_type,
+-            format!("{context} has unsupported code page {code_page}"),
++            format!("{context} has undefined CODEPG identifier {code_page}"),
+         ))
+     }
+ }
++
+ /// Decode an `XLUnicodeStringNoCch` inside a fixed-size field of `field`
+ /// bytes: one option-flags byte followed by `cch` characters. Characters past
+ /// `cch` are ignored per MS-XLS 2.5.294.
+@@ -950,8 +966,6 @@
+ }
+ 
+ impl RrdHead {
+-    const NEXT_TAB_ID_OFFSET: usize = RRD_LEN + GUID_LEN + 2 + 2 + RRD_HEAD_USER_FIELD_LEN + SHORT_DTR_LEN;
+-
+     /// Validate the fixed payload without materializing its user name.
+     pub(crate) fn validate_payload_borrowed(data: &[u8]) -> Result<()> {
+         const PAYLOAD_LEN: usize =
+@@ -1007,12 +1021,6 @@
+             ));
+         }
+         Ok(())
+-    }
+-
+-    /// Whether this header may omit `RRTabId` under the >4112-sheet exception.
+-    pub(crate) fn allows_missing_tab_id(data: &[u8]) -> Result<bool> {
+-        Self::validate_payload_borrowed(data)?;
+-        Ok(i32::from(read_i16(data, Self::NEXT_TAB_ID_OFFSET)) > MAX_TAB_ID_COUNT as i32)
+     }
+ 
+     /// Validate and copy the fixed GUID without allocating the header name.
+--- a/crates/litchi-xls/src/user_names/edit.rs
++++ b/crates/litchi-xls/src/user_names/edit.rs
+@@ -249,14 +249,14 @@
+ pub struct Transaction {
+     source: Snapshot,
+     candidate: Arc<[u8]>,
+-    package: Package,
++    package: Arc<Package>,
+ }
+ 
+ impl Transaction {
+     fn new(source: Snapshot) -> Self {
+         Self {
+             candidate: Arc::clone(&source.bytes),
+-            package: (*source.package).clone(),
++            package: Arc::clone(&source.package),
+             source,
+         }
+     }
+@@ -423,20 +423,13 @@
+                 patch,
+             });
+         }
+-        let parsed_package = if let Some(guids) = &package.revision_guids {
+-            Package::parse_with_revision_guids_and_source(
+-                &candidate,
+-                package.limits,
+-                Arc::clone(guids),
+-                package.revision_log_source.clone(),
+-            )?
+-        } else {
+-            Package::parse(&candidate, package.limits)?
+-        };
+         let snapshot = Snapshot {
+             fingerprint: fingerprint(&candidate),
+             bytes: candidate,
+-            package: Arc::new(parsed_package),
++            // `replace_candidate` reparses every changed candidate before it
++            // reaches commit, so transfer that validated package instead of
++            // paying for a second full User Names parse at publication.
++            package,
+         };
+         let patch = Patch::new(source, snapshot.clone());
+         Ok(Commit { snapshot, patch })
+@@ -455,7 +448,7 @@
+             Package::parse(&bytes, self.package.limits)?
+         };
+         self.candidate = bytes;
+-        self.package = package;
++        self.package = Arc::new(package);
+         Ok(())
+     }
+ 
+--- a/crates/litchi-xls/src/user_names/model.rs
++++ b/crates/litchi-xls/src/user_names/model.rs
+@@ -59,8 +59,8 @@
+     /// bounds.  The timestamp is already a validated [`ShortDtr`].
+     /// # Errors
+     ///
+-    /// Returns an error when the name is empty, too long, or contains a NUL
+-    /// character that cannot be authored safely as a BIFF user name.
++    /// Returns an error when the name is empty or too long for the BIFF user
++    /// name field. NUL characters are retained as inert string data.
+     pub fn new(
+         user_id: i32,
+         guid: UserGuid,
+@@ -290,9 +290,9 @@
+                 "User Names stream user limit exceeds CUsr.iCount".to_string(),
+             ));
+         }
+-        if self.max_revision_records < 2 || self.max_revision_records > Self::MAX_REVISION_RECORDS {
++        if self.max_revision_records < 4 || self.max_revision_records > Self::MAX_REVISION_RECORDS {
+             return Err(Error::InvalidData(format!(
+-                "Revision Log record limit must be in 2..={} records",
++                "Revision Log record limit must be in 4..={} records",
+                 Self::MAX_REVISION_RECORDS
+             )));
+         }
+@@ -319,10 +319,5 @@
+             "UsrInfo user name has {utf16_len} UTF-16 code units; expected 1..=54"
+         )));
+     }
+-    if user_name.contains('\0') {
+-        return Err(Error::UnsafeEdit(
+-            "UsrInfo user names cannot contain NUL".to_string(),
+-        ));
+-    }
+     Ok(())
+ }
+--- a/crates/litchi-xls/src/user_names/tests.rs
++++ b/crates/litchi-xls/src/user_names/tests.rs
+@@ -11,8 +11,12 @@
+ }
+ 
+ fn stream_with_user() -> (Vec<u8>, [u8; 16]) {
++    stream_with_user_named("Alice")
++}
++
++fn stream_with_user_named(name: &str) -> (Vec<u8>, [u8; 16]) {
+     let guid = [0x11; 16];
+-    let mut user = UserEntry::new(7, guid, opened_at(), "Alice")
++    let mut user = UserEntry::new(7, guid, opened_at(), name)
+         .unwrap()
+         .with_unused(0xA5);
+     user.string_flags = 0x02;
+@@ -31,6 +35,22 @@
+ }
+ 
+ #[test]
++fn timestamp_edit_preserves_nul_in_inert_user_name() {
++    let (bytes, guid) = stream_with_user_named("A\0lice");
++    let source = Snapshot::parse_with_revision_guids(&bytes, &[guid]).unwrap();
++    assert_eq!(source.users()[0].user_name().as_bytes(), b"A\0lice");
++
++    let mut edit = source.edit();
++    edit.set_user_opened_at(
++        0,
++        ShortDtr::parse(USR_INFO_RECORD_TYPE, &[0xEA, 0x07, 2, 3, 4, 5, 6, 2]).unwrap(),
++    )
++    .unwrap();
++    let target = edit.commit().unwrap().into_snapshot();
++    assert_eq!(target.users()[0].user_name().as_bytes(), b"A\0lice");
++}
++
++#[test]
+ fn parses_user_names_and_preserves_reserved_fields() {
+     let (bytes, guid) = stream_with_user();
+     let snapshot = Snapshot::parse(&bytes).unwrap();
+--- a/crates/litchi-xls/src/user_routing.rs
++++ b/crates/litchi-xls/src/user_routing.rs
+@@ -63,10 +63,6 @@
+ const USR_INFO_MAX_NAME_CHARS: usize = 54;
+ /// `fHighByte` option bit of an `XLUnicodeString` (MS-XLS 2.5.294).
+ const STRING_HIGH_BYTE: u8 = 0x01;
+-/// Option bits of an `XLUnicodeString` that select rich-text runs or an
+-/// extended string (`fRichSt`/`fExtSt`); neither can appear in the
+-/// fixed-layout `UsrInfo` record (MS-XLS 2.5.294).
+-const STRING_UNSUPPORTED_FLAGS: u8 = 0x0C;
+ 
+ /// Byte length of the fixed `DocRoute` header: ten 2-byte fields plus the
+ /// 4-byte `ulEIDSize` (MS-XLS 2.4.91).
+@@ -269,6 +265,9 @@
+     opened_at: ShortDtr,
+     /// Name of this user (`stUserName`).
+     user_name: String,
++    /// Raw `XLUnicodeString` option flags, including reserved producer bits.
++    /// Bits 1–7 are ignored during decoding and preserved on output.
++    string_flags: u8,
+     /// Undefined trailing byte (`unused`), preserved verbatim.
+     unused: u8,
+ }
+@@ -305,12 +304,6 @@
+             ));
+         }
+         let flags = data[USR_INFO_PREFIX_LEN + 2];
+-        if flags & STRING_UNSUPPORTED_FLAGS != 0 {
+-            return Err(invalid(
+-                USR_INFO_RECORD_TYPE,
+-                "UsrInfo stUserName cannot carry rich-text or extended-string data",
+-            ));
+-        }
+         let high_byte = flags & STRING_HIGH_BYTE != 0;
+         let char_bytes = cch * if high_byte { 2 } else { 1 };
+         let chars_offset = USR_INFO_PREFIX_LEN + XL_UNICODE_STRING_HEADER_LEN;
+@@ -341,6 +334,7 @@
+             guid,
+             opened_at,
+             user_name,
++            string_flags: flags,
+             unused,
+         })
+     }
+@@ -360,9 +354,11 @@
+         payload.push(dtr.second());
+         payload.push(dtr.weekday());
+         let units: Vec<u16> = self.user_name.encode_utf16().collect();
+-        let high_byte = units.iter().any(|unit| *unit > 0xFF);
++        let high_byte =
++            self.string_flags & STRING_HIGH_BYTE != 0 || units.iter().any(|unit| *unit > 0xFF);
+         payload.extend_from_slice(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes());
+-        payload.push(if high_byte { STRING_HIGH_BYTE } else { 0 });
++        let string_flags = (self.string_flags & !STRING_HIGH_BYTE) | u8::from(high_byte);
++        payload.push(string_flags);
+         if high_byte {
+             for unit in units {
+                 payload.extend_from_slice(&unit.to_le_bytes());
+@@ -396,6 +392,12 @@
+     #[must_use]
+     pub fn user_name(&self) -> &str {
+         &self.user_name
++    }
++
++    /// Raw `XLUnicodeString` option flags, including reserved producer bits.
++    #[must_use]
++    pub const fn string_flags(&self) -> u8 {
++        self.string_flags
+     }
+ }
+ 
+@@ -897,6 +899,15 @@
+         assert_eq!(record.opened_at().month(), 5);
+         assert_eq!(record.opened_at().weekday(), 2);
+         assert_eq!(record.user_name(), "Alice");
++        assert_eq!(record.string_flags(), 0);
++        assert_eq!(record.to_payload(), payload);
++    }
++
++    #[test]
++    fn usr_info_round_trip_reserved_string_flag() {
++        let payload = usr_info_payload(5, 0x02, b"Alice");
++        let record = UsrInfo::parse(&payload).unwrap();
++        assert_eq!(record.string_flags(), 0x02);
+         assert_eq!(record.to_payload(), payload);
+     }
+ 
+@@ -907,6 +918,14 @@
+         let payload = usr_info_payload(2, STRING_HIGH_BYTE, &name);
+         let record = UsrInfo::parse(&payload).unwrap();
+         assert_eq!(record.user_name(), "Яб");
++        assert_eq!(record.to_payload(), payload);
++    }
++
++    #[test]
++    fn usr_info_round_trip_preserves_wide_ascii_and_reserved_flags() {
++        let payload = usr_info_payload(1, STRING_HIGH_BYTE | 0x02, &[b'A', 0]);
++        let record = UsrInfo::parse(&payload).unwrap();
++        assert_eq!(record.user_name(), "A");
+         assert_eq!(record.to_payload(), payload);
+     }
+ 
+@@ -932,11 +951,20 @@
+     }
+ 
+     #[test]
+-    fn usr_info_rejects_rich_and_extended_strings() {
+-        let payload = usr_info_payload(5, 0x08, b"Alice"); // fRichSt
+-        assert!(UsrInfo::parse(&payload).is_err());
+-        let payload = usr_info_payload(5, 0x04, b"Alice"); // fExtSt
+-        assert!(UsrInfo::parse(&payload).is_err());
++    fn usr_info_preserves_all_plain_unicode_string_reserved_bits() {
++        // XLUnicodeString reserves every bit except fHighByte. It is not
++        // XLUnicodeRichExtendedString, whose flags describe extra fields.
++        for flags in 0..=u8::MAX {
++            let characters: &[u8] = if flags & STRING_HIGH_BYTE == 0 {
++                b"A"
++            } else {
++                &[b'A', 0]
++            };
++            let payload = usr_info_payload(1, flags, characters);
++            let parsed = UsrInfo::parse(&payload).unwrap();
++            assert_eq!(parsed.user_name(), "A");
++            assert_eq!(parsed.to_payload(), payload, "flags {flags:#04x}");
++        }
+     }
+ 
+     #[test]
+--- a/crates/litchi-xls/src/workbook/package.rs
++++ b/crates/litchi-xls/src/workbook/package.rs
+@@ -429,7 +429,8 @@
+             return Ok(None);
+         };
+         let data = self.ole_file.open_stream(&[name.as_str()])?;
+-        crate::revision_log::parse_revision_log_stream(&data).map(Some)
++        crate::revision_log::parse_revision_log_stream_with_sheet_count(&data, self.sheets.len())
++            .map(Some)
+     }
+ 
+     /// Whether this workbook contains the shared-workbook `User Names` stream.
+@@ -535,11 +536,12 @@
+                 .open_stream(&[revision_name.as_str()])?
+                 .into_boxed_slice(),
+         );
+-        let revision_guids = crate::revision_log::scan_revision_header_guids(
++        let revision_guids = crate::revision_log::scan_revision_header_guids_with_sheet_count(
+             &revision_data,
+             limits.max_stream_bytes,
+             limits.max_revision_records,
+             limits.max_revision_guids,
++            self.sheets.len(),
+         )?;
+         crate::user_names::Snapshot::parse_shared_with_revision_guids_arc_and_revision_log_with_limits(
+             data,
+--- a/crates/litchi-xls/tests/xls_revision_log.rs
++++ b/crates/litchi-xls/tests/xls_revision_log.rs
+@@ -131,6 +131,7 @@
+ fn workbook_container(extra_streams: &[(&str, Vec<u8>)]) -> Vec<u8> {
+     let mut writer = Writer::new();
+     let sheet = writer.add_worksheet("Sheet1").unwrap();
++    writer.add_worksheet("Sheet2").unwrap();
+     writer.write_string(sheet, 0, 0, "shared").unwrap();
+     let mut workbook_bytes = Cursor::new(Vec::new());
+     writer.write_to(&mut workbook_bytes).unwrap();
+--- a/crates/litchi-xls/tests/xls_user_names.rs
++++ b/crates/litchi-xls/tests/xls_user_names.rs
+@@ -2,7 +2,7 @@
+ 
+ use std::io::Cursor;
+ 
+-use litchi_cfb::{OleFile, OleWriter};
++use litchi_cfb::{DirectoryEntry, OleFile, OleWriter};
+ use litchi_xls::{UserNamesLimits, UserNamesPackageSnapshot, Workbook, Writer};
+ 
+ const USER_NAMES_STREAM_NAME: &str = "User Names";
+@@ -19,6 +19,14 @@
+ const USR_EXCL: u16 = 0x0194;
+ const RRD_INS_DEL_BEGIN: u16 = 0x0150;
+ const EOF: u16 = 0x000A;
++const BOUND_SHEET8: u16 = 0x0085;
++const BOF: u16 = 0x0809;
++const WORKSHEET_BOF: u16 = 0x0010;
++const WINDOW1: u16 = 0x003D;
++const WINDOW2: u16 = 0x023E;
++const WINDOW2_SELECTED: u16 = 0x0200;
++const CODE_PAGE: u16 = 0x0042;
++const FILE_PASS: u16 = 0x002F;
+ 
+ fn record(record_type: u16, payload: &[u8]) -> Vec<u8> {
+     let mut bytes = Vec::with_capacity(4 + payload.len());
+@@ -54,6 +62,25 @@
+ }
+ 
+ fn revision_log_stream(guid: [u8; 16]) -> Vec<u8> {
++    revision_log_stream_with(guid, 1200, true, 1)
++}
++
++fn revision_log_stream_with(
++    guid: [u8; 16],
++    code_page: u16,
++    include_rr_tab_id: bool,
++    next_tab_id: i16,
++) -> Vec<u8> {
++    let tab_ids = include_rr_tab_id.then_some(&[1u16][..]);
++    revision_log_stream_with_tab_ids(guid, code_page, tab_ids, next_tab_id)
++}
++
++fn revision_log_stream_with_tab_ids(
++    guid: [u8; 16],
++    code_page: u16,
++    tab_ids: Option<&[u16]>,
++    next_tab_id: i16,
++) -> Vec<u8> {
+     let mut info = vec![0u8; 50];
+     info[..2].copy_from_slice(&8u16.to_le_bytes());
+     info[4..6].copy_from_slice(&0x000Bu16.to_le_bytes());
+@@ -63,12 +90,13 @@
+     head[8..10].copy_from_slice(&0x0020u16.to_le_bytes());
+     head[12..14].copy_from_slice(&0xFFFFu16.to_le_bytes());
+     head[14..30].copy_from_slice(&guid);
+-    head[30..32].copy_from_slice(&1200u16.to_le_bytes());
++    head[30..32].copy_from_slice(&code_page.to_le_bytes());
+     head[32..34].copy_from_slice(&5u16.to_le_bytes());
+     head[34] = 0;
+     head[35..40].copy_from_slice(b"Alice");
+     head[148..150].copy_from_slice(&2024u16.to_le_bytes());
+-    head[150..158].copy_from_slice(&[1, 2, 3, 4, 5, 1, 0, 0]);
++    head[150..156].copy_from_slice(&[1, 2, 3, 4, 5, 1]);
++    head[156..158].copy_from_slice(&next_tab_id.to_le_bytes());
+     let mut file_lock = vec![0u8; 162];
+     file_lock[0..4].copy_from_slice(&0x0001_0001u32.to_le_bytes());
+     file_lock[4..6].copy_from_slice(&3u16.to_le_bytes());
+@@ -87,20 +115,40 @@
+     stream.extend_from_slice(&record(FILE_LOCK, &file_lock));
+     stream.extend_from_slice(&record(USR_EXCL, &usr_excl));
+     stream.extend_from_slice(&record(RRD_HEAD, &head));
+-    stream.extend_from_slice(&record(RR_TAB_ID, &1u16.to_le_bytes()));
++    if let Some(tab_ids) = tab_ids {
++        let mut payload = Vec::with_capacity(tab_ids.len() * 2);
++        for tab_id in tab_ids {
++            payload.extend_from_slice(&tab_id.to_le_bytes());
++        }
++        stream.extend_from_slice(&record(RR_TAB_ID, &payload));
++    }
+     stream.extend_from_slice(&record(EOF, &[]));
+     stream
+ }
+ 
+ fn workbook_container(user_names: Vec<u8>, revision_log: Vec<u8>) -> Vec<u8> {
++    workbook_container_from_stream(authored_workbook_stream(), user_names, revision_log, |_| {})
++}
++
++fn authored_workbook_stream() -> Vec<u8> {
+     let mut writer = Writer::new();
+     let sheet = writer.add_worksheet("Sheet1").unwrap();
+     writer.write_string(sheet, 0, 0, "shared").unwrap();
+     let mut workbook_bytes = Cursor::new(Vec::new());
+     writer.write_to(&mut workbook_bytes).unwrap();
+     let mut source = OleFile::open(Cursor::new(workbook_bytes.into_inner())).unwrap();
+-    let workbook_stream = source.open_stream(&["Workbook"]).unwrap();
+-
++    source.open_stream(&["Workbook"]).unwrap()
++}
++
++fn workbook_container_from_stream<F>(
++    workbook_stream: Vec<u8>,
++    user_names: Vec<u8>,
++    revision_log: Vec<u8>,
++    configure: F,
++) -> Vec<u8>
++where
++    F: FnOnce(&mut OleWriter),
++{
+     let mut container = OleWriter::new();
+     container
+         .create_stream(&["Workbook"], &workbook_stream)
+@@ -111,9 +159,220 @@
+     container
+         .create_stream(&[REVISION_LOG_STREAM_NAME], &revision_log)
+         .unwrap();
++    configure(&mut container);
+     let mut output = Cursor::new(Vec::new());
+     container.write_to(&mut output).unwrap();
+     output.into_inner()
++}
++
++fn replace_workbook_record_kind(mut workbook: Vec<u8>, from: u16, to: u16) -> Vec<u8> {
++    let mut offset = 0usize;
++    while offset + 4 <= workbook.len() {
++        let record_type = u16::from_le_bytes([workbook[offset], workbook[offset + 1]]);
++        let payload_len = usize::from(u16::from_le_bytes([
++            workbook[offset + 2],
++            workbook[offset + 3],
++        ]));
++        let end = offset
++            .checked_add(4)
++            .and_then(|value| value.checked_add(payload_len))
++            .expect("BIFF record end");
++        assert!(end <= workbook.len(), "truncated workbook record");
++        if record_type == from {
++            workbook[offset..offset + 2].copy_from_slice(&to.to_le_bytes());
++            return workbook;
++        }
++        offset = end;
++    }
++    panic!("workbook did not contain record 0x{from:04X}");
++}
++
++fn strip_workbook_record_type(data: &[u8], omitted: u16) -> Vec<u8> {
++    let mut retained = Vec::with_capacity(data.len());
++    let mut offset = 0usize;
++    while offset + 4 <= data.len() {
++        let record_type = u16::from_le_bytes([data[offset], data[offset + 1]]);
++        let payload_len = usize::from(u16::from_le_bytes([data[offset + 2], data[offset + 3]]));
++        let end = offset
++            .checked_add(4)
++            .and_then(|value| value.checked_add(payload_len))
++            .expect("BIFF record end");
++        assert!(end <= data.len(), "truncated workbook record");
++        if record_type != omitted {
++            retained.extend_from_slice(&data[offset..end]);
++        }
++        offset = end;
++    }
++    assert_eq!(offset, data.len(), "trailing workbook bytes");
++    retained
++}
++
++fn insert_workbook_record_before(data: &[u8], before: u16, inserted: &[u8]) -> Vec<u8> {
++    let mut output = Vec::with_capacity(data.len() + inserted.len());
++    let mut offset = 0usize;
++    let mut found = false;
++    while offset + 4 <= data.len() {
++        let record_type = u16::from_le_bytes([data[offset], data[offset + 1]]);
++        let payload_len = usize::from(u16::from_le_bytes([data[offset + 2], data[offset + 3]]));
++        let end = offset
++            .checked_add(4)
++            .and_then(|value| value.checked_add(payload_len))
++            .expect("BIFF record end");
++        assert!(end <= data.len(), "truncated workbook record");
++        if record_type == before {
++            output.extend_from_slice(inserted);
++            found = true;
++        }
++        output.extend_from_slice(&data[offset..end]);
++        offset = end;
++    }
++    assert_eq!(offset, data.len(), "trailing workbook bytes");
++    assert!(found, "workbook did not contain record 0x{before:04X}");
++    output
++}
++
++fn workbook_with_sheet_count(sheet_count: usize, include_rr_tab_id: bool) -> Vec<u8> {
++    assert!(sheet_count > 1);
++    let source = authored_workbook_stream();
++    let mut offset = 0usize;
++    let mut bound_offset = None;
++    let mut bound_end = None;
++    let mut worksheet_offset = None;
++    while offset + 4 <= source.len() {
++        let record_type = u16::from_le_bytes([source[offset], source[offset + 1]]);
++        let payload_len = usize::from(u16::from_le_bytes([source[offset + 2], source[offset + 3]]));
++        let end = offset
++            .checked_add(4)
++            .and_then(|value| value.checked_add(payload_len))
++            .expect("BIFF record end");
++        assert!(end <= source.len(), "truncated authored workbook record");
++        if record_type == BOUND_SHEET8 && bound_offset.is_none() {
++            bound_offset = Some(offset);
++            bound_end = Some(end);
++        }
++        if record_type == BOF
++            && payload_len >= 4
++            && source[offset + 6..offset + 8] == WORKSHEET_BOF.to_le_bytes()
++        {
++            worksheet_offset = Some(offset);
++            break;
++        }
++        offset = end;
++    }
++    let bound_offset = bound_offset.expect("authored workbook BoundSheet8");
++    let bound_end = bound_end.expect("authored workbook BoundSheet8 end");
++    let worksheet_offset = worksheet_offset.expect("authored workbook worksheet BOF");
++    let bound_payload = source[bound_offset + 4..bound_end].to_vec();
++    assert_eq!(bound_payload.len(), 14, "fixed six-character BoundSheet8");
++    let sheet_stream = source[worksheet_offset..].to_vec();
++    let globals_prefix = if include_rr_tab_id {
++        let mut tab_ids = Vec::with_capacity(sheet_count * 2);
++        for tab_id in 1..=sheet_count {
++            tab_ids.extend_from_slice(
++                &u16::try_from(tab_id)
++                    .expect("RRTabId test identifier")
++                    .to_le_bytes(),
++            );
++        }
++        let prefix = strip_workbook_record_type(&source[..bound_offset], RR_TAB_ID);
++        insert_workbook_record_before(&prefix, WINDOW1, &record(RR_TAB_ID, &tab_ids))
++    } else {
++        strip_workbook_record_type(&source[..bound_offset], RR_TAB_ID)
++    };
++    let globals_suffix =
++        strip_workbook_record_type(&source[bound_end..worksheet_offset], RR_TAB_ID);
++    let bound_record_len = 4 + bound_payload.len();
++    let sheet_stream_offset = globals_prefix
++        .len()
++        .checked_add(
++            sheet_count
++                .checked_mul(bound_record_len)
++                .expect("BoundSheet8 size"),
++        )
++        .and_then(|value| value.checked_add(globals_suffix.len()))
++        .expect("first worksheet offset");
++
++    let mut expanded = Vec::with_capacity(
++        sheet_stream_offset
++            .checked_add(
++                sheet_count
++                    .checked_mul(sheet_stream.len())
++                    .expect("worksheet stream size"),
++            )
++            .expect("expanded Workbook size"),
++    );
++    expanded.extend_from_slice(&globals_prefix);
++    for index in 0..sheet_count {
++        let mut payload = bound_payload.clone();
++        let sheet_offset = sheet_stream_offset
++            .checked_add(index.checked_mul(sheet_stream.len()).expect("sheet offset"))
++            .expect("sheet offset");
++        payload[..4].copy_from_slice(
++            &u32::try_from(sheet_offset)
++                .expect("Workbook stream offset")
++                .to_le_bytes(),
++        );
++        let name = format!("S{index:05}");
++        assert_eq!(name.len(), 6);
++        payload[6] = 6;
++        payload[7] = 0;
++        payload[8..14].copy_from_slice(name.as_bytes());
++        expanded.extend_from_slice(&record(BOUND_SHEET8, &payload));
++    }
++    expanded.extend_from_slice(&globals_suffix);
++    for index in 0..sheet_count {
++        let mut sheet = sheet_stream.clone();
++        if index > 0 {
++            let mut sheet_offset = 0usize;
++            while sheet_offset + 4 <= sheet.len() {
++                let record_type =
++                    u16::from_le_bytes([sheet[sheet_offset], sheet[sheet_offset + 1]]);
++                let payload_len = usize::from(u16::from_le_bytes([
++                    sheet[sheet_offset + 2],
++                    sheet[sheet_offset + 3],
++                ]));
++                let end = sheet_offset
++                    .checked_add(4)
++                    .and_then(|value| value.checked_add(payload_len))
++                    .expect("worksheet BIFF record end");
++                assert!(end <= sheet.len(), "truncated worksheet record");
++                if record_type == WINDOW2 {
++                    assert!(payload_len >= 2, "truncated Window2 record");
++                    let mut flags =
++                        u16::from_le_bytes([sheet[sheet_offset + 4], sheet[sheet_offset + 5]]);
++                    flags &= !WINDOW2_SELECTED;
++                    sheet[sheet_offset + 4..sheet_offset + 6].copy_from_slice(&flags.to_le_bytes());
++                    break;
++                }
++                sheet_offset = end;
++            }
++        }
++        expanded.extend_from_slice(&sheet);
++    }
++    expanded
++}
++
++#[derive(Debug, Clone, PartialEq, Eq)]
++struct DirectoryMetadata {
++    name: String,
++    entry_type: u8,
++    clsid: String,
++    state_bits: u32,
++    creation_time: u64,
++    modified_time: u64,
++    size: u64,
++}
++
++fn directory_metadata(entry: &DirectoryEntry) -> DirectoryMetadata {
++    DirectoryMetadata {
++        name: entry.name.clone(),
++        entry_type: entry.entry_type,
++        clsid: entry.clsid.clone(),
++        state_bits: entry.state_bits,
++        creation_time: entry.creation_time,
++        modified_time: entry.modified_time,
++        size: entry.size,
++    }
+ }
+ 
+ #[test]
+@@ -145,6 +404,65 @@
+     );
+     let mut workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+     assert!(workbook.user_names().is_err());
++}
++
++#[test]
++fn workbook_user_names_requires_rrtabid_from_bound_sheet_count() {
++    let guid = [0x21; 16];
++    let revision = revision_log_stream_with(guid, 1200, false, 4113);
++    let bytes = workbook_container(user_names_stream(guid, "Alice"), revision.clone());
++    let mut workbook = Workbook::new(Cursor::new(bytes.clone())).unwrap();
++    assert!(workbook.user_names().is_err());
++    assert!(UserNamesPackageSnapshot::from_bytes(bytes).is_err());
++}
++
++#[test]
++fn package_owner_rejects_rrtabid_cardinality_mismatch_for_one_sheet() {
++    for (index, tab_ids) in [Vec::new(), vec![1u16, 2]].into_iter().enumerate() {
++        let guid = [0x23 + u8::try_from(index).unwrap(); 16];
++        let bytes = workbook_container(
++            user_names_stream(guid, "Alice"),
++            revision_log_stream_with_tab_ids(guid, 1200, Some(&tab_ids), 1),
++        );
++        assert!(
++            UserNamesPackageSnapshot::from_bytes(bytes.clone()).is_err(),
++            "RRTabId cardinality {:?} was accepted for one sheet",
++            tab_ids
++        );
++        let mut workbook = Workbook::new(Cursor::new(bytes)).unwrap();
++        assert!(workbook.user_names().is_err());
++    }
++}
++
++#[test]
++fn package_owner_accepts_rrtabid_omission_for_more_than_4112_sheets() {
++    let guid = [0x22; 16];
++    let workbook_stream = workbook_with_sheet_count(4_113, false);
++    let bytes = workbook_container_from_stream(
++        workbook_stream,
++        user_names_stream(guid, "Alice"),
++        revision_log_stream_with(guid, 1200, false, 1),
++        |_| {},
++    );
++    let source = UserNamesPackageSnapshot::from_bytes(bytes.clone()).unwrap();
++    assert_eq!(source.user_names().users()[0].user_name(), "Alice");
++    let mut workbook = Workbook::new(Cursor::new(source.finish())).unwrap();
++    assert_eq!(workbook.sheets().len(), 4_113);
++    assert!(workbook.user_names().unwrap().is_some());
++}
++
++#[test]
++fn package_owner_accepts_exact_rrtabid_cardinality_at_4112_sheets() {
++    let guid = [0x24; 16];
++    let tab_ids = (1..=4_112u16).collect::<Vec<_>>();
++    let bytes = workbook_container_from_stream(
++        workbook_with_sheet_count(4_112, true),
++        user_names_stream(guid, "Alice"),
++        revision_log_stream_with_tab_ids(guid, 1200, Some(&tab_ids), 4_113),
++        |_| {},
++    );
++    let source = UserNamesPackageSnapshot::from_bytes(bytes).unwrap();
++    assert_eq!(source.user_names().users()[0].user_name(), "Alice");
+ }
+ 
+ #[test]
+@@ -199,6 +517,192 @@
+         commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+         source
+     );
++}
++
++#[test]
++fn package_owner_accepts_official_rrdhead_code_pages_and_keeps_unicode_user_name() {
++    for (index, code_page) in [437u16, 850, 20_127, 1_201, 12_000].into_iter().enumerate() {
++        let guid = [0x80 + u8::try_from(index).unwrap(); 16];
++        let source_bytes = workbook_container(
++            user_names_stream(guid, "Alice"),
++            revision_log_stream_with(guid, code_page, true, 1),
++        );
++        let source = UserNamesPackageSnapshot::from_bytes(source_bytes).unwrap();
++        let mut edit = source.edit();
++        edit.set_user_name(0, "Élodie").unwrap();
++        let target = edit.commit().unwrap().into_snapshot();
++        assert_eq!(target.user_names().users()[0].user_name(), "Élodie");
++
++        let mut workbook = Workbook::new(Cursor::new(target.finish())).unwrap();
++        let revision = workbook.revision_log().unwrap().unwrap();
++        assert_eq!(revision.headers()[0].head().code_page(), code_page);
++        assert_eq!(revision.headers()[0].head().user_name(), "Alice");
++    }
++}
++
++#[test]
++fn package_owner_rejects_undefined_rrdhead_code_pages() {
++    for code_page in [436u16, 65_535] {
++        let guid = [0x90; 16];
++        let bytes = workbook_container(
++            user_names_stream(guid, "Alice"),
++            revision_log_stream_with(guid, code_page, true, 1),
++        );
++        assert!(
++            UserNamesPackageSnapshot::from_bytes(bytes).is_err(),
++            "undefined CODEPG {code_page} was accepted"
++        );
++    }
++}
++
++#[test]
++fn package_owner_refuses_protected_cfb_markers_and_filepass() {
++    let guid = [0xA0; 16];
++    for marker in ["DigitalSignature", "EncryptedPackage"] {
++        let bytes = workbook_container_from_stream(
++            authored_workbook_stream(),
++            user_names_stream(guid, "Alice"),
++            revision_log_stream(guid),
++            |container| {
++                container.create_stream(&[marker], b"protected").unwrap();
++            },
++        );
++        assert!(
++            UserNamesPackageSnapshot::from_bytes(bytes).is_err(),
++            "protected marker {marker} was accepted"
++        );
++    }
++
++    let bytes = workbook_container_from_stream(
++        replace_workbook_record_kind(authored_workbook_stream(), CODE_PAGE, FILE_PASS),
++        user_names_stream(guid, "Alice"),
++        revision_log_stream(guid),
++        |_| {},
++    );
++    assert!(UserNamesPackageSnapshot::from_bytes(bytes).is_err());
++}
++
++#[test]
++fn package_owner_preserves_unrelated_streams_and_directory_metadata() {
++    let guid = [0xB0; 16];
++    let source_bytes = workbook_container_from_stream(
++        authored_workbook_stream(),
++        user_names_stream(guid, "Alice"),
++        revision_log_stream(guid),
++        |container| {
++            container.set_root_clsid([
++                0x06, 0x09, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00,
++                0x00, 0x46,
++            ]);
++            container.set_root_state_bits(0x1020_3040);
++            container.set_root_creation_time_from_source(0x0102_0304_0506_0708);
++            container.set_root_modified_time(0x1112_1314_1516_1718);
++            container.create_storage(&["Meta"]).unwrap();
++            container
++                .set_storage_metadata(
++                    &["Meta"],
++                    0xA5A5_5A5A,
++                    0x2122_2324_2526_2728,
++                    0x3132_3334_3536_3738,
++                )
++                .unwrap();
++            container
++                .create_stream(&["Unrelated"], b"unrelated stream")
++                .unwrap();
++            container
++                .set_stream_metadata(
++                    &["Unrelated"],
++                    0x0BAD_CAFE,
++                    0x4142_4344_4546_4748,
++                    0x5152_5354_5556_5758,
++                )
++                .unwrap();
++            container
++                .create_stream(&["Meta", "Nested"], b"nested stream")
++                .unwrap();
++            container
++                .set_stream_metadata(
++                    &["Meta", "Nested"],
++                    0x1234_5678,
++                    0x6162_6364_6566_6768,
++                    0x7172_7374_7576_7778,
++                )
++                .unwrap();
++        },
++    );
++    let source = UserNamesPackageSnapshot::from_bytes(source_bytes.clone()).unwrap();
++    let mut edit = source.edit();
++    edit.set_user_name(0, "Bob").unwrap();
++    let target = edit.commit().unwrap().into_snapshot();
++
++    let mut source_ole = OleFile::open(Cursor::new(source_bytes)).unwrap();
++    let mut target_ole = OleFile::open(Cursor::new(target.finish())).unwrap();
++    assert_eq!(
++        source_ole.open_stream(&["Unrelated"]).unwrap(),
++        target_ole.open_stream(&["Unrelated"]).unwrap()
++    );
++    assert_eq!(
++        source_ole.open_stream(&["Meta", "Nested"]).unwrap(),
++        target_ole.open_stream(&["Meta", "Nested"]).unwrap()
++    );
++
++    let source_root = source_ole.root_entry().unwrap();
++    let target_root = target_ole.root_entry().unwrap();
++    let source_meta = directory_metadata(
++        source_ole
++            .list_directory_entries(&[])
++            .unwrap()
++            .into_iter()
++            .find(|entry| entry.name == "Meta")
++            .unwrap(),
++    );
++    let target_meta = directory_metadata(
++        target_ole
++            .list_directory_entries(&[])
++            .unwrap()
++            .into_iter()
++            .find(|entry| entry.name == "Meta")
++            .unwrap(),
++    );
++    let source_unrelated = directory_metadata(
++        source_ole
++            .list_directory_entries(&[])
++            .unwrap()
++            .into_iter()
++            .find(|entry| entry.name == "Unrelated")
++            .unwrap(),
++    );
++    let target_unrelated = directory_metadata(
++        target_ole
++            .list_directory_entries(&[])
++            .unwrap()
++            .into_iter()
++            .find(|entry| entry.name == "Unrelated")
++            .unwrap(),
++    );
++    let source_nested = directory_metadata(
++        source_ole
++            .list_directory_entries(&["Meta"])
++            .unwrap()
++            .into_iter()
++            .find(|entry| entry.name == "Nested")
++            .unwrap(),
++    );
++    let target_nested = directory_metadata(
++        target_ole
++            .list_directory_entries(&["Meta"])
++            .unwrap()
++            .into_iter()
++            .find(|entry| entry.name == "Nested")
++            .unwrap(),
++    );
++    assert_eq!(source_root.clsid, target_root.clsid);
++    assert_eq!(source_root.state_bits, target_root.state_bits);
++    assert_eq!(source_root.creation_time, target_root.creation_time);
++    assert_eq!(source_root.modified_time, target_root.modified_time);
++    assert_eq!(source_meta, target_meta);
++    assert_eq!(source_unrelated, target_unrelated);
++    assert_eq!(source_nested, target_nested);
+ }
+ 
+ #[test]

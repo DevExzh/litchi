@@ -1,0 +1,83 @@
+base=906be17c2408e863bb26f2faf8f79361809597e6
+worktree=/var/tmp/litchi-xldm-extraction-validation-20260910
+
+STATUS
+ M Cargo.toml
+ M crates/litchi-xlsx/Cargo.toml
+ M crates/litchi-xlsx/src/package.rs
+ D crates/litchi-xlsx/src/package/xldm/codec.rs
+ D crates/litchi-xlsx/src/package/xldm/compression.rs
+ D crates/litchi-xlsx/src/package/xldm/compression/xpress_stream.rs
+ D crates/litchi-xlsx/src/package/xldm/crypt.rs
+ D crates/litchi-xlsx/src/package/xldm/generated.rs
+ D crates/litchi-xlsx/src/package/xldm/metadata/codec.rs
+ D crates/litchi-xlsx/src/package/xldm/metadata/mod.rs
+ D crates/litchi-xlsx/src/package/xldm/metadata/model.rs
+ D crates/litchi-xlsx/src/package/xldm/metadata/tests.rs
+ D crates/litchi-xlsx/src/package/xldm/metadata/validation.rs
+ D crates/litchi-xlsx/src/package/xldm/mod.rs
+ D crates/litchi-xlsx/src/package/xldm/model.rs
+ D crates/litchi-xlsx/src/package/xldm/native.rs
+ D crates/litchi-xlsx/src/package/xldm/olap.rs
+ D crates/litchi-xlsx/src/package/xldm/semantic.rs
+ D crates/litchi-xlsx/src/package/xldm/tabular_paths.rs
+ D crates/litchi-xlsx/src/package/xldm/tests.rs
+ D crates/litchi-xlsx/src/package/xldm/validation.rs
+ M crates/litchi-xlsx/src/workbook/data_model/package.rs
+ M tools/native-resave/Cargo.lock
+ M tools/perf-baseline/Cargo.lock
+?? crates/litchi-xldm/
+?? crates/litchi-xlsx/src/package/xldm_test_support.rs
+
+DIFF STAT
+ Cargo.toml                                         |    1 +
+ crates/litchi-xlsx/Cargo.toml                      |    1 +
+ crates/litchi-xlsx/src/package.rs                  |   45 +-
+ crates/litchi-xlsx/src/package/xldm/codec.rs       |  598 --------
+ crates/litchi-xlsx/src/package/xldm/compression.rs | 1445 ------------------
+ .../src/package/xldm/compression/xpress_stream.rs  |  111 --
+ crates/litchi-xlsx/src/package/xldm/crypt.rs       |  282 ----
+ crates/litchi-xlsx/src/package/xldm/generated.rs   |  547 -------
+ .../litchi-xlsx/src/package/xldm/metadata/codec.rs | 1573 --------------------
+ .../litchi-xlsx/src/package/xldm/metadata/mod.rs   |   22 -
+ .../litchi-xlsx/src/package/xldm/metadata/model.rs |  230 ---
+ .../litchi-xlsx/src/package/xldm/metadata/tests.rs |  168 ---
+ .../src/package/xldm/metadata/validation.rs        |   20 -
+ crates/litchi-xlsx/src/package/xldm/mod.rs         |   35 -
+ crates/litchi-xlsx/src/package/xldm/model.rs       |  267 ----
+ crates/litchi-xlsx/src/package/xldm/native.rs      | 1248 ----------------
+ crates/litchi-xlsx/src/package/xldm/olap.rs        | 1465 ------------------
+ crates/litchi-xlsx/src/package/xldm/semantic.rs    |  315 ----
+ .../litchi-xlsx/src/package/xldm/tabular_paths.rs  |  655 --------
+ crates/litchi-xlsx/src/package/xldm/tests.rs       |  435 ------
+ crates/litchi-xlsx/src/package/xldm/validation.rs  |  579 -------
+ .../litchi-xlsx/src/workbook/data_model/package.rs |   10 +-
+ tools/native-resave/Cargo.lock                     |   12 +
+ tools/perf-baseline/Cargo.lock                     |   10 +
+ 24 files changed, 73 insertions(+), 10001 deletions(-)
+
+NAME STATUS
+M	Cargo.toml
+M	crates/litchi-xlsx/Cargo.toml
+M	crates/litchi-xlsx/src/package.rs
+D	crates/litchi-xlsx/src/package/xldm/codec.rs
+D	crates/litchi-xlsx/src/package/xldm/compression.rs
+D	crates/litchi-xlsx/src/package/xldm/compression/xpress_stream.rs
+D	crates/litchi-xlsx/src/package/xldm/crypt.rs
+D	crates/litchi-xlsx/src/package/xldm/generated.rs
+D	crates/litchi-xlsx/src/package/xldm/metadata/codec.rs
+D	crates/litchi-xlsx/src/package/xldm/metadata/mod.rs
+D	crates/litchi-xlsx/src/package/xldm/metadata/model.rs
+D	crates/litchi-xlsx/src/package/xldm/metadata/tests.rs
+D	crates/litchi-xlsx/src/package/xldm/metadata/validation.rs
+D	crates/litchi-xlsx/src/package/xldm/mod.rs
+D	crates/litchi-xlsx/src/package/xldm/model.rs
+D	crates/litchi-xlsx/src/package/xldm/native.rs
+D	crates/litchi-xlsx/src/package/xldm/olap.rs
+D	crates/litchi-xlsx/src/package/xldm/semantic.rs
+D	crates/litchi-xlsx/src/package/xldm/tabular_paths.rs
+D	crates/litchi-xlsx/src/package/xldm/tests.rs
+D	crates/litchi-xlsx/src/package/xldm/validation.rs
+M	crates/litchi-xlsx/src/workbook/data_model/package.rs
+M	tools/native-resave/Cargo.lock
+M	tools/perf-baseline/Cargo.lock

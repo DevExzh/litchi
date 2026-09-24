@@ -1,0 +1,56 @@
+2026-09-13T02:00:45Z
+cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+rustc 1.95.0 (59807616e 2026-04-14)
+Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           48 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  32
+On-line CPU(s) list:                     0-31
+Vendor ID:                               AuthenticAMD
+Model name:                              AMD EPYC 9R45
+CPU family:                              26
+Model:                                   2
+Thread(s) per core:                      1
+Core(s) per socket:                      32
+Socket(s):                               1
+Stepping:                                1
+BogoMIPS:                                5200.00
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch topoext perfctr_core ssbd perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 clzero xsaveerptr rdpru wbnoinvd arat avx512vbmi pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid movdiri movdir64b fsrm avx512_vp2intersect flush_l1d
+Hypervisor vendor:                       KVM
+Virtualization type:                     full
+L1d cache:                               1.5 MiB (32 instances)
+L1i cache:                               1 MiB (32 instances)
+L2 cache:                                32 MiB (32 instances)
+L3 cache:                                128 MiB (4 instances)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-31
+
+loadavg
+2.41 1.79 2.07 3/1367 2006920
+
+process snapshot
+    PID PSR STAT %CPU %MEM COMMAND         COMMAND
+1996051  17 R    99.9  0.1 python3         python3 -B tools/check_crate_boundaries.py
+2000468   8 Rs   99.6  0.0 python3         python3 tools/check_crate_boundaries.py
+2006896   4 Ss   14.2  0.0 bash            /bin/bash -c out=docs/report/spec-gap-validation-evidence/ods-sheet-metadata/final-corrected/host.txt {   date -u +%Y-%m-%dT%H:%M:%SZ   cargo --version   rustc --version   uname -a   lscpu | sed -n '1,24p'   printf '\nloadavg\n'   cat /proc/loadavg   printf '\nprocess snapshot\n'   ps -eo pid,psr,stat,pcpu,pmem,comm,args --sort=-pcpu | sed -n '1,20p'   printf '\nprofiling affinity\n'   taskset -pc $$ } > "$out" cat "$out"
+ 984164  20 Sl   11.5  0.8 MainThread      /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/node /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/out/bootstrap-fork --type=fileWatcher
+1637553  28 Sl+   3.7  0.4 codex           codex --yolo
+1636218  11 Sl+   1.9  0.3 codex           codex --yolo resume 01a09123-b7df-7022-b34a-b3ef1e911be4
+ 560353   6 Sl    1.3  0.0 peculiar_shell  /home/zhuhe/code/peculiar/target/tmp-service/peculiar-runtime-SPF2PM/peculiar_shell --type=gpu-process --gpu-recent-crash-count=0 --no-sandbox --headless=old --ozone-platform=headless --use-angle=swiftshader-webgl --enable-unsafe-swiftshader --gpu-preferences=YAAAAAAAAAAgAAAEAAAAAAAAAAAAAGAASAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAGAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAMAAAAAQAAAAAAAAAAAAAACAAAAAAAAAAIAAAAAAAAAA== --shared-files --field-trial-handle=3,i,17875282983276018628,2709091972832008174,262144 --enable-features=PeculiarOnDemandSoftwareDisplay --disable-features=DnsOverHttpsUpgrade,PaintHolding --variations-seed-version --pseudonymization-salt-handle=7,i,11458559994724806018,9062978855751633139,4 --trace-process-track-uuid=3190708988185955192
+1280864  13 Ssl+  0.9  0.0 lazygit         /home/zhuhe/go/bin/lazygit
+   2276  22 Ss    0.9  0.0 tmux: server    tmux new -s office
+ 560330  25 Ssl   0.8  0.0 peculiar_shell  /home/zhuhe/code/peculiar/target/tmp-service/peculiar-runtime-SPF2PM/peculiar_shell --peculiar-browser-child --disable-background-networking --disable-quic --proxy-server=127.0.0.1:33165 --disable-features=DnsOverHttpsUpgrade --host-resolver-rules=MAP * ^NOTFOUND, EXCLUDE localhost, EXCLUDE *.localhost, EXCLUDE <loopback> --disable-component-update --disable-default-apps --disable-sync --enable-unsafe-swiftshader --enable-features=PeculiarOnDemandSoftwareDisplay --enable-bfcache --metrics-recording-only --no-default-browser-check --no-first-run --no-sandbox --no-system-proxy-config-service --enable-unsafe-webgpu --window-size=1920x1080
+1986980  13 Ss    0.5  0.0 python3         python3 -B docs/performance/results/change-0546/integration/final_quality.py candidate
+ 985679   2 Sl    0.5  0.0 peculiar_shell  /home/zhuhe/code/peculiar/target/tmp-service/peculiar-runtime-SPF2PM/peculiar_shell --type=renderer --headless=old --no-sandbox --enable-unsafe-webgpu --allow-pre-commit-input --ozone-platform=headless --disable-gpu-compositing --lang=en-US@posix --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=68 --launch-time-ticks=27709959429 --shared-files --field-trial-handle=3,i,17875282983276018628,2709091972832008174,262144 --enable-features=PeculiarOnDemandSoftwareDisplay --disable-features=DnsOverHttpsUpgrade,PaintHolding --variations-seed-version --pseudonymization-salt-handle=7,i,11458559994724806018,9062978855751633139,4 --trace-process-track-uuid=3190709050030717226
+ 159285   5 Sl+   0.4  0.3 kimi-code       kimi-code
+ 409803  11 S     0.3  0.0 run-pipeline3   /usr/local/bin/python3.9 /usr/local/bin/run-pipeline3 --disable-web-server pipeline.py --concurrent 5 DevExzh
+1629327   7 Ssl   0.2  0.0 nvim            nvim --embed .
+2006720  10 S     0.2  0.0 wget-at         ./wget-at -nv --no-hsts --host-lookups dns --hosts-file /dev/null --resolvconf-file /dev/null --dns-servers 9.9.9.10,149.112.112.10,2620:fe::10,2620:fe::fe:10 --reject-reserved-subnets --content-on-error --lua-script sinavideo.lua -o /grab/data/1789264837b2da8be066a1a4c6-11603/cf05227f9b8bbc7d46fcc8e5c9e0b4d541913f8d/wget.log --output-document /grab/data/1789264837b2da8be066a1a4c6-11603/cf05227f9b8bbc7d46fcc8e5c9e0b4d541913f8d/wget.tmp --truncate-output -e robots=off --recursive --level=inf --no-parent --page-requisites --timeout 60 --connect-timeout 10 --tries inf --domains iask.com,sina.cn,sina.com,sina.com.cn,sina.net,sina.net.cn,sinaapp.com,sinacloud.net,sincloud.net,sinaedge.com,sinaimg.cn,sinajs.cn,weibo.cn,weibo.com,weibo.com.cn,weibocdn.com --span-hosts --waitretry 30 --warc-file /grab/data/1789264837b2da8be066a1a4c6-11603/cf05227f9b8bbc7d46fcc8e5c9e0b4d541913f8d/sinavideo-cf05227f9b8bbc7d46fcc8e5c9e0b4d541913f8d-20260913-020038 --warc-header operator: Archive Team --warc-header x-wget-at-project-version: 20260911.01 --warc-header x-wget-at-project-name: sinavideo --warc-dedup-url-agnostic --impersonate firefox148-h1 --header Accept-Encoding: identity --user-agent Mozilla/5.0 (X11; Linux x86_64; rv:151.0) Gecko/20100101 Firefox/151.0 --warc-header x-wget-at-project-item-name: video:209222298 item-name://video:209222298 --warc-header sinavideo-video: 209222298 https://api.ivideo.sina.com.cn/public/video/info?video_id=209222298&appname=sinaplayer_pc&appver=V11220.210521.03&applt=web&tags=sinaplayer_pc
+    249  25 S     0.2  0.0 kswapd0         [kswapd0]
+ 163348  14 Ss    0.2  0.0 nvim            nvim --embed .
+ 160297  20 Sl    0.1  0.0 code-08d4889f9e /home/zhuhe/.vscode-server/code-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5 command-shell --cli-data-dir /home/zhuhe/.vscode-server/cli --parent-process-id 160279 --on-host=127.0.0.1 --on-port
+
+profiling affinity
+pid 2006896's current affinity list: 0-31

@@ -5,12 +5,13 @@ use super::{
     STYLE, TEXT,
     model::{Connections, Declaration, Use},
 };
+use crate::core::ResolvedReader;
+use crate::generic::FlatMutationBudget;
 use crate::variable_declaration::{Body, HeaderFooter, Part, Scope};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
+use quick_xml::name::ResolveResult;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone)]
@@ -39,8 +40,9 @@ pub(super) fn parse_part(
     names: &mut HashSet<String>,
     containers: &mut HashSet<(Part, Scope)>,
     aggregate: &mut usize,
+    budget: Option<&FlatMutationBudget>,
 ) -> Result<()> {
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -50,6 +52,9 @@ pub(super) fn parse_part(
     let mut pending_use: Option<PendingElement> = None;
 
     loop {
+        if let Some(budget) = budget {
+            budget.event(depth)?;
+        }
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| make_error(format!("invalid DDE connection XML: {error}")))?;
@@ -76,22 +81,29 @@ pub(super) fn parse_part(
                         group.part,
                         group.scope.clone(),
                         aggregate,
+                        budget,
                     )?;
-                    add_declaration(declaration, parsed, names)?;
+                    add_declaration(declaration, parsed, names, budget)?;
                     pending_declaration = Some(PendingElement { depth: depth + 1 });
                 } else if namespace.as_deref() == Some(TEXT) && local == "dde-connection-decls" {
                     start_group(element, part, depth, &stack, containers, &mut active)?;
                 } else if namespace.as_deref() == Some(TEXT) && local == "dde-connection" {
-                    let usage = parse_use(&reader, element, part, &stack, aggregate)?;
-                    add_use(usage, parsed)?;
+                    let usage = parse_use(&reader, element, part, &stack, aggregate, budget)?;
+                    add_use(usage, parsed, budget)?;
                     pending_use = Some(PendingElement { depth: depth + 1 });
                 }
                 let master_page_name =
                     if namespace.as_deref() == Some(STYLE) && local == "master-page" {
-                        optional_attribute(&reader, element, STYLE, "name")?
+                        optional_attribute(&reader, element, STYLE, "name", budget)?
                     } else {
                         None
                     };
+                stack
+                    .try_reserve_exact(1)
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODT DDE parser frame stack",
+                        source,
+                    })?;
                 stack.push(Frame {
                     namespace,
                     local,
@@ -100,6 +112,9 @@ pub(super) fn parse_part(
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| make_error("DDE connection XML depth overflow"))?;
+                if let Some(budget) = budget {
+                    budget.observe_depth(depth)?;
+                }
                 if depth > MAX_DEPTH {
                     return invalid(format!(
                         "DDE connection XML nesting exceeds {MAX_DEPTH} levels"
@@ -107,6 +122,9 @@ pub(super) fn parse_part(
                 }
             },
             Event::Empty(ref element) => {
+                if let Some(budget) = budget {
+                    budget.observe_depth(depth.saturating_add(1))?;
+                }
                 if pending_declaration.is_some() || pending_use.is_some() {
                     return invalid("DDE connection elements cannot contain elements");
                 }
@@ -128,14 +146,15 @@ pub(super) fn parse_part(
                         group.part,
                         group.scope.clone(),
                         aggregate,
+                        budget,
                     )?;
-                    add_declaration(declaration, parsed, names)?;
+                    add_declaration(declaration, parsed, names, budget)?;
                 } else if namespace.as_deref() == Some(TEXT) && local == "dde-connection-decls" {
                     let mut temporary = None;
                     start_group(element, part, depth, &stack, containers, &mut temporary)?;
                 } else if namespace.as_deref() == Some(TEXT) && local == "dde-connection" {
-                    let usage = parse_use(&reader, element, part, &stack, aggregate)?;
-                    add_use(usage, parsed)?;
+                    let usage = parse_use(&reader, element, part, &stack, aggregate, budget)?;
+                    add_use(usage, parsed, budget)?;
                 }
             },
             Event::End(_) => {
@@ -231,13 +250,14 @@ fn start_group(
 }
 
 fn parse_declaration(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     part: Part,
     scope: Scope,
     aggregate: &mut usize,
+    budget: Option<&FlatMutationBudget>,
 ) -> Result<Declaration> {
-    let attributes = collect_attributes(reader, element, aggregate)?;
+    let attributes = collect_attributes(reader, element, aggregate, budget)?;
     reject_unexpected(
         &attributes,
         &[
@@ -267,13 +287,14 @@ fn parse_declaration(
 }
 
 fn parse_use(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     part: Part,
     stack: &[Frame],
     aggregate: &mut usize,
+    budget: Option<&FlatMutationBudget>,
 ) -> Result<Use> {
-    let attributes = collect_attributes(reader, element, aggregate)?;
+    let attributes = collect_attributes(reader, element, aggregate, budget)?;
     reject_unexpected(&attributes, &[(TEXT, "connection-name")])?;
     Ok(Use {
         part,
@@ -287,41 +308,79 @@ fn add_declaration(
     declaration: Declaration,
     parsed: &mut Connections,
     names: &mut HashSet<String>,
+    budget: Option<&FlatMutationBudget>,
 ) -> Result<()> {
     if parsed.declarations.len() >= MAX_CONNECTIONS {
         return invalid(format!(
             "document exceeds {MAX_CONNECTIONS} DDE connection declarations"
         ));
     }
+    if let Some(budget) = budget {
+        budget.check()?;
+        budget.consume_objects(1)?;
+    }
+    names.try_reserve(1).map_err(|source| Error::Allocation {
+        resource: "ODT DDE declaration names",
+        source,
+    })?;
     if !names.insert(declaration.name.clone()) {
         return invalid(format!(
             "duplicate DDE connection declaration '{}'",
             declaration.name
         ));
     }
+    parsed
+        .declarations
+        .try_reserve_exact(1)
+        .map_err(|source| Error::Allocation {
+            resource: "ODT DDE declarations",
+            source,
+        })?;
     parsed.declarations.push(declaration);
     Ok(())
 }
 
-fn add_use(usage: Use, parsed: &mut Connections) -> Result<()> {
+fn add_use(
+    usage: Use,
+    parsed: &mut Connections,
+    budget: Option<&FlatMutationBudget>,
+) -> Result<()> {
     if parsed.uses.len() >= MAX_REFERENCES {
         return invalid(format!(
             "document exceeds {MAX_REFERENCES} DDE connection references"
         ));
     }
+    if let Some(budget) = budget {
+        budget.check()?;
+        budget.consume_objects(1)?;
+    }
+    parsed
+        .uses
+        .try_reserve_exact(1)
+        .map_err(|source| Error::Allocation {
+            resource: "ODT DDE uses",
+            source,
+        })?;
     parsed.uses.push(usage);
     Ok(())
 }
 
 fn collect_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
+    budget: Option<&FlatMutationBudget>,
 ) -> Result<Attributes> {
     let mut attributes = HashMap::new();
     for attribute in element.attributes().with_checks(true) {
+        if let Some(budget) = budget {
+            budget.check()?;
+        }
         let attribute = attribute
             .map_err(|error| make_error(format!("invalid DDE connection attribute: {error}")))?;
+        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = namespace_uri(&namespace)?.unwrap_or_default();
         let local = decode(local.as_ref(), "attribute name")?;
@@ -338,6 +397,12 @@ fn collect_attributes(
         if *aggregate > MAX_AGGREGATE_BYTES {
             return invalid("DDE connection metadata exceeds 16 MiB");
         }
+        attributes
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "ODT DDE attribute map",
+                source,
+            })?;
         if attributes.insert((namespace, local), value).is_some() {
             return invalid("duplicate expanded DDE connection attribute");
         }
@@ -346,15 +411,22 @@ fn collect_attributes(
 }
 
 fn optional_attribute(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     namespace: &str,
     local: &str,
+    budget: Option<&FlatMutationBudget>,
 ) -> Result<Option<String>> {
     let mut value = None;
     for attribute in element.attributes().with_checks(true) {
+        if let Some(budget) = budget {
+            budget.check()?;
+        }
         let attribute =
             attribute.map_err(|error| make_error(format!("invalid XML attribute: {error}")))?;
+        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
         let (resolved, resolved_local) = reader.resolver().resolve_attribute(attribute.key);
         if namespace_uri(&resolved)?.as_deref() == Some(namespace)
             && resolved_local.as_ref() == local.as_bytes()
@@ -470,14 +542,13 @@ fn parse_bool(value: &str) -> Result<bool> {
 }
 
 fn namespace_uri(result: &ResolveResult<'_>) -> Result<Option<String>> {
-    match result {
-        ResolveResult::Bound(Namespace(value)) => Ok(Some(decode(value, "namespace URI")?)),
-        ResolveResult::Unbound => Ok(None),
-        ResolveResult::Unknown(prefix) => Err(make_error(format!(
-            "unbound namespace prefix '{}'",
-            String::from_utf8_lossy(prefix)
-        ))),
-    }
+    crate::elements::xml::normalized_namespace_uri(result, "DDE connection")?
+        .map(|uri| {
+            std::str::from_utf8(uri)
+                .map(str::to_owned)
+                .map_err(|_error| make_error("DDE connection namespace URI is not UTF-8"))
+        })
+        .transpose()
 }
 
 fn decode(value: &[u8], description: &str) -> Result<String> {
@@ -492,4 +563,22 @@ pub(super) fn invalid<T>(message: impl Into<String>) -> Result<T> {
 
 pub(super) fn make_error(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
+}
+
+#[cfg(test)]
+mod namespace_tests {
+    use super::*;
+
+    #[test]
+    fn accepts_entity_escaped_odf_namespace_uris() {
+        let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office&#58;1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text&#58;1.0"><o:body><o:text><t:dde-connection-decls><t:dde-connection-decl o:name="prices" o:dde-application="soffice" o:dde-topic="topic" o:dde-item="item"/></t:dde-connection-decls></o:text></o:body></o:document-content>"#;
+        let connections = crate::dde_connection::parse_dde_connection_parts_with_budget(
+            &[(xml, Part::Content)],
+            None,
+        )
+        .expect("entity-escaped ODF namespace URIs should resolve semantically");
+
+        assert_eq!(connections.declarations.len(), 1);
+        assert_eq!(connections.declarations[0].name, "prices");
+    }
 }

@@ -1,0 +1,184 @@
+{
+  "verified_utc": "2026-09-13T05:37:05.797307+00:00",
+  "baseline_commit": "ae9bf7bfa11eed50e6560be166eaa18987cda2b5",
+  "source_sha256": {
+    "crates/litchi-ods/src/authoring/mutable.rs": "cf50c89c0dc4aea48ef37362199ea4cd3103a1198ed12a8409e9b10c172ae57f",
+    "crates/litchi-ods/src/facade/mod.rs": "5e5a23698cdf3918dc9576ead1cc43bed2c6354c09a7674ea7a49e03910be9ec",
+    "crates/litchi-ods/src/facade/source.rs": "af69bfa318bec97ade9da279ee7cb19fd3fe302d84e4acb8a53e3565fffd0daa",
+    "crates/litchi-ods/src/model/dde/lexical.rs": "cc67145d64775ea993797c927639b4c98c100ada47e23df06e6429139686e427",
+    "crates/litchi-ods/src/model/dde/source_backed.rs": "38225c1d3d40008fe60008b86cc81a398d64ff95955cab964d73fd0829fdc35b",
+    "crates/litchi-ods/src/model/dde/transaction.rs": "d8be57303a27c65d68312b18477a9356c5d4df8fa054910dace9b2318f009706",
+    "crates/litchi-ods/src/model/dde.rs": "98c15134cd0a89fd16e4aa8e2b7fc22aa4f1e10c5189a125f0a9186e3976f4d8",
+    "crates/litchi-ods/tests/ods_dde_facades.rs": "cd952632f5cb8252a5e6ad47a78a3179fb1864501c2afd0a207705ab4d285468",
+    "crates/litchi-ods/tests/ods_dde_transactions.rs": "c691220b1c25a989cd68edfa7bcd52bd673153a1413f78a63a32dde3c3751f0c"
+  },
+  "unchanged_across_final_gates": true,
+  "gates": [
+    {
+      "gate": "all-targets",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--all-targets"
+      ],
+      "exit_code": 0
+    },
+    {
+      "gate": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    },
+    {
+      "gate": "rustdoc",
+      "command": [
+        "cargo",
+        "doc",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--no-deps"
+      ],
+      "exit_code": 0
+    },
+    {
+      "gate": "doctests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-ods",
+        "--all-features",
+        "--doc"
+      ],
+      "exit_code": 0
+    },
+    {
+      "gate": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-ods",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0
+    },
+    {
+      "gate": "api-authoring-runner-final",
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "docs/report/spec-gap-validation-evidence/ods-dde-transactions/authoring-runner/Cargo.toml",
+        "--",
+        "/var/tmp/litchi-ods-catalog-root-tmp/api-content.xml"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "ods_tests": {
+    "passed": 772,
+    "targets": 45
+  },
+  "isolated_tests": {
+    "passed": 47,
+    "targets": 2
+  },
+  "api_replay": {
+    "sha256": "c325938c04decebaf32eb0296ade4189a9da3a5d7d8df50c50e8db3659d631b8",
+    "exactly_matches_preoptimization_artifact": true,
+    "whole_odf_14_rng_valid": true,
+    "cache_prose_checks_pass": true
+  },
+  "performance_receipts": {
+    "baseline": {
+      "lanes": 18,
+      "all_exit_zero": true,
+      "csv_matches_raw_stdout_and_rss": true,
+      "raw_sha256": "5ffac20c6e64402801f61c9b965232f866ff3ae477d6abe337a52d16cf1d3dd9"
+    },
+    "candidate": {
+      "lanes": 18,
+      "all_exit_zero": true,
+      "csv_matches_raw_stdout_and_rss": true,
+      "raw_sha256": "1fde120cff7e5f527113971cbc81091e72e7288edc943303bcdd956933388a76"
+    }
+  },
+  "comparisons": {
+    "commit-many-links": {
+      "baseline_requested_bytes": 448348123,
+      "candidate_requested_bytes": 12352299,
+      "request_reduction_percent": 97.24493125624171,
+      "baseline_p50_ns": 20386187,
+      "candidate_p50_ns": 20593210,
+      "memory_delta_unchanged": true,
+      "allocator_peak_live_delta_unchanged": true
+    },
+    "edit-many-links": {
+      "baseline_requested_bytes": 453255631,
+      "candidate_requested_bytes": 17259807,
+      "request_reduction_percent": 96.19203693908437,
+      "baseline_p50_ns": 30904991,
+      "candidate_p50_ns": 30591483,
+      "memory_delta_unchanged": true,
+      "allocator_peak_live_delta_unchanged": true
+    }
+  },
+  "no_latency_or_actual_copy_improvement_claim": true,
+  "perf_stat_repetitions": 3,
+  "perf_stat_scope": "whole process includes setup and untimed parsing",
+  "candidate_checkout_matches_all_nine_gated_files": true,
+  "changed_two_file_patch_replay_verified": true,
+  "baseline_and_candidate_executable_hashes_verified_before_cleanup": true,
+  "baseline_source_manifest_verified_paths": 16,
+  "candidate_source_and_test_manifest_verified_paths": 18,
+  "owned_temporaries_and_worktrees_removed": true,
+  "normalized_receipts_trailing_blank_lines": [
+    "gates/all-targets.log",
+    "gates/doctests.log",
+    "baseline/perf-stat-commit-many-links.stderr",
+    "candidate/scoped-tests-final.log",
+    "candidate/perf-stat-commit-many-links.stderr"
+  ],
+  "broader_goal_complete": false,
+  "evidence_sha256": {
+    "gates/all-targets.log": "71b1c5dd684d934c515fa09aed1a5fe15df14d988083d0d1c0328c637c76d270",
+    "gates/clippy.log": "f96d2a101372826660af0aae454ab1c220d6704333483c0fec89c6d311c2d8da",
+    "gates/rustdoc.log": "0d777f528de3d4e66bfc58166d1721778109de74993d5b95dd213761056f31a0",
+    "gates/doctests.log": "9ac7e115def30ba3e3856e56c25e1524ac3700bb8b423e08ccf255adc9ea3553",
+    "gates/fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gates/api-schema.json": "b00c795f494c2e9cdb4f51e9a7b03facc2eb0dfc1fa0ba94f4342e6ec97cc5a4",
+    "gates/api-replay.json": "69446730fe909212279b63258465e74fc4c1647e1941701f428040e0393c343a",
+    "candidate/scoped-tests-final.log": "9c2d836b8cb2f4689a72ce4e1a846b2ebda985025d17b80912b3f5859981fd12",
+    "candidate/transaction.diff": "cd8fa02f1ccba271711b0f43aec8b2d343c5a0d1932a3b3740727aa3f63f2780",
+    "candidate/source-hashes.sha256": "c3f4fe6d3b4e8c9f8b20e7598f30fdcfd6316d880b7b27eab5bb1a9468e6ab89",
+    "candidate/test-hashes.sha256": "06ca4d0902891c662c0d42e81ac17b40e2f00f7f85133b1b7c701d263ede84c1",
+    "baseline/source-hashes.sha256": "d1aa9b348f948147fe344c9934728affd2efb14c5376b93023789adfea4c91ab",
+    "baseline/perf-stat-commit-many-links.stderr": "99e56de4065238487ee05b61e7a251b33bb1a771187d4753be473ecff9bd4ee9",
+    "candidate/perf-stat-commit-many-links.stderr": "d0d495f8594270bc2380acddf92d1ba88ea5fbfd662638a106f1194c29c29075"
+  }
+}

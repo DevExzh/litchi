@@ -31,6 +31,7 @@ pub(super) struct SheetActions {
     pub(super) page_setup: Option<OptionalAction<crate::page_setup::Setup>>,
     pub(super) print_options: Option<OptionalAction<crate::print_options::PrintOptions>>,
     pub(super) hyperlinks: BTreeMap<(u32, u32, u32, u32), HyperlinkAction>,
+    pub(super) form_control_scalars: Vec<crate::form_control::FormControlScalarAction>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,6 +74,7 @@ impl SheetActions {
             .saturating_add(usize::from(self.page_setup.is_some()))
             .saturating_add(usize::from(self.print_options.is_some()))
             .saturating_add(self.hyperlinks.len())
+            .saturating_add(self.form_control_scalars.len())
     }
 
     pub(super) fn is_empty(&self) -> bool {
@@ -89,6 +91,7 @@ impl SheetActions {
             && self.page_setup.is_none()
             && self.print_options.is_none()
             && self.hyperlinks.is_empty()
+            && self.form_control_scalars.is_empty()
     }
 }
 

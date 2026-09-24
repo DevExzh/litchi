@@ -1,0 +1,73 @@
+{
+  "unicode_version": "17.0.0",
+  "rust_std_unicode_version": {
+    "expression": "char::UNICODE_VERSION",
+    "verified_value": "17.0.0",
+    "verification": "rustc 1.95.0 (59807616 2026-04-14)"
+  },
+  "sources": [
+    {
+      "filename": "UnicodeData.txt",
+      "url": "https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt",
+      "bytes": 2198209,
+      "sha256": "2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c"
+    },
+    {
+      "filename": "DerivedCoreProperties.txt",
+      "url": "https://www.unicode.org/Public/17.0.0/ucd/DerivedCoreProperties.txt",
+      "bytes": 1134783,
+      "sha256": "24c7fed1195c482faaefd5c1e7eb821c5ee1fb6de07ecdbaa64b56a99da22c08"
+    },
+    {
+      "filename": "CaseFolding.txt",
+      "url": "https://www.unicode.org/Public/17.0.0/ucd/CaseFolding.txt",
+      "bytes": 87539,
+      "sha256": "ff8d8fefbf123574205085d6714c36149eb946d717a0c585c27f0f4ef58c4183"
+    },
+    {
+      "filename": "SpecialCasing.txt",
+      "url": "https://www.unicode.org/Public/17.0.0/ucd/SpecialCasing.txt",
+      "bytes": 17049,
+      "sha256": "efc25faf19de21b92c1194c111c932e03d2a5eaf18194e33f1156e96de4c9588"
+    },
+    {
+      "filename": "license.txt",
+      "url": "https://www.unicode.org/license.txt",
+      "bytes": 1995,
+      "sha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96"
+    }
+  ],
+  "properties": {
+    "CLEAN_REMOVED": "Unicode General_Category Cc or Cn, where Cn is the unassigned default for scalar values absent from UnicodeData.txt",
+    "LETTER": "Unicode General_Category values whose two-letter category starts with L",
+    "CASED": "DerivedCoreProperties Cased",
+    "CASE_IGNORABLE": "DerivedCoreProperties Case_Ignorable",
+    "CASE_FOLD": "Unicode default full case folding: CaseFolding status C and F; status T is excluded",
+    "LOWERCASE": "UnicodeData simple lowercase mappings overridden by unconditional SpecialCasing lowercase mappings",
+    "UPPERCASE": "UnicodeData simple uppercase mappings overridden by unconditional SpecialCasing uppercase mappings"
+  },
+  "generated": {
+    "path": "crates/litchi-ods/src/codec/formula/evaluation/text/unicode.rs",
+    "sha256": "336584ece56ee00e9e68a0c2165b5396ac1f007d5ad671f1fe8eba30aac877b6",
+    "range_counts": {
+      "CLEAN_REMOVED": 737,
+      "LETTER": 684,
+      "CASED": 158,
+      "CASE_IGNORABLE": 464,
+      "CASE_FOLD": 1585,
+      "LOWERCASE": 1488,
+      "UPPERCASE": 1580
+    }
+  },
+  "generator": {
+    "path": "docs/report/spec-gap-validation-evidence/ods-formula-text-functions/unicode-data/generate.py",
+    "sha256": "ecdd04283e0f01ed61e7af5aa3a9b11ddfc645db4d9570684f439116fca6e6d6",
+    "language": "Python 3 standard library only",
+    "determinism": "downloaded source hashes, sorted disjoint scalar ranges, two-pass byte equality"
+  },
+  "license": {
+    "path": "UNICODE-LICENSE.txt",
+    "source_url": "https://www.unicode.org/license.txt",
+    "sha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96"
+  }
+}

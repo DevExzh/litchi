@@ -7,9 +7,14 @@
 
 //! Byte-exact goldens for the fresh DOC writer's text paths.
 //!
-//! Every fixture below was written by the writer at `6d989cad63`, before the
-//! single-pass UTF-16 text encoding of change 0753, and its SHA-256 recorded
-//! here. The same inputs must keep producing the same bytes: ASCII, Latin-1,
+//! Every fixture below was first written by the writer at `6d989cad63`, before
+//! the single-pass UTF-16 text encoding of change 0753, and its SHA-256
+//! recorded here. The spec-gap merge re-pinned each digest to the output of
+//! the incoming writer at `a67a38abf2`, which changes the fresh DOC bytes but
+//! does not contain the 0753 encoding: that writer and the merged writer
+//! produce identical bytes for all nine fixtures, so the merged 0753 text
+//! paths still reproduce a writer without them exactly. The same inputs must
+//! keep producing the same bytes: ASCII, Latin-1,
 //! CJK and supplementary-plane text, empty runs, runs longer than 64 KiB,
 //! field characters next to surrogate pairs, and every story that carries
 //! text (main, table, header/footer, footnote, endnote, comment, main and
@@ -298,47 +303,47 @@ fn fresh_doc_writer_text_paths_match_the_pre_0753_goldens() {
         (
             "ascii_paragraphs",
             ascii_paragraphs,
-            "fd88d8bff13d61755347f5ec2d5659c240ed7ac0a70f9c95cbc3bd65af38871c",
+            "ac3ec26bad3fec491f1e7e5371bffa90928546afe4a9cf4fe0f9ee81090906c0",
         ),
         (
             "unicode_paragraphs",
             unicode_paragraphs,
-            "334de3f380c1172fa5554904f0cb9450c8dbea61ed4328248daeda11f6df0d8b",
+            "7058630276283726732af3036e90b216a5da38834685013f97eb59ab212eb2ae",
         ),
         (
             "main_story_fields",
             main_story_fields,
-            "2bdc6278ad103485746f453240ec3530301fafb3e291cbcaee6b6368b6899480",
+            "94e9e068236543274d3bace63ea67bb9f533d158c5d063d5fd142044ee9206ce",
         ),
         (
             "tables",
             tables,
-            "8665e185f5c59a5eb503cc64efa989514ab5b6fe168c3eb6cf38512fe913d498",
+            "b132acb223e7168e37a529136c8d90eab67f6552808ce062a650022a9aa0ad89",
         ),
         (
             "headers_and_footers",
             headers_and_footers,
-            "969a91b09342b97891c1b2145f57cd7d4b8e834f15c690e53fa77fe32331e466",
+            "7182aece8dc42c91177239d319d84bf5168bd33a3840a5597d707bf072d25e51",
         ),
         (
             "notes_and_comments",
             notes_and_comments,
-            "20447c54a9718e5e0343e3037028948edc85b1938eb9543c44cb9897ae2956f9",
+            "e8ce076ac5c04225e8e2f63bfdb2eea3eed81a157f1b9c6ebdbcf5cd3544ff75",
         ),
         (
             "text_boxes",
             text_boxes,
-            "cdf5835f9b699cf2c36c09f673062aa3455b361c963d946694562f1b1e836ae7",
+            "482aeac3d553aa7b6fa7a94284ea357f54ac9452841b690bf29352fb94f4f0d5",
         ),
         (
             "glossary_document",
             glossary_document,
-            "5f59fad273a72d9fe90e86bbd8e2486a5d9b484df21fa3f24fe40847634ed223",
+            "4901ae815515a73a07e3703abad209e07fc57c8c31d09c9c27439011800086b2",
         ),
         (
             "attached_glossary_template",
             attached_glossary_template,
-            "7e9790745194f8d9b94e45edc9f904886dbf50627fbdbfc6573f0d69c2bcdda3",
+            "444e956843618b7b8dcc1a3da56460a72df4e57174e745863711eb533fa853bd",
         ),
     ];
     let mut mismatches = Vec::new();

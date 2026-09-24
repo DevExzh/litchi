@@ -61,6 +61,10 @@ impl Patch {
         if self.is_noop() {
             return Ok(source.clone());
         }
+        source
+            .protection_policy
+            .authorize(source.protection_state())
+            .map_err(Error::Invalid)?;
         Ok(self.after.clone())
     }
 

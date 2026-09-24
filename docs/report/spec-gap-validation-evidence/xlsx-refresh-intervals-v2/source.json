@@ -1,0 +1,85 @@
+{
+  "crates/litchi-xlsx/docs/FEATURE_MATRIX.md": {
+    "primary_head_sha256": "652b583c6d1a161d14ef96d644f3f53b726a1cb00623109d074ac031d484db6e",
+    "primary_worktree_sha256": "ed85e234a5e94301746836d8b5281f625decc92a4fe5b6f3ccb6daced5f232c3",
+    "v2_sha256": "f5df2a79d8621543147667037c18effb87b5da8ff8a6d867de3617ffd4364d1a",
+    "previous_21d5_candidate_sha256": "f65dede5b0f022f0f6dc2359234e72e61466aa8d8fac9de3e573ee689e49128f",
+    "candidate_sha256": "f5df2a79d8621543147667037c18effb87b5da8ff8a6d867de3617ffd4364d1a",
+    "primary_status": [
+      " M crates/litchi-xlsx/docs/FEATURE_MATRIX.md"
+    ],
+    "candidate_bytes": 26456
+  },
+  "crates/litchi-xlsx/src/lib.rs": {
+    "primary_head_sha256": "fa92b3585a0ad856fc9abe1ac5f8e78cd0eb1b66c9c81295c48d1a3ef03f5986",
+    "primary_worktree_sha256": "fa92b3585a0ad856fc9abe1ac5f8e78cd0eb1b66c9c81295c48d1a3ef03f5986",
+    "v2_sha256": "0610463c8705f04118c667f166efd8459286fd29800a95750772d987f349248e",
+    "previous_21d5_candidate_sha256": "0610463c8705f04118c667f166efd8459286fd29800a95750772d987f349248e",
+    "candidate_sha256": "0610463c8705f04118c667f166efd8459286fd29800a95750772d987f349248e",
+    "primary_status": [],
+    "candidate_bytes": 15428
+  },
+  "crates/litchi-xlsx/src/rich_values/codec/mod.rs": {
+    "primary_head_sha256": "02996783c1f43ec6cd555abec5f98f772264616dd279c8fdb0c392d5c4662d6d",
+    "primary_worktree_sha256": "02996783c1f43ec6cd555abec5f98f772264616dd279c8fdb0c392d5c4662d6d",
+    "v2_sha256": "dcfb02d09e44b595ba84c1003f436c812fa49eb2f080a43f0fc8403b49c73756",
+    "previous_21d5_candidate_sha256": "dcfb02d09e44b595ba84c1003f436c812fa49eb2f080a43f0fc8403b49c73756",
+    "candidate_sha256": "dcfb02d09e44b595ba84c1003f436c812fa49eb2f080a43f0fc8403b49c73756",
+    "primary_status": [],
+    "candidate_bytes": 566
+  },
+  "crates/litchi-xlsx/src/rich_values/mod.rs": {
+    "primary_head_sha256": "380054e1336cb8eef165005d1041e4ee00f2f1463ad7861216b8f9c053dffd47",
+    "primary_worktree_sha256": "380054e1336cb8eef165005d1041e4ee00f2f1463ad7861216b8f9c053dffd47",
+    "v2_sha256": "d8cb228c2f884e06d4287b4a1eab4f4b7d200186ba52005ec0b1b9032bb9513a",
+    "previous_21d5_candidate_sha256": "d8cb228c2f884e06d4287b4a1eab4f4b7d200186ba52005ec0b1b9032bb9513a",
+    "candidate_sha256": "d8cb228c2f884e06d4287b4a1eab4f4b7d200186ba52005ec0b1b9032bb9513a",
+    "primary_status": [],
+    "candidate_bytes": 3134
+  },
+  "crates/litchi-xlsx/src/rich_values/refresh_intervals/codec.rs": {
+    "primary_head_sha256": null,
+    "primary_worktree_sha256": null,
+    "v2_sha256": "f3b1ca8d95514789fbf3bcb77d3adb404afaccaef021d4826f36b93cf9858b70",
+    "previous_21d5_candidate_sha256": "f3b1ca8d95514789fbf3bcb77d3adb404afaccaef021d4826f36b93cf9858b70",
+    "candidate_sha256": "f3b1ca8d95514789fbf3bcb77d3adb404afaccaef021d4826f36b93cf9858b70",
+    "primary_status": [],
+    "candidate_bytes": 41380
+  },
+  "crates/litchi-xlsx/src/rich_values/refresh_intervals/model.rs": {
+    "primary_head_sha256": null,
+    "primary_worktree_sha256": null,
+    "v2_sha256": "73e4d9076d0aab81a0ca82ddd2f716dbd8aad198131929ddea26e2a884189326",
+    "previous_21d5_candidate_sha256": "73e4d9076d0aab81a0ca82ddd2f716dbd8aad198131929ddea26e2a884189326",
+    "candidate_sha256": "73e4d9076d0aab81a0ca82ddd2f716dbd8aad198131929ddea26e2a884189326",
+    "primary_status": [],
+    "candidate_bytes": 5009
+  },
+  "crates/litchi-xlsx/src/rich_values/refresh_intervals/mod.rs": {
+    "primary_head_sha256": null,
+    "primary_worktree_sha256": null,
+    "v2_sha256": "8591619f182b37425e480edfbe31a56618288c3eea083f6338b81d04b2723451",
+    "previous_21d5_candidate_sha256": "8591619f182b37425e480edfbe31a56618288c3eea083f6338b81d04b2723451",
+    "candidate_sha256": "8591619f182b37425e480edfbe31a56618288c3eea083f6338b81d04b2723451",
+    "primary_status": [],
+    "candidate_bytes": 1474
+  },
+  "crates/litchi-xlsx/src/rich_values/refresh_intervals/package.rs": {
+    "primary_head_sha256": null,
+    "primary_worktree_sha256": null,
+    "v2_sha256": "f8d2347bc9e3b97cf8cbef1f2ceab9f6cab62437ef8f8c19153cdab7c1f557cd",
+    "previous_21d5_candidate_sha256": "f8d2347bc9e3b97cf8cbef1f2ceab9f6cab62437ef8f8c19153cdab7c1f557cd",
+    "candidate_sha256": "f8d2347bc9e3b97cf8cbef1f2ceab9f6cab62437ef8f8c19153cdab7c1f557cd",
+    "primary_status": [],
+    "candidate_bytes": 15348
+  },
+  "crates/litchi-xlsx/tests/rich_value_refresh_intervals.rs": {
+    "primary_head_sha256": null,
+    "primary_worktree_sha256": null,
+    "v2_sha256": "6617b114c2d3303d2a75c8bfb2276350e31c3a1fc1a933e5a8185230ca5685d8",
+    "previous_21d5_candidate_sha256": "6617b114c2d3303d2a75c8bfb2276350e31c3a1fc1a933e5a8185230ca5685d8",
+    "candidate_sha256": "6617b114c2d3303d2a75c8bfb2276350e31c3a1fc1a933e5a8185230ca5685d8",
+    "primary_status": [],
+    "candidate_bytes": 13474
+  }
+}

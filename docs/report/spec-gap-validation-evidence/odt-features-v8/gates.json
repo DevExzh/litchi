@@ -1,0 +1,59 @@
+[
+  {
+    "gate": "test",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-odt",
+      "--all-features",
+      "--no-fail-fast"
+    ],
+    "log": "/var/tmp/litchi-odt-root-final-v8-20260910-test.log",
+    "sha256": "4a7dba3d9cc5d50fbfc682e3619d6c00676cf3fbb98251061b5efbc462be9bd9"
+  },
+  {
+    "gate": "clippy",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "-p",
+      "litchi-odt",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "log": "/var/tmp/litchi-odt-root-final-v8-20260910-clippy.log",
+    "sha256": "0f0d0b94f1d2b4e4ad06d993b5bb834a7225aa064a535f0b2585ffd45c814ebb"
+  },
+  {
+    "gate": "rustdoc",
+    "exit": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "doc",
+      "-p",
+      "litchi-odt",
+      "--all-features",
+      "--no-deps"
+    ],
+    "log": "/var/tmp/litchi-odt-root-final-v8-20260910-rustdoc.log",
+    "sha256": "f5d3cff80e8b328673b69d8c69e05e7e16fda05af665c71999d7ba1708a6e5ce"
+  }
+]

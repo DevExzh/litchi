@@ -3,6 +3,7 @@
 mod add_in;
 mod budget;
 mod collection;
+mod custom_functions;
 mod extension;
 mod limits;
 mod pane;
@@ -12,6 +13,7 @@ mod snapshot;
 
 pub use add_in::*;
 pub use collection::*;
+pub use custom_functions::*;
 pub use extension::*;
 pub use limits::*;
 pub use pane::*;

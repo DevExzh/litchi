@@ -2173,6 +2173,33 @@ impl<'data> Package<'data> {
         self.archive.is_stored(path)
     }
 
+    /// Return the declared size of one member after ODF materialization
+    /// without reading or decompressing its payload.
+    ///
+    /// For an encrypted entry this returns the manifest's declared plaintext
+    /// size. For an unencrypted entry it returns the ZIP central-directory
+    /// declaration. Both values are attacker-controlled metadata and are not
+    /// proof of the decoded length.
+    pub fn member_materialized_size(&self, path: &str) -> Result<Option<u64>> {
+        let path = normalize_member_path(path)?;
+        if !self.archive.contains(path) {
+            return Ok(None);
+        }
+        let zip_size = self.archive.metadata(path)?.uncompressed_size();
+        let Some(entry) = manifest_entry_for_path(&self.manifest, path)? else {
+            return Ok(Some(zip_size));
+        };
+        if entry.encryption.is_some() {
+            let size = entry.size.ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Encrypted ODF entry '{path}' has no plaintext size"
+                ))
+            })?;
+            return Ok(Some(size));
+        }
+        Ok(Some(zip_size))
+    }
+
     /// Get the manifest.
     #[must_use]
     pub fn manifest(&self) -> &super::manifest::Manifest {

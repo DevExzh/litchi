@@ -1,0 +1,135 @@
+{
+  "baseline_commit": "069c658700912994720540cbaaecc4f7d1f41574",
+  "captures": [
+    {
+      "binary_sha256": "3c0075c1802925926a230b2d208b7226af846bc69d4d11cd237aea25c441de8b",
+      "case_scope": "matched-controls",
+      "cases": [
+        "scalar-control-arithmetic",
+        "scalar-control-round",
+        "array-control-4x4-arithmetic",
+        "array-control-4x4-round",
+        "array-control-16x16-arithmetic",
+        "array-control-16x16-round",
+        "reference-scalar-arithmetic",
+        "reference-scalar-round",
+        "reference-array-arithmetic",
+        "reference-array-round"
+      ],
+      "label": "baseline-069c65870",
+      "phases": [
+        "evaluate",
+        "parse-evaluate"
+      ],
+      "records": 300,
+      "source_git_head": "069c658700912994720540cbaaecc4f7d1f41574"
+    },
+    {
+      "binary_sha256": "0729603f2569e89ec2df90288956338815e73bc747a310bebb9db5100e446aa7",
+      "case_scope": "all-named-cases",
+      "cases": [
+        "scalar-control-arithmetic",
+        "scalar-control-round",
+        "scalar-trig-acos",
+        "scalar-trig-acosh",
+        "scalar-trig-acot",
+        "scalar-trig-acoth",
+        "scalar-trig-asin",
+        "scalar-trig-asinh",
+        "scalar-trig-atan",
+        "scalar-trig-atan2",
+        "scalar-trig-atanh",
+        "scalar-trig-cos",
+        "scalar-trig-cosh",
+        "scalar-trig-cot",
+        "scalar-trig-coth",
+        "scalar-trig-csc",
+        "scalar-trig-csch",
+        "scalar-trig-degrees",
+        "scalar-trig-pi",
+        "scalar-trig-radians",
+        "scalar-trig-sec",
+        "scalar-trig-sech",
+        "scalar-trig-sin",
+        "scalar-trig-sinh",
+        "scalar-trig-tan",
+        "scalar-trig-tanh",
+        "array-control-4x4-arithmetic",
+        "array-control-4x4-round",
+        "array-control-4x4-sin",
+        "array-control-4x4-cos",
+        "array-control-4x4-asin",
+        "array-control-4x4-acosh",
+        "array-control-4x4-tanh",
+        "array-control-16x16-arithmetic",
+        "array-control-16x16-round",
+        "array-control-16x16-sin",
+        "array-control-16x16-cos",
+        "array-control-16x16-asin",
+        "array-control-16x16-acosh",
+        "array-control-16x16-tanh",
+        "reference-scalar-arithmetic",
+        "reference-scalar-round",
+        "reference-scalar-sin",
+        "reference-scalar-acosh",
+        "reference-scalar-atanh",
+        "reference-array-arithmetic",
+        "reference-array-round",
+        "reference-array-sin",
+        "reference-array-acosh",
+        "reference-array-tanh"
+      ],
+      "freeze_base_commit": "069c658700912994720540cbaaecc4f7d1f41574",
+      "freeze_path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-trigonometry/gates/freeze.json",
+      "label": "candidate-final",
+      "phases": [
+        "evaluate",
+        "parse-evaluate"
+      ],
+      "records": 1500,
+      "source_git_head": "069c658700912994720540cbaaecc4f7d1f41574"
+    }
+  ],
+  "cleanup": {
+    "baseline_removed": true,
+    "baseline_worktree": "/tmp/litchi-ods-trig-baseline-gnqwmpy0"
+  },
+  "controls": [
+    "scalar-control-arithmetic",
+    "scalar-control-round",
+    "array-control-4x4-arithmetic",
+    "array-control-4x4-round",
+    "array-control-16x16-arithmetic",
+    "array-control-16x16-round",
+    "reference-scalar-arithmetic",
+    "reference-scalar-round",
+    "reference-array-arithmetic",
+    "reference-array-round"
+  ],
+  "phases": [
+    "evaluate",
+    "parse-evaluate"
+  ],
+  "profile_input_sha256_after": {
+    "PLAN.md": "a93acf7ebf0c76ceb80d52384560f04e542a28c1941d19a3bb375080f66cfa71",
+    "README.md": "63e3185b5aa323474938e6842316f32ff63988a63be2856e4a14906c5affd39c",
+    "harness/Cargo.lock": "370f37565191292851036f391d6d4b82f95760da7b37306796cb55153e27d603",
+    "harness/Cargo.toml": "d526db1bf45765b85d6e6a14e0543c304314e3d34daa13820f83651e1c65accd",
+    "harness/src/main.rs": "473d228936d26d0c0de77fac285579b7a408fba47a0951ab54bda2520988c49d",
+    "run_profile.py": "4cddec3d549f779001c569eed8df561d239f5231ef7057125ec461a78aeee7d1",
+    "summarize.py": "ce81f647bfc75765b18afb34109128c052b4e0d199adddcb0f466ba289fb6d52",
+    "verify.py": "695b73e2fb7c235d17d92ce482c254b147946f6f215770cb6fb3104da50346cf"
+  },
+  "profile_input_sha256_before": {
+    "PLAN.md": "a93acf7ebf0c76ceb80d52384560f04e542a28c1941d19a3bb375080f66cfa71",
+    "README.md": "63e3185b5aa323474938e6842316f32ff63988a63be2856e4a14906c5affd39c",
+    "harness/Cargo.lock": "370f37565191292851036f391d6d4b82f95760da7b37306796cb55153e27d603",
+    "harness/Cargo.toml": "d526db1bf45765b85d6e6a14e0543c304314e3d34daa13820f83651e1c65accd",
+    "harness/src/main.rs": "473d228936d26d0c0de77fac285579b7a408fba47a0951ab54bda2520988c49d",
+    "run_profile.py": "4cddec3d549f779001c569eed8df561d239f5231ef7057125ec461a78aeee7d1",
+    "summarize.py": "ce81f647bfc75765b18afb34109128c052b4e0d199adddcb0f466ba289fb6d52",
+    "verify.py": "695b73e2fb7c235d17d92ce482c254b147946f6f215770cb6fb3104da50346cf"
+  },
+  "samples_per_group": 15,
+  "warmups_per_child": 3
+}

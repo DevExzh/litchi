@@ -1,0 +1,1 @@
+CARGO_TARGET_DIR=/var/tmp/litchi-xlsb-projection-root-20260910 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=2 CARGO_PROFILE_RELEASE_DEBUG=0 cargo +1.95.0 build --manifest-path tools/perf-baseline/Cargo.toml --offline --locked --release --features xlsb-crud --bin xlsb_crud

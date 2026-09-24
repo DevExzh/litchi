@@ -1,0 +1,106 @@
+{
+  "base_commit": "2e023cbd253a9b46ec2582e5319cbcbcddac5433",
+  "binary": {
+    "path": "temporary isolated target/release/ods-data-style-source-performance",
+    "sha256": "df347d512f1aa2648403072d752c74f9d5761301bdaba8200b59627b60886d64"
+  },
+  "build": {
+    "build_log_sha256": "95e8e806ee8ed546e1f793e7df1a99a0f7d6772fb9e8e5060be5e53a6c4d34e8",
+    "locked": true,
+    "manifest": "docs/report/spec-gap-validation-evidence/ods-data-style-source-performance/harness/Cargo.toml",
+    "offline": true,
+    "profile": "release",
+    "target_isolated": true
+  },
+  "candidate_commit": "8e3ad310426a534c0bb17a789eb2c42a96e61310",
+  "capture": {
+    "cpu_pin": "taskset -c 2",
+    "pass1_raw_sha256": "0eafbac22fe853f90ceda11e81041a8f6a7ed9372f229de35c87a9bd3744c22e",
+    "pass2_raw_sha256": "be34c8ae2efabdba100f9bdbfd403b745b2e4cc685378fb4a20df19f49a56e20",
+    "perf_repeat_count": 1,
+    "repeats": 7,
+    "scales": [
+      8,
+      128,
+      512
+    ]
+  },
+  "harness_after": {
+    "docs/report/spec-gap-validation-evidence/ods-data-style-source-performance/harness/Cargo.lock": "199987f84e81fd758d3679046b62f4ccfd2491d13819db869f8218551f76647f",
+    "docs/report/spec-gap-validation-evidence/ods-data-style-source-performance/harness/Cargo.toml": "af3b2097d7d053cc6842f9abd11d414ea50a7ab9d1a3313295937c218bc88fed",
+    "docs/report/spec-gap-validation-evidence/ods-data-style-source-performance/harness/main.rs": "b7883717b0489ca55bca28846f8d2f16a68e53a265a310a910e9f7e484cd8a34",
+    "docs/report/spec-gap-validation-evidence/ods-data-style-source-performance/harness/summarize.py": "df14336222275a0966dc974b0b5ed02acd314826e54d648daf27f8963e807f40"
+  },
+  "harness_before": {
+    "docs/report/spec-gap-validation-evidence/ods-data-style-source-performance/harness/Cargo.lock": "199987f84e81fd758d3679046b62f4ccfd2491d13819db869f8218551f76647f",
+    "docs/report/spec-gap-validation-evidence/ods-data-style-source-performance/harness/Cargo.toml": "af3b2097d7d053cc6842f9abd11d414ea50a7ab9d1a3313295937c218bc88fed",
+    "docs/report/spec-gap-validation-evidence/ods-data-style-source-performance/harness/main.rs": "b7883717b0489ca55bca28846f8d2f16a68e53a265a310a910e9f7e484cd8a34",
+    "docs/report/spec-gap-validation-evidence/ods-data-style-source-performance/harness/summarize.py": "df14336222275a0966dc974b0b5ed02acd314826e54d648daf27f8963e807f40"
+  },
+  "harness_unchanged": true,
+  "private_source_checkout_head": "8e3ad310426a534c0bb17a789eb2c42a96e61310",
+  "schema": "ods-data-style-source-performance/provenance-v1",
+  "source_after": {
+    "crates/litchi-odf-common/src/core/mod.rs": "ebf305ff2b1bd64262f07953649108183a980f3622d06d20a16f4b78733bc701",
+    "crates/litchi-odf-common/src/core/resolved_reader.rs": "3872bd0d9816e58976d5181f6da31840e8f9d4e4de7ac22d35cf109efab9aa5b",
+    "crates/litchi-odf-common/src/lib.rs": "16dae1c947260ca5a6c59c87666e9b02a38c03c1a666836175722fcbfbd6c00a",
+    "crates/litchi-odf-common/src/namespace.rs": "352cd311edcd140e7a549efd3945b23eac5aefbf14d4ec9885425d2a78023885",
+    "crates/litchi-odf-common/tests/resolved_reader.rs": "609b3df95d6d9e09ef2d1ccfee498583960bdbac87be423f33f5413e736d6a5d",
+    "crates/litchi-ods/src/advanced.rs": "0d1fad5bd849a0e34a1f60cdfec6dd62185bff2ac35673aa6148a63da3df3677",
+    "crates/litchi-ods/src/authoring/builder.rs": "adb9a82cb97c51e972fa4213e9a27b722574437a20fb32e5247bb05045dbaebc",
+    "crates/litchi-ods/src/data_style/mod.rs": "d5e1caad8b0f41fe506669616ee4163665f3ff165774d43861420b29aea09f24",
+    "crates/litchi-ods/src/data_style/source.rs": "97121798e76fda01d7d12a1be10c4a34457d6447e1fb5de6184a86e5b2629261",
+    "crates/litchi-ods/src/document.rs": "ed61fcd31b997a3eea725a550cfc5645055aadad6e18bf0210c9e7f728a41fdc",
+    "crates/litchi-ods/src/facade/mod.rs": "79a8dd565387b35265427caca2f690c83b9e68a19a9d27abf03745b948a17f79",
+    "crates/litchi-ods/src/open_parse.rs": "41503f2146b551cd83ca20ecd37ccba69a57f3529c21aca4a98d8851317c1467",
+    "crates/litchi-ods/src/package/document.rs": "cdfefd76a240bc31e62865099db6128ca420e045222b4bb3fc4051be7bf37276",
+    "crates/litchi-ods/src/worksheet/codec.rs": "5ce767fe0f655768ad6d507c582f225991d836e6f7990a7bccdd09d5736da45b",
+    "crates/litchi-ods/tests/data_style_vocabulary.rs": "3b891291717210cbc6e377927a914786e448e22d3623f13305bb761ed668faab",
+    "crates/litchi-odt/src/auto_mark_file/codec.rs": "f357fa4017edf45cbe06ba7de6bb7fb8f2787fa317ee2ff4a25ff7128d8d67e0",
+    "crates/litchi-odt/src/bibliography_configuration/codec.rs": "f2b54caa2ff0ca34dcc63736389eb2a3a70fee1c988643466df025a894e874a4",
+    "crates/litchi-odt/src/content_metadata.rs": "68b0e29793fc58e4aca310573d37eedeae01416ab265069e5c0a0f139ebc7b94",
+    "crates/litchi-odt/src/dde_connection/codec.rs": "b816e98168a2fad56d960b87c5b00809c1062bf8685463860a41e8f457338a6f",
+    "crates/litchi-odt/src/elements/xml.rs": "459c40419861ce98ff0daf1ee30f0e7175e468c79fe7da67d63b6d6ea8cea3d0",
+    "crates/litchi-odt/src/flat/mod.rs": "60756e7c40900e06b1e4090114a7eb16881c14c6e52b6366ef3ea41cb36a0fbc",
+    "crates/litchi-odt/src/generic/codec.rs": "af26127963f477d45f4f5453d2dc7c02ac05d8a405abd7da5e74ac8110ec56d8",
+    "crates/litchi-odt/src/variable_declaration/codec.rs": "b5d5778b6a0e4b8b2e008352d01ac4522e73a38b3630267c57186e3bc267a57e",
+    "crates/litchi-odt/src/variable_declaration/package.rs": "b5cfae11d028665b56438952f24331f6bbfb385343f8a5227c64bc8d3cd45ea6",
+    "crates/litchi-odt/src/xforms.rs": "a53fc7e8eb710eedef7ae17a6c392d4ab2413cd49cdd7e55aa2c2c4959a36054",
+    "crates/litchi-odt/tests/flat_text_templates.rs": "e17b5295dd11995d5dbd73819e758aaae460bf19cba793596cd8bf12f54ba653"
+  },
+  "source_before": {
+    "crates/litchi-odf-common/src/core/mod.rs": "ebf305ff2b1bd64262f07953649108183a980f3622d06d20a16f4b78733bc701",
+    "crates/litchi-odf-common/src/core/resolved_reader.rs": "3872bd0d9816e58976d5181f6da31840e8f9d4e4de7ac22d35cf109efab9aa5b",
+    "crates/litchi-odf-common/src/lib.rs": "16dae1c947260ca5a6c59c87666e9b02a38c03c1a666836175722fcbfbd6c00a",
+    "crates/litchi-odf-common/src/namespace.rs": "352cd311edcd140e7a549efd3945b23eac5aefbf14d4ec9885425d2a78023885",
+    "crates/litchi-odf-common/tests/resolved_reader.rs": "609b3df95d6d9e09ef2d1ccfee498583960bdbac87be423f33f5413e736d6a5d",
+    "crates/litchi-ods/src/advanced.rs": "0d1fad5bd849a0e34a1f60cdfec6dd62185bff2ac35673aa6148a63da3df3677",
+    "crates/litchi-ods/src/authoring/builder.rs": "adb9a82cb97c51e972fa4213e9a27b722574437a20fb32e5247bb05045dbaebc",
+    "crates/litchi-ods/src/data_style/mod.rs": "d5e1caad8b0f41fe506669616ee4163665f3ff165774d43861420b29aea09f24",
+    "crates/litchi-ods/src/data_style/source.rs": "97121798e76fda01d7d12a1be10c4a34457d6447e1fb5de6184a86e5b2629261",
+    "crates/litchi-ods/src/document.rs": "ed61fcd31b997a3eea725a550cfc5645055aadad6e18bf0210c9e7f728a41fdc",
+    "crates/litchi-ods/src/facade/mod.rs": "79a8dd565387b35265427caca2f690c83b9e68a19a9d27abf03745b948a17f79",
+    "crates/litchi-ods/src/open_parse.rs": "41503f2146b551cd83ca20ecd37ccba69a57f3529c21aca4a98d8851317c1467",
+    "crates/litchi-ods/src/package/document.rs": "cdfefd76a240bc31e62865099db6128ca420e045222b4bb3fc4051be7bf37276",
+    "crates/litchi-ods/src/worksheet/codec.rs": "5ce767fe0f655768ad6d507c582f225991d836e6f7990a7bccdd09d5736da45b",
+    "crates/litchi-ods/tests/data_style_vocabulary.rs": "3b891291717210cbc6e377927a914786e448e22d3623f13305bb761ed668faab",
+    "crates/litchi-odt/src/auto_mark_file/codec.rs": "f357fa4017edf45cbe06ba7de6bb7fb8f2787fa317ee2ff4a25ff7128d8d67e0",
+    "crates/litchi-odt/src/bibliography_configuration/codec.rs": "f2b54caa2ff0ca34dcc63736389eb2a3a70fee1c988643466df025a894e874a4",
+    "crates/litchi-odt/src/content_metadata.rs": "68b0e29793fc58e4aca310573d37eedeae01416ab265069e5c0a0f139ebc7b94",
+    "crates/litchi-odt/src/dde_connection/codec.rs": "b816e98168a2fad56d960b87c5b00809c1062bf8685463860a41e8f457338a6f",
+    "crates/litchi-odt/src/elements/xml.rs": "459c40419861ce98ff0daf1ee30f0e7175e468c79fe7da67d63b6d6ea8cea3d0",
+    "crates/litchi-odt/src/flat/mod.rs": "60756e7c40900e06b1e4090114a7eb16881c14c6e52b6366ef3ea41cb36a0fbc",
+    "crates/litchi-odt/src/generic/codec.rs": "af26127963f477d45f4f5453d2dc7c02ac05d8a405abd7da5e74ac8110ec56d8",
+    "crates/litchi-odt/src/variable_declaration/codec.rs": "b5d5778b6a0e4b8b2e008352d01ac4522e73a38b3630267c57186e3bc267a57e",
+    "crates/litchi-odt/src/variable_declaration/package.rs": "b5cfae11d028665b56438952f24331f6bbfb385343f8a5227c64bc8d3cd45ea6",
+    "crates/litchi-odt/src/xforms.rs": "a53fc7e8eb710eedef7ae17a6c392d4ab2413cd49cdd7e55aa2c2c4959a36054",
+    "crates/litchi-odt/tests/flat_text_templates.rs": "e17b5295dd11995d5dbd73819e758aaae460bf19cba793596cd8bf12f54ba653"
+  },
+  "source_root_dependency": false,
+  "source_unchanged": true,
+  "toolchain": {
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "kernel": "Linux-7.0.0-1012-aws-x86_64-with-glibc2.43",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+  }
+}

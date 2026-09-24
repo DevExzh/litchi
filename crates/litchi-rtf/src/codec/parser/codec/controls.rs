@@ -5,17 +5,61 @@
 )]
 use super::{
     Alignment, CharacterType, ColorRef, ControlWord, Destination, FontRef, Formatting, Mbcs,
-    Paragraph, ParagraphFontAlignment, ParagraphWrapping, Parser, RevisionMetadata, RtfEncoding,
-    RtfError, RtfResult, TextDirection, UnderlineStyle, animated_text,
-    apply_associated_character_control, apply_table_distance, apply_table_distance_side,
-    character_grid, character_style_reference, character_type_selector, complex_script_selector,
-    emphasis_mark, fit_text, floating_table_offset, floating_table_wrap_distance, font_size,
-    nonnegative_author_index, paragraph_style_reference, parser_classification_error,
-    pending_cell_revision, require_parameterless, required_list_spacing, required_paragraph_bool,
-    required_paragraph_indent, resolve_preferred_width, resolve_row_geometry,
-    strict_paragraph_selector, strict_paragraph_toggle, table_geometry_twips, table_indent_unit,
-    table_row_height, table_style_reference, table_width_unit,
+    Paragraph, ParagraphFontAlignment, ParagraphFrame, ParagraphFrameHorizontalPosition,
+    ParagraphFrameHorizontalReference, ParagraphFrameTextFlow, ParagraphFrameVerticalPosition,
+    ParagraphFrameVerticalReference, ParagraphFrameWrap, ParagraphWrapping, Parser,
+    RevisionMetadata, RtfEncoding, RtfError, RtfResult, State, TextDirection, UnderlineStyle,
+    animated_text, apply_associated_character_control, apply_table_distance,
+    apply_table_distance_side, character_grid, character_style_reference, character_type_selector,
+    complex_script_selector, emphasis_mark, fit_text, floating_table_offset,
+    floating_table_wrap_distance, font_size, nonnegative_author_index, paragraph_style_reference,
+    parser_classification_error, pending_cell_revision, require_parameterless,
+    required_list_spacing, required_paragraph_bool, required_paragraph_indent,
+    resolve_preferred_width, resolve_row_geometry, strict_paragraph_selector,
+    strict_paragraph_toggle, table_geometry_twips, table_indent_unit, table_row_height,
+    table_style_reference, table_width_unit,
 };
+
+fn paragraph_frame(state: &mut State) -> &mut ParagraphFrame {
+    state
+        .paragraph
+        .frame
+        .get_or_insert_with(ParagraphFrame::default)
+}
+
+fn frame_nonnegative(value: Option<i32>, name: &str) -> RtfResult<u32> {
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+    })?;
+    let value = u32::try_from(value).map_err(|_err| {
+        RtfError::MalformedDocument(format!("RTF {name} parameter cannot be negative"))
+    })?;
+    (value <= crate::MAX_PARAGRAPH_FRAME_TWIPS as u32)
+        .then_some(value)
+        .ok_or_else(|| RtfError::MalformedDocument(format!("RTF {name} exceeds the safety limit")))
+}
+
+fn frame_offset(value: Option<i32>, name: &str) -> RtfResult<i32> {
+    let value = value.ok_or_else(|| {
+        RtfError::MalformedDocument(format!("RTF {name} requires a numeric parameter"))
+    })?;
+    (value.unsigned_abs() <= crate::MAX_PARAGRAPH_FRAME_TWIPS as u32)
+        .then_some(value)
+        .ok_or_else(|| RtfError::MalformedDocument(format!("RTF {name} exceeds the safety limit")))
+}
+
+fn frame_toggle(value: Option<i32>, name: &str) -> RtfResult<bool> {
+    match value {
+        Some(1) => Ok(true),
+        Some(0) => Ok(false),
+        None => Err(RtfError::MalformedDocument(format!(
+            "RTF {name} requires a numeric parameter of 0 or 1"
+        ))),
+        Some(_) => Err(RtfError::MalformedDocument(format!(
+            "RTF {name} parameter must be 0 or 1"
+        ))),
+    }
+}
 
 impl Parser<'_> {
     /// Apply a control word to the current state.
@@ -1780,9 +1824,17 @@ impl Parser<'_> {
                     "RTF generated list marker must be a grouped body destination".to_string(),
                 ));
             },
-            ControlWord::XmlNamespace(_) => {
+            ControlWord::XmlNamespace(_)
+            | ControlWord::XmlAttributeGroup
+            | ControlWord::XmlAttribute(_)
+            | ControlWord::XmlAttributeNamespace(_)
+            | ControlWord::FactoidName
+            | ControlWord::MoveFromStart
+            | ControlWord::MoveFromEnd
+            | ControlWord::MoveToStart
+            | ControlWord::MoveToEnd => {
                 return Err(RtfError::MalformedDocument(
-                    "orphan RTF xmlns control outside xmlnstbl".to_string(),
+                    "orphan RTF metadata control outside its destination".to_string(),
                 ));
             },
             ControlWord::ListPicture(_)
@@ -1971,6 +2023,11 @@ impl Parser<'_> {
             ControlWord::Password => {
                 return Err(RtfError::MalformedDocument(
                     "RTF password hash is misplaced or not a starred info destination".to_string(),
+                ));
+            },
+            ControlWord::PasswordHash => {
+                return Err(RtfError::MalformedDocument(
+                    "RTF passwordhash is misplaced or not a starred info destination".to_string(),
                 ));
             },
             control if Self::is_math_scoped_control(control) => {
@@ -2405,6 +2462,178 @@ impl Parser<'_> {
             ControlWord::FontAlignFixed(value) => {
                 strict_paragraph_selector(*value, "fafixed")?;
                 state.paragraph.line_breaking.font_alignment = ParagraphFontAlignment::Fixed;
+            },
+            // Positioned paragraph objects and frames
+            ControlWord::FrameAbsoluteWidth(value) => {
+                paragraph_frame(state).width_twips = Some(frame_nonnegative(*value, "absw")?);
+            },
+            ControlWord::FrameAbsoluteHeight(value) => {
+                paragraph_frame(state).height_twips = Some(frame_offset(*value, "absh")?);
+            },
+            ControlWord::FrameHorizontalMargin(value) => {
+                require_parameterless(*value, "phmrg")?;
+                paragraph_frame(state).horizontal_reference =
+                    ParagraphFrameHorizontalReference::Margin;
+            },
+            ControlWord::FrameHorizontalPage(value) => {
+                require_parameterless(*value, "phpg")?;
+                paragraph_frame(state).horizontal_reference =
+                    ParagraphFrameHorizontalReference::Page;
+            },
+            ControlWord::FrameHorizontalColumn(value) => {
+                require_parameterless(*value, "phcol")?;
+                paragraph_frame(state).horizontal_reference =
+                    ParagraphFrameHorizontalReference::Column;
+            },
+            ControlWord::FrameHorizontalOffset(value) => {
+                paragraph_frame(state).horizontal_position =
+                    ParagraphFrameHorizontalPosition::Offset(
+                        i32::try_from(frame_nonnegative(*value, "posx")?).map_err(|_err| {
+                            RtfError::MalformedDocument(
+                                "RTF posx exceeds the safety limit".to_string(),
+                            )
+                        })?,
+                    );
+            },
+            ControlWord::FrameHorizontalNegativeOffset(value) => {
+                paragraph_frame(state).horizontal_position =
+                    ParagraphFrameHorizontalPosition::NegativeOffset(frame_offset(
+                        *value, "posnegx",
+                    )?);
+            },
+            ControlWord::FrameHorizontalCenter(value) => {
+                require_parameterless(*value, "posxc")?;
+                paragraph_frame(state).horizontal_position =
+                    ParagraphFrameHorizontalPosition::Center;
+            },
+            ControlWord::FrameHorizontalInside(value) => {
+                require_parameterless(*value, "posxi")?;
+                paragraph_frame(state).horizontal_position =
+                    ParagraphFrameHorizontalPosition::Inside;
+            },
+            ControlWord::FrameHorizontalOutside(value) => {
+                require_parameterless(*value, "posxo")?;
+                paragraph_frame(state).horizontal_position =
+                    ParagraphFrameHorizontalPosition::Outside;
+            },
+            ControlWord::FrameHorizontalLeft(value) => {
+                require_parameterless(*value, "posxl")?;
+                paragraph_frame(state).horizontal_position = ParagraphFrameHorizontalPosition::Left;
+            },
+            ControlWord::FrameHorizontalRight(value) => {
+                require_parameterless(*value, "posxr")?;
+                paragraph_frame(state).horizontal_position =
+                    ParagraphFrameHorizontalPosition::Right;
+            },
+            ControlWord::FrameVerticalMargin(value) => {
+                require_parameterless(*value, "pvmrg")?;
+                paragraph_frame(state).vertical_reference = ParagraphFrameVerticalReference::Margin;
+            },
+            ControlWord::FrameVerticalPage(value) => {
+                require_parameterless(*value, "pvpg")?;
+                paragraph_frame(state).vertical_reference = ParagraphFrameVerticalReference::Page;
+            },
+            ControlWord::FrameVerticalParagraph(value) => {
+                require_parameterless(*value, "pvpara")?;
+                paragraph_frame(state).vertical_reference =
+                    ParagraphFrameVerticalReference::Paragraph;
+            },
+            ControlWord::FrameVerticalOffset(value) => {
+                paragraph_frame(state).vertical_position = ParagraphFrameVerticalPosition::Offset(
+                    i32::try_from(frame_nonnegative(*value, "posy")?).map_err(|_err| {
+                        RtfError::MalformedDocument("RTF posy exceeds the safety limit".to_string())
+                    })?,
+                );
+            },
+            ControlWord::FrameVerticalNegativeOffset(value) => {
+                paragraph_frame(state).vertical_position =
+                    ParagraphFrameVerticalPosition::NegativeOffset(frame_offset(
+                        *value, "posnegy",
+                    )?);
+            },
+            ControlWord::FrameVerticalInline(value) => {
+                require_parameterless(*value, "posyil")?;
+                paragraph_frame(state).vertical_position = ParagraphFrameVerticalPosition::Inline;
+            },
+            ControlWord::FrameVerticalTop(value) => {
+                require_parameterless(*value, "posyt")?;
+                paragraph_frame(state).vertical_position = ParagraphFrameVerticalPosition::Top;
+            },
+            ControlWord::FrameVerticalCenter(value) => {
+                require_parameterless(*value, "posyc")?;
+                paragraph_frame(state).vertical_position = ParagraphFrameVerticalPosition::Center;
+            },
+            ControlWord::FrameVerticalBottom(value) => {
+                require_parameterless(*value, "posyb")?;
+                paragraph_frame(state).vertical_position = ParagraphFrameVerticalPosition::Bottom;
+            },
+            ControlWord::FrameVerticalInside(value) => {
+                require_parameterless(*value, "posyin")?;
+                paragraph_frame(state).vertical_position = ParagraphFrameVerticalPosition::Inside;
+            },
+            ControlWord::FrameVerticalOutside(value) => {
+                require_parameterless(*value, "posyout")?;
+                paragraph_frame(state).vertical_position = ParagraphFrameVerticalPosition::Outside;
+            },
+            ControlWord::FrameAbsoluteLock(value) => {
+                paragraph_frame(state).anchor_locked = Some(frame_toggle(*value, "abslock")?);
+            },
+            ControlWord::FrameNoWrap(value) => {
+                require_parameterless(*value, "nowrap")?;
+                paragraph_frame(state).no_wrap = true;
+            },
+            ControlWord::FrameHorizontalTextDistance(value) => {
+                paragraph_frame(state).horizontal_text_distance_twips =
+                    Some(frame_nonnegative(*value, "dxfrtext")?);
+            },
+            ControlWord::FrameHorizontalTextOffset(value) => {
+                paragraph_frame(state).horizontal_text_offset_twips =
+                    Some(frame_nonnegative(*value, "dfrmtxtx")?);
+            },
+            ControlWord::FrameVerticalTextOffset(value) => {
+                paragraph_frame(state).vertical_text_offset_twips =
+                    Some(frame_nonnegative(*value, "dfrmtxty")?);
+            },
+            ControlWord::FrameWrapAround(value) => {
+                require_parameterless(*value, "wraparound")?;
+                paragraph_frame(state).wrap = ParagraphFrameWrap::Around;
+            },
+            ControlWord::FrameWrapTight(value) => {
+                require_parameterless(*value, "wraptight")?;
+                paragraph_frame(state).wrap = ParagraphFrameWrap::Tight;
+            },
+            ControlWord::FrameWrapThrough(value) => {
+                require_parameterless(*value, "wrapthrough")?;
+                paragraph_frame(state).wrap = ParagraphFrameWrap::Through;
+            },
+            ControlWord::FrameOverlay(value) => {
+                require_parameterless(*value, "overlay")?;
+                paragraph_frame(state).overlay = true;
+            },
+            ControlWord::FrameNoOverlap(value) => {
+                paragraph_frame(state).no_overlap = Some(frame_toggle(*value, "absnoovrlp")?);
+            },
+            ControlWord::FrameTextFlowLrtb(value) => {
+                require_parameterless(*value, "frmtxlrtb")?;
+                paragraph_frame(state).text_flow = ParagraphFrameTextFlow::LeftToRightTopToBottom;
+            },
+            ControlWord::FrameTextFlowTbrl(value) => {
+                require_parameterless(*value, "frmtxtbrl")?;
+                paragraph_frame(state).text_flow = ParagraphFrameTextFlow::TopToBottomRightToLeft;
+            },
+            ControlWord::FrameTextFlowBtlr(value) => {
+                require_parameterless(*value, "frmtxbtlr")?;
+                paragraph_frame(state).text_flow = ParagraphFrameTextFlow::BottomToTopLeftToRight;
+            },
+            ControlWord::FrameTextFlowLrtbv(value) => {
+                require_parameterless(*value, "frmtxlrtbv")?;
+                paragraph_frame(state).text_flow =
+                    ParagraphFrameTextFlow::LeftToRightTopToBottomVertical;
+            },
+            ControlWord::FrameTextFlowTbrlv(value) => {
+                require_parameterless(*value, "frmtxtbrlv")?;
+                paragraph_frame(state).text_flow =
+                    ParagraphFrameTextFlow::TopToBottomRightToLeftVertical;
             },
             ControlWord::ListOverrideIndex(value) => {
                 state.paragraph.list_override = Some(*value);

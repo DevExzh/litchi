@@ -1,0 +1,553 @@
+{
+  "scope": "Debug baseline capability preflight only; no timing comparison.",
+  "commit": "f945a5129ad8967a863cf4937de01ee2152b9fbf",
+  "binary_sha256": "4ea115e281f8bf607041ea745866a1cdf83baf97827189da1bc3ca0b8e850d39",
+  "rows": [
+    {
+      "name": "control-scalar-arithmetic",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"control-scalar-arithmetic\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":1.42,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=0.17+1.25\",\"supported\":true}\npreflight case=control-scalar-arithmetic reference_reads=0 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "control-scalar-sin",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"control-scalar-sin\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":0.16918234906699603,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=SIN(0.17)\",\"supported\":true}\npreflight case=control-scalar-sin reference_reads=0 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "control-array-arithmetic",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"control-array-arithmetic\",\"class\":\"matched-control\",\"evaluation_path\":\"value\",\"expected\":{\"columns\":1,\"kind\":\"array\",\"rows\":4,\"values\":[2.0,3.0,4.0,5.0]},\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"4x1\",\"source\":\"={1|2|3|4}+1\",\"supported\":true}\npreflight case=control-array-arithmetic reference_reads=0 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "control-array-sin",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"control-array-sin\",\"class\":\"matched-control\",\"evaluation_path\":\"value\",\"expected\":{\"columns\":1,\"kind\":\"array\",\"rows\":4,\"values\":[0.09983341664682815,0.19866933079506122,0.29552020666133955,0.3894183423086505]},\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"4x1\",\"source\":\"=SIN({0.1|0.2|0.3|0.4})\",\"supported\":true}\npreflight case=control-array-sin reference_reads=0 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "control-scalar-aggregate",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"control-scalar-aggregate\",\"class\":\"matched-control\",\"evaluation_path\":\"scalar\",\"expected\":1.25,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=SUM(1.25)\",\"supported\":true}\npreflight case=control-scalar-aggregate reference_reads=0 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "control-reference-sum-64",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"control-reference-sum-64\",\"class\":\"matched-control\",\"evaluation_path\":\"value\",\"expected\":185.5,\"max_steps\":null,\"reference_reads\":64,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=SUM([.D1:.D64])\",\"supported\":true}\npreflight case=control-reference-sum-64 reference_reads=64 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "control-reference-average-64",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"control-reference-average-64\",\"class\":\"matched-control\",\"evaluation_path\":\"value\",\"expected\":2.8984375,\"max_steps\":null,\"reference_reads\":64,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=AVERAGE([.D1:.D64])\",\"supported\":true}\npreflight case=control-reference-average-64 reference_reads=64 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "control-reference-conditional-sumif-64",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"control-reference-conditional-sumif-64\",\"class\":\"matched-control\",\"evaluation_path\":\"value\",\"expected\":163.5,\"max_steps\":null,\"reference_reads\":112,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=SUMIF([.D1:.D64];\\\">=2\\\";[.D1:.D64])\",\"supported\":true}\npreflight case=control-reference-conditional-sumif-64 reference_reads=112 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "control-lazy-if",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"control-lazy-if\",\"class\":\"matched-control\",\"evaluation_path\":\"value\",\"expected\":{\"columns\":1,\"kind\":\"array\",\"rows\":2,\"values\":[0.0,0.0]},\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"2x1\",\"source\":\"=IF({FALSE()|FALSE()};SUM([.D1:.D64]);0)\",\"supported\":true}\npreflight case=control-lazy-if reference_reads=0 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "control-iferror",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"control-iferror\",\"class\":\"matched-control\",\"evaluation_path\":\"scalar\",\"expected\":42.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=IFERROR(1/0;42)\",\"supported\":true}\npreflight case=control-iferror reference_reads=0 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "control-ifna",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"control-ifna\",\"class\":\"matched-control\",\"evaluation_path\":\"scalar\",\"expected\":42.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=IFNA(#N/A;42)\",\"supported\":true}\npreflight case=control-ifna reference_reads=0 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-cumipmt-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-cumipmt-core\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":-10.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=CUMIPMT(0.1;2;100;1;1;0)\",\"supported\":false}\npreflight case=financial-cumipmt-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-cumprinc-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-cumprinc-core\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":-47.61904761904762,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=CUMPRINC(0.1;2;100;1;1;0)\",\"supported\":false}\npreflight case=financial-cumprinc-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-effect-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-effect-core\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":0.1025,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=EFFECT(0.1;2)\",\"supported\":false}\npreflight case=financial-effect-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-fv-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-fv-core\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":110.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=FV(0.1;1;-110)\",\"supported\":false}\npreflight case=financial-fv-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-fvschedule-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-fvschedule-core\",\"class\":\"financial\",\"evaluation_path\":\"value\",\"expected\":132.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=FVSCHEDULE(100;{0.1|0.2})\",\"supported\":false}\npreflight case=financial-fvschedule-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-ipmt-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-ipmt-core\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":-10.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=IPMT(0.1;1;2;100)\",\"supported\":false}\npreflight case=financial-ipmt-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-irr-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-irr-core\",\"class\":\"financial\",\"evaluation_path\":\"value\",\"expected\":0.1,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=IRR({-100|110})\",\"supported\":false}\npreflight case=financial-irr-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-ispmt-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-ispmt-core\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":-5.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=ISPMT(0.1;1;2;100)\",\"supported\":false}\npreflight case=financial-ispmt-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-mirr-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-mirr-core\",\"class\":\"financial\",\"evaluation_path\":\"value\",\"expected\":0.1,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=MIRR({-100|110};0.1;0.1)\",\"supported\":false}\npreflight case=financial-mirr-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-nominal-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-nominal-core\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":0.1,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=NOMINAL(0.1025;2)\",\"supported\":false}\npreflight case=financial-nominal-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-nper-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-nper-core\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":1.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=NPER(0.1;-110;100)\",\"supported\":false}\npreflight case=financial-nper-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-npv-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-npv-core\",\"class\":\"financial\",\"evaluation_path\":\"value\",\"expected\":0.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=NPV(0.1;{-100|110})\",\"supported\":false}\npreflight case=financial-npv-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-pduration-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-pduration-core\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":2.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=PDURATION(0.1;100;121)\",\"supported\":false}\npreflight case=financial-pduration-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-pmt-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-pmt-core\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":-110.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=PMT(0.1;1;100)\",\"supported\":false}\npreflight case=financial-pmt-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-ppmt-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-ppmt-core\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":-47.61904761904762,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=PPMT(0.1;1;2;100)\",\"supported\":false}\npreflight case=financial-ppmt-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-pv-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-pv-core\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":100.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=PV(0.1;1;-110)\",\"supported\":false}\npreflight case=financial-pv-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-rate-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-rate-core\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":0.1,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=RATE(1;-110;100)\",\"supported\":false}\npreflight case=financial-rate-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-rri-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-rri-core\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":0.1,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=RRI(2;100;121)\",\"supported\":false}\npreflight case=financial-rri-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-xirr-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-xirr-core\",\"class\":\"financial\",\"evaluation_path\":\"value\",\"expected\":0.1,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=XIRR({-100|110};{43831|44196})\",\"supported\":false}\npreflight case=financial-xirr-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-xnpv-core",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-xnpv-core\",\"class\":\"financial\",\"evaluation_path\":\"value\",\"expected\":0.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=XNPV(0.1;{-100|110};{43831|44196})\",\"supported\":false}\npreflight case=financial-xnpv-core reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-cumipmt-span-4",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-cumipmt-span-4\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":-23.32040508511097,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=CUMIPMT(0.1;4;100;1;3;0)\",\"supported\":false}\npreflight case=financial-cumipmt-span-4 reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-cumprinc-span-4",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-cumprinc-span-4\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":-71.32083602671833,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=CUMPRINC(0.1;4;100;1;3;0)\",\"supported\":false}\npreflight case=financial-cumprinc-span-4 reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-cumipmt-span-64",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-cumipmt-span-64\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":-540.5277414286131,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=CUMIPMT(0.1;64;100;1;63;0)\",\"supported\":false}\npreflight case=financial-cumipmt-span-64 reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-cumprinc-span-64",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-cumprinc-span-64\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":-90.88865232676255,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=CUMPRINC(0.1;64;100;1;63;0)\",\"supported\":false}\npreflight case=financial-cumprinc-span-64 reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-cumipmt-span-512",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-cumipmt-span-512\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":-5019.09090909091,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=CUMIPMT(0.1;512;100;1;511;0)\",\"supported\":false}\npreflight case=financial-cumipmt-span-512 reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-cumprinc-span-512",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-cumprinc-span-512\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":-90.90909090909008,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=CUMPRINC(0.1;512;100;1;511;0)\",\"supported\":false}\npreflight case=financial-cumprinc-span-512 reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-cumipmt-span-2048",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-cumipmt-span-2048\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":-20379.09090909092,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=CUMIPMT(0.1;2048;100;1;2047;0)\",\"supported\":false}\npreflight case=financial-cumipmt-span-2048 reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-cumprinc-span-2048",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-cumprinc-span-2048\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":-90.90909090908099,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=CUMPRINC(0.1;2048;100;1;2047;0)\",\"supported\":false}\npreflight case=financial-cumprinc-span-2048 reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-effect-zero",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-effect-zero\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":0.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=EFFECT(0;2)\",\"supported\":false}\npreflight case=financial-effect-zero reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-fv-zero-rate",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-fv-zero-rate\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":20.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=FV(0;2;-10)\",\"supported\":false}\npreflight case=financial-fv-zero-rate reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-pmt-zero-rate",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-pmt-zero-rate\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":-50.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=PMT(0;2;100)\",\"supported\":false}\npreflight case=financial-pmt-zero-rate reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-pv-zero-rate",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-pv-zero-rate\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":100.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=PV(0;2;-50)\",\"supported\":false}\npreflight case=financial-pv-zero-rate reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-nper-zero-rate",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-nper-zero-rate\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":2.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=NPER(0;-50;100)\",\"supported\":false}\npreflight case=financial-nper-zero-rate reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-rri-negative-inputs",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-rri-negative-inputs\",\"class\":\"financial\",\"evaluation_path\":\"scalar\",\"expected\":0.1,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=RRI(2;-100;-121)\",\"supported\":false}\npreflight case=financial-rri-negative-inputs reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-fvschedule-zero-factor",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-fvschedule-zero-factor\",\"class\":\"financial-sequence\",\"evaluation_path\":\"value\",\"expected\":0.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=FVSCHEDULE(100;{0|-1|0.1})\",\"supported\":false}\npreflight case=financial-fvschedule-zero-factor reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-fvschedule-formula-error",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-fvschedule-formula-error\",\"class\":\"financial-error\",\"evaluation_path\":\"value\",\"expected\":{\"kind\":\"formula_error\",\"value\":\"#N/A\"},\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=FVSCHEDULE(100;{0.1|#N/A|0.2})\",\"supported\":false}\npreflight case=financial-fvschedule-formula-error reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-npv-split-arguments",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-npv-split-arguments\",\"class\":\"financial-sequence\",\"evaluation_path\":\"value\",\"expected\":0.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=NPV(0.1;{-100};{110})\",\"supported\":false}\npreflight case=financial-npv-split-arguments reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-npv-reference-list",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-npv-reference-list\",\"class\":\"financial-sequence\",\"evaluation_path\":\"value\",\"expected\":0.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=NPV(0.1;[.A1:.A1]~[.A2:.A2])\",\"supported\":false}\npreflight case=financial-npv-reference-list reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-npv-projected-if",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-npv-projected-if\",\"class\":\"financial-projected\",\"evaluation_path\":\"value\",\"expected\":{\"columns\":1,\"kind\":\"array\",\"rows\":2,\"values\":[-1.4210854715202004e-14,0.0]},\"max_steps\":null,\"reference_reads\":1,\"repeat\":32,\"shape\":\"2x1\",\"source\":\"=IF({TRUE()|FALSE()};NPV(0.1;[.A1:.A4]);0)\",\"supported\":false}\npreflight case=financial-npv-projected-if reference_reads=1 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-irr-negative-branch",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-irr-negative-branch\",\"class\":\"financial-solver\",\"evaluation_path\":\"value\",\"expected\":-2.0,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=IRR({-100|0|100};-2)\",\"supported\":false}\npreflight case=financial-irr-negative-branch reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-irr-no-sign-variation",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-irr-no-sign-variation\",\"class\":\"financial-error\",\"evaluation_path\":\"value\",\"expected\":{\"kind\":\"formula_error\",\"value\":\"#NUM!\"},\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=IRR({1|2})\",\"supported\":false}\npreflight case=financial-irr-no-sign-variation reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-xirr-nonannual",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-xirr-nonannual\",\"class\":\"financial-solver\",\"evaluation_path\":\"value\",\"expected\":0.21320772540428345,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=XIRR({-100|110};{43831|44011})\",\"supported\":false}\npreflight case=financial-xirr-nonannual reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-xnpv-nonannual",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-xnpv-nonannual\",\"class\":\"financial-stream\",\"evaluation_path\":\"value\",\"expected\":4.949374402715122,\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=XNPV(0.1;{-100|110};{43831|44011})\",\"supported\":false}\npreflight case=financial-xnpv-nonannual reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-fvschedule-reference-list-refusal",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-fvschedule-reference-list-refusal\",\"class\":\"financial-refusal\",\"evaluation_path\":\"value\",\"expected\":{\"kind\":\"formula_error\",\"value\":\"#VALUE!\"},\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=FVSCHEDULE(100;[.C1:.C2]~[.C3:.C4])\",\"supported\":false}\npreflight case=financial-fvschedule-reference-list-refusal reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-xirr-reference-list-refusal",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-xirr-reference-list-refusal\",\"class\":\"financial-refusal\",\"evaluation_path\":\"value\",\"expected\":{\"kind\":\"formula_error\",\"value\":\"#VALUE!\"},\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=XIRR([.A1:.A2]~[.A3:.A4];{43831|44196})\",\"supported\":false}\npreflight case=financial-xirr-reference-list-refusal reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-xnpv-reference-list-refusal",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-xnpv-reference-list-refusal\",\"class\":\"financial-refusal\",\"evaluation_path\":\"value\",\"expected\":{\"kind\":\"formula_error\",\"value\":\"#VALUE!\"},\"max_steps\":null,\"reference_reads\":4,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=XNPV(0.1;[.A1:.A2]~[.A3:.A4];[.B1:.B4])\",\"supported\":false}\npreflight case=financial-xnpv-reference-list-refusal reference_reads=4 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-effect-invalid-rate",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-effect-invalid-rate\",\"class\":\"financial-error\",\"evaluation_path\":\"scalar\",\"expected\":{\"kind\":\"formula_error\",\"value\":\"#NUM!\"},\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=EFFECT(-0.1;2)\",\"supported\":false}\npreflight case=financial-effect-invalid-rate reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-nominal-invalid-rate",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-nominal-invalid-rate\",\"class\":\"financial-error\",\"evaluation_path\":\"scalar\",\"expected\":{\"kind\":\"formula_error\",\"value\":\"#NUM!\"},\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=NOMINAL(0;2)\",\"supported\":false}\npreflight case=financial-nominal-invalid-rate reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-pduration-invalid-rate",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-pduration-invalid-rate\",\"class\":\"financial-error\",\"evaluation_path\":\"scalar\",\"expected\":{\"kind\":\"formula_error\",\"value\":\"#NUM!\"},\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=PDURATION(0;100;121)\",\"supported\":false}\npreflight case=financial-pduration-invalid-rate reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-ppmt-invalid-period",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-ppmt-invalid-period\",\"class\":\"financial-error\",\"evaluation_path\":\"scalar\",\"expected\":{\"kind\":\"formula_error\",\"value\":\"#NUM!\"},\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=PPMT(0.1;2;2;100)\",\"supported\":false}\npreflight case=financial-ppmt-invalid-period reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-rri-nonintegral-negative",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-rri-nonintegral-negative\",\"class\":\"financial-error\",\"evaluation_path\":\"scalar\",\"expected\":{\"kind\":\"formula_error\",\"value\":\"#NUM!\"},\"max_steps\":null,\"reference_reads\":0,\"repeat\":32,\"shape\":\"scalar\",\"source\":\"=RRI(3;100;-800)\",\"supported\":false}\npreflight case=financial-rri-nonintegral-negative reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-fvschedule-4",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-fvschedule-4\",\"class\":\"financial-stream\",\"evaluation_path\":\"value\",\"expected\":100.04060618151821,\"max_steps\":null,\"reference_reads\":4,\"repeat\":8,\"shape\":\"scalar\",\"source\":\"=FVSCHEDULE(100;[.C1:.C4])\",\"supported\":false}\npreflight case=financial-fvschedule-4 reference_reads=4 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-npv-4",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-npv-4\",\"class\":\"financial-stream\",\"evaluation_path\":\"value\",\"expected\":-1.4210854715202004e-14,\"max_steps\":null,\"reference_reads\":4,\"repeat\":8,\"shape\":\"scalar\",\"source\":\"=NPV(0.1;[.A1:.A4])\",\"supported\":false}\npreflight case=financial-npv-4 reference_reads=4 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-fvschedule-64",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-fvschedule-64\",\"class\":\"financial-stream\",\"evaluation_path\":\"value\",\"expected\":100.84509450979579,\"max_steps\":null,\"reference_reads\":64,\"repeat\":8,\"shape\":\"scalar\",\"source\":\"=FVSCHEDULE(100;[.C1:.C64])\",\"supported\":false}\npreflight case=financial-fvschedule-64 reference_reads=64 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-npv-64",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-npv-64\",\"class\":\"financial-stream\",\"evaluation_path\":\"value\",\"expected\":-1.4210854715202004e-14,\"max_steps\":null,\"reference_reads\":64,\"repeat\":8,\"shape\":\"scalar\",\"source\":\"=NPV(0.1;[.A1:.A64])\",\"supported\":false}\npreflight case=financial-npv-64 reference_reads=64 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-fvschedule-1024",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-fvschedule-1024\",\"class\":\"financial-stream\",\"evaluation_path\":\"value\",\"expected\":187.0002822387954,\"max_steps\":null,\"reference_reads\":1024,\"repeat\":1,\"shape\":\"scalar\",\"source\":\"=FVSCHEDULE(100;[.C1:.C1024])\",\"supported\":false}\npreflight case=financial-fvschedule-1024 reference_reads=1024 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-npv-1024",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-npv-1024\",\"class\":\"financial-stream\",\"evaluation_path\":\"value\",\"expected\":-1.4210854715202004e-14,\"max_steps\":8000000,\"reference_reads\":1024,\"repeat\":1,\"shape\":\"scalar\",\"source\":\"=NPV(0.1;[.A1:.A1024])\",\"supported\":false}\npreflight case=financial-npv-1024 reference_reads=1024 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-fvschedule-4096",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-fvschedule-4096\",\"class\":\"financial-stream\",\"evaluation_path\":\"value\",\"expected\":652814.146471943,\"max_steps\":null,\"reference_reads\":4096,\"repeat\":1,\"shape\":\"scalar\",\"source\":\"=FVSCHEDULE(100;[.C1:.C4096])\",\"supported\":false}\npreflight case=financial-fvschedule-4096 reference_reads=4096 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-npv-4096",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-npv-4096\",\"class\":\"financial-stream\",\"evaluation_path\":\"value\",\"expected\":-1.4210854715202004e-14,\"max_steps\":8000000,\"reference_reads\":4096,\"repeat\":1,\"shape\":\"scalar\",\"source\":\"=NPV(0.1;[.A1:.A4096])\",\"supported\":false}\npreflight case=financial-npv-4096 reference_reads=4096 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-irr-4",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-irr-4\",\"class\":\"financial-solver\",\"evaluation_path\":\"value\",\"expected\":0.1,\"max_steps\":null,\"reference_reads\":4,\"repeat\":4,\"shape\":\"scalar\",\"source\":\"=IRR([.A1:.A4])\",\"supported\":false}\npreflight case=financial-irr-4 reference_reads=4 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-xirr-4",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-xirr-4\",\"class\":\"financial-solver\",\"evaluation_path\":\"value\",\"expected\":0.1,\"max_steps\":null,\"reference_reads\":8,\"repeat\":4,\"shape\":\"scalar\",\"source\":\"=XIRR([.A1:.A4];[.B1:.B4])\",\"supported\":false}\npreflight case=financial-xirr-4 reference_reads=8 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-xnpv-4",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-xnpv-4\",\"class\":\"financial-stream\",\"evaluation_path\":\"value\",\"expected\":0.0,\"max_steps\":null,\"reference_reads\":8,\"repeat\":4,\"shape\":\"scalar\",\"source\":\"=XNPV(0.1;[.A1:.A4];[.B1:.B4])\",\"supported\":false}\npreflight case=financial-xnpv-4 reference_reads=8 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-mirr-4",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-mirr-4\",\"class\":\"financial-array\",\"evaluation_path\":\"value\",\"expected\":0.03228011545636722,\"max_steps\":null,\"reference_reads\":0,\"repeat\":4,\"shape\":\"scalar\",\"source\":\"=MIRR({-100|0|0|110};0.1;0.1)\",\"supported\":false}\npreflight case=financial-mirr-4 reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-irr-64",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-irr-64\",\"class\":\"financial-solver\",\"evaluation_path\":\"value\",\"expected\":0.1,\"max_steps\":null,\"reference_reads\":64,\"repeat\":4,\"shape\":\"scalar\",\"source\":\"=IRR([.A1:.A64])\",\"supported\":false}\npreflight case=financial-irr-64 reference_reads=64 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-xirr-64",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-xirr-64\",\"class\":\"financial-solver\",\"evaluation_path\":\"value\",\"expected\":0.1,\"max_steps\":null,\"reference_reads\":128,\"repeat\":4,\"shape\":\"scalar\",\"source\":\"=XIRR([.A1:.A64];[.B1:.B64])\",\"supported\":false}\npreflight case=financial-xirr-64 reference_reads=128 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-xnpv-64",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-xnpv-64\",\"class\":\"financial-stream\",\"evaluation_path\":\"value\",\"expected\":0.0,\"max_steps\":null,\"reference_reads\":128,\"repeat\":4,\"shape\":\"scalar\",\"source\":\"=XNPV(0.1;[.A1:.A64];[.B1:.B64])\",\"supported\":false}\npreflight case=financial-xnpv-64 reference_reads=128 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-mirr-64",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-mirr-64\",\"class\":\"financial-array\",\"evaluation_path\":\"value\",\"expected\":0.001514004946889358,\"max_steps\":null,\"reference_reads\":0,\"repeat\":4,\"shape\":\"scalar\",\"source\":\"=MIRR({-100|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|110};0.1;0.1)\",\"supported\":false}\npreflight case=financial-mirr-64 reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-irr-1024",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-irr-1024\",\"class\":\"financial-solver\",\"evaluation_path\":\"value\",\"expected\":0.1,\"max_steps\":null,\"reference_reads\":1024,\"repeat\":1,\"shape\":\"scalar\",\"source\":\"=IRR([.A1:.A1024])\",\"supported\":false}\npreflight case=financial-irr-1024 reference_reads=1024 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-xirr-1024",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-xirr-1024\",\"class\":\"financial-solver\",\"evaluation_path\":\"value\",\"expected\":0.1,\"max_steps\":null,\"reference_reads\":2048,\"repeat\":1,\"shape\":\"scalar\",\"source\":\"=XIRR([.A1:.A1024];[.B1:.B1024])\",\"supported\":false}\npreflight case=financial-xirr-1024 reference_reads=2048 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-xnpv-1024",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-xnpv-1024\",\"class\":\"financial-stream\",\"evaluation_path\":\"value\",\"expected\":0.0,\"max_steps\":8000000,\"reference_reads\":2048,\"repeat\":1,\"shape\":\"scalar\",\"source\":\"=XNPV(0.1;[.A1:.A1024];[.B1:.B1024])\",\"supported\":false}\npreflight case=financial-xnpv-1024 reference_reads=2048 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-mirr-1024",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-mirr-1024\",\"class\":\"financial-array\",\"evaluation_path\":\"value\",\"expected\":0.00009317167139766269,\"max_steps\":8000000,\"reference_reads\":0,\"repeat\":1,\"shape\":\"scalar\",\"source\":\"=MIRR({-100|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|110};0.1;0.1)\",\"supported\":false}\npreflight case=financial-mirr-1024 reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-irr-reference-list-refusal",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-irr-reference-list-refusal\",\"class\":\"financial-refusal\",\"evaluation_path\":\"value\",\"expected\":{\"kind\":\"formula_error\",\"value\":\"#VALUE!\"},\"max_steps\":null,\"reference_reads\":0,\"repeat\":1,\"shape\":\"scalar\",\"source\":\"=IRR([.A1:.A2]~[.A3:.A4])\",\"supported\":false}\npreflight case=financial-irr-reference-list-refusal reference_reads=0 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-npv-reference-limit",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-npv-reference-limit\",\"class\":\"financial-resource\",\"evaluation_path\":\"value\",\"expected\":{\"kind\":\"failure\",\"value\":\"ReferenceCells\"},\"max_steps\":null,\"reference_reads\":0,\"repeat\":1,\"shape\":\"scalar\",\"source\":\"=NPV(0.1;[.A1:.A4])\",\"supported\":true}\npreflight case=financial-npv-reference-limit reference_reads=0 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-irr-work-limit",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-irr-work-limit\",\"class\":\"financial-resource\",\"evaluation_path\":\"value\",\"expected\":{\"kind\":\"failure\",\"value\":\"Work\"},\"max_steps\":2,\"reference_reads\":0,\"repeat\":1,\"shape\":\"scalar\",\"source\":\"=IRR({-100|110})\",\"supported\":true}\npreflight case=financial-irr-work-limit reference_reads=0 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-npv-cancel-after-read",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-npv-cancel-after-read\",\"class\":\"financial-cancellation\",\"evaluation_path\":\"value\",\"expected\":{\"kind\":\"failure\",\"value\":\"Cancelled\"},\"max_steps\":null,\"reference_reads\":1,\"repeat\":4,\"shape\":\"scalar\",\"source\":\"=NPV(0.1;[.A1:.A4])\",\"supported\":true}\npreflight case=financial-npv-cancel-after-read reference_reads=1 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-npv-cancel-before-read",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-npv-cancel-before-read\",\"class\":\"financial-cancellation\",\"evaluation_path\":\"value\",\"expected\":{\"kind\":\"failure\",\"value\":\"Cancelled\"},\"max_steps\":null,\"reference_reads\":0,\"repeat\":4,\"shape\":\"scalar\",\"source\":\"=NPV(0.1;[.A1:.A4])\",\"supported\":true}\npreflight case=financial-npv-cancel-before-read reference_reads=0 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-npv-retained-formula-error",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-npv-retained-formula-error\",\"class\":\"financial-error\",\"evaluation_path\":\"value\",\"expected\":{\"kind\":\"formula_error\",\"value\":\"#N/A\"},\"max_steps\":null,\"reference_reads\":4,\"repeat\":1,\"shape\":\"scalar\",\"source\":\"=NPV(0.1;[.A1:.A4])\",\"supported\":false}\npreflight case=financial-npv-retained-formula-error reference_reads=4 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-npv-late-provider-failure",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-npv-late-provider-failure\",\"class\":\"financial-error\",\"evaluation_path\":\"value\",\"expected\":{\"kind\":\"failure\",\"value\":\"Unsupported\"},\"max_steps\":null,\"reference_reads\":1,\"repeat\":1,\"shape\":\"scalar\",\"source\":\"=NPV(0.1;[.A1:.A4])\",\"supported\":false}\npreflight case=financial-npv-late-provider-failure reference_reads=1 supported=false\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-irr-cancel-during-scan",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-irr-cancel-during-scan\",\"class\":\"financial-cancellation\",\"evaluation_path\":\"value\",\"expected\":{\"kind\":\"failure\",\"value\":\"Cancelled\"},\"max_steps\":null,\"reference_reads\":1,\"repeat\":1,\"shape\":\"scalar\",\"source\":\"=IRR([.A1:.A4])\",\"supported\":true}\npreflight case=financial-irr-cancel-during-scan reference_reads=1 supported=true\n",
+      "stderr": ""
+    },
+    {
+      "name": "financial-xnpv-late-date-provider-failure",
+      "exit_code": 0,
+      "stdout": "preflight-json {\"case\":\"financial-xnpv-late-date-provider-failure\",\"class\":\"financial-error\",\"evaluation_path\":\"value\",\"expected\":{\"kind\":\"failure\",\"value\":\"Unsupported\"},\"max_steps\":null,\"reference_reads\":4,\"repeat\":1,\"shape\":\"scalar\",\"source\":\"=XNPV(0.1;[.A1:.A4];[.B1:.B4])\",\"supported\":false}\npreflight case=financial-xnpv-late-date-provider-failure reference_reads=4 supported=false\n",
+      "stderr": ""
+    }
+  ]
+}

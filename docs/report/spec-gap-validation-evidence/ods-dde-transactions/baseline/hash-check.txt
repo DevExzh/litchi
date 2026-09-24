@@ -1,0 +1,15 @@
+Cargo.toml: OK
+crates/litchi-ods/Cargo.toml: OK
+crates/litchi-ods/src/lib.rs: OK
+crates/litchi-ods/src/model/mod.rs: OK
+crates/litchi-ods/src/model/dde.rs: OK
+crates/litchi-ods/src/facade/mod.rs: OK
+crates/litchi-ods/src/flat.rs: OK
+crates/litchi-ods/tests/source_features.rs: OK
+crates/litchi-ods/tests/ods_metadata_transactions.rs: OK
+crates/litchi-ods/tests/deferred_flat_spreadsheet.rs: OK
+crates/litchi-ods/tests/fixtures/odfpy-sheet-dde-source.fods: OK
+crates/litchi-ods/tests/fixtures/odfpy-sheet-dde-source-compact.fods: OK
+docs/report/spec-gap-validation-evidence/ods-dde-transactions/harness/Cargo.lock: OK
+docs/report/spec-gap-validation-evidence/ods-dde-transactions/harness/Cargo.toml: OK
+docs/report/spec-gap-validation-evidence/ods-dde-transactions/harness/src/main.rs: OK

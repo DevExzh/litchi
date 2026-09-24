@@ -1,0 +1,15 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--release",
+    "--manifest-path",
+    "docs/report/spec-gap-validation-evidence/ods-formula-expression-grammar/performance/expression-harness/Cargo.toml"
+  ],
+  "cwd": "/var/tmp/ods-expression-worktree",
+  "CARGO_TARGET_DIR": "/var/tmp/ods-expression-target",
+  "TMPDIR": "/var/tmp/ods-expression-tmp",
+  "status": 0
+}

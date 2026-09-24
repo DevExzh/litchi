@@ -1,0 +1,22 @@
+{
+  "head": "dee29f5b2ecd58c225143650147806a635772fad",
+  "evidence": {
+    "root-source-after.json.gz": "42166f5cb9923e3982fefbff99e67c0ffc13bd049f7b8afe123fd77f3dcacd60",
+    "root-python-tests.log.gz": "6e842276b9494ebfec3d978243ba96d50ae10089ccac3003c8ee102732c02721",
+    "root-setup-r0.json.gz": "b04e6df13a1c5bd94f25a71f3ffb71b3bda8b7197837f015da54edd7d25fa149",
+    "author-manifest.json.gz": "e822b4a7d5c40ea3846acdf148b98ca8c9db9a7b1d129ab2ed4421d82d147f1a",
+    "root-rustfmt.log.gz": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+    "README.md": "fc929bd4a5e7fb04ee0958ab7ca386c1ea86008715232a0a161efb3b83d9c505",
+    "author-perf-baseline-Cargo.lock.preimage.gz": "3aec71cc118b05271bd08c4f8f177817cdfc86cc379e410c944fd83e044da8e4",
+    "root-cold-tests.log.gz": "635af566167a2a9124eeca87203fe5de02ef302a663157571ab7ccc840d40909",
+    "root-gates.json.gz": "4346ee68d7a4f4e3c60730136e2ec7236d769e99be98ecc8815fbcfba9ed9be0",
+    "author-latest527-owned-overlay.patch.gz": "ef848099f9a24fc7e52864c053d116ac46ad5103a07cca73af5083b24a7a601c",
+    "author-perf-baseline-Cargo.lock.postimage.gz": "cba366e2a77613b66937efeadfcfd6fa9fe026d0ce2988c701ff0723e126f993",
+    "root-rustdoc.log.gz": "690cd7d923f448d4a1ea98ec952c411170546fad136c412fbb2193cb0116126d",
+    "root-clippy.log.gz": "a44ceb970bc15926509c513f34b7689ef33d66971148970c54455456c7a27b50",
+    "author-perf-baseline-cargo-lock-rc4-local-edges.patch.gz": "405df0c7981552db6deeed81d895325b030091f24398ea9f235d6a75ed43e298",
+    "root-integration.json.gz": "fdbe9f4fa7003dee1c45555b07566092edbb254c6c56f8c698ac93471729f316",
+    "author-cargo-lock-registry-comparison.json.gz": "ee5a78e15c5c0a7d33119a5f76f58a0febe4ebfea9fc85c7ee603c8764661a87",
+    "author-independent-cold-prepost-review-receipt.json.gz": "d890d710d602ef2b3475b4f3b3f72bd897b2b425f448705d8fc7cc7394f57ae1"
+  }
+}

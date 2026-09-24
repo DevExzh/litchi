@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "status": "pass",
+  "sample_count": 360,
+  "correctness_count": 3,
+  "complete_count": 3,
+  "samples_by_lane": {
+    "eager_noop_save_reopen": 45,
+    "eager_read": 45,
+    "eager_scalar_save_reopen": 45,
+    "source_forward_apply": 45,
+    "source_inverse_apply": 45,
+    "source_noop_save_reopen": 45,
+    "source_read": 45,
+    "source_scalar_save_reopen": 45
+  },
+  "samples_by_fixture": {
+    "singlecontrol": 120,
+    "tdf120301_xmlSpaceParsing": 120,
+    "tdf134769": 120
+  },
+  "raw_sha256": "db4e32d0ac3a348ba952af92975bdc96ab8c11966d550b4ce9a0451ceb830226",
+  "errors": [],
+  "stats_sha256": "07e1aa3032c563cf0e2753b1afcbf58a35f824c07dd93ae06d63d5be974298e8",
+  "report_sha256": "ede89728f498ef0c52cf8df895dcf9336efba32be99bf4ed65b16cf79ae17375"
+}

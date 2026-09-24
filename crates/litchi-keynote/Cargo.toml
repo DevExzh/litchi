@@ -7,6 +7,99 @@ authors.workspace      = true
 license.workspace      = true
 repository.workspace   = true
 rust-version.workspace = true
+autoexamples = false
+
+[[example]]
+name = "keynote_edit_chart_arrangement"
+path = "examples/edit_chart_arrangement.rs"
+
+[[example]]
+name = "edit_chart_caption"
+path = "examples/edit_chart_caption.rs"
+
+[[example]]
+name = "edit_chart_legend_visibility"
+path = "examples/edit_chart_legend_visibility.rs"
+
+[[example]]
+name = "edit_chart_title"
+path = "examples/edit_chart_title.rs"
+
+[[example]]
+name = "keynote_edit_image_adjustments"
+path = "examples/edit_image_adjustments.rs"
+
+[[example]]
+name = "edit_show_settings"
+path = "examples/edit_show_settings.rs"
+
+[[example]]
+name = "edit_slide_chart_data"
+path = "examples/edit_slide_chart_data.rs"
+
+[[example]]
+name = "edit_slide_chart_value_axis"
+path = "examples/edit_slide_chart_value_axis.rs"
+
+[[example]]
+name = "edit_slide_media_data"
+path = "examples/edit_slide_media_data.rs"
+
+[[example]]
+name = "edit_slide_notes"
+path = "examples/edit_slide_notes.rs"
+
+[[example]]
+name = "edit_slide_number_visibility"
+path = "examples/edit_slide_number_visibility.rs"
+
+[[example]]
+name = "edit_slide_placeholder_visibility"
+path = "examples/edit_slide_placeholder_visibility.rs"
+
+[[example]]
+name = "edit_slide_text"
+path = "examples/edit_slide_text.rs"
+
+[[example]]
+name = "edit_slide_transition"
+path = "examples/edit_slide_transition.rs"
+
+[[example]]
+name = "edit_soundtrack_items"
+path = "examples/edit_soundtrack_items.rs"
+
+[[example]]
+name = "edit_soundtrack_settings"
+path = "examples/edit_soundtrack_settings.rs"
+
+[[example]]
+name = "keynote_edit_table_cell_number_format"
+path = "examples/edit_table_cell_number_format.rs"
+
+[[example]]
+name = "execute_slide_table_sort"
+path = "examples/execute_slide_table_sort.rs"
+
+[[example]]
+name = "inspect_text"
+path = "examples/inspect_text.rs"
+
+[[example]]
+name = "move_slide"
+path = "examples/move_slide.rs"
+
+[[example]]
+name = "remove_slide"
+path = "examples/remove_slide.rs"
+
+[[example]]
+name = "keynote_save_package"
+path = "examples/save_package.rs"
+
+[[example]]
+name = "set_slide_skipped"
+path = "examples/set_slide_skipped.rs"
 
 [features]
 default = []

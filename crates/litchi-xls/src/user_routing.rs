@@ -3,9 +3,9 @@
 //!
 //! - **CUsr** (0x0191): count of unique users that have the shared workbook
 //!   open (MS-XLS 2.4.72).
-//! - **CbUsr** (0x018A): byte count of each `UsrInfo` record stored in the
+//! - **CbUsr** (0x0192): byte count of each `UsrInfo` record stored in the
 //!   user names stream of a shared workbook (MS-XLS 2.4.40).
-//! - **UsrInfo** (0x0192): one user of the shared workbook, from the user
+//! - **UsrInfo** (0x0193): one user of the shared workbook, from the user
 //!   names stream (MS-XLS 2.4.340).
 //! - **DocRoute** (0x00B8): routing-slip delivery options and strings of an
 //!   e-mail routed document (MS-XLS 2.4.91).
@@ -29,9 +29,9 @@ use super::{Error, Result};
 /// Record type of the `CUsr` record (MS-XLS 2.4.72).
 pub(crate) const C_USR_RECORD_TYPE: u16 = 0x0191;
 /// Record type of the `CbUsr` record (MS-XLS 2.4.40).
-pub(crate) const CB_USR_RECORD_TYPE: u16 = 0x018A;
+pub(crate) const CB_USR_RECORD_TYPE: u16 = 0x0192;
 /// Record type of the `UsrInfo` record (MS-XLS 2.4.340).
-pub(crate) const USR_INFO_RECORD_TYPE: u16 = 0x0192;
+pub(crate) const USR_INFO_RECORD_TYPE: u16 = 0x0193;
 /// Record type of the `DocRoute` record (MS-XLS 2.4.91).
 pub(crate) const DOC_ROUTE_RECORD_TYPE: u16 = 0x00B8;
 /// Record type of the `RecipName` record (MS-XLS 2.4.216).
@@ -63,10 +63,6 @@ const USR_INFO_MIN_NAME_CHARS: usize = 1;
 const USR_INFO_MAX_NAME_CHARS: usize = 54;
 /// `fHighByte` option bit of an `XLUnicodeString` (MS-XLS 2.5.294).
 const STRING_HIGH_BYTE: u8 = 0x01;
-/// Option bits of an `XLUnicodeString` that select rich-text runs or an
-/// extended string (`fRichSt`/`fExtSt`); neither can appear in the
-/// fixed-layout `UsrInfo` record (MS-XLS 2.5.294).
-const STRING_UNSUPPORTED_FLAGS: u8 = 0x0C;
 
 /// Byte length of the fixed `DocRoute` header: ten 2-byte fields plus the
 /// 4-byte `ulEIDSize` (MS-XLS 2.4.91).
@@ -269,6 +265,9 @@ pub struct UsrInfo {
     opened_at: ShortDtr,
     /// Name of this user (`stUserName`).
     user_name: String,
+    /// Raw `XLUnicodeString` option flags, including reserved producer bits.
+    /// Bits 1–7 are ignored during decoding and preserved on output.
+    string_flags: u8,
     /// Undefined trailing byte (`unused`), preserved verbatim.
     unused: u8,
 }
@@ -305,12 +304,6 @@ impl UsrInfo {
             ));
         }
         let flags = data[USR_INFO_PREFIX_LEN + 2];
-        if flags & STRING_UNSUPPORTED_FLAGS != 0 {
-            return Err(invalid(
-                USR_INFO_RECORD_TYPE,
-                "UsrInfo stUserName cannot carry rich-text or extended-string data",
-            ));
-        }
         let high_byte = flags & STRING_HIGH_BYTE != 0;
         let char_bytes = cch * if high_byte { 2 } else { 1 };
         let chars_offset = USR_INFO_PREFIX_LEN + XL_UNICODE_STRING_HEADER_LEN;
@@ -341,6 +334,7 @@ impl UsrInfo {
             guid,
             opened_at,
             user_name,
+            string_flags: flags,
             unused,
         })
     }
@@ -359,17 +353,18 @@ impl UsrInfo {
         payload.push(dtr.minute());
         payload.push(dtr.second());
         payload.push(dtr.weekday());
-        let high_byte = self.user_name.chars().any(|ch| u32::from(ch) > 0xFF);
-        payload.extend_from_slice(
-            &crate::utils::truncate_usize_to_u16(self.user_name.chars().count()).to_le_bytes(),
-        );
-        payload.push(if high_byte { STRING_HIGH_BYTE } else { 0 });
+        let units: Vec<u16> = self.user_name.encode_utf16().collect();
+        let high_byte =
+            self.string_flags & STRING_HIGH_BYTE != 0 || units.iter().any(|unit| *unit > 0xFF);
+        payload.extend_from_slice(&crate::utils::truncate_usize_to_u16(units.len()).to_le_bytes());
+        let string_flags = (self.string_flags & !STRING_HIGH_BYTE) | u8::from(high_byte);
+        payload.push(string_flags);
         if high_byte {
-            for unit in self.user_name.encode_utf16() {
+            for unit in units {
                 payload.extend_from_slice(&unit.to_le_bytes());
             }
         } else {
-            payload.extend(self.user_name.chars().map(|ch| ch as u8));
+            payload.extend(units.into_iter().map(|unit| unit as u8));
         }
         payload.push(self.unused);
         payload
@@ -397,6 +392,12 @@ impl UsrInfo {
     #[must_use]
     pub fn user_name(&self) -> &str {
         &self.user_name
+    }
+
+    /// Raw `XLUnicodeString` option flags, including reserved producer bits.
+    #[must_use]
+    pub const fn string_flags(&self) -> u8 {
+        self.string_flags
     }
 }
 
@@ -898,6 +899,15 @@ mod tests {
         assert_eq!(record.opened_at().month(), 5);
         assert_eq!(record.opened_at().weekday(), 2);
         assert_eq!(record.user_name(), "Alice");
+        assert_eq!(record.string_flags(), 0);
+        assert_eq!(record.to_payload(), payload);
+    }
+
+    #[test]
+    fn usr_info_round_trip_reserved_string_flag() {
+        let payload = usr_info_payload(5, 0x02, b"Alice");
+        let record = UsrInfo::parse(&payload).unwrap();
+        assert_eq!(record.string_flags(), 0x02);
         assert_eq!(record.to_payload(), payload);
     }
 
@@ -908,6 +918,23 @@ mod tests {
         let payload = usr_info_payload(2, STRING_HIGH_BYTE, &name);
         let record = UsrInfo::parse(&payload).unwrap();
         assert_eq!(record.user_name(), "Яб");
+        assert_eq!(record.to_payload(), payload);
+    }
+
+    #[test]
+    fn usr_info_round_trip_preserves_wide_ascii_and_reserved_flags() {
+        let payload = usr_info_payload(1, STRING_HIGH_BYTE | 0x02, &[b'A', 0]);
+        let record = UsrInfo::parse(&payload).unwrap();
+        assert_eq!(record.user_name(), "A");
+        assert_eq!(record.to_payload(), payload);
+    }
+
+    #[test]
+    fn usr_info_round_trip_surrogate_pair_counts_utf16_units() {
+        let name: Vec<u8> = "😀".encode_utf16().flat_map(u16::to_le_bytes).collect();
+        let payload = usr_info_payload(2, STRING_HIGH_BYTE, &name);
+        let record = UsrInfo::parse(&payload).unwrap();
+        assert_eq!(record.user_name(), "😀");
         assert_eq!(record.to_payload(), payload);
     }
 
@@ -924,11 +951,20 @@ mod tests {
     }
 
     #[test]
-    fn usr_info_rejects_rich_and_extended_strings() {
-        let payload = usr_info_payload(5, 0x08, b"Alice"); // fRichSt
-        assert!(UsrInfo::parse(&payload).is_err());
-        let payload = usr_info_payload(5, 0x04, b"Alice"); // fExtSt
-        assert!(UsrInfo::parse(&payload).is_err());
+    fn usr_info_preserves_all_plain_unicode_string_reserved_bits() {
+        // XLUnicodeString reserves every bit except fHighByte. It is not
+        // XLUnicodeRichExtendedString, whose flags describe extra fields.
+        for flags in 0..=u8::MAX {
+            let characters: &[u8] = if flags & STRING_HIGH_BYTE == 0 {
+                b"A"
+            } else {
+                &[b'A', 0]
+            };
+            let payload = usr_info_payload(1, flags, characters);
+            let parsed = UsrInfo::parse(&payload).unwrap();
+            assert_eq!(parsed.user_name(), "A");
+            assert_eq!(parsed.to_payload(), payload, "flags {flags:#04x}");
+        }
     }
 
     #[test]

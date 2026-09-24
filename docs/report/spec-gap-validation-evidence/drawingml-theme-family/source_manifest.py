@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""Hash the manifests and source trees Cargo can use for the profile binary."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def display(path: Path, root: Path) -> str:
+    path = path.resolve()
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def check_file(path: Path) -> None:
+    path = path.resolve()
+    if not path.is_file():
+        raise SystemExit(f"source manifest input is missing: {path}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--metadata", type=Path, required=True)
+    parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--extra", type=Path, action="append", default=[])
+    args = parser.parse_args()
+
+    root = args.root.resolve()
+    metadata_path = args.metadata.resolve()
+    metadata = json.loads(metadata_path.read_text())
+    packages: list[tuple[str, str, Path, str | None, list[Path]]] = []
+
+    for package in metadata["packages"]:
+        manifest = Path(package["manifest_path"]).resolve()
+        source_dir = manifest.parent / "src"
+        package_files = [manifest]
+        if source_dir.is_dir():
+            for path in sorted(source_dir.rglob("*")):
+                if path.is_file():
+                    package_files.append(path.resolve())
+        build_script = manifest.parent / "build.rs"
+        if build_script.is_file():
+            package_files.append(build_script.resolve())
+        for target in package["targets"]:
+            target_source = Path(target["src_path"])
+            if target_source.is_file() and not target_source.resolve().is_relative_to(source_dir.resolve()):
+                package_files.append(target_source.resolve())
+        package_files = sorted(set(package_files), key=str)
+        packages.append(
+            (
+                package["name"],
+                package["version"],
+                manifest,
+                package.get("source"),
+                package_files,
+            )
+        )
+
+    for extra in args.extra:
+        check_file(extra)
+
+    lines = [
+        "format=theme-family-build-source-v1",
+        f"metadata_sha256={sha256(metadata_path)}",
+    ]
+    for name, version, manifest, source, package_files in sorted(
+        packages, key=lambda value: (value[0], value[1], str(value[2]))
+    ):
+        source_text = source or "path"
+        package_hash_lines = [
+            f"{display(path, root)}\t{sha256(path)}" for path in package_files
+        ]
+        tree_hash = hashlib.sha256("\n".join(package_hash_lines).encode()).hexdigest()
+        lines.append(
+            "package="
+            + "\t".join(
+                (
+                    name,
+                    version,
+                    source_text,
+                    display(manifest, root),
+                    sha256(manifest),
+                    str(len(package_files)),
+                    tree_hash,
+                )
+            )
+        )
+    for path in args.extra:
+        resolved = path.resolve()
+        shown = display(resolved, root)
+        lines.append(f"extra=\t{shown}\t{sha256(resolved)}")
+    args.output.write_text("\n".join(lines) + "\n")
+
+
+if __name__ == "__main__":
+    main()

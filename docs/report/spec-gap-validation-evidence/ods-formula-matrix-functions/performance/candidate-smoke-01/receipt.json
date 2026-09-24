@@ -1,0 +1,25 @@
+{
+  "scope": "debug validation smoke; aborted on incorrect inverse oracle, not a production defect",
+  "source_basis": "../../candidate-03/source.tar.gz",
+  "harness_basis": "../harness-smoke-corrected/harness-source.tar.gz",
+  "build_status": 0,
+  "evaluate_status": 1,
+  "command": [
+    "ods-formula-matrix-functions-performance",
+    "--phase",
+    "evaluate",
+    "--warmups",
+    "0",
+    "--iterations",
+    "1",
+    "--repeat",
+    "1"
+  ],
+  "completed_rows": 6,
+  "binary_sha256": "db4553da038b35d2d9610dd11a8d9e3e35cbdcac52d73d02f2debe14ddc8e4aa",
+  "artifacts": {
+    "build.log": "b81f86a49f3f1644915e3c27ded61a7e6f2530a4df6b5b5e344e5f4d3f16caa2",
+    "evaluate.jsonl": "6d54b583bcd58c3b746a60e7eb2e8377ec9aa981c5734f035660996749a8e16e",
+    "evaluate.stderr": "adb182cf623a225e9173486fba7956c5e256dbb9cb8cafcf22756b471a05931b"
+  }
+}

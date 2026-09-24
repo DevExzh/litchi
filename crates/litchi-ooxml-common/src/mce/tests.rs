@@ -1009,22 +1009,28 @@ mod codec_tests {
     }
 
     #[test]
-    fn transformed_output_limit_is_exact_and_never_overcommitted() {
-        let xml = br#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><a value="&amp;"/></r>"#;
+    fn transformed_output_limit_is_exact_across_buffer_growth() {
+        let xml = br#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:p="urn:namespace-closure-expands-each-descendant"><a value="&amp;"><b/><c/><d/></a></r>"#;
         let output =
             process_markup_compatibility(xml, &Capabilities::new(), &Limits::default()).unwrap();
         let output_len = output.xml.len();
+        assert!(output_len > xml.len());
         let exact = Limits {
             max_output_bytes: output_len,
             ..Limits::default()
         };
-        assert_eq!(
-            process_markup_compatibility(xml, &Capabilities::new(), &exact)
+        for allowance in [0, 1, 37] {
+            let bounded = Limits {
+                max_output_bytes: output_len + allowance,
+                ..exact.clone()
+            };
+            let transformed = process_markup_compatibility(xml, &Capabilities::new(), &bounded)
                 .unwrap()
                 .xml
-                .len(),
-            output_len
-        );
+                .into_owned();
+            assert_eq!(transformed.as_slice(), output.xml.as_ref());
+            assert!(transformed.len() <= bounded.max_output_bytes);
+        }
         let over = Limits {
             max_output_bytes: output_len - 1,
             ..Limits::default()

@@ -1,22 +1,95 @@
 //! Bounded MIME, flat-document, and XML-part codecs for the generic owner.
 
 use super::Family;
+use super::flat::FlatMutationBudget;
 use crate::constants;
-use litchi_core::{Error, Result};
+use crate::core::ResolvedReader;
+use litchi_core::{Error, ExecutionContext, ExecutionError, Resource, Result};
 use quick_xml::events::Event;
-use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
 
-pub(super) fn validate_flat_document(xml: &str, family: Family) -> Result<()> {
+pub(super) fn validate_flat_document_with_context(
+    xml: &str,
+    family: Family,
+    context: &ExecutionContext,
+) -> Result<()> {
+    validate_flat_document_inner(xml, family, EventBudget::Context(context))
+}
+
+pub(super) fn validate_flat_document_with_budget(
+    xml: &str,
+    family: Family,
+    budget: &FlatMutationBudget,
+) -> Result<()> {
+    validate_flat_document_inner(xml, family, EventBudget::Mutation(budget))
+}
+
+enum EventBudget<'a> {
+    Context(&'a ExecutionContext),
+    Mutation(&'a FlatMutationBudget),
+}
+
+impl EventBudget<'_> {
+    fn event(&self, depth: usize, maximum_depth: &mut usize) -> Result<()> {
+        match self {
+            Self::Context(context) => {
+                context.check().map_err(map_execution_error)?;
+                context
+                    .consume(Resource::Work, 1)
+                    .map_err(map_execution_error)?;
+                context
+                    .consume(Resource::Objects, 1)
+                    .map_err(map_execution_error)?;
+                Self::observe_context_depth(context, depth, maximum_depth)
+            },
+            Self::Mutation(budget) => budget.event(depth),
+        }
+    }
+
+    fn observe(&self, depth: usize, maximum_depth: &mut usize) -> Result<()> {
+        match self {
+            Self::Context(context) => Self::observe_context_depth(context, depth, maximum_depth),
+            Self::Mutation(budget) => budget.observe_depth(depth),
+        }
+    }
+
+    fn observe_context_depth(
+        context: &ExecutionContext,
+        depth: usize,
+        maximum_depth: &mut usize,
+    ) -> Result<()> {
+        if depth <= *maximum_depth {
+            return Ok(());
+        }
+        context.check().map_err(map_execution_error)?;
+        context
+            .consume(
+                Resource::Depth,
+                u64::try_from(depth - *maximum_depth).map_err(|_| {
+                    Error::InvalidFormat(
+                        "flat OpenDocument XML depth exceeds platform limits".into(),
+                    )
+                })?,
+            )
+            .map_err(map_execution_error)?;
+        *maximum_depth = depth;
+        Ok(())
+    }
+}
+
+fn validate_flat_document_inner(
+    xml: &str,
+    family: Family,
+    event_budget: EventBudget<'_>,
+) -> Result<()> {
     const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
-    let mut reader = NsReader::from_str(xml);
-    let mut buffer = Vec::new();
+    let mut reader = ResolvedReader::from_xml(xml);
     let mut depth = 0usize;
     let mut root_seen = false;
     let mut root_closed = false;
     let mut body_seen = false;
     let mut family_body_seen = false;
+    let mut maximum_depth = 0usize;
     let expected_body = match family {
         Family::Text => b"text".as_slice(),
         Family::Spreadsheet => b"spreadsheet".as_slice(),
@@ -30,52 +103,50 @@ pub(super) fn validate_flat_document(xml: &str, family: Family) -> Result<()> {
         },
     };
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| {
-                Error::InvalidFormat(format!("invalid flat OpenDocument XML: {error}"))
-            })?;
+        event_budget.event(depth, &mut maximum_depth)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            Error::InvalidFormat(format!("invalid flat OpenDocument XML: {error}"))
+        })?;
         match event {
             Event::Start(element) => {
+                let is_office = crate::elements::xml::normalized_namespace_matches(
+                    &namespace,
+                    OFFICE_NAMESPACE,
+                    "flat OpenDocument",
+                )?;
                 if depth == 0 {
-                    if root_seen
-                        || !matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
-                        || element.local_name().as_ref() != b"document"
-                    {
+                    if root_seen || !is_office || element.local_name().as_ref() != b"document" {
                         return Err(Error::InvalidFormat(
                             "flat OpenDocument must contain one office:document root".to_string(),
                         ));
                     }
                     root_seen = true;
-                } else if depth == 1
-                    && matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
-                    && element.local_name().as_ref() == b"body"
-                {
+                } else if depth == 1 && is_office && element.local_name().as_ref() == b"body" {
                     body_seen = true;
-                } else if depth == 2
-                    && matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
-                    && element.local_name().as_ref() == expected_body
+                } else if depth == 2 && is_office && element.local_name().as_ref() == expected_body
                 {
                     family_body_seen = true;
                 }
                 depth = depth.checked_add(1).ok_or_else(|| {
                     Error::InvalidFormat("flat OpenDocument nesting overflow".to_string())
                 })?;
+                event_budget.observe(depth, &mut maximum_depth)?;
             },
             Event::Empty(element) => {
+                let is_office = crate::elements::xml::normalized_namespace_matches(
+                    &namespace,
+                    OFFICE_NAMESPACE,
+                    "flat OpenDocument",
+                )?;
                 if depth == 0 {
                     return Err(Error::InvalidFormat(
                         "flat OpenDocument root cannot be empty".to_string(),
                     ));
                 }
-                if depth == 1
-                    && matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
-                    && element.local_name().as_ref() == b"body"
-                {
+                event_budget.observe(depth + 1, &mut maximum_depth)?;
+                if depth == 1 && is_office && element.local_name().as_ref() == b"body" {
                     body_seen = true;
-                } else if depth == 2
-                    && matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
-                    && element.local_name().as_ref() == expected_body
+                } else if depth == 2 && is_office && element.local_name().as_ref() == expected_body
                 {
                     family_body_seen = true;
                 }
@@ -101,7 +172,6 @@ pub(super) fn validate_flat_document(xml: &str, family: Family) -> Result<()> {
             Event::Eof => break,
             _ => {},
         }
-        buffer.clear();
     }
     if !root_seen || !root_closed || depth != 0 || !body_seen || !family_body_seen {
         return Err(Error::InvalidFormat(
@@ -110,6 +180,15 @@ pub(super) fn validate_flat_document(xml: &str, family: Family) -> Result<()> {
     }
     Ok(())
 }
+
+fn map_execution_error(error: ExecutionError) -> Error {
+    match error {
+        ExecutionError::ResourceLimit(limit) => Error::ResourceLimit(limit),
+        ExecutionError::Cancelled => Error::Other("flat OpenDocument operation cancelled".into()),
+        other => Error::Other(format!("flat OpenDocument execution failed: {other}")),
+    }
+}
+
 pub(super) fn decode_xml_part(bytes: Vec<u8>, path: &str) -> Result<String> {
     String::from_utf8(bytes)
         .map_err(|_error| Error::InvalidFormat(format!("invalid UTF-8 in {path}")))

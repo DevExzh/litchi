@@ -13,7 +13,8 @@
 use crate::error::{Error, Result};
 /// Table, Row, and Cell structures for Word documents.
 use crate::namespace::{
-    direct_word_property_value, normalize_xml_integer, scan_word_element_ranges,
+    NamespaceBindings, direct_word_property_value, normalize_xml_integer, scan_word_element_ranges,
+    scan_word_element_ranges_with_context,
 };
 use crate::paragraph::{Paragraph, extract_word_text};
 use crate::revision::Revision;
@@ -21,7 +22,7 @@ use litchi_core::XmlSlice;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use smallvec::SmallVec;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, LazyLock, OnceLock};
 
 /// Internal storage for table XML data.
 /// Supports both owned data and shared slices for arena-based parsing.
@@ -30,7 +31,10 @@ enum XmlData {
     /// Owned data for standalone tables
     Owned(Box<[u8]>),
     /// Shared slice into an arena for zero-copy batch parsing
-    Shared(XmlSlice),
+    Shared {
+        slice: XmlSlice,
+        namespaces: NamespaceBindings,
+    },
 }
 
 impl XmlData {
@@ -38,7 +42,7 @@ impl XmlData {
     fn as_bytes(&self) -> &[u8] {
         match self {
             XmlData::Owned(b) => b,
-            XmlData::Shared(s) => s.as_bytes(),
+            XmlData::Shared { slice, .. } => slice.as_bytes(),
         }
     }
 
@@ -46,7 +50,14 @@ impl XmlData {
     fn get_or_create_arc(&self) -> (Arc<Vec<u8>>, u32) {
         match self {
             XmlData::Owned(bytes) => (Arc::new(bytes.to_vec()), 0),
-            XmlData::Shared(slice) => (slice.arc(), slice.start()),
+            XmlData::Shared { slice, .. } => (slice.arc(), slice.start()),
+        }
+    }
+
+    fn namespace_bindings(&self) -> &NamespaceBindings {
+        match self {
+            XmlData::Owned(_) => &EMPTY_NAMESPACE_BINDINGS,
+            XmlData::Shared { namespaces, .. } => namespaces,
         }
     }
 
@@ -59,7 +70,7 @@ impl XmlData {
     fn self_contained_xml(&self) -> Result<Vec<u8>> {
         match self {
             XmlData::Owned(bytes) => Ok(bytes.to_vec()),
-            XmlData::Shared(slice) => crate::namespace::self_contained_element_xml(
+            XmlData::Shared { slice, .. } => crate::namespace::self_contained_element_xml(
                 slice.arc().as_slice(),
                 slice.start(),
                 u32::try_from(slice.len()).map_err(|_source_error| {
@@ -69,6 +80,8 @@ impl XmlData {
         }
     }
 }
+
+static EMPTY_NAMESPACE_BINDINGS: LazyLock<NamespaceBindings> = LazyLock::new(|| Arc::from([]));
 
 fn absolute_start(base_offset: u32, relative_start: u32) -> Result<u32> {
     base_offset
@@ -195,7 +208,24 @@ impl Table {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn revisions(&self) -> Result<Vec<Revision>> {
-        Ok(crate::revision::parse_revisions(self.xml_bytes())?.into_vec())
+        let revisions = crate::revision::parse_revisions_with_context(
+            self.xml_bytes(),
+            self.xml_data.namespace_bindings(),
+        )?;
+        Ok(revisions.into_vec())
+    }
+
+    /// Read revisions in source order using explicit finite resource limits.
+    ///
+    /// # Errors
+    /// Returns an error for malformed revision XML or an exceeded resource limit.
+    pub fn revisions_with_limits(&self, limits: crate::revision::Limits) -> Result<Vec<Revision>> {
+        let revisions = crate::revision::parse_revisions_with_limits(
+            self.xml_bytes(),
+            self.xml_data.namespace_bindings(),
+            limits,
+        )?;
+        Ok(revisions.into_vec())
     }
 
     /// Create a new Table from XML bytes (owned).
@@ -212,8 +242,20 @@ impl Table {
     #[inline]
     #[must_use]
     pub fn from_arc_range(arena: Arc<Vec<u8>>, start: u32, len: u32) -> Self {
+        Self::from_arc_range_with_context(arena, start, len, Arc::clone(&EMPTY_NAMESPACE_BINDINGS))
+    }
+
+    pub(crate) fn from_arc_range_with_context(
+        arena: Arc<Vec<u8>>,
+        start: u32,
+        len: u32,
+        namespaces: NamespaceBindings,
+    ) -> Self {
         Self {
-            xml_data: XmlData::Shared(XmlSlice::new(arena, start, len)),
+            xml_data: XmlData::Shared {
+                slice: XmlSlice::new(arena, start, len),
+                namespaces,
+            },
             cached_rows: OnceLock::new(),
         }
     }
@@ -278,14 +320,20 @@ impl Table {
     fn parse_rows(&self) -> Result<SmallVec<[Row; 16]>> {
         let (source, base_offset) = self.xml_data.get_or_create_arc();
         let mut rows = SmallVec::new();
-        scan_word_element_ranges(self.xml_bytes(), &[b"tr".as_slice()], |_, start, length| {
-            rows.push(Row::from_arc_range(
-                Arc::clone(&source),
-                absolute_start(base_offset, start)?,
-                length,
-            ));
-            Ok(())
-        })?;
+        scan_word_element_ranges_with_context(
+            self.xml_bytes(),
+            self.xml_data.namespace_bindings(),
+            &[b"tr".as_slice()],
+            |_, start, length, namespaces| {
+                rows.push(Row::from_arc_range(
+                    Arc::clone(&source),
+                    absolute_start(base_offset, start)?,
+                    length,
+                    namespaces,
+                ));
+                Ok(())
+            },
+        )?;
         Ok(rows)
     }
 
@@ -340,7 +388,24 @@ impl Row {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn revisions(&self) -> Result<Vec<Revision>> {
-        Ok(crate::revision::parse_revisions(self.xml_bytes())?.into_vec())
+        let revisions = crate::revision::parse_revisions_with_context(
+            self.xml_bytes(),
+            self.xml_data.namespace_bindings(),
+        )?;
+        Ok(revisions.into_vec())
+    }
+
+    /// Read revisions in source order using explicit finite resource limits.
+    ///
+    /// # Errors
+    /// Returns an error for malformed revision XML or an exceeded resource limit.
+    pub fn revisions_with_limits(&self, limits: crate::revision::Limits) -> Result<Vec<Revision>> {
+        let revisions = crate::revision::parse_revisions_with_limits(
+            self.xml_bytes(),
+            self.xml_data.namespace_bindings(),
+            limits,
+        )?;
+        Ok(revisions.into_vec())
     }
 
     /// Create a new Row from XML bytes.
@@ -354,9 +419,17 @@ impl Row {
     }
 
     #[inline]
-    fn from_arc_range(arena: Arc<Vec<u8>>, start: u32, len: u32) -> Self {
+    fn from_arc_range(
+        arena: Arc<Vec<u8>>,
+        start: u32,
+        len: u32,
+        namespaces: NamespaceBindings,
+    ) -> Self {
         Self {
-            xml_data: XmlData::Shared(XmlSlice::new(arena, start, len)),
+            xml_data: XmlData::Shared {
+                slice: XmlSlice::new(arena, start, len),
+                namespaces,
+            },
             cached_cells: OnceLock::new(),
         }
     }
@@ -421,14 +494,20 @@ impl Row {
     fn parse_cells(&self) -> Result<SmallVec<[Cell; 16]>> {
         let (source, base_offset) = self.xml_data.get_or_create_arc();
         let mut cells = SmallVec::new();
-        scan_word_element_ranges(self.xml_bytes(), &[b"tc".as_slice()], |_, start, length| {
-            cells.push(Cell::from_arc_range(
-                Arc::clone(&source),
-                absolute_start(base_offset, start)?,
-                length,
-            ));
-            Ok(())
-        })?;
+        scan_word_element_ranges_with_context(
+            self.xml_bytes(),
+            self.xml_data.namespace_bindings(),
+            &[b"tc".as_slice()],
+            |_, start, length, namespaces| {
+                cells.push(Cell::from_arc_range_with_context(
+                    Arc::clone(&source),
+                    absolute_start(base_offset, start)?,
+                    length,
+                    namespaces,
+                ));
+                Ok(())
+            },
+        )?;
         Ok(cells)
     }
 }
@@ -466,7 +545,24 @@ impl Cell {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn revisions(&self) -> Result<Vec<Revision>> {
-        Ok(crate::revision::parse_revisions(self.xml_bytes())?.into_vec())
+        let revisions = crate::revision::parse_revisions_with_context(
+            self.xml_bytes(),
+            self.xml_data.namespace_bindings(),
+        )?;
+        Ok(revisions.into_vec())
+    }
+
+    /// Read revisions in source order using explicit finite resource limits.
+    ///
+    /// # Errors
+    /// Returns an error for malformed revision XML or an exceeded resource limit.
+    pub fn revisions_with_limits(&self, limits: crate::revision::Limits) -> Result<Vec<Revision>> {
+        let revisions = crate::revision::parse_revisions_with_limits(
+            self.xml_bytes(),
+            self.xml_data.namespace_bindings(),
+            limits,
+        )?;
+        Ok(revisions.into_vec())
     }
 
     /// Create a new Cell from XML bytes.
@@ -480,9 +576,17 @@ impl Cell {
     }
 
     #[inline]
-    fn from_arc_range(arena: Arc<Vec<u8>>, start: u32, len: u32) -> Self {
+    fn from_arc_range_with_context(
+        arena: Arc<Vec<u8>>,
+        start: u32,
+        len: u32,
+        namespaces: NamespaceBindings,
+    ) -> Self {
         Self {
-            xml_data: XmlData::Shared(XmlSlice::new(arena, start, len)),
+            xml_data: XmlData::Shared {
+                slice: XmlSlice::new(arena, start, len),
+                namespaces,
+            },
             cached_text: OnceLock::new(),
         }
     }
@@ -613,14 +717,20 @@ impl Cell {
     pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 8]>> {
         let (source, base_offset) = self.xml_data.get_or_create_arc();
         let mut paragraphs = SmallVec::new();
-        scan_word_element_ranges(self.xml_bytes(), &[b"p".as_slice()], |_, start, length| {
-            paragraphs.push(Paragraph::from_arc_range(
-                Arc::clone(&source),
-                absolute_start(base_offset, start)?,
-                length,
-            ));
-            Ok(())
-        })?;
+        scan_word_element_ranges_with_context(
+            self.xml_bytes(),
+            self.xml_data.namespace_bindings(),
+            &[b"p".as_slice()],
+            |_, start, length, namespaces| {
+                paragraphs.push(Paragraph::from_arc_range_with_context(
+                    Arc::clone(&source),
+                    absolute_start(base_offset, start)?,
+                    length,
+                    namespaces,
+                ));
+                Ok(())
+            },
+        )?;
         Ok(paragraphs)
     }
 }

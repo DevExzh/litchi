@@ -1,0 +1,212 @@
+{
+  "kind": "isolated-opc-fuzz-source-overlay",
+  "revision": "v3",
+  "date_utc": "2026-09-10",
+  "base_head": "5953a2ed1a036179042b55f96a4ee333e554b659",
+  "primary_root": "/home/zhuhe/code/litchi-spec-gaps",
+  "overlay_root": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3",
+  "primary_head_observed_after_parallel_work": "52519031b4c877032553bf5d4ea4393f3e0e60d1",
+  "owned_paths": [
+    "crates/litchi-opc/fuzz/Cargo.toml",
+    "crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+    "crates/litchi-opc/fuzz/fuzz_targets/opc_harness.rs",
+    "crates/litchi-opc/fuzz/fuzz_targets/smoke_opc.rs"
+  ],
+  "primary_worktree_touched_by_this_task": false,
+  "primary_owned_paths_match_overlay": false,
+  "primary_overlay_relationship": "The primary candidate contains the earlier v1 fuzz edits and remains preserved. This clean v3 overlay starts from base 5953a2ed1 and adds the v3 relationship-resolution/reopen assertions and 22 applicable boundary checks; integration should review the patch against the primary candidate before applying.",
+  "primary_status": [
+    "M crates/litchi-opc/fuzz/Cargo.toml",
+    " M crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+    "?? crates/litchi-opc/fuzz/fuzz_targets/opc_harness.rs",
+    "?? crates/litchi-opc/fuzz/fuzz_targets/smoke_opc.rs"
+  ],
+  "overlay_status": [
+    "M crates/litchi-opc/fuzz/Cargo.toml",
+    " M crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+    "?? crates/litchi-opc/fuzz/fuzz_targets/opc_harness.rs",
+    "?? crates/litchi-opc/fuzz/fuzz_targets/smoke_opc.rs"
+  ],
+  "files": [
+    {
+      "relative_path": "crates/litchi-opc/fuzz/Cargo.toml",
+      "primary": {
+        "relative_path": "crates/litchi-opc/fuzz/Cargo.toml",
+        "path": "/home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc/fuzz/Cargo.toml",
+        "bytes": 588,
+        "sha256": "e30d40781c458aee1f1f876b92fba7f3a1114001f334ef38381c7ddd2a8b8d26"
+      },
+      "overlay": {
+        "relative_path": "crates/litchi-opc/fuzz/Cargo.toml",
+        "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3/crates/litchi-opc/fuzz/Cargo.toml",
+        "bytes": 588,
+        "sha256": "e30d40781c458aee1f1f876b92fba7f3a1114001f334ef38381c7ddd2a8b8d26"
+      },
+      "sha256_match": true
+    },
+    {
+      "relative_path": "crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+      "primary": {
+        "relative_path": "crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+        "path": "/home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+        "bytes": 165,
+        "sha256": "8ab521491d73022eee117c604ef96dd76e834866d55b6784693188947258ba18"
+      },
+      "overlay": {
+        "relative_path": "crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+        "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3/crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+        "bytes": 301,
+        "sha256": "0efaaec21ec84fe478608b81c125ec3fec3abe5995d44950079d62b71a966db4"
+      },
+      "sha256_match": false
+    },
+    {
+      "relative_path": "crates/litchi-opc/fuzz/fuzz_targets/opc_harness.rs",
+      "primary": {
+        "relative_path": "crates/litchi-opc/fuzz/fuzz_targets/opc_harness.rs",
+        "path": "/home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc/fuzz/fuzz_targets/opc_harness.rs",
+        "bytes": 10148,
+        "sha256": "750397855f35ae4d316e5841f696d3dbba45ec45d63527491bb684dde94acf79"
+      },
+      "overlay": {
+        "relative_path": "crates/litchi-opc/fuzz/fuzz_targets/opc_harness.rs",
+        "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3/crates/litchi-opc/fuzz/fuzz_targets/opc_harness.rs",
+        "bytes": 27833,
+        "sha256": "26c16672bb312113ae481e08b3f38b52fa70906b19238989be5e19ada6292d2b"
+      },
+      "sha256_match": false
+    },
+    {
+      "relative_path": "crates/litchi-opc/fuzz/fuzz_targets/smoke_opc.rs",
+      "primary": {
+        "relative_path": "crates/litchi-opc/fuzz/fuzz_targets/smoke_opc.rs",
+        "path": "/home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc/fuzz/fuzz_targets/smoke_opc.rs",
+        "bytes": 5443,
+        "sha256": "990cc510aab67c191809ebf3719e931008ef7192c7aebd87d77b1a714077cbca"
+      },
+      "overlay": {
+        "relative_path": "crates/litchi-opc/fuzz/fuzz_targets/smoke_opc.rs",
+        "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3/crates/litchi-opc/fuzz/fuzz_targets/smoke_opc.rs",
+        "bytes": 9312,
+        "sha256": "1cb4d03cf5953bc64c567d98f48cb66f60b7f7f6dd918675f730a3009ea39949"
+      },
+      "sha256_match": false
+    }
+  ],
+  "source_delta_patch": {
+    "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/source-delta-v3.patch",
+    "bytes": 45294,
+    "sha256": "a60be8e2838960bcf9bcfa352c051351cbc10b86f0ddf182c25b6c6f96eebc4f",
+    "relative_path": "source-delta-v3.patch"
+  },
+  "fuzz_workspace_lock": {
+    "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3/crates/litchi-opc/fuzz/Cargo.lock",
+    "bytes": 22400,
+    "sha256": "c94123f2c10e92123034bb2b916b986ba989c0f51d4c202b5916d4a321f7b70d",
+    "relative_path": "crates/litchi-opc/fuzz/Cargo.lock",
+    "package_count": 99,
+    "used_by_validation": true,
+    "replay_mode": "--locked"
+  },
+  "root_workspace_lock": {
+    "path": "/home/zhuhe/code/litchi-spec-gaps/Cargo.lock",
+    "bytes": 138692,
+    "sha256": "28499130dfcc9fe70f86205d3872b5cac1290a74099bcaeabb88add3c418f3c5",
+    "used_for_fuzz_dependency_resolution": false
+  },
+  "locked_cargo_wrapper": {
+    "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/locked-cargo/bin/cargo",
+    "bytes": 362,
+    "sha256": "3307eec7fbd232fb48d6e63aa8a63f8f2c1ed57ed5ec9329efee87b447af1e5c"
+  },
+  "tooling_binary": {
+    "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/tooling/bin/cargo-fuzz",
+    "bytes": 2583800,
+    "sha256": "311966e03b177d403d6b472991d8dcda43e8ccc9fde6f5fcbd65144e5cad3e35"
+  },
+  "preservation_proof": {
+    "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/primary-v1-preservation-v3.json",
+    "bytes": 2138,
+    "sha256": "da6152f4f69b9c4522a82b2c4d91c9f88421a1500fa274d371aeeb5cb22c0663",
+    "relative_path": "primary-v1-preservation-v3.json"
+  },
+  "preserved_v2_evidence": [
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/README-v2.md",
+      "bytes": 1821,
+      "sha256": "00788cb7cd5edbf4f7318d8f86e4018e280ad7d668ec2db00ed5b5454e318ead",
+      "relative_path": "README-v2.md"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/receipt-v2.json",
+      "bytes": 14456,
+      "sha256": "55623944af3a8c4753a9682587bc82de374a5b3dda1bb6c537cc9c220ae68990",
+      "relative_path": "receipt-v2.json"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/source-manifest-v2.json",
+      "bytes": 7252,
+      "sha256": "1f6fa02220f2a730399d53d5c84b456adbfc622dca018c525ffbc0d605120563",
+      "relative_path": "source-manifest-v2.json"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/corpus-manifest-v2.json",
+      "bytes": 57929,
+      "sha256": "38f427922cf90da019a979f786cacac14cbe2f02d6ab277c87cad50011db2162",
+      "relative_path": "corpus-manifest-v2.json"
+    }
+  ],
+  "validation_logs": [
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/smoke-v3-rerun.log",
+      "bytes": 479,
+      "sha256": "aca5c14c273f9a7261ca74e3268ae1955545bafa40ba1635acd553b4141e343e",
+      "relative_path": "smoke-v3-rerun.log"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/clippy-v3-rerun.log",
+      "bytes": 2867,
+      "sha256": "45d5f17d5deedd6f0ba014a3f36b9b8f94d0196db5b6b2ca1900fdf803672359",
+      "relative_path": "clippy-v3-rerun.log"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/rustfmt-v3-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "relative_path": "rustfmt-v3-final.log"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/diff-check-v3-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "relative_path": "diff-check-v3-final.log"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/fuzz-build-v3-final.log",
+      "bytes": 6634,
+      "sha256": "9ef777a7151a789bd1800e12301f904971d4a46da63c5ce126ad93c278fa8cec",
+      "relative_path": "fuzz-build-v3-final.log"
+    },
+    {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/fuzz-run-v3-final.log",
+      "bytes": 26151,
+      "sha256": "b896675fd2ef2cb24bf276ef30b7bfa81e18ae97d925a9e4df4d6ca6b581f92a",
+      "relative_path": "fuzz-run-v3-final.log"
+    }
+  ],
+  "toolchain": {
+    "rust_1_95": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "nightly_rustc": "rustc 1.100.0-nightly (a36d05efa 2026-09-09)",
+    "nightly_cargo": "cargo 1.100.0-nightly (3c0b53475 2026-09-04)",
+    "cargo_fuzz": "cargo-fuzz 0.13.2",
+    "rustup_home": "/tmp/litchi-spec-gap-rustup",
+    "cargo_home": "/tmp/litchi-spec-gap-cargo-home",
+    "network": "offline",
+    "cargo_1_95": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+  },
+  "notes": [
+    "The V3 source overlay contains only the four owned fuzz source paths plus the ignored fuzz-workspace Cargo.lock generated for locked validation; build target directories are excluded from the source binding.",
+    "The primary HEAD observed during manifest creation was 52519031b4c877032553bf5d4ea4393f3e0e60d1; the overlay itself is frozen at the requested 5953a2ed1 base. Primary path hashes and the preservation proof are bound separately.",
+    "No primary or V2 evidence path was edited by this task."
+  ]
+}

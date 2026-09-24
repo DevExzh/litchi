@@ -1,0 +1,14 @@
+{
+  "removed_directories": [
+    "/home/zhuhe/code/litchi-roman-worktree",
+    "/home/zhuhe/code/litchi-roman-target",
+    "/home/zhuhe/code/litchi-roman-tmp"
+  ],
+  "all_removed_paths_absent": true,
+  "remaining_process_references": [],
+  "reclaimed_allocated_bytes": 1555263488,
+  "unique_archive": "/home/zhuhe/code/litchi-tmp-recovery-20260913/roman-final/unique-scratch.tar.gz",
+  "unique_archive_sha256": "160045b7abd02c4b6653dbbf73ba3423b2ca40e3b170fa4d136cfab3bfa24442",
+  "unique_file_count": 22,
+  "finished_at": "2026-09-13T15:01:40.853445+00:00"
+}

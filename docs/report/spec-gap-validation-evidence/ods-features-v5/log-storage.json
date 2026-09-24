@@ -1,0 +1,35 @@
+{
+  "format": "gzip; decompression restores exact gate logs",
+  "files": [
+    {
+      "raw_path": "/var/tmp/litchi-ods-feature-root-v5-20260910-tests.log",
+      "raw_sha256": "e283e052ee7355420aee5dc8636f97c06d359788c3eb7e7c95cb662e2bab641e",
+      "stored_name": "tests.log.gz",
+      "stored_sha256": "a98b8846827d1f2e9c944fbf1e3a00b6a8e8c1ed597efb22a09f9cb6654c0224"
+    },
+    {
+      "raw_path": "/var/tmp/litchi-ods-feature-root-v5-20260910-doctests.log",
+      "raw_sha256": "389c7abd072fb641e0b084d7744966f7a58ff6a51547eca5e4b1c79846c610ea",
+      "stored_name": "doctests.log.gz",
+      "stored_sha256": "6636485ef5df8f4840090ee1f203576a951dca24f21be81184b87d239e438e4c"
+    },
+    {
+      "raw_path": "/var/tmp/litchi-ods-feature-root-v5-20260910-clippy.log",
+      "raw_sha256": "24084b7ee87ca48771885d340b5bb986dcf8a2817c5282222d304c055351a571",
+      "stored_name": "clippy.log.gz",
+      "stored_sha256": "6767a1ff2bcaba12fe884b3ae5e49b7486ec072c49c9a1f1622add4ef5893d93"
+    },
+    {
+      "raw_path": "/var/tmp/litchi-ods-feature-root-v5-20260910-rustdoc.log",
+      "raw_sha256": "787756db712ee40898e3d15317c40a2b55403b0df191ea789276e4ef71fa0631",
+      "stored_name": "rustdoc.log.gz",
+      "stored_sha256": "31092b6f94ff1911a30cea4c2455f9d6fa701242062bf32f38e9c82e7cae6558"
+    },
+    {
+      "raw_path": "/var/tmp/litchi-ods-feature-root-v5-20260910-fmt.log",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stored_name": "fmt.log.gz",
+      "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    }
+  ]
+}

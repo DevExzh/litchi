@@ -15,7 +15,9 @@ use super::fat::FatBuilder;
 use super::header::HeaderBuilder;
 use super::minifat::MiniFatBuilder;
 use super::{atomic_replace, create_sibling_temp_file, parent_directory, sync_parent};
-use crate::consts::{DIFSECT, ENDOFCHAIN, FATSECT, MAXREGSECT};
+use crate::consts::{
+    DIFSECT, ENDOFCHAIN, FATSECT, MAXREGSECT, RANGE_LOCK_SECTOR_V4, SECTOR_SIZE_V4,
+};
 use crate::directory_name::directory_name_data;
 use crate::file::{OleError, OleFile};
 use litchi_core::CancellationToken;
@@ -595,6 +597,9 @@ struct StreamInput<'a> {
     path: Vec<String>,
     declared_len: u64,
     source: Box<dyn Read + 'a>,
+    state_bits: u32,
+    creation_time: u64,
+    modified_time: u64,
     start_sector: u32,
     start_mini_sector: u32,
 }
@@ -602,6 +607,9 @@ struct StreamInput<'a> {
 struct StorageInput {
     path: Vec<String>,
     clsid: Option<[u8; 16]>,
+    state_bits: u32,
+    creation_time: u64,
+    modified_time: u64,
 }
 
 /// A single-use writer for a fresh CFB artifact.
@@ -614,6 +622,9 @@ struct StorageInput {
 pub struct SequentialOleWriter<'a> {
     options: SequentialWriterOptions,
     root_clsid: Option<[u8; 16]>,
+    root_state_bits: u32,
+    root_creation_time: u64,
+    root_modified_time: u64,
     storages: Vec<StorageInput>,
     streams: Vec<StreamInput<'a>>,
     path_bytes: u64,
@@ -626,6 +637,9 @@ impl<'a> SequentialOleWriter<'a> {
         Self {
             options: SequentialWriterOptions::default(),
             root_clsid: None,
+            root_state_bits: 0,
+            root_creation_time: 0,
+            root_modified_time: 0,
             storages: Vec::new(),
             streams: Vec::new(),
             path_bytes: 0,
@@ -638,6 +652,9 @@ impl<'a> SequentialOleWriter<'a> {
         Ok(Self {
             options,
             root_clsid: None,
+            root_state_bits: 0,
+            root_creation_time: 0,
+            root_modified_time: 0,
             storages: Vec::new(),
             streams: Vec::new(),
             path_bytes: 0,
@@ -660,6 +677,37 @@ impl<'a> SequentialOleWriter<'a> {
         self.root_clsid = Some(clsid);
     }
 
+    /// Sets the root storage's user-defined state bits.
+    pub fn set_root_state_bits(&mut self, state_bits: u32) {
+        self.root_state_bits = state_bits;
+    }
+
+    /// Sets the root storage's raw modification FILETIME.
+    pub fn set_root_modified_time(&mut self, modified_time: u64) {
+        self.root_modified_time = modified_time;
+    }
+
+    /// Sets the root storage's creation FILETIME for a fresh artifact.
+    ///
+    /// The CFB root directory entry has no creation timestamp. This
+    /// forward-only writer has no source-replay mode, so only zero is valid.
+    ///
+    /// # Errors
+    ///
+    /// Returns a planning error when `creation_time` is nonzero.
+    pub fn set_root_creation_time(
+        &mut self,
+        creation_time: u64,
+    ) -> Result<(), SequentialWriteError> {
+        if creation_time != 0 {
+            return Err(planning(
+                "CFB fresh root creation time must be zero; sequential writer has no source replay mode",
+            ));
+        }
+        self.root_creation_time = 0;
+        Ok(())
+    }
+
     /// Declares a storage path.  Missing parent storages are created during planning.
     pub fn create_storage(&mut self, path: &[&str]) -> Result<(), SequentialWriteError> {
         let path_bytes_before = self.path_bytes;
@@ -672,7 +720,13 @@ impl<'a> SequentialOleWriter<'a> {
             self.path_bytes = path_bytes_before;
             return Err(OleError::allocation("sequential storage table", source).into());
         }
-        self.storages.push(StorageInput { path, clsid: None });
+        self.storages.push(StorageInput {
+            path,
+            clsid: None,
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
+        });
         Ok(())
     }
 
@@ -704,8 +758,139 @@ impl<'a> SequentialOleWriter<'a> {
         self.storages.push(StorageInput {
             path,
             clsid: Some(clsid),
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
         });
         Ok(())
+    }
+
+    /// Sets the raw state and FILETIME fields for an existing or newly
+    /// declared storage path. Path matching uses the exact stored spelling,
+    /// consistent with sequential storage registration; it does not resolve
+    /// case aliases before planning.
+    pub fn set_storage_metadata(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "storage path")?;
+        self.set_storage_metadata_owned(
+            path,
+            state_bits,
+            creation_time,
+            modified_time,
+            path_bytes_before,
+        )
+    }
+
+    fn set_storage_metadata_owned(
+        &mut self,
+        path: Vec<String>,
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+        path_bytes_before: u64,
+    ) -> Result<(), SequentialWriteError> {
+        if path.is_empty() {
+            self.path_bytes = path_bytes_before;
+            return Err(planning("CFB storage metadata path must not be empty"));
+        }
+        if let Some(storage) = self
+            .storages
+            .iter_mut()
+            .find(|storage| storage.path == path)
+        {
+            storage.state_bits = state_bits;
+            storage.creation_time = creation_time;
+            storage.modified_time = modified_time;
+            self.path_bytes = path_bytes_before;
+            return Ok(());
+        }
+        if let Err(source) = self.storages.try_reserve(1) {
+            self.path_bytes = path_bytes_before;
+            return Err(OleError::allocation("sequential storage table", source).into());
+        }
+        self.storages.push(StorageInput {
+            path,
+            clsid: None,
+            state_bits,
+            creation_time,
+            modified_time,
+        });
+        Ok(())
+    }
+
+    /// Sets only the state bits for an existing or newly declared storage.
+    pub fn set_storage_state_bits(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "storage path")?;
+        let existing = self
+            .storages
+            .iter()
+            .find(|storage| storage.path == path)
+            .map(|storage| (storage.creation_time, storage.modified_time));
+        let (creation_time, modified_time) = existing.unwrap_or((0, 0));
+        self.set_storage_metadata_owned(
+            path,
+            state_bits,
+            creation_time,
+            modified_time,
+            path_bytes_before,
+        )
+    }
+
+    /// Sets only the creation FILETIME for an existing or newly declared storage.
+    pub fn set_storage_creation_time(
+        &mut self,
+        path: &[&str],
+        creation_time: u64,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "storage path")?;
+        let existing = self
+            .storages
+            .iter()
+            .find(|storage| storage.path == path)
+            .map(|storage| (storage.state_bits, storage.modified_time));
+        let (state_bits, modified_time) = existing.unwrap_or((0, 0));
+        self.set_storage_metadata_owned(
+            path,
+            state_bits,
+            creation_time,
+            modified_time,
+            path_bytes_before,
+        )
+    }
+
+    /// Sets only the modification FILETIME for an existing or newly declared storage.
+    pub fn set_storage_modified_time(
+        &mut self,
+        path: &[&str],
+        modified_time: u64,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "storage path")?;
+        let existing = self
+            .storages
+            .iter()
+            .find(|storage| storage.path == path)
+            .map(|storage| (storage.state_bits, storage.creation_time));
+        let (state_bits, creation_time) = existing.unwrap_or((0, 0));
+        self.set_storage_metadata_owned(
+            path,
+            state_bits,
+            creation_time,
+            modified_time,
+            path_bytes_before,
+        )
     }
 
     /// Registers one single-use source and its exact byte length.
@@ -743,9 +928,90 @@ impl<'a> SequentialOleWriter<'a> {
             path,
             declared_len,
             source: Box::new(source),
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
             start_sector: ENDOFCHAIN,
             start_mini_sector: ENDOFCHAIN,
         });
+        Ok(())
+    }
+
+    /// Sets the raw state and FILETIME fields for an existing stream.
+    ///
+    /// Sequential writers default newly added streams to zero. This setter
+    /// is available when a caller is replaying raw source metadata, including
+    /// legacy nonzero stream timestamp words. Path matching uses the exact
+    /// stored spelling, consistent with sequential stream registration; it
+    /// does not resolve case aliases before planning.
+    pub fn set_stream_metadata(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "stream path")?;
+        let Some(stream) = self.streams.iter_mut().find(|stream| stream.path == path) else {
+            self.path_bytes = path_bytes_before;
+            return Err(planning("CFB stream metadata target does not exist"));
+        };
+        stream.state_bits = state_bits;
+        stream.creation_time = creation_time;
+        stream.modified_time = modified_time;
+        self.path_bytes = path_bytes_before;
+        Ok(())
+    }
+
+    /// Sets only the state bits for an existing stream.
+    pub fn set_stream_state_bits(
+        &mut self,
+        path: &[&str],
+        state_bits: u32,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "stream path")?;
+        let Some(stream) = self.streams.iter_mut().find(|stream| stream.path == path) else {
+            self.path_bytes = path_bytes_before;
+            return Err(planning("CFB stream metadata target does not exist"));
+        };
+        stream.state_bits = state_bits;
+        self.path_bytes = path_bytes_before;
+        Ok(())
+    }
+
+    /// Sets only the creation FILETIME for an existing stream.
+    pub fn set_stream_creation_time(
+        &mut self,
+        path: &[&str],
+        creation_time: u64,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "stream path")?;
+        let Some(stream) = self.streams.iter_mut().find(|stream| stream.path == path) else {
+            self.path_bytes = path_bytes_before;
+            return Err(planning("CFB stream metadata target does not exist"));
+        };
+        stream.creation_time = creation_time;
+        self.path_bytes = path_bytes_before;
+        Ok(())
+    }
+
+    /// Sets only the modification FILETIME for an existing stream.
+    pub fn set_stream_modified_time(
+        &mut self,
+        path: &[&str],
+        modified_time: u64,
+    ) -> Result<(), SequentialWriteError> {
+        let path_bytes_before = self.path_bytes;
+        let path = self.own_path(path, "stream path")?;
+        let Some(stream) = self.streams.iter_mut().find(|stream| stream.path == path) else {
+            self.path_bytes = path_bytes_before;
+            return Err(planning("CFB stream metadata target does not exist"));
+        };
+        stream.modified_time = modified_time;
+        self.path_bytes = path_bytes_before;
         Ok(())
     }
 
@@ -772,6 +1038,7 @@ impl<'a> SequentialOleWriter<'a> {
         let mut accepted = 0_u64;
         let mut buffer = plan.publication_buffer;
         let expected = plan.output_bytes;
+        let mut physical = PhysicalOutputCursor::new(plan.sector_size);
 
         publish_segment(
             sink,
@@ -790,6 +1057,7 @@ impl<'a> SequentialOleWriter<'a> {
                 &mut accepted,
                 expected,
                 &plan.cancellation,
+                &mut physical,
             )?;
         }
         if !plan.small_streams.is_empty() {
@@ -802,6 +1070,7 @@ impl<'a> SequentialOleWriter<'a> {
                     &mut accepted,
                     expected,
                     &plan.cancellation,
+                    &mut physical,
                 )?;
             }
             let mini_stream_bytes = plan
@@ -835,6 +1104,7 @@ impl<'a> SequentialOleWriter<'a> {
                 &mut accepted,
                 expected,
                 &plan.cancellation,
+                &mut physical,
             )?;
         }
 
@@ -846,15 +1116,16 @@ impl<'a> SequentialOleWriter<'a> {
             &mut accepted,
             expected,
             &plan.cancellation,
+            &mut physical,
         )?;
         for sector in &plan.minifat_sectors {
-            publish_segment(sink, sector, &mut accepted, expected, &plan.cancellation)?;
+            physical.publish(sink, sector, &mut accepted, expected, &plan.cancellation)?;
         }
         for sector in &plan.difat_sectors {
-            publish_segment(sink, sector, &mut accepted, expected, &plan.cancellation)?;
+            physical.publish(sink, sector, &mut accepted, expected, &plan.cancellation)?;
         }
         for sector in &plan.fat_sectors {
-            publish_segment(sink, sector, &mut accepted, expected, &plan.cancellation)?;
+            physical.publish(sink, sector, &mut accepted, expected, &plan.cancellation)?;
         }
 
         if accepted != expected {
@@ -1112,7 +1383,9 @@ impl<'a> SequentialOleWriter<'a> {
                 large_streams.push(index);
             }
         }
-        if u64::from(fat.total_sectors()) != preflight.large_sector_count {
+        if u64::from(fat.total_sectors())
+            != physical_sector_count(preflight.large_sector_count, sector_size)?
+        {
             return Err(planning(
                 "CFB large-stream preflight disagrees with allocation",
             ));
@@ -1136,10 +1409,13 @@ impl<'a> SequentialOleWriter<'a> {
                 .map_err(SequentialWriteError::Planning)?
         };
         let sectors_after_ministream = u64::from(fat.total_sectors());
-        let expected_after_ministream = preflight
-            .large_sector_count
-            .checked_add(preflight.ministream_sector_count)
-            .ok_or_else(|| planning("CFB ministream sector count overflows u64"))?;
+        let expected_after_ministream = physical_sector_count(
+            preflight
+                .large_sector_count
+                .checked_add(preflight.ministream_sector_count)
+                .ok_or_else(|| planning("CFB ministream sector count overflows u64"))?,
+            sector_size,
+        )?;
         if sectors_after_ministream != expected_after_ministream {
             return Err(planning(
                 "CFB ministream sector preflight disagrees with allocation",
@@ -1151,6 +1427,11 @@ impl<'a> SequentialOleWriter<'a> {
         if let Some(clsid) = self.root_clsid {
             directory.set_root_clsid(clsid);
         }
+        directory.set_root_state_bits(self.root_state_bits);
+        directory
+            .set_root_creation_time(self.root_creation_time)
+            .map_err(SequentialWriteError::Planning)?;
+        directory.set_root_modified_time(self.root_modified_time);
         for storage in &self.storages {
             directory
                 .add_storage_path(&storage.path)
@@ -1162,17 +1443,41 @@ impl<'a> SequentialOleWriter<'a> {
                     .set_storage_clsid(&storage.path, clsid)
                     .map_err(SequentialWriteError::Planning)?;
             }
+            directory
+                .set_storage_metadata(
+                    &storage.path,
+                    storage.state_bits,
+                    storage.creation_time,
+                    storage.modified_time,
+                )
+                .map_err(SequentialWriteError::Planning)?;
         }
         for &index in &large_streams {
             let stream = &self.streams[index];
-            directory
+            let sid = directory
                 .add_stream_path(&stream.path, stream.start_sector, stream.declared_len)
+                .map_err(SequentialWriteError::Planning)?;
+            directory
+                .set_stream_metadata_sid(
+                    sid,
+                    stream.state_bits,
+                    stream.creation_time,
+                    stream.modified_time,
+                )
                 .map_err(SequentialWriteError::Planning)?;
         }
         for &index in &small_streams {
             let stream = &self.streams[index];
-            directory
+            let sid = directory
                 .add_stream_path(&stream.path, stream.start_mini_sector, stream.declared_len)
+                .map_err(SequentialWriteError::Planning)?;
+            directory
+                .set_stream_metadata_sid(
+                    sid,
+                    stream.state_bits,
+                    stream.creation_time,
+                    stream.modified_time,
+                )
                 .map_err(SequentialWriteError::Planning)?;
         }
         let directory_entries = u64::try_from(directory.entry_count()).unwrap_or(u64::MAX);
@@ -1192,11 +1497,15 @@ impl<'a> SequentialOleWriter<'a> {
         let directory_start = fat
             .allocate_chain_u64(u64::try_from(directory_bytes.len()).unwrap_or(u64::MAX))
             .map_err(SequentialWriteError::Planning)?;
-        if u64::from(fat.total_sectors())
-            != expected_after_ministream
-                .checked_add(preflight.directory_sector_count)
-                .ok_or_else(|| planning("CFB directory sector count overflows u64"))?
-        {
+        let expected_after_directory = physical_sector_count(
+            preflight
+                .large_sector_count
+                .checked_add(preflight.ministream_sector_count)
+                .and_then(|value| value.checked_add(preflight.directory_sector_count))
+                .ok_or_else(|| planning("CFB directory sector count overflows u64"))?,
+            sector_size,
+        )?;
+        if u64::from(fat.total_sectors()) != expected_after_directory {
             return Err(planning(
                 "CFB directory sector preflight disagrees with allocation",
             ));
@@ -1219,12 +1528,16 @@ impl<'a> SequentialOleWriter<'a> {
             fat.allocate_chain_u64(bytes)
                 .map_err(SequentialWriteError::Planning)?
         };
-        if u64::from(fat.total_sectors())
-            != expected_after_ministream
-                .checked_add(preflight.directory_sector_count)
+        let expected_after_minifat = physical_sector_count(
+            preflight
+                .large_sector_count
+                .checked_add(preflight.ministream_sector_count)
+                .and_then(|value| value.checked_add(preflight.directory_sector_count))
                 .and_then(|value| value.checked_add(preflight.minifat_sector_count))
-                .ok_or_else(|| planning("CFB MiniFAT sector count overflows u64"))?
-        {
+                .ok_or_else(|| planning("CFB MiniFAT sector count overflows u64"))?,
+            sector_size,
+        )?;
+        if u64::from(fat.total_sectors()) != expected_after_minifat {
             return Err(planning(
                 "CFB MiniFAT sector preflight disagrees with allocation",
             ));
@@ -1254,10 +1567,12 @@ impl<'a> SequentialOleWriter<'a> {
             fat.allocate_special(fat_count, FATSECT)
                 .map_err(SequentialWriteError::Planning)?
         };
+        fat.finalize_range_lock()
+            .map_err(SequentialWriteError::Planning)?;
         validate_output_size(sector_size, fat.total_sectors(), limits.max_output_bytes)?;
         fat.validate().map_err(SequentialWriteError::Planning)?;
 
-        let fat_sector_ids = sector_ids(fat_start, fat_count)?;
+        let fat_sector_ids = sector_ids(fat_start, fat_count, sector_size)?;
         let mut difat = DifatBuilder::new(sector_size).map_err(SequentialWriteError::Planning)?;
         difat
             .set_fat_sectors(&fat_sector_ids)
@@ -1352,6 +1667,11 @@ impl<'a> SequentialOleWriter<'a> {
             physical_bytes = physical_bytes
                 .checked_add(u64::try_from(sector.len()).unwrap_or(u64::MAX))
                 .ok_or_else(|| planning("CFB metadata physical length overflows u64"))?;
+        }
+        if sector_size == SECTOR_SIZE_V4 && fat.total_sectors() > RANGE_LOCK_SECTOR_V4 {
+            physical_bytes = physical_bytes
+                .checked_add(u64::try_from(sector_size).unwrap_or(u64::MAX))
+                .ok_or_else(|| planning("CFB range-lock sector length overflows u64"))?;
         }
         if physical_bytes != output_bytes {
             return Err(planning("CFB sequential physical layout length mismatch"));
@@ -1455,21 +1775,23 @@ fn preflight_layout(
         .checked_mul(4)
         .ok_or_else(|| planning("CFB MiniFAT byte count overflows u64"))?;
     let minifat_sector_count = ceil_div_u64(minifat_bytes, sector_size)?;
-    let used_sectors = large_sector_count
+    let logical_used_sectors = large_sector_count
         .checked_add(ministream_sector_count)
         .and_then(|value| value.checked_add(directory_sector_count))
         .and_then(|value| value.checked_add(minifat_sector_count))
         .ok_or_else(|| planning("CFB used-sector count overflows u64"))?;
+    let used_sectors = physical_sector_count(logical_used_sectors, sector_size)?;
     let used_u32 = u32::try_from(used_sectors)
         .map_err(|_err| planning("CFB used-sector count exceeds u32"))?;
     let (fat_sector_count, difat_sector_count) =
         allocation_table_sector_counts(used_u32, sector_size)?;
     let fat_sector_count = u64::from(fat_sector_count);
     let difat_sector_count = u64::from(difat_sector_count);
-    let total_sectors = used_sectors
+    let logical_total_sectors = logical_used_sectors
         .checked_add(fat_sector_count)
         .and_then(|value| value.checked_add(difat_sector_count))
         .ok_or_else(|| planning("CFB total-sector count overflows u64"))?;
+    let total_sectors = physical_sector_count(logical_total_sectors, sector_size)?;
     let total_u32 = u32::try_from(total_sectors)
         .map_err(|_err| planning("CFB total-sector count exceeds u32"))?;
     validate_output_size(sector_size, total_u32, limits.max_output_bytes)?;
@@ -1576,6 +1898,22 @@ fn sectors_for_u64(value: u64, sector_size: usize) -> Result<u64, SequentialWrit
     ceil_div_u64(value, sector_size)
 }
 
+/// Map logical allocations to physical sector count while reserving the
+/// fixed version-4 range-lock hole.  The allocator starts at sector zero, so
+/// the hole is consumed exactly once when any logical sector would lie after
+/// its fixed ID.
+fn physical_sector_count(
+    logical_count: u64,
+    sector_size: usize,
+) -> Result<u64, SequentialWriteError> {
+    if sector_size != SECTOR_SIZE_V4 || logical_count <= u64::from(RANGE_LOCK_SECTOR_V4) {
+        return Ok(logical_count);
+    }
+    logical_count
+        .checked_add(1)
+        .ok_or_else(|| planning("CFB physical sector count overflows u64"))
+}
+
 struct SequentialPlan<'a> {
     sector_size: usize,
     cancellation: Option<CancellationToken>,
@@ -1592,6 +1930,87 @@ struct SequentialPlan<'a> {
     publication_buffer: Vec<u8>,
 }
 
+/// Publishes bytes in physical sector order while inserting the fixed v4
+/// range-lock sector without consuming source payload bytes.
+struct PhysicalOutputCursor {
+    sector_size: usize,
+    next_sector: u32,
+    used_in_sector: usize,
+    range_lock_sector: Option<u32>,
+}
+
+impl PhysicalOutputCursor {
+    fn new(sector_size: usize) -> Self {
+        Self {
+            sector_size,
+            next_sector: 0,
+            used_in_sector: 0,
+            range_lock_sector: (sector_size == SECTOR_SIZE_V4).then_some(RANGE_LOCK_SECTOR_V4),
+        }
+    }
+
+    fn publish<W: Write>(
+        &mut self,
+        sink: &mut W,
+        bytes: &[u8],
+        accepted: &mut u64,
+        expected_output: u64,
+        cancellation: &Option<CancellationToken>,
+    ) -> Result<(), SequentialWriteError> {
+        const ZEROES: [u8; 4096] = [0; 4096];
+        let mut offset = 0usize;
+        while offset < bytes.len() {
+            if self.used_in_sector == 0 && self.range_lock_sector == Some(self.next_sector) {
+                publish_segment(
+                    sink,
+                    &ZEROES[..self.sector_size],
+                    accepted,
+                    expected_output,
+                    cancellation,
+                )?;
+                self.next_sector = self
+                    .next_sector
+                    .checked_add(1)
+                    .ok_or_else(|| planning("CFB physical sector cursor overflows u32"))?;
+                continue;
+            }
+            // Retain the caller's buffered write size, splitting only at the
+            // reserved sector. Partial sectors may span input buffers.
+            let before_lock = self
+                .range_lock_sector
+                .filter(|lock| *lock > self.next_sector);
+            let capacity = before_lock.map_or(usize::MAX, |lock| {
+                let bytes = u64::from(lock - self.next_sector)
+                    * u64::try_from(self.sector_size).unwrap_or(u64::MAX)
+                    - u64::try_from(self.used_in_sector).unwrap_or(0);
+                usize::try_from(bytes).unwrap_or(usize::MAX)
+            });
+            let count = capacity.min(bytes.len() - offset);
+            publish_segment(
+                sink,
+                &bytes[offset..offset + count],
+                accepted,
+                expected_output,
+                cancellation,
+            )?;
+            offset += count;
+            let progressed = u64::try_from(count)
+                .ok()
+                .and_then(|count| count.checked_add(self.used_in_sector as u64))
+                .ok_or_else(|| planning("CFB physical byte cursor overflows u64"))?;
+            let sectors = u32::try_from(progressed / self.sector_size as u64)
+                .map_err(|_err| planning("CFB physical sector cursor overflows u32"))?;
+            self.next_sector = self
+                .next_sector
+                .checked_add(sectors)
+                .ok_or_else(|| planning("CFB physical sector cursor overflows u32"))?;
+            self.used_in_sector = usize::try_from(progressed % self.sector_size as u64)
+                .map_err(|_err| planning("CFB physical sector offset exceeds usize"))?;
+        }
+        Ok(())
+    }
+}
+
 fn emit_stream<W: Write>(
     sink: &mut W,
     stream: &mut StreamInput<'_>,
@@ -1600,6 +2019,7 @@ fn emit_stream<W: Write>(
     accepted: &mut u64,
     expected_output: u64,
     cancellation: &Option<CancellationToken>,
+    physical: &mut PhysicalOutputCursor,
 ) -> Result<(), SequentialWriteError> {
     let expected = stream.declared_len;
     let mut remaining = expected;
@@ -1644,7 +2064,7 @@ fn emit_stream<W: Write>(
         let read_u64 = u64::try_from(read).unwrap_or(u64::MAX);
         observed = observed.saturating_add(read_u64);
         remaining = remaining.saturating_sub(read_u64);
-        publish_segment(
+        physical.publish(
             sink,
             &buffer[..read],
             accepted,
@@ -1696,6 +2116,7 @@ fn emit_stream<W: Write>(
         accepted,
         expected_output,
         cancellation,
+        physical,
     )
 }
 
@@ -1707,8 +2128,9 @@ fn publish_padded<W: Write>(
     accepted: &mut u64,
     expected_output: u64,
     cancellation: &Option<CancellationToken>,
+    physical: &mut PhysicalOutputCursor,
 ) -> Result<(), SequentialWriteError> {
-    publish_segment(sink, bytes, accepted, expected_output, cancellation)?;
+    physical.publish(sink, bytes, accepted, expected_output, cancellation)?;
     let bytes_len = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
     let padding = padded_len(bytes_len, alignment)
         .and_then(|padded| padded.checked_sub(bytes_len))
@@ -1724,6 +2146,7 @@ fn publish_padded<W: Write>(
         accepted,
         expected_output,
         cancellation,
+        physical,
     )
 }
 
@@ -1734,6 +2157,7 @@ fn publish_zeroes<W: Write>(
     accepted: &mut u64,
     expected_output: u64,
     cancellation: &Option<CancellationToken>,
+    physical: &mut PhysicalOutputCursor,
 ) -> Result<(), SequentialWriteError> {
     buffer.fill(0);
     while bytes != 0 {
@@ -1741,7 +2165,7 @@ fn publish_zeroes<W: Write>(
         let count = usize::try_from(bytes)
             .unwrap_or(buffer.len())
             .min(buffer.len());
-        publish_segment(
+        physical.publish(
             sink,
             &buffer[..count],
             accepted,
@@ -1918,8 +2342,8 @@ fn validate_output_size(
     sector_count: u32,
     maximum: u64,
 ) -> Result<(), SequentialWriteError> {
-    // MAXREGSECT is the first reserved sector marker, not a usable sector ID.
-    // Require the complete regular-sector count to remain strictly below it.
+    // MS-CFB 2.9 caps the complete file at MAXREGSECT sectors, including
+    // its header. The count here covers only sectors following the header.
     if sector_count >= MAXREGSECT {
         return Err(planning(
             "CFB output requires a sector count below MAXREGSECT",
@@ -1949,10 +2373,21 @@ fn allocation_table_sector_counts(
     let mut fat = 0_u32;
     let mut difat = 0_u32;
     for _ in 0..32 {
-        let total = used
+        let mut total = used
             .checked_add(fat)
             .and_then(|value| value.checked_add(difat))
             .ok_or_else(|| planning("CFB sector count overflows u32"))?;
+        if sector_size == SECTOR_SIZE_V4
+            && used <= RANGE_LOCK_SECTOR_V4
+            && total > RANGE_LOCK_SECTOR_V4
+        {
+            total = total
+                .checked_add(1)
+                .ok_or_else(|| planning("CFB range-lock sector overflows u32"))?;
+        }
+        if total > MAXREGSECT {
+            return Err(planning("CFB sector count exceeds MAXREGSECT"));
+        }
         let next_fat = total.div_ceil(fat_entries);
         let next_difat = next_fat.saturating_sub(109).div_ceil(difat_entries);
         if next_fat == fat && next_difat == difat {
@@ -1964,22 +2399,35 @@ fn allocation_table_sector_counts(
     Err(planning("CFB FAT/DIFAT planning did not converge"))
 }
 
-fn sector_ids(start: u32, count: u32) -> Result<Vec<u32>, SequentialWriteError> {
+fn sector_ids(
+    start: u32,
+    count: u32,
+    sector_size: usize,
+) -> Result<Vec<u32>, SequentialWriteError> {
     if count == 0 {
         return Ok(Vec::new());
-    }
-    let end = start
-        .checked_add(count)
-        .ok_or_else(|| planning("CFB FAT sector range overflows u32"))?;
-    if start >= MAXREGSECT || end > MAXREGSECT {
-        return Err(planning("CFB FAT sector range exceeds MAXREGSECT"));
     }
     let count =
         usize::try_from(count).map_err(|_err| planning("CFB FAT sector count exceeds usize"))?;
     let mut ids = Vec::new();
     ids.try_reserve_exact(count)
         .map_err(|source| OleError::allocation("sequential FAT sector IDs", source))?;
-    ids.extend(start..end);
+    let mut current = start;
+    while ids.len() < count {
+        if sector_size == SECTOR_SIZE_V4 && current == RANGE_LOCK_SECTOR_V4 {
+            current = current
+                .checked_add(1)
+                .ok_or_else(|| planning("CFB range-lock sector overflows u32"))?;
+            continue;
+        }
+        if current >= MAXREGSECT {
+            return Err(planning("CFB FAT sector range exceeds MAXREGSECT"));
+        }
+        ids.push(current);
+        current = current
+            .checked_add(1)
+            .ok_or_else(|| planning("CFB FAT sector range overflows u32"))?;
+    }
     Ok(ids)
 }
 
@@ -1992,6 +2440,7 @@ mod tests {
     )]
 
     use super::*;
+    use crate::consts::TWO_GIB_BYTES;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -2016,6 +2465,25 @@ mod tests {
     }
 
     #[test]
+    fn metadata_crossing_range_lock_expands_fat_capacity() {
+        // Without the reserved hole, 512 FAT sectors appear to fit exactly.
+        // The metadata allocations cross the hole and need a 513th FAT sector.
+        let used = 512 * 1024 - 512 - 1;
+        assert_eq!(
+            allocation_table_sector_counts(used - 1, 4096).unwrap(),
+            (512, 1)
+        );
+        assert_eq!(
+            allocation_table_sector_counts(used, 4096).unwrap(),
+            (513, 1)
+        );
+        assert_eq!(
+            allocation_table_sector_counts(used + 1, 4096).unwrap(),
+            (513, 1)
+        );
+    }
+
+    #[test]
     fn exact_two_gib_and_reserved_sector_boundaries_are_explicit() {
         let exact_two_gib_sector_count = u32::try_from(DEFAULT_MAX_OUTPUT_BYTES / 512 - 1).unwrap();
         assert!(
@@ -2037,6 +2505,147 @@ mod tests {
                 .to_string()
                 .contains("sector count below MAXREGSECT")
         );
+    }
+
+    #[test]
+    fn physical_output_preserves_buffered_writes_and_inserts_only_the_lock_hole() {
+        #[derive(Default)]
+        struct Sink {
+            writes: Vec<Vec<u8>>,
+        }
+        impl Write for Sink {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                self.writes.push(bytes.to_vec());
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let data = vec![0xA5; 64 * 1024];
+        for sector_size in [512, 4096] {
+            let mut physical = PhysicalOutputCursor::new(sector_size);
+            let mut sink = Sink::default();
+            let mut accepted = 0;
+            physical
+                .publish(&mut sink, &data, &mut accepted, data.len() as u64, &None)
+                .unwrap();
+            assert_eq!(sink.writes, vec![data.clone()]);
+            assert_eq!(accepted, data.len() as u64);
+        }
+        let mut physical = PhysicalOutputCursor::new(4096);
+        physical.next_sector = RANGE_LOCK_SECTOR_V4 - 1;
+        physical.used_in_sector = 7;
+        let mut sink = Sink::default();
+        let mut accepted = 0;
+        physical
+            .publish(
+                &mut sink,
+                &data,
+                &mut accepted,
+                (data.len() + 4096) as u64,
+                &None,
+            )
+            .unwrap();
+        assert_eq!(sink.writes.len(), 3);
+        assert_eq!(sink.writes[0], data[..4089]);
+        assert_eq!(sink.writes[1], vec![0; 4096]);
+        assert_eq!(sink.writes[2], data[4089..]);
+        assert_eq!(accepted, (data.len() + 4096) as u64);
+        assert_eq!(physical.next_sector, RANGE_LOCK_SECTOR_V4 + 16);
+        assert_eq!(physical.used_in_sector, 7);
+    }
+
+    #[test]
+    fn version_four_range_lock_adds_one_physical_sector_after_the_fixed_id() {
+        let lock = u64::from(RANGE_LOCK_SECTOR_V4);
+        assert_eq!(physical_sector_count(lock, SECTOR_SIZE_V4).unwrap(), lock);
+        assert_eq!(
+            physical_sector_count(lock + 1, SECTOR_SIZE_V4).unwrap(),
+            lock + 2
+        );
+        assert_eq!(physical_sector_count(lock + 1, 512).unwrap(), lock + 1);
+    }
+
+    #[test]
+    fn version_four_counting_publication_crosses_range_lock_without_retaining_payload() {
+        struct Repeating {
+            remaining: u64,
+        }
+
+        impl Read for Repeating {
+            fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+                let count = usize::try_from(self.remaining)
+                    .unwrap_or(output.len())
+                    .min(output.len());
+                output[..count].fill(0xA5);
+                self.remaining -= u64::try_from(count).unwrap_or(0);
+                Ok(count)
+            }
+        }
+
+        struct CountingSink {
+            bytes: u64,
+            range_lock_nonzero: bool,
+        }
+
+        impl Write for CountingSink {
+            fn write(&mut self, input: &[u8]) -> io::Result<usize> {
+                let lock_start =
+                    (u64::from(RANGE_LOCK_SECTOR_V4) + 1) * u64::try_from(SECTOR_SIZE_V4).unwrap();
+                let start = self.bytes;
+                let end = start + u64::try_from(input.len()).unwrap();
+                if start < lock_start + u64::try_from(SECTOR_SIZE_V4).unwrap() && end > lock_start {
+                    let first = usize::try_from(lock_start.saturating_sub(start)).unwrap_or(0);
+                    let first = first.min(input.len());
+                    let last = usize::try_from(
+                        (lock_start + u64::try_from(SECTOR_SIZE_V4).unwrap()).saturating_sub(start),
+                    )
+                    .unwrap_or(input.len())
+                    .min(input.len());
+                    if input[first..last].iter().any(|byte| *byte != 0) {
+                        self.range_lock_nonzero = true;
+                    }
+                }
+                self.bytes += u64::try_from(input.len()).unwrap_or(u64::MAX);
+                Ok(input.len())
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let payload_len =
+            u64::from(RANGE_LOCK_SECTOR_V4 + 1) * u64::try_from(SECTOR_SIZE_V4).unwrap();
+        let limits = SequentialWriterLimits::new(
+            4,
+            16,
+            8,
+            128,
+            payload_len,
+            256 * 1024 * 1024,
+            TWO_GIB_BYTES + 16 * 1024 * 1024,
+        );
+        let options = SequentialWriterOptions::new(SECTOR_SIZE_V4, limits, 64 * 1024);
+        let mut writer = SequentialOleWriter::with_options(options).unwrap();
+        writer
+            .add_stream(
+                &["Large"],
+                payload_len,
+                Repeating {
+                    remaining: payload_len,
+                },
+            )
+            .unwrap();
+        let mut sink = CountingSink {
+            bytes: 0,
+            range_lock_nonzero: false,
+        };
+        let report = writer.write_to(&mut sink).unwrap();
+        assert!(report.output_bytes() > TWO_GIB_BYTES);
+        assert_eq!(report.output_bytes(), sink.bytes);
+        assert!(!sink.range_lock_nonzero);
     }
 
     #[test]

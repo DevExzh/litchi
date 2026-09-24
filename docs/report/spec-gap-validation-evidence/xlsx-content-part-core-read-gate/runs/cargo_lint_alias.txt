@@ -1,0 +1,39 @@
+$ CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/home/zhuhe/xlsx-content-part-final-target-20260912 cargo lint --locked --offline
+   Compiling syn v2.0.114
+   Compiling libc v0.2.189
+   Compiling libm v0.2.16
+   Compiling num-traits v0.2.19
+   Compiling serde_core v1.0.229
+   Compiling thiserror-impl v2.0.18
+    Checking getrandom v0.4.3
+    Checking crypto-common v0.2.2
+   Compiling serde v1.0.229
+   Compiling zerocopy v0.8.56
+    Checking thiserror v2.0.18
+   Compiling zerocopy-derive v0.8.56
+   Compiling generic-array v0.14.7
+    Checking const-oid v0.9.6
+    Checking chrono v0.4.45
+    Checking digest v0.11.3
+   Compiling pkg-config v0.3.34
+    Checking crypto-common v0.1.7
+    Checking hashbrown v0.16.1
+    Checking equivalent v1.0.2
+    Checking indexmap v2.11.4
+   Compiling find-msvc-tools v0.1.12
+   Compiling shlex v2.0.1
+   Compiling serde_json v1.0.149
+   Compiling cc v1.4.5
+    Checking block-buffer v0.10.4
+    Checking either v1.18.0
+    Checking digest v0.10.7
+    Checking rand v0.10.2
+    Checking sha2 v0.11.0
+    Checking litchi-core v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-core)
+error: Unrecognized option: 'locked'
+
+error: could not compile `litchi-core` (lib)
+
+Caused by:
+  process didn't exit successfully: `/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/clippy-driver /home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name litchi_core --edition=2024 crates/litchi-core/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata -C embed-bitcode=no -C debuginfo=2 '--deny=clippy::all' --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs '--deny=rustdoc::unescaped_backticks' --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints '--deny=rustdoc::redundant_explicit_links' '--deny=rustdoc::private_intra_doc_links' --deny=non_ascii_idents '--allow=clippy::needless_return' '--allow=clippy::manual_saturating_arithmetic' '--allow=clippy::manual_is_multiple_of' '--deny=rustdoc::invalid_rust_codeblocks' '--deny=rustdoc::invalid_html_tags' '--deny=rustdoc::invalid_codeblock_attributes' '--allow=clippy::if_same_then_else' '--allow=clippy::collapsible_match' '--allow=clippy::collapsible_if' '--deny=rustdoc::broken_intra_doc_links' '--deny=rustdoc::bare_urls' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=dbd4e27cf5f9a851 -C extra-filename=-9da8d38334958ad8 --out-dir /home/zhuhe/xlsx-content-part-final-target-20260912/debug/deps -L dependency=/home/zhuhe/xlsx-content-part-final-target-20260912/debug/deps --extern base64=/home/zhuhe/xlsx-content-part-final-target-20260912/debug/deps/libbase64-62463b3040bdadaa.rmeta --extern chrono=/home/zhuhe/xlsx-content-part-final-target-20260912/debug/deps/libchrono-a059254481fa2ff8.rmeta --extern fast_float2=/home/zhuhe/xlsx-content-part-final-target-20260912/debug/deps/libfast_float2-38fb18ea68243f47.rmeta --extern once_cell=/home/zhuhe/xlsx-content-part-final-target-20260912/debug/deps/libonce_cell-08e43b4cec5c7e80.rmeta --extern rand=/home/zhuhe/xlsx-content-part-final-target-20260912/debug/deps/librand-784c8bfb1ca0feed.rmeta --extern serde=/home/zhuhe/xlsx-content-part-final-target-20260912/debug/deps/libserde-e9ff5c4f3f7aa5be.rmeta --extern serde_json=/home/zhuhe/xlsx-content-part-final-target-20260912/debug/deps/libserde_json-3f594dd267d94875.rmeta --extern sha2=/home/zhuhe/xlsx-content-part-final-target-20260912/debug/deps/libsha2-a2b86f162412ebe6.rmeta --extern smallvec=/home/zhuhe/xlsx-content-part-final-target-20260912/debug/deps/libsmallvec-20dd76d8f6c987fa.rmeta --extern thiserror=/home/zhuhe/xlsx-content-part-final-target-20260912/debug/deps/libthiserror-e4082574db230005.rmeta --extern zerocopy=/home/zhuhe/xlsx-content-part-final-target-20260912/debug/deps/libzerocopy-0964671ca2478706.rmeta` (exit status: 1)
+exit=101

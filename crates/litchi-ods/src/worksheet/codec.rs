@@ -3,6 +3,7 @@
 use super::{Cell, CellValue, Row, Sheet};
 use super::{model::Merge, validation};
 use crate::model::hyperlink::{Actuate, Link, Show};
+use crate::model::source::CellRange;
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -44,6 +45,8 @@ pub(crate) enum NamespaceKind {
 struct Attributes {
     name: Option<String>,
     style_name: Option<String>,
+    template_name: Option<String>,
+    style_usage: crate::model::structure::StyleUsage,
     default_cell_style_name: Option<String>,
     value_type: Option<String>,
     value: Option<String>,
@@ -52,6 +55,7 @@ struct Attributes {
     boolean_value: Option<String>,
     currency: Option<String>,
     formula: Option<String>,
+    range_source: Option<CellRange>,
     rows_repeated: usize,
     columns_repeated: usize,
     rows_spanned: usize,
@@ -64,6 +68,8 @@ impl Default for Attributes {
         Self {
             name: None,
             style_name: None,
+            template_name: None,
+            style_usage: crate::model::structure::StyleUsage::default(),
             default_cell_style_name: None,
             value_type: None,
             value: None,
@@ -72,6 +78,7 @@ impl Default for Attributes {
             boolean_value: None,
             currency: None,
             formula: None,
+            range_source: None,
             rows_repeated: 1,
             columns_repeated: 1,
             rows_spanned: 1,
@@ -129,8 +136,47 @@ impl Attributes {
             };
             if namespace == TABLE_NAMESPACE.as_bytes() {
                 match local {
-                    b"name" => result.name = Some(value.into_owned()),
-                    b"style-name" => result.style_name = Some(value.into_owned()),
+                    b"name" => set_unique(&mut result.name, value.into_owned(), "table:name")?,
+                    b"style-name" => set_unique(
+                        &mut result.style_name,
+                        value.into_owned(),
+                        "table:style-name",
+                    )?,
+                    b"template-name" => set_unique(
+                        &mut result.template_name,
+                        value.into_owned(),
+                        "table:template-name",
+                    )?,
+                    b"use-first-row-styles" => set_unique(
+                        &mut result.style_usage.use_first_row_styles,
+                        parse_bool(&value, "table:use-first-row-styles")?,
+                        "table:use-first-row-styles",
+                    )?,
+                    b"use-last-row-styles" => set_unique(
+                        &mut result.style_usage.use_last_row_styles,
+                        parse_bool(&value, "table:use-last-row-styles")?,
+                        "table:use-last-row-styles",
+                    )?,
+                    b"use-first-column-styles" => set_unique(
+                        &mut result.style_usage.use_first_column_styles,
+                        parse_bool(&value, "table:use-first-column-styles")?,
+                        "table:use-first-column-styles",
+                    )?,
+                    b"use-last-column-styles" => set_unique(
+                        &mut result.style_usage.use_last_column_styles,
+                        parse_bool(&value, "table:use-last-column-styles")?,
+                        "table:use-last-column-styles",
+                    )?,
+                    b"use-banding-rows-styles" => set_unique(
+                        &mut result.style_usage.use_banding_row_styles,
+                        parse_bool(&value, "table:use-banding-rows-styles")?,
+                        "table:use-banding-rows-styles",
+                    )?,
+                    b"use-banding-columns-styles" => set_unique(
+                        &mut result.style_usage.use_banding_column_styles,
+                        parse_bool(&value, "table:use-banding-columns-styles")?,
+                        "table:use-banding-columns-styles",
+                    )?,
                     b"default-cell-style-name" => {
                         result.default_cell_style_name = Some(value.into_owned())
                     },
@@ -209,6 +255,7 @@ impl Attributes {
         cell.formula = self.formula;
         cell.style_name = self.style_name;
         cell.hyperlinks = hyperlinks;
+        cell.range_source = self.range_source;
         cell.merge = if self.covered {
             Merge::Covered
         } else if self.rows_spanned != 1 || self.columns_spanned != 1 {
@@ -447,6 +494,11 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                 }
                 let local = element.local_name();
                 let parent = stack.last().copied();
+                if is_cell_range_source(namespace, local.as_ref()) {
+                    return Err(Error::InvalidFormat(
+                        "table:cell-range-source must be an empty direct cell child".to_string(),
+                    ));
+                }
                 let mut kind = classify(namespace, local.as_ref());
                 if dde_cache_depth.is_some() {
                     kind = Kind::Other;
@@ -495,6 +547,10 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                             name: attributes.name.unwrap_or_else(|| "Sheet1".to_string()),
                             rows: Vec::new(),
                             style_name: attributes.style_name,
+                            template_name: attributes.template_name,
+                            style_usage: attributes.style_usage,
+                            title: None,
+                            description: None,
                         });
                     },
                     Kind::Row => {
@@ -554,6 +610,26 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                     )));
                 }
                 let local = element.local_name();
+                if is_cell_range_source(namespace, local.as_ref()) {
+                    if stack.last() != Some(&Kind::Cell) {
+                        return Err(Error::InvalidFormat(
+                            "table:cell-range-source must be a direct cell child".to_string(),
+                        ));
+                    }
+                    let source =
+                        parse_cell_range_source(&element, reader.resolver(), reader.decoder())?;
+                    let cell = current_cell.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("table:cell-range-source has no open cell".to_string())
+                    })?;
+                    if cell.attributes.range_source.replace(source).is_some() {
+                        return Err(Error::InvalidFormat(
+                            "ODS cell has duplicate table:cell-range-source declarations"
+                                .to_string(),
+                        ));
+                    }
+                    buffer.clear();
+                    continue;
+                }
                 let mut kind = classify(namespace, local.as_ref());
                 if dde_cache_depth.is_some() {
                     kind = Kind::Other;
@@ -573,6 +649,10 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                             name: attributes.name.unwrap_or_else(|| "Sheet1".to_string()),
                             rows: Vec::new(),
                             style_name: attributes.style_name,
+                            template_name: attributes.template_name,
+                            style_usage: attributes.style_usage,
+                            title: None,
+                            description: None,
                         };
                         reserve_parser_push(
                             &mut sheets,
@@ -785,6 +865,7 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
             "ODS content ended with an unfinished worksheet object".to_string(),
         ));
     }
+    apply_table_metadata(xml, &mut sheets)?;
     if require_unique_names {
         validation::validate_sheets(&sheets)?;
     } else {
@@ -799,6 +880,314 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
         }
     }
     Ok(sheets)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TableMetadataKind {
+    Title,
+    Description,
+}
+
+struct OpenTableMetadata {
+    sheet_index: usize,
+    kind: TableMetadataKind,
+    depth: usize,
+    value: String,
+}
+
+/// Read the schema-owned direct `table:title` and `table:desc` children.
+///
+/// The worksheet event loop deliberately treats unknown table children as
+/// inert so that the old row model can continue to read producer documents.
+/// These two text-only children are nevertheless part of the public worksheet
+/// model, so they get a small bounded pass of their own.  The pass is strict
+/// about the ODF shape and never evaluates or otherwise interprets text.
+pub(crate) fn apply_table_metadata(xml: &str, sheets: &mut [Sheet]) -> Result<()> {
+    // Keep metadata admission on the same normalized namespace reader as the
+    // fused worksheet pass.  In particular, escaped namespace declaration
+    // values must resolve semantically while the original source bytes remain
+    // untouched for source-backed publication.
+    let mut reader = litchi_odf_common::core::ResolvedReader::from_xml(xml);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    let mut stack = Vec::<(NamespaceKind, Vec<u8>)>::new();
+    let mut direct_table_count = 0usize;
+    let mut open = None::<OpenTableMetadata>;
+
+    loop {
+        let (resolved, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid ODS XML: {error}")))?;
+        let namespace = namespace_kind(&resolved);
+        match event {
+            Event::Start(element) => {
+                let local = element.local_name();
+                if open.is_some() {
+                    return Err(Error::InvalidFormat(
+                        "table:title and table:desc must contain text only".to_string(),
+                    ));
+                }
+                let parent_is_spreadsheet = stack.last().is_some_and(|(parent, local)| {
+                    *parent == NamespaceKind::Office && local.as_slice() == b"spreadsheet"
+                });
+                let direct_table = namespace == NamespaceKind::Table
+                    && local.as_ref() == b"table"
+                    && parent_is_spreadsheet;
+                if direct_table {
+                    direct_table_count = direct_table_count.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "ODS worksheet table count overflows usize".to_string(),
+                        )
+                    })?;
+                }
+
+                if namespace == NamespaceKind::Table && matches!(local.as_ref(), b"title" | b"desc")
+                {
+                    if !(stack.len() >= 2
+                        && stack.last().is_some_and(|(parent, local)| {
+                            *parent == NamespaceKind::Table && local.as_slice() == b"table"
+                        })
+                        && stack.get(stack.len() - 2).is_some_and(|(parent, local)| {
+                            *parent == NamespaceKind::Office && local.as_slice() == b"spreadsheet"
+                        }))
+                    {
+                        return Err(Error::InvalidFormat(
+                            "table:title and table:desc must be direct table children".to_string(),
+                        ));
+                    }
+                    for raw in element.attributes().with_checks(true) {
+                        let raw = raw.map_err(|error| {
+                            Error::InvalidFormat(format!(
+                                "invalid ODS table metadata attribute: {error}"
+                            ))
+                        })?;
+                        if raw.key.as_ref() == b"xmlns" || raw.key.as_ref().starts_with(b"xmlns:") {
+                            continue;
+                        }
+                        // Decode rejected attributes as well, matching the
+                        // worksheet attribute policy before reporting shape.
+                        raw.decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+                            .map_err(|error| {
+                                Error::InvalidFormat(format!(
+                                    "invalid ODS table metadata attribute value: {error}"
+                                ))
+                            })?;
+                        return Err(Error::InvalidFormat(
+                            "table:title and table:desc do not accept attributes".to_string(),
+                        ));
+                    }
+                    let sheet_index = direct_table_count.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("ODS table metadata has no owning table".to_string())
+                    })?;
+                    if sheet_index >= sheets.len() {
+                        return Err(Error::InvalidFormat(
+                            "ODS table metadata has no parsed owning worksheet".to_string(),
+                        ));
+                    }
+                    let kind = if local.as_ref() == b"title" {
+                        TableMetadataKind::Title
+                    } else {
+                        TableMetadataKind::Description
+                    };
+                    let already_present = match kind {
+                        TableMetadataKind::Title => sheets[sheet_index].title.is_some(),
+                        TableMetadataKind::Description => sheets[sheet_index].description.is_some(),
+                    };
+                    if already_present {
+                        return Err(Error::InvalidFormat(
+                            "ODS worksheet has duplicate table:title or table:desc".to_string(),
+                        ));
+                    }
+                    open = Some(OpenTableMetadata {
+                        sheet_index,
+                        kind,
+                        depth: stack.len() + 1,
+                        value: String::new(),
+                    });
+                }
+                let local = local.as_ref().to_vec();
+                stack.try_reserve(1).map_err(|_| {
+                    Error::InvalidFormat("ODS table metadata stack allocation failed".to_string())
+                })?;
+                stack.push((namespace, local));
+            },
+            Event::Empty(element) => {
+                let local = element.local_name();
+                let parent_is_spreadsheet = stack.last().is_some_and(|(parent, local)| {
+                    *parent == NamespaceKind::Office && local.as_slice() == b"spreadsheet"
+                });
+                if namespace == NamespaceKind::Table
+                    && local.as_ref() == b"table"
+                    && parent_is_spreadsheet
+                {
+                    direct_table_count = direct_table_count.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "ODS worksheet table count overflows usize".to_string(),
+                        )
+                    })?;
+                }
+                if open.is_some() {
+                    return Err(Error::InvalidFormat(
+                        "table:title and table:desc must contain text only".to_string(),
+                    ));
+                }
+                if namespace == NamespaceKind::Table && matches!(local.as_ref(), b"title" | b"desc")
+                {
+                    if !(stack.len() >= 2
+                        && stack.last().is_some_and(|(parent, local)| {
+                            *parent == NamespaceKind::Table && local.as_slice() == b"table"
+                        })
+                        && stack.get(stack.len() - 2).is_some_and(|(parent, local)| {
+                            *parent == NamespaceKind::Office && local.as_slice() == b"spreadsheet"
+                        }))
+                    {
+                        return Err(Error::InvalidFormat(
+                            "table:title and table:desc must be direct table children".to_string(),
+                        ));
+                    }
+                    for raw in element.attributes().with_checks(true) {
+                        let raw = raw.map_err(|error| {
+                            Error::InvalidFormat(format!(
+                                "invalid ODS table metadata attribute: {error}"
+                            ))
+                        })?;
+                        if raw.key.as_ref() == b"xmlns" || raw.key.as_ref().starts_with(b"xmlns:") {
+                            continue;
+                        }
+                        raw.decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+                            .map_err(|error| {
+                                Error::InvalidFormat(format!(
+                                    "invalid ODS table metadata attribute value: {error}"
+                                ))
+                            })?;
+                        return Err(Error::InvalidFormat(
+                            "table:title and table:desc do not accept attributes".to_string(),
+                        ));
+                    }
+                    let sheet_index = direct_table_count.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("ODS table metadata has no owning table".to_string())
+                    })?;
+                    if sheet_index >= sheets.len() {
+                        return Err(Error::InvalidFormat(
+                            "ODS table metadata has no parsed owning worksheet".to_string(),
+                        ));
+                    }
+                    let kind = if local.as_ref() == b"title" {
+                        TableMetadataKind::Title
+                    } else {
+                        TableMetadataKind::Description
+                    };
+                    let value = String::new();
+                    match kind {
+                        TableMetadataKind::Title => {
+                            if sheets[sheet_index].title.replace(value).is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "ODS worksheet has duplicate table:title".to_string(),
+                                ));
+                            }
+                        },
+                        TableMetadataKind::Description => {
+                            if sheets[sheet_index].description.replace(value).is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "ODS worksheet has duplicate table:desc".to_string(),
+                                ));
+                            }
+                        },
+                    }
+                }
+            },
+            Event::Text(text) => {
+                if let Some(metadata) = open.as_mut() {
+                    let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid ODS table metadata text: {error}"))
+                    })?;
+                    append_table_metadata_text(&mut metadata.value, &value)?;
+                }
+            },
+            Event::CData(text) => {
+                if let Some(metadata) = open.as_mut() {
+                    let value = text.decode().map_err(|error| {
+                        Error::InvalidFormat(format!("invalid ODS table metadata text: {error}"))
+                    })?;
+                    append_table_metadata_text(&mut metadata.value, &value)?;
+                }
+            },
+            Event::GeneralRef(reference) => {
+                if let Some(metadata) = open.as_mut() {
+                    let character =
+                        crate::xml_reference::decode(reference.as_ref()).map_err(|error| {
+                            Error::InvalidFormat(format!(
+                                "invalid ODS table metadata character reference: {error}"
+                            ))
+                        })?;
+                    let mut encoded = [0_u8; 4];
+                    append_table_metadata_text(
+                        &mut metadata.value,
+                        character.encode_utf8(&mut encoded),
+                    )?;
+                } else {
+                    crate::xml_reference::decode(reference.as_ref()).map_err(|error| {
+                        Error::InvalidFormat(format!(
+                            "invalid ODS XML character reference: {error}"
+                        ))
+                    })?;
+                }
+            },
+            Event::End(element) => {
+                let (element_namespace, _) = stack.pop().ok_or_else(|| {
+                    Error::InvalidFormat("ODS table metadata element stack underflow".to_string())
+                })?;
+                if let Some(metadata) = open.as_ref()
+                    && metadata.depth == stack.len() + 1
+                    && element_namespace == NamespaceKind::Table
+                    && matches!(element.local_name().as_ref(), b"title" | b"desc")
+                {
+                    let metadata = open.take().expect("metadata was checked above");
+                    validation::validate_text(
+                        &metadata.value,
+                        match metadata.kind {
+                            TableMetadataKind::Title => "table title",
+                            TableMetadataKind::Description => "table description",
+                        },
+                    )?;
+                    match metadata.kind {
+                        TableMetadataKind::Title => {
+                            sheets[metadata.sheet_index].title = Some(metadata.value)
+                        },
+                        TableMetadataKind::Description => {
+                            sheets[metadata.sheet_index].description = Some(metadata.value)
+                        },
+                    }
+                }
+            },
+            Event::Eof => break,
+            Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
+        }
+        buffer.clear();
+    }
+    if open.is_some() || !stack.is_empty() {
+        return Err(Error::InvalidFormat(
+            "ODS table metadata ended with an unfinished XML object".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn append_table_metadata_text(output: &mut String, value: &str) -> Result<()> {
+    let next = output.len().checked_add(value.len()).ok_or_else(|| {
+        Error::InvalidFormat("ODS table metadata text length overflows usize".to_string())
+    })?;
+    if next > validation::MAX_TEXT_BYTES {
+        return Err(Error::InvalidFormat(
+            "ODS table metadata text exceeds the worksheet text safety limit".to_string(),
+        ));
+    }
+    output.try_reserve(value.len()).map_err(|_| {
+        Error::InvalidFormat("ODS table metadata text allocation failed".to_string())
+    })?;
+    output.push_str(value);
+    Ok(())
 }
 
 /// Streaming event handler holding the [`parse_impl`] state.
@@ -855,6 +1244,11 @@ impl WorksheetHandler {
                     )));
                 }
                 let local = element.local_name();
+                if is_cell_range_source(namespace, local.as_ref()) {
+                    return Err(Error::InvalidFormat(
+                        "table:cell-range-source must be an empty direct cell child".to_string(),
+                    ));
+                }
                 let mut kind = classify(namespace, local.as_ref());
                 if self.dde_cache_depth.is_some() {
                     kind = Kind::Other;
@@ -905,6 +1299,10 @@ impl WorksheetHandler {
                             name: attributes.name.unwrap_or_else(|| "Sheet1".to_string()),
                             rows: Vec::new(),
                             style_name: attributes.style_name,
+                            template_name: attributes.template_name,
+                            style_usage: attributes.style_usage,
+                            title: None,
+                            description: None,
                         });
                     },
                     Kind::Row => {
@@ -966,6 +1364,24 @@ impl WorksheetHandler {
                     )));
                 }
                 let local = element.local_name();
+                if is_cell_range_source(namespace, local.as_ref()) {
+                    if self.stack.last() != Some(&Kind::Cell) {
+                        return Err(Error::InvalidFormat(
+                            "table:cell-range-source must be a direct cell child".to_string(),
+                        ));
+                    }
+                    let source = parse_cell_range_source(element, resolver, decoder)?;
+                    let cell = self.current_cell.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("table:cell-range-source has no open cell".to_string())
+                    })?;
+                    if cell.attributes.range_source.replace(source).is_some() {
+                        return Err(Error::InvalidFormat(
+                            "ODS cell has duplicate table:cell-range-source declarations"
+                                .to_string(),
+                        ));
+                    }
+                    return Ok(());
+                }
                 let mut kind = classify(namespace, local.as_ref());
                 if self.dde_cache_depth.is_some() {
                     kind = Kind::Other;
@@ -986,6 +1402,10 @@ impl WorksheetHandler {
                             name: attributes.name.unwrap_or_else(|| "Sheet1".to_string()),
                             rows: Vec::new(),
                             style_name: attributes.style_name,
+                            template_name: attributes.template_name,
+                            style_usage: attributes.style_usage,
+                            title: None,
+                            description: None,
                         };
                         reserve_parser_push(
                             &mut self.sheets,
@@ -1398,6 +1818,169 @@ fn is_covered(namespace: NamespaceKind, local: &[u8]) -> bool {
     namespace == NamespaceKind::Table && local == b"covered-table-cell"
 }
 
+fn is_cell_range_source(namespace: NamespaceKind, local: &[u8]) -> bool {
+    namespace == NamespaceKind::Table && local == b"cell-range-source"
+}
+
+pub(crate) fn parse_cell_range_source(
+    element: &BytesStart<'_>,
+    resolver: &NamespaceResolver,
+    decoder: Decoder,
+) -> Result<CellRange> {
+    let mut name = None;
+    let mut href = None;
+    let mut rows = None;
+    let mut columns = None;
+    let mut filter_name = None;
+    let mut filter_options = None;
+    let mut refresh_delay = None;
+    let mut actuate_on_request = false;
+    let mut actuate_seen = false;
+    let mut link_type = None;
+    for raw in element.attributes().with_checks(true) {
+        let raw = raw.map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODS cell-range-source attribute: {error}"))
+        })?;
+        if raw.key.as_ref() == b"xmlns" || raw.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
+        if raw.value.len() > validation::MAX_TEXT_BYTES {
+            return Err(Error::InvalidFormat(
+                "ODS cell-range-source attribute exceeds the worksheet text safety limit"
+                    .to_string(),
+            ));
+        }
+        let value = raw
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "invalid ODS cell-range-source attribute value: {error}"
+                ))
+            })?
+            .into_owned();
+        if value.len() > validation::MAX_TEXT_BYTES {
+            return Err(Error::InvalidFormat(
+                "ODS cell-range-source attribute exceeds the worksheet text safety limit"
+                    .to_string(),
+            ));
+        }
+        let (namespace, local) = resolver.resolve_attribute(raw.key);
+        let namespace = match namespace {
+            ResolveResult::Bound(Namespace(uri)) => uri,
+            ResolveResult::Unbound => {
+                return Err(Error::InvalidFormat(format!(
+                    "unbound ODS cell-range-source attribute prefix for '{}'",
+                    String::from_utf8_lossy(local.as_ref())
+                )));
+            },
+            ResolveResult::Unknown(prefix) => {
+                return Err(Error::InvalidFormat(format!(
+                    "unbound ODS cell-range-source attribute prefix '{}'",
+                    String::from_utf8_lossy(prefix.as_ref())
+                )));
+            },
+        };
+        let local = local.as_ref();
+        let slot = if namespace == TABLE_NAMESPACE.as_bytes() {
+            match local {
+                b"name" => &mut name,
+                b"last-row-spanned" => {
+                    let parsed = positive(&value, "last-row-spanned")?;
+                    if rows.replace(parsed).is_some() {
+                        return Err(Error::InvalidFormat(
+                            "duplicate table:last-row-spanned".to_string(),
+                        ));
+                    }
+                    continue;
+                },
+                b"last-column-spanned" => {
+                    let parsed = positive(&value, "last-column-spanned")?;
+                    if columns.replace(parsed).is_some() {
+                        return Err(Error::InvalidFormat(
+                            "duplicate table:last-column-spanned".to_string(),
+                        ));
+                    }
+                    continue;
+                },
+                b"filter-name" => &mut filter_name,
+                b"filter-options" => &mut filter_options,
+                b"refresh-delay" => &mut refresh_delay,
+                _ => {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODS cell-range-source refuses unknown table attribute '{}'",
+                        String::from_utf8_lossy(local)
+                    )));
+                },
+            }
+        } else if namespace == XLINK_NAMESPACE.as_bytes() {
+            match local {
+                b"href" => &mut href,
+                b"type" => &mut link_type,
+                b"actuate" => {
+                    if actuate_seen {
+                        return Err(Error::InvalidFormat(
+                            "duplicate ODS cell-range-source attribute 'actuate'".to_string(),
+                        ));
+                    }
+                    if value != "onRequest" {
+                        return Err(Error::InvalidFormat(
+                            "ODS cell-range-source xlink:actuate must be 'onRequest'".to_string(),
+                        ));
+                    }
+                    actuate_seen = true;
+                    actuate_on_request = true;
+                    continue;
+                },
+                _ => {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODS cell-range-source refuses unknown xlink attribute '{}'",
+                        String::from_utf8_lossy(local)
+                    )));
+                },
+            }
+        } else {
+            return Err(Error::InvalidFormat(format!(
+                "ODS cell-range-source refuses attribute '{}' in an unsupported namespace",
+                String::from_utf8_lossy(local)
+            )));
+        };
+        if slot.replace(value).is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate ODS cell-range-source attribute '{}'",
+                String::from_utf8_lossy(local)
+            )));
+        }
+    }
+    if link_type.as_deref() != Some("simple") {
+        return Err(Error::InvalidFormat(
+            "ODS cell-range-source requires xlink:type='simple'".to_string(),
+        ));
+    }
+    let mut source = CellRange::new(
+        name.ok_or_else(|| {
+            Error::InvalidFormat("ODS cell-range-source requires table:name".to_string())
+        })?,
+        href.ok_or_else(|| {
+            Error::InvalidFormat("ODS cell-range-source requires xlink:href".to_string())
+        })?,
+        rows.ok_or_else(|| {
+            Error::InvalidFormat(
+                "ODS cell-range-source requires table:last-row-spanned".to_string(),
+            )
+        })?,
+        columns.ok_or_else(|| {
+            Error::InvalidFormat(
+                "ODS cell-range-source requires table:last-column-spanned".to_string(),
+            )
+        })?,
+    )?;
+    source.set_actuate_on_request(actuate_on_request);
+    source.set_filter_name(filter_name);
+    source.set_filter_options(filter_options);
+    source.set_refresh_delay(refresh_delay)?;
+    Ok(source)
+}
+
 fn parse_link(
     element: &BytesStart<'_>,
     resolver: &NamespaceResolver,
@@ -1560,6 +2143,15 @@ fn parse_bool(value: &str, name: &str) -> Result<bool> {
     }
 }
 
+fn set_unique<T>(slot: &mut Option<T>, value: T, name: &str) -> Result<()> {
+    if slot.replace(value).is_some() {
+        return Err(Error::InvalidFormat(format!(
+            "ODS attribute '{name}' is duplicated by expanded name"
+        )));
+    }
+    Ok(())
+}
+
 /// Render one worksheet as a standalone table fragment.
 pub(crate) fn write_sheet(sheet: &Sheet) -> Result<String> {
     validation::validate_sheet(sheet)?;
@@ -1580,11 +2172,18 @@ pub(crate) fn write_sheet(sheet: &Sheet) -> Result<String> {
         output.push_str(&escape_xml(style_name));
         output.push('"');
     }
-    if sheet.rows.is_empty() {
+    if let Some(template_name) = &sheet.template_name {
+        output.push_str(" table:template-name=\"");
+        output.push_str(&escape_xml(template_name));
+        output.push('\"');
+    }
+    write_style_usage(&mut output, &sheet.style_usage);
+    if sheet.rows.is_empty() && sheet.title.is_none() && sheet.description.is_none() {
         output.push_str("/>");
         return Ok(output);
     }
     output.push('>');
+    write_table_metadata(&mut output, sheet);
     for row in &sheet.rows {
         write_row(&mut output, row)?;
     }
@@ -1612,11 +2211,18 @@ pub(crate) fn write_sheet_bounded(sheet: &Sheet, max_bytes: usize) -> Result<Str
         bounded_push(&mut output, &escape_xml(style_name), max_bytes)?;
         bounded_push(&mut output, "\"", max_bytes)?;
     }
-    if sheet.rows.is_empty() {
+    if let Some(template_name) = &sheet.template_name {
+        bounded_push(&mut output, " table:template-name=\"", max_bytes)?;
+        bounded_push(&mut output, &escape_xml(template_name), max_bytes)?;
+        bounded_push(&mut output, "\"", max_bytes)?;
+    }
+    write_style_usage_bounded(&mut output, &sheet.style_usage, max_bytes)?;
+    if sheet.rows.is_empty() && sheet.title.is_none() && sheet.description.is_none() {
         bounded_push(&mut output, "/>", max_bytes)?;
         return Ok(output);
     }
     bounded_push(&mut output, ">", max_bytes)?;
+    write_table_metadata_bounded(&mut output, sheet, max_bytes)?;
     for row in &sheet.rows {
         write_row_bounded(&mut output, row, max_bytes, false)?;
     }
@@ -1646,6 +2252,140 @@ fn bounded_push(output: &mut String, value: &str, max_bytes: usize) -> Result<()
         Error::InvalidFormat("flat ODS worksheet rendering allocation failed".to_string())
     })?;
     output.push_str(value);
+    Ok(())
+}
+
+fn write_style_usage(output: &mut String, usage: &crate::model::structure::StyleUsage) {
+    write_optional_bool_attribute(
+        output,
+        "table:use-first-row-styles",
+        usage.use_first_row_styles,
+    );
+    write_optional_bool_attribute(
+        output,
+        "table:use-last-row-styles",
+        usage.use_last_row_styles,
+    );
+    write_optional_bool_attribute(
+        output,
+        "table:use-first-column-styles",
+        usage.use_first_column_styles,
+    );
+    write_optional_bool_attribute(
+        output,
+        "table:use-last-column-styles",
+        usage.use_last_column_styles,
+    );
+    write_optional_bool_attribute(
+        output,
+        "table:use-banding-rows-styles",
+        usage.use_banding_row_styles,
+    );
+    write_optional_bool_attribute(
+        output,
+        "table:use-banding-columns-styles",
+        usage.use_banding_column_styles,
+    );
+}
+
+fn write_optional_bool_attribute(output: &mut String, name: &str, value: Option<bool>) {
+    if let Some(value) = value {
+        output.push(' ');
+        output.push_str(name);
+        output.push_str("=\"");
+        output.push_str(if value { "true" } else { "false" });
+        output.push('"');
+    }
+}
+
+fn write_style_usage_bounded(
+    output: &mut String,
+    usage: &crate::model::structure::StyleUsage,
+    max_bytes: usize,
+) -> Result<()> {
+    write_optional_bool_attribute_bounded(
+        output,
+        "table:use-first-row-styles",
+        usage.use_first_row_styles,
+        max_bytes,
+    )?;
+    write_optional_bool_attribute_bounded(
+        output,
+        "table:use-last-row-styles",
+        usage.use_last_row_styles,
+        max_bytes,
+    )?;
+    write_optional_bool_attribute_bounded(
+        output,
+        "table:use-first-column-styles",
+        usage.use_first_column_styles,
+        max_bytes,
+    )?;
+    write_optional_bool_attribute_bounded(
+        output,
+        "table:use-last-column-styles",
+        usage.use_last_column_styles,
+        max_bytes,
+    )?;
+    write_optional_bool_attribute_bounded(
+        output,
+        "table:use-banding-rows-styles",
+        usage.use_banding_row_styles,
+        max_bytes,
+    )?;
+    write_optional_bool_attribute_bounded(
+        output,
+        "table:use-banding-columns-styles",
+        usage.use_banding_column_styles,
+        max_bytes,
+    )?;
+    Ok(())
+}
+
+fn write_optional_bool_attribute_bounded(
+    output: &mut String,
+    name: &str,
+    value: Option<bool>,
+    max_bytes: usize,
+) -> Result<()> {
+    if let Some(value) = value {
+        bounded_push(output, " ", max_bytes)?;
+        bounded_push(output, name, max_bytes)?;
+        bounded_push(output, "=\"", max_bytes)?;
+        bounded_push(output, if value { "true" } else { "false" }, max_bytes)?;
+        bounded_push(output, "\"", max_bytes)?;
+    }
+    Ok(())
+}
+
+fn write_table_metadata(output: &mut String, sheet: &Sheet) {
+    if let Some(title) = &sheet.title {
+        output.push_str("<table:title>");
+        output.push_str(&escape_xml(title));
+        output.push_str("</table:title>");
+    }
+    if let Some(description) = &sheet.description {
+        output.push_str("<table:desc>");
+        output.push_str(&escape_xml(description));
+        output.push_str("</table:desc>");
+    }
+}
+
+fn write_table_metadata_bounded(
+    output: &mut String,
+    sheet: &Sheet,
+    max_bytes: usize,
+) -> Result<()> {
+    if let Some(title) = &sheet.title {
+        bounded_push(output, "<table:title>", max_bytes)?;
+        bounded_push(output, &escape_xml(title), max_bytes)?;
+        bounded_push(output, "</table:title>", max_bytes)?;
+    }
+    if let Some(description) = &sheet.description {
+        bounded_push(output, "<table:desc>", max_bytes)?;
+        bounded_push(output, &escape_xml(description), max_bytes)?;
+        bounded_push(output, "</table:desc>", max_bytes)?;
+    }
     Ok(())
 }
 
@@ -1740,10 +2480,16 @@ fn write_cell_bounded(output: &mut String, cell: &Cell, max_bytes: usize) -> Res
         && cell.hyperlinks.is_empty()
         && matches!(cell.value, CellValue::Empty)
         && cell.formula.is_none()
+        && cell.range_source.is_none()
     {
         return bounded_push(output, "/>", max_bytes);
     }
     bounded_push(output, ">", max_bytes)?;
+    if let Some(source) = &cell.range_source {
+        let mut source_xml = String::new();
+        crate::model::source::write_cell_range_source(&mut source_xml, source);
+        bounded_push(output, &source_xml, max_bytes)?;
+    }
     if !cell.text.is_empty()
         || !cell.hyperlinks.is_empty()
         || matches!(cell.value, CellValue::Text(_))
@@ -1962,11 +2708,15 @@ fn write_cell_inner(
         && cell.hyperlinks.is_empty()
         && matches!(cell.value, CellValue::Empty)
         && cell.formula.is_none()
+        && cell.range_source.is_none()
     {
         output.push_str("/>");
         return Ok(());
     }
     output.push('>');
+    if let Some(source) = &cell.range_source {
+        crate::model::source::write_cell_range_source(output, source);
+    }
     if let Some(body) = body {
         output.push_str(body);
     } else if !cell.text.is_empty()

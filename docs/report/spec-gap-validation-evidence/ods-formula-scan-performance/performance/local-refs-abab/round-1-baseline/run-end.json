@@ -1,0 +1,9 @@
+{
+  "label": "round-1-baseline",
+  "binary_sha256": "421a788fe9c2199bc4b224f4bcc05bb19c15c0ea6d0b61bf56ffe45f764bd274",
+  "status": 0,
+  "raw_sha256": "55d2c668e44c3344e01b9f4f2e206d660c46b48c8457e8f5358a94d2f2ae149f",
+  "elapsed_seconds": 0.05164313316345215,
+  "finished_at": "2026-09-13T08:28:52Z",
+  "row_count": 1
+}

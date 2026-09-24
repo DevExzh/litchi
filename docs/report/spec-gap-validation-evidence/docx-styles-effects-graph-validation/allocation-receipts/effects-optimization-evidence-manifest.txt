@@ -1,0 +1,25 @@
+schema=docx-styles-effects-graph-validation-optimization-evidence-v1
+working_tree=/home/zhuhe/code/litchi-spec-gaps
+working_head=4d01e69d4f9e8a6a87d3445e2b0e1f136236239e
+baseline_source_commit=d000d977b99e03f8542c7dae74acf767a91b1feb
+before_optimization_source_commit=4d01e69d4f9e8a6a87d3445e2b0e1f136236239e
+before_effects_sha256=aebd25d0fba937b4760c39cbe67839fee496f9036a9cacbc36265175873d6bb8
+after_effects_sha256=9a1f99b15a572de5366b4470d7bbbc63f4567d057fed38468379678604224346
+source_patch path=/var/tmp/litchi-docx-styles-effects-alloc-after-effects-20260912-b/effects-graph-validation-optimization.patch bytes=2660 sha256=2ddbfe2e5dd6da8ad18afe2627d13b0a41f280f91aa824fd7356f044ac53be92
+baseline_profile_dir=docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/results/profile-projection-reuse-463334f1
+baseline_readme path=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/results/profile-projection-reuse-463334f1/README.md bytes=5797 sha256=0be97b3c24d4187495030ecfe4da537a1da6dc70feecb0c77401edc37ea5193a
+baseline_receipt path=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/results/profile-projection-reuse-463334f1/profile-replace_main-1m-p1.json bytes=98856 sha256=5ed65b3ec5015b4530a5c6b8e73f9352ee2239429638d40e9ba684d87b0fff66
+baseline_receipt path=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/results/profile-projection-reuse-463334f1/profile-replace_main-1m-p2.json bytes=98842 sha256=97dcc93f269186dc1f1cc29d45133f5f861f4f3421e1c1469a23d73e3972ce03
+baseline_receipt path=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/results/profile-projection-reuse-463334f1/profile-replace_main-1m-p3.json bytes=98847 sha256=396cdd0e87761a2a5d63a24c7d10d63f4b2c70495649196b39a5ac56151dfe9b
+profile_harness path=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/profile-harness/Cargo.lock bytes=31866 sha256=fae17d47d39ab25c3e03f1d38c881f5ceed3b38f9749fc7e352686e16a3ea4a6
+profile_harness path=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/profile-harness/Cargo.toml bytes=463 sha256=2f6c0529dad385bbdcff445924da8d2740f9f035e64a61016bd9cbc19faa6091
+profile_harness path=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/profile-harness/main.rs bytes=23927 sha256=9e7e98779099d2948cc47627f6f1cd908cac104407332b6fe7b586863916194c
+profile_harness path=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/profile-harness/profile_adapter.rs bytes=111464 sha256=51d65d8b485c977baff0249e5fb5f8399b5ec139344625a950138755ce94e5c3
+profile_harness path=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/profile-harness/synthetic.rs bytes=10292 sha256=2b5acfce0dcc648d29d5d602fb7832541dbe140ecce0932a1785d11eacc61a43
+after_receipt path=/var/tmp/litchi-docx-styles-effects-alloc-after-effects-20260912-b/replace_main-1m-p1.json bytes=98825 sha256=abd0e0e13fcf09be01be95710a021a9d9fedf8f52ede22b7c92cda041ea7d940
+after_receipt path=/var/tmp/litchi-docx-styles-effects-alloc-after-effects-20260912-b/replace_main-1m-p2.json bytes=98822 sha256=7505bd083f98ce60f96c426a51a59d87ff649cfbda1a0c902a8af1f1a52effe1
+after_receipt path=/var/tmp/litchi-docx-styles-effects-alloc-after-effects-20260912-b/replace_main-1m-p3.json bytes=98820 sha256=72d9af00d59272cf4773496eb82db77c3566ddcb0637626b375a9fc1c22cd9bc
+after_artifact path=/var/tmp/litchi-docx-styles-effects-alloc-after-effects-20260912-b/generated-fixtures.json bytes=2963 sha256=91651362fd7824da871c008bb2734ba78f34c451b75acaaf7b2bfe7811783795
+after_artifact path=/var/tmp/litchi-docx-styles-effects-alloc-after-effects-20260912-b/full-lib-cargo-test.log bytes=124877 sha256=69682988beb4f6c0a47d0ceedb5868f776e196a9d29ee2c25a51c9246d77a861
+profile_command=docx-styles-effects-profile --lane replace_main --scale 1m --warmup 2 --samples 20
+allocation_comparison_samples=baseline 60; after 60

@@ -8,7 +8,8 @@ use super::transaction::{
 use super::validation;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Patch as ObjectPatch, Targets};
+use crate::parts::protection::{EditProtection, PackagePatch, ProtectionPolicy, classify};
+use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Targets};
 
 /// Immutable package bytes plus the decoded annotation-tag state.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -51,7 +52,7 @@ impl Snapshot {
 pub struct Commit {
     snapshot: Snapshot,
     patch: Patch,
-    package_patch: ObjectPatch,
+    package_patch: PackagePatch,
 }
 
 impl Commit {
@@ -69,7 +70,7 @@ impl Commit {
 
     /// Reversible whole-CFB patch.
     #[must_use]
-    pub fn package_patch(&self) -> &ObjectPatch {
+    pub fn package_patch(&self) -> &PackagePatch {
         &self.package_patch
     }
 }
@@ -81,6 +82,8 @@ pub struct Editor {
     table_name: String,
     original: TransactionSnapshot,
     tags: TransactionSnapshot,
+    protection: EditProtection,
+    protection_policy: ProtectionPolicy,
     changed: bool,
 }
 
@@ -90,8 +93,22 @@ impl Editor {
         Self::open_with_limits(bytes, Limits::default())
     }
 
+    /// Open a package with an explicit policy for changed protected content.
+    pub fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
+        Self::open_with_limits_and_policy(bytes, Limits::default(), policy)
+    }
+
     /// Open a DOC package with an explicit bounded OLE resource profile.
     pub fn open_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+        Self::open_with_limits_and_policy(bytes, limits, ProtectionPolicy::default())
+    }
+
+    /// Open a package with both bounded resources and an explicit protection policy.
+    pub fn open_with_limits_and_policy(
+        bytes: Vec<u8>,
+        limits: Limits,
+        protection_policy: ProtectionPolicy,
+    ) -> Result<Self> {
         let targets = Targets::new([]).map_err(PackageError::from)?;
         let package = ObjectEditor::open(bytes, targets, limits).map_err(PackageError::from)?;
         let word_path = vec!["WordDocument".to_owned()];
@@ -109,12 +126,15 @@ impl Editor {
         let table = package
             .stream(&table_path)
             .ok_or_else(|| PackageError::StreamNotFound(table_name.to_owned()))?;
+        let protection = classify(&fib, table)?;
         let tags = TransactionSnapshot::from_option(codec::parse(&fib, table)?)?;
         Ok(Self {
             package,
             table_name: table_name.to_owned(),
             original: tags.clone(),
             tags,
+            protection,
+            protection_policy,
             changed: false,
         })
     }
@@ -207,18 +227,24 @@ impl Editor {
 
     /// Finish and return DOC bytes.
     pub fn finish(self) -> Result<Vec<u8>> {
+        if self.changed {
+            self.protection_policy.authorize(self.protection)?;
+        }
         self.package.finish().map_err(PackageError::from)
     }
 
     /// Commit semantic and byte-level reversible patches.
     pub fn commit(self) -> Result<Commit> {
+        if self.changed {
+            self.protection_policy.authorize(self.protection)?;
+        }
         let patch = Patch::new(self.original, self.tags.clone());
         let object_commit = self.package.commit().map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
         Ok(Commit {
             snapshot: Snapshot::new(bytes, self.tags),
             patch,
-            package_patch: object_commit.into_patch(),
+            package_patch: PackagePatch::new(object_commit.into_patch(), self.protection),
         })
     }
 
@@ -231,12 +257,15 @@ impl Editor {
                 .commit()
                 .map_err(PackageError::from)?
                 .into_patch();
+            let package_patch = PackagePatch::new(package_patch, self.protection);
             return Ok(Commit {
                 snapshot: self.snapshot()?,
                 patch,
                 package_patch,
             });
         }
+
+        self.protection_policy.authorize(self.protection)?;
 
         let mut candidate = self.clone();
         candidate.write_snapshot(&snapshot)?;
@@ -248,7 +277,7 @@ impl Editor {
             .commit()
             .map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
-        let package_patch = object_commit.into_patch();
+        let package_patch = PackagePatch::new(object_commit.into_patch(), candidate.protection);
         let package_snapshot = Snapshot::new(bytes, candidate.tags.clone());
         *self = candidate;
         Ok(Commit {

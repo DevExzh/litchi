@@ -1,0 +1,30 @@
+   Compiling litchi-ods v0.0.1 (/var/tmp/ods-string-worktree/crates/litchi-ods)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.56s
+     Running tests/ods_formula_string_regression.rs (/var/tmp/ods-string-target/debug/deps/ods_formula_string_regression-d9b545b6dea15423)
+
+running 6 tests
+test literal_allocation_failure_is_typed_and_targeted ... ok
+test doubled_quotes_multibyte_values_and_source_text_are_exact ... ok
+test byte_and_token_limits_are_exact_for_string_formulas ... ok
+test unterminated_and_malformed_quotes_remain_typed_syntax_errors ... ok
+
+thread 'nul_is_rejected_while_non_nul_controls_remain_valid' (3082554) panicked at crates/litchi-ods/tests/ods_formula_string_regression.rs:178:14:
+NUL is excluded by the OpenFormula string grammar: Formula { text: "=\"a\0\"\"b\"", tokens: [String("a\0\"b")] }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'many_short_and_empty_utf8_literals_retain_bounded_capacity' (3082553) panicked at crates/litchi-ods/tests/ods_formula_string_regression.rs:135:17:
+assertion `left == right` failed: empty literal retained a buffer
+  left: 1214
+ right: 0
+test nul_is_rejected_while_non_nul_controls_remain_valid ... FAILED
+test many_short_and_empty_utf8_literals_retain_bounded_capacity ... FAILED
+
+failures:
+
+failures:
+    many_short_and_empty_utf8_literals_retain_bounded_capacity
+    nul_is_rejected_while_non_nul_controls_remain_valid
+
+test result: FAILED. 4 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-ods --test ods_formula_string_regression`

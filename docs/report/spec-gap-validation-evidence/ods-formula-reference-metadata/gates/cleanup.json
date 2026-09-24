@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "completed_at_utc": "2026-09-20T09:42:45.065321+00:00",
+  "paths": {
+    "root": {
+      "path": "/var/tmp/litchi-reference-metadata-gates-7d9uic94",
+      "removed": true
+    },
+    "checkout": {
+      "path": "/var/tmp/litchi-reference-metadata-gates-7d9uic94/checkout",
+      "removed": true
+    },
+    "target": {
+      "path": "/var/tmp/litchi-reference-metadata-gates-7d9uic94/target",
+      "removed": true
+    }
+  },
+  "registry_removed": true,
+  "generated_bytecode_removed": [],
+  "retained_diagnostics": "Historical source/gate/capture receipts are retained as evidence, not build artifacts.",
+  "performance_audit_sha256": "9dfac7c6804f4a5ea6b9ace589e2a447f0e4b90f49ba8edd0a27f71d26204e3c"
+}

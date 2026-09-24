@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "compile_first": true,
+  "source_files_checked": 868,
+  "reviewed_production_files": 3,
+  "test_totals_including_doctests": {
+    "passed": 1136,
+    "failed": 0,
+    "ignored": 12
+  },
+  "receipt_sha256": "4d25d1d78d3b0bf431efd7fb1d6c13cdb441009eb1e5ccd7a91bd859d0847310"
+}

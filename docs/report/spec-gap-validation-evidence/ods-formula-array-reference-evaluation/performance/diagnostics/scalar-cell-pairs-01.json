@@ -1,0 +1,14 @@
+{
+  "archive": "scalar-cell-pairs-01.tar.gz",
+  "sha256": "6d578dd70faf8e62576ed6e89bba522a5c162e2cadf9508295d7bea2071e3b53",
+  "file_count": 327,
+  "status": "failed",
+  "child_count": 162,
+  "pair_count": 81,
+  "deterministic_mismatch_pairs": 81,
+  "binaries_unchanged": true,
+  "runner_unchanged": true,
+  "harness_unchanged": true,
+  "source_receipts_unchanged": true,
+  "disposition": "Runner setup failure only: all wrappers rejected unsupported --case/--repeat CLI arguments. No measured executable ran. Failed runner hash retained in run.json; its full script bytes were not retained before correction. Not runtime or performance evidence."
+}

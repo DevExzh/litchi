@@ -1,0 +1,13 @@
+{
+  "status": "pass",
+  "candidate_only": true,
+  "accepted_correctness_records": 4,
+  "refusal_correctness_records": 1,
+  "receipt_records": 294,
+  "iterations_per_case": 7,
+  "warm_query_clone_zero_allocator_and_source_reads": true,
+  "diagnostics_measured_separately": true,
+  "unsupported_graph_refusal_measured_separately": true,
+  "baseline_claim": false,
+  "speedup_claim": false
+}

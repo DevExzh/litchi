@@ -1,0 +1,5 @@
+$ CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/home/zhuhe/xlsx-content-part-final-target-20260912 cargo clippy -p litchi-xlsx --all-features --locked --offline --lib --no-deps -- -D warnings
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-codepage)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.14s
+exit=0

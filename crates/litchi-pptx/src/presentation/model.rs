@@ -161,6 +161,31 @@ impl<'a> Presentation<'a> {
         package::content_parts(self)
     }
 
+    /// Load the typed, source-backed InkAction snapshots owned by the slides
+    /// in presentation order.  Each snapshot retains the complete owner MCE
+    /// source and its existing target closure for a subsequent edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if one slide has an unsupported or malformed typed
+    /// action closure.
+    pub fn ink_actions(&self) -> Result<Vec<embedded::ink_actions::Snapshot>> {
+        package::ink_actions(self)
+    }
+
+    /// Load presentation InkAction snapshots under an explicit bounded policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if one slide exceeds the supplied policy or has an
+    /// unsupported or malformed typed action closure.
+    pub fn ink_actions_with_limits(
+        &self,
+        limits: embedded::ink_actions::Limits,
+    ) -> Result<Vec<embedded::ink_actions::Snapshot>> {
+        package::ink_actions_with_limits(self, limits)
+    }
+
     /// Discover inert hyperlinks owned by the presentation's slides.
     ///
     /// Each result contains the zero-based slide position and a typed target.

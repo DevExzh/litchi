@@ -1,0 +1,9 @@
+{
+  "platform": "Linux-7.0.0-1011-aws-x86_64-with-glibc2.43",
+  "machine": "x86_64",
+  "cpu_model": "AMD EPYC 9R45",
+  "logical_cpus": 32,
+  "python": "3.14.4",
+  "build_target": "/tmp/litchi-xlsb-theme-target-20260910",
+  "measurement_scope": "allocator-instrumented elapsed time and requested allocation bytes; logical ReadAt calls, not RSS or physical storage I/O"
+}

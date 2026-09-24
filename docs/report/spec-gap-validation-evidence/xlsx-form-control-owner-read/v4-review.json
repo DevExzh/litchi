@@ -1,0 +1,16 @@
+{
+  "verdict": "per-control diagnostic fix approved; complete owner allocation contract held",
+  "owner_sha256": "68af2e46998b28a71c5b7a35948752681731b171fe586b88473b641e5ac97aa3",
+  "tests_passed": 1229,
+  "approved": [
+    "checked diagnostic detail sizing",
+    "preallocation before vector/string allocation",
+    "capacity reconciliation in DiagnosticBuffer",
+    "failure unwinding"
+  ],
+  "remaining": [
+    "collection_diagnostics names and diagnostics capacity reconciliation",
+    "eager inventory execution reservations must remain held while inventory is live"
+  ],
+  "assigned_to": "/root/xlsx_form_control_owner_reader"
+}

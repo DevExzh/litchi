@@ -38,6 +38,11 @@ pub mod layout {
     };
 }
 
+/// Typed inert drawing-layer declarations and source-owner selectors.
+pub mod layer {
+    pub use crate::model::layer::{Layer, LayerInventory, LayerOwner, LayerSet};
+}
+
 /// Presentation master pages and their shared ODF regions/children.
 pub mod master {
     #[allow(

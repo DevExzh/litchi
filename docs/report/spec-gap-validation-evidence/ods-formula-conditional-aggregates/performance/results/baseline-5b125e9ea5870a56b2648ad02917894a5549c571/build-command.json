@@ -1,0 +1,13 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/tmp/litchi-ods-conditional-baseline-iign1uwv/docs/report/spec-gap-validation-evidence/ods-formula-conditional-aggregates/performance/harness/Cargo.toml",
+    "--release"
+  ],
+  "cwd": "/tmp/litchi-ods-conditional-baseline-iign1uwv",
+  "target": "/var/tmp/litchi-ods-conditional-baseline-5b125e9ea5870a56b2648ad02917894a5549c571-sifz0aeg"
+}

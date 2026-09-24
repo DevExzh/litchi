@@ -1,0 +1,75 @@
+{
+  "bundle": {
+    "archive": "/var/tmp/litchi-xlsx-v8-portable-historical-bundle-v2-20260910.tar.zst",
+    "archive_bytes": 81967,
+    "archive_sha256": "a7bd6bdc48312f90391871f4d0594a34e3c9dbe148e5f94d7fa6f2c7477afd31",
+    "directory": "/var/tmp/litchi-xlsx-v8-portable-historical-bundle-v2-20260910",
+    "manifest_path": "/var/tmp/litchi-xlsx-v8-portable-historical-bundle-v2-20260910/bundle-manifest.json",
+    "manifest_sha256": "85abdaebe46035504901150d6e3ab03cf8cd4aca572086f8f0138279d0bd148a",
+    "mapped_file_count": 59,
+    "raw_output_count": 31,
+    "release_binaries_included": false,
+    "release_binary_count": 4,
+    "verifier_path": "/var/tmp/litchi-xlsx-v8-portable-historical-bundle-v2-20260910/verifier/verify-v8-portable.py",
+    "verifier_sha256": "246bb07404ce78e6bf0455ded10c0115ed731a8cfe3dfb43902af7e2ef312f88"
+  },
+  "created_utc": "2026-09-10T13:16:42.276675+00:00",
+  "frozen_source_preservation": {
+    "capture_plan_sha256": "20583d9d209939244f15d8cd281e0c57223a36a56fef647e4a11699ffc09a11f",
+    "capture_release_sha256": "82f67581a77403d63da00a091fcc7d9b0085334142b698662602efbd862099c5",
+    "original_analysis_json": {
+      "path": "/var/tmp/litchi-xlsx-v8-minlock-analysis-20260910/v8-minlock-analysis.json",
+      "sha256": "5b4af39e505c6368c69b42171d4ae6cb9b2b26f83b9782ec2f716645f924f763"
+    },
+    "original_analysis_markdown": {
+      "path": "/var/tmp/litchi-xlsx-v8-minlock-analysis-20260910/v8-minlock-analysis.md",
+      "sha256": "b3ad5c3c6a9c99c63b537fcd37b52996dca67c5bbf8a70dd078675bee876c0ff"
+    },
+    "original_analysis_receipt": {
+      "path": "/var/tmp/litchi-xlsx-v8-minlock-analysis-20260910/v8-minlock-analysis-receipt.json",
+      "sha256": "64811b5842abe904c5d13e4a924bf080b5580fa06d241d3a22dbfe11e0959b86"
+    },
+    "raw_outputs_sha256": "34e7b778a1bcb950f10202bfd37971518e8c7c755ae38a0964c629fed94d4ffd"
+  },
+  "historical_scope": {
+    "accepted_plain_cell_tag_commit": "556c61ef355bac77a1dcef0870209c68bf3290e9",
+    "base_commit": "21d5fb0bef3a36ee42903e5cc7cb2fd98373150e",
+    "bootstrap_scope": "pooled 40 raw samples per side; resampling uncertainty, not 40 independent process replicates",
+    "claim_classification": "historical matched pair only",
+    "later_heads_not_measured": [
+      "52519031b4c877032553bf5d4ea4393f3e0e60d1",
+      "de80c38248ff797501564886c5df0987088f430c"
+    ]
+  },
+  "kind": "xlsx_v8_historical_portable_publication",
+  "qualification": [
+    "No current 52519031 or de80 performance result is claimed.",
+    "Allocator-instrumented elapsed values are excluded from latency.",
+    "Original raw capture and analysis remain immutable; the revised wording is a separate publication."
+  ],
+  "revised_analysis": {
+    "decision": "accept_as_historical_21d5_matched_pair_delta",
+    "directory": "/var/tmp/litchi-xlsx-v8-historical-analysis-revision-20260910",
+    "json": {
+      "path": "/var/tmp/litchi-xlsx-v8-historical-analysis-revision-20260910/v8-historical-21d5-analysis.json",
+      "sha256": "1e44156d0de59d2aa35563869d3dbaa4ee1b6c392d178b1e8ec57f92fed27f08"
+    },
+    "markdown": {
+      "path": "/var/tmp/litchi-xlsx-v8-historical-analysis-revision-20260910/v8-historical-21d5-analysis.md",
+      "sha256": "3b897c39b2b386759783d4747f6d039215ebb9be3edb1f53c16dc079c15d9bf0"
+    }
+  },
+  "schema_version": 1,
+  "status": "immutable_read_only_publication",
+  "verification_evidence": {
+    "command": "python3 verifier/verify-v8-portable.py --bundle-root <extracted-bundle-root> --output-dir <separate-output-dir>",
+    "extracted_bundle_root": "/var/tmp/litchi-xlsx-v8-portable-historical-bundle-v2-20260910",
+    "no_binary_execution": true,
+    "no_frozen_file_overwrite": true,
+    "output_dir": "/var/tmp/litchi-xlsx-v8-portable-historical-verification-extracted-v2-20260910",
+    "status": "verified",
+    "verification_json_sha256": "3ac6009c3f84f32246f33fe7dc8c73b518d597c8ad59db0a05f98fce066e0f6f",
+    "verification_markdown_sha256": "f60d7378d31f45d15ed8911a0ce5d00af8dff7672075a25f5c3ad0560d3896ec",
+    "verification_receipt_sha256": "bd37ffa78c7c15c86e6af3cdb3b07b0a4ce3d9bb87302a72e8b98cc1bdfa3461"
+  }
+}

@@ -71,7 +71,7 @@ pub(crate) struct HeadingSite {
     pub(crate) value: crate::heading::Heading,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ReplacementSite {
     pub(crate) prefix: String,
     pub(crate) range: Range<usize>,

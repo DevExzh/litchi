@@ -1,0 +1,16 @@
+[
+  {
+    "gate": "tests",
+    "passed": 488,
+    "failed": 0,
+    "ignored": 0,
+    "summaries": 36
+  },
+  {
+    "gate": "doctests",
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "summaries": 1
+  }
+]

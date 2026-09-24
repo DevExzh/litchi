@@ -1,0 +1,78 @@
+{
+  "completed_at": "2026-09-13T09:11:27.024800Z",
+  "owned_paths": [
+    {
+      "path": "/var/tmp/ods-string-worktree",
+      "exists": true,
+      "apparent_bytes": 2481604039,
+      "sha256": null
+    },
+    {
+      "path": "/var/tmp/ods-string-target",
+      "exists": true,
+      "apparent_bytes": 7681438214,
+      "sha256": null
+    },
+    {
+      "path": "/var/tmp/ods-string-tmp",
+      "exists": true,
+      "apparent_bytes": 0,
+      "sha256": null
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/baseline/ods-formula-reference-profile",
+      "exists": true,
+      "apparent_bytes": 1173352,
+      "sha256": "52fc5e50b1a8ddebc0dc04fcdde8ef9062728b0bf33e45d39b3a5e2182b550bb"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/candidate/ods-formula-reference-profile",
+      "exists": true,
+      "apparent_bytes": 1140352,
+      "sha256": "d9dcf284a1b311191bbd1b959ec9c0c6915dec5a585f4c5e588ef29e570839d5"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/candidate-pre-nul/ods-formula-reference-profile",
+      "exists": true,
+      "apparent_bytes": 1174496,
+      "sha256": "641b7d901c7eba8f944e1d0efb2a92fbbfb8d87d96110ba70bb0fb8ee5c20d71"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/harness/__pycache__",
+      "exists": true,
+      "apparent_bytes": 9234,
+      "sha256": null
+    }
+  ],
+  "post_delete": [
+    {
+      "path": "/var/tmp/ods-string-worktree",
+      "exists": false
+    },
+    {
+      "path": "/var/tmp/ods-string-target",
+      "exists": false
+    },
+    {
+      "path": "/var/tmp/ods-string-tmp",
+      "exists": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/baseline/ods-formula-reference-profile",
+      "exists": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/candidate/ods-formula-reference-profile",
+      "exists": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/candidate-pre-nul/ods-formula-reference-profile",
+      "exists": false
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-string-performance/performance/harness/__pycache__",
+      "exists": false
+    }
+  ],
+  "evidence_retained": "performance report, raw CSVs, per-lane receipts, source/harness manifests, paired and ABAB metadata, hardware counter receipts, and binary digests"
+}

@@ -1,0 +1,80 @@
+{
+  "schema": "docx-styles-effects-representative-nontiming-retention-v1",
+  "source_commit": "d000d977b99e03f8542c7dae74acf767a91b1feb",
+  "frozen_checkout": "463334f1a32de687ffb2b3357e55816dcfd3102e",
+  "current_smoke_commit": "c4ac516353591f88a9b797349002d05737614e78",
+  "operator_session": "44845",
+  "lanes": [
+    "replace_main/native",
+    "replace_glossary/native"
+  ],
+  "samples_per_lane": 1,
+  "warmups_per_lane": 0,
+  "timing_claim": false,
+  "rss_claim": false,
+  "contention_observed": true,
+  "raw_file_count": 12,
+  "raw_total_bytes": 115683,
+  "raw_files": [
+    {
+      "path": "binary.sha256",
+      "bytes": 187,
+      "sha256": "ea3061b52d95bf87288b5ab75c8112030290ee5d5ff17b2842238298f198cf02"
+    },
+    {
+      "path": "build.log",
+      "bytes": 4623,
+      "sha256": "f9e65904c830c0a075054883898dce3fe7f35557456a873f37864d355f65f2ed"
+    },
+    {
+      "path": "commands.txt",
+      "bytes": 517,
+      "sha256": "bff3c137264a80b378163a95d8b5e8536f1cca6492521b2afc2ccc2dcfe4bbb4"
+    },
+    {
+      "path": "process-census-after.txt",
+      "bytes": 47708,
+      "sha256": "46584be4c3459592d15dfc5d427d3db9e69ae60a546c457421ce0dd5b83ff03d"
+    },
+    {
+      "path": "process-census-before.txt",
+      "bytes": 51022,
+      "sha256": "acbdb107e9ad0540790b5e7011e507beca87a773778618927a4584e01d79e1ef"
+    },
+    {
+      "path": "replace_glossary-native.json",
+      "bytes": 5211,
+      "sha256": "ccfd4a25d4a0fda47f2164dd5a811b9082c942d2ac13db28e7f03cc51cabdb00"
+    },
+    {
+      "path": "replace_glossary-native.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "replace_main-native.json",
+      "bytes": 5173,
+      "sha256": "d1cae07c19f34f080dc8f07d4624a8344051654697ed81e7ed501da1d134c652"
+    },
+    {
+      "path": "replace_main-native.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-provenance-after.txt",
+      "bytes": 87,
+      "sha256": "a57ca7ea8f36f23224e3760cb19cae2b1841e88d75a5e819d5012fc78c2d9100"
+    },
+    {
+      "path": "source-provenance-before.txt",
+      "bytes": 948,
+      "sha256": "61e6c90b16f220fa6335d0e8ea7b708bdbbdda6ff6c3af285b8415a6e0f5afdd"
+    },
+    {
+      "path": "status.txt",
+      "bytes": 207,
+      "sha256": "4ca979742918fa03ee7ff9c11e3196a0acc0edf41c67c671f4a465f17eb6d1e5"
+    }
+  ]
+}

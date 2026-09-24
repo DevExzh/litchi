@@ -1,0 +1,9 @@
+status=passed
+scope=exploratory-before-three-multi-picture-same-drawing-lanes
+fresh_processes=1
+samples_per_process=1
+source_copy_bytes=unavailable
+staged_bytes=unavailable
+lane=multi_picture_same_drawing_16 input_bytes=4126 elapsed_ns=2462820 requested_alloc_bytes=4132401 peak_live_delta=653817 semantic_ok=True output_exact=True
+lane=multi_picture_same_drawing_64 input_bytes=4876 elapsed_ns=7386359 requested_alloc_bytes=8748614 peak_live_delta=1123353 semantic_ok=True output_exact=True
+lane=multi_picture_same_drawing_256 input_bytes=7692 elapsed_ns=32882749 requested_alloc_bytes=28544839 peak_live_delta=4054897 semantic_ok=True output_exact=True

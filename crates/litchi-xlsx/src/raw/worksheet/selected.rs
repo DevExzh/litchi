@@ -29,13 +29,17 @@
 //! bounded-state description; event and input limits provide the aggregate
 //! bound for the stream.
 
-use std::io::BufRead;
+use std::borrow::Cow;
+use std::io::{BufRead, Cursor};
 
 use litchi_ooxml_common::mce::{
-    ActiveFlow, Capabilities, SemanticElement, SemanticEvent, StreamLimits,
+    ActiveFlow, Capabilities, SemanticElement, SemanticEvent, StreamError, StreamLimits,
 };
 use litchi_sheet::{Cell as Address, Rect};
-use quick_xml::events::BytesRef;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesRef, BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
 
 use super::super::formula::Range as FormulaRange;
 use super::super::namespace::{SPREADSHEETML_NAMESPACE, STRICT_SPREADSHEETML_NAMESPACE};
@@ -206,8 +210,7 @@ pub enum RangeScanOutcome {
 ///
 /// MCE, XML, raw x14ac, input, and allocation failures remain separate typed
 /// stream errors; `NotEligible` is carried inside the successful result.
-pub type StreamResult<T> =
-    std::result::Result<T, litchi_ooxml_common::mce::StreamError<crate::Error, crate::Error>>;
+pub type StreamResult<T> = std::result::Result<T, StreamError<crate::Error, crate::Error>>;
 
 /// Scan one requested coordinate through a source worksheet stream.
 ///
@@ -242,10 +245,49 @@ fn scan_stream(
     limits: &StreamLimits,
     requested: Rect,
 ) -> StreamResult<(RangeScanOutcome, Option<Rect>)> {
-    let mut scanner = Scanner::new(requested);
+    scan_stream_with_targets(input, capabilities, limits, requested, None)
+}
+
+/// Scan one worksheet while retaining only the sorted target coordinates.
+///
+/// The ordinary range scanner intentionally retains every physical record in
+/// its rectangle. Edit verification often has a sparse set of changed cells
+/// spread over a whole sheet; retaining the bounding rectangle would turn a
+/// small verification into a second materialized worksheet. This internal
+/// variant keeps the same complete stream validation while using binary search
+/// over the caller-owned, sorted target list for retention.
+#[expect(
+    clippy::result_large_err,
+    reason = "The stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
+)]
+pub(crate) fn scan_targets(
+    input: &mut dyn BufRead,
+    capabilities: &Capabilities,
+    limits: &StreamLimits,
+    targets: &[Address],
+) -> StreamResult<RangeScanOutcome> {
+    let requested = Rect::ALL;
+    scan_stream_with_targets(input, capabilities, limits, requested, Some(targets))
+        .map(|(outcome, _)| outcome)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "The stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
+)]
+fn scan_stream_with_targets(
+    input: &mut dyn BufRead,
+    capabilities: &Capabilities,
+    limits: &StreamLimits,
+    requested: Rect,
+    targets: Option<&[Address]>,
+) -> StreamResult<(RangeScanOutcome, Option<Rect>)> {
+    let mut scanner = Scanner::new(requested, targets);
     // Change 0658: `Scanner::event` answers `ActiveFlow::Stop` for the event
     // that settles an ineligible verdict, so the stream ends there instead of
-    // running to EOF. `Scanner::finish` reports that verdict unchanged.
+    // running to EOF. `Scanner::finish` reports that verdict unchanged. An
+    // eligible scan still runs to EOF, so a target scan keeps validating the
+    // complete stream.
     let result = x14ac::capture_stream_with_stoppable_active(
         input,
         capabilities,
@@ -254,16 +296,667 @@ fn scan_stream(
         |event| scanner.event(event),
     );
     match result {
-        Ok(_) => {
-            scanner
-                .finish()
-                .map_err(|error| litchi_ooxml_common::mce::StreamError::Callback {
-                    raw_error: None,
-                    active_error: Some(error),
-                })
-        },
+        Ok(_) => scanner.finish().map_err(|error| StreamError::Callback {
+            raw_error: None,
+            active_error: Some(error),
+        }),
         Err(error) => Err(error),
     }
+}
+
+/// Scan sorted target cells from an in-memory worksheet without constructing
+/// the MCE semantic element/attribute snapshots used by the general scanner.
+///
+/// The plain path is deliberately narrow: it accepts only the core scalar
+/// worksheet shape with no styles, formulas, shared strings, inline strings,
+/// merges, extensions, or compatibility markup. Any other valid shape falls
+/// back to the existing MCE scanner, while malformed XML and resource errors
+/// remain typed failures. The in-memory caller uses this path after its own
+/// bounded worksheet rewrite, so the XML input is borrowed throughout the
+/// ordinary dense numeric case.
+#[expect(
+    clippy::result_large_err,
+    reason = "The stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
+)]
+pub(crate) fn scan_targets_bytes(
+    content: &[u8],
+    capabilities: &Capabilities,
+    limits: &StreamLimits,
+    targets: &[Address],
+) -> StreamResult<RangeScanOutcome> {
+    if let Err(error) = limits.validate() {
+        return Err(StreamError::Mce {
+            error,
+            prior_mce_error: None,
+            raw_error: None,
+            active_error: None,
+        });
+    }
+    if !plain_limits_match_default(limits) {
+        let mut input = Cursor::new(content);
+        return scan_targets(&mut input, capabilities, limits, targets);
+    }
+    match scan_plain_targets(content, limits, targets) {
+        Ok(PlainScan::Eligible(selected)) => Ok(RangeScanOutcome::Eligible(selected)),
+        Err(PlainScanError::Fallback) => {
+            let mut input = Cursor::new(content);
+            scan_targets(&mut input, capabilities, limits, targets)
+        },
+        // The authoritative scanner drains the source after an active
+        // callback failure. Re-run it for direct-path semantic failures so a
+        // later XML/MCE error retains the same primary-error precedence.
+        Err(PlainScanError::Callback(_error)) => {
+            let mut input = Cursor::new(content);
+            scan_targets(&mut input, capabilities, limits, targets)
+        },
+        Err(PlainScanError::Limit(resource)) => Err(StreamError::Mce {
+            error: litchi_ooxml_common::mce::Error::LimitExceeded(resource.into()),
+            prior_mce_error: None,
+            raw_error: None,
+            active_error: None,
+        }),
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn scan_targets_bytes_uses_plain_path(
+    content: &[u8],
+    limits: &StreamLimits,
+    targets: &[Address],
+) -> bool {
+    plain_limits_match_default(limits)
+        && matches!(
+            scan_plain_targets(content, limits, targets),
+            Ok(PlainScan::Eligible(_))
+        )
+}
+
+/// The direct scanner has no MCE branch state. Keep its hot path identical to
+/// the ordinary default profile while routing every caller-customized event,
+/// namespace, directive, depth, or name budget through the established
+/// bounded MCE scanner. The sparse verifier lowers only the source and output
+/// byte bounds to the already materialized input size; those remain enforced
+/// directly by the input check below.
+fn plain_limits_match_default(limits: &StreamLimits) -> bool {
+    let defaults = StreamLimits::default();
+    limits.max_events == defaults.max_events
+        && limits.max_event_bytes == defaults.max_event_bytes
+        && limits.max_attributes_per_event == defaults.max_attributes_per_event
+        && limits.max_attribute_bytes_per_event == defaults.max_attribute_bytes_per_event
+        && limits.max_context_bytes == defaults.max_context_bytes
+        && limits.max_name_bytes == defaults.max_name_bytes
+        && limits.processing.max_depth == defaults.processing.max_depth
+        && limits.processing.max_namespace_bindings == defaults.processing.max_namespace_bindings
+        && limits.processing.max_directive_tokens == defaults.processing.max_directive_tokens
+        && limits.processing.max_choices_per_alternate
+            == defaults.processing.max_choices_per_alternate
+}
+
+#[derive(Debug)]
+enum PlainScan {
+    Eligible(SelectedCells),
+}
+
+#[derive(Debug)]
+enum PlainScanError {
+    Callback(crate::Error),
+    Fallback,
+    Limit(&'static str),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PlainFrame {
+    Worksheet,
+    Dimension,
+    SheetData,
+    Row,
+    Cell,
+    Value,
+}
+
+#[derive(Debug)]
+struct PlainCell {
+    address: Address,
+    selected: bool,
+    saw_value: bool,
+    value: String,
+    value_bytes: usize,
+    value_characters: usize,
+}
+
+#[derive(Debug)]
+struct PlainScanner<'a> {
+    targets: &'a [Address],
+    stack: Vec<PlainFrame>,
+    row: Option<(u32, u32)>,
+    previous_row: u32,
+    root_seen: bool,
+    root_closed: bool,
+    declaration_seen: bool,
+    pre_root_event_seen: bool,
+    seen_dimension: bool,
+    seen_sheet_data: bool,
+    selected: Vec<SelectedRecord>,
+    cell: Option<PlainCell>,
+    numeric_value_scratch: String,
+}
+
+impl<'a> PlainScanner<'a> {
+    fn new(targets: &'a [Address]) -> Result<Self> {
+        let mut selected = Vec::new();
+        selected
+            .try_reserve(targets.len())
+            .map_err(|source| allocation("plain selected worksheet records", source))?;
+        Ok(Self {
+            targets,
+            stack: Vec::new(),
+            row: None,
+            previous_row: 0,
+            root_seen: false,
+            root_closed: false,
+            declaration_seen: false,
+            pre_root_event_seen: false,
+            seen_dimension: false,
+            seen_sheet_data: false,
+            selected,
+            cell: None,
+            numeric_value_scratch: String::new(),
+        })
+    }
+
+    fn push(&mut self, frame: PlainFrame) -> std::result::Result<(), PlainScanError> {
+        if self.stack.len() >= MAX_XML_DEPTH {
+            return Err(PlainScanError::Limit("depth"));
+        }
+        self.stack.try_reserve(1).map_err(|source| {
+            PlainScanError::Callback(allocation("plain worksheet stack", source))
+        })?;
+        self.stack.push(frame);
+        Ok(())
+    }
+
+    fn start(
+        &mut self,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        limits: &StreamLimits,
+        empty: bool,
+    ) -> std::result::Result<(), PlainScanError> {
+        if element.name().as_ref().len() > limits.max_name_bytes {
+            return Err(PlainScanError::Fallback);
+        }
+        if !plain_spreadsheetml(namespace) {
+            return if self.stack.is_empty() {
+                Err(PlainScanError::Callback(invalid(
+                    "plain worksheet scanner encountered a non-SpreadsheetML root",
+                )))
+            } else {
+                Err(PlainScanError::Fallback)
+            };
+        }
+        let local = element.name().local_name();
+        let local = local.as_ref();
+        let parent = self.stack.last().copied();
+        match (parent, local) {
+            (None, b"worksheet") => {
+                if self.root_seen || self.root_closed {
+                    return Err(PlainScanError::Callback(invalid(
+                        "worksheet XML has multiple worksheet roots",
+                    )));
+                }
+                plain_attributes(element, decoder, PlainAttributeSet::Root, limits)?;
+                self.root_seen = true;
+                if empty {
+                    self.root_closed = true;
+                } else {
+                    self.push(PlainFrame::Worksheet)?;
+                }
+            },
+            (Some(PlainFrame::Worksheet), b"dimension") => {
+                if self.seen_sheet_data {
+                    return Err(PlainScanError::Callback(invalid(
+                        "worksheet dimension appears after column or cell data",
+                    )));
+                }
+                if self.seen_dimension {
+                    return Err(PlainScanError::Callback(invalid(
+                        "worksheet has duplicate dimension elements",
+                    )));
+                }
+                self.seen_dimension = true;
+                let attrs =
+                    plain_attributes(element, decoder, PlainAttributeSet::Dimension, limits)?;
+                let Some(reference) = attrs.reference else {
+                    return Err(PlainScanError::Callback(invalid(
+                        "worksheet dimension is missing ref",
+                    )));
+                };
+                Rect::from_a1(reference).map_err(|error| {
+                    PlainScanError::Callback(invalid(format!(
+                        "invalid worksheet dimension '{reference}': {error}"
+                    )))
+                })?;
+                if !empty {
+                    self.push(PlainFrame::Dimension)?;
+                }
+            },
+            (Some(PlainFrame::Worksheet), b"sheetData") => {
+                plain_attributes(element, decoder, PlainAttributeSet::Empty, limits)?;
+                if self.seen_sheet_data {
+                    return Err(PlainScanError::Callback(invalid(
+                        "worksheet has duplicate sheetData",
+                    )));
+                }
+                self.seen_sheet_data = true;
+                if empty {
+                    return Err(PlainScanError::Fallback);
+                }
+                self.push(PlainFrame::SheetData)?;
+            },
+            (Some(PlainFrame::SheetData), b"row") => {
+                let attrs = plain_attributes(element, decoder, PlainAttributeSet::Row, limits)?;
+                let number = match attrs.reference {
+                    Some(value) => parse_one_based_row(value).map_err(PlainScanError::Callback)?,
+                    None => self
+                        .previous_row
+                        .checked_add(1)
+                        .filter(|value| *value <= litchi_sheet::ROWS)
+                        .ok_or_else(|| {
+                            PlainScanError::Callback(invalid(
+                                "inferred worksheet row exceeds the spreadsheet grid",
+                            ))
+                        })?,
+                };
+                if self.previous_row != 0 {
+                    if number < self.previous_row {
+                        return Err(PlainScanError::Fallback);
+                    }
+                    if number == self.previous_row {
+                        return Err(PlainScanError::Callback(invalid(format!(
+                            "duplicate worksheet row {number}"
+                        ))));
+                    }
+                }
+                self.previous_row = number;
+                self.row = Some((number, 0));
+                if empty {
+                    return Err(PlainScanError::Fallback);
+                }
+                self.push(PlainFrame::Row)?;
+            },
+            (Some(PlainFrame::Row), b"c") => {
+                let attrs = plain_attributes(element, decoder, PlainAttributeSet::Cell, limits)?;
+                let (row, last_column) = self.row.ok_or_else(|| {
+                    PlainScanError::Callback(invalid("worksheet cell outside a row"))
+                })?;
+                let column = match attrs.reference {
+                    Some(reference) => {
+                        let (reference_row, column) = parse_a1(reference).map_err(|error| {
+                            PlainScanError::Callback(invalid(format!(
+                                "invalid worksheet cell reference '{reference}': {error}"
+                            )))
+                        })?;
+                        if reference_row != row {
+                            return Err(PlainScanError::Callback(invalid(format!(
+                                "cell reference '{reference}' does not belong to row {row}"
+                            ))));
+                        }
+                        column
+                    },
+                    None => last_column
+                        .checked_add(1)
+                        .filter(|value| *value <= litchi_sheet::COLUMNS)
+                        .ok_or_else(|| {
+                            PlainScanError::Callback(invalid(
+                                "inferred worksheet column exceeds the spreadsheet grid",
+                            ))
+                        })?,
+                };
+                if last_column != 0 {
+                    if column < last_column {
+                        return Err(PlainScanError::Fallback);
+                    }
+                    if column == last_column {
+                        return Err(PlainScanError::Callback(invalid(format!(
+                            "duplicate worksheet cell at row {row}, column {column}"
+                        ))));
+                    }
+                }
+                self.row = Some((row, column));
+                let address = Address::at(row - 1, column - 1).map_err(|_error| {
+                    PlainScanError::Callback(invalid("worksheet cell address exceeds the grid"))
+                })?;
+                let selected = self.targets.binary_search(&address).is_ok();
+                self.cell = Some(PlainCell {
+                    address,
+                    selected,
+                    saw_value: false,
+                    value: std::mem::take(&mut self.numeric_value_scratch),
+                    value_bytes: 0,
+                    value_characters: 0,
+                });
+                if let Some(cell) = self.cell.as_mut() {
+                    cell.value.clear();
+                }
+                if empty {
+                    self.finish_cell()?;
+                } else {
+                    self.push(PlainFrame::Cell)?;
+                }
+            },
+            (Some(PlainFrame::Cell), b"v") => {
+                plain_attributes(element, decoder, PlainAttributeSet::Empty, limits)?;
+                let cell = self.cell.as_mut().ok_or_else(|| {
+                    PlainScanError::Callback(invalid("worksheet value outside a cell"))
+                })?;
+                if cell.saw_value {
+                    return Err(PlainScanError::Callback(invalid(
+                        "duplicate worksheet cell value",
+                    )));
+                }
+                cell.saw_value = true;
+                if !empty {
+                    self.push(PlainFrame::Value)?;
+                }
+            },
+            _ => return Err(PlainScanError::Fallback),
+        }
+        Ok(())
+    }
+
+    fn finish_cell(&mut self) -> std::result::Result<(), PlainScanError> {
+        let cell = self
+            .cell
+            .take()
+            .ok_or_else(|| PlainScanError::Callback(invalid("missing worksheet cell")))?;
+        let PlainCell {
+            address,
+            selected,
+            saw_value,
+            value,
+            ..
+        } = cell;
+        if selected {
+            let semantic = if saw_value && !value.trim().is_empty() {
+                let number =
+                    Number::new(value.into_boxed_str()).map_err(PlainScanError::Callback)?;
+                Cell::Value(Value::Number(number))
+            } else {
+                Cell::Empty
+            };
+            self.selected.push(SelectedRecord {
+                address,
+                payload: SelectedPayload::Cell(semantic),
+            });
+        } else {
+            if saw_value && !value.trim().is_empty() {
+                Number::validate_lexical(&value).map_err(PlainScanError::Callback)?;
+            }
+            self.numeric_value_scratch = value;
+        }
+        Ok(())
+    }
+
+    fn end(
+        &mut self,
+        element: &quick_xml::events::BytesEnd<'_>,
+    ) -> std::result::Result<(), PlainScanError> {
+        let Some(frame) = self.stack.pop() else {
+            return Err(PlainScanError::Callback(invalid(
+                "worksheet XML has an unexpected end",
+            )));
+        };
+        let expected = match frame {
+            PlainFrame::Worksheet => b"worksheet".as_slice(),
+            PlainFrame::Dimension => b"dimension".as_slice(),
+            PlainFrame::SheetData => b"sheetData".as_slice(),
+            PlainFrame::Row => b"row".as_slice(),
+            PlainFrame::Cell => b"c".as_slice(),
+            PlainFrame::Value => b"v".as_slice(),
+        };
+        if element.name().local_name().as_ref() != expected {
+            return Err(PlainScanError::Callback(invalid(
+                "worksheet XML has an unexpected semantic end",
+            )));
+        }
+        match frame {
+            PlainFrame::Worksheet => self.root_closed = true,
+            PlainFrame::Dimension | PlainFrame::SheetData | PlainFrame::Value => {},
+            PlainFrame::Row => self.row = None,
+            PlainFrame::Cell => self.finish_cell()?,
+        }
+        Ok(())
+    }
+
+    fn text(
+        &mut self,
+        value: &quick_xml::events::BytesText<'_>,
+    ) -> std::result::Result<(), PlainScanError> {
+        let Some(frame) = self.stack.last().copied() else {
+            if value.as_ref().iter().all(u8::is_ascii_whitespace) {
+                return Ok(());
+            }
+            return Err(PlainScanError::Fallback);
+        };
+        if frame != PlainFrame::Value {
+            if value.as_ref().iter().all(u8::is_ascii_whitespace) {
+                return Ok(());
+            }
+            return Err(PlainScanError::Fallback);
+        }
+        let decoded = value.decode().map_err(|_| PlainScanError::Fallback)?;
+        self.append_value(decoded.as_ref())
+    }
+
+    fn append_value(&mut self, text: &str) -> std::result::Result<(), PlainScanError> {
+        let cell = self.cell.as_mut().ok_or_else(|| {
+            PlainScanError::Callback(invalid("worksheet value text outside a cell"))
+        })?;
+        cell.value_bytes = cell
+            .value_bytes
+            .checked_add(text.len())
+            .filter(|length| *length <= MAX_ENCODED_CELL_BYTES)
+            .ok_or_else(|| {
+                PlainScanError::Callback(invalid("selected worksheet cell value is too large"))
+            })?;
+        cell.value_characters = cell
+            .value_characters
+            .checked_add(text.chars().count())
+            .filter(|length| *length <= MAX_CELL_CHARACTERS)
+            .ok_or_else(|| {
+                PlainScanError::Callback(invalid(format!(
+                    "selected worksheet cell value exceeds {MAX_CELL_CHARACTERS} characters"
+                )))
+            })?;
+        cell.value.try_reserve(text.len()).map_err(|source| {
+            PlainScanError::Callback(allocation("selected worksheet cell value", source))
+        })?;
+        cell.value.push_str(text);
+        Ok(())
+    }
+
+    fn finish(self) -> std::result::Result<SelectedCells, PlainScanError> {
+        if !self.root_seen || !self.root_closed || !self.stack.is_empty() {
+            return Err(PlainScanError::Callback(invalid(
+                "worksheet XML has an incomplete SpreadsheetML worksheet root",
+            )));
+        }
+        if !self.seen_sheet_data {
+            return Err(PlainScanError::Callback(invalid(
+                "worksheet XML is missing required sheetData",
+            )));
+        }
+        Ok(SelectedCells {
+            cells: self.selected,
+            dependencies: SelectedDependencies::default(),
+        })
+    }
+}
+
+#[derive(Clone, Copy)]
+enum PlainAttributeSet {
+    Root,
+    Dimension,
+    Row,
+    Cell,
+    Empty,
+}
+
+struct PlainAttributes<'a> {
+    reference: Option<&'a str>,
+}
+
+fn plain_attributes<'a>(
+    element: &'a BytesStart<'_>,
+    _decoder: Decoder,
+    set: PlainAttributeSet,
+    limits: &StreamLimits,
+) -> std::result::Result<PlainAttributes<'a>, PlainScanError> {
+    let mut reference = None;
+    let mut seen_reference = false;
+    let mut count = 0usize;
+    let mut bytes = 0usize;
+    let check_duplicates = element
+        .attributes_raw()
+        .windows(b"xmlns".len())
+        .any(|window| window == b"xmlns");
+    let mut attributes = element.attributes();
+    attributes.with_checks(check_duplicates);
+    for attribute in attributes {
+        let attribute = attribute.map_err(|_error| PlainScanError::Fallback)?;
+        count = count
+            .checked_add(1)
+            .ok_or(PlainScanError::Limit("stream attributes per event"))?;
+        bytes = bytes
+            .checked_add(attribute.key.as_ref().len())
+            .and_then(|bytes| bytes.checked_add(attribute.value.as_ref().len()))
+            .ok_or(PlainScanError::Limit("stream attribute bytes"))?;
+        if count > limits.max_attributes_per_event {
+            return Err(PlainScanError::Limit("stream attributes per event"));
+        }
+        if bytes > limits.max_attribute_bytes_per_event {
+            return Err(PlainScanError::Limit("stream attribute bytes"));
+        }
+        let key = attribute.key.as_ref();
+        if key == b"xmlns" {
+            if !matches!(set, PlainAttributeSet::Root) {
+                return Err(PlainScanError::Fallback);
+            }
+            continue;
+        }
+        if key.starts_with(b"xmlns:") {
+            return Err(PlainScanError::Fallback);
+        }
+        if key.len() > limits.max_name_bytes {
+            return Err(PlainScanError::Fallback);
+        }
+        let allowed = match set {
+            PlainAttributeSet::Root | PlainAttributeSet::Empty => None,
+            PlainAttributeSet::Dimension => Some(b"ref".as_slice()),
+            PlainAttributeSet::Row | PlainAttributeSet::Cell => Some(b"r".as_slice()),
+        };
+        if allowed != Some(key) {
+            return Err(PlainScanError::Fallback);
+        }
+        if seen_reference {
+            return Err(PlainScanError::Fallback);
+        }
+        seen_reference = true;
+        let value = match attribute.value {
+            Cow::Borrowed(value) => value,
+            Cow::Owned(_) => return Err(PlainScanError::Fallback),
+        };
+        if value.contains(&b'&') {
+            return Err(PlainScanError::Fallback);
+        }
+        reference = Some(std::str::from_utf8(value).map_err(|_| PlainScanError::Fallback)?);
+    }
+    Ok(PlainAttributes { reference })
+}
+
+fn plain_spreadsheetml(namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value))
+            if *value == SPREADSHEETML_NAMESPACE || *value == STRICT_SPREADSHEETML_NAMESPACE
+    )
+}
+
+fn scan_plain_targets(
+    content: &[u8],
+    limits: &StreamLimits,
+    targets: &[Address],
+) -> std::result::Result<PlainScan, PlainScanError> {
+    if content.len() > limits.processing.max_input_bytes {
+        return Err(PlainScanError::Limit("input bytes"));
+    }
+    let mut reader = NsReader::from_reader(content);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().check_comments = true;
+    reader
+        .resolver_mut()
+        .set_max_declarations_per_element(limits.max_attributes_per_event);
+    let mut scanner = PlainScanner::new(targets).map_err(PlainScanError::Callback)?;
+    let mut events = 0usize;
+    loop {
+        let event = reader.read_event().map_err(|_| PlainScanError::Fallback)?;
+        if !matches!(&event, Event::Eof | Event::DocType(_) | Event::PI(_)) {
+            events = events
+                .checked_add(1)
+                .ok_or(PlainScanError::Limit("stream event count"))?;
+            if events > limits.max_events {
+                return Err(PlainScanError::Limit("stream event count"));
+            }
+        }
+        let (namespace, event) = reader.resolver().resolve_event(event);
+        let event_bytes = match &event {
+            Event::Start(value) => value.as_ref().len().saturating_add(2),
+            Event::Empty(value) => value.as_ref().len().saturating_add(3),
+            Event::End(value) => value.as_ref().len().saturating_add(3),
+            Event::Text(value) => value.as_ref().len(),
+            Event::CData(value) => value.as_ref().len().saturating_add(12),
+            Event::Comment(value) => value.as_ref().len().saturating_add(7),
+            Event::Decl(value) => value.as_ref().len().saturating_add(4),
+            Event::GeneralRef(value) => value.as_ref().len().saturating_add(2),
+            Event::DocType(value) => value.as_ref().len().saturating_add(10),
+            Event::PI(value) => value.as_ref().len().saturating_add(4),
+            Event::Eof => 0,
+        };
+        if event_bytes > limits.max_event_bytes {
+            return Err(PlainScanError::Limit("stream event bytes"));
+        }
+        if !matches!(&event, Event::Eof | Event::Decl(_)) && !scanner.root_seen {
+            scanner.pre_root_event_seen = true;
+        }
+        match event {
+            Event::Start(element) => {
+                scanner.start(&namespace, &element, reader.decoder(), limits, false)?
+            },
+            Event::Empty(element) => {
+                scanner.start(&namespace, &element, reader.decoder(), limits, true)?
+            },
+            Event::End(element) => scanner.end(&element)?,
+            Event::Text(value) => scanner.text(&value)?,
+            Event::CData(_) | Event::GeneralRef(_) | Event::DocType(_) | Event::PI(_) => {
+                return Err(PlainScanError::Fallback);
+            },
+            Event::Decl(_value) => {
+                if scanner.root_seen || scanner.declaration_seen || scanner.pre_root_event_seen {
+                    return Err(PlainScanError::Fallback);
+                }
+                scanner.declaration_seen = true;
+            },
+            Event::Comment(value) => {
+                if value.decode().is_err() {
+                    return Err(PlainScanError::Fallback);
+                }
+            },
+            Event::Eof => break,
+        }
+    }
+    scanner.finish().map(PlainScan::Eligible)
 }
 
 /// Scan one requested coordinate through a source worksheet stream.
@@ -293,7 +986,7 @@ pub fn scan(
                 0 => None,
                 1 => records.pop(),
                 _ => {
-                    return Err(litchi_ooxml_common::mce::StreamError::Callback {
+                    return Err(StreamError::Callback {
                         raw_error: None,
                         active_error: Some(invalid(
                             "one-cell worksheet selection produced multiple records",
@@ -474,8 +1167,9 @@ fn append_bounded(
 }
 
 #[derive(Debug)]
-struct Scanner {
+struct Scanner<'a> {
     requested: Rect,
+    targets: Option<&'a [Address]>,
     stack: Vec<Frame>,
     row: Option<(u32, u32)>,
     previous_row: u32,
@@ -495,10 +1189,11 @@ struct Scanner {
     not_eligible: Option<NotEligibleReason>,
 }
 
-impl Scanner {
-    fn new(requested: Rect) -> Self {
+impl<'a> Scanner<'a> {
+    fn new(requested: Rect, targets: Option<&'a [Address]>) -> Self {
         Self {
             requested,
+            targets,
             stack: Vec::new(),
             row: None,
             previous_row: 0,
@@ -1143,7 +1838,10 @@ impl Scanner {
             .take()
             .ok_or_else(|| invalid("missing worksheet cell"))?;
         let address = cell.address;
-        let selected = self.requested.contains(address);
+        let selected = self.targets.map_or_else(
+            || self.requested.contains(address),
+            |targets| targets.binary_search(&address).is_ok(),
+        );
         let effective_inline = cell.saw_inline || matches!(cell.kind, CellKind::InlineString);
         if effective_inline && cell.saw_value {
             return Err(invalid(

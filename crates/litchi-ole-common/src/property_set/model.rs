@@ -30,6 +30,17 @@ pub(crate) const MAX_NAMED_PROPERTY_ID: u32 = 0x7fff_ffff;
 pub(crate) const MAX_COMPOSITE_ELEMENTS: usize = 1_000_000;
 pub(crate) const VT_ARRAY: u16 = 0x2000;
 pub(crate) const VT_VERSIONED_STREAM: u16 = 0x0049;
+/// `[MS-OLEPS]` `VT_STREAM` indirect property type.
+pub const VT_STREAM: u16 = 0x0042;
+/// `[MS-OLEPS]` `VT_STORAGE` indirect property type.
+pub const VT_STORAGE: u16 = 0x0043;
+/// `[MS-OLEPS]` `VT_STREAMED_OBJECT` indirect property type.
+pub const VT_STREAMED_OBJECT: u16 = 0x0044;
+/// `[MS-OLEPS]` `VT_STORED_OBJECT` indirect property type.
+///
+/// The local MS-OLEPS 2.22 table contains a `0x0044` typo; 2.10, 2.15, and
+/// the CFB property-type constants identify this family as `0x0045`.
+pub const VT_STORED_OBJECT: u16 = 0x0045;
 const MAX_ARRAY_ELEMENTS: usize = 1_000_000;
 const MAX_ARRAY_DIMENSIONS: usize = 31;
 
@@ -86,6 +97,68 @@ pub enum CodePage {
     Utf16Le,
     /// Checked NUL-terminated byte-stream code page.
     Mbcs(Mbcs),
+}
+
+/// The checked `propN` selector carried by an indirect OLE Property Set
+/// value.
+///
+/// The original CodePageString spelling is retained after parsing so an
+/// unchanged non-simple property set can be replayed without inventing a
+/// selector. Newly authored values use the canonical `prop{identifier}`
+/// spelling required by [MS-OLEPS] section 2.10.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct IndirectPropertyName {
+    property_identifier: u32,
+    spelling: String,
+}
+
+impl IndirectPropertyName {
+    /// Creates the canonical selector for a normal property identifier.
+    pub fn new(property_identifier: u32) -> Result<Self, OleError> {
+        Ok(Self {
+            property_identifier,
+            spelling: make_indirect_property_name(property_identifier)?,
+        })
+    }
+
+    /// The normal property identifier represented by this selector.
+    #[must_use]
+    pub const fn property_identifier(&self) -> u32 {
+        self.property_identifier
+    }
+
+    /// The source or canonical `propN` spelling.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.spelling
+    }
+
+    pub(crate) fn from_wire(
+        spelling: String,
+        expected_property_identifier: Option<u32>,
+    ) -> Result<Self, OleError> {
+        let identifier = indirect_property_identifier(&spelling)?;
+        if let Some(expected) = expected_property_identifier
+            && expected != identifier
+        {
+            return Err(invalid(
+                "Indirect property name does not match its property identifier",
+            ));
+        }
+        Ok(Self {
+            property_identifier: identifier,
+            spelling,
+        })
+    }
+
+    pub(crate) fn validate_for_property(&self, property_identifier: u32) -> Result<(), OleError> {
+        if self.property_identifier != property_identifier {
+            return Err(invalid(
+                "Indirect property name does not match its property identifier",
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl CodePage {
@@ -268,6 +341,7 @@ impl Section {
                 "Duplicate or reserved property identifier {identifier}"
             )));
         }
+        validate_indirect_value_for_property(identifier, &value)?;
         self.properties
             .try_reserve(1)
             .map_err(|source| allocation("property values", source))?;
@@ -309,6 +383,7 @@ impl Section {
                 "Duplicate or reserved property identifier {identifier}"
             )));
         }
+        validate_indirect_value_for_property(identifier, &value)?;
         self.properties
             .try_reserve(1)
             .map_err(|source| allocation("property values", source))?;
@@ -346,6 +421,7 @@ impl Section {
         if identifier == PID_CODEPAGE {
             return Err(invalid("Use set_page to update PID 1"));
         }
+        validate_indirect_value_for_property(identifier, &value)?;
         let target = self
             .properties
             .get_mut(&identifier)
@@ -851,14 +927,28 @@ pub enum Value {
     Lpwstr(String),
     Filetime(u64),
     Blob(Vec<u8>),
-    Clipboard { format: i32, data: Vec<u8> },
+    Clipboard {
+        format: i32,
+        data: Vec<u8>,
+    },
     Clsid(Guid),
+    /// A non-simple property-set stream element.
+    Stream(IndirectPropertyName),
+    /// A non-simple property-set storage element.
+    Storage(IndirectPropertyName),
+    /// A streamed object represented by a non-simple stream element.
+    StreamedObject(IndirectPropertyName),
+    /// A stored object represented by a non-simple storage element.
+    StoredObject(IndirectPropertyName),
     VersionedStream(VersionedStream),
     HeadingPairs(HeadingPairs),
     DocParts(DocParts),
     Vector(Vector),
     Array(Array),
-    Unknown { variant_type: u16, data: Vec<u8> },
+    Unknown {
+        variant_type: u16,
+        data: Vec<u8>,
+    },
 }
 
 impl Stream {
@@ -1069,6 +1159,10 @@ fn scalar_of(property_value: &Value) -> Option<Scalar> {
         Value::Empty
         | Value::Null
         | Value::Blob(_)
+        | Value::Stream(_)
+        | Value::Storage(_)
+        | Value::StreamedObject(_)
+        | Value::StoredObject(_)
         | Value::VersionedStream(_)
         | Value::HeadingPairs(_)
         | Value::DocParts(_)
@@ -1076,6 +1170,20 @@ fn scalar_of(property_value: &Value) -> Option<Scalar> {
         | Value::Array(_)
         | Value::Unknown { .. } => return None,
     })
+}
+
+pub(crate) fn validate_indirect_value_for_property(
+    property_identifier: u32,
+    value: &Value,
+) -> Result<(), OleError> {
+    match value {
+        Value::Stream(name)
+        | Value::Storage(name)
+        | Value::StreamedObject(name)
+        | Value::StoredObject(name) => name.validate_for_property(property_identifier),
+        Value::VersionedStream(value) => value.validate_for_property(property_identifier),
+        _ => Ok(()),
+    }
 }
 
 pub(crate) fn try_clone_property_value(property_value: &Value) -> Result<Value, OleError> {
@@ -1109,6 +1217,10 @@ pub(crate) fn try_clone_property_value(property_value: &Value) -> Result<Value, 
             data: try_copy_bytes(data, "property value clipboard data")?,
         },
         Value::Clsid(value) => Value::Clsid(*value),
+        Value::Stream(value) => Value::Stream(value.clone()),
+        Value::Storage(value) => Value::Storage(value.clone()),
+        Value::StreamedObject(value) => Value::StreamedObject(value.clone()),
+        Value::StoredObject(value) => Value::StoredObject(value.clone()),
         Value::VersionedStream(value) => Value::VersionedStream(VersionedStream {
             version_guid: value.version_guid,
             stream_name: try_clone_string(&value.stream_name, "indirect property name")?,
@@ -1281,9 +1393,11 @@ pub(crate) fn validate_property_name(name: &str) -> Result<(), OleError> {
 }
 
 fn indirect_property_identifier(name: &str) -> Result<u32, OleError> {
-    let digits = name
-        .strip_prefix("prop")
-        .ok_or_else(|| invalid("Indirect property name must start with 'prop'"))?;
+    let bytes = name.as_bytes();
+    if bytes.len() < 4 || !bytes[..4].eq_ignore_ascii_case(b"prop") {
+        return Err(invalid("Indirect property name must start with 'prop'"));
+    }
+    let digits = &name[4..];
     if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
         return Err(invalid(
             "Indirect property name must contain a decimal property identifier",

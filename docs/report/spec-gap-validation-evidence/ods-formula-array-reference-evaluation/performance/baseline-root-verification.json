@@ -1,0 +1,7 @@
+{
+  "status": "pass",
+  "scope": "baseline corpus completeness, successful captures, repeat counts and comparison self-identity; no candidate claim",
+  "rows": 282,
+  "raw_sha256": "22ed898910a76723d81d5e93fe5f40a8d9f8f20b5a2e37166ebfd01c562f54e0",
+  "comparison_sha256": "dbdb146c3b694165af282a9830e9707bad0e6c09b93a88bf3277bddc7cd4a998"
+}

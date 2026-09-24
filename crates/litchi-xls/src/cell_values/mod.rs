@@ -28,11 +28,11 @@ use crate::records::{BoundSheetRecord, Encoding, SheetType};
 use crate::workbook::{KeptCells, ValidationWorkbook};
 use crate::{Error, Result, SheetKind, Workbook};
 use litchi_biff::Records;
-use litchi_cfb::consts::STGTY_STORAGE;
 use litchi_cfb::{
     ArtifactFingerprint, ComposedOverlaySource, OverlayError, OverlayOperationShape, PublishReport,
     SameLengthStreamSplice, StreamSpliceLimits, ValidatedOverlayPlan,
 };
+use litchi_cfb::{OleFileLimits, consts::STGTY_STORAGE};
 use litchi_core::binary;
 pub use litchi_core::patch::HistoryLimits;
 use litchi_core::patch::{
@@ -566,7 +566,28 @@ impl Snapshot {
     /// Returns a typed CFB, BIFF, encryption, allocation, or workbook
     /// validation error before a snapshot is published.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let package = PackageEditor::open(bytes, Targets::default(), Limits::default())?;
+        Self::from_bytes_with_limits(bytes, Limits::default())
+    }
+
+    /// Opens an unencrypted XLS package under an explicit object capture
+    /// profile before publishing the editable snapshot.
+    ///
+    /// The bounded corpus and other security-sensitive callers use this entry
+    /// point instead of inheriting the broad convenience defaults.
+    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+        let package = PackageEditor::open(bytes, Targets::default(), limits)?;
+        Self::from_package_editor(package)
+    }
+
+    /// Opens an unencrypted XLS package under explicit object and CFB
+    /// admission profiles before publishing the editable snapshot.
+    pub fn from_bytes_with_limits_and_cfb(
+        bytes: Vec<u8>,
+        limits: Limits,
+        cfb_limits: OleFileLimits,
+    ) -> Result<Self> {
+        let package =
+            PackageEditor::open_with_cfb_limits(bytes, Targets::default(), limits, cfb_limits)?;
         Self::from_package_editor(package)
     }
 

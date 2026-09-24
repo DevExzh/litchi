@@ -1,7 +1,9 @@
 use super::{
     Editor, FileInformationBlock, Limits, SmartTagBookmarkInfo, SmartTagOrigin,
-    SmartTagRecognizerState, Snapshot, TableKind,
+    SmartTagRecognizerState, Snapshot, TableKind, TransactionError,
 };
+use crate::package::Error as PackageError;
+use crate::parts::protection::{EditProtection, ProtectionAuthorization, ProtectionPolicy};
 use litchi_codepage::Ansi;
 use litchi_ole_common::smart_tags::{
     Property, PropertyBag, PropertyBagStore, PropertyBagString, PropertyBagStringEncoding, Type,
@@ -78,13 +80,20 @@ fn source() -> (FileInformationBlock, Vec<u8>) {
     let recognizer_offset = table.len();
     table.extend_from_slice(&recognizer);
 
-    let mut fib_bytes = vec![0u8; 154 + 136 * 8];
+    const POINTER_COUNT: usize = 136;
+    let pointer_end = 154 + POINTER_COUNT * 8;
+    let mut fib_bytes = vec![0u8; pointer_end + 4];
     fib_bytes[0..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
-    fib_bytes[2..4].copy_from_slice(&0x0101u16.to_le_bytes());
+    // FibBase.csw and cslw are fixed MS-DOC counts.
+    fib_bytes[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    fib_bytes[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
+    fib_bytes[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
     fib_bytes[6..8].copy_from_slice(&0x0409u16.to_le_bytes());
     fib_bytes[10..12].copy_from_slice(&0x0200u16.to_le_bytes());
     fib_bytes[76..80].copy_from_slice(&20u32.to_le_bytes());
-    fib_bytes[152..154].copy_from_slice(&136u16.to_le_bytes());
+    fib_bytes[152..154].copy_from_slice(&(POINTER_COUNT as u16).to_le_bytes());
+    fib_bytes[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+    fib_bytes[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
 
     let pointers = [
         (20, 0, unknown_prefix_len),
@@ -99,6 +108,31 @@ fn source() -> (FileInformationBlock, Vec<u8>) {
         fib_bytes[pointer..pointer + 4].copy_from_slice(&(offset as u32).to_le_bytes());
         fib_bytes[pointer + 4..pointer + 8].copy_from_slice(&(length as u32).to_le_bytes());
     }
+    let dop_offset = table.len();
+    table.extend_from_slice(
+        &crate::parts::document_properties::DocumentProperties::writer_bytes(
+            false, false, false, true,
+        ),
+    );
+    let dop_pointer = 154 + 31 * 8;
+    fib_bytes[dop_pointer..dop_pointer + 4].copy_from_slice(&(dop_offset as u32).to_le_bytes());
+    fib_bytes[dop_pointer + 4..dop_pointer + 8].copy_from_slice(&594u32.to_le_bytes());
+    (FileInformationBlock::parse(&fib_bytes).unwrap(), table)
+}
+
+fn protected_source() -> (FileInformationBlock, Vec<u8>) {
+    const DOP_INDEX: usize = 31;
+    let (fib, mut table) = source();
+    let offset = table.len();
+    let mut dop = crate::parts::document_properties::DocumentProperties::writer_bytes(
+        false, false, false, true,
+    );
+    dop[6] = 0x10;
+    table.extend_from_slice(&dop);
+    let mut fib_bytes = fib.raw_data().to_vec();
+    let pointer = 154 + DOP_INDEX * 8;
+    fib_bytes[pointer..pointer + 4].copy_from_slice(&(offset as u32).to_le_bytes());
+    fib_bytes[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
     (FileInformationBlock::parse(&fib_bytes).unwrap(), table)
 }
 
@@ -219,4 +253,69 @@ fn package_editor_publishes_only_source_checked_transactions() {
         .unwrap();
     let factoid = factoid.offset as usize..factoid.end().unwrap() as usize;
     assert_eq!(&table_bytes[factoid.clone()], &table[factoid]);
+}
+
+#[test]
+fn protected_smart_tag_edits_require_authorization_and_preserve_patch_capability() {
+    let (fib, table) = protected_source();
+    let snapshot = Snapshot::parse(&fib, &table).unwrap();
+    assert_eq!(snapshot.protection(), EditProtection::Document);
+    assert!(!snapshot.edit().commit().unwrap().changed());
+
+    let mut denied = snapshot.edit();
+    denied
+        .set_recognizer_state(0, SmartTagRecognizerState::Pending)
+        .unwrap();
+    assert!(matches!(
+        denied.commit(),
+        Err(TransactionError::Invalid(PackageError::ProtectionDenied(
+            EditProtection::Document
+        )))
+    ));
+
+    let authorization =
+        ProtectionAuthorization::audited("test-suite", "approved metadata repair").unwrap();
+    let policy = ProtectionPolicy::allow_protected(authorization);
+    let allowed = Snapshot::parse_with_policy(&fib, &table, policy).unwrap();
+    let mut transaction = allowed.edit();
+    transaction
+        .set_recognizer_state(0, SmartTagRecognizerState::Pending)
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    assert!(commit.changed());
+    assert_eq!(
+        commit.patch().apply(&allowed).unwrap(),
+        commit.snapshot().clone()
+    );
+}
+
+#[test]
+fn smart_tag_patch_uses_the_destination_editor_policy() {
+    let (fib, table) = protected_source();
+    let authorization =
+        ProtectionAuthorization::audited("test-suite", "approved cross-editor patch").unwrap();
+    let allowed = Snapshot::parse_with_policy(
+        &fib,
+        &table,
+        ProtectionPolicy::allow_protected(authorization),
+    )
+    .unwrap();
+    let enforcing = Snapshot::parse(&fib, &table).unwrap();
+
+    let mut transaction = allowed.edit();
+    transaction
+        .set_recognizer_state(0, SmartTagRecognizerState::Pending)
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    assert!(matches!(
+        commit.patch().apply(&enforcing),
+        Err(TransactionError::Invalid(PackageError::ProtectionDenied(_)))
+    ));
+
+    let mut cross_editor_transaction = allowed.edit();
+    cross_editor_transaction
+        .set_recognizer_state(0, SmartTagRecognizerState::Pending)
+        .unwrap();
+    let mut editor = Editor::open(&fib, &table).unwrap();
+    assert!(editor.apply(cross_editor_transaction).is_err());
 }

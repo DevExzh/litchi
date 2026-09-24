@@ -8,7 +8,7 @@
 use std::io::{Read, Write};
 use std::path::Path;
 
-use litchi_core::sheet::WorkbookTrait;
+use litchi_core::{ExecutionContext, sheet::WorkbookTrait};
 use litchi_opc::{OpcPackage, PackageWriter, ReadLimits};
 
 use crate::Workbook;
@@ -400,6 +400,66 @@ impl Package {
     /// Validate and adopt an already parsed OPC package.
     pub fn from_opc(package: OpcPackage) -> Result<Self> {
         Self::from_opc_with_external_link_limits(package, ExternalLinkLimits::default())
+    }
+
+    /// Read the source-bound XLSB Custom Data catalog.
+    pub fn custom_data(&self) -> Result<crate::custom_data::Snapshot> {
+        crate::custom_data::Snapshot::load(&self.0)
+    }
+
+    /// Read Custom Data with an explicit finite policy.
+    pub fn custom_data_with_limits(
+        &self,
+        limits: crate::custom_data::Limits,
+    ) -> Result<crate::custom_data::Snapshot> {
+        crate::custom_data::Snapshot::load_with_limits(&self.0, limits)
+    }
+
+    /// Read Custom Data with an explicit policy and owned execution context.
+    pub fn custom_data_with_limits_and_context(
+        &self,
+        limits: crate::custom_data::Limits,
+        context: ExecutionContext,
+    ) -> Result<crate::custom_data::Snapshot> {
+        crate::custom_data::Snapshot::load_with_limits_and_context(&self.0, limits, Some(context))
+    }
+
+    /// Start a detached source-bound Custom Data transaction.
+    pub fn edit_custom_data(&self) -> Result<crate::custom_data::Transaction> {
+        crate::custom_data::Transaction::from_package(self.0.clone())
+    }
+
+    /// Start a detached Custom Data transaction with an explicit finite policy.
+    pub fn edit_custom_data_with_limits(
+        &self,
+        limits: crate::custom_data::Limits,
+    ) -> Result<crate::custom_data::Transaction> {
+        crate::custom_data::Transaction::from_package_with_limits(self.0.clone(), limits)
+    }
+
+    /// Start a detached Custom Data transaction with an owned execution context.
+    pub fn edit_custom_data_with_limits_and_context(
+        &self,
+        limits: crate::custom_data::Limits,
+        context: ExecutionContext,
+    ) -> Result<crate::custom_data::Transaction> {
+        crate::custom_data::Transaction::from_package_with_limits_and_context(
+            self.0.clone(),
+            limits,
+            Some(context),
+        )
+    }
+
+    /// Apply a source-checked Custom Data patch and return a new package.
+    pub fn apply_custom_data_patch(&self, patch: &crate::custom_data::Patch) -> Result<Self> {
+        let mut candidate = self.0.clone();
+        patch.apply_to_opc(&mut candidate)?;
+        Self::from_opc_with_external_link_limits(candidate, self.1)
+    }
+
+    /// Apply a source-checked Custom Data commit and return a new package.
+    pub fn apply_custom_data(&self, commit: &crate::custom_data::Commit) -> Result<Self> {
+        self.apply_custom_data_patch(commit.patch())
     }
 
     /// Validate and adopt an already parsed OPC package using explicit

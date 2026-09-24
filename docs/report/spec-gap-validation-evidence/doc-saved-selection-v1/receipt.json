@@ -1,0 +1,52 @@
+{
+  "base_commit": "e7f39166bbce03d63eb23452d8a34cf58c269da0",
+  "sources": {
+    "crates/litchi-doc/docs/FEATURE_MATRIX.md": "6b30ede19afeb5dccaa806ef80eccaaeff888e43d8f8fd07395b714c7dbc5592",
+    "crates/litchi-doc/src/document/model/semantic/basics.rs": "c29138559061c301d096c532df870672671ca32a935f233ff12f09740f798c3e",
+    "crates/litchi-doc/src/document/model/semantic/prelude.rs": "7cf560e6b7e0818c2edf7a8de2a10862251dc1f24d8816815a533fcf20db51f1",
+    "crates/litchi-doc/src/document/model/state.rs": "39503ef0d6641c4a0247ae449449582a1a3875beec9934e60eed8c0418cf5116",
+    "crates/litchi-doc/src/document/package.rs": "327e3c3afe6887a7b4c402e32ccb7b988d174e3b8bf6ec8620ab3a603e1855aa",
+    "crates/litchi-doc/src/lib.rs": "9aea5b0a2cd37365aae94418428c92cc964d49f0c5ecffed4bbe3e118efd9933",
+    "crates/litchi-doc/src/parts/mod.rs": "0212223a6994b9ac3745a2446991333a9b67db4dde789aba1ef4e3ea3a89c960",
+    "crates/litchi-doc/src/parts/saved_selection.rs": "e001ff1c9ba130e3acc0d973d896ee08eb536821cf00ef6527323e087a01f8d0",
+    "crates/litchi-doc/tests/saved_selection.rs": "66d15f9885ea26f66876f2b1bcc21ebbe7b8ec0431407f91b8e463e951c1be4b"
+  },
+  "toolchain": "1.95.0",
+  "commands": [
+    "cargo +1.95.0 test --offline --locked -p litchi-doc --all-features",
+    "cargo +1.95.0 clippy --offline --locked -p litchi-doc --all-targets --all-features -- -D warnings",
+    "rustfmt --edition 2024 --config skip_children=true --check <eight Rust source paths>",
+    "git diff --check"
+  ],
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  },
+  "tests": {
+    "passed": 1201,
+    "failed": 0,
+    "ignored": 2
+  },
+  "doctests": {
+    "passed": 14,
+    "failed": 0,
+    "ignored": 12
+  },
+  "clippy": "pass",
+  "format": "pass",
+  "whitespace": "pass",
+  "cargo_lock_sha256": "b5a7e7c78d8211439da193dfc56967df23321e53d96e44350b54769efb01d83a",
+  "independent_review": "xlsx_survey_fix: final local-spec Selsf, BlockSel, TableSel, FIB range/context, caching and preservation review clear after calc_chain_review findings were corrected",
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "36892825e14b5ba10d33515969bd45521ac89d8833ccd66200f39e97bc32a625",
+      "raw_sha256": "e881e6f1f8018522ae8fd7bf3402aa03871fb441f1c61a65b32609a9f95d862f"
+    },
+    "clippy.log.gz": {
+      "sha256": "71d15e953297af0b1e75fabd4ccf9d3794fe4e6a4adc580e6c5f911da4ea15e1",
+      "raw_sha256": "b18c31eb7a52a31ade20a5180c965aa73e9d2a90bcd3d3a2db02ba8c35da4f67"
+    }
+  }
+}

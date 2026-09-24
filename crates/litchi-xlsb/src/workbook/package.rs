@@ -1,6 +1,6 @@
 //! OPC/package integration for the typed XLSB workbook.
 
-use super::model::Workbook;
+use super::model::{DrawingLoadPolicy, Workbook};
 use crate::calc::Props;
 use crate::cell_values;
 use crate::cell_watches;
@@ -16,10 +16,12 @@ use crate::package::vba_project::{
 use crate::package::web_extension_bindings::PackageAppRefs;
 use crate::raw::Records;
 use crate::sparkline;
+use litchi_core::ExecutionContext;
 use litchi_ooxml_common::embedded;
 use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::web;
 use litchi_opc::constants::{content_type, relationship_type};
+use litchi_opc::part::Part;
 use litchi_opc::{OpcError, OpcPackage};
 use std::collections::HashMap;
 use std::io::{Read, Seek, Write};
@@ -55,6 +57,266 @@ fn is_known_non_worksheet_relationship(reltype: &str) -> bool {
 }
 
 impl Workbook {
+    /// Read the source-bound XLSB Custom Data catalog.
+    pub fn custom_data(&self) -> Result<crate::custom_data::Snapshot> {
+        crate::custom_data::Snapshot::load(&self.package)
+    }
+
+    /// Read Custom Data with an explicit finite policy.
+    pub fn custom_data_with_limits(
+        &self,
+        limits: crate::custom_data::Limits,
+    ) -> Result<crate::custom_data::Snapshot> {
+        crate::custom_data::Snapshot::load_with_limits(&self.package, limits)
+    }
+
+    /// Read Custom Data with an explicit policy and owned execution context.
+    pub fn custom_data_with_limits_and_context(
+        &self,
+        limits: crate::custom_data::Limits,
+        context: ExecutionContext,
+    ) -> Result<crate::custom_data::Snapshot> {
+        crate::custom_data::Snapshot::load_with_limits_and_context(
+            &self.package,
+            limits,
+            Some(context),
+        )
+    }
+
+    /// Start a detached source-bound Custom Data transaction.
+    pub fn edit_custom_data(&self) -> Result<crate::custom_data::Transaction> {
+        crate::custom_data::Transaction::from_package(self.package.clone())
+    }
+
+    /// Start a detached Custom Data transaction with an explicit finite policy.
+    pub fn edit_custom_data_with_limits(
+        &self,
+        limits: crate::custom_data::Limits,
+    ) -> Result<crate::custom_data::Transaction> {
+        crate::custom_data::Transaction::from_package_with_limits(self.package.clone(), limits)
+    }
+
+    /// Start a detached Custom Data transaction with an owned execution context.
+    pub fn edit_custom_data_with_limits_and_context(
+        &self,
+        limits: crate::custom_data::Limits,
+        context: ExecutionContext,
+    ) -> Result<crate::custom_data::Transaction> {
+        crate::custom_data::Transaction::from_package_with_limits_and_context(
+            self.package.clone(),
+            limits,
+            Some(context),
+        )
+    }
+
+    /// Apply a source-checked Custom Data commit and return its read-back snapshot.
+    pub fn apply_custom_data(
+        &mut self,
+        commit: &crate::custom_data::Commit,
+    ) -> Result<crate::custom_data::Snapshot> {
+        self.apply_custom_data_patch(commit.patch())
+    }
+
+    /// Apply a source-checked Custom Data patch through the workbook reparse seam.
+    pub fn apply_custom_data_patch(
+        &mut self,
+        patch: &crate::custom_data::Patch,
+    ) -> Result<crate::custom_data::Snapshot> {
+        let mut candidate = self.package.clone();
+        patch.apply_to_opc(&mut candidate)?;
+        let validated = self.reparse_candidate(candidate)?;
+        let snapshot = crate::custom_data::Snapshot::load_with_limits_and_context(
+            &validated.package,
+            patch.after().limits(),
+            patch.after().execution_context(),
+        )?;
+        *self = validated;
+        Ok(snapshot)
+    }
+
+    /// Read the optional workbook Theme part with conservative finite limits.
+    pub fn theme(&self) -> Result<Option<crate::theme::Snapshot>> {
+        self.theme_with_limits(crate::theme::Limits::DEFAULT)
+    }
+
+    /// Read the optional workbook Theme part with an explicit XML policy.
+    pub fn theme_with_limits(
+        &self,
+        limits: crate::theme::Limits,
+    ) -> Result<Option<crate::theme::Snapshot>> {
+        crate::theme::read(&self.package, limits)
+    }
+
+    /// Start a detached edit of the workbook Theme part.
+    pub fn edit_theme(&self) -> Result<crate::theme::Transaction> {
+        let snapshot = self
+            .theme_with_limits(crate::theme::Limits::DEFAULT)?
+            .ok_or_else(|| {
+                crate::package::error::Error::UnsupportedFeature(
+                    "cannot edit an absent Theme part through a present-only snapshot".to_string(),
+                )
+            })?;
+        Ok(snapshot.edit())
+    }
+
+    /// Start a detached Theme edit with explicit finite limits.
+    pub fn edit_theme_with_limits(
+        &self,
+        limits: crate::theme::Limits,
+    ) -> Result<crate::theme::Transaction> {
+        let snapshot = self.theme_with_limits(limits)?.ok_or_else(|| {
+            crate::package::error::Error::UnsupportedFeature(
+                "cannot edit an absent Theme part through a present-only snapshot".to_string(),
+            )
+        })?;
+        Ok(snapshot.edit())
+    }
+
+    /// Apply an atomic, source-checked Theme commit and return its read-back
+    /// snapshot.
+    pub fn apply_theme(&mut self, commit: &crate::theme::Commit) -> Result<crate::theme::Snapshot> {
+        self.apply_theme_patch(commit.patch())
+    }
+
+    /// Apply a source-checked theme patch, including an exact inverse.
+    ///
+    /// A stale source or invalid theme graph is refused before publication.
+    pub fn apply_theme_patch(
+        &mut self,
+        patch: &crate::theme::Patch,
+    ) -> Result<crate::theme::Snapshot> {
+        patch.apply(&mut self.package)
+    }
+
+    /// Read the optional Theme owner together with the package graph needed by
+    /// create/remove publication.  Use [`Self::theme`] when a present-only
+    /// typed snapshot is sufficient.
+    pub fn theme_owner(&self) -> Result<crate::theme::OwnerSnapshot> {
+        self.theme_owner_with_limits(crate::theme::Limits::DEFAULT)
+    }
+
+    /// Read the optional Theme owner with an explicit finite XML policy.
+    pub fn theme_owner_with_limits(
+        &self,
+        limits: crate::theme::Limits,
+    ) -> Result<crate::theme::OwnerSnapshot> {
+        crate::theme::read_owner(&self.package, limits)
+    }
+
+    /// Start a detached Theme owner transaction.  The transaction can create,
+    /// replace, or remove the Workbook-owned Theme part.
+    pub fn edit_theme_owner(&self) -> Result<crate::theme::OwnerTransaction> {
+        Ok(self.theme_owner()?.edit())
+    }
+
+    /// Start a detached Theme owner transaction with explicit finite limits.
+    pub fn edit_theme_owner_with_limits(
+        &self,
+        limits: crate::theme::Limits,
+    ) -> Result<crate::theme::OwnerTransaction> {
+        Ok(self.theme_owner_with_limits(limits)?.edit())
+    }
+
+    /// Apply a source-checked Theme owner commit atomically.
+    pub fn apply_theme_owner(
+        &mut self,
+        commit: &crate::theme::OwnerCommit,
+    ) -> Result<crate::theme::OwnerSnapshot> {
+        commit.patch().apply(&mut self.package)
+    }
+
+    /// Apply a source-checked Theme owner patch atomically.
+    pub fn apply_theme_owner_patch(
+        &mut self,
+        patch: &crate::theme::OwnerPatch,
+    ) -> Result<crate::theme::OwnerSnapshot> {
+        patch.apply(&mut self.package)
+    }
+
+    /// Read and bind the Worksheet Binary Index attached to one worksheet.
+    /// Offsets are validated against the worksheet bytes during this call;
+    /// the returned metadata owns the parsed index bytes but does not retain a
+    /// live view of the workbook's worksheet part.
+    pub fn worksheet_binary_index(
+        &self,
+        worksheet_index: usize,
+    ) -> Result<Option<crate::binary_index::WorksheetBinaryIndex>> {
+        self.worksheet_binary_index_with_limits(
+            worksheet_index,
+            crate::binary_index::Limits::DEFAULT,
+        )
+    }
+
+    /// Read a Worksheet Binary Index with explicit finite index limits.
+    pub fn worksheet_binary_index_with_limits(
+        &self,
+        worksheet_index: usize,
+        limits: crate::binary_index::Limits,
+    ) -> Result<Option<crate::binary_index::WorksheetBinaryIndex>> {
+        let worksheet_uri = self.worksheet_uri(worksheet_index)?;
+        let worksheet = self.package.get_part(&worksheet_uri)?;
+        let mut relationships = worksheet.rels().iter().filter(|relationship| {
+            relationship.reltype() == crate::binary_index::BINARY_INDEX_RELATIONSHIP
+        });
+        let Some(relationship) = relationships.next() else {
+            return Ok(None);
+        };
+        if relationships.next().is_some() {
+            return Err(crate::package::error::Error::InvalidRelationship(
+                "worksheet has multiple binary index relationships".to_string(),
+            ));
+        }
+        if relationship.is_external() {
+            return Err(crate::package::error::Error::InvalidRelationship(
+                "worksheet binary index relationship is external".to_string(),
+            ));
+        }
+        let index_uri = relationship.target_partname()?;
+        let index_part = self.package.get_part(&index_uri)?;
+        if index_part.content_type() != crate::binary_index::BINARY_INDEX_CONTENT_TYPE {
+            return Err(crate::package::error::Error::InvalidContentType {
+                expected: crate::binary_index::BINARY_INDEX_CONTENT_TYPE.to_string(),
+                got: index_part.content_type().to_string(),
+            });
+        }
+        if !index_part.rels().is_empty() {
+            return Err(crate::package::error::Error::InvalidRelationship(
+                "worksheet binary index part must not have relationships".to_string(),
+            ));
+        }
+        crate::binary_index::WorksheetBinaryIndex::from_parts(
+            index_part.blob(),
+            worksheet.blob(),
+            limits,
+        )
+        .map(Some)
+    }
+
+    /// Reparse an owned candidate while retaining this workbook's typed
+    /// drawing projection boundary.
+    pub(crate) fn reparse_candidate(&self, package: OpcPackage) -> Result<Self> {
+        Self::from_opc_package_with_external_link_limits_and_drawing_policy(
+            package,
+            self.external_link_limits,
+            self.drawing_load_policy,
+        )
+    }
+
+    /// Reparse bytes after a caller has already selected the projection
+    /// policy.  This is the single internal seam used by detached CRUD
+    /// validators so opaque drawing parts are never parsed accidentally.
+    pub(crate) fn reparse_candidate_with_policy(
+        package: OpcPackage,
+        external_link_limits: ExternalLinkLimits,
+        drawing_load_policy: DrawingLoadPolicy,
+    ) -> Result<Self> {
+        Self::from_opc_package_with_external_link_limits_and_drawing_policy(
+            package,
+            external_link_limits,
+            drawing_load_policy,
+        )
+    }
+
     /// Start a detached, exact-source transaction spanning sheet metadata and
     /// dependency-managed cross-workbook cell transfer.
     pub fn edit_workbook_structure(&self) -> Result<cell_values::WorkbookEdit> {
@@ -136,7 +398,10 @@ impl Workbook {
     /// already holds; the commit's snapshot is returned unchanged instead.
     /// Every other commit is parsed and validated as a complete candidate
     /// workbook first, and only a candidate that passes every check replaces
-    /// this one, so a refusal leaves the published workbook untouched.
+    /// this one, so a refusal leaves the published workbook untouched. The
+    /// candidate is parsed under this workbook's drawing policy, so a
+    /// drawing-skipped projection keeps that typed-inventory boundary after
+    /// publication.
     ///
     /// # Errors
     ///
@@ -153,6 +418,7 @@ impl Workbook {
             &uri,
             commit,
             self.external_link_limits,
+            self.drawing_load_policy,
         )?;
         match applied {
             cell_values::workbook::Applied::Unchanged(snapshot) => Ok(snapshot),
@@ -260,6 +526,7 @@ impl Workbook {
             &uri,
             commit,
             self.external_link_limits,
+            self.drawing_load_policy,
         )?;
         match applied {
             sparkline::workbook::Applied::Unchanged(snapshot) => Ok(snapshot),
@@ -300,6 +567,7 @@ impl Workbook {
             &uri,
             commit,
             self.external_link_limits,
+            self.drawing_load_policy,
         )?;
         match applied {
             cell_watches::workbook::Applied::Unchanged(snapshot) => Ok(snapshot),
@@ -418,15 +686,15 @@ impl Workbook {
     /// or unwinding leaves this workbook unchanged. A successful edit drops
     /// package signatures, reparses workbook-owned state, and revalidates the
     /// inert VBA and External Data Connections relationship graphs before
-    /// publication.
+    /// publication. A drawing-skipped projection remains drawing-skipped after
+    /// this reparse.
     pub fn edit_opc<T>(&mut self, edit: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
         let mut candidate = self.package.clone();
         candidate.unsign();
         let value = edit(&mut candidate)?;
 
         Self::validate_edit_candidate(&candidate)?;
-        let validated =
-            Self::from_opc_package_with_external_link_limits(candidate, self.external_link_limits)?;
+        let validated = self.reparse_candidate(candidate)?;
         *self = validated;
         Ok(value)
     }
@@ -619,7 +887,7 @@ impl Workbook {
     fn load_sheet_drawing(
         &self,
         sheet_index: usize,
-        drawing_part: &dyn litchi_opc::part::Part,
+        drawing_part: &dyn Part,
     ) -> Result<crate::package::drawing::SheetDrawing> {
         use crate::package::drawing::{EmbeddedChart, EmbeddedImage, Object, SheetDrawing};
         let drawing_xml = std::str::from_utf8(drawing_part.blob()).map_err(|error| {
@@ -768,6 +1036,50 @@ impl Workbook {
         )
     }
 
+    /// Read an XLSB workbook for cell/catalog CRUD without decoding standard
+    /// SpreadsheetDrawing parts during open.
+    ///
+    /// This explicit projection retains every drawing, chart, image, and
+    /// relationship part in the underlying OPC package for lossless save, but
+    /// does not populate the typed [`Workbook::sheet_drawings`] inventory.
+    /// Callers that need typed drawing access must use [`Self::new`] instead.
+    /// The source-backed workbook remains the preferred selector-first path
+    /// when positional input and deferred worksheet payloads are available.
+    pub fn new_without_drawing_parse<R: Read + Seek>(reader: R) -> Result<Self> {
+        Self::new_without_drawing_parse_with_limits_and_external_link_limits(
+            reader,
+            litchi_opc::ReadLimits::default(),
+            ExternalLinkLimits::default(),
+        )
+    }
+
+    /// Read a cell/catalog CRUD projection with explicit OPC resource limits.
+    pub fn new_without_drawing_parse_with_limits<R: Read + Seek>(
+        reader: R,
+        limits: litchi_opc::ReadLimits,
+    ) -> Result<Self> {
+        Self::new_without_drawing_parse_with_limits_and_external_link_limits(
+            reader,
+            limits,
+            ExternalLinkLimits::default(),
+        )
+    }
+
+    /// Read a cell/catalog CRUD projection with explicit OPC and external-link
+    /// resource limits.
+    pub fn new_without_drawing_parse_with_limits_and_external_link_limits<R: Read + Seek>(
+        reader: R,
+        limits: litchi_opc::ReadLimits,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        let package = OpcPackage::from_reader_with_limits(reader, limits)?;
+        Self::from_opc_package_with_external_link_limits_and_drawing_policy(
+            package,
+            external_link_limits,
+            DrawingLoadPolicy::Skipped,
+        )
+    }
+
     /// Read and validate an XLSB workbook with explicit OPC resource limits.
     pub fn new_with_limits<R: Read + Seek>(
         reader: R,
@@ -822,6 +1134,18 @@ impl Workbook {
         package: OpcPackage,
         external_link_limits: ExternalLinkLimits,
     ) -> Result<Self> {
+        Self::from_opc_package_with_external_link_limits_and_drawing_policy(
+            package,
+            external_link_limits,
+            DrawingLoadPolicy::Eager,
+        )
+    }
+
+    pub(crate) fn from_opc_package_with_external_link_limits_and_drawing_policy(
+        package: OpcPackage,
+        external_link_limits: ExternalLinkLimits,
+        drawing_load_policy: DrawingLoadPolicy,
+    ) -> Result<Self> {
         let mut external_link_budget = external_link_limits.budget();
         let mut workbook = Workbook {
             package,
@@ -840,17 +1164,25 @@ impl Workbook {
             structured_tables: Vec::new(),
             chart_sheets: Vec::new(),
             sheet_drawings: Vec::new(),
+            drawing_load_policy,
             connections: None,
         };
 
-        workbook.load_workbook_info(&mut external_link_budget)?;
+        workbook.load_workbook_info(
+            &mut external_link_budget,
+            drawing_load_policy == DrawingLoadPolicy::Eager,
+        )?;
         workbook.load_styles()?;
         workbook.load_shared_strings()?;
 
         Ok(workbook)
     }
 
-    fn load_workbook_info(&mut self, external_link_budget: &mut Budget) -> Result<()> {
+    fn load_workbook_info(
+        &mut self,
+        external_link_budget: &mut Budget,
+        load_drawings: bool,
+    ) -> Result<()> {
         let workbook_part = self.package.main_document_part()?;
 
         let blob = workbook_part.blob();
@@ -1071,7 +1403,9 @@ impl Workbook {
                         });
                     }
                     let drawing_part = self.package.get_part(&relationship.target_partname()?)?;
-                    sheet_drawings.push(self.load_sheet_drawing(sheet_index, drawing_part)?);
+                    if load_drawings {
+                        sheet_drawings.push(self.load_sheet_drawing(sheet_index, drawing_part)?);
+                    }
                 }
                 chart_sheets.push((sheet_index, chart_sheet));
                 continue;
@@ -1100,7 +1434,9 @@ impl Workbook {
                     });
                 }
                 let drawing_part = self.package.get_part(&relationship.target_partname()?)?;
-                sheet_drawings.push(self.load_sheet_drawing(sheet_index, drawing_part)?);
+                if load_drawings {
+                    sheet_drawings.push(self.load_sheet_drawing(sheet_index, drawing_part)?);
+                }
             }
             for table_rel_id in crate::package::table::parse_table_part_rel_ids(sheet_part.blob())?
             {

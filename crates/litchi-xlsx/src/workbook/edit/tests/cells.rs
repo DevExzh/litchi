@@ -70,6 +70,67 @@ fn cell_crud_is_atomic_reversible_and_source_preserving() {
 }
 
 #[test]
+fn plain_cell_rewrite_preserves_neighbor_bytes_and_reopens_typed_formulas() {
+    let baseline = Workbook::new().expect("baseline");
+    let mut package = baseline.inner.package.clone();
+    let source_sheet = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><f>SUM(A1,1)</f><v>2</v></c><c r="C1" t="inlineStr"><is><t>typed</t></is></c><x:c r="D1"><x:f>SUM(A1,3)</x:f><x:v>4</x:v></x:c></row></sheetData></worksheet>"#;
+    package
+        .get_part_mut(&baseline.inner.sheets[0].part_uri)
+        .expect("worksheet part")
+        .set_blob(source_sheet.to_vec());
+    let source = Workbook::from_package(package).expect("source workbook");
+    let source_sheet_xml = part_text(&source, "/xl/worksheets/sheet1.xml").to_owned();
+    let untouched_formula = r#"<c r="B1"><f>SUM(A1,1)</f><v>2</v></c>"#;
+    assert_eq!(
+        source_sheet_xml.matches(untouched_formula).count(),
+        1,
+        "fixture must contain one untouched plain formula cell"
+    );
+
+    let mut edit = source.edit().expect("edit");
+    edit.sheet(0usize)
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "edited")
+        .expect("plain cell edit");
+    let committed = edit.commit().expect("commit");
+    let changed_sheet_xml = part_text(committed.workbook(), "/xl/worksheets/sheet1.xml");
+    assert_eq!(
+        changed_sheet_xml.matches(untouched_formula).count(),
+        1,
+        "untouched plain formula cell should retain its exact source bytes"
+    );
+    assert!(changed_sheet_xml.contains(r#"<c r="A1" t="inlineStr">"#));
+    assert!(changed_sheet_xml.contains(r#"<c r="C1" t="inlineStr"><is><t>typed</t></is></c>"#));
+    assert!(changed_sheet_xml.contains(r#"<x:c r="D1"><x:f>SUM(A1,3)</x:f><x:v>4</x:v></x:c>"#));
+
+    let reopened = Workbook::from_bytes(committed.workbook().to_bytes().expect("serialized"))
+        .expect("reopened workbook");
+    let sheet = reopened
+        .sheet(0usize)
+        .expect("sheet lookup")
+        .expect("worksheet");
+    assert!(matches!(
+        sheet.cell("A1").expect("A1").stored(),
+        Some(Cell::Value(Value::Text(value))) if value.as_str() == "edited"
+    ));
+    assert!(matches!(
+        sheet.cell("B1").expect("B1").stored(),
+        Some(Cell::Formula(formula)) if formula.text() == "SUM(A1,1)"
+    ));
+    assert!(matches!(
+        sheet.cell("C1").expect("C1").stored(),
+        Some(Cell::Value(Value::Text(value))) if value.as_str() == "typed"
+    ));
+    assert!(matches!(
+        sheet.cell("D1").expect("D1").stored(),
+        Some(Cell::Formula(formula)) if formula.text() == "SUM(A1,3)"
+    ));
+    let reopened_sheet_xml = part_text(&reopened, "/xl/worksheets/sheet1.xml");
+    assert!(reopened_sheet_xml.contains(r#"<x:c r="D1"><x:f>SUM(A1,3)</x:f>"#));
+}
+
+#[test]
 fn commit_adopts_only_the_changed_worksheet_store() {
     let source = two_sheet_workbook(WorksheetKind::Worksheet);
     assert!(
@@ -110,6 +171,62 @@ fn commit_does_not_retain_an_oversized_validated_store() {
 
     let committed = edit.commit().expect("commit");
     assert!(committed.workbook().inner.sheets[0].cells.get().is_none());
+}
+
+#[test]
+fn large_plain_worksheet_sparse_edit_reopens_and_preserves_store_policy() {
+    let source = Workbook::new().expect("source workbook");
+    let mut create = source.edit().expect("create edit");
+    {
+        let mut sheet = create
+            .sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("sheet");
+        for index in 0..4_097_u32 {
+            sheet
+                .set(
+                    (index / 64, index % 64),
+                    i32::try_from(index).expect("bounded value"),
+                )
+                .expect("cell edit");
+        }
+    }
+    let created = create.commit().expect("large worksheet commit");
+    let reopened = Workbook::from_bytes(created.workbook().to_bytes().expect("large bytes"))
+        .expect("large worksheet reopen");
+
+    let mut edit = reopened.edit().expect("sparse edit");
+    edit.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("sheet")
+        .set("A1", 42_i32)
+        .expect("changed value");
+    let committed = edit.commit().expect("sparse commit");
+    assert!(
+        committed.workbook().inner.sheets[0].cells.get().is_none(),
+        "large sparse verification must not retain a second full worksheet store"
+    );
+    let sheet = committed
+        .workbook()
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("sheet");
+    assert!(matches!(
+        sheet.cell("A1").expect("updated cell").stored(),
+        Some(Cell::Value(Value::Number(value))) if value.as_str() == "42"
+    ));
+    let final_bytes = committed.workbook().to_bytes().expect("final bytes");
+    let final_reopen = Workbook::from_bytes(final_bytes).expect("final reopen");
+    assert!(matches!(
+        final_reopen
+            .sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("sheet")
+            .cell("A1")
+            .expect("updated cell")
+            .stored(),
+        Some(Cell::Value(Value::Number(value))) if value.as_str() == "42"
+    ));
 }
 #[test]
 fn merged_range_crud_is_sparse_safe_reversible_and_composable() {

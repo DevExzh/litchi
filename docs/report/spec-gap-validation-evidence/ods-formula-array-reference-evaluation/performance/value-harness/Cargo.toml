@@ -1,0 +1,11 @@
+[package]
+name = "ods-formula-array-reference-evaluation-value-profile"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+litchi-ods = { path = "../../../../../../crates/litchi-ods" }
+litchi-core = { path = "../../../../../../crates/litchi-core" }

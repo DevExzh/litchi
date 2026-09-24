@@ -1,0 +1,7 @@
+rustc: rustc 1.95.0 (59807616e 2026-04-14)
+cargo: cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+baseline worktree commit: 8e3ad310426a534c0bb17a789eb2c42a96e61310
+baseline binary:
+9667373b7ce13ae555e91011d49eee7b78d235ad44217c11333dab0e3f6324c8  /var/tmp/ods-source-profile-base7-target.oVrbQW/release/ods-data-style-source-performance
+candidate binary:
+6580693909685b64f2900a7ad3dccf1eb18ab6517f801addb5c4026f3fc5f8f3  /var/tmp/ods-source-profile-final-target.NkvPhP/release/ods-data-style-source-performance

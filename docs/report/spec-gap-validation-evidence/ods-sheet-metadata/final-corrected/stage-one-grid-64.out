@@ -1,0 +1,2 @@
+config workload=StageOne sheets=1 rows=64 columns=64 source_bytes=338634 warmups=3 iterations=15
+result mean_ns=586 p50_ns=580 p95_ns=670 p99_ns=670 memory_delta_p50=1052 memory_delta_max=1052 memory_final_p50=7910632 memory_final_max=7910632 work_delta_p50=88 work_delta_max=88 work_final_p50=1197490 work_final_max=1197490 probes=15

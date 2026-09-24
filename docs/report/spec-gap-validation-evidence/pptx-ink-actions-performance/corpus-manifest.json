@@ -1,0 +1,570 @@
+{
+  "build_performed": false,
+  "fixture_authority": {
+    "git_blob": "ad7e43e8c2c362c1b9e1938806f59b9fb3ab1dea",
+    "kind": "synthetic_complete_opc_owner_helper",
+    "path": "crates/litchi-pptx/tests/pptx_ink_actions.rs",
+    "sha256": "bec6baafcf735d778216fb54fe6299312707e912dcaed5f89de988f7112bb58e"
+  },
+  "isolated_lockfile_present": true,
+  "isolated_lockfile_sha256": "3c773b848134c52df596034ffbbe8688dde9924fb741dee8bc8bce0eaa772f2e",
+  "lanes": [
+    {
+      "id": "package_read_tiny_shared",
+      "operation": "Package::ink_actions",
+      "recipe": "r01_tiny_shared"
+    },
+    {
+      "id": "presentation_read_small_shared",
+      "operation": "Presentation::ink_actions",
+      "recipe": "r02_small_shared"
+    },
+    {
+      "id": "package_read_medium_shared",
+      "operation": "Package::ink_actions",
+      "recipe": "r04_medium_shared"
+    },
+    {
+      "id": "package_read_small_distinct",
+      "operation": "Package::ink_actions",
+      "recipe": "r03_small_distinct"
+    },
+    {
+      "id": "package_read_large_shared",
+      "operation": "Package::ink_actions",
+      "recipe": "r06_large_shared"
+    },
+    {
+      "id": "package_read_large_distinct",
+      "operation": "Package::ink_actions",
+      "recipe": "r07_large_distinct"
+    },
+    {
+      "id": "package_read_near_shared",
+      "operation": "Package::ink_actions",
+      "recipe": "r08_near_shared"
+    },
+    {
+      "id": "package_read_near_distinct",
+      "operation": "Package::ink_actions",
+      "recipe": "r09_near_distinct"
+    },
+    {
+      "id": "package_read_multislide_shared",
+      "operation": "Package::ink_actions_with_limits",
+      "recipe": "r10_multislide_shared"
+    },
+    {
+      "id": "package_read_multislide_distinct",
+      "operation": "Package::ink_actions_with_limits",
+      "recipe": "r11_multislide_distinct"
+    },
+    {
+      "id": "package_scalar_edit_small_shared",
+      "operation": "Snapshot::edit_profile+commit",
+      "recipe": "r02_small_shared"
+    },
+    {
+      "id": "presentation_scalar_edit_small_shared",
+      "operation": "Presentation snapshot edit+commit",
+      "recipe": "r02_small_shared"
+    },
+    {
+      "id": "package_noop_small_shared",
+      "operation": "exact scalar no-op+commit",
+      "recipe": "r02_small_shared"
+    },
+    {
+      "id": "presentation_noop_small_shared",
+      "operation": "Presentation snapshot exact no-op+commit",
+      "recipe": "r02_small_shared"
+    },
+    {
+      "id": "package_apply_medium_shared",
+      "operation": "Package::apply_ink_actions_patch",
+      "recipe": "r04_medium_shared"
+    },
+    {
+      "id": "package_apply_medium_distinct",
+      "operation": "Package::apply_ink_actions_patch",
+      "recipe": "r05_medium_distinct"
+    },
+    {
+      "id": "package_inverse_small_shared",
+      "operation": "forward+inverse apply",
+      "recipe": "r02_small_shared"
+    },
+    {
+      "id": "package_inverse_case_equivalent",
+      "operation": "forward+inverse apply",
+      "recipe": "r12_case_equivalent_shared"
+    },
+    {
+      "id": "package_save_medium_shared",
+      "operation": "Package::to_bytes",
+      "recipe": "r04_medium_shared"
+    },
+    {
+      "id": "package_save_reopen_medium_shared",
+      "operation": "to_bytes+from_vec_with_limits+read",
+      "recipe": "r04_medium_shared"
+    },
+    {
+      "expected": "Error::StaleSource",
+      "id": "stale_owner",
+      "operation": "apply",
+      "recipe": "r16_stale_owner"
+    },
+    {
+      "expected": "Error::StaleSource",
+      "id": "stale_owner_rels",
+      "operation": "apply",
+      "recipe": "r17_stale_owner_rels"
+    },
+    {
+      "expected": "Error::StaleSource",
+      "id": "stale_target",
+      "operation": "apply",
+      "recipe": "r18_stale_target"
+    },
+    {
+      "expected": "Error::ContentType",
+      "id": "stale_content_type",
+      "operation": "apply",
+      "recipe": "r19_stale_content_type"
+    },
+    {
+      "expected": "success",
+      "id": "signed_noop",
+      "operation": "apply exact no-op",
+      "recipe": "r15_signed"
+    },
+    {
+      "expected": "Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)",
+      "id": "signed_changed_refusal",
+      "operation": "apply",
+      "recipe": "r15_signed"
+    },
+    {
+      "id": "opaque_mce_scalar_edit",
+      "operation": "Package::apply_ink_actions_patch existing-target scalar publication",
+      "recipe": "r14_opaque_unknown_external"
+    },
+    {
+      "id": "opaque_mce_save_reopen",
+      "operation": "save+reopen",
+      "recipe": "r14_opaque_unknown_external"
+    },
+    {
+      "id": "unknown_outbound_read_edit",
+      "operation": "read+scalar edit with retained internal and external outbound diagnostics",
+      "recipe": "r14_opaque_unknown_external"
+    },
+    {
+      "id": "strict_shared_edit",
+      "operation": "Strict read+existing-target edit",
+      "recipe": "r13_strict_shared"
+    },
+    {
+      "expected": "Error::Limit { resource: ink-action anchor count, limit: 7 }",
+      "id": "limit_anchor_one_under",
+      "operation": "read with owner limit 7",
+      "recipe": "r20_limit_anchor"
+    },
+    {
+      "expected": "success",
+      "id": "limit_anchor_exact",
+      "operation": "read with owner limit 8",
+      "recipe": "r20_limit_anchor"
+    },
+    {
+      "expected": "success",
+      "id": "limit_anchor_one_over",
+      "operation": "read with owner limit 9",
+      "recipe": "r20_limit_anchor"
+    },
+    {
+      "expected": "Error::Limit { resource: ink-action target bytes, limit: 16383 }",
+      "id": "limit_target_one_under",
+      "operation": "read with owner limit 16383",
+      "recipe": "r21_limit_target"
+    },
+    {
+      "expected": "success",
+      "id": "limit_target_exact",
+      "operation": "read with owner limit 16384",
+      "recipe": "r21_limit_target"
+    },
+    {
+      "expected": "success",
+      "id": "limit_target_one_over",
+      "operation": "read with owner limit 16385",
+      "recipe": "r21_limit_target"
+    },
+    {
+      "expected": "Error::Limit { resource: ink-action aggregate target bytes, limit: 32767 }",
+      "id": "limit_aggregate_one_under",
+      "operation": "read with owner limit 32767",
+      "recipe": "r22_limit_aggregate"
+    },
+    {
+      "expected": "success",
+      "id": "limit_aggregate_exact",
+      "operation": "read with owner limit 32768",
+      "recipe": "r22_limit_aggregate"
+    },
+    {
+      "expected": "success",
+      "id": "limit_aggregate_one_over",
+      "operation": "read with owner limit 32769",
+      "recipe": "r22_limit_aggregate"
+    },
+    {
+      "expected": "Error::Limit { resource: ink-action relationship edges, limit: 7 }",
+      "id": "limit_graph_one_under",
+      "operation": "read with owner limit 7",
+      "recipe": "r23_limit_graph"
+    },
+    {
+      "expected": "success",
+      "id": "limit_graph_exact",
+      "operation": "read with owner limit 8",
+      "recipe": "r23_limit_graph"
+    },
+    {
+      "expected": "success",
+      "id": "limit_graph_one_over",
+      "operation": "read with owner limit 9",
+      "recipe": "r23_limit_graph"
+    }
+  ],
+  "matrix_validation": {
+    "expected_lane_count": 42,
+    "expected_recipe_count": 23,
+    "requires_every_lane_recipe_reference": true,
+    "requires_every_recipe_used": true,
+    "requires_unique_lane_ids": true,
+    "requires_unique_recipe_ids": true
+  },
+  "measurement_gate": {
+    "build_authorized": false,
+    "fresh_processes": 3,
+    "lane_count": 42,
+    "max_measured_calls": 2520,
+    "max_process_launches": 126,
+    "max_total_operation_calls": 2772,
+    "max_warmup_calls": 252,
+    "recipe_count": 23,
+    "requires_clean_isolated_checkout": true,
+    "requires_materialized_isolated_lockfile_before_build": true,
+    "requires_scaffold_commit_and_review": true,
+    "samples_per_process": 20,
+    "timing_authorized": false,
+    "warmups_per_process": 2
+  },
+  "native_fixture": null,
+  "native_powerpoint_claim": false,
+  "semantic_owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+  "production_source_baseline_commit": "2a2ffa1cae4e6b7070082768ce84483e5d411dc8",
+  "semantic_owner_design": {
+    "commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+    "git_blob": "597400950b1027c47cd6e4cbbedd23915bc0980e",
+    "path": "docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md",
+    "sha256": "30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d"
+  },
+  "source_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+  "owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+  "owner_limits": {
+    "max_anchors": 4096,
+    "max_target_bytes": 16777216,
+    "max_target_relationships": 4096,
+    "max_total_target_bytes": 268435456,
+    "shared_profile_actions": 65536,
+    "shared_profile_groups": 16384,
+    "shared_profile_nodes": 100000,
+    "shared_profile_source_bytes": 16777216
+  },
+  "planned_isolated_lockfile": "harness/Cargo.lock",
+  "recipes": [
+    {
+      "anchors": 1,
+      "dialect": "transitional",
+      "edges": 1,
+      "id": "r01_tiny_shared",
+      "slides": 1,
+      "target_bytes": 1024,
+      "topology": "shared",
+      "unique_targets": 1
+    },
+    {
+      "anchors": 8,
+      "dialect": "transitional",
+      "edges": 8,
+      "id": "r02_small_shared",
+      "slides": 1,
+      "target_bytes": 16384,
+      "topology": "shared",
+      "unique_targets": 1
+    },
+    {
+      "anchors": 8,
+      "dialect": "transitional",
+      "edges": 8,
+      "id": "r03_small_distinct",
+      "slides": 1,
+      "target_bytes": 1024,
+      "topology": "distinct",
+      "unique_targets": 8
+    },
+    {
+      "anchors": 64,
+      "dialect": "transitional",
+      "edges": 64,
+      "id": "r04_medium_shared",
+      "slides": 1,
+      "target_bytes": 262144,
+      "topology": "shared",
+      "unique_targets": 1
+    },
+    {
+      "anchors": 64,
+      "dialect": "transitional",
+      "edges": 64,
+      "id": "r05_medium_distinct",
+      "slides": 1,
+      "target_bytes": 16384,
+      "topology": "distinct",
+      "unique_targets": 8
+    },
+    {
+      "anchors": 256,
+      "dialect": "transitional",
+      "edges": 256,
+      "id": "r06_large_shared",
+      "slides": 1,
+      "target_bytes": 1048576,
+      "topology": "shared",
+      "unique_targets": 1
+    },
+    {
+      "anchors": 256,
+      "dialect": "transitional",
+      "edges": 256,
+      "id": "r07_large_distinct",
+      "slides": 1,
+      "target_bytes": 16384,
+      "topology": "distinct",
+      "unique_targets": 32
+    },
+    {
+      "anchors": 1024,
+      "dialect": "transitional",
+      "edges": 1024,
+      "id": "r08_near_shared",
+      "slides": 1,
+      "target_bytes": 8388608,
+      "topology": "shared",
+      "unique_targets": 1
+    },
+    {
+      "anchors": 1024,
+      "dialect": "transitional",
+      "edges": 1024,
+      "id": "r09_near_distinct",
+      "slides": 1,
+      "target_bytes": 65536,
+      "topology": "distinct",
+      "unique_targets": 128
+    },
+    {
+      "anchors": 2,
+      "dialect": "transitional",
+      "edges": 2,
+      "id": "r10_multislide_shared",
+      "slides": 2,
+      "target_bytes": 16384,
+      "topology": "shared",
+      "unique_targets": 1
+    },
+    {
+      "anchors": 2,
+      "dialect": "transitional",
+      "edges": 2,
+      "id": "r11_multislide_distinct",
+      "slides": 2,
+      "target_bytes": 16384,
+      "topology": "distinct",
+      "unique_targets": 2
+    },
+    {
+      "anchors": 2,
+      "dialect": "transitional",
+      "edges": 2,
+      "id": "r12_case_equivalent_shared",
+      "slides": 1,
+      "target_bytes": 16384,
+      "topology": "case_equivalent_shared",
+      "unique_targets": 1
+    },
+    {
+      "anchors": 8,
+      "dialect": "strict",
+      "edges": 8,
+      "id": "r13_strict_shared",
+      "slides": 1,
+      "target_bytes": 16384,
+      "topology": "shared",
+      "unique_targets": 1
+    },
+    {
+      "anchors": 1,
+      "dialect": "transitional",
+      "edges": 1,
+      "id": "r14_opaque_unknown_external",
+      "opaque_mce": true,
+      "outbound_diagnostic_modes": [
+        "internal_unknown",
+        "external_unknown"
+      ],
+      "outbound_edges": 2,
+      "slides": 1,
+      "target_bytes": 16384,
+      "topology": "shared",
+      "unique_targets": 1,
+      "unknown_external_outbound": true,
+      "unknown_internal_outbound": true
+    },
+    {
+      "anchors": 1,
+      "dialect": "transitional",
+      "edges": 1,
+      "id": "r15_signed",
+      "signed": true,
+      "slides": 1,
+      "target_bytes": 1024,
+      "topology": "shared",
+      "unique_targets": 1
+    },
+    {
+      "anchors": 1,
+      "dialect": "transitional",
+      "edges": 1,
+      "id": "r16_stale_owner",
+      "slides": 1,
+      "stale_input": "owner_xml",
+      "target_bytes": 1024,
+      "topology": "shared",
+      "unique_targets": 1
+    },
+    {
+      "anchors": 1,
+      "dialect": "transitional",
+      "edges": 1,
+      "id": "r17_stale_owner_rels",
+      "slides": 1,
+      "stale_input": "owner_relationship_source",
+      "target_bytes": 1024,
+      "topology": "shared",
+      "unique_targets": 1
+    },
+    {
+      "anchors": 1,
+      "dialect": "transitional",
+      "edges": 1,
+      "id": "r18_stale_target",
+      "slides": 1,
+      "stale_input": "target_bytes",
+      "target_bytes": 1024,
+      "topology": "shared",
+      "unique_targets": 1
+    },
+    {
+      "anchors": 1,
+      "dialect": "transitional",
+      "edges": 1,
+      "id": "r19_stale_content_type",
+      "slides": 1,
+      "stale_input": "content_type_source",
+      "target_bytes": 1024,
+      "topology": "shared",
+      "unique_targets": 1
+    },
+    {
+      "anchors": 8,
+      "dialect": "transitional",
+      "edges": 8,
+      "id": "r20_limit_anchor",
+      "limit_resource": "anchors",
+      "limits": [
+        7,
+        8,
+        9
+      ],
+      "slides": 1,
+      "target_bytes": 16384,
+      "topology": "shared",
+      "unique_targets": 1
+    },
+    {
+      "anchors": 1,
+      "dialect": "transitional",
+      "edges": 1,
+      "id": "r21_limit_target",
+      "limit_resource": "target_bytes",
+      "limits": [
+        16383,
+        16384,
+        16385
+      ],
+      "slides": 1,
+      "target_bytes": 16384,
+      "topology": "shared",
+      "unique_targets": 1
+    },
+    {
+      "anchors": 2,
+      "dialect": "transitional",
+      "edges": 2,
+      "id": "r22_limit_aggregate",
+      "limit_resource": "total_target_bytes",
+      "limits": [
+        32767,
+        32768,
+        32769
+      ],
+      "slides": 1,
+      "target_bytes": 16384,
+      "topology": "distinct",
+      "unique_targets": 2
+    },
+    {
+      "anchors": 8,
+      "dialect": "transitional",
+      "edges": 8,
+      "id": "r23_limit_graph",
+      "limit_resource": "target_relationships",
+      "limits": [
+        7,
+        8,
+        9
+      ],
+      "slides": 1,
+      "target_bytes": 16384,
+      "topology": "shared",
+      "unique_targets": 1
+    }
+  ],
+  "retained_opc_generator": {
+    "git_blob": "42511dfede7932a38f3c9c378d23536c7ca263fa",
+    "kind": "bounded_synthetic_complete_opc_generator",
+    "path": "harness/adapter.rs",
+    "sha256": "eae2c7b98970878bfcdc743e0e92b13f418fbf4a21243fac698b13f01bbd7a72"
+  },
+  "retained_opc_limits": {
+    "policy": "ReadLimits::default() for positive lanes; every field is serialized in a future receipt",
+    "separate_from_owner_limits": true
+  },
+  "schema": "pptx-ink-actions-performance-scaffold-v2",
+  "status": "harness-scaffold-api-wired-no-profile-capture",
+  "timings_collected": false
+}

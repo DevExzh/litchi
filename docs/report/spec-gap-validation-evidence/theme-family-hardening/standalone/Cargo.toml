@@ -1,0 +1,16 @@
+[package]
+name = "litchi-theme-family-hardening-probe"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "litchi-theme-family-hardening-probe"
+path = "main.rs"
+
+[dependencies]
+litchi-drawingml = { path = "../../../../../crates/litchi-drawingml" }
+litchi-xlsb = { path = "../../../../../crates/litchi-xlsb" }

@@ -7,6 +7,59 @@ authors.workspace      = true
 license.workspace      = true
 repository.workspace   = true
 rust-version.workspace = true
+autoexamples = false
+
+[[example]]
+name = "body_chart_arrangement"
+path = "examples/body_chart_arrangement.rs"
+
+[[example]]
+name = "edit_body_chart_data"
+path = "examples/edit_body_chart_data.rs"
+
+[[example]]
+name = "edit_body_table_hidden_axes"
+path = "examples/edit_body_table_hidden_axes.rs"
+
+[[example]]
+name = "edit_body_table_title"
+path = "examples/edit_body_table_title.rs"
+
+[[example]]
+name = "edit_document_settings"
+path = "examples/edit_document_settings.rs"
+
+[[example]]
+name = "pages_edit_image_adjustments"
+path = "examples/edit_image_adjustments.rs"
+
+[[example]]
+name = "edit_page_layout"
+path = "examples/edit_page_layout.rs"
+
+[[example]]
+name = "edit_section_background"
+path = "examples/edit_section_background.rs"
+
+[[example]]
+name = "edit_section_name"
+path = "examples/edit_section_name.rs"
+
+[[example]]
+name = "edit_section_pagination"
+path = "examples/edit_section_pagination.rs"
+
+[[example]]
+name = "edit_section_settings"
+path = "examples/edit_section_settings.rs"
+
+[[example]]
+name = "edit_section_text"
+path = "examples/edit_section_text.rs"
+
+[[example]]
+name = "pages_save_package"
+path = "examples/save_package.rs"
 
 [features]
 default = []

@@ -1,0 +1,22 @@
+[package]
+name = "litchi-xlsx-svg-lifecycle-profile"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.89"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "xlsx-svg-lifecycle-profile"
+path = "main.rs"
+
+[[bin]]
+name = "xlsx-svg-lifecycle-phase-profile"
+path = "phase_main.rs"
+
+[dependencies]
+litchi-opc = { path = "../../../../../crates/litchi-opc" }
+litchi-xlsx = { path = "../../../../../crates/litchi-xlsx" }
+quick-xml = "0.41"
+sha2 = "0.11"

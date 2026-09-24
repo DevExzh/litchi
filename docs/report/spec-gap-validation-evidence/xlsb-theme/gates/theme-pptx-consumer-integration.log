@@ -1,0 +1,9 @@
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-pptx)
+    Finished `test` profile [unoptimized] target(s) in 9.78s
+     Running tests/pptx_master_themes.rs (/tmp/litchi-xlsb-theme-target-20260910/debug/deps/pptx_master_themes-bc0b9e8d8ce97b2e)
+
+running 2 tests
+test master_theme_inventory_resolves_through_the_standalone_owner ... ok
+test master_theme_accessor_rejects_external_theme_relationships ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s

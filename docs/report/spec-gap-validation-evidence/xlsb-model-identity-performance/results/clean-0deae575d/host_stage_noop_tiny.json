@@ -1,0 +1,216 @@
+{
+  "baseline_commit": "1b0d4864804d666aaf4ae5039bd6300996ca32a5",
+  "caller_limits": {
+    "max_connection_bytes": 33554432,
+    "max_connections": 4096,
+    "max_graph_parts": 100000,
+    "max_graph_relationships": 1000000,
+    "max_metadata_bytes": 67108864,
+    "max_part_bytes": 536870912,
+    "max_records": 1048576,
+    "max_relationships": 65536,
+    "max_rewrite_bytes": 67108864,
+    "max_tables": 65536,
+    "max_time_grouping_columns": 256,
+    "max_time_groupings": 65536,
+    "raw_payload_bytes": 67108864,
+    "raw_string_units": 1048576
+  },
+  "expected_success": true,
+  "fixture_kind": "synthetic_complete_xldm140",
+  "input_bytes": 8851,
+  "input_hash_fnv1a64": 8860411088468348232,
+  "input_sha256": "66a7cbc4e76234dbe13a658e2aa1f5f6fdf1d5e2b6e5f700c81197e5f740e1e2",
+  "lane": "host_stage_noop_tiny",
+  "native_acceptance_claim": false,
+  "neutral_baseline_commit": "4f53be2d31e14b215d6eeaee56d11eefeae94107",
+  "olap_proof_limits": {
+    "max_items": 1000000,
+    "max_source_bytes": 536870912,
+    "max_string_bytes": 268435456,
+    "max_work": 4000000
+  },
+  "recipe": {
+    "endpoint_layouts": [
+      "selected_table",
+      "distributed"
+    ],
+    "generator": "docs/report/spec-gap-validation-evidence/xlsb-model-identity-performance/harness/scaled_fixture.rs",
+    "id": "synthetic-complete-xldm140-table-identity",
+    "name_profiles": [
+      "same_length_ascii",
+      "shorter",
+      "longer",
+      "escaped_xml",
+      "unicode"
+    ],
+    "olap_proof_limits": {
+      "max_items": 1000000,
+      "max_source_bytes": 536870912,
+      "max_string_bytes": 268435456,
+      "max_work": 4000000
+    },
+    "scale_matrix": [
+      {
+        "family": "tiny",
+        "relationships": 0,
+        "tables": 1
+      },
+      {
+        "family": "small",
+        "relationships": 0,
+        "tables": 4
+      },
+      {
+        "family": "small",
+        "relationships": 3,
+        "tables": 4
+      },
+      {
+        "family": "small",
+        "relationships": 8,
+        "tables": 4
+      },
+      {
+        "family": "medium",
+        "relationships": 0,
+        "tables": 16
+      },
+      {
+        "family": "medium",
+        "relationships": 15,
+        "tables": 16
+      },
+      {
+        "family": "medium",
+        "relationships": 32,
+        "tables": 16
+      },
+      {
+        "family": "medium",
+        "relationships": 64,
+        "tables": 16
+      },
+      {
+        "family": "large",
+        "relationships": 0,
+        "tables": 64
+      },
+      {
+        "family": "large",
+        "relationships": 63,
+        "tables": 64
+      },
+      {
+        "family": "large",
+        "relationships": 128,
+        "tables": 64
+      },
+      {
+        "family": "large",
+        "relationships": 256,
+        "tables": 64
+      }
+    ],
+    "selected_endpoint_layout": "selected_table",
+    "selected_name_profile": "same_length_ascii",
+    "selected_relationships": 0,
+    "selected_scale": "tiny",
+    "selected_table_id": "T1",
+    "selected_tables": 1,
+    "source": "crates/litchi-xlsb/tests/data_model_identity.rs",
+    "version": 2
+  },
+  "recipe_version": 2,
+  "relationship_count": 0,
+  "sample_count": 1,
+  "samples": [
+    {
+      "actual_success": true,
+      "alloc_balance_ok": true,
+      "alloc_invalid": false,
+      "allocation_calls": 8905,
+      "allocation_failed": 0,
+      "candidate_bytes": 32768,
+      "deallocated_bytes": 1052193,
+      "deallocation_calls": 8900,
+      "direct_allocated_bytes": 971458,
+      "elapsed_ns": 11001310,
+      "error": null,
+      "exact_cap_ok": null,
+      "exact_inverse_ok": null,
+      "live_after": 20137,
+      "live_before": 19964,
+      "one_under_cap_refused": null,
+      "opaque_ok": true,
+      "output_bytes": null,
+      "peak_live_delta": 174781,
+      "phases": {
+        "commit_ns": 7480,
+        "inverse_ns": null,
+        "open_ns": null,
+        "reopen_ns": null,
+        "save_ns": null,
+        "stage_ns": 19850,
+        "validation_ns": 4020648
+      },
+      "preservation": {
+        "all_parts_equal": true,
+        "content_types_bytes": 1230,
+        "content_types_equal": true,
+        "inner_all_equal": true,
+        "inner_member_count": 15,
+        "inner_unchanged_equal": true,
+        "relationship_owner_count": 10,
+        "relationships_equal": true,
+        "unchanged_parts_equal": true
+      },
+      "realloc_new_bytes": 160144,
+      "realloc_old_bytes": 79236,
+      "reallocation_calls": 860,
+      "requested_alloc_bytes": 1131602,
+      "semantic_check": {
+        "all_equal": true,
+        "relationship_endpoints_equal": true,
+        "relationship_ids_equal": true,
+        "relationship_paths_equal": true,
+        "table_ids_equal": true,
+        "table_names_equal": true,
+        "time_grouping_ids_equal": true
+      },
+      "semantic_observed": {
+        "relationships": [],
+        "tables": [
+          {
+            "dimension_object_id": "11111111-2222-3333-4444-555555555555",
+            "metadata_path": "Model.1.db/T1.0.dim/T1.1.tbl.xml",
+            "table_id": "T1",
+            "xml_name": "OldName"
+          }
+        ],
+        "time_groupings": []
+      },
+      "semantic_ok": true,
+      "source_bytes": 8851,
+      "source_unchanged": true,
+      "staged_bytes": 32768
+    }
+  ],
+  "scale": "tiny",
+  "schema": "xlsb-model-identity-profile-v1-smoke",
+  "semantic_source": {
+    "relationships": [],
+    "tables": [
+      {
+        "dimension_object_id": "11111111-2222-3333-4444-555555555555",
+        "metadata_path": "Model.1.db/T1.0.dim/T1.1.tbl.xml",
+        "table_id": "T1",
+        "xml_name": "OldName"
+      }
+    ],
+    "time_groupings": []
+  },
+  "source_backed_api": true,
+  "table_count": 1,
+  "warmup": 0
+}

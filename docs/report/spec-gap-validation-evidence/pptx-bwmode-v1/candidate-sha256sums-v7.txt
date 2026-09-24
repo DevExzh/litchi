@@ -1,0 +1,14 @@
+6a7aeab3762b4f8fbbe53651c3009dc29beb52ef71cfc51cb3ded20dd83a26ef  /var/tmp/litchi-pptx-bwmode-validation-20260910-artifacts/bwmode-candidate-v7.patch
+382067e23318d121a32214535c79e1aa919df08bf546f2c518529776d180cbe8  /var/tmp/litchi-pptx-bwmode-validation-20260910-artifacts/receipt-v7.md
+7ccc7a76c14449b09edc6fedb71b73119b4482585ecee7fef89c147f7a283f39  crates/litchi-pptx/docs/FEATURE_MATRIX.md
+4f783ac3b88ae722d35cac4f335ed3c6706a1c6d9eca61ecddff0cf6411ff64c  crates/litchi-pptx/src/presentation/embedded/content_parts/codec.rs
+2ae7a4a696d3ff4798f399ebfd2cff52f545b20a0db6ebb6fe660878cc3cb677  crates/litchi-pptx/src/presentation/embedded/content_parts/mod.rs
+71c72a5fed5cad088cbc25a629d1570fa8817b9f0c9943da2180216c4a20f4f2  crates/litchi-pptx/src/presentation/embedded/content_parts/model.rs
+aa20b503b5e6666d7c64376cd294313b3b87b32fe1a6d1ea30794c2b1da83c99  crates/litchi-pptx/src/presentation/embedded/content_parts/package.rs
+2b37a7b2fb946b5b0aa10aac9dab751b345a74a711e5e1787c91075375be9bba  crates/litchi-pptx/src/presentation/embedded/content_parts/tests.rs
+863e7bef63b46ff9096bba689c6534fa4115ecf6819838f3ce758bf2aa2017e8  crates/litchi-pptx/src/presentation/embedded/content_parts/transaction.rs
+6d95bdfefd3a6eb4368985fa8379f5adf317338d2e7b5dc0045651a45449e15a  crates/litchi-pptx/src/presentation/embedded/content_parts/validation.rs
+c71aa2ee41f2cc7dbcf6a5d145f9232f8b01812ea885b7171e30000296bd16e6  /var/tmp/litchi-pptx-bwmode-validation-20260910-focused-v7.log
+f31c7035e2573791cff8d5f8dc09347179611fad912ba9863e40de8d0e3b70cd  /var/tmp/litchi-pptx-bwmode-validation-20260910-all-tests-v7.log
+d1494fcd6bb38fe763f3dd575566f709acbf7bd388de91b1f7b31a31c95ec99a  /var/tmp/litchi-pptx-bwmode-validation-20260910-clippy-v7.log
+5abfdfe582df5d52f2cdb7685f587a4b838b42081819ff3ed78cd8fa1b077606  /var/tmp/litchi-pptx-bwmode-validation-20260910-doc-v7.log

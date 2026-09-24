@@ -1,0 +1,30 @@
+{
+  "actor": "root",
+  "candidate": "/var/tmp/litchi-odf-oth-structures-candidate-v2-20260910",
+  "base_commit": "fdd2b80dfa9efc246a5983a3fec64de25e5c4f63",
+  "source_manifest_sha256": "0147cc19269207d93fbfa982884f726590782df95cc27191996da42bd828d5a1",
+  "toolchain": "1.95.0",
+  "cpu_set": "8-31",
+  "gates": {
+    "tests": {
+      "exit_code": 0,
+      "path": "/var/tmp/litchi-oth-structures-root-tests-v2-20260910.log",
+      "sha256": "24d6414f86c746fd38dd722af824c9fe7c737bdfc46046d8664132e1da5f1df2"
+    },
+    "clippy": {
+      "exit_code": 0,
+      "path": "/var/tmp/litchi-oth-structures-root-clippy-v2-20260910.log",
+      "sha256": "45d8f7d972875790a6cec7ca48e9acc17c5af68372da1940633becec3b4cd60a"
+    },
+    "rustdoc": {
+      "exit_code": 0,
+      "path": "/var/tmp/litchi-oth-structures-root-rustdoc-v2-20260910.log",
+      "sha256": "690106090986736088b0133154c17b11b510937b047f0bbe3c235dea9b2bfe9d"
+    },
+    "rustfmt": {
+      "exit_code": 0,
+      "path": "/var/tmp/litchi-oth-structures-root-rustfmt-v2-20260910.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

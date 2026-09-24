@@ -176,6 +176,13 @@ impl Document {
         let footnotes_table = FootnotesTable::parse(&fib, &table_stream).ok();
         let endnotes_table = EndnotesTable::parse(&fib, &table_stream).ok();
         let comments_table = CommentsTable::parse(&fib, &table_stream)?;
+        let annotation_bookmarks_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::annotation_bookmarks::FIB_INDEX,
+            crate::parts::annotation_bookmarks::MAX_TABLE_BYTES,
+            "SttbfAtnBkmk",
+        );
         let document_properties = DocumentProperties::parse(&fib, &table_stream);
         let bookmarks_table = BookmarksTable::parse(&fib, &table_stream)?;
         let smart_tags = DocumentSmartTags::parse(&fib, &table_stream)?;
@@ -285,6 +292,60 @@ impl Document {
             None
         };
 
+        // Optional metadata readers defer semantic validation until their
+        // accessors are called. Retain only their bounded FIB-selected ranges
+        // so an ordinary document does not keep the complete table stream
+        // alive solely for optional metadata.
+        let saved_selection_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::saved_selection::FIB_INDEX_WSS,
+            crate::parts::saved_selection::SELSF_SIZE,
+            "Selsf",
+        );
+        let paragraph_groups_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::paragraph_groups::FIB_INDEX_PGP,
+            crate::parts::paragraph_groups::MAX_PGP_BYTES,
+            "PGPArray",
+        );
+        let dofr_records_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::dofr::FIB_INDEX_RG_DOFR,
+            crate::parts::dofr::MAX_DOFR_BYTES,
+            "RgDofr",
+        );
+        let print_driver_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::print_environment::FIB_INDEX_PR_DRVR,
+            crate::parts::print_environment::MAX_PRINT_METADATA_BYTES,
+            "PrDrvr",
+        );
+        let print_environment_portrait_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::print_environment::FIB_INDEX_PR_ENV_PORT,
+            crate::parts::print_environment::MAX_PRINT_METADATA_BYTES,
+            "PrEnvPort",
+        );
+        let print_environment_landscape_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::print_environment::FIB_INDEX_PR_ENV_LAND,
+            crate::parts::print_environment::MAX_PRINT_METADATA_BYTES,
+            "PrEnvLand",
+        );
+        let vba_signatures_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::vba_signature::FIB_INDEX_STW_USER,
+            crate::parts::vba_signature::MAX_STW_USER_BYTES,
+            "StwUser",
+        );
+
         Ok(Self {
             fib,
             word_document,
@@ -297,6 +358,8 @@ impl Document {
             footnotes_table,
             endnotes_table,
             comments_table,
+            annotation_bookmarks_source,
+            annotation_bookmarks: std::sync::OnceLock::new(),
             document_properties,
             bookmarks_table,
             smart_tags,
@@ -324,6 +387,18 @@ impl Document {
             textbox_breaks,
             text_services,
             saved_by_table,
+            saved_selection_source,
+            saved_selection: std::sync::OnceLock::new(),
+            paragraph_groups_source,
+            paragraph_groups: std::sync::OnceLock::new(),
+            dofr_records_source,
+            dofr_records: std::sync::OnceLock::new(),
+            print_driver_source,
+            print_environment_portrait_source,
+            print_environment_landscape_source,
+            print_environment: std::sync::OnceLock::new(),
+            vba_signatures_source,
+            vba_signatures: std::sync::OnceLock::new(),
             caption_tables,
             repair_bookmarks,
             glossary_metadata,
@@ -340,6 +415,40 @@ impl Document {
             parsed_mtef,
         })
     }
+}
+
+fn capture_optional_table_range(
+    fib: &FileInformationBlock,
+    table_stream: &[u8],
+    index: usize,
+    max_bytes: usize,
+    field: &str,
+) -> std::result::Result<Option<Vec<u8>>, String> {
+    let Some((offset, length)) = fib.get_table_pointer(index) else {
+        return Ok(None);
+    };
+    if length == 0 {
+        return Ok(None);
+    }
+    let length =
+        usize::try_from(length).map_err(|_| format!("{field} length does not fit in memory"))?;
+    if length > max_bytes {
+        return Err(format!("{field} exceeds the {max_bytes}-byte limit"));
+    }
+    let start =
+        usize::try_from(offset).map_err(|_| format!("{field} offset does not fit in memory"))?;
+    let end = start
+        .checked_add(length)
+        .ok_or_else(|| format!("{field} range overflows"))?;
+    let data = table_stream
+        .get(start..end)
+        .ok_or_else(|| format!("{field} extends beyond the table stream"))?;
+    let mut source = Vec::new();
+    source
+        .try_reserve_exact(data.len())
+        .map_err(|error| format!("{field} source allocation failed: {error}"))?;
+    source.extend_from_slice(data);
+    Ok(Some(source))
 }
 
 fn locate_stream<R: Read + Seek>(

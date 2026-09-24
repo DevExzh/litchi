@@ -1,0 +1,6 @@
+{
+  "captured_path": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-formula-array-reference-evaluation/performance/baseline/ods-formula-array-reference-evaluation-scalar-profile",
+  "retained_path": "/home/zhuhe/code/litchi-array-target/retained/scalar-baseline",
+  "sha256": "b68d801f62a1ec6e4accdd090940dda46e58d97c7818b91e4dbcc38ca8cdf682",
+  "reason": "Keep executable scratch outside repository evidence; retain for candidate A/B investigations until validation finishes."
+}

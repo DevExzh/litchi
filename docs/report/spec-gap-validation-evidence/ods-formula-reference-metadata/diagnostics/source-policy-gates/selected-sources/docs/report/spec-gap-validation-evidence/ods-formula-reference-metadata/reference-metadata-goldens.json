@@ -1,0 +1,1545 @@
+{
+  "schema": "ods-formula-reference-metadata-oracle-v1",
+  "status": "independent normative/profile observations; production support pending",
+  "baseline_commit": "049c09cdde3978593149079c4257df047a3fa419",
+  "normative_archive_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+  "normative_part4_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+  "contract_sha256": "ba3fd0e9f35c0439ef4757447bc19373383ed255254e2f59133629e51c91665d",
+  "functions": [
+    "AREAS",
+    "COLUMN",
+    "COLUMNS",
+    "ISREF",
+    "ROW",
+    "ROWS",
+    "SHEET",
+    "SHEETS"
+  ],
+  "workbook": {
+    "sheets": [
+      "Main",
+      "Data",
+      "Archive",
+      "Hidden"
+    ],
+    "sheet_numbers": {
+      "Main": 1,
+      "Data": 2,
+      "Archive": 3,
+      "Hidden": 4
+    },
+    "hidden_sheets_included": true,
+    "extent": {
+      "rows": 16,
+      "columns": 12
+    }
+  },
+  "profile": {
+    "areas": "logical reference records; a 3-D record remains one area; list duplicates retained",
+    "column_row": "one Reference record; omitted scalar uses current position; matrix result is full vector; explicit scalar projection selects the first axis element",
+    "dimensions": "Reference or rectangular Array; ReferenceList is a type refusal",
+    "sheet": "local sheet metadata; first sheet of a 3-D Reference; Text names a local sheet",
+    "sheets": "local workbook count or inclusive 3-D reference span; hidden sheets included",
+    "source_references": "ISREF classifies source descriptors; SHEET/SHEETS reject them as #VALUE!; no source is fetched",
+    "cell_reads": "zero for every admitted metadata observation"
+  },
+  "observations": [
+    {
+      "case": "areas.single_cell",
+      "function": "AREAS",
+      "arguments": [
+        "[.A1]"
+      ],
+      "formula": "=AREAS([.A1])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 1
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "areas.two_dimensional",
+      "function": "AREAS",
+      "arguments": [
+        "[.B2:.D4]"
+      ],
+      "formula": "=AREAS([.B2:.D4])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 1
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "areas.three_dimensional_record",
+      "function": "AREAS",
+      "arguments": [
+        "[Data.A1:Archive.C3]"
+      ],
+      "formula": "=AREAS([Data.A1:Archive.C3])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 1
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "areas.ordered_list",
+      "function": "AREAS",
+      "arguments": [
+        "[.A1]~[.B2:.C3]"
+      ],
+      "formula": "=AREAS([.A1]~[.B2:.C3])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "areas.duplicate_list_member",
+      "function": "AREAS",
+      "arguments": [
+        "[.A1]~[.A1]"
+      ],
+      "formula": "=AREAS([.A1]~[.A1])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "areas.scalar_refusal",
+      "function": "AREAS",
+      "arguments": [
+        "42"
+      ],
+      "formula": "=AREAS(42)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "areas.array_refusal",
+      "function": "AREAS",
+      "arguments": [
+        "{1;2|3;4}"
+      ],
+      "formula": "=AREAS({1;2|3;4})",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "column.omitted_current",
+      "function": "COLUMN",
+      "arguments": [],
+      "formula": "=COLUMN()",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 5,
+        "column": 6
+      },
+      "expected": {
+        "type": "number",
+        "value": 6
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "column.single_cell",
+      "function": "COLUMN",
+      "arguments": [
+        "[Data.C4]"
+      ],
+      "formula": "=COLUMN([Data.C4])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 2,
+        "column": 2
+      },
+      "expected": {
+        "type": "number",
+        "value": 3
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "column.vector_scalar",
+      "function": "COLUMN",
+      "arguments": [
+        "[.B2:.D2]"
+      ],
+      "formula": "=COLUMN([.B2:.D2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 9,
+        "column": 9
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "column.two_dimensional_scalar",
+      "function": "COLUMN",
+      "arguments": [
+        "[.B2:.D4]"
+      ],
+      "formula": "=COLUMN([.B2:.D4])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 9,
+        "column": 9
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "column.vector_matrix",
+      "function": "COLUMN",
+      "arguments": [
+        "[Data.B2:Archive.D4]"
+      ],
+      "formula": "=COLUMN([Data.B2:Archive.D4])",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "array",
+        "rows": 1,
+        "columns": 3,
+        "values": [
+          2,
+          3,
+          4
+        ]
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "column.list_refusal",
+      "function": "COLUMN",
+      "arguments": [
+        "[.A1]~[.B2]"
+      ],
+      "formula": "=COLUMN([.A1]~[.B2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "column.one_record_list_refusal",
+      "function": "COLUMN",
+      "arguments": [
+        "(([.A1]~[.B2])![.A1])"
+      ],
+      "formula": "=COLUMN((([.A1]~[.B2])![.A1]))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "column.array_refusal",
+      "function": "COLUMN",
+      "arguments": [
+        "{1;2;3}"
+      ],
+      "formula": "=COLUMN({1;2;3})",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "row.omitted_current",
+      "function": "ROW",
+      "arguments": [],
+      "formula": "=ROW()",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Data",
+        "row": 4,
+        "column": 6
+      },
+      "expected": {
+        "type": "number",
+        "value": 4
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "row.single_cell",
+      "function": "ROW",
+      "arguments": [
+        "[Archive.C4]"
+      ],
+      "formula": "=ROW([Archive.C4])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 2,
+        "column": 2
+      },
+      "expected": {
+        "type": "number",
+        "value": 4
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "row.vector_scalar",
+      "function": "ROW",
+      "arguments": [
+        "[.B2:.B4]"
+      ],
+      "formula": "=ROW([.B2:.B4])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 9,
+        "column": 9
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "row.two_dimensional_scalar",
+      "function": "ROW",
+      "arguments": [
+        "[.B2:.D4]"
+      ],
+      "formula": "=ROW([.B2:.D4])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 9,
+        "column": 9
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "row.vector_matrix",
+      "function": "ROW",
+      "arguments": [
+        "[Data.B2:Archive.D4]"
+      ],
+      "formula": "=ROW([Data.B2:Archive.D4])",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "array",
+        "rows": 3,
+        "columns": 1,
+        "values": [
+          2,
+          3,
+          4
+        ]
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "row.list_refusal",
+      "function": "ROW",
+      "arguments": [
+        "[.A1]~[.B2]"
+      ],
+      "formula": "=ROW([.A1]~[.B2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "row.one_record_list_refusal",
+      "function": "ROW",
+      "arguments": [
+        "(([.A1]~[.B2])![.A1])"
+      ],
+      "formula": "=ROW((([.A1]~[.B2])![.A1]))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "row.array_refusal",
+      "function": "ROW",
+      "arguments": [
+        "{1;2;3}"
+      ],
+      "formula": "=ROW({1;2;3})",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "columns.single_cell",
+      "function": "COLUMNS",
+      "arguments": [
+        "[.A1]"
+      ],
+      "formula": "=COLUMNS([.A1])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 1
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "columns_two_dimensional",
+      "function": "COLUMNS",
+      "arguments": [
+        "[.B2:.D4]"
+      ],
+      "formula": "=COLUMNS([.B2:.D4])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 3
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "columns_three_dimensional",
+      "function": "COLUMNS",
+      "arguments": [
+        "[Data.B2:Archive.D4]"
+      ],
+      "formula": "=COLUMNS([Data.B2:Archive.D4])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 3
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "columns_array",
+      "function": "COLUMNS",
+      "arguments": [
+        "{1;2|3;4}"
+      ],
+      "formula": "=COLUMNS({1;2|3;4})",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "columns_list_refusal",
+      "function": "COLUMNS",
+      "arguments": [
+        "[.A1]~[.B2]"
+      ],
+      "formula": "=COLUMNS([.A1]~[.B2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "columns.one_record_list_refusal",
+      "function": "COLUMNS",
+      "arguments": [
+        "(([.A1]~[.B2])![.A1])"
+      ],
+      "formula": "=COLUMNS((([.A1]~[.B2])![.A1]))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "columns_scalar_refusal",
+      "function": "COLUMNS",
+      "arguments": [
+        "42"
+      ],
+      "formula": "=COLUMNS(42)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "rows.single_cell",
+      "function": "ROWS",
+      "arguments": [
+        "[.A1]"
+      ],
+      "formula": "=ROWS([.A1])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 1
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "rows_two_dimensional",
+      "function": "ROWS",
+      "arguments": [
+        "[.B2:.D4]"
+      ],
+      "formula": "=ROWS([.B2:.D4])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 3
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "rows_three_dimensional",
+      "function": "ROWS",
+      "arguments": [
+        "[Data.B2:Archive.D4]"
+      ],
+      "formula": "=ROWS([Data.B2:Archive.D4])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 3
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "rows_array",
+      "function": "ROWS",
+      "arguments": [
+        "{1;2|3;4}"
+      ],
+      "formula": "=ROWS({1;2|3;4})",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "rows_list_refusal",
+      "function": "ROWS",
+      "arguments": [
+        "[.A1]~[.B2]"
+      ],
+      "formula": "=ROWS([.A1]~[.B2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "rows.one_record_list_refusal",
+      "function": "ROWS",
+      "arguments": [
+        "(([.A1]~[.B2])![.A1])"
+      ],
+      "formula": "=ROWS((([.A1]~[.B2])![.A1]))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "rows_scalar_refusal",
+      "function": "ROWS",
+      "arguments": [
+        "42"
+      ],
+      "formula": "=ROWS(42)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "isref_single_cell",
+      "function": "ISREF",
+      "arguments": [
+        "[.A1]"
+      ],
+      "formula": "=ISREF([.A1])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "logical",
+        "value": true
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "isref_three_dimensional",
+      "function": "ISREF",
+      "arguments": [
+        "[Data.A1:Archive.B2]"
+      ],
+      "formula": "=ISREF([Data.A1:Archive.B2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "logical",
+        "value": true
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "isref_ordered_list",
+      "function": "ISREF",
+      "arguments": [
+        "[.A1]~[.B2]"
+      ],
+      "formula": "=ISREF([.A1]~[.B2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "logical",
+        "value": true
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "isref_source_reference",
+      "function": "ISREF",
+      "arguments": [
+        "['file:///book.ods'#.A1]"
+      ],
+      "formula": "=ISREF(['file:///book.ods'#.A1])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "logical",
+        "value": true
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "isref_selected_source",
+      "function": "ISREF",
+      "arguments": [
+        "IF(TRUE();['file:///book.ods'#.A1];[.A1])"
+      ],
+      "formula": "=ISREF(IF(TRUE();['file:///book.ods'#.A1];[.A1]))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "logical",
+        "value": true
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "isref_selected_local_after_source",
+      "function": "ISREF",
+      "arguments": [
+        "IF(FALSE();['file:///book.ods'#.A1];[.A1])"
+      ],
+      "formula": "=ISREF(IF(FALSE();['file:///book.ods'#.A1];[.A1]))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "logical",
+        "value": true
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "isref_iferror_source",
+      "function": "ISREF",
+      "arguments": [
+        "IFERROR(['file:///book.ods'#.A1];\"Main\")"
+      ],
+      "formula": "=ISREF(IFERROR(['file:///book.ods'#.A1];\"Main\"))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "logical",
+        "value": true
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "isref_ifna_source",
+      "function": "ISREF",
+      "arguments": [
+        "IFNA(['file:///book.ods'#.A1];\"Main\")"
+      ],
+      "formula": "=ISREF(IFNA(['file:///book.ods'#.A1];\"Main\"))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "logical",
+        "value": true
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "isref_array",
+      "function": "ISREF",
+      "arguments": [
+        "{1;2|3;4}"
+      ],
+      "formula": "=ISREF({1;2|3;4})",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "logical",
+        "value": false
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "isref_number",
+      "function": "ISREF",
+      "arguments": [
+        "42"
+      ],
+      "formula": "=ISREF(42)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "logical",
+        "value": false
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "isref_formula_error_value",
+      "function": "ISREF",
+      "arguments": [
+        "#N/A"
+      ],
+      "formula": "=ISREF(#N/A)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "logical",
+        "value": false
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_omitted_current",
+      "function": "SHEET",
+      "arguments": [],
+      "formula": "=SHEET()",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Archive",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 3
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_local_text",
+      "function": "SHEET",
+      "arguments": [
+        "\"Data\""
+      ],
+      "formula": "=SHEET(\"Data\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_unknown_text",
+      "function": "SHEET",
+      "arguments": [
+        "\"Missing\""
+      ],
+      "formula": "=SHEET(\"Missing\")",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#REF!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_local_reference",
+      "function": "SHEET",
+      "arguments": [
+        "[.B2]"
+      ],
+      "formula": "=SHEET([.B2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 1
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_explicit_reference",
+      "function": "SHEET",
+      "arguments": [
+        "[Archive.B2]"
+      ],
+      "formula": "=SHEET([Archive.B2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 3
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_three_dimensional_first",
+      "function": "SHEET",
+      "arguments": [
+        "[Data.A1:Archive.B2]"
+      ],
+      "formula": "=SHEET([Data.A1:Archive.B2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_list_refusal",
+      "function": "SHEET",
+      "arguments": [
+        "[.A1]~[.B2]"
+      ],
+      "formula": "=SHEET([.A1]~[.B2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet.one_record_list_refusal",
+      "function": "SHEET",
+      "arguments": [
+        "(([.A1]~[.B2])![.A1])"
+      ],
+      "formula": "=SHEET((([.A1]~[.B2])![.A1]))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_source_refusal",
+      "function": "SHEET",
+      "arguments": [
+        "['file:///book.ods'#.A1]"
+      ],
+      "formula": "=SHEET(['file:///book.ods'#.A1])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_selected_source_refusal",
+      "function": "SHEET",
+      "arguments": [
+        "IF(TRUE();['file:///book.ods'#.A1];[Data.A1])"
+      ],
+      "formula": "=SHEET(IF(TRUE();['file:///book.ods'#.A1];[Data.A1]))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_selected_local_after_source",
+      "function": "SHEET",
+      "arguments": [
+        "IF(FALSE();['file:///book.ods'#.A1];[Data.A1])"
+      ],
+      "formula": "=SHEET(IF(FALSE();['file:///book.ods'#.A1];[Data.A1]))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_iferror_source_refusal",
+      "function": "SHEET",
+      "arguments": [
+        "IFERROR(['file:///book.ods'#.A1];\"Main\")"
+      ],
+      "formula": "=SHEET(IFERROR(['file:///book.ods'#.A1];\"Main\"))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_ifna_source_refusal",
+      "function": "SHEET",
+      "arguments": [
+        "IFNA(['file:///book.ods'#.A1];\"Main\")"
+      ],
+      "formula": "=SHEET(IFNA(['file:///book.ods'#.A1];\"Main\"))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_number_conversion",
+      "function": "SHEET",
+      "arguments": [
+        "1"
+      ],
+      "formula": "=SHEET(1)",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#REF!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_logical_conversion",
+      "function": "SHEET",
+      "arguments": [
+        "TRUE()"
+      ],
+      "formula": "=SHEET(TRUE())",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#REF!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_array_scalar_projection",
+      "function": "SHEET",
+      "arguments": [
+        "{\"Main\";\"Data\"}"
+      ],
+      "formula": "=SHEET({\"Main\";\"Data\"})",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 1
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_array_matrix_conversion",
+      "function": "SHEET",
+      "arguments": [
+        "{\"Main\";\"Data\"}"
+      ],
+      "formula": "=SHEET({\"Main\";\"Data\"})",
+      "mode": "matrix",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "array",
+        "rows": 1,
+        "columns": 2,
+        "values": [
+          {
+            "type": "number",
+            "value": 1
+          },
+          {
+            "type": "number",
+            "value": 2
+          }
+        ]
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheet_array_number_refusal",
+      "function": "SHEET",
+      "arguments": [
+        "{1;2;3}"
+      ],
+      "formula": "=SHEET({1;2;3})",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#REF!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheets_omitted_document",
+      "function": "SHEETS",
+      "arguments": [],
+      "formula": "=SHEETS()",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 4
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheets_local_reference",
+      "function": "SHEETS",
+      "arguments": [
+        "[.B2]"
+      ],
+      "formula": "=SHEETS([.B2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 1
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheets_three_dimensional",
+      "function": "SHEETS",
+      "arguments": [
+        "[Data.A1:Archive.B2]"
+      ],
+      "formula": "=SHEETS([Data.A1:Archive.B2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 2
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheets_explicit_same_sheet",
+      "function": "SHEETS",
+      "arguments": [
+        "[Archive.B2:Archive.D4]"
+      ],
+      "formula": "=SHEETS([Archive.B2:Archive.D4])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 1
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheets_list_refusal",
+      "function": "SHEETS",
+      "arguments": [
+        "[.A1]~[.B2]"
+      ],
+      "formula": "=SHEETS([.A1]~[.B2])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheets.one_record_list_refusal",
+      "function": "SHEETS",
+      "arguments": [
+        "(([.A1]~[.B2])![.A1])"
+      ],
+      "formula": "=SHEETS((([.A1]~[.B2])![.A1]))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheets_source_refusal",
+      "function": "SHEETS",
+      "arguments": [
+        "['file:///book.ods'#.A1]"
+      ],
+      "formula": "=SHEETS(['file:///book.ods'#.A1])",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheets_selected_source_refusal",
+      "function": "SHEETS",
+      "arguments": [
+        "IF(TRUE();['file:///book.ods'#.A1];[Data.A1])"
+      ],
+      "formula": "=SHEETS(IF(TRUE();['file:///book.ods'#.A1];[Data.A1]))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheets_selected_local_after_source",
+      "function": "SHEETS",
+      "arguments": [
+        "IF(FALSE();['file:///book.ods'#.A1];[Data.A1])"
+      ],
+      "formula": "=SHEETS(IF(FALSE();['file:///book.ods'#.A1];[Data.A1]))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "number",
+        "value": 1
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheets_iferror_source_refusal",
+      "function": "SHEETS",
+      "arguments": [
+        "IFERROR(['file:///book.ods'#.A1];\"Main\")"
+      ],
+      "formula": "=SHEETS(IFERROR(['file:///book.ods'#.A1];\"Main\"))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheets_ifna_source_refusal",
+      "function": "SHEETS",
+      "arguments": [
+        "IFNA(['file:///book.ods'#.A1];\"Main\")"
+      ],
+      "formula": "=SHEETS(IFNA(['file:///book.ods'#.A1];\"Main\"))",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    },
+    {
+      "case": "sheets_array_refusal",
+      "function": "SHEETS",
+      "arguments": [
+        "{1;2|3;4}"
+      ],
+      "formula": "=SHEETS({1;2|3;4})",
+      "mode": "scalar",
+      "position": {
+        "sheet": "Main",
+        "row": 1,
+        "column": 1
+      },
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      },
+      "expected_reads": 0
+    }
+  ]
+}

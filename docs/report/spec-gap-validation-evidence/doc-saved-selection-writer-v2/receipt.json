@@ -1,0 +1,196 @@
+{
+    "schema_version": 2,
+    "base_commit": "ce0be842b60a28db142b795389e24be5bde8ae07",
+    "recorded_at": "2026-09-10",
+    "scope": "DOC Selsf/fcWss bounded reader, source-bound reversible writer, and deterministic body-position remapping",
+    "source_manifest": "source-manifest.json",
+    "source_manifest_sha256": "ca3773d6b9d29014ee39bacba87ef6e4a90feff376674e9dbafdefe8ae9f2c53",
+    "sources": {
+        "crates/litchi-doc/docs/FEATURE_MATRIX.md": "0be5fcc8ab15ce66f2e73f70d12311853df4de2bfd4458652055fe47111c1467",
+        "crates/litchi-doc/src/body_text.rs": "785490bc607882f750d9bbff3b3d6f86f77be5ac3f624bc8dca2cd6ae7ea5ef6",
+        "crates/litchi-doc/src/lib.rs": "7870a5684519d43ea243f6ddc2bbe26df613a925af32fa210ffbf1d1c8699b09",
+        "crates/litchi-doc/src/parts/saved_selection.rs": "dabe7db1eddba969ef3e6916f399662daf8c046e87b9e79383d9c9f171959047",
+        "crates/litchi-doc/src/tracked_revision/package.rs": "12f9e06750d6f40cfc94a98d25db42309b846791dc600f882daa421553a63405",
+        "crates/litchi-doc/tests/auxiliary_tables.rs": "2e90488302bce8adb23636002cef6aed267d61022a03da4c78c5d7ca4c06cd1c",
+        "crates/litchi-doc/tests/saved_selection.rs": "c1fb4400f2ddc48d6d42868c425f010796534f964e8ae2e1da504e04d9bd67f3"
+    },
+    "toolchain": "1.95.0",
+    "environment": {
+        "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+        "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp",
+        "cpu_affinity": "8-31 for replay jobs",
+        "focused_targets": [
+            "/var/tmp/litchi-doc-saved-selection-v2-focused-target-195",
+            "/var/tmp/litchi-doc-saved-selection-v2-lib-target-195",
+            "/var/tmp/litchi-doc-saved-selection-v2-clippy-target-195",
+            "/var/tmp/litchi-doc-saved-selection-v2-doc-target-195"
+        ],
+        "full_target": "/var/tmp/litchi-doc-saved-selection-v2-full-target-195"
+    },
+    "commands": [
+        {
+            "name": "saved_selection_integration",
+            "command": "taskset -c 8-31 cargo +1.95.0 test -p litchi-doc --test saved_selection --offline --locked",
+            "log": "saved-selection.log.gz",
+            "exit_code": 0,
+            "passed": 8,
+            "failed": 0,
+            "ignored": 0
+        },
+        {
+            "name": "saved_selection_unit",
+            "command": "taskset -c 8-31 cargo +1.95.0 test -p litchi-doc --lib parts::saved_selection --offline --locked",
+            "log": "saved-selection-unit.log.gz",
+            "exit_code": 0,
+            "passed": 9,
+            "failed": 0,
+            "ignored": 0,
+            "filtered": 1018
+        },
+        {
+            "name": "auxiliary_tables_integration",
+            "command": "taskset -c 8-31 cargo +1.95.0 test -p litchi-doc --test auxiliary_tables --offline --locked",
+            "log": "auxiliary-tables.log.gz",
+            "exit_code": 0,
+            "passed": 2,
+            "failed": 0,
+            "ignored": 0
+        },
+        {
+            "name": "doc_body_transaction",
+            "command": "taskset -c 8-31 cargo +1.95.0 test -p litchi-doc --test doc_body_transaction --offline --locked",
+            "log": "doc-body-transaction.log.gz",
+            "exit_code": 0,
+            "passed": 6,
+            "failed": 0,
+            "ignored": 0
+        },
+        {
+            "name": "all_features_all_targets",
+            "command": "taskset -c 8-31 cargo +1.95.0 test -p litchi-doc --all-features --all-targets --offline --locked",
+            "log": "all-features-tests.log.gz",
+            "exit_code": 0,
+            "library_tests_run": 1044,
+            "library_passed": 1042,
+            "passed": 1232,
+            "failed": 0,
+            "ignored": 2,
+            "test_binaries": 45
+        },
+        {
+            "name": "clippy",
+            "command": "taskset -c 8-31 cargo +1.95.0 clippy -p litchi-doc --all-features --all-targets --offline --locked -- -D warnings",
+            "log": "clippy.log.gz",
+            "exit_code": 0
+        },
+        {
+            "name": "rustdoc",
+            "command": "RUSTDOCFLAGS='-D warnings' taskset -c 8-31 cargo +1.95.0 doc --offline --locked --all-features -p litchi-doc --no-deps",
+            "log": "rustdoc.log.gz",
+            "exit_code": 0
+        },
+        {
+            "name": "rustfmt",
+            "command": "rustfmt +1.95.0 --check --edition 2024 [six owned Rust files]",
+            "log": "rustfmt.log.gz",
+            "exit_code": 0
+        },
+        {
+            "name": "git_diff_check",
+            "command": "git diff --check",
+            "log": "diff-check.log.gz",
+            "exit_code": 0
+        }
+    ],
+    "gates": {
+        "focused_tests": "pass",
+        "doc_body_transaction": "pass",
+        "all_features_all_targets": "pass",
+        "clippy": "pass",
+        "rustdoc": "pass",
+        "rustfmt": "pass",
+        "git_diff_check": "pass",
+        "source_hashes_verified": true,
+        "dedicated_targets": true,
+        "independent_review": "pending",
+        "v1_evidence": "historical_pending_replacement"
+    },
+    "policy": {
+        "main_story_bounds": "Raw Selsf parsing remains context-free; strict DOC owner access and patch preflight validate active main-story CPs before table cloning.",
+        "length_changes": "Main-story length-changing operations remap cpFirst, cpLim, cpAnchor, and active text-block cpAnchorShrink at exact splice boundaries; interior CPs and insertion-at-CP ambiguity return a typed PositionDependency refusal before candidate/table cloning.",
+        "replay": "Durable text operations remain representable because replay invokes the same deterministic Selsf remap; explicit Selsf byte patches remain outside durable and semantic three-way merging.",
+        "ignored_fields": "Semantic no-ops preserve undefined blktblSel and shape fInsEnd bytes; partial TableSel transitions normalize invalid previously ignored edges before parsing, and applicability checks do not depend on setter order.",
+        "three_way": "Patches with explicit Selsf auxiliary changes are refused at the body three-way boundary to avoid dropping opaque effects."
+    },
+    "logs": {
+        "saved-selection.log.gz": {
+            "archive": "saved-selection.log.gz",
+            "archive_sha256": "a6a94be6f65259ad04bfd34733317d1278e39ea8878154411102142d660088fe",
+            "raw_sha256": "9df26924ff72dfb38094a8b904acd4367eb25e2c166573a8bc450a933ef34b3b",
+            "raw_bytes": 976,
+            "exit_code": 0
+        },
+        "saved-selection-unit.log.gz": {
+            "archive": "saved-selection-unit.log.gz",
+            "archive_sha256": "e9bba3d5eca6100f5acecc8c7a1c1f736d71318333ab27969fd5a45af328b147",
+            "raw_sha256": "30325ca28f404089b80ee1a7b64f0feaed7194d6b299df243a09929108352cbe",
+            "raw_bytes": 1169,
+            "exit_code": 0
+        },
+        "auxiliary-tables.log.gz": {
+            "archive": "auxiliary-tables.log.gz",
+            "archive_sha256": "98812dcf68483888359c4263478ffa31692559491b53091ea85cd59f873e9dd6",
+            "raw_sha256": "84b1ef3a1d9f5131a78a4f1c5d858dd6448af77d457760236eeba88b2ba2285b",
+            "raw_bytes": 478,
+            "exit_code": 0
+        },
+        "doc-body-transaction.log.gz": {
+            "archive": "doc-body-transaction.log.gz",
+            "archive_sha256": "de236f5d7ae9d63f522d62d5d028b6dbef0f258d36e63729ca7fc42f0996c23d",
+            "raw_sha256": "3f0c0d5ea181aae48206b49ae002e7ffbb007e63168b67ed71123b224b180fad",
+            "raw_bytes": 809,
+            "exit_code": 0
+        },
+        "all-features-tests.log.gz": {
+            "archive": "all-features-tests.log.gz",
+            "archive_sha256": "422ff0424ed7fa5f60e0fb35475f1d6a08c17826cc327d413457a185fa78175a",
+            "raw_sha256": "a6bca542c3145e261ef387f1ddca978f8b8cddbdf5281f7d0ee75e410add583c",
+            "raw_bytes": 108330,
+            "exit_code": 0
+        },
+        "clippy.log.gz": {
+            "archive": "clippy.log.gz",
+            "archive_sha256": "87ab6f165f34c17b0850ed3f7727aa06115abcd3ae712aaf77b745586d5438b3",
+            "raw_sha256": "1f5852af1ed7025b5728e842e3c3c2f5d2f720d25557d84c38f1ffda99719c59",
+            "raw_bytes": 72,
+            "exit_code": 0
+        },
+        "rustdoc.log.gz": {
+            "archive": "rustdoc.log.gz",
+            "archive_sha256": "925566089f5a1285ca6431541e4d1919f4b76cf29d90f140341e866d8c6be128",
+            "raw_sha256": "3d20a6f880e2d1c4440e08418a0059d529cb37833472582505832f28ea629c4a",
+            "raw_bytes": 284,
+            "exit_code": 0
+        },
+        "rustfmt.log.gz": {
+            "archive": "rustfmt.log.gz",
+            "archive_sha256": "0932f8936a41128a21d7d5bc730165683808a43cfecc33b813a9ef85910c2f00",
+            "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "raw_bytes": 0,
+            "exit_code": 0
+        },
+        "diff-check.log.gz": {
+            "archive": "diff-check.log.gz",
+            "archive_sha256": "6fbb63e62f78326474bdda9820fc45a7108a237daddc605d2fdedceba868b463",
+            "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "raw_bytes": 0,
+            "exit_code": 0
+        }
+    },
+    "cargo_lock": {
+        "archive": "Cargo.lock.gz",
+        "archive_sha256": "9e626b690966e91b9f0b775240682342d755c9d6fc86df8e2ce82d9084611532",
+        "raw_sha256": "41f148118a4acdcb86b1abc174e914bec2ac0eb77738d6414f0e7febf7309ad8",
+        "raw_bytes": 138692
+    }
+}

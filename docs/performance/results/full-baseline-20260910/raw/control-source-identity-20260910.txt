@@ -1,0 +1,7 @@
+capture_control=/var/tmp/litchi-performance-full-baseline-capture-control-20260910
+head=1b3f2c2d0c059e8e59272775a97d0567e14e67f2
+status=0
+8c731d7506bef3a4c05df553a0cd1cadb7d12da641099a2f9a0adc7e3fb4c518  /var/tmp/litchi-performance-full-baseline-capture-control-20260910/tools/perf-baseline/Cargo.lock
+lock_patch=/var/tmp/litchi-performance-full-baseline-20260909/Cargo.lock.generated.patch
+806b37859e566bbbf78f3f77ea0ecf1040ce5b09b0a9bc811b7f795c4117610b  /var/tmp/litchi-performance-full-baseline-20260909/Cargo.lock.generated.patch
+expected_control_worktree_clean=true

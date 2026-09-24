@@ -1,0 +1,20 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--release",
+    "--manifest-path",
+    "docs/report/spec-gap-validation-evidence/ods-formula-bitwise-evaluation/performance/bitwise-harness/Cargo.toml"
+  ],
+  "cwd": "/home/zhuhe/code/litchi-bitwise-worktree",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-bitwise-target",
+    "TMPDIR": "/home/zhuhe/code/litchi-bitwise-tmp",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "started_at": "2026-09-13T13:13:20.659903+00:00",
+  "finished_at": "2026-09-13T13:13:32.422818+00:00",
+  "status": 0
+}

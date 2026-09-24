@@ -4,10 +4,10 @@
     reason = "test assertions panic by design"
 )]
 
-use super::super::{Ref, Stream, axis, cache, format, group};
+use super::super::{Kind, Ref, Stream, axis, cache, format, group};
 use super::{
-    Ai, Binding, Cache, Chart, Context, Count, DataKind, Group, GroupId, Link, Order, Owner, Props,
-    Role, Series, Source, Value, ValueRef, XlValue,
+    Ai, Binding, Cache, Chart, Context, Count, DataKind, GraphFamily, Group, GroupId, Link, Order,
+    Owner, Props, Role, Series, Source, Value, ValueRef, XlValue,
 };
 use crate::chart::RowCol;
 use crate::{Error, Limits};
@@ -37,6 +37,109 @@ fn area_format() -> format::Area {
         foreground_index: 9,
         background_index: 10,
     }
+}
+
+fn graph_authoring_chart(family: GraphFamily) -> Chart {
+    let context = Context::graph();
+    let mut chart = Chart::new_graph_authoring(family, Limits::default()).expect("Graph scaffold");
+    let count = count(2);
+    let row = RowCol::new(1).expect("series row");
+    let mut series = Series::new(context);
+    series.category_kind = DataKind::Text;
+    series.category_count = count;
+    series.value_count = count;
+    series.ai = Ai::new(
+        Binding::new(
+            Link::graph(Role::Name, Source::Literal, row),
+            Some("Sales".into()),
+        ),
+        Binding::new(Link::graph(Role::Values, Source::Literal, row), None),
+        Binding::new(
+            Link::graph(Role::Categories, Source::Literal, RowCol::ZERO),
+            None,
+        ),
+        Binding::new(
+            Link::graph(Role::Bubbles, Source::Automatic, RowCol::ZERO),
+            None,
+        ),
+    )
+    .expect("Graph AI roles");
+    chart.add_series(series).expect("Graph series");
+    chart
+        .add_cache(Cache::graph(
+            row,
+            RowCol::ZERO,
+            cache::Ifmt::new(0),
+            Value::Text("Sales".into()),
+        ))
+        .expect("series name cache");
+    for (col, value) in [(1, "Q1"), (2, "Q2")] {
+        chart
+            .add_cache(Cache::graph(
+                RowCol::ZERO,
+                RowCol::new(col).expect("category column"),
+                cache::Ifmt::new(0),
+                Value::Text(value.into()),
+            ))
+            .expect("category cache");
+    }
+    for (col, value) in [(1, 10.0), (2, 20.0)] {
+        chart
+            .add_cache(Cache::graph(
+                row,
+                RowCol::new(col).expect("value column"),
+                cache::Ifmt::new(0),
+                Value::Number(value),
+            ))
+            .expect("value cache");
+    }
+    chart
+}
+
+#[test]
+fn standalone_graph_authoring_roundtrips_bar_line_and_pie_profiles() {
+    for family in [GraphFamily::Bar, GraphFamily::Line, GraphFamily::Pie] {
+        let chart = graph_authoring_chart(family)
+            .finish_graph_authoring()
+            .expect("complete Graph authoring");
+        let stream = chart.encode().expect("Graph chart encoding");
+        let orient = stream
+            .records()
+            .map(|item| item.expect("Graph record framing"))
+            .find(|record| record.kind() == RecordKind::from_wire(0x1055))
+            .expect("Graph Orient record");
+        assert_eq!(orient.kind(), RecordKind::from_wire(0x1055));
+        assert_eq!(orient.payload(), &[1, 0, 0, 0, 0, 1]);
+        let parsed = Chart::open(stream, Context::graph()).expect("Graph chart reopen");
+        assert_eq!(parsed.context().kind(), Kind::Graph);
+        assert_eq!(parsed.parents().len(), 1);
+        assert_eq!(parsed.groups().len(), 1);
+        assert_eq!(parsed.series().len(), 1);
+        assert_eq!(parsed.caches().len(), 5);
+        match family {
+            GraphFamily::Pie => assert!(parsed.axes().is_empty()),
+            GraphFamily::Bar | GraphFamily::Line => assert_eq!(parsed.axes().len(), 2),
+        }
+    }
+}
+
+#[test]
+fn standalone_graph_authoring_rejects_wrong_context_and_incomplete_series() {
+    let excel = Chart::new(Context::excel())
+        .expect("Excel chart")
+        .finish_graph_authoring();
+    assert!(matches!(excel, Err(Error::UnsupportedAuthoring { .. })));
+
+    let incomplete = Chart::new_graph_authoring(GraphFamily::Pie, Limits::default())
+        .expect("Pie scaffold")
+        .finish_graph_authoring();
+    assert!(matches!(
+        incomplete,
+        Err(Error::InvalidModel {
+            field: "series",
+            ..
+        })
+    ));
 }
 
 fn fixture(mut chart: Chart) -> Stream {

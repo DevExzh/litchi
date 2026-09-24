@@ -1,0 +1,19 @@
+{
+  "run": "before",
+  "capture_scope": "historical_pre_correction_candidate",
+  "current_source_comparable": false,
+  "source_base_head": "d20f8402295c8a73a54faa25f8a424a70c092b36",
+  "source_candidate_commit": "a889b380cf48933fe1c0fb030988ca3b752dec2f",
+  "source_manifest_sha256": "51f8f27e20c2bd3a3db5c431f7c1e5ba133173d93729e70096f22b525381aa0a",
+  "harness_source_sha256": "f9bc82d2e334db288166f6abf109fcd049ee7ea5f9bca35ca81dbbc689c25d91",
+  "harness_manifest_sha256": "690c1bbf7fc6f977bfacec001b93f9146f383b0afcc5d500617721651bfce01c",
+  "harness_lock_sha256": "8043bb7c29e458b858249de77737f9ba5a339a6a346028df7265d44aa3d8b62e",
+  "workspace_lock_sha256": "9886ab7f4458ddcf4286fa686a420d9351f4cfc278552484c64791dd159fc282",
+  "binary_sha256": "5116182e0ea7e01041d55776b2697a063d6aa8a182af7b3b6b24731dcbe40f81",
+  "fixture_sha256": {
+    "8": "684d12d075d4c7e63dd97c285710855c9ac207b3b7ccf73c1aebc44a8f33575f",
+    "512": "5457172b1c58a3b600b9b77cbf922b28d66d60822021b67ebc7fdd96d2e35cc9"
+  },
+  "command": "TMPDIR=/var/tmp CARGO_TARGET_DIR=/var/tmp/ods-style-profile-frozen-target cargo run --manifest-path docs/report/spec-gap-validation-evidence/ods-data-style-performance/harness/Cargo.toml --locked --offline --quiet",
+  "source_changed_from_after": false
+}

@@ -1,0 +1,30 @@
+{
+  "passed": true,
+  "snapshots": {
+    "before": {
+      "commit": "8b5838c591775990747b2cbce82fb2eea372b58b",
+      "manifest_inputs_rehashed": 4852,
+      "manifest_sha256": "048b6a34a1e00a8978e36fc640bdfcae967497ab26281ad895822c27bcbd7a51",
+      "binary_sha256": "1c0df3243a09ec02fc7699d99eccedd7413d4a62ab2eda5fc1392ba20b5aea0d",
+      "receipts": 117,
+      "samples": 2340
+    },
+    "after": {
+      "commit": "fc44c4e6c945ab07ded7447f40670d898839eeb3",
+      "manifest_inputs_rehashed": 4852,
+      "manifest_sha256": "622d4b9bda1e1699cf2387b03eb574ea288dd12b693cef2189c080c4d1198081",
+      "binary_sha256": "7060662a0cbd0508ee6ea330df0afaa4575fbe12a8a72a8a719615dbe8a43122",
+      "receipts": 117,
+      "samples": 2340
+    }
+  },
+  "retained_harness_extras_match_build_manifests": true,
+  "corpus_sha256": "61134b9c019accffb00a660bac6113267a3b75be36e10a031dd52d4cdf7ed14c",
+  "normalized_manifest_sha256": "aacacce9411a6d94bc7211b2f6f511ac2d9109bb4155ca683ecaf48e15539c94",
+  "scope": "Frozen source scanner only; no lifecycle, native acceptance, or speedup claim.",
+  "limitations": [
+    "Binaries were hashed by the runner before target cleanup; root checks those retained hash receipts, not a second live binary.",
+    "Small-output-cap lanes count any returned error; they do not assert a specific error variant.",
+    "The verifier checks shared context identity and counts, but not exact namespace binding counts."
+  ]
+}

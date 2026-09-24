@@ -44,6 +44,14 @@ pub enum Error {
     #[error("DrawingML error: {0}")]
     Drawing(#[from] litchi_drawingml::Error),
 
+    /// A DOCX InkML inventory exhausted a finite resource budget.
+    #[error("DOCX ink {resource} limit exceeded: {actual} > {maximum}")]
+    InkLimit {
+        resource: &'static str,
+        actual: usize,
+        maximum: usize,
+    },
+
     /// Bounded, inert VBA parsing or authoring failed.
     #[cfg(feature = "vba-inspection")]
     #[error("VBA error: {0}")]
@@ -117,6 +125,24 @@ pub enum Error {
         /// Original allocator failure.
         #[source]
         source: TryReserveError,
+    },
+
+    /// A tracked-revision read exceeded a finite resource ceiling.
+    #[error("DOCX revision {resource} limit exceeded: {actual} > {maximum}")]
+    RevisionLimit {
+        /// Bounded resource.
+        resource: &'static str,
+        /// Observed value.
+        actual: usize,
+        /// Maximum accepted value.
+        maximum: usize,
+    },
+
+    /// A bounded revision collection could not reserve storage.
+    #[error("DOCX allocation failed for {resource}")]
+    RevisionAllocation {
+        /// Buffer or collection being reserved.
+        resource: &'static str,
     },
 
     /// A bounded external hyperlink-wrapper detachment ceiling was exceeded.

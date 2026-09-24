@@ -45,6 +45,8 @@ pub(super) use crate::vba_project::{
     remove_vba_project as clear_vba_graph_from_document,
     store_vba_project as store_vba_project_in_document,
 };
+#[cfg(test)]
+pub(super) use crate::web_extensions as web;
 pub(super) use crate::writer::MutableDocument;
 pub(super) use crate::{font, glossary, web as docx_web};
 pub(super) use litchi_drawingml::diagram::{
@@ -58,7 +60,6 @@ pub(super) use litchi_ooxml_common::custom_xml::{
 pub(super) use litchi_ooxml_common::embedded;
 pub(super) use litchi_ooxml_common::properties::{Props, Slot};
 pub(super) use litchi_ooxml_common::ribbon;
-pub(super) use litchi_ooxml_common::web;
 pub(super) use litchi_opc::OpcPackage;
 pub(super) use litchi_opc::constants::content_type as ct;
 pub(super) use litchi_opc::packuri::PackURI;
@@ -674,38 +675,6 @@ impl Package {
             let source = candidate.main_document_part()?.partname().clone();
             store_vba_project_in_document(candidate, &source, payload, supplemental_xml)
         })
-    }
-
-    /// Load inert persisted Office Add-in task panes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn task_panes(&self) -> Result<Option<web::Panes>> {
-        Ok(web::load(&self.opc)?)
-    }
-
-    /// Store a validated task-pane graph by moving it into package ownership.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn put_task_panes(
-        &mut self,
-        panes: web::Panes,
-        conformance: web::Conformance,
-    ) -> Result<&mut Self> {
-        web::put(&mut self.opc, panes, conformance)?;
-        Ok(self)
-    }
-
-    /// Remove task panes and graph resources no longer shared elsewhere.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn remove_task_panes(&mut self) -> Result<bool> {
-        Ok(web::remove(&mut self.opc)?)
     }
 
     /// Read the fixed legacy and modern package-level Ribbon slots.

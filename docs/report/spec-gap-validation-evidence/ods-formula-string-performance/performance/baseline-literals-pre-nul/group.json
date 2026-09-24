@@ -1,0 +1,44 @@
+{
+  "group": "literals",
+  "case_count": 9,
+  "cases": [
+    {
+      "case": "literal-many-short-64",
+      "repeat": 128
+    },
+    {
+      "case": "literal-many-short-256",
+      "repeat": 64
+    },
+    {
+      "case": "literal-many-short-1024",
+      "repeat": 16
+    },
+    {
+      "case": "literal-many-short-4096",
+      "repeat": 1
+    },
+    {
+      "case": "literal-many-empty-1024",
+      "repeat": 8
+    },
+    {
+      "case": "literal-mixed-utf8-doubled-quotes",
+      "repeat": 4
+    },
+    {
+      "case": "literal-single-plain-64k",
+      "repeat": 8
+    },
+    {
+      "case": "literal-single-doubled-quote-64k",
+      "repeat": 8
+    },
+    {
+      "case": "literal-unterminated-64k",
+      "repeat": 8
+    }
+  ],
+  "warmups": 3,
+  "iterations": 15
+}

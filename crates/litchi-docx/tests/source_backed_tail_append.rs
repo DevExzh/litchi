@@ -2285,26 +2285,28 @@ fn encrypted_metadata_refusal_precedes_main_payload_reads_and_output() {
         archive(&source_xml, Compression::Store, false, Topology::Plain),
         MAIN,
     );
+    // Encrypted members are now refused when the source is admitted (the
+    // spec-gap branch's admission check, merge record 0759): no package, so no
+    // append plan and no output can follow. Admission reads only framing: the
+    // locator, the central directory and one fixed local-header prefix per
+    // member, never a payload.
+    let eocd = encrypted_archive
+        .windows(4)
+        .rposition(|window| window == b"PK\x05\x06")
+        .expect("fixture EOCD must be present");
+    let members = u64::from(little_u16(&encrypted_archive, eocd + 10));
     let source = Arc::new(ReadCountingSource::new(encrypted_archive));
-    let source_reader: Arc<dyn ReadAt> = source.clone();
-    let package = source_backed::Package::from_read_at(source_reader)
-        .expect("encrypted metadata fixture must open without payload reads");
     source.arm();
-    let mut output = Vec::new();
-    let result = package
-        .tail_append_plain_paragraph("tail")
-        .with_limits(limits(source_xml.len()))
-        .prepare()
-        .and_then(|plan| plan.write_to_stream(&mut output));
-    assert!(result.is_err(), "encrypted metadata must refuse an append");
+    let source_reader: Arc<dyn ReadAt> = source.clone();
+    let result = source_backed::Package::from_read_at(source_reader);
     assert!(
-        output.is_empty(),
-        "encrypted refusal must precede archive output"
+        result.is_err(),
+        "encrypted metadata must be refused at admission"
     );
-    assert_eq!(
-        source.reads(),
-        0,
-        "encrypted metadata refusal must not read the main payload"
+    assert!(
+        source.reads() <= members + 4,
+        "admission read more than framing: {} reads for {members} members",
+        source.reads()
     );
 }
 

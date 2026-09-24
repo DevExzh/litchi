@@ -4,6 +4,10 @@ use super::super::package::{read_workbook, targets_for_sheets};
 use super::super::*;
 use crate::error::Error;
 use litchi_cfb::{OleFile, OleWriter};
+use litchi_ole_common::property_set::document_summary::DIGITAL_SIGNATURE;
+use litchi_ole_common::property_set::{
+    CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Section, Stream, Value,
+};
 use std::io::Cursor;
 
 fn object(id: u16, position: u32, dde: bool) -> OleObjectRecord {
@@ -15,13 +19,19 @@ fn object(id: u16, position: u32, dde: bool) -> OleObjectRecord {
                 flags: 0,
                 reserved: [0; 12],
             }),
+            ObjSubrecord::PictureFormat(FtCf {
+                format: FtCf::UNSPECIFIED,
+            }),
             ObjSubrecord::PictureFlags(FtPioGrbit {
                 raw: if dde { 0x0002 } else { 0 },
             }),
             ObjSubrecord::PictureFormula(FtPictFmla {
-                formula: vec![0x05, 0, 0, 0, 0],
+                formula: vec![
+                    0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00,
+                    0x00,
+                ],
                 storage_position: Some(position),
-                control_buffer_size: Some(0),
+                control_buffer_size: if dde { Some(0) } else { None },
             }),
             ObjSubrecord::End,
         ],
@@ -43,6 +53,29 @@ fn derives_deduplicated_mbd_and_lnk_targets_from_obj_records() {
     assert_eq!(mbd.path(), &["MBD0000002A".to_owned()]);
     let lnk = targets.get("LNK0000002A").expect("LNK target");
     assert_eq!(lnk.path(), &["LNK0000002A".to_owned()]);
+}
+
+#[test]
+fn storage_name_does_not_claim_camera_or_control_stream_ownership() {
+    let mut camera = object(1, 0x2A, false);
+    if let Some(ObjSubrecord::PictureFlags(flags)) = camera
+        .subrecords
+        .iter_mut()
+        .find(|value| matches!(value, ObjSubrecord::PictureFlags(_)))
+    {
+        flags.raw |= 0x0080;
+    }
+    assert_eq!(camera.storage_name(), None);
+
+    let mut controls_stream = object(2, 0x2A, false);
+    if let Some(ObjSubrecord::PictureFlags(flags)) = controls_stream
+        .subrecords
+        .iter_mut()
+        .find(|value| matches!(value, ObjSubrecord::PictureFlags(_)))
+    {
+        flags.raw |= 0x0020;
+    }
+    assert_eq!(controls_stream.storage_name(), None);
 }
 
 #[test]
@@ -103,6 +136,38 @@ fn workbook_cfb(controls: &[Vec<u8>]) -> Vec<u8> {
         .write_to(&mut output)
         .expect("test compound file should be written");
     output.into_inner()
+}
+
+fn workbook_cfb_with_root_stream(name: &str, data: &[u8]) -> Vec<u8> {
+    let mut writer = OleWriter::new();
+    writer
+        .create_stream(&["Workbook"], &workbook_stream(&[]))
+        .expect("Workbook stream should be created");
+    writer
+        .create_stream(&[name], data)
+        .expect("root stream should be created");
+    let mut output = Cursor::new(Vec::new());
+    writer
+        .write_to(&mut output)
+        .expect("test compound file should be written");
+    output.into_inner()
+}
+
+fn pidssi_with_signature() -> Vec<u8> {
+    let mut section = Section::new(DOCUMENT_SUMMARY_INFORMATION_FMTID);
+    section.set_page(CodePage::WINDOWS_1252);
+    section
+        .add(
+            DIGITAL_SIGNATURE,
+            Value::Unknown {
+                variant_type: 0x7F01,
+                data: vec![0xAA, 0x55],
+            },
+        )
+        .expect("signature property should be accepted by the generic set");
+    Stream::new(section)
+        .to_bytes()
+        .expect("PIDDSI stream should serialize")
 }
 
 fn checkbox_control(id: u16, marker: u8) -> FormControl {
@@ -203,4 +268,81 @@ fn add_form_control_rejects_duplicate_ids_without_mutation() {
             .unwrap(),
         existing
     );
+}
+
+#[test]
+fn workbook_reader_rejects_filepass_and_active_biff_protection_before_editing() {
+    let cases = [
+        ("FILEPASS", 0x002F, vec![0, 0]),
+        ("unknown FILEPASS", 0x002F, vec![0xFF; 8]),
+        ("malformed FILEPASS", 0x002F, vec![0]),
+        ("workbook PROTECT", 0x0012, vec![1, 0]),
+        ("worksheet OBJECTPROTECT", 0x0063, vec![1, 0]),
+        ("invalid protection Boolean", 0x0012, vec![2, 0]),
+        (
+            "FILESHARING write reservation",
+            0x005B,
+            vec![0, 0, 1, 0, 0, 0, 0],
+        ),
+    ];
+    for (name, kind, body) in cases {
+        let error = read_workbook(&workbook_cfb(&[record(kind, &body)]), Limits::default())
+            .expect_err(name);
+        assert!(
+            matches!(
+                error,
+                Error::PasswordProtected
+                    | Error::UnsafeEdit(_)
+                    | Error::InvalidRecord { .. }
+                    | Error::InvalidLength { .. }
+            ),
+            "{name}: {error:?}"
+        );
+    }
+}
+
+#[test]
+fn file_sharing_read_only_recommendation_is_not_protection() {
+    let input = workbook_cfb(&[record(0x005B, &[1, 0, 0, 0, 0, 0])]);
+    let editor = Editor::new(input.clone(), Limits::default())
+        .expect("read-only recommendation without a write password is editable");
+    assert_eq!(editor.finish().expect("no-op should finish"), input);
+}
+
+#[test]
+fn workbook_reader_rejects_root_encryption_stream() {
+    let error = read_workbook(
+        &workbook_cfb_with_root_stream("encryption", b"opaque"),
+        Limits::default(),
+    )
+    .expect_err("root encryption stream must refuse edits");
+    assert!(matches!(error, Error::PasswordProtected));
+}
+
+#[test]
+fn workbook_reader_refuses_pidssi_digital_signature() {
+    let error = read_workbook(
+        &workbook_cfb_with_root_stream(
+            "\u{0005}DocumentSummaryInformation",
+            &pidssi_with_signature(),
+        ),
+        Limits::default(),
+    )
+    .expect_err("a stale PIDDSI signature must not be rewritten");
+    assert!(matches!(error, Error::UnsafeEdit(message) if message.contains("DigitalSignature")));
+}
+
+#[test]
+fn disabled_protection_markers_remain_readable_and_exact_noop() {
+    let input = workbook_cfb(&[
+        record(0x0012, &[0, 0]),
+        record(0x0063, &[0, 0]),
+        record(0x0013, &[0, 0]),
+    ]);
+    let editor = Editor::new(input.clone(), Limits::default())
+        .expect("disabled protection metadata should remain readable");
+    let _ = editor
+        .objects(0)
+        .expect("worksheet object view should remain available");
+    assert_eq!(editor.finish().expect("no-op should finish"), input);
 }

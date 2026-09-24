@@ -1,0 +1,53 @@
+{
+  "schema": "docx-styles-effects-nontiming-retention-v1",
+  "source_commit": "d000d977b99e03f8542c7dae74acf767a91b1feb",
+  "frozen_checkout": "463334f1a32de687ffb2b3357e55816dcfd3102e",
+  "current_smoke_commit": "c4ac516353591f88a9b797349002d05737614e78",
+  "operator_session": "17932",
+  "result": "2 serial tests passed",
+  "contended": true,
+  "raw_file_count": 8,
+  "raw_total_bytes": 8797,
+  "raw_files": [
+    {
+      "path": "README.md",
+      "bytes": 1470,
+      "sha256": "a6d13a690f82dada3c79e21e68a45b73a10a1c96e7ef95476b71293ab01138c4"
+    },
+    {
+      "path": "cargo-test.log",
+      "bytes": 5079,
+      "sha256": "359725c46bfb177e2b011ccefc0e47e2e2f52c40a6db1f99a1cdf5f81e4bdc69"
+    },
+    {
+      "path": "command.txt",
+      "bytes": 174,
+      "sha256": "209c02b1ed2d2708bcb3332f491e86af24c0df48e21e4961f088923fd482b727"
+    },
+    {
+      "path": "process-census-after.txt",
+      "bytes": 50,
+      "sha256": "7dddef0d29f8c83f41889d63cfac8ed40f78f7d28902de38caa4c7c784139195"
+    },
+    {
+      "path": "process-census-before.txt",
+      "bytes": 237,
+      "sha256": "5999389a0c21e43cb597e9fc81ff62449efd5e60e1b43ce104ceb299e03acd61"
+    },
+    {
+      "path": "source-hashes.txt",
+      "bytes": 1232,
+      "sha256": "8424c7756707b2b2e7ef3f337829af23f6d3f4d09c1bae9a6a5d4c2a12df2e3c"
+    },
+    {
+      "path": "status.txt",
+      "bytes": 12,
+      "sha256": "bde294368bfed77c2cddf8cec271d398aee9cdbab3b26e1059281bd33adb0120"
+    },
+    {
+      "path": "toolchain-and-env.txt",
+      "bytes": 543,
+      "sha256": "b6b5711aeee8614031ce6f22d48d0db61463aa5e63b42336ade4a992ea28265d"
+    }
+  ]
+}

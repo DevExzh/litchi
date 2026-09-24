@@ -1,0 +1,36 @@
+{
+  "candidate_only": false,
+  "case_count": 94,
+  "controls": 53,
+  "failure_counts": {
+    "cancelled": 4,
+    "none": 260,
+    "resource-memory": 4,
+    "resource-objects": 4,
+    "resource-work": 4,
+    "unsupported-array": 2,
+    "unsupported-name": 2,
+    "unsupported-reference": 2
+  },
+  "phase_count": 3,
+  "phase_counts": {
+    "evaluate": 94,
+    "parse": 94,
+    "parse-evaluate": 94
+  },
+  "roman_arabic": 41,
+  "roman_expected_success_by_phase": {
+    "evaluate:false": 4,
+    "evaluate:true": 37,
+    "parse-evaluate:false": 4,
+    "parse-evaluate:true": 37,
+    "parse:true": 41
+  },
+  "row_count": 282,
+  "sequence_count": 282,
+  "status_counts": {
+    "0": 282
+  },
+  "unsupported_function_failures": 0,
+  "verified_at": "2026-09-13T15:33:27.937Z"
+}

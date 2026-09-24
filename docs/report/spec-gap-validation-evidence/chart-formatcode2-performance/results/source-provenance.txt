@@ -1,0 +1,14 @@
+source_manifest_before_sha256=8940055076744f349cb97b4034ad8d52dd9f59668c2b0464c4f3a0c3360160ca
+source_manifest_after_sha256=8940055076744f349cb97b4034ad8d52dd9f59668c2b0464c4f3a0c3360160ca
+git_head=625b7e121a10ee46b502a07ffe008fabc922201e
+git_status_relevant=
+source_sha256:
+ffbcb72782c0541c5ee83a5dca68e49c157a9c39097fa444972e9d56588ca18d  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/chart/mod.rs
+03573be9c830a92012720f97fe9994b8fab8cb028ba4d0ed0bfebcdbb975cb17  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/chart/extension/mod.rs
+7064c49368c525b03b2d3d819426af85d32da99d44fddf4c8b7a587f40ce2959  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/chart/extension/formatcode2.rs
+73d0de72cff7d0506c6519c192a56c2bc3fb4bfaa38dec6535445162f216632e  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/tests/chart_formatcode2.rs
+e37620335d14a9a3cb279f9bdcfd4752bff81052a7c8f27b405e2332a20f08ad  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/tests/chart_formatcode2_adversarial.rs
+harness_sha256:
+2448e9caeeb3099c99ac5d9028b8d7eea9fc958f6bb94562a0521a7032425e95  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/chart-formatcode2-performance/harness/Cargo.lock
+bc6715eb62cf230935e1fdf77c6ba6f56ceab8b90c7763911ca4d9a10d225ed9  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/chart-formatcode2-performance/harness/Cargo.toml
+f39f1ed431bf97d08ac7e8b08cb6d5e194d61e4cfec07e8011aca102843bcdc4  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/chart-formatcode2-performance/harness/main.rs

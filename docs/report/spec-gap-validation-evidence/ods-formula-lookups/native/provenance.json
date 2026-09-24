@@ -1,0 +1,55 @@
+{
+  "schema": "ods-formula-lookups-native-provenance-v1",
+  "status": "captured",
+  "scope": {
+    "functions": [
+      "ADDRESS",
+      "CHOOSE",
+      "HLOOKUP",
+      "INDEX",
+      "INDIRECT",
+      "LOOKUP",
+      "MATCH",
+      "OFFSET",
+      "VLOOKUP"
+    ],
+    "formula_rows": 32,
+    "function_rows": 30,
+    "parity_rows": 17,
+    "divergence_rows": 13,
+    "fixture_data_rows": 2
+  },
+  "converter": {
+    "executable": "/usr/bin/libreoffice",
+    "version": "LibreOffice 26.2.5.2 620(Build:2)",
+    "locale": "C.UTF-8",
+    "headless": true,
+    "fresh_profile": true
+  },
+  "fixture": {
+    "input": "lookup-functions-native.fods",
+    "input_sha256": "f084909cae337df25c37e028fa4644eac5c80a68b78522cc6c7ebbb2e592cb60",
+    "recalculated_output": "recalculated.ods",
+    "recalculated_output_sha256": "4a6eb73fb895fffda6654a07a94a77e894210228ef7f4c10943eebbadfc05ae4",
+    "content_xml": "content.xml",
+    "recalculated_content_xml_sha256": "ecd94bdfc0acfff99eb3890148adaf7267243d11ae2543b987217706fc4a9175",
+    "native_results": "native-results.json",
+    "native_results_sha256": "ecb3f972895a260f95fdfc0285e881d4cea872c701e3ec0752901cfcede4fbb1"
+  },
+  "independent_oracle": {
+    "script": "lookup_oracle.py",
+    "script_sha256": "a9e33442aec45cce4ee361f2bd54daaeb22d7a0778e39b7669cc3ab725f8054b",
+    "goldens": "lookup-goldens.json",
+    "goldens_sha256": "ad2a9bd6c92823b1a40d012d2c64bea66a7b9a0b87c998bb16fc4fcd89887758",
+    "functions": 9,
+    "observations": 127,
+    "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf"
+  },
+  "normative_source": {
+    "contract": "contract.md",
+    "contract_sha256": "b112d66d687337912333f932c199f6e0ee5241fedc335aeaa95de572889e6aaf",
+    "odf_archive_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+    "odf_part4_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1"
+  },
+  "divergence_policy": "Native observations retain LibreOffice typed values verbatim; native-divergence rows are documented against the independent contract and are not translated into normative results."
+}

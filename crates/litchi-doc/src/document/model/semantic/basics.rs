@@ -1,5 +1,16 @@
 use super::prelude::*;
 
+fn parse_deferred_source<T>(
+    source: &std::result::Result<Option<Vec<u8>>, String>,
+    parser: impl Fn(&[u8]) -> Result<T>,
+) -> std::result::Result<Option<T>, String> {
+    match source {
+        Ok(Some(bytes)) => parser(bytes).map(Some).map_err(|error| error.to_string()),
+        Ok(None) => Ok(None),
+        Err(error) => Err(error.clone()),
+    }
+}
+
 impl Document {
     /// Get all text content from the document.
     ///
@@ -191,6 +202,117 @@ impl Document {
         self.saved_by_table
             .as_ref()
             .map_err(|error| PackageError::Corrupted(format!("invalid saved-by metadata: {error}")))
+    }
+
+    /// Strictly access the inert main-document saved selection (`Selsf`).
+    ///
+    /// Selection state is a historical Word UI cache. The returned record is
+    /// never applied to document navigation or host selection state, and its
+    /// optional malformed bytes are reported only when this accessor is used.
+    pub fn saved_selection(&self) -> Result<Option<&SavedSelection>> {
+        match self.saved_selection.get_or_init(|| {
+            let ccp_text = self.fib.get_main_doc_range().1;
+            parse_deferred_source(&self.saved_selection_source, |source| {
+                let selection = SavedSelection::parse_bytes(source)?;
+                if selection.cp_first() > ccp_text {
+                    return Err(PackageError::Corrupted(format!(
+                        "Selsf cpFirst {} exceeds ccpText {ccp_text}",
+                        selection.cp_first()
+                    )));
+                }
+                if selection.cp_lim() > ccp_text {
+                    return Err(PackageError::Corrupted(format!(
+                        "Selsf cpLim {} exceeds ccpText {ccp_text}",
+                        selection.cp_lim()
+                    )));
+                }
+                Ok(selection)
+            })
+        }) {
+            Ok(value) => Ok(value.as_ref()),
+            Err(error) => Err(PackageError::Corrupted(format!(
+                "invalid saved selection metadata: {error}"
+            ))),
+        }
+    }
+
+    /// Strictly access the inert paragraph-group property array (`PGPArray`).
+    ///
+    /// PGP entries describe paragraph margins, borders, and HTML-oriented
+    /// block types. They are returned as metadata and are never applied to
+    /// document paragraphs.
+    pub fn paragraph_groups(&self) -> Result<Option<&PgpArray>> {
+        match self.paragraph_groups.get_or_init(|| {
+            parse_deferred_source(&self.paragraph_groups_source, PgpArray::parse_bytes)
+        }) {
+            Ok(value) => Ok(value.as_ref()),
+            Err(error) => Err(PackageError::Corrupted(format!(
+                "invalid paragraph-group metadata: {error}"
+            ))),
+        }
+    }
+
+    /// Strictly access inert frame-set and list-style records from `RgDofr`.
+    ///
+    /// The records are exposed as bounded metadata. Frame file names are not
+    /// opened, frame layout is not rendered, and list styles are not applied
+    /// to document paragraphs.
+    pub fn dofr_records(&self) -> Result<Option<&DofrArray>> {
+        match self.dofr_records.get_or_init(|| {
+            parse_deferred_source(&self.dofr_records_source, DofrArray::parse_bytes)
+        }) {
+            Ok(value) => Ok(value.as_ref()),
+            Err(error) => Err(PackageError::Corrupted(format!(
+                "invalid RgDofr metadata: {error}"
+            ))),
+        }
+    }
+
+    /// Strictly access inert `PrDrvr`, `PrEnvPort`, and `PrEnvLand` metadata.
+    ///
+    /// Printer environment blocks are retained as bounded bytes; no printer is
+    /// contacted and no print settings are applied.
+    pub fn print_environment(&self) -> Result<Option<&DocumentPrintEnvironment>> {
+        match self.print_environment.get_or_init(|| {
+            let driver =
+                parse_deferred_source(&self.print_driver_source, PrintDriver::parse_bytes)?;
+            let portrait = parse_deferred_source(
+                &self.print_environment_portrait_source,
+                PrintEnvironment::parse_bytes,
+            )?;
+            let landscape = parse_deferred_source(
+                &self.print_environment_landscape_source,
+                PrintEnvironment::parse_bytes,
+            )?;
+            Ok(DocumentPrintEnvironment::from_parts(
+                driver, portrait, landscape,
+            ))
+        }) {
+            Ok(value) => Ok(value.as_ref()),
+            Err(error) => Err(PackageError::Corrupted(format!(
+                "invalid print-environment metadata: {error}"
+            ))),
+        }
+    }
+
+    /// Strictly access Word's inert VBA signature variables in `StwUser`.
+    ///
+    /// Parsing is deferred because this optional table is independent of the
+    /// main text. Signature and certificate-store bytes remain opaque; no
+    /// certificate trust is established and no VBA project is opened or
+    /// executed.
+    pub fn vba_signatures(&self) -> Result<Option<&DocumentVbaSignatures>> {
+        match self.vba_signatures.get_or_init(|| {
+            parse_deferred_source(
+                &self.vba_signatures_source,
+                DocumentVbaSignatures::parse_bytes,
+            )
+        }) {
+            Ok(value) => Ok(value.as_ref()),
+            Err(error) => Err(PackageError::Corrupted(format!(
+                "invalid VBA signature metadata: {error}"
+            ))),
+        }
     }
 
     /// Strictly access the caption label and `AutoCaption` tables.

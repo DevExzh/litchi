@@ -228,6 +228,41 @@ fn local_header_offset(bytes: &[u8], name: &str) -> u64 {
     panic!("member {name} has no local header");
 }
 
+/// Every local file header offset in a stored test archive, in file order.
+fn local_header_offsets(bytes: &[u8]) -> Vec<u64> {
+    let mut offsets = Vec::new();
+    let mut offset = 0usize;
+    while offset + 30 <= bytes.len() {
+        if bytes[offset..offset + 4] == [0x50, 0x4b, 0x03, 0x04] {
+            offsets.push(offset as u64);
+        }
+        offset += 1;
+    }
+    offsets
+}
+
+/// Remove the ZIP admission probes and return the reads that remain.
+///
+/// Since the spec-gap branch merge (change 0759), package admission refuses
+/// an encryption flag in any central or local header, and reads each physical
+/// entry's fixed eight-byte local-header prefix exactly once to do so. Those
+/// probes happen before any member is read; this helper checks that there is
+/// exactly one per entry, so the tests below can keep asserting the
+/// structural prefetch's own read shape unchanged.
+fn without_admission_probes(bytes: &[u8], reads: Vec<(u64, usize)>) -> Vec<(u64, usize)> {
+    let offsets = local_header_offsets(bytes);
+    let (probes, rest): (Vec<_>, Vec<_>) = reads
+        .into_iter()
+        .partition(|&(offset, taken)| taken == 8 && offsets.contains(&offset));
+    let mut probed: Vec<u64> = probes.iter().map(|&(offset, _)| offset).collect();
+    probed.sort_unstable();
+    assert_eq!(
+        probed, offsets,
+        "admission reads one eight-byte prefix per physical entry"
+    );
+    rest
+}
+
 fn payload_range(bytes: &[u8], name: &str) -> Range<u64> {
     let header = local_header_offset(bytes, name) as usize;
     let compressed = u32::from_le_bytes([
@@ -297,7 +332,7 @@ fn one_read_serves_a_contiguous_run_of_structural_members() {
     let bytes = run_package(8, None);
     let source = Recording::new(bytes.clone());
     let package = open(Arc::clone(&source)).expect("open");
-    let reads = source.take();
+    let reads = without_admission_probes(&bytes, source.take());
 
     // Eleven structural members — the content-types member, the package
     // `_rels/.rels`, the document's relationship part and eight child
@@ -556,9 +591,9 @@ fn a_scattered_package_costs_no_more_reads() {
         .unwrap();
     let bytes = writer.finish_to_bytes().unwrap();
 
-    let source = Recording::new(bytes);
+    let source = Recording::new(bytes.clone());
     open(Arc::clone(&source)).expect("open");
-    let reads = source.take();
+    let reads = without_admission_probes(&bytes, source.take());
     // Two locator reads (change 0632 merged the third into the second) plus
     // one read for each of the seven structural members: exactly what the same
     // package costs without this mechanism.
@@ -588,9 +623,9 @@ fn a_managed_open_keeps_the_exact_grammar() {
     let bytes = run_package(8, None);
     let unmanaged = Recording::new(bytes.clone());
     open(Arc::clone(&unmanaged)).expect("unmanaged open");
-    let unmanaged_reads = unmanaged.take();
+    let unmanaged_reads = without_admission_probes(&bytes, unmanaged.take());
 
-    let managed_source = Recording::new(bytes);
+    let managed_source = Recording::new(bytes.clone());
     let dynamic: Arc<dyn ReadAt> = managed_source.clone();
     let budget = Budget::root(
         "structural-prefetch-test",
@@ -612,7 +647,7 @@ fn a_managed_open_keeps_the_exact_grammar() {
         context,
     )
     .expect("managed open");
-    let managed_reads = managed_source.take();
+    let managed_reads = without_admission_probes(&bytes, managed_source.take());
 
     assert!(
         managed_reads.len() > unmanaged_reads.len(),

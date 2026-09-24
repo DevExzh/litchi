@@ -5,6 +5,7 @@ use super::semantic::Topology;
 use super::validation;
 use super::{DocumentSmartTag, DocumentSmartTags, FileInformationBlock, SmartTagBookmarkInfo};
 use crate::package::{Error as PackageError, Result as PackageResult};
+use crate::parts::protection::{EditProtection, ProtectionPolicy, classify};
 use litchi_codepage::Ansi;
 use litchi_ole_common::smart_tags::{Property, PropertyBag, PropertyBagString, Type};
 use std::sync::Arc;
@@ -27,13 +28,36 @@ pub struct Snapshot {
     topology: Topology,
     links: Arc<[u16]>,
     limits: Limits,
+    protection: EditProtection,
+    protection_policy: ProtectionPolicy,
     revision: u64,
 }
 
 impl Snapshot {
     /// Parse a Word smart-tag view with the document's LCID-derived ANSI page.
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> PackageResult<Self> {
-        Self::parse_with_options(fib, table_stream, None, Limits::default())
+        Self::parse_with_options_and_policy(
+            fib,
+            table_stream,
+            None,
+            Limits::default(),
+            ProtectionPolicy::default(),
+        )
+    }
+
+    /// Parse with an explicit policy for changed protected metadata.
+    pub fn parse_with_policy(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+        protection_policy: ProtectionPolicy,
+    ) -> PackageResult<Self> {
+        Self::parse_with_options_and_policy(
+            fib,
+            table_stream,
+            None,
+            Limits::default(),
+            protection_policy,
+        )
     }
 
     /// Parse with an explicit ANSI page and default resource limits.
@@ -42,7 +66,13 @@ impl Snapshot {
         table_stream: &[u8],
         ansi: Ansi,
     ) -> PackageResult<Self> {
-        Self::parse_with_options(fib, table_stream, Some(ansi), Limits::default())
+        Self::parse_with_options_and_policy(
+            fib,
+            table_stream,
+            Some(ansi),
+            Limits::default(),
+            ProtectionPolicy::default(),
+        )
     }
 
     /// Parse with custom resource limits and LCID-derived ANSI decoding.
@@ -51,7 +81,13 @@ impl Snapshot {
         table_stream: &[u8],
         limits: Limits,
     ) -> PackageResult<Self> {
-        Self::parse_with_options(fib, table_stream, None, limits)
+        Self::parse_with_options_and_policy(
+            fib,
+            table_stream,
+            None,
+            limits,
+            ProtectionPolicy::default(),
+        )
     }
 
     /// Parse with explicit ANSI decoding and resource limits.
@@ -60,6 +96,22 @@ impl Snapshot {
         table_stream: &[u8],
         ansi: Option<Ansi>,
         limits: Limits,
+    ) -> PackageResult<Self> {
+        Self::parse_with_options_and_policy(
+            fib,
+            table_stream,
+            ansi,
+            limits,
+            ProtectionPolicy::default(),
+        )
+    }
+
+    pub(super) fn parse_with_options_and_policy(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+        ansi: Option<Ansi>,
+        limits: Limits,
+        protection_policy: ProtectionPolicy,
     ) -> PackageResult<Self> {
         if table_stream.len() > limits.max_bytes {
             return Err(corrupted(
@@ -75,6 +127,7 @@ impl Snapshot {
         let topology = Topology::capture(fib, table_stream)?;
         let links = codec::bookmark_links(&topology, table_stream)?;
         validation::source(&topology, &metadata, table_stream, &links, limits)?;
+        let protection = classify(fib, table_stream)?;
         Ok(Self::from_validated(
             Arc::new(fib.clone()),
             Arc::<[u8]>::from(table_stream),
@@ -82,7 +135,19 @@ impl Snapshot {
             topology,
             links,
             limits,
+            protection,
+            protection_policy,
         ))
+    }
+
+    /// Protection state observed in the selected DOC table stream.
+    #[must_use]
+    pub const fn protection(&self) -> EditProtection {
+        self.protection
+    }
+
+    pub(super) fn protection_policy(&self) -> ProtectionPolicy {
+        self.protection_policy.clone()
     }
 
     /// Exact raw FIB bytes captured by this snapshot.
@@ -177,6 +242,8 @@ impl Snapshot {
         topology: Topology,
         links: Vec<u16>,
         limits: Limits,
+        protection: EditProtection,
+        protection_policy: ProtectionPolicy,
     ) -> Self {
         let revision = fingerprint(fib.raw_data(), &table_stream);
         Self {
@@ -186,6 +253,8 @@ impl Snapshot {
             topology,
             links: links.into(),
             limits,
+            protection,
+            protection_policy,
             revision,
         }
     }
@@ -227,6 +296,8 @@ impl Snapshot {
             self.topology.clone(),
             self.links.to_vec(),
             self.limits,
+            self.protection,
+            self.protection_policy.clone(),
         ))
     }
 }
@@ -496,7 +567,14 @@ impl Transaction {
     /// Commit the candidate as a reversible source-checked patch.
     pub fn commit(self) -> TxResult<Commit> {
         let snapshot = self.snapshot()?;
-        let patch = Patch::new(self.source, snapshot.clone());
+        if snapshot != self.source {
+            self.source
+                .protection_policy
+                .authorize(self.source.protection)
+                .map_err(Error::Invalid)?;
+        }
+        let policy = self.source.protection_policy.clone();
+        let patch = Patch::new(self.source, snapshot.clone(), policy);
         Ok(Commit { snapshot, patch })
     }
 
@@ -579,11 +657,16 @@ impl Commit {
 pub struct Patch {
     before: Snapshot,
     after: Snapshot,
+    protection_policy: ProtectionPolicy,
 }
 
 impl Patch {
-    fn new(before: Snapshot, after: Snapshot) -> Self {
-        Self { before, after }
+    fn new(before: Snapshot, after: Snapshot, protection_policy: ProtectionPolicy) -> Self {
+        Self {
+            before,
+            after,
+            protection_policy,
+        }
     }
 
     /// Source snapshot required by this patch.
@@ -606,8 +689,25 @@ impl Patch {
 
     /// Apply only to the exact source snapshot used to create this patch.
     pub fn apply(&self, source: &Snapshot) -> TxResult<Snapshot> {
+        // The destination owns the publication policy. Reusing the policy
+        // captured by the transaction would let an AllowProtected patch be
+        // laundered through a byte-identical Enforce snapshot.
+        self.apply_with_policy(source, source.protection_policy())
+    }
+
+    /// Apply with an explicit policy for changed protected metadata.
+    pub fn apply_with_policy(
+        &self,
+        source: &Snapshot,
+        policy: ProtectionPolicy,
+    ) -> TxResult<Snapshot> {
         if source.fingerprint() != self.before.fingerprint() || source != &self.before {
             return Err(Error::Conflict);
+        }
+        if source != &self.after {
+            policy
+                .authorize(source.protection)
+                .map_err(Error::Invalid)?;
         }
         Ok(self.after.clone())
     }
@@ -615,7 +715,11 @@ impl Patch {
     /// Return the exact inverse replacement.
     #[must_use]
     pub fn inverse(&self) -> Self {
-        Self::new(self.after.clone(), self.before.clone())
+        Self::new(
+            self.after.clone(),
+            self.before.clone(),
+            self.protection_policy.clone(),
+        )
     }
 }
 

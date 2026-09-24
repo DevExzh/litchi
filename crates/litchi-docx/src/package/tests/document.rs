@@ -31,6 +31,96 @@ fn saves_and_reopens_inline_and_display_office_math() {
 }
 
 #[test]
+fn authored_revision_utc_survives_save_and_reopen_with_mce_declaration() {
+    let file = NamedTempFile::with_suffix(".docx").unwrap();
+    let mut package = Package::new().unwrap();
+    let mut metadata = crate::writer::RevisionMetadata::new("1", "Alice").unwrap();
+    metadata
+        .set_date_utc(Some("2026-07-17T00:00:00.123456+00:00"))
+        .unwrap();
+    package
+        .document_mut()
+        .unwrap()
+        .add_paragraph()
+        .add_revision(crate::writer::RevisionKind::Insert, metadata)
+        .add_run_with_text("  A&<🙂  ");
+    package.save(file.path()).unwrap();
+    let reopened = Package::open(file.path()).unwrap();
+    let document_uri = PackURI::new("/word/document.xml").unwrap();
+    let xml = std::str::from_utf8(reopened.opc.get_part(&document_uri).unwrap().blob()).unwrap();
+    assert!(xml.contains("mc:Ignorable=\"w16du\""));
+    let paragraphs = reopened.document().unwrap().paragraphs().unwrap();
+    let revisions = paragraphs[0].revisions().unwrap();
+    assert_eq!(revisions.len(), 1);
+    assert_eq!(revisions[0].text(), "  A&<🙂  ");
+    assert_eq!(
+        revisions[0].date_utc(),
+        Some("2026-07-17T00:00:00.123456+00:00")
+    );
+}
+
+#[test]
+fn opened_package_resolves_inherited_revision_utc_namespace_context() {
+    let file = NamedTempFile::with_suffix(".docx").unwrap();
+    let mut package = Package::new().unwrap();
+    let document_uri = PackURI::new("/word/document.xml").unwrap();
+    let document_xml = format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:du="{}" xmlns:w16du="urn:foreign"><w:body><w:p><w:ins w:id="1" w:author="Alice" du:dateUtc="2026-07-17T00:00:00.123456+00:00"><w:r><w:t xml:space="preserve">  A&amp;&lt;&#x1F642;&#13;<![CDATA[ &amp; ]]></w:t></w:r></w:ins><w:del w:id="2" w:author="Bob" w16du:dateUtc="2026-07-17T00:00:00Z"/></w:p><w:sectPr/></w:body></w:document>"#,
+        crate::revision::WORD_2023_DATE_UTC_NAMESPACE
+    );
+    package
+        .opc
+        .get_part_mut(&document_uri)
+        .unwrap()
+        .set_blob(document_xml.into_bytes());
+    package.save(file.path()).unwrap();
+
+    let reopened = Package::open(file.path()).unwrap();
+    let paragraphs = reopened.document().unwrap().paragraphs().unwrap();
+    let revisions = paragraphs[0].revisions().unwrap();
+    assert_eq!(revisions.len(), 2);
+    assert_eq!(revisions[0].text(), "  A&<🙂\r &amp; ");
+    assert_eq!(
+        revisions[0].date_utc(),
+        Some("2026-07-17T00:00:00.123456+00:00")
+    );
+    assert_eq!(revisions[1].date_utc(), None);
+}
+
+#[test]
+fn opened_package_round_trips_inert_owexml_custom_function_metadata() {
+    let file = NamedTempFile::with_suffix(".docx").unwrap();
+    let reference = web::Reference::new("addin", "1.0", web::Store::Omex).unwrap();
+    let add_in = web::AddIn::new("addin-instance", reference)
+        .unwrap()
+        .bind(web::Binding::new("binding", "matrix", "app-ref").unwrap())
+        .unwrap();
+    let mut metadata = web::CustomFunctions::new();
+    metadata.set_contains_custom_functions(Some(web::ContainsCustomFunctions::new(Some(true))));
+    metadata.set_background_app_data(Some(web::BackgroundAppData::new(3, "runtime-3").unwrap()));
+    let mut ids = web::CustomFunctionList::new();
+    ids.push_id("CONTOSO.ADDIN.FUNCTION").unwrap();
+    metadata.set_custom_function_list(Some(ids));
+    let mut add_in = add_in;
+    add_in.set_custom_functions(Some(metadata.clone())).unwrap();
+    let mut panes = web::Panes::new();
+    panes.push(web::Pane::new(add_in)).unwrap();
+
+    let mut package = Package::new().unwrap();
+    package
+        .put_task_panes(panes, web::Conformance::Transitional)
+        .unwrap();
+    package.save(file.path()).unwrap();
+
+    let reopened = Package::open(file.path()).unwrap();
+    let loaded = reopened.task_panes().unwrap().unwrap();
+    assert_eq!(
+        loaded.get(0usize).unwrap().add_in().custom_functions(),
+        Some(&metadata)
+    );
+}
+
+#[test]
 fn writes_and_rediscovers_distinct_watermarks() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
     let mut package = Package::new().unwrap();
@@ -1131,4 +1221,96 @@ fn writes_and_discovers_typed_index_fields() {
         Some("TopicRange")
     );
     assert!(entries[0].is_bold());
+}
+
+#[test]
+fn document_revision_queries_cover_final_sections_grids_and_numbering_after_reopen() {
+    use crate::revision::{Limits, RevisionType};
+    let source_file = NamedTempFile::with_suffix(".docx").unwrap();
+    let saved_file = NamedTempFile::with_suffix(".docx").unwrap();
+    let mut package = Package::new().unwrap();
+    let uri = PackURI::new("/word/document.xml").unwrap();
+    let xml = format!(
+        r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:d="{}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unknown" mc:Ignorable="d x"><w:body><w:p><w:pPr><w:numPr><w:numberingChange w:id="1" w:author="A" w:original="&lt;%1:0:1:.&gt;" d:dateUtc="2026-09-08T00:00:00Z"/></w:numPr></w:pPr></w:p><w:tbl><w:tblPr/><w:tblGrid><w:tblGridChange w:id="2"><w:tblGrid><w:gridCol w:w="100"/></w:tblGrid></w:tblGridChange></w:tblGrid><w:tr><w:tblPrEx><w:tblPrExChange w:id="3" w:author="B"><w:tblPrEx/></w:tblPrExChange></w:tblPrEx><w:tc><w:p/></w:tc></w:tr></w:tbl><x:opaque vendor="a>b">  kept  </x:opaque><w:sectPr><w:sectPrChange w:id="4" w:author="C" d:dateUtc="2026-09-08T00:00:00Z"><w:sectPr/></w:sectPrChange></w:sectPr></w:body></w:document>"#,
+        crate::revision::WORD_2023_DATE_UTC_NAMESPACE
+    );
+    package
+        .opc
+        .get_part_mut(&uri)
+        .unwrap()
+        .set_blob(xml.as_bytes().to_vec());
+    package.save(source_file.path()).unwrap();
+    let mut reopened = Package::open(source_file.path()).unwrap();
+    let document = reopened.document().unwrap();
+    let records = document.revisions().unwrap();
+    assert_eq!(
+        records
+            .iter()
+            .map(|r| r.revision_type())
+            .collect::<Vec<_>>(),
+        [
+            RevisionType::NumberingChange,
+            RevisionType::TableGridChange,
+            RevisionType::TablePropertyExceptionsChange,
+            RevisionType::SectionPropertiesChange,
+        ]
+    );
+    assert_eq!(records[0].original_numbering(), Some("<%1:0:1:.>"));
+    assert_eq!(records[1].author(), None);
+    assert_eq!(records[3].date_utc(), Some("2026-09-08T00:00:00Z"));
+    let limits = Limits {
+        max_revisions: 3,
+        ..Limits::default()
+    };
+    assert!(matches!(
+        document.revisions_with_limits(limits),
+        Err(Error::RevisionLimit {
+            resource: "records",
+            ..
+        })
+    ));
+    let paragraphs = document.paragraphs().unwrap();
+    assert_eq!(
+        paragraphs
+            .iter()
+            .map(|p| p.revisions().unwrap().len())
+            .sum::<usize>(),
+        1
+    );
+    let pinned = crate::source_backed::Package::open(source_file.path()).unwrap();
+    let pinned_document = pinned.document().unwrap();
+    let pinned_records = pinned_document.revisions().unwrap();
+    assert_eq!(
+        pinned_records
+            .iter()
+            .map(|r| (
+                r.revision_type(),
+                r.id(),
+                r.author(),
+                r.original_numbering(),
+                r.date_utc()
+            ))
+            .collect::<Vec<_>>(),
+        records
+            .iter()
+            .map(|r| (
+                r.revision_type(),
+                r.id(),
+                r.author(),
+                r.original_numbering(),
+                r.date_utc()
+            ))
+            .collect::<Vec<_>>()
+    );
+    assert!(matches!(
+        pinned_document.revisions_with_limits(limits),
+        Err(Error::RevisionLimit {
+            resource: "records",
+            ..
+        })
+    ));
+    reopened.save(saved_file.path()).unwrap();
+    let saved = Package::open(saved_file.path()).unwrap();
+    assert_eq!(saved.opc.get_part(&uri).unwrap().blob(), xml.as_bytes());
+    assert_eq!(saved.document().unwrap().revisions().unwrap().len(), 4);
 }

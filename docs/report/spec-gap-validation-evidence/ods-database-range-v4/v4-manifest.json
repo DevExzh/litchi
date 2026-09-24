@@ -1,0 +1,284 @@
+{
+  "artifact": "litchi-ods-database-range-validation-v4",
+  "created_utc": "2026-09-10",
+  "worktree": "/var/tmp/litchi-ods-database-range-validation-v4-20260910",
+  "base_commit": "1230d85f75f8e87ed7c6242aec22021bb5d7ae82",
+  "v2_reference": {
+    "worktree": "/var/tmp/litchi-ods-database-range-validation-v2-20260910",
+    "manifest": "/var/tmp/litchi-ods-database-range-validation-v2-20260910-manifest.json",
+    "manifest_sha256": "60c7c15f1bf6d24dd93a07cac1e47ea187d9b04e4f47b8aecbdb7e695a9dbc7e"
+  },
+  "spec_inputs": {
+    "schema_rng": {
+      "path": "/var/tmp/odf14-spec-v3/schema.rng",
+      "bytes": 610092,
+      "sha256": "4034ec6be29205d5fc1ee5f42468ac6ef824287b3aba6d9289032af4fafbda7f"
+    },
+    "source_zip": {
+      "path": "/home/zhuhe/code/litchi-spec-gaps/3rdparty/specs/OpenDocument-v1.4-os.zip",
+      "bytes": 8130448,
+      "sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4"
+    }
+  },
+  "scope": [
+    "V3 database-range feature candidate plus expanded-name owner parent grammar",
+    "known table elements in unsupported parents become opaque before typed rewrites",
+    "exact no-op preservation and changed-edit refusal for representationally unsafe contexts",
+    "systematic known-parent regressions covering every owned table element family"
+  ],
+  "v3_delta_paths": [
+    "crates/litchi-ods/src/database_range/codec.rs",
+    "crates/litchi-ods/src/database_range/tests.rs",
+    "crates/litchi-ods/src/database_range/validation.rs"
+  ],
+  "files": [
+    {
+      "path": "crates/litchi-ods/docs/FEATURE_MATRIX.md",
+      "bytes": 22702,
+      "sha256": "b7d8cf9e95ddba3a4cb0c1233f3ceb8cd492dc7b880a1aa02ff9942637c6c874",
+      "v2_sha256": "b7d8cf9e95ddba3a4cb0c1233f3ceb8cd492dc7b880a1aa02ff9942637c6c874",
+      "changed_from_v2": false,
+      "v3_sha256": "b7d8cf9e95ddba3a4cb0c1233f3ceb8cd492dc7b880a1aa02ff9942637c6c874",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/authoring/builder.rs",
+      "bytes": 34272,
+      "sha256": "c54fe7b4537e77cac0f6292ee7eb4991e95377af42abd2fdf1fbc53b4ccee52f",
+      "v2_sha256": "c54fe7b4537e77cac0f6292ee7eb4991e95377af42abd2fdf1fbc53b4ccee52f",
+      "changed_from_v2": false,
+      "v3_sha256": "c54fe7b4537e77cac0f6292ee7eb4991e95377af42abd2fdf1fbc53b4ccee52f",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/authoring/mutable.rs",
+      "bytes": 25875,
+      "sha256": "d784a4ff56148235faaaca304963464e43a2fb3fc007da04d2aa85d23d2a93fa",
+      "v2_sha256": "d784a4ff56148235faaaca304963464e43a2fb3fc007da04d2aa85d23d2a93fa",
+      "changed_from_v2": false,
+      "v3_sha256": "d784a4ff56148235faaaca304963464e43a2fb3fc007da04d2aa85d23d2a93fa",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/codec.rs",
+      "bytes": 27843,
+      "sha256": "0b3a26d76486c735143e9c8258f06573ac9c7aa788e449ea415218872d351b23",
+      "v2_sha256": "1a76eeea63c478425565cf69bd4f3bbe3ad2839285bbde42de961d2bbd3e4537",
+      "changed_from_v2": true,
+      "v3_sha256": "e86c408058c0da787f5cb07f09fdf7317d89a96d383a7d18808cfcaf82c430d7",
+      "changed_from_v3": true
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/content.rs",
+      "bytes": 5580,
+      "sha256": "38bdf39a629598edcc4c43c8d912e28d9f80084ccbd194513086e7b389debee2",
+      "v2_sha256": "38bdf39a629598edcc4c43c8d912e28d9f80084ccbd194513086e7b389debee2",
+      "changed_from_v2": false,
+      "v3_sha256": "38bdf39a629598edcc4c43c8d912e28d9f80084ccbd194513086e7b389debee2",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/mod.rs",
+      "bytes": 2716,
+      "sha256": "1c568e148f84d19f4ef25b840bf0bad4343fd11f7927609be1606cee63cb03df",
+      "v2_sha256": "1c568e148f84d19f4ef25b840bf0bad4343fd11f7927609be1606cee63cb03df",
+      "changed_from_v2": false,
+      "v3_sha256": "1c568e148f84d19f4ef25b840bf0bad4343fd11f7927609be1606cee63cb03df",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/model.rs",
+      "bytes": 4337,
+      "sha256": "c1e241e84f5fcf9f13d12fead6dc342171a319ff2ef9120d086403720697538c",
+      "v2_sha256": "c1e241e84f5fcf9f13d12fead6dc342171a319ff2ef9120d086403720697538c",
+      "changed_from_v2": false,
+      "v3_sha256": "c1e241e84f5fcf9f13d12fead6dc342171a319ff2ef9120d086403720697538c",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/package.rs",
+      "bytes": 1017,
+      "sha256": "3f9d63c7eb1bcb54d7a583bdcb758411148f3a13079aa439ca8f4d1c7c5e82d9",
+      "v2_sha256": "3f9d63c7eb1bcb54d7a583bdcb758411148f3a13079aa439ca8f4d1c7c5e82d9",
+      "changed_from_v2": false,
+      "v3_sha256": "3f9d63c7eb1bcb54d7a583bdcb758411148f3a13079aa439ca8f4d1c7c5e82d9",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/snapshot.rs",
+      "bytes": 9667,
+      "sha256": "fb4b3e062291f44e79d6df8e466f38ff8f0f8929fab317b65d91c8c9a210a48d",
+      "v2_sha256": "fb4b3e062291f44e79d6df8e466f38ff8f0f8929fab317b65d91c8c9a210a48d",
+      "changed_from_v2": false,
+      "v3_sha256": "fb4b3e062291f44e79d6df8e466f38ff8f0f8929fab317b65d91c8c9a210a48d",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/tests.rs",
+      "bytes": 20617,
+      "sha256": "f8e6cb61b97cb57ac7621431b82cedfccf47d5444b204c5382fe3c5a9f42a3cf",
+      "v2_sha256": "c9f072b89a88fb4892189e378039568ac556fd4cfe640add4896f2313ca0f389",
+      "changed_from_v2": true,
+      "v3_sha256": "d8a14b8033e3447232bc8e8c6a1a6e79d8e647496ce27ddb743c88b1c719d0db",
+      "changed_from_v3": true
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/transaction.rs",
+      "bytes": 7448,
+      "sha256": "01584e0b4dd960a3ba598d625621fde2fac3e82cccb7292028917dc2e75adce0",
+      "v2_sha256": "01584e0b4dd960a3ba598d625621fde2fac3e82cccb7292028917dc2e75adce0",
+      "changed_from_v2": false,
+      "v3_sha256": "01584e0b4dd960a3ba598d625621fde2fac3e82cccb7292028917dc2e75adce0",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/database_range/validation.rs",
+      "bytes": 1620,
+      "sha256": "5197c42649a0254c22e07b26ff6b42f37e7d02b243eacc212c3eaa5e6940691f",
+      "v2_sha256": "faa745044d4cdd098b0a057812ad0600fb9a7e3a4af6a0ea4d11b16f003a4e94",
+      "changed_from_v2": false,
+      "v3_sha256": "faa745044d4cdd098b0a057812ad0600fb9a7e3a4af6a0ea4d11b16f003a4e94",
+      "changed_from_v3": true
+    },
+    {
+      "path": "crates/litchi-ods/src/facade/mod.rs",
+      "bytes": 58740,
+      "sha256": "2b2f82b91a6cb0504f5c35e754d4fbba4bea5b89f7a5177114e704256ee8d1ff",
+      "v2_sha256": "2b2f82b91a6cb0504f5c35e754d4fbba4bea5b89f7a5177114e704256ee8d1ff",
+      "changed_from_v2": false,
+      "v3_sha256": "2b2f82b91a6cb0504f5c35e754d4fbba4bea5b89f7a5177114e704256ee8d1ff",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/lib.rs",
+      "bytes": 3968,
+      "sha256": "4a34fe106458ccb8c22e2a27ca79919460efeda22631f08c80e0051d775dd0fa",
+      "v2_sha256": "4a34fe106458ccb8c22e2a27ca79919460efeda22631f08c80e0051d775dd0fa",
+      "changed_from_v2": false,
+      "v3_sha256": "4a34fe106458ccb8c22e2a27ca79919460efeda22631f08c80e0051d775dd0fa",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/model/data_pilot/codec/writer.rs",
+      "bytes": 10502,
+      "sha256": "a70820af8b70b1d43b2fbfb228ff396c2809d69377a69f024dd9896997225952",
+      "v2_sha256": "a70820af8b70b1d43b2fbfb228ff396c2809d69377a69f024dd9896997225952",
+      "changed_from_v2": false,
+      "v3_sha256": "a70820af8b70b1d43b2fbfb228ff396c2809d69377a69f024dd9896997225952",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/model/data_pilot/mod.rs",
+      "bytes": 2363,
+      "sha256": "7e8a6c023ee26ad5257c2a0be02d9d87bfbec639c2734ea38b8f7532d510235d",
+      "v2_sha256": "ea8d055104240af37b7661027fcdba86fe8ec1517e633d6885e40926016b36b8",
+      "changed_from_v2": true,
+      "v3_sha256": "7e8a6c023ee26ad5257c2a0be02d9d87bfbec639c2734ea38b8f7532d510235d",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/model/data_pilot/range.rs",
+      "bytes": 11277,
+      "sha256": "e807e89073af61908da0e7ac85da5893e3ea81c09158e533cc6e6132d5857b8f",
+      "v2_sha256": "b2e0cdd1305c8e039ed40cfdc408d4528f210fc466b16af2cb98864926a1a6d0",
+      "changed_from_v2": true,
+      "v3_sha256": "e807e89073af61908da0e7ac85da5893e3ea81c09158e533cc6e6132d5857b8f",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/model/database_range.rs",
+      "bytes": 822,
+      "sha256": "c850cbac64e3047a67c33c9b457ffa6c0923ae95242bdd9c21cec89d63a888ae",
+      "v2_sha256": "c850cbac64e3047a67c33c9b457ffa6c0923ae95242bdd9c21cec89d63a888ae",
+      "changed_from_v2": false,
+      "v3_sha256": "c850cbac64e3047a67c33c9b457ffa6c0923ae95242bdd9c21cec89d63a888ae",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/model/database_range/codec.rs",
+      "bytes": 62962,
+      "sha256": "ff5a799066d9fd55abcea2991ca2394582f5394674e1285b984f8ca63acd424b",
+      "v2_sha256": "4c02f1d796a9fe05bbb918e9d1e6096948ace49706c3f020f09384fc446c1371",
+      "changed_from_v2": true,
+      "v3_sha256": "ff5a799066d9fd55abcea2991ca2394582f5394674e1285b984f8ca63acd424b",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/model/database_range/semantic.rs",
+      "bytes": 8867,
+      "sha256": "c59eb6aa7814b701e47b614322f71afd232c92d10521ec73adcf320ec38fae5a",
+      "v2_sha256": "c59eb6aa7814b701e47b614322f71afd232c92d10521ec73adcf320ec38fae5a",
+      "changed_from_v2": false,
+      "v3_sha256": "c59eb6aa7814b701e47b614322f71afd232c92d10521ec73adcf320ec38fae5a",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/model/database_range/tests.rs",
+      "bytes": 11105,
+      "sha256": "f83df38299c03a8d8c13660ea34308315e017a28e7480337b2c3dc3b215ff7ee",
+      "v2_sha256": "8b78c6fbe870d84bd5fd4a02dac9ac11b58fd39d89ba77cffc0ef68f4c8a41a5",
+      "changed_from_v2": true,
+      "v3_sha256": "f83df38299c03a8d8c13660ea34308315e017a28e7480337b2c3dc3b215ff7ee",
+      "changed_from_v3": false
+    },
+    {
+      "path": "crates/litchi-ods/src/model/database_range/validation.rs",
+      "bytes": 20260,
+      "sha256": "750a20f0b2493fc8923711ec3b52148aa4ba3a2312e312d1911cf1773e6eb59b",
+      "v2_sha256": "f514dab433ae0ae77b106d03ac1170065575a5433a6a2151517351c0874458e0",
+      "changed_from_v2": true,
+      "v3_sha256": "750a20f0b2493fc8923711ec3b52148aa4ba3a2312e312d1911cf1773e6eb59b",
+      "changed_from_v3": false
+    }
+  ],
+  "validation": {
+    "cargo_test": {
+      "toolchain": "1.95.0",
+      "command": "CARGO_TARGET_DIR=/var/tmp/litchi-ods-database-range-validation-v4-target taskset -c 8-31 cargo test -p litchi-ods --all-features --no-fail-fast",
+      "status": "passed",
+      "library_tests": "249 passed, 0 failed",
+      "integration_and_doc_tests": "passed, 0 failed",
+      "log": "/var/tmp/litchi-ods-database-range-validation-v4-tests.log",
+      "log_bytes": 52148,
+      "log_sha256": "59fec7dc5d2a93dd3a515a87af03f09bbfe9a97dda98c4d06b3b8abb1bdb0079"
+    },
+    "clippy": {
+      "toolchain": "1.98.1",
+      "command": "CARGO_TARGET_DIR=/var/tmp/litchi-ods-database-range-validation-v4-target taskset -c 8-31 cargo clippy -p litchi-ods --all-targets --all-features -- -D warnings",
+      "status": "passed",
+      "log": "/var/tmp/litchi-ods-database-range-validation-v4-clippy.log",
+      "log_bytes": 4734,
+      "log_sha256": "861d3e03a01002a4abe4dfc070b7f0eac1e01c1d3a56b831b4397002e39c1171"
+    },
+    "rustdoc": {
+      "toolchain": "1.98.1",
+      "command": "CARGO_TARGET_DIR=/var/tmp/litchi-ods-database-range-validation-v4-target RUSTDOCFLAGS='-D warnings' taskset -c 8-31 cargo doc -p litchi-ods --all-features --no-deps",
+      "status": "passed",
+      "log": "/var/tmp/litchi-ods-database-range-validation-v4-rustdoc-strict.log",
+      "log_bytes": 276,
+      "log_sha256": "6e89f257313e940e29a618c61e96771e7a011765ece3db6ca48fc20a59174c49"
+    },
+    "rustfmt_owned_paths": {
+      "toolchain": "1.98.1",
+      "command": "rustfmt --edition 2024 --check on all V4-owned Rust paths",
+      "status": "passed"
+    },
+    "git_diff_check": "passed"
+  },
+  "repository_state": {
+    "staged_changes": false,
+    "committed_changes": false,
+    "primary_worktree_mutated": false,
+    "frozen_v3_unchanged": true
+  },
+  "v3_reference": {
+    "worktree": "/var/tmp/litchi-ods-database-range-validation-v3-20260910",
+    "manifest": "/var/tmp/litchi-ods-database-range-validation-v3-20260910-manifest.json",
+    "manifest_sha256": "4088c370021e9abace4d96d43cc7f7e06d4af680c7551db1a0764528b1d6ee39"
+  },
+  "delta_patch": {
+    "path": "/var/tmp/litchi-ods-database-range-validation-v4-20260910-v3-delta.patch",
+    "bytes": 13666,
+    "sha256": "d894d662d3394158a28ae8656bba85987e6378d9e6f9f5c85f66c00e62ddc2a9"
+  }
+}

@@ -15,6 +15,9 @@ impl Editor {
     /// Publishes the source-backed DOC/ObjectPool edit with the default OLE2
     /// sector-layout reuse policy carried by the common object editor.
     pub fn finish(self) -> Result<Vec<u8>> {
+        if self.changed {
+            self.protection_policy.authorize(self.protection)?;
+        }
         self.package.finish().map_err(PackageError::from)
     }
 

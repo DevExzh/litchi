@@ -1,0 +1,10 @@
+{
+  "removed": [
+    "/tmp/litchi-ods-text-gates-qga93bo_",
+    "/tmp/litchi-ods-text-gate-target-4n153dnh",
+    "/tmp/litchi-text-root-verification.json",
+    "docs/report/spec-gap-validation-evidence/ods-formula-text-functions/__pycache__",
+    "docs/report/spec-gap-validation-evidence/ods-formula-text-functions/performance/__pycache__"
+  ],
+  "all_absent": true
+}

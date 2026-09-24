@@ -1,0 +1,79 @@
+{
+  "source_hashes_match": true,
+  "gates_passed": 5,
+  "baseline_git_and_candidate_manifests_match": true,
+  "test_count": 783,
+  "test_targets": 46,
+  "isolated_formula_tests_passed": 37,
+  "csv_rows_verified_against_raw": {
+    "baseline/raw.csv": 23,
+    "candidate/raw.csv": 23,
+    "candidate/new-names.csv": 12
+  },
+  "comparable_inputs_and_outputs_match": true,
+  "candidate_lookup_allocations_zero": true,
+  "baseline_commit": "21ad9118367a7f154083ec337069896d63fb3a92",
+  "final_source_hashes": {
+    "crates/litchi-ods/src/codec/formula.rs": "0c3108e95e4b5fd92e616917171ebd840f26e103a2076e27592a9a330f2bd647",
+    "crates/litchi-ods/src/codec/formula/functions.rs": "1d736271e9f9cf3743295f8895f184e32842640eaba48084dfafc9ca7333e2a1",
+    "crates/litchi-ods/tests/ods_formula_functions.rs": "0699ad88e3eb17f07c98f57178b4eea68d6cc39ec88d026fc80222efe63a1947"
+  },
+  "catalog_verification": {
+    "standard_names": 393,
+    "previous_names": 161,
+    "new_names": 232,
+    "all_previous_names_retained": true,
+    "independent_lxml_heading_set_matches": true,
+    "stdlib_extractor_replay_byte_identical": true,
+    "production_catalog_matches_normative_set": true,
+    "test_golden_catalog_matches_normative_set": true,
+    "maximum_canonical_name_bytes": 19,
+    "all_section_anchors_exist": true,
+    "spec_zip_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+    "part4_html_sha256": "ace07938ef54303b57af8472e0b66b289fc6946c32390fc23b8e13fdeeb5ffa1",
+    "normative_tsv_sha256": "a4fa63d7b25db5e380f75097345d4d4132f796502937ef597973db44c43055b3"
+  },
+  "scoped_patch_replay": {
+    "baseline_commit": "21ad9118367a7f154083ec337069896d63fb3a92",
+    "patch_sha256": "d901ec22cdaa0df73eff112563ec0c9729977ee587a195aa94bf6dbfdb0d4680",
+    "patch_context": "zero; apply with --unidiff-zero",
+    "git_apply_check": true,
+    "git_apply": true,
+    "replayed_sources_match_final_gates": true,
+    "source_hashes": {
+      "crates/litchi-ods/src/codec/formula.rs": "0c3108e95e4b5fd92e616917171ebd840f26e103a2076e27592a9a330f2bd647",
+      "crates/litchi-ods/src/codec/formula/functions.rs": "1d736271e9f9cf3743295f8895f184e32842640eaba48084dfafc9ca7333e2a1",
+      "crates/litchi-ods/tests/ods_formula_functions.rs": "0699ad88e3eb17f07c98f57178b4eea68d6cc39ec88d026fc80222efe63a1947"
+    }
+  },
+  "binaries_verified_before_cleanup": {
+    "baseline": "96c6e5fe1827e1a74b63701faca3ff5a65bacf50a27eebc294ec34fa3d623bbb",
+    "candidate": "4081441dffd3b77d92e44ddf76febc7449aefd052e70a8f739f025cdcb5602b4"
+  },
+  "isolated_worktree_status_before_cleanup": {
+    "baseline": "?? docs/report/spec-gap-validation-evidence/ods-formula-functions/\n",
+    "candidate": " M crates/litchi-ods/src/codec/formula.rs\n?? crates/litchi-ods/src/codec/formula/\n?? crates/litchi-ods/tests/ods_formula_functions.rs\n?? docs/report/spec-gap-validation-evidence/ods-formula-functions/\n"
+  },
+  "performance_scope": "Instrumented lexical lookup/parser microbenchmarks, no end-to-end Office or evaluation claim",
+  "broader_goal_complete": false,
+  "cleanup": {
+    "owned_paths_removed_and_absent": [
+      "/var/tmp/ods-formula-baseline-21ad",
+      "/var/tmp/ods-formula-candidate-21ad",
+      "/var/tmp/ods-formula-baseline-target",
+      "/var/tmp/ods-formula-candidate-target",
+      "/var/tmp/ods-formula-candidate-test-target",
+      "/var/tmp/litchi-ods-formula-root-target",
+      "/var/tmp/litchi-ods-formula-root-tmp",
+      "/var/tmp/ods-formula-candidate-add.log"
+    ],
+    "unrelated_worktrees_and_changes_preserved": true
+  },
+  "root_gate_environment": {
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-ods-formula-root-target",
+    "TMPDIR": "/var/tmp/litchi-ods-formula-root-tmp",
+    "RUSTDOCFLAGS_for_rustdoc_and_doctests": "-D warnings",
+    "offline": true,
+    "locked": true
+  }
+}

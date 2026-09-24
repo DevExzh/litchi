@@ -4,7 +4,9 @@ use super::super::super::axis::{self, Axis};
 use super::super::super::cache as chart_cache;
 use super::super::super::format::{self, Format};
 use super::super::super::layout;
-use super::super::super::model::{Cache, Chart, DataKind, Family, Group, Owner};
+use super::super::super::model::{
+    Cache, Chart, DataKind, Family, Group, Link, Owner, Role, RowCol, Source,
+};
 use super::super::super::{
     BOF, BOF_BYTES, EOF, EXCEL_DOC_TYPE, EXCEL_VERSION, GRAPH_DOC_TYPE, GRAPH_VERSION,
     Kind as ChartKind,
@@ -14,12 +16,13 @@ use super::links;
 use super::text::short_text;
 use super::validate;
 use super::wire::{
-    AREA, AREA_FORMAT, AXES_USED, AXIS, AXIS_LINE, AXIS_PARENT, BAR, BEGIN, BRAI, CHART_FORMAT,
-    CHART_REC, CRT_LINE, CRT_LINK, DATA_FORMAT, DIMENSIONS, DROP_BAR, END, LEGEND, LINE,
-    LINE_FORMAT, MARKER_FORMAT, PIE, PIE_FORMAT, PLOT_AREA, PLOT_GROWTH, POS, RADAR, RADAR_AREA,
-    SCATTER, SCL, SER_AUX_ERR_BAR, SER_AUX_TREND, SER_TO_CRT, SERIES, SERIES_TEXT, SHT_PROPS,
-    SI_INDEX, SURFACE, TICK, VALUE_RANGE, push_record, put_byte, put_f64, put_i16, put_i32,
-    put_slice, put_u16, put_u32,
+    AREA, AREA_FORMAT, AXC_EXT, AXES_USED, AXIS, AXIS_LINE, AXIS_PARENT, BAR, BEGIN, BOF_DATASHEET,
+    BRAI, CHART_FORMAT, CHART_REC, COUNTRY, CRT_LINE, CRT_LINK, DATA_FORMAT, DIMENSIONS, DROP_BAR,
+    END, EXCLUDE_COLUMNS, EXCLUDE_ROWS, FONT_X, LEGEND, LINE, LINE_FORMAT, MAIN_WINDOW,
+    MARKER_FORMAT, MAX_STATUS, OBJECT_LINK, ORIENT, PIE, PIE_FORMAT, PLOT_AREA, PLOT_GROWTH, POS,
+    RADAR, RADAR_AREA, SCATTER, SCL, SELECTION, SER_AUX_ERR_BAR, SER_AUX_TREND, SER_TO_CRT, SERIES,
+    SERIES_TEXT, SHT_PROPS, SI_INDEX, SURFACE, TEXT, TICK, UNITS, VALUE_RANGE, WIN_DOC, WINDOW1,
+    WINDOW2_GRAPH, push_record, put_byte, put_f64, put_i16, put_i32, put_slice, put_u16, put_u32,
 };
 use crate::{Error, Limits, Result};
 use litchi_biff::Encoder;
@@ -36,8 +39,76 @@ pub(crate) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
         });
     }
     validate::validate(chart, limits, true)?;
+    if chart.graph_authoring_profile {
+        // The typed model retains the title's attached-label payload as
+        // opaque inner records on semantic reopen. Charge that retained
+        // metadata before BIFF output so a package admitted under a small
+        // unknown-byte ceiling cannot fail only on its later readback.
+        if let Some(title) = &chart.title {
+            let units = title.encode_utf16().count();
+            let width = if title.encode_utf16().any(|value| value > u16::from(u8::MAX)) {
+                2
+            } else {
+                1
+            };
+            let title_payload = 4usize
+                .checked_add(units.checked_mul(width).ok_or(Error::SizeOverflow {
+                    resource: "Graph title retained metadata",
+                })?)
+                .ok_or(Error::SizeOverflow {
+                    resource: "Graph title retained metadata",
+                })?;
+            let retained = 20usize
+                .checked_add(8)
+                .and_then(|value| value.checked_add(6))
+                .and_then(|value| value.checked_add(title_payload))
+                .ok_or(Error::SizeOverflow {
+                    resource: "Graph title retained metadata",
+                })?;
+            if retained > limits.max_unknown_bytes {
+                return Err(Error::LimitExceeded {
+                    resource: "unknown chart bytes",
+                    observed: crate::limits::as_u64(retained),
+                    maximum: crate::limits::as_u64(limits.max_unknown_bytes),
+                });
+            }
+        }
+    }
     let mut out = Encoder::with_limits(limits.biff)?;
     push_record(&mut out, BOF, &bof(chart.context.kind()))?;
+    if chart.graph_authoring_profile {
+        // CHARTSHEETCONTENT requires a complete DATASHEET before the optional
+        // OBJECTS collection and the chart-format collection. The public
+        // profile lays out each series in a datasheet row; the non-scatter
+        // families require both axis-selector fields to be zero, and the
+        // final Orient byte is the reserved value required by MS-OGRAPH.
+        push_record(&mut out, BOF_DATASHEET, &[0; 4])?;
+        push_record(&mut out, BEGIN, &[])?;
+        push_record(&mut out, COUNTRY, &[0; 4])?;
+        push_record(&mut out, FONT_X, &[0; 2])?;
+        push_record(&mut out, EXCLUDE_ROWS, &[])?;
+        push_record(&mut out, EXCLUDE_COLUMNS, &[])?;
+        push_record(&mut out, ORIENT, &[1, 0, 0, 0, 0, 1])?;
+        for value in &chart.caches {
+            cache::encode_cache(&mut out, value)?;
+        }
+        push_record(&mut out, WIN_DOC, &[1])?;
+        push_record(&mut out, MAIN_WINDOW, &[1, 0, 1, 0])?;
+        push_record(&mut out, WINDOW1, &[0, 0, 1, 0, 1, 0, 0, 0, 0, 0])?;
+        push_record(
+            &mut out,
+            WINDOW2_GRAPH,
+            &[1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0],
+        )?;
+        push_record(&mut out, MAX_STATUS, &[0, 0])?;
+        push_record(
+            &mut out,
+            SELECTION,
+            &[3, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+        )?;
+        push_record(&mut out, END, &[])?;
+        push_record(&mut out, UNITS, &[0, 0])?;
+    }
 
     let mut rect = [0u8; 16];
     rect.get_mut(0..4)
@@ -132,13 +203,13 @@ pub(crate) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
     push_record(&mut out, BEGIN, &[])?;
     encode_pos(&mut out, parent.pos())?;
     for axis in &chart.axes {
-        encode_axis(&mut out, axis)?;
-    }
-    for group in &chart.groups {
-        encode_group(&mut out, group)?;
+        encode_axis(&mut out, axis, chart.graph_authoring_profile)?;
     }
     if chart.props.plot_area {
         push_record(&mut out, PLOT_AREA, &[])?;
+    }
+    for group in &chart.groups {
+        encode_group(&mut out, group)?;
     }
     if let Some(legend) = chart.legend {
         let mut data = [0u8; 20];
@@ -151,9 +222,6 @@ pub(crate) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
         put_u16(&mut data, 18, legend.flags)?;
         push_record(&mut out, LEGEND, &data)?;
     }
-    if let Some(title) = &chart.title {
-        push_record(&mut out, SERIES_TEXT, &short_text(title)?)?;
-    }
     for value in &chart.formats {
         encode_format(&mut out, value)?;
     }
@@ -162,6 +230,12 @@ pub(crate) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
     }
 
     push_record(&mut out, END, &[])?;
+    // ATTACHEDLABEL is a chart-level member of CHARTFOMATS and follows the
+    // complete AxisParent collection. Keeping it outside AxisParent is
+    // required for Graph readers to associate the label with the chart.
+    if let Some(title) = &chart.title {
+        encode_title(&mut out, title, chart.context, limits)?;
+    }
     push_record(&mut out, END, &[])?;
     encode_dimensions(&mut out, chart.dimensions)?;
     match chart.context.kind() {
@@ -176,8 +250,10 @@ pub(crate) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
             }
         },
         ChartKind::Graph => {
-            for value in &chart.caches {
-                cache::encode_cache(&mut out, value)?;
+            if !chart.graph_authoring_profile {
+                for value in &chart.caches {
+                    cache::encode_cache(&mut out, value)?;
+                }
             }
         },
     }
@@ -194,6 +270,34 @@ fn encode_pos(out: &mut Encoder, pos: layout::Pos) -> Result<()> {
     put_i16(&mut data, 12, pos.width())?;
     put_i16(&mut data, 16, pos.height())?;
     push_record(out, POS, &data)
+}
+
+fn encode_title(
+    out: &mut Encoder,
+    title: &str,
+    context: super::super::super::model::Context,
+    limits: Limits,
+) -> Result<()> {
+    // ATTACHEDLABEL = Text Begin Pos [FontX] [AlRuns] AI [Frame]
+    // [ObjectLink] [DataLabExtContents] End. The title profile deliberately
+    // emits only the required Text, Pos, AI, SeriesText, and ObjectLink
+    // members; all optional formatting records remain outside authoring.
+    let mut data = [0u8; 32];
+    put_byte(&mut data, 0, 2)?; // centered horizontal alignment
+    put_byte(&mut data, 1, 2)?; // centered vertical alignment
+    put_u16(&mut data, 2, 1)?; // transparent background
+    // rgbText, x/y/dx/dy remain zero; Pos supplies the attached-label mode.
+    put_u16(&mut data, 24, 0x00B1)?; // auto color/text/generated/mode
+    put_u16(&mut data, 26, 0x004D)?; // automatic text color index
+    push_record(out, TEXT, &data)?;
+    push_record(out, BEGIN, &[])?;
+    encode_pos(out, layout::Pos::default())?;
+    let link = Link::graph(Role::Name, Source::Literal, RowCol::ZERO);
+    push_record(out, BRAI, &links::encode_link(&link, context, limits)?)?;
+    push_record(out, SERIES_TEXT, &short_text(title)?)?;
+    // Entire chart (wLinkObj=0x0001); both variables are required to be zero.
+    push_record(out, OBJECT_LINK, &[1, 0, 0, 0, 0, 0])?;
+    push_record(out, END, &[])
 }
 
 fn encode_dimensions(out: &mut Encoder, dimensions: chart_cache::Dims) -> Result<()> {
@@ -236,7 +340,7 @@ fn bof(kind: ChartKind) -> [u8; BOF_BYTES] {
     data
 }
 
-fn encode_axis(out: &mut Encoder, axis: &Axis) -> Result<()> {
+fn encode_axis(out: &mut Encoder, axis: &Axis, graph_profile: bool) -> Result<()> {
     let mut body = [0u8; 18];
     put_u16(
         &mut body,
@@ -249,6 +353,12 @@ fn encode_axis(out: &mut Encoder, axis: &Axis) -> Result<()> {
     )?;
     push_record(out, AXIS, &body)?;
     push_record(out, BEGIN, &[])?;
+    if graph_profile && axis.kind == axis::Kind::Category {
+        // A category axis is an IVAXIS and therefore owns AxcExt. Zero makes
+        // this an ordinary (non-date) category axis; all date-only fields
+        // are ignored by the grammar in that mode.
+        push_record(out, AXC_EXT, &[0; 18])?;
+    }
     if let Some(scale) = axis.scale {
         let mut data = [0u8; 42];
         put_f64(&mut data, 0, scale.min)?;

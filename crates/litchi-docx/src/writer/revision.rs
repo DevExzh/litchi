@@ -22,10 +22,14 @@ use super::hyperlink::MutableHyperlink;
 use super::paragraph::{MutableParagraph, ParagraphElement, ParagraphProperties};
 use super::run::{MutableRun, RunProperties};
 use crate::error::{Error, Result};
+use crate::revision::WORD_2023_DATE_UTC_NAMESPACE;
 use crate::revision::conflict::Metadata as ConflictMetadata;
 use chrono::DateTime;
 use litchi_core::xml::escape_xml;
+use litchi_ooxml_common::properties::time::DateTime as XmlDateTime;
 use std::fmt::Write as _;
+
+const MAX_REVISION_DATE_UTC_BYTES: usize = 128;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RevisionKind {
@@ -68,22 +72,6 @@ const fn conflict_text_mode(kind: ConflictKind) -> RevisionTextMode {
     match kind {
         ConflictKind::Insert => RevisionTextMode::Normal,
         ConflictKind::Delete => RevisionTextMode::Deleted,
-    }
-}
-
-/// Whole-table insertion or deletion marker written in table properties.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TableRevisionKind {
-    Insert,
-    Delete,
-}
-
-impl TableRevisionKind {
-    pub(crate) fn element(self) -> &'static str {
-        match self {
-            Self::Insert => "tblIns",
-            Self::Delete => "tblDel",
-        }
     }
 }
 
@@ -163,6 +151,7 @@ pub struct RevisionMetadata {
     id: u32,
     author: String,
     date: Option<String>,
+    date_utc: Option<String>,
     user_id: Option<String>,
 }
 
@@ -187,6 +176,7 @@ impl RevisionMetadata {
             id,
             author,
             date: None,
+            date_utc: None,
             user_id: None,
         })
     }
@@ -201,6 +191,10 @@ impl RevisionMetadata {
     #[must_use]
     pub fn date(&self) -> Option<&str> {
         self.date.as_deref()
+    }
+    #[must_use]
+    pub fn date_utc(&self) -> Option<&str> {
+        self.date_utc.as_deref()
     }
     #[must_use]
     pub fn user_id(&self) -> Option<&str> {
@@ -219,6 +213,20 @@ impl RevisionMetadata {
             })?;
         }
         self.date = candidate;
+        Ok(self)
+    }
+    /// Sets the Word 2023 UTC timestamp while retaining its supplied lexical form.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the value is not a bounded ASCII `xsd:dateTime`
+    /// whose timezone is UTC.
+    pub fn set_date_utc(&mut self, date_utc: Option<impl Into<String>>) -> Result<&mut Self> {
+        let candidate = date_utc.map(Into::into);
+        if let Some(value) = &candidate {
+            validate_revision_date_utc(value)?;
+        }
+        self.date_utc = candidate;
         Ok(self)
     }
     ///
@@ -243,11 +251,56 @@ impl RevisionMetadata {
         if let Some(date) = &self.date {
             write!(xml, " w:date=\"{}\"", escape_xml(date))?;
         }
+        if let Some(date_utc) = &self.date_utc {
+            write!(
+                xml,
+                " xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" mc:Ignorable=\"w16du\" xmlns:w16du=\"{}\" w16du:dateUtc=\"{}\"",
+                WORD_2023_DATE_UTC_NAMESPACE,
+                escape_xml(date_utc)
+            )?;
+        }
         if let Some(user_id) = &self.user_id {
             write!(xml, " w:userId=\"{}\"", escape_xml(user_id))?;
         }
         Ok(())
     }
+}
+
+fn validate_revision_date_utc(value: &str) -> Result<()> {
+    if value.len() > MAX_REVISION_DATE_UTC_BYTES || !value.is_ascii() {
+        return Err(Error::InvalidFormat(
+            "revision dateUtc must be a bounded ASCII UTC dateTime".into(),
+        ));
+    }
+    XmlDateTime::new(value.to_owned()).map_err(|_source_error| {
+        Error::InvalidFormat("revision dateUtc must be a valid xsd:dateTime".into())
+    })?;
+    let normalized = collapse_xml_whitespace(value);
+    if normalized.ends_with('Z') || normalized.ends_with("+00:00") || normalized.ends_with("-00:00")
+    {
+        Ok(())
+    } else {
+        Err(Error::InvalidFormat(
+            "revision dateUtc must use a UTC timezone".into(),
+        ))
+    }
+}
+
+fn collapse_xml_whitespace(value: &str) -> String {
+    let mut output = String::with_capacity(value.len());
+    let mut pending_space = false;
+    for character in value.chars() {
+        if matches!(character, '\u{9}' | '\u{A}' | '\u{D}' | ' ') {
+            pending_space = true;
+        } else {
+            if pending_space && !output.is_empty() {
+                output.push(' ');
+            }
+            output.push(character);
+            pending_space = false;
+        }
+    }
+    output
 }
 
 fn validate_nonempty_xml(label: &str, value: &str) -> Result<()> {
@@ -987,8 +1040,46 @@ mod tests {
         let mut m = RevisionMetadata::new("1", "a").unwrap();
         assert!(m.set_date(Some("bad")).is_err());
         assert_eq!(m.date(), None);
+        m.set_date_utc(Some("2026-07-19T10:30:00.123456+00:00"))
+            .unwrap();
+        assert!(m.set_date_utc(Some("2026-07-19T10:30:00+01:00")).is_err());
+        assert_eq!(m.date_utc(), Some("2026-07-19T10:30:00.123456+00:00"));
+        m.set_date_utc(Some(" 2026-07-19T10:30:00Z ")).unwrap();
+        assert_eq!(m.date_utc(), Some(" 2026-07-19T10:30:00Z "));
         assert!(m.set_user_id(Some("\u{1}")).is_err());
         assert_eq!(m.user_id(), None);
+    }
+
+    #[test]
+    fn writes_date_utc_with_bound_word_2023_namespace() {
+        let mut metadata = RevisionMetadata::new("1", "Alice").unwrap();
+        metadata
+            .set_date_utc(Some("2026-07-17T00:00:00.123456+00:00"))
+            .unwrap();
+        let mut paragraph = MutableParagraph::new();
+        paragraph
+            .add_revision(RevisionKind::Insert, metadata)
+            .add_run_with_text("inserted");
+
+        let mut xml = String::new();
+        paragraph.to_xml(&mut xml).unwrap();
+        assert!(xml.contains(
+            "xmlns:w16du=\"http://schemas.microsoft.com/office/word/2023/wordml/word16du\""
+        ));
+        assert!(xml.contains("w16du:dateUtc=\"2026-07-17T00:00:00.123456+00:00\""));
+        assert!(xml.contains("mc:Ignorable=\"w16du\""));
+        assert!(
+            xml.contains(
+                "xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\""
+            )
+        );
+
+        let revisions = Paragraph::new(xml.into_bytes()).revisions().unwrap();
+        assert_eq!(revisions.len(), 1);
+        assert_eq!(
+            revisions[0].date_utc(),
+            Some("2026-07-17T00:00:00.123456+00:00")
+        );
     }
     #[test]
     fn deleted_fields_use_deleted_elements() {

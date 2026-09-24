@@ -1,0 +1,11 @@
+{
+  "source_basis": "../../candidate-07/receipt.json",
+  "archives": {
+    "build.tar.gz": "2d2a23bffe12c8a205d1ed6c22f445319e12abe6b6576e911bb24da455e6bda5",
+    "capture.tar.gz": "ecead0022cb9ea30a8c8a96be197f859a5de996a6237b4b1e87d1bc946f17915"
+  },
+  "cases": 29,
+  "children": 87,
+  "all_child_statuses_zero": true,
+  "performance_acceptance": "open; no common-value before/after comparison yet"
+}

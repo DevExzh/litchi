@@ -5,13 +5,14 @@ use super::{
     MAX_DECLARATIONS, MAX_DEPTH, MAX_GROUPS, MAX_NAME_BYTES, MAX_VALUE_BYTES, MAX_XML_BYTES,
     OFFICE, Part, STYLE, Scope, TEXT, Value, ValueType,
 };
+use crate::core::ResolvedReader;
 use crate::core::{AuthoredXmlFragment, OwnedPackage, XmlSourcePart, XmlSplicePublication};
 use crate::datatype::{Boolean, Date};
-use litchi_core::{Error, Result};
+use crate::generic::{ChargedXml, FlatMutationBudget, allocate_xml};
+use litchi_core::{Error, Resource, ResourceLimit, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
+use quick_xml::name::ResolveResult;
 use std::{
     collections::{HashMap, HashSet},
     ops::Range,
@@ -44,9 +45,32 @@ impl Group {
     /// Namespace declarations are emitted on the container so the fragment can
     /// be inserted into documents that use arbitrary prefixes for ODF names.
     pub fn to_xml(&self) -> Result<String> {
-        let xml = serialize_group_unchecked(self);
-        validate_serialized_group(self, &xml)?;
-        Ok(xml)
+        self.to_xml_with_limit(MAX_XML_BYTES)
+    }
+
+    /// Serialize this declaration container under a caller-supplied output limit.
+    pub(crate) fn to_xml_with_limit(&self, maximum: usize) -> Result<String> {
+        self.to_xml_with_limit_and_budget(maximum, None)
+            .map(ChargedXml::into_string)
+    }
+
+    pub(crate) fn to_xml_with_limit_and_budget(
+        &self,
+        maximum: usize,
+        budget: Option<&FlatMutationBudget>,
+    ) -> Result<ChargedXml> {
+        let output_len = group_output_len(self, budget)?;
+        bounded_output_len_with_limit(output_len, "variable declaration serialization", maximum)?;
+        let (mut xml, memory) =
+            allocate_xml(budget, output_len, "ODT variable declaration serialization")?;
+        serialize_group_into(&mut xml, self, budget)?;
+        debug_assert_eq!(xml.len(), output_len);
+        // The parser's synthetic document adds a fixed wrapper around the
+        // already charged fragment. Keep that validation scratch under the
+        // same caller-selected output ceiling as the emitted fragment and
+        // edited document below.
+        validate_serialized_group(self, &xml, maximum, budget)?;
+        Ok(ChargedXml { xml, memory })
     }
 }
 
@@ -56,21 +80,62 @@ impl Group {
 /// be validated together with the document's other XML parts before commit so
 /// cross-part field references remain valid.
 pub fn set_xml(xml: &str, group: &Group) -> Result<String> {
-    let replacement = group.to_xml()?;
-    let scan = scan_scope(xml, &group.scope)?;
+    set_xml_with_limit(xml, group, MAX_XML_BYTES)
+}
+
+/// Insert or replace one declaration container under an exact output limit.
+pub(crate) fn set_xml_with_limit(xml: &str, group: &Group, maximum: usize) -> Result<String> {
+    set_xml_with_limit_and_budget(xml, group, maximum, None).map(ChargedXml::into_string)
+}
+
+pub(crate) fn set_xml_with_limit_and_budget(
+    xml: &str,
+    group: &Group,
+    maximum: usize,
+    budget: Option<&FlatMutationBudget>,
+) -> Result<ChargedXml> {
+    let replacement = group.to_xml_with_limit_and_budget(maximum, budget)?;
+    let _scan_memory = budget
+        .map(|budget| {
+            super::package::parser_memory_plan(&[(xml, Part::Flat)], Some(budget)).and_then(
+                |amount| budget.reserve_bytes(amount, "ODT variable declaration scope scan"),
+            )
+        })
+        .transpose()?;
+    let scan = scan_scope_with_optional_budget(xml, &group.scope, budget)?;
     if let Some(parent) = scan.empty_parent.as_ref() {
-        return expand_empty_parent(xml, parent, &replacement);
+        return expand_empty_parent_with_limit_and_budget(
+            xml,
+            parent,
+            &replacement.xml,
+            maximum,
+            budget,
+        );
     }
     if let Some(existing) = scan
         .groups
         .iter()
         .find(|candidate| candidate.kind == group.kind)
     {
-        return replace_range(xml, existing.start, existing.end, &replacement);
+        return replace_range_with_limit_and_budget(
+            xml,
+            existing.start,
+            existing.end,
+            &replacement.xml,
+            maximum,
+            budget,
+        );
     }
 
     let insertion = group_insertion(&scan, group.kind);
-    replace_range(xml, insertion, insertion, &replacement)
+    replace_range_with_limit_and_budget(
+        xml,
+        insertion,
+        insertion,
+        &replacement.xml,
+        maximum,
+        budget,
+    )
 }
 
 pub(crate) fn splice_publication(
@@ -153,83 +218,146 @@ fn group_insertion(scan: &ScopeScan, kind: Kind) -> usize {
 
 /// Remove one declaration container from a structural scope.
 pub fn remove_xml(xml: &str, scope: &Scope, kind: Kind) -> Result<String> {
-    let scan = scan_scope(xml, scope)?;
+    remove_xml_with_limit(xml, scope, kind, MAX_XML_BYTES)
+}
+
+/// Remove one declaration container under an exact output limit.
+pub(crate) fn remove_xml_with_limit(
+    xml: &str,
+    scope: &Scope,
+    kind: Kind,
+    maximum: usize,
+) -> Result<String> {
+    remove_xml_with_limit_and_budget(xml, scope, kind, maximum, None).map(ChargedXml::into_string)
+}
+
+pub(crate) fn remove_xml_with_limit_and_budget(
+    xml: &str,
+    scope: &Scope,
+    kind: Kind,
+    maximum: usize,
+    budget: Option<&FlatMutationBudget>,
+) -> Result<ChargedXml> {
+    let _scan_memory = budget
+        .map(|budget| {
+            super::package::parser_memory_plan(&[(xml, Part::Flat)], Some(budget)).and_then(
+                |amount| budget.reserve_bytes(amount, "ODT variable declaration scope scan"),
+            )
+        })
+        .transpose()?;
+    let scan = scan_scope_with_optional_budget(xml, scope, budget)?;
     let existing = scan
         .groups
         .iter()
         .find(|candidate| candidate.kind == kind)
         .ok_or_else(|| invalid("variable declaration container was not found"))?;
-    replace_range(xml, existing.start, existing.end, "")
+    replace_range_with_limit_and_budget(xml, existing.start, existing.end, "", maximum, budget)
 }
 
-fn serialize_group_unchecked(group: &Group) -> String {
+fn serialize_group_into(
+    xml: &mut String,
+    group: &Group,
+    budget: Option<&FlatMutationBudget>,
+) -> Result<()> {
     let container = match group.kind {
         Kind::Simple => "variable-decls",
         Kind::User => "user-field-decls",
         Kind::Sequence => "sequence-decls",
     };
-    let mut xml = String::with_capacity(
-        group
-            .declarations
-            .iter()
-            .map(|declaration| declaration.name().len())
-            .sum::<usize>()
-            + group.declarations.len() * 96
-            + 192,
-    );
+    check_budget(budget)?;
     xml.push_str("<text:");
     xml.push_str(container);
-    push_attribute(&mut xml, "xmlns:text", TEXT);
-    push_attribute(&mut xml, "xmlns:office", OFFICE);
+    push_attribute(xml, "xmlns:text", TEXT, budget)?;
+    push_attribute(xml, "xmlns:office", OFFICE, budget)?;
     xml.push('>');
     for declaration in &group.declarations {
-        serialize_declaration(&mut xml, declaration);
+        if let Some(budget) = budget {
+            budget.consume_objects(1)?;
+        }
+        serialize_declaration(xml, declaration, budget)?;
     }
+    check_budget(budget)?;
     xml.push_str("</text:");
     xml.push_str(container);
     xml.push('>');
-    xml
+    Ok(())
 }
 
-fn serialize_declaration(xml: &mut String, declaration: &Declaration) {
-    xml.push_str("<text:");
-    xml.push_str(declaration_local(declaration.kind()));
-    push_attribute(xml, "text:name", declaration.name());
+fn group_output_len(group: &Group, budget: Option<&FlatMutationBudget>) -> Result<usize> {
+    let container = match group.kind {
+        Kind::Simple => "variable-decls",
+        Kind::User => "user-field-decls",
+        Kind::Sequence => "sequence-decls",
+    };
+    let mut length = 0usize;
+    add_len(&mut length, "<text:".len())?;
+    add_len(&mut length, container.len())?;
+    add_attribute_len(&mut length, "xmlns:text", TEXT, budget)?;
+    add_attribute_len(&mut length, "xmlns:office", OFFICE, budget)?;
+    add_len(&mut length, 1)?;
+    for declaration in &group.declarations {
+        check_budget(budget)?;
+        if let Some(budget) = budget {
+            budget.consume_objects(1)?;
+        }
+        declaration_output_len(&mut length, declaration, budget)?;
+    }
+    add_len(&mut length, "</text:".len())?;
+    add_len(&mut length, container.len())?;
+    add_len(&mut length, 1)?;
+    Ok(length)
+}
+
+fn declaration_output_len(
+    total: &mut usize,
+    declaration: &Declaration,
+    budget: Option<&FlatMutationBudget>,
+) -> Result<()> {
+    check_budget(budget)?;
+    add_len(total, "<text:".len())?;
+    add_len(total, declaration_local(declaration.kind()).len())?;
+    add_attribute_len(total, "text:name", declaration.name(), budget)?;
     match declaration {
         Declaration::Simple { value_type, .. } => {
-            push_attribute(xml, "office:value-type", value_type_name(*value_type));
+            add_attribute_len(
+                total,
+                "office:value-type",
+                value_type_name(*value_type),
+                budget,
+            )?;
         },
         Declaration::User { value, formula, .. } => {
             if let Some(formula) = formula {
-                push_attribute(xml, "text:formula", formula);
+                add_attribute_len(total, "text:formula", formula, budget)?;
             }
             if let Some(value) = value {
-                push_attribute(
-                    xml,
+                add_attribute_len(
+                    total,
                     "office:value-type",
                     value_type_name(value.value_type()),
-                );
+                    budget,
+                )?;
                 match value {
                     Value::Float { lexical, .. } | Value::Percentage { lexical, .. } => {
-                        push_attribute(xml, "office:value", lexical);
+                        add_attribute_len(total, "office:value", lexical, budget)?;
                     },
                     Value::Currency {
                         lexical, currency, ..
                     } => {
-                        push_attribute(xml, "office:value", lexical);
-                        push_attribute(xml, "office:currency", currency);
+                        add_attribute_len(total, "office:value", lexical, budget)?;
+                        add_attribute_len(total, "office:currency", currency, budget)?;
                     },
                     Value::Date { lexical, .. } => {
-                        push_attribute(xml, "office:date-value", lexical);
+                        add_attribute_len(total, "office:date-value", lexical, budget)?;
                     },
                     Value::Time { lexical, .. } => {
-                        push_attribute(xml, "office:time-value", lexical);
+                        add_attribute_len(total, "office:time-value", lexical, budget)?;
                     },
                     Value::Boolean { lexical, .. } => {
-                        push_attribute(xml, "office:boolean-value", lexical);
+                        add_attribute_len(total, "office:boolean-value", lexical, budget)?;
                     },
                     Value::String { value } => {
-                        push_attribute(xml, "office:string-value", value);
+                        add_attribute_len(total, "office:string-value", value, budget)?;
                     },
                     Value::Void => {},
                 }
@@ -240,17 +368,126 @@ fn serialize_declaration(xml: &mut String, declaration: &Declaration) {
             separation_character,
             ..
         } => {
+            let display = display_outline_level.to_string();
+            add_attribute_len(total, "text:display-outline-level", &display, budget)?;
+            if let Some(character) = separation_character {
+                let separator = character.to_string();
+                add_attribute_len(total, "text:separation-character", &separator, budget)?;
+            }
+        },
+    }
+    add_len(total, 2)?; // \/>
+    Ok(())
+}
+
+fn add_attribute_len(
+    total: &mut usize,
+    name: &str,
+    value: &str,
+    budget: Option<&FlatMutationBudget>,
+) -> Result<()> {
+    check_budget(budget)?;
+    add_len(total, 1)?; // leading space
+    add_len(total, name.len())?;
+    add_len(total, 2)?; // ="
+    add_len(total, escaped_xml_len(value, budget)?)?;
+    add_len(total, 1) // closing quote
+}
+
+fn escaped_xml_len(value: &str, budget: Option<&FlatMutationBudget>) -> Result<usize> {
+    let mut length = 0usize;
+    for (index, byte) in value.bytes().enumerate() {
+        if index % (8 * 1024) == 0 {
+            check_budget(budget)?;
+        }
+        let extra = match byte {
+            b'&' => 4,
+            b'<' | b'>' => 3,
+            b'"' | b'\'' => 5,
+            _ => 0,
+        };
+        add_len(&mut length, 1 + extra)?;
+    }
+    Ok(length)
+}
+
+fn add_len(total: &mut usize, amount: usize) -> Result<()> {
+    *total = total
+        .checked_add(amount)
+        .ok_or_else(|| invalid("variable declaration XML size overflow"))?;
+    Ok(())
+}
+
+fn serialize_declaration(
+    xml: &mut String,
+    declaration: &Declaration,
+    budget: Option<&FlatMutationBudget>,
+) -> Result<()> {
+    check_budget(budget)?;
+    xml.push_str("<text:");
+    xml.push_str(declaration_local(declaration.kind()));
+    push_attribute(xml, "text:name", declaration.name(), budget)?;
+    match declaration {
+        Declaration::Simple { value_type, .. } => {
             push_attribute(
                 xml,
-                "text:display-outline-level",
-                &display_outline_level.to_string(),
-            );
+                "office:value-type",
+                value_type_name(*value_type),
+                budget,
+            )?;
+        },
+        Declaration::User { value, formula, .. } => {
+            if let Some(formula) = formula {
+                push_attribute(xml, "text:formula", formula, budget)?;
+            }
+            if let Some(value) = value {
+                push_attribute(
+                    xml,
+                    "office:value-type",
+                    value_type_name(value.value_type()),
+                    budget,
+                )?;
+                match value {
+                    Value::Float { lexical, .. } | Value::Percentage { lexical, .. } => {
+                        push_attribute(xml, "office:value", lexical, budget)?;
+                    },
+                    Value::Currency {
+                        lexical, currency, ..
+                    } => {
+                        push_attribute(xml, "office:value", lexical, budget)?;
+                        push_attribute(xml, "office:currency", currency, budget)?;
+                    },
+                    Value::Date { lexical, .. } => {
+                        push_attribute(xml, "office:date-value", lexical, budget)?;
+                    },
+                    Value::Time { lexical, .. } => {
+                        push_attribute(xml, "office:time-value", lexical, budget)?;
+                    },
+                    Value::Boolean { lexical, .. } => {
+                        push_attribute(xml, "office:boolean-value", lexical, budget)?;
+                    },
+                    Value::String { value } => {
+                        push_attribute(xml, "office:string-value", value, budget)?;
+                    },
+                    Value::Void => {},
+                }
+            }
+        },
+        Declaration::Sequence {
+            display_outline_level,
+            separation_character,
+            ..
+        } => {
+            let display = display_outline_level.to_string();
+            push_attribute(xml, "text:display-outline-level", &display, budget)?;
             if let Some(character) = separation_character {
-                push_attribute(xml, "text:separation-character", &character.to_string());
+                let separator = character.to_string();
+                push_attribute(xml, "text:separation-character", &separator, budget)?;
             }
         },
     }
     xml.push_str("/>");
+    Ok(())
 }
 
 fn value_type_name(value_type: ValueType) -> &'static str {
@@ -266,11 +503,22 @@ fn value_type_name(value_type: ValueType) -> &'static str {
     }
 }
 
-fn push_attribute(xml: &mut String, name: &str, value: &str) {
+fn push_attribute(
+    xml: &mut String,
+    name: &str,
+    value: &str,
+    budget: Option<&FlatMutationBudget>,
+) -> Result<()> {
+    check_budget(budget)?;
     xml.push(' ');
     xml.push_str(name);
     xml.push_str("=\"");
-    for character in value.chars() {
+    let mut checkpoint = 0usize;
+    for (index, character) in value.char_indices() {
+        if index.saturating_sub(checkpoint) >= 8 * 1024 {
+            check_budget(budget)?;
+            checkpoint = index;
+        }
         match character {
             '&' => xml.push_str("&amp;"),
             '<' => xml.push_str("&lt;"),
@@ -281,13 +529,100 @@ fn push_attribute(xml: &mut String, name: &str, value: &str) {
         }
     }
     xml.push('\"');
+    check_budget(budget)
 }
 
-fn validate_serialized_group(group: &Group, xml: &str) -> Result<()> {
-    let document = format!(
-        r#"<office:document-content xmlns:office="{OFFICE}"><office:body><office:text>{xml}</office:text></office:body></office:document-content>"#
-    );
-    let parsed = super::package::parse_parts(&[(document.as_str(), group.part)])?;
+fn check_budget(budget: Option<&FlatMutationBudget>) -> Result<()> {
+    if let Some(budget) = budget {
+        budget.check()?;
+    }
+    Ok(())
+}
+
+fn append_budgeted(
+    output: &mut String,
+    value: &str,
+    budget: Option<&FlatMutationBudget>,
+) -> Result<()> {
+    let Some(budget) = budget else {
+        output.push_str(value);
+        return Ok(());
+    };
+    let mut start = 0usize;
+    for (index, _) in value.char_indices() {
+        if index.saturating_sub(start) >= 8 * 1024 {
+            budget.check()?;
+            output.push_str(&value[start..index]);
+            start = index;
+        }
+    }
+    if start < value.len() {
+        budget.check()?;
+        output.push_str(&value[start..]);
+    } else {
+        budget.check()?;
+    }
+    Ok(())
+}
+
+fn validate_serialized_group(
+    group: &Group,
+    xml: &str,
+    maximum: usize,
+    budget: Option<&FlatMutationBudget>,
+) -> Result<()> {
+    let prefix =
+        format!(r#"<office:document-content xmlns:office="{OFFICE}"><office:body><office:text>"#);
+    let suffix = r#"</office:text></office:body></office:document-content>"#;
+    let document_len = prefix
+        .len()
+        .checked_add(xml.len())
+        .and_then(|length| length.checked_add(suffix.len()))
+        .ok_or_else(|| invalid("variable declaration validation XML size overflow"))?;
+    // The wrapper is validation-only scratch around the caller-bounded
+    // fragment. Allow exactly that fixed wrapper overhead without turning the
+    // final fragment/document output cap into a scratch cap.
+    let validation_limit = maximum
+        .checked_add(prefix.len())
+        .and_then(|length| length.checked_add(suffix.len()))
+        .ok_or_else(|| invalid("variable declaration validation XML size overflow"))?;
+    if document_len > validation_limit {
+        return Err(Error::ResourceLimit(ResourceLimit {
+            resource: Resource::OutputBytes,
+            observed: u64::try_from(document_len).unwrap_or(u64::MAX),
+            limit: u64::try_from(validation_limit).unwrap_or(u64::MAX),
+            scope: "variable declaration validation".into(),
+        }));
+    }
+    let (mut document, _document_memory) =
+        allocate_xml(budget, document_len, "ODT variable declaration validation")?;
+    append_budgeted(&mut document, &prefix, budget)?;
+    append_budgeted(&mut document, xml, budget)?;
+    append_budgeted(&mut document, suffix, budget)?;
+    let parsed = match budget {
+        Some(budget) => {
+            let (parsed, memory) = super::package::parse_parts_with_budget(
+                &[(document.as_str(), group.part)],
+                budget,
+            )?;
+            // The parsed projection is used only for this consistency check;
+            // retain its lease until the owned values are dropped.
+            let result = if parsed.groups.len() != 1
+                || parsed.groups[0].kind != group.kind
+                || parsed.groups[0].declarations.len() != group.declarations.len()
+            {
+                Err(invalid(
+                    "serialized variable declaration group is inconsistent",
+                ))
+            } else {
+                Ok(())
+            };
+            drop(parsed);
+            drop(memory);
+            return result;
+        },
+        None => super::package::parse_parts(&[(document.as_str(), group.part)])?,
+    };
     if parsed.groups.len() != 1
         || parsed.groups[0].kind != group.kind
         || parsed.groups[0].declarations.len() != group.declarations.len()
@@ -307,7 +642,14 @@ fn kind_order(kind: Kind) -> u8 {
     }
 }
 
-fn replace_range(xml: &str, start: usize, end: usize, replacement: &str) -> Result<String> {
+fn replace_range_with_limit_and_budget(
+    xml: &str,
+    start: usize,
+    end: usize,
+    replacement: &str,
+    maximum: usize,
+    budget: Option<&FlatMutationBudget>,
+) -> Result<ChargedXml> {
     if start > end || end > xml.len() || !xml.is_char_boundary(start) || !xml.is_char_boundary(end)
     {
         return Err(invalid("variable declaration XML range is invalid"));
@@ -317,17 +659,25 @@ fn replace_range(xml: &str, start: usize, end: usize, replacement: &str) -> Resu
         .checked_sub(end - start)
         .and_then(|size| size.checked_add(replacement.len()))
         .ok_or_else(|| invalid("variable declaration XML size overflow"))?;
-    if new_len > MAX_XML_BYTES {
-        return Err(invalid("variable declaration XML exceeds 64 MiB"));
-    }
-    let mut updated = String::with_capacity(new_len);
-    updated.push_str(&xml[..start]);
-    updated.push_str(replacement);
-    updated.push_str(&xml[end..]);
-    Ok(updated)
+    bounded_output_len_with_limit(new_len, "variable declaration XML replacement", maximum)?;
+    let (mut updated, memory) =
+        allocate_xml(budget, new_len, "ODT variable declaration XML replacement")?;
+    append_budgeted(&mut updated, &xml[..start], budget)?;
+    append_budgeted(&mut updated, replacement, budget)?;
+    append_budgeted(&mut updated, &xml[end..], budget)?;
+    Ok(ChargedXml {
+        xml: updated,
+        memory,
+    })
 }
 
-fn expand_empty_parent(xml: &str, parent: &EmptyParentSpan, child: &str) -> Result<String> {
+fn expand_empty_parent_with_limit_and_budget(
+    xml: &str,
+    parent: &EmptyParentSpan,
+    child: &str,
+    maximum: usize,
+    budget: Option<&FlatMutationBudget>,
+) -> Result<ChargedXml> {
     let raw = xml
         .get(parent.start..parent.end)
         .ok_or_else(|| invalid("empty declaration scope range is invalid"))?;
@@ -339,21 +689,69 @@ fn expand_empty_parent(xml: &str, parent: &EmptyParentSpan, child: &str) -> Resu
         .checked_add(child.len())
         .and_then(|size| size.checked_add(parent.qname.len() + 4))
         .ok_or_else(|| invalid("variable declaration XML size overflow"))?;
-    let mut replacement = String::with_capacity(replacement_len);
-    replacement.push_str(prefix);
+    bounded_output_len_with_limit(
+        replacement_len,
+        "variable declaration scope expansion",
+        maximum,
+    )?;
+    let (mut replacement, replacement_memory) = allocate_xml(
+        budget,
+        replacement_len,
+        "ODT variable declaration scope expansion",
+    )?;
+    append_budgeted(&mut replacement, prefix, budget)?;
     replacement.push('>');
-    replacement.push_str(child);
-    replacement.push_str("</");
-    replacement.push_str(&parent.qname);
+    append_budgeted(&mut replacement, child, budget)?;
+    append_budgeted(&mut replacement, "</", budget)?;
+    append_budgeted(&mut replacement, &parent.qname, budget)?;
     replacement.push('>');
-    replace_range(xml, parent.start, parent.end, &replacement)
+    let candidate = replace_range_with_limit_and_budget(
+        xml,
+        parent.start,
+        parent.end,
+        &replacement,
+        maximum,
+        budget,
+    );
+    drop(replacement_memory);
+    candidate
+}
+
+fn bounded_output_len_with_limit(length: usize, operation: &str, maximum: usize) -> Result<()> {
+    if length > maximum {
+        if maximum < MAX_XML_BYTES {
+            return Err(Error::ResourceLimit(ResourceLimit {
+                resource: Resource::OutputBytes,
+                observed: u64::try_from(length).unwrap_or(u64::MAX),
+                limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+                scope: operation.into(),
+            }));
+        }
+        return Err(invalid(format!(
+            "{operation} exceeds the {MAX_XML_BYTES} edit limit"
+        )));
+    }
+    if length > MAX_XML_BYTES {
+        return Err(invalid(format!(
+            "{operation} exceeds the {MAX_XML_BYTES} edit limit"
+        )));
+    }
+    Ok(())
 }
 
 fn scan_scope(xml: &str, scope: &Scope) -> Result<ScopeScan> {
+    scan_scope_with_optional_budget(xml, scope, None)
+}
+
+fn scan_scope_with_optional_budget(
+    xml: &str,
+    scope: &Scope,
+    budget: Option<&FlatMutationBudget>,
+) -> Result<ScopeScan> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("variable declaration XML exceeds 64 MiB"));
     }
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut depth = 0usize;
@@ -366,6 +764,9 @@ fn scan_scope(xml: &str, scope: &Scope) -> Result<ScopeScan> {
     let mut first_other_child = None;
     let mut empty_parent = None;
     loop {
+        if let Some(budget) = budget {
+            budget.event(depth)?;
+        }
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| invalid(format!("invalid variable declaration XML: {error}")))?;
@@ -406,6 +807,9 @@ fn scan_scope(xml: &str, scope: &Scope) -> Result<ScopeScan> {
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("XML depth overflow"))?;
+                if let Some(budget) = budget {
+                    budget.observe_depth(depth)?;
+                }
                 if depth > MAX_DEPTH {
                     return Err(invalid(format!(
                         "variable declaration XML nesting exceeds {MAX_DEPTH} levels"
@@ -413,6 +817,9 @@ fn scan_scope(xml: &str, scope: &Scope) -> Result<ScopeScan> {
                 }
             },
             Event::Empty(ref element) => {
+                if let Some(budget) = budget {
+                    budget.observe_depth(depth.saturating_add(1))?;
+                }
                 let namespace = namespace_uri(&resolved)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_declaration_name(namespace.as_deref(), &local)?;
@@ -435,6 +842,12 @@ fn scan_scope(xml: &str, scope: &Scope) -> Result<ScopeScan> {
                 }
                 if parent_depth == Some(depth) {
                     if let Some(kind) = container_kind(namespace.as_deref(), &local) {
+                        groups
+                            .try_reserve_exact(1)
+                            .map_err(|source| Error::Allocation {
+                                resource: "ODT variable declaration scope groups",
+                                source,
+                            })?;
                         groups.push(GroupSpan {
                             kind,
                             start: event_start,
@@ -450,6 +863,12 @@ fn scan_scope(xml: &str, scope: &Scope) -> Result<ScopeScan> {
                 if let Some((kind, start, group_depth)) = active_group
                     && group_depth == depth
                 {
+                    groups
+                        .try_reserve_exact(1)
+                        .map_err(|source| Error::Allocation {
+                            resource: "ODT variable declaration scope groups",
+                            source,
+                        })?;
                     groups.push(GroupSpan {
                         kind,
                         start,
@@ -580,14 +999,18 @@ pub(super) fn parse_part(
     all_uses: &mut Vec<(Kind, String)>,
     aggregate: &mut usize,
     declaration_count: &mut usize,
+    budget: Option<&FlatMutationBudget>,
 ) -> Result<()> {
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut stack = Vec::<Frame>::new();
     let mut active: Option<ActiveGroup> = None;
     let mut pending: Option<PendingDeclaration> = None;
     loop {
+        if let Some(budget) = budget {
+            budget.event(depth)?;
+        }
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| invalid(format!("invalid variable declaration XML: {error}")))?;
@@ -638,6 +1061,12 @@ pub(super) fn parse_part(
                     } else {
                         None
                     };
+                stack
+                    .try_reserve_exact(1)
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODT variable declaration parser frame stack",
+                        source,
+                    })?;
                 stack.push(Frame {
                     namespace,
                     local,
@@ -646,6 +1075,9 @@ pub(super) fn parse_part(
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("XML depth overflow"))?;
+                if let Some(budget) = budget {
+                    budget.observe_depth(depth)?;
+                }
                 if depth > MAX_DEPTH {
                     return Err(invalid(format!(
                         "variable declaration XML nesting exceeds {MAX_DEPTH} levels"
@@ -653,6 +1085,9 @@ pub(super) fn parse_part(
                 }
             },
             Event::Empty(ref element) => {
+                if let Some(budget) = budget {
+                    budget.observe_depth(depth.saturating_add(1))?;
+                }
                 if pending.is_some() {
                     return Err(invalid("variable declarations cannot contain elements"));
                 }
@@ -691,6 +1126,13 @@ pub(super) fn parse_part(
                         containers,
                         &mut temporary,
                     )?;
+                    result
+                        .groups
+                        .try_reserve_exact(1)
+                        .map_err(|source| Error::Allocation {
+                            resource: "ODT variable declaration groups",
+                            source,
+                        })?;
                     result.groups.push(
                         temporary
                             .ok_or_else(|| invalid("missing variable declaration group"))?
@@ -721,6 +1163,13 @@ pub(super) fn parse_part(
                     }
                 }
                 if active.as_ref().is_some_and(|group| group.depth == depth) {
+                    result
+                        .groups
+                        .try_reserve_exact(1)
+                        .map_err(|source| Error::Allocation {
+                            resource: "ODT variable declaration groups",
+                            source,
+                        })?;
                     result.groups.push(
                         active
                             .take()
@@ -772,7 +1221,7 @@ pub(super) fn parse_part(
 
 #[allow(clippy::too_many_arguments)]
 fn start_group(
-    _reader: &NsReader<&[u8]>,
+    _reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     part: Part,
     kind: Kind,
@@ -801,6 +1250,12 @@ fn start_group(
         .last()
         .ok_or_else(|| invalid("misplaced declaration container"))?;
     let scope = scope_for_parent(parent, stack)?;
+    containers
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "ODT variable declaration containers",
+            source,
+        })?;
     if !containers.insert((part, scope.clone(), kind)) {
         return Err(invalid(
             "duplicate variable declaration container in one scope",
@@ -843,18 +1298,29 @@ fn add_declaration(
             "ODF {kind:?} variable '{name}' is declared after its use"
         )));
     }
+    names.try_reserve(1).map_err(|source| Error::Allocation {
+        resource: "ODT variable declaration names",
+        source,
+    })?;
     if !names.insert((kind, name.clone())) {
         return Err(invalid(format!(
             "duplicate ODF {kind:?} variable declaration '{name}'"
         )));
     }
     *declaration_count += 1;
+    group
+        .declarations
+        .try_reserve_exact(1)
+        .map_err(|source| Error::Allocation {
+            resource: "ODT variable declarations",
+            source,
+        })?;
     group.declarations.push(declaration);
     Ok(())
 }
 
 fn parse_declaration(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     kind: Kind,
     aggregate: &mut usize,
@@ -948,7 +1414,7 @@ fn parse_declaration(
 type Attributes = HashMap<(String, String), String>;
 
 fn collect_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
 ) -> Result<Attributes> {
@@ -956,6 +1422,9 @@ fn collect_attributes(
     for attribute in element.attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid declaration attribute: {error}")))?;
+        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = namespace_uri(&namespace)?.unwrap_or_default();
         let local = decode(local.as_ref(), "attribute name")?;
@@ -1096,7 +1565,7 @@ fn parse_double(value: &str) -> Result<f64> {
 
 #[allow(clippy::too_many_arguments)]
 fn record_use(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     part: Part,
     kind: Kind,
@@ -1114,6 +1583,10 @@ fn record_use(
         return Err(invalid("declaration text exceeds 16 MiB"));
     }
     if let Some(scope) = nearest_scope(stack)? {
+        uses.try_reserve(1).map_err(|source| Error::Allocation {
+            resource: "ODT variable declaration uses",
+            source,
+        })?;
         uses.insert(ScopedName {
             part,
             scope,
@@ -1121,6 +1594,12 @@ fn record_use(
             name: name.clone(),
         });
     }
+    all_uses
+        .try_reserve_exact(1)
+        .map_err(|source| Error::Allocation {
+            resource: "ODT variable declaration use list",
+            source,
+        })?;
     all_uses.push((kind, name));
     Ok(())
 }
@@ -1263,7 +1742,7 @@ fn required<'a>(attributes: &'a Attributes, namespace: &str, local: &str) -> Res
 }
 
 fn required_attribute(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     namespace: &str,
     local: &str,
@@ -1273,7 +1752,7 @@ fn required_attribute(
 }
 
 fn optional_attribute(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     namespace: &str,
     local: &str,
@@ -1282,6 +1761,9 @@ fn optional_attribute(
     for attribute in element.attributes() {
         let attribute =
             attribute.map_err(|error| invalid(format!("invalid XML attribute: {error}")))?;
+        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
         let (resolved, resolved_local) = reader.resolver().resolve_attribute(attribute.key);
         if namespace_uri(&resolved)?.as_deref() == Some(namespace)
             && resolved_local.as_ref() == local.as_bytes()
@@ -1301,14 +1783,13 @@ fn optional_attribute(
 }
 
 fn namespace_uri(namespace: &ResolveResult<'_>) -> Result<Option<String>> {
-    match namespace {
-        ResolveResult::Bound(Namespace(value)) => Ok(Some(decode(value, "namespace URI")?)),
-        ResolveResult::Unbound => Ok(None),
-        ResolveResult::Unknown(prefix) => Err(invalid(format!(
-            "unbound XML namespace prefix '{}'",
-            String::from_utf8_lossy(prefix)
-        ))),
-    }
+    crate::elements::xml::normalized_namespace_uri(namespace, "variable declaration")?
+        .map(|uri| {
+            std::str::from_utf8(uri)
+                .map(str::to_owned)
+                .map_err(|_error| invalid("variable declaration namespace URI is not UTF-8"))
+        })
+        .transpose()
 }
 
 fn decode(value: &[u8], description: &str) -> Result<String> {
@@ -1329,4 +1810,19 @@ fn validate_string(value: &str, limit: usize, description: &str) -> Result<()> {
 
 pub(super) fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
+}
+
+#[cfg(test)]
+mod namespace_tests {
+    use super::*;
+
+    #[test]
+    fn accepts_entity_escaped_odf_namespace_uris() {
+        let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office&#58;1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text&#58;1.0"><o:body><o:text><t:variable-decls><t:variable-decl t:name="counter" o:value-type="float"/></t:variable-decls></o:text></o:body></o:document-content>"#;
+        let declarations = crate::variable_declaration::parse_parts(&[(xml, Part::Content)])
+            .expect("entity-escaped ODF namespace URIs should resolve semantically");
+
+        assert_eq!(declarations.groups.len(), 1);
+        assert_eq!(declarations.groups[0].declarations.len(), 1);
+    }
 }

@@ -1,0 +1,21 @@
+{
+  "candidate": "/var/tmp/litchi-docx-ink-profile-validation-20260910",
+  "base_commit": "04fdd02a25029ea6d5729487207690a4740d3a70",
+  "patch": {
+    "path": "patch-v2.patch.gz",
+    "sha256": "4fd7ed4202a3d1d176bb786d4bbbb50d635a359dc70e57907e9566562c1e60c1",
+    "format": "git diff --binary, gzip -n",
+    "paths": [
+      "crates/litchi-docx/src/ink/mod.rs",
+      "crates/litchi-docx/src/ink/model.rs",
+      "crates/litchi-docx/src/ink/package.rs",
+      "crates/litchi-docx/tests/ink_inventory.rs",
+      "crates/litchi-drawingml/src/ink/authoring.rs",
+      "crates/litchi-drawingml/src/ink/mod.rs",
+      "crates/litchi-drawingml/src/ink/model.rs",
+      "crates/litchi-drawingml/src/ink/tests.rs"
+    ]
+  },
+  "source_manifest": "root-source-v2.json",
+  "source_manifest_sha256": "6b2cb389c28c3d714767362e5af5ea4fc67d742b2046ab4b248b5ec264e36d80"
+}

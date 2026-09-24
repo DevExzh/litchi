@@ -31,8 +31,9 @@ pub(crate) fn decode(entry: &DirectoryEntry) -> Result<Metadata, OleError> {
         entry.start_sector,
         entry.size,
         entry.is_minifat,
-    );
-    validation::validate(metadata)?;
+    )
+    .with_directory_fields(entry.state_bits, entry.creation_time, entry.modified_time);
+    validation::validate_source(metadata)?;
     Ok(metadata)
 }
 
@@ -89,6 +90,15 @@ pub(crate) fn apply_metadata(entry: &mut DirectoryEntry, before: Metadata, after
         entry.sid_right = after.links().right().map_or(NOSTREAM, Sid::raw);
         entry.sid_child = after.links().child().map_or(NOSTREAM, Sid::raw);
     }
+    if before.state_bits() != after.state_bits() {
+        entry.state_bits = after.state_bits();
+    }
+    if before.creation_time() != after.creation_time() {
+        entry.creation_time = after.creation_time();
+    }
+    if before.modified_time() != after.modified_time() {
+        entry.modified_time = after.modified_time();
+    }
     if before.start_sector() != after.start_sector() {
         entry.start_sector = after.start_sector();
     }
@@ -108,6 +118,9 @@ pub(crate) fn raw_equal(left: &DirectoryEntry, right: &DirectoryEntry) -> bool {
         && left.sid_right == right.sid_right
         && left.sid_child == right.sid_child
         && left.clsid == right.clsid
+        && left.state_bits == right.state_bits
+        && left.creation_time == right.creation_time
+        && left.modified_time == right.modified_time
         && left.start_sector == right.start_sector
         && left.size == right.size
         && left.is_minifat == right.is_minifat
@@ -144,6 +157,9 @@ fn hash_entry(value: &mut u64, entry: &DirectoryEntry) {
     hash_u32(value, entry.sid_right);
     hash_u32(value, entry.sid_child);
     hash_bytes(value, entry.clsid.as_bytes());
+    hash_u32(value, entry.state_bits);
+    hash_u64(value, entry.creation_time);
+    hash_u64(value, entry.modified_time);
     hash_u32(value, entry.start_sector);
     hash_u64(value, entry.size);
     hash_u8(value, u8::from(entry.is_minifat));

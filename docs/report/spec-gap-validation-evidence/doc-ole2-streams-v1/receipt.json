@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "9aa761f071b37edfbb898664338e2819c81e728d",
+  "toolchain": "1.95.0",
+  "source_files": {
+    "crates/litchi-doc/src/embedded_object/mod.rs": "54829686dc7c163913c5c234b38277b1ecbc0f27901e4beed0a1a9e445d4f9ac",
+    "crates/litchi-doc/src/embedded_object/tests.rs": "8ee3c7ae57be05f5b2db7d73d6dcfba45cc4df6554b1aaafd83d06c1ce4f9946",
+    "crates/litchi-doc/src/embedded_object/transaction/storage.rs": "6c6cfb11e22de4d75b2849dcf50594049761ba114c81a22079b66de2028a73bc",
+    "crates/litchi-doc/src/embedded_object/transaction/snapshot.rs": "e1f4bae736f81594a41f9f93993fe266673d63330af2343e1e93d21aef9e7d4f",
+    "crates/litchi-doc/src/embedded_object/transaction/edit.rs": "ff164502a36a5e6ef5e214593d4901ba1078a36627eb726a7045455b7e6619ab"
+  },
+  "scope": "DOC managed storage-id/Reference-selected OLE2 typed presentation/native reads and atomic edits delegated to common owner; coherent unique storage identity and source patch admission before outer cloning, DOC reference readback, whole-DOC exact mutate/revert. Synthetic evidence; no general DOC source-admission, rendering, activation, native-producer, throughput or total-memory claim.",
+  "commands": [
+    {
+      "command": "cargo +1.95.0 test --offline --locked -p litchi-doc --all-features",
+      "exit_code": 0,
+      "log": "tests.log.gz",
+      "tests_passed": 1175,
+      "doctests_passed": 14,
+      "doctests_ignored": 12,
+      "tests_ignored": 2
+    },
+    {
+      "command": "cargo +1.95.0 clippy --offline --locked -p litchi-doc --all-targets --all-features -- -D warnings",
+      "exit_code": 0,
+      "log": "clippy.log.gz"
+    },
+    {
+      "command": "rustfmt --check --edition 2024 --config skip_children=true (changed Rust files)",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "logs": {
+    "tests.log.gz": {
+      "sha256": "e535e191e4027125dd80a59924b624acdea6e26d2df3387771b331ce39d5f3be",
+      "uncompressed_sha256": "02650f09e040d15f9a950093a5f277d990d1c60a237230e4655f20e5997d6743"
+    },
+    "clippy.log.gz": {
+      "sha256": "f04a9fef836b185e8cab293968742ae8c2b9cc7f885de687f9568a5a01551641",
+      "uncompressed_sha256": "d93f563e5ce7f54c6a06e32eb1321e1d73414f10ec9887a7fc04ce9e8d80195d"
+    }
+  },
+  "environment": {
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-feature-batch-target-195",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp"
+  }
+}

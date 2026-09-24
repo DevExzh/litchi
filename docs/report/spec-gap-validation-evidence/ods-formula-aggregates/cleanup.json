@@ -1,0 +1,11 @@
+{
+  "removed_paths": {
+    "/tmp/litchi-ods-aggregates": true,
+    "/tmp/litchi-ods-aggregates-target": true,
+    "docs/report/spec-gap-validation-evidence/ods-formula-aggregates/performance/harness/target": true,
+    "/var/tmp/litchi-ods-aggregate-baseline-2aeeb8d2f-bxxhgqlt": true,
+    "/var/tmp/litchi-ods-aggregate-candidate-final-86fhkf7x": true,
+    "/tmp/litchi-ods-aggregate-baseline-dbtmu58m": true
+  },
+  "no_retained_python_bytecode": true
+}

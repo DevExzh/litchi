@@ -1,0 +1,41 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running tests/data_model.rs (target/debug/deps/data_model-48cf6c2603b7c220)
+
+running 17 tests
+test writer_requires_a_connection_for_each_model_table ... ok
+test writer_rejects_time_grouping_before_retaining_unproven_opaque_payload ... ok
+test data_model_limits_bound_borrowed_graph_metadata_before_snapshot_ownership ... ok
+test data_model_limits_bound_connection_count_before_typed_load ... ok
+test identity_edits_are_refused_while_payload_is_opaque ... ok
+test table_connection_binding_is_case_insensitive ... ok
+test writer_emits_relationship_free_model_part_and_typed_workbook_records ... ok
+test time_grouping_edit_requires_inner_xldm_identity_proof_before_draft_change ... ok
+test empty_transaction_is_an_exact_noop ... ok
+test connection_source_change_is_stale_even_when_model_and_workbook_bytes_are_unchanged ... ok
+test load_version_edit_is_source_checked_and_reversible ... ok
+test workbook_records_and_model_part_are_a_strict_singleton_pair ... ok
+test creation_removal_and_stale_source_checks_are_atomic ... ok
+test case_equivalent_model_and_connection_owners_are_resolved_by_physical_name ... ok
+test source_tokens_restore_explicit_empty_model_relationships_after_reopened_zip_inverse ... ok
+test signed_noop_preserves_and_signed_change_requires_explicit_disposition ... ok
+test elevated_source_tokens_survive_reopened_inverse_with_large_content_types ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.21s
+
+     Running tests/data_model_connection_graph.rs (target/debug/deps/data_model_connection_graph-fe4047328b177452)
+
+running 12 tests
+test case_variant_connection_names_are_rejected_as_ambiguous_owners ... ok
+test connections_relationship_requires_the_connections_content_type ... ok
+test external_connections_relationship_is_rejected ... ok
+test orphan_connections_part_is_rejected ... ok
+test duplicate_connections_relationship_is_rejected ... ok
+test connections_part_rejects_outbound_relationships ... ok
+test ambiguous_model_table_connection_names_are_rejected ... ok
+test missing_model_table_connection_name_is_rejected ... ok
+test rejected_connection_graph_edits_preserve_workbook_bytes ... ok
+test model_connection_binding_is_case_insensitive ... ok
+test valid_model_and_connections_owner_form_a_readable_closure ... ok
+test missing_connections_owner_rejects_model_snapshot_without_mutating_bytes ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s

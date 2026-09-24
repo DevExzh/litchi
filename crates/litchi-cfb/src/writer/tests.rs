@@ -57,6 +57,152 @@ fn test_write_simple_ole_file() {
 }
 
 #[test]
+fn test_directory_state_and_filetimes_round_trip_without_clock_access() {
+    let mut writer = OleWriter::new();
+    writer.set_root_state_bits(0x1020_3040);
+    writer.set_root_modified_time(0x0123_4567_89AB_CDEF);
+    writer.create_storage(&["Storage"]).unwrap();
+    writer
+        .set_storage_metadata(
+            &["Storage"],
+            0xA5A5_5A5A,
+            0xFEDC_BA98_7654_3210,
+            0x0123_4567_89AB_CDEF,
+        )
+        .unwrap();
+    writer
+        .create_stream(&["Storage", "Payload"], b"payload")
+        .unwrap();
+    writer
+        .set_stream_metadata(
+            &["Storage", "Payload"],
+            0x0BAD_CAFE,
+            0x8877_6655_4433_2211,
+            0x1100_FFEE_DDCC_BBAA,
+        )
+        .unwrap();
+    writer
+        .create_stream(&["Storage", "DefaultPayload"], b"default")
+        .unwrap();
+
+    let mut buffer = Cursor::new(Vec::new());
+    writer.write_to(&mut buffer).unwrap();
+    let ole = OleFile::open(Cursor::new(buffer.into_inner())).unwrap();
+
+    let root = ole.root_entry().unwrap();
+    assert_eq!(root.state_bits, 0x1020_3040);
+    assert_eq!(root.creation_time, 0);
+    assert_eq!(root.modified_time, 0x0123_4567_89AB_CDEF);
+    let storage = ole
+        .list_directory_entries(&[])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "Storage")
+        .unwrap();
+    assert_eq!(storage.state_bits, 0xA5A5_5A5A);
+    assert_eq!(storage.creation_time, 0xFEDC_BA98_7654_3210);
+    assert_eq!(storage.modified_time, 0x0123_4567_89AB_CDEF);
+    let stream = ole
+        .list_directory_entries(&["Storage"])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "Payload")
+        .unwrap();
+    assert_eq!(stream.state_bits, 0x0BAD_CAFE);
+    assert_eq!(stream.creation_time, 0x8877_6655_4433_2211);
+    assert_eq!(stream.modified_time, 0x1100_FFEE_DDCC_BBAA);
+    let default_stream = ole
+        .list_directory_entries(&["Storage"])
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.name == "DefaultPayload")
+        .unwrap();
+    assert_eq!(default_stream.state_bits, 0);
+    assert_eq!(default_stream.creation_time, 0);
+    assert_eq!(default_stream.modified_time, 0);
+}
+
+#[test]
+fn fresh_root_creation_time_is_checked_and_source_replay_is_explicit() {
+    let mut fresh = OleWriter::new();
+    assert!(fresh.set_root_creation_time(1).is_err());
+    fresh.create_stream(&["Payload"], b"payload").unwrap();
+
+    let mut output = Cursor::new(Vec::new());
+    fresh.write_to(&mut output).unwrap();
+    let fresh_file = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+    assert_eq!(fresh_file.root_entry().unwrap().creation_time, 0);
+
+    let expected = 0x0102_0304_0506_0708;
+    let mut replay = OleWriter::new();
+    replay.set_root_creation_time_from_source(expected);
+    assert!(replay.set_root_creation_time(1).is_err());
+    replay.create_stream(&["Payload"], b"payload").unwrap();
+    let mut output = Cursor::new(Vec::new());
+    replay.write_to(&mut output).unwrap();
+    let replay_file = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+    assert_eq!(replay_file.root_entry().unwrap().creation_time, expected);
+}
+
+#[test]
+fn known_legacy_fixture_directory_metadata_round_trips_exactly() {
+    const FIXTURE: &[u8] =
+        include_bytes!("../../../../test-data/ole/doc/cfb-v3-uninitialized-size-high-word.doc");
+    let mut source = OleFile::open(Cursor::new(FIXTURE)).unwrap();
+    let root = source.root_entry().unwrap().clone();
+    assert_ne!(root.creation_time, 0);
+    assert_ne!(root.modified_time, 0);
+
+    let paths = source.list_streams();
+    assert!(!paths.is_empty());
+    let mut writer = OleWriter::new();
+    writer.set_root_state_bits(root.state_bits);
+    writer.set_root_creation_time_from_source(root.creation_time);
+    writer.set_root_modified_time(root.modified_time);
+    for path in paths {
+        assert_eq!(path.len(), 1, "fixture should contain root streams only");
+        let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
+        let entry = source
+            .list_directory_entries(&[])
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.name == path[0])
+            .unwrap();
+        let metadata = (entry.state_bits, entry.creation_time, entry.modified_time);
+        let bytes = source.open_stream(&refs).unwrap();
+        writer.create_stream_owned(&refs, bytes).unwrap();
+        writer
+            .set_stream_metadata(&refs, metadata.0, metadata.1, metadata.2)
+            .unwrap();
+    }
+
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    let output = OleFile::open(Cursor::new(output.into_inner())).unwrap();
+    let output_root = output.root_entry().unwrap();
+    assert_eq!(output_root.state_bits, root.state_bits);
+    assert_eq!(output_root.creation_time, root.creation_time);
+    assert_eq!(output_root.modified_time, root.modified_time);
+    for path in source.list_streams() {
+        let entry = source
+            .list_directory_entries(&[])
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.name == path[0])
+            .unwrap();
+        let round_tripped = output
+            .list_directory_entries(&[])
+            .unwrap()
+            .into_iter()
+            .find(|candidate| candidate.name == path[0])
+            .unwrap();
+        assert_eq!(round_tripped.state_bits, entry.state_bits);
+        assert_eq!(round_tripped.creation_time, entry.creation_time);
+        assert_eq!(round_tripped.modified_time, entry.modified_time);
+    }
+}
+
+#[test]
 fn test_write_multiple_streams() {
     let mut writer = OleWriter::new();
 

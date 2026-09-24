@@ -1,25 +1,22 @@
 //! Immutable flat ODT snapshots and failure-atomic text edits.
 
-use std::ffi::OsString;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::ops::Range;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::core::ResolvedReader;
 use litchi_core::{Error, Metadata, Resource, ResourceLimit, Result};
 use quick_xml::events::Event;
-use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
 
 use crate::elements::parser::{OrderElement, Parser};
 use crate::elements::table::Table;
 use crate::generic::{Family, FlatDocument};
 
+pub(crate) mod atomic;
+
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
-const MAX_TEMP_CREATE_ATTEMPTS: usize = 128;
-static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(0);
 
 /// Finite resource limits for opening and editing a flat ODT snapshot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -167,33 +164,24 @@ impl Document {
     }
 
     /// Reads and validates a flat ODT document with caller-selected finite limits.
-    pub fn from_reader_with_limits(mut reader: impl Read, limits: Limits) -> Result<Self> {
+    pub fn from_reader_with_limits(reader: impl Read, limits: Limits) -> Result<Self> {
         validate_limits(limits)?;
-        let read_limit = limits.max_document_bytes.checked_add(1).ok_or_else(|| {
+        let maximum = u64::try_from(limits.max_document_bytes).map_err(|_error| {
             resource_limit_error(
                 Resource::InputBytes,
-                usize::MAX,
+                limits.max_document_bytes,
                 limits.max_document_bytes,
                 "flat ODT input",
             )
         })?;
-        let mut bytes = Vec::new();
-        bytes
-            .try_reserve_exact(read_limit.min(64 * 1024))
-            .map_err(|source| Error::Allocation {
-                resource: "flat ODT input",
-                source,
-            })?;
-        let read_limit = u64::try_from(read_limit).map_err(|_error| {
-            resource_limit_error(
-                Resource::InputBytes,
-                read_limit,
-                limits.max_document_bytes,
-                "flat ODT input",
-            )
-        })?;
-        reader.by_ref().take(read_limit).read_to_end(&mut bytes)?;
-        Self::from_bytes_with_limits(bytes, limits)
+        let document = FlatDocument::from_reader_with_limit(reader, maximum)?;
+        if document.family() != Family::Text {
+            return invalid("flat document is not an OpenDocument Text document");
+        }
+        Ok(Self {
+            inner: Arc::new(document),
+            limits,
+        })
     }
 
     /// Validates owned flat ODT bytes with default finite limits.
@@ -212,7 +200,15 @@ impl Document {
                 "flat ODT input",
             ));
         }
-        let document = FlatDocument::from_bytes(bytes)?;
+        let maximum = u64::try_from(limits.max_document_bytes).map_err(|_error| {
+            resource_limit_error(
+                Resource::InputBytes,
+                limits.max_document_bytes,
+                limits.max_document_bytes,
+                "flat ODT input",
+            )
+        })?;
+        let document = FlatDocument::from_bytes_with_limit(bytes, maximum)?;
         if document.family() != Family::Text {
             return invalid("flat document is not an OpenDocument Text document");
         }
@@ -226,6 +222,30 @@ impl Document {
     #[must_use]
     pub fn xml(&self) -> &str {
         self.inner.xml()
+    }
+
+    /// Returns the validated flat document family.
+    #[must_use]
+    pub fn family(&self) -> Family {
+        self.inner.family()
+    }
+
+    /// Returns whether this flat text snapshot uses the text-template MIME.
+    #[must_use]
+    pub fn is_template(&self) -> bool {
+        self.inner.is_template()
+    }
+
+    /// Returns the canonical root `office:mimetype` value.
+    #[must_use]
+    pub fn mimetype(&self) -> &str {
+        self.inner.mimetype()
+    }
+
+    /// Returns the conventional flat extension for this snapshot.
+    #[must_use]
+    pub fn extension(&self) -> &'static str {
+        self.inner.extension()
     }
 
     /// Returns the exact snapshot bytes.
@@ -312,44 +332,30 @@ impl Document {
     }
 
     /// Atomically replaces a filesystem destination with these exact bytes.
+    ///
+    /// Unix and Windows use a same-directory temporary and atomic replacement;
+    /// other targets return [`Error::Unsupported`].
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
-        let path = path.as_ref();
-        let parent = path
-            .parent()
-            .filter(|value| !value.as_os_str().is_empty())
-            .unwrap_or_else(|| Path::new("."));
-        validate_destination(path)?;
-        let (temporary, mut file) = create_owned_sibling_temp(parent)?;
-        let write_result = (|| -> Result<()> {
-            file.write_all(self.as_bytes())?;
-            file.flush()?;
-            file.sync_all()?;
-            let expected_len = u64::try_from(self.as_bytes().len()).map_err(|_error| {
-                resource_limit_error(
-                    Resource::OutputBytes,
-                    self.as_bytes().len(),
-                    self.limits.max_document_bytes,
-                    "flat ODT output",
-                )
-            })?;
-            if file.metadata()?.len() != expected_len {
-                return Err(ResourceLimit {
-                    resource: Resource::OutputBytes,
-                    observed: file.metadata()?.len(),
-                    limit: expected_len,
-                    scope: Arc::from("flat ODT temporary output"),
-                }
-                .into());
-            }
-            drop(file);
-            publish_owned_temp(&temporary, path)?;
-            sync_parent(parent)?;
-            Ok(())
-        })();
-        if write_result.is_err() {
-            drop(std::fs::remove_file(&temporary));
-        }
-        write_result
+        self.inner.save_with_attached_context_and_scopes(
+            path,
+            "flat ODT output",
+            "flat ODT symbolic-link or non-file destination",
+        )
+    }
+
+    /// Atomically replaces a filesystem destination using a caller-supplied
+    /// cancellation and resource context for staging and publication.
+    pub fn save_with_execution_context(
+        &self,
+        path: impl AsRef<Path>,
+        context: litchi_core::ExecutionContext,
+    ) -> Result<()> {
+        self.inner.save_with_execution_context_and_scopes(
+            path,
+            context,
+            "flat ODT output",
+            "flat ODT symbolic-link or non-file destination",
+        )
     }
 }
 
@@ -595,7 +601,7 @@ fn render_paragraph_edits(
 }
 
 fn index_direct_paragraphs(xml: &str, limits: Limits) -> Result<Vec<ParagraphSite>> {
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -606,8 +612,16 @@ fn index_direct_paragraphs(xml: &str, limits: Limits) -> Result<Vec<ParagraphSit
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("invalid flat ODT XML: {error}")))?;
-        let is_office = is_bound(&namespace, OFFICE_NAMESPACE);
-        let is_text = is_bound(&namespace, TEXT_NAMESPACE);
+        let is_office = crate::elements::xml::normalized_namespace_matches(
+            &namespace,
+            OFFICE_NAMESPACE,
+            "flat ODT",
+        )?;
+        let is_text = crate::elements::xml::normalized_namespace_matches(
+            &namespace,
+            TEXT_NAMESPACE,
+            "flat ODT",
+        )?;
         let event = event.into_owned();
         let event_end = usize::try_from(reader.buffer_position()).map_err(|_error| {
             resource_limit_error(
@@ -671,7 +685,7 @@ fn index_direct_paragraphs(xml: &str, limits: Limits) -> Result<Vec<ParagraphSit
 }
 
 fn classify_paragraph_end(
-    reader: &mut NsReader<&[u8]>,
+    reader: &mut ResolvedReader<'_>,
     buffer: &mut Vec<u8>,
     content_start: usize,
     outer_depth: usize,
@@ -831,91 +845,6 @@ fn check_limit(
     Ok(())
 }
 
-fn validate_destination(path: &Path) -> Result<()> {
-    match std::fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.file_type().is_symlink() => Err(resource_limit_error(
-            Resource::Objects,
-            1,
-            0,
-            "flat ODT symbolic-link destination",
-        )),
-        Ok(metadata) if !metadata.is_file() => Err(resource_limit_error(
-            Resource::Objects,
-            1,
-            0,
-            "flat ODT non-file destination",
-        )),
-        Ok(_) => Ok(()),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(error.into()),
-    }
-}
-
-fn create_owned_sibling_temp(parent: &Path) -> Result<(PathBuf, std::fs::File)> {
-    for _ in 0..MAX_TEMP_CREATE_ATTEMPTS {
-        let id = NEXT_TEMP_ID
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
-                value.checked_add(1)
-            })
-            .map_err(|_error| {
-                resource_limit_error(
-                    Resource::Work,
-                    usize::MAX,
-                    usize::MAX - 1,
-                    "flat ODT temporary identifiers",
-                )
-            })?;
-        let temporary_name = OsString::from(format!(".litchi-{:x}-{id:x}.tmp", std::process::id()));
-        let temporary = parent.join(temporary_name);
-        match std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)
-        {
-            Ok(file) => return Ok((temporary, file)),
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {},
-            Err(error) => return Err(error.into()),
-        }
-    }
-    Err(resource_limit_error(
-        Resource::Work,
-        MAX_TEMP_CREATE_ATTEMPTS.saturating_add(1),
-        MAX_TEMP_CREATE_ATTEMPTS,
-        "flat ODT sibling temporary collisions",
-    ))
-}
-
-#[cfg(unix)]
-fn publish_owned_temp(temporary: &Path, destination: &Path) -> Result<()> {
-    std::fs::rename(temporary, destination)?;
-    Ok(())
-}
-
-#[cfg(windows)]
-fn publish_owned_temp(_temporary: &Path, _destination: &Path) -> Result<()> {
-    Err(Error::Unsupported(
-        "atomic flat ODT publication is unavailable on Windows".to_string(),
-    ))
-}
-
-#[cfg(not(any(unix, windows)))]
-fn publish_owned_temp(_temporary: &Path, _destination: &Path) -> Result<()> {
-    Err(Error::Unsupported(
-        "atomic flat ODT publication is unavailable on this platform".to_string(),
-    ))
-}
-
-#[cfg(unix)]
-fn sync_parent(parent: &Path) -> Result<()> {
-    std::fs::File::open(parent)?.sync_all()?;
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn sync_parent(_parent: &Path) -> Result<()> {
-    Ok(())
-}
-
 fn resource_limit_error(
     resource: Resource,
     observed: usize,
@@ -949,10 +878,6 @@ fn checked_depth(depth: usize, limits: Limits) -> Result<usize> {
         ));
     }
     Ok(depth)
-}
-
-fn is_bound(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
-    matches!(namespace, ResolveResult::Bound(Namespace(value)) if value.as_ref() == expected)
 }
 
 fn invalid<T>(message: &str) -> Result<T> {

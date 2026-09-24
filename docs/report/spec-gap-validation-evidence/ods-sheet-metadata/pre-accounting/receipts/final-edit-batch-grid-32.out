@@ -1,0 +1,2 @@
+config workload=EditBatch sheets=1 rows=32 columns=32 source_bytes=85610 warmups=3 iterations=15
+result mean_ns=6639759 p50_ns=6652028 p95_ns=6687087 p99_ns=6687087 memory_delta_p50=7195416 memory_delta_max=7195416 memory_final_p50=7195416 memory_final_max=7195416 work_delta_p50=1100927 work_delta_max=1100927 work_final_p50=1100927 work_final_max=1100927 probes=15360

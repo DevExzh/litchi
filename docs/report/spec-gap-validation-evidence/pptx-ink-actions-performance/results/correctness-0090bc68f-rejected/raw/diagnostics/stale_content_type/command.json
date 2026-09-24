@@ -1,0 +1,16 @@
+{
+  "command": [
+    "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/target/release/pptx-ink-actions-performance",
+    "--lane",
+    "stale_content_type",
+    "--warmup",
+    "1",
+    "--samples",
+    "1"
+  ],
+  "cwd": "/var/tmp/pptx-ink-actions-correctness-0090bc68f-clean",
+  "exit_code": 0,
+  "lane": "stale_content_type",
+  "stderr": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/stale_content_type/stderr.txt",
+  "stdout": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/stale_content_type/stdout.json"
+}

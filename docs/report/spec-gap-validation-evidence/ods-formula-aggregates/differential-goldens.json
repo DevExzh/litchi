@@ -1,0 +1,2694 @@
+{
+  "seed": "0x0DF1407",
+  "oracle": "fractions.Fraction",
+  "observations": [
+    {
+      "function": "SUM",
+      "case": 0,
+      "formula": "=SUM(-4.190963858916546e-308;-1.0968479063625583e+154;4.190963858916546e-308)",
+      "expected_bits": "dfea2d99e24359ee",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 1,
+      "formula": "=SUM(1.03662626e-316)",
+      "expected_bits": "000000000140272d",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 2,
+      "formula": "=SUM(-3.6102583084399154e-308;-1.7125883440850955;0.6877186781022792;-3.805709713484254e-162)",
+      "expected_bits": "bff065ddbc20f031",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 3,
+      "formula": "=SUM(1.8450392438596745;5.533683136929192e-151;-1.8450392438596745)",
+      "expected_bits": "20bcfb74c0a4cf1e",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 4,
+      "formula": "=SUM(4.439580722813327e-163;5e-324;-5.571505300924971e+150;-1e-323;0.7626988832815215)",
+      "expected_bits": "df3b3ba2a705d5cc",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 5,
+      "formula": "=SUM(3.360261367133943e-151;-3.396444157181352e-151)",
+      "expected_bits": "a04841b0352c6200",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 6,
+      "formula": "=SUM(5.563333782194867e+150;2.233449001688363;-5.563333782194867e+150)",
+      "expected_bits": "4001de1a829c486f",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 7,
+      "formula": "=SUM(-1.1215033952650994e+301;2.0698682039762194e+154;1.6589762124461442e+308;4.273941988147755e+150;-0.6239847445568579;3.7690333375781046e-151)",
+      "expected_bits": "7fed87df8c477802",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 8,
+      "formula": "=SUM(5.135235030424668e-163)",
+      "expected_bits": "1e3d9262679d5e4b",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 9,
+      "formula": "=SUM(1.5402533107172304e-301;-1.2103328630925192e-162;-1.5402533107172304e-301)",
+      "expected_bits": "9e516cb1afcc30f3",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 10,
+      "formula": "=SUM(-1.1093732248002678e+154;3.779093008208827;9.333636151595164e+153)",
+      "expected_bits": "dfc0cd95d33dc098",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 11,
+      "formula": "=SUM(1.32939934797786;1.1038548e-316;-1.20608415e-316)",
+      "expected_bits": "3ff54538402e37d7",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 12,
+      "formula": "=SUM(4.468991271661756e-163;3.8887191162166185e-308;-4.468991271661756e-163)",
+      "expected_bits": "001bf6804344c3eb",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 13,
+      "formula": "=SUM(-1.7529203276319196e+308;5.4637983706837944e-151;-1.7771327631992648e+154;1.9685597189361317;-1.4611328180189188e-301)",
+      "expected_bits": "ffef33f8f5bb7bb3",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 14,
+      "formula": "=SUM(-3.904169888199069;-1.5715526266469228e+301;-3.030602286963825;1.4025052884842573)",
+      "expected_bits": "fe77777dfe4d45b0",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 15,
+      "formula": "=SUM(-3.2044893452788314e-163;1.7802942633782081e+308;3.2044893452788314e-163)",
+      "expected_bits": "7fefb0b6d53273b6",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 16,
+      "formula": "=SUM(-3.4178613282179295e+150;-2.2976425436228465)",
+      "expected_bits": "df30b4c6c82aea32",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 17,
+      "formula": "=SUM(-1e-323;4.717662407263702e+150)",
+      "expected_bits": "5f370f38583e2368",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 18,
+      "formula": "=SUM(-9.249731e-317;3.426658896752126e-151;9.249731e-317)",
+      "expected_bits": "20b1f265ffb2f628",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 19,
+      "formula": "=SUM(-5e-324)",
+      "expected_bits": "8000000000000001",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 20,
+      "formula": "=SUM(1.1839272108550497e+154;5.567692064265306e-151)",
+      "expected_bits": "5fec41a502f4beb1",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 21,
+      "formula": "=SUM(1e-323;1.6857252494320155e+154;-1e-323)",
+      "expected_bits": "5ff41dc88a80491a",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 22,
+      "formula": "=SUM(2.640685296402841e+154;0.5021570515528362;1.339436316994962;1.920334031738858e+154;-1.5038230733653255e+308)",
+      "expected_bits": "ffeac4d9342c095a",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 23,
+      "formula": "=SUM(1.2607428561075825e-162;2.1643473211687604e-162;-1e-323;5.6232318741451534e+150;-1.5530643254494923e+154;1.2993050516714374e+308)",
+      "expected_bits": "7fe720deaae66440",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 24,
+      "formula": "=SUM(-3.5122812129218836e-151;2.7930783147941765;3.5122812129218836e-151)",
+      "expected_bits": "400658397189a989",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 25,
+      "formula": "=SUM(-6.0195778138661015e+150;-1.112338e-316;-4.206396652181976e-151)",
+      "expected_bits": "df3d6c4f326ee99c",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 26,
+      "formula": "=SUM(2.1546482009741204e-162;9.737464587390339e+153;-4.9557559346221594e-151)",
+      "expected_bits": "5fe73d7788cea26a",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 27,
+      "formula": "=SUM(-9.381816e-317;-2.410588507245033e-162;9.381816e-317)",
+      "expected_bits": "9e615a1fce566bb4",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 28,
+      "formula": "=SUM(1.316551953494159e+308;-1.04439379213428e-301;5.0901588301754215e-163)",
+      "expected_bits": "7fe76f768cd2292f",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 29,
+      "formula": "=SUM(-2.173433771040369e-162;-1.5e-323)",
+      "expected_bits": "9e5f4a36589fa78e",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 30,
+      "formula": "=SUM(-1.9094729201065447e-162;3.3643534913840833e-308;1.9094729201065447e-162)",
+      "expected_bits": "0018313a9e5c8971",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 31,
+      "formula": "=SUM(-5.2808455260537234e-163;-1.19479347e-316;-1.2926948576634683;1.3471136985322692e+301)",
+      "expected_bits": "7e741d8a8b7ddb76",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 32,
+      "formula": "=SUM(3.675900464950021e-151;1.1555301715043471;2.6281155146208234e-308)",
+      "expected_bits": "3ff27d0d34827067",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 33,
+      "formula": "=SUM(-1.0704712443275455;6.500644469561947e+150;1.0704712443275455)",
+      "expected_bits": "5f3fc644dd324eab",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 34,
+      "formula": "=SUM(-1.9105957759108398;2.0128931138480776e-162;2.1993132347084225e-162;-1.167028646032086;1.352994735133246e+301;-4.0946096839287994e-162)",
+      "expected_bits": "7e743405b6ed356e",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 35,
+      "formula": "=SUM(-1.5370676216578564e+301;-1.725880087037594e+308;-3.716412780216342;4.011787327816963e-162)",
+      "expected_bits": "ffeeb8c08c587f35",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 36,
+      "formula": "=SUM(3.0811531386910544e-163;4.4071143507310764e-151;-3.0811531386910544e-163)",
+      "expected_bits": "20b714f96a052aa7",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 37,
+      "formula": "=SUM(-3.3282647770627444e-308)",
+      "expected_bits": "8017eecba6939c55",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 38,
+      "formula": "=SUM(-1.7520744761170792;-5.3531784613260973e-151)",
+      "expected_bits": "bffc087f3ef1445b",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 39,
+      "formula": "=SUM(-4.2544225095394744e+150;4.207101404219405e-163;4.2544225095394744e+150)",
+      "expected_bits": "1e383a2042fe5d5f",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 40,
+      "formula": "=SUM(-1.129615870210652;1.0154307940871906e+154;1.552820133985048e+301;5.091648172267857e-163)",
+      "expected_bits": "7e772fe26aaa2ad2",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 41,
+      "formula": "=SUM(4.1975470246117937e-162;-2.568241102488824e+154;-2e-323;-5.96198796770484e+150;-3.024795237107368e-308;5e-324)",
+      "expected_bits": "dffea7a26d849977",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 42,
+      "formula": "=SUM(-1.434595542853844e+308;-1.6551966021840665e-301;1.434595542853844e+308)",
+      "expected_bits": "817c607dbaf9995f",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 43,
+      "formula": "=SUM(1e-323;-1.3161607608713096e+301;2.2050488296839666e+154;-1e-323;2.2464234384530415e+154;1.41744667e-316)",
+      "expected_bits": "fe73a7381133f4a6",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 44,
+      "formula": "=SUM(0.5670357561115372;2e-323)",
+      "expected_bits": "3fe225282b852c85",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 45,
+      "formula": "=SUM(0.6792616312903904;-1.4062751122841675e+308;-0.6792616312903904)",
+      "expected_bits": "ffe90853bff7eb01",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 46,
+      "formula": "=SUM(4.159851820814565e-151;0.8483111104885576;3.419049631628271e-162;-1.5536370199924872e-162;2e-323)",
+      "expected_bits": "3feb255d578c37af",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUM",
+      "case": 47,
+      "formula": "=SUM(2.207528257008408;1e-323;-1.4633661857945301e+301;-1.401881888507207e-162;-1.6404140473623328e-301;1.7569364950640065)",
+      "expected_bits": "fe75d9eefa15a525",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "PRODUCT",
+      "case": 0,
+      "formula": "=PRODUCT(-3.2241125037285294e-162;1.5e-323;-1.605552583838234e-162;-1.5267957e-316;-1.3651628213322897e+301;3.4421812764412074)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 1,
+      "formula": "=PRODUCT(-1.50416107e-316;-4.9590071670334165e+150;3.5966933970574614e-162;-2.1570358049912294e+154)",
+      "expected_bits": "9c2ca03335691fb2",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 2,
+      "formula": "=PRODUCT(-1.3663536699266765e-162;4.830877823992974e-163;-1.6237964e-316;1.6914404532604002;1e-323;5e-324)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 3,
+      "formula": "=PRODUCT(1.19126534e-316;5e-324;4.918541058898416e-163)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 4,
+      "formula": "=PRODUCT(-3.8370779708642457e-308)",
+      "expected_bits": "801b977024691d91",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 5,
+      "formula": "=PRODUCT(-9.64576394144403e+153;-0.7429036413244713;3.8660268622276813e-308;-6.3861240999541236e+150;1.5973552054617297e+154;-1.5621868133260838e-162)",
+      "expected_bits": "3dc845342f6feb9d",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 6,
+      "formula": "=PRODUCT(-5.127131107849951e+150;1.5e-323;-3.7604815364841087)",
+      "expected_bits": "1c51ab91cde92de7",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 7,
+      "formula": "=PRODUCT(-9.62738584415318e+307;-1e-323;1.4493959908202119;1.639066290098767e-162)",
+      "expected_bits": "1b4250eecae87454",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 8,
+      "formula": "=PRODUCT(-1.0695442278164885e-301)",
+      "expected_bits": "8172561f32863d2c",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 9,
+      "formula": "=PRODUCT(0.5194418275208362;4.5768347074238646e+150)",
+      "expected_bits": "5f273db05ba24092",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 10,
+      "formula": "=PRODUCT(1.610033689202031e+308;-1.552756677360098e+154;-2.0181589994597112e+301;1.309386486297864;0.890206584632678;3.3019000285748048e-308)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 11,
+      "formula": "=PRODUCT(2.926059197143983e-308)",
+      "expected_bits": "00150a6679405628",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 12,
+      "formula": "=PRODUCT(1.4973647563703004e+308;-1.11729473e-316;3.6523548506013625e-162;3.421015545093351e+150)",
+      "expected_bits": "bc0ed932c3b27f01",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 13,
+      "formula": "=PRODUCT(0.6871569668340013;1.420454765851574e+301;4.283731602298449e-162;-1.5e-323;6.313400207224107e+150)",
+      "expected_bits": "b93450d997c6cb0b",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 14,
+      "formula": "=PRODUCT(1.3163039064119175;-1.2838390385667748e-162;-1.608612149734097e-301)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 15,
+      "formula": "=PRODUCT(-1e-323)",
+      "expected_bits": "8000000000000002",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 16,
+      "formula": "=PRODUCT(-1.330825924444502e-162;1.2576657632451933e+308;-1.231799789381452e+308;5e-324)",
+      "expected_bits": "5b225e70356d2cb3",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 17,
+      "formula": "=PRODUCT(1.6487554765964627e-301;1.5e-323;-3.5596016750229453;1.448726830513425e-301)",
+      "expected_bits": "8000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 18,
+      "formula": "=PRODUCT(2.024068909072124;3.705274601438347e-308;-1e-323;1.0878477e-316;-4.8043050259435916e-163)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 19,
+      "formula": "=PRODUCT(1.52322543e-316;1.4927382727122734e-301;4.380937183483363e-163;-2.9322929707369504e-308;-1.2580770646805878e+301)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 20,
+      "formula": "=PRODUCT(-2.1496308899031827e-162;-3.9977954534308125e-163;3.7588766848184063e-151;1.340219135317323e-162;0.8635132772115821)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 21,
+      "formula": "=PRODUCT(-1.5790803018835934e+301;-1.7142673779077132e+308;-2.5130272263854417e-162;-5e-324;2.0650232934403767e+154)",
+      "expected_bits": "79d393912a549df4",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 22,
+      "formula": "=PRODUCT(5.491668372257866e+150;1.3386168066151627e-162;1.0616492190578952;-3.73606066034298e+150)",
+      "expected_bits": "dce3967f964e848a",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 23,
+      "formula": "=PRODUCT(1e-323)",
+      "expected_bits": "0000000000000002",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 24,
+      "formula": "=PRODUCT(3.683559147900247e+150;-3.578034168706177e-308;1.3791304775707934e+308;2.325802327576632)",
+      "expected_bits": "df69d47343548053",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 25,
+      "formula": "=PRODUCT(-4.3052692370941264e-308;0.8880227927826319;-1.040059342666381e+308;-1e-323;-2.006970219423295e+154;5e-324)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 26,
+      "formula": "=PRODUCT(-0.5841597844132922;1.739486497138644;-1.5e-323)",
+      "expected_bits": "0000000000000003",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 27,
+      "formula": "=PRODUCT(-5e-324;1.752764161782369e+308;4.690475759700443e-151;-1.7989208808819723;9.756078426067574e-302;3.469855514600306e-162)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 28,
+      "formula": "=PRODUCT(3.3344041056235944e-162;-1.2229469832742998e-162;3.917475141219055e-151)",
+      "expected_bits": "8000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 29,
+      "formula": "=PRODUCT(2.667429932369022e-162)",
+      "expected_bits": "1e63336b8abd469a",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 30,
+      "formula": "=PRODUCT(2.5858209266694816e-308;1.6700979370799014;-4.25185541793559e+150)",
+      "expected_bits": "9f642b0d813bf8ef",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 31,
+      "formula": "=PRODUCT(-1.5305162630697904e+154;5.105868257232653e-163;-1.5993690878188143e-162;4.422959686276709e+150;1.959311971811293e-162)",
+      "expected_bits": "1a5cc3997bb4b0e5",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 32,
+      "formula": "=PRODUCT(-2.024434284864807e+154;1.1315723056118539e+154;1.9903430728427079e-162)",
+      "expected_bits": "de6241c16c65993b",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 33,
+      "formula": "=PRODUCT(1.5267203926730604e+154;3.7797521062337875e-308;1.1523891371275202e-162;1.6140182485980122e+154;1.639165761237468e-301;1.4116427122988962e-301)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 34,
+      "formula": "=PRODUCT(0.8440452266629419)",
+      "expected_bits": "3feb026b229b977e",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 35,
+      "formula": "=PRODUCT(4.527337045064598e-163;-1.8909954637656472e+154;-2.846574415042164e-163;-1.553921811823456)",
+      "expected_bits": "9c8d44f1c24821ae",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 36,
+      "formula": "=PRODUCT(-9.795900782844628e-302;-1.6541659725462508e-301;-1.0137335598009605;3.57460189923435e-308;-1.5311852e-316)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 37,
+      "formula": "=PRODUCT(0.7663100942178901)",
+      "expected_bits": "3fe8859cbf285627",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 38,
+      "formula": "=PRODUCT(-1.786633227934427e-162)",
+      "expected_bits": "9e59b8a7aad38d79",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 39,
+      "formula": "=PRODUCT(-1.3189427999466336e+301;1.0618102e-316;1.0260705646050519e+308;-1.4962618314661915e+301)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 40,
+      "formula": "=PRODUCT(-1.1104674445600756e+308;-3.3954111435755596;1.4640067e-316;2.406478255970946)",
+      "expected_bits": "3e81d449bfba38ee",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 41,
+      "formula": "=PRODUCT(1.1082813834351212e+308;-2.4993471121459767e+154;-1.1766747806746489e+308;1.267133770967645e+301)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 42,
+      "formula": "=PRODUCT(4.9529004989044756e+150;1.5873674169064862e+154;3.928532379366622e-162)",
+      "expected_bits": "5db954187d8a13db",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 43,
+      "formula": "=PRODUCT(1.7927473639614243e+301;1.9435317828801602e-162;4.864161746516733e-151;-1e-323)",
+      "expected_bits": "8000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 44,
+      "formula": "=PRODUCT(2.412717716178072e+154;2.89267117329632e-308;3.525730335333471e-151;-1.8690869177442133e+301;-1.1711472745479288e-162;-2.8520902753313133)",
+      "expected_bits": "9dec4f2358d142c2",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 45,
+      "formula": "=PRODUCT(-1.4135996e-316;2.879783826734718;-5.0703102814491405e-163;2.838389690041096e-163)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 46,
+      "formula": "=PRODUCT(1.5e-323)",
+      "expected_bits": "0000000000000003",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "PRODUCT",
+      "case": 47,
+      "formula": "=PRODUCT(-3.2139348107484604;-5.827421032713889e+150;4.958916764185264e-163)",
+      "expected_bits": "3da46c6a4940623b",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMSQ",
+      "case": 0,
+      "formula": "=SUMSQ(4.3111976230849456e-163;9.523946e-317;1.6703236976505983e+154)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 1,
+      "formula": "=SUMSQ(-6.1644263246974656e+150;-4.3376047229388815e-162;1.2781511e-316;3.9056554598009984e-162;5e-324;3.2026120050433234e-162)",
+      "expected_bits": "7e8c5f0f505e1a15",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 2,
+      "formula": "=SUMSQ(-1.218783375417525e+154;0.5106506522409656;-1.1818294228689628e+308)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 3,
+      "formula": "=SUMSQ(-1.7139239537964566e-162;-3.3505193124107163e-308;1e-323;3.754983795295039e-162)",
+      "expected_bits": "0000000000000003",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 4,
+      "formula": "=SUMSQ(-2e-323;-1.614647859577075;-3.819311336524857e-163;-2.684841310326877)",
+      "expected_bits": "4023a1840c5079b9",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 5,
+      "formula": "=SUMSQ(-1.4181872036623653e-162;1e-323;-0.5274170509518038;4.53872409948699e-163)",
+      "expected_bits": "3fd1cd8448514dba",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 6,
+      "formula": "=SUMSQ(1.8972149767292335e+154;0.7137315039781921)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 7,
+      "formula": "=SUMSQ(1.6866314501351052e-301)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 8,
+      "formula": "=SUMSQ(1.48324757e-316;-5.812963108817724e+150;-3.470298877787168e-308;-0.8004079475847408;3.8107254135679205;-2.9285063927643536e-163)",
+      "expected_bits": "7e893a7776e801ef",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 9,
+      "formula": "=SUMSQ(3.0000604576967875;2e-323;-2.7416041336063507e-162)",
+      "expected_bits": "4022002f8bdd5d00",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 10,
+      "formula": "=SUMSQ(1.0913265463840235e+154;-1.3122170591519102;-0.7650328082974852;-3.4964307840088638;3.1159853691951466e-162;-0.6107561770487165)",
+      "expected_bits": "7fe5334cc82bc5ec",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 11,
+      "formula": "=SUMSQ(1.531579e-316;2.3271781360552937;2.3784040519933633e-308;-9.968088306509809e+153)",
+      "expected_bits": "7fe1afe9e5bde68e",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 12,
+      "formula": "=SUMSQ(1.9929494524307857e+301)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 13,
+      "formula": "=SUMSQ(1.7793796899316359e-162;1.9805237843265195e+301)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 14,
+      "formula": "=SUMSQ(-1.5074650628647022e+301;-3.1170934827568594e-151;3.125256898690469e-308;3.485925214818501e-151)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 15,
+      "formula": "=SUMSQ(1.939153887739757e+301;-3.895583284620602e+150)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 16,
+      "formula": "=SUMSQ(1.2694176e-316;-1.518760615163176e+301;5.394498752719244e-163;-1.5e-323;2.4121579650131064)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 17,
+      "formula": "=SUMSQ(3.8390562856063026e-162;2.106601781799994e+154;1.05553963e-316)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 18,
+      "formula": "=SUMSQ(1e-323;-5.9015645781334e-151;1.315693724160772e-162)",
+      "expected_bits": "018ddaee5bcd68ad",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 19,
+      "formula": "=SUMSQ(-9.488958740665013e+153;-1.6116911710308344e+301;1.6415228565553323e-301;-2.265479953433475e-308;-1.49525233e-316;-1.9413805470607445e-162)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 20,
+      "formula": "=SUMSQ(1.9707137754996514e-162)",
+      "expected_bits": "0000000000000001",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 21,
+      "formula": "=SUMSQ(-0.5868506004744484;-0.5513924921134249;4.113934268098615e+150;-2.500522907052787e-308;1.2261190821298458e+154;1.958435117462723)",
+      "expected_bits": "7feac2c686afdf81",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 22,
+      "formula": "=SUMSQ(-1.5509581230376526e+301)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 23,
+      "formula": "=SUMSQ(-3.262274228443101e-162)",
+      "expected_bits": "0000000000000002",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 24,
+      "formula": "=SUMSQ(3.408800520665965e-162)",
+      "expected_bits": "0000000000000002",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 25,
+      "formula": "=SUMSQ(5.5083207402600825e+150;-2.3146561730070774e-162)",
+      "expected_bits": "7e86a743121a0a94",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 26,
+      "formula": "=SUMSQ(-1.79962016626378;-5.414709014389728e-151;-1.8583132357306854e-301;1.7776185507714344e-301;-1.5e-323;-4.452269127401544e-151)",
+      "expected_bits": "4009e8b84891722b",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 27,
+      "formula": "=SUMSQ(2.9440750785132497e-162;9.264555841421172e+307;5.471744002655975e-163;-2.9336123735975123e-162)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 28,
+      "formula": "=SUMSQ(3.361382454403994e+150;-2.1291435521452213e-162;-0.6300352728959937;3.756610195180756e-162;-1.2892647550435207e+308)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 29,
+      "formula": "=SUMSQ(-6.0702988527401326e-151)",
+      "expected_bits": "018f963950d8c7c7",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 30,
+      "formula": "=SUMSQ(-1.5552071867846178e+308;1.6579407613411848e-162)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 31,
+      "formula": "=SUMSQ(1.6073365600616558e-162;0.99416527330382;8.425496165428983e+153;2.589567892695032e+154;3.665219704204246e-308;1.5285755e-316)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 32,
+      "formula": "=SUMSQ(-1.8170033341099003;1.062444617331221e-301;4.1808598528707296e-163;-1.3398858455387721e-301;1.7134407141802475e+308;5.0831348382851436e-163)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 33,
+      "formula": "=SUMSQ(-1.8887855339733262e+154)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 34,
+      "formula": "=SUMSQ(-9.063680850751447e+153;3.4908232777385675;5.6544488298528536e-151)",
+      "expected_bits": "7fdd3f19670796b1",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 35,
+      "formula": "=SUMSQ(3.551070890113664e+150;0.9486295144601159;-9.464734813384274e-302;-3.401899711743145e-162;2.7695595719969273)",
+      "expected_bits": "7e72d46616dadb76",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 36,
+      "formula": "=SUMSQ(5.9725456722063094e+150;-1.0817249745356983e+154;-4.5924756003711296e-151)",
+      "expected_bits": "7fe4d438dab02812",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 37,
+      "formula": "=SUMSQ(3.905252483627828e-162;-2.4332796033768166e+154)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 38,
+      "formula": "=SUMSQ(-3.916698340370183e-162;-4.826335384706363e-163)",
+      "expected_bits": "0000000000000003",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 39,
+      "formula": "=SUMSQ(-1.8657653051489968e+154)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 40,
+      "formula": "=SUMSQ(3.489425236922644e-308)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 41,
+      "formula": "=SUMSQ(-0.9820866330352657)",
+      "expected_bits": "3feedd22d87fb94f",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 42,
+      "formula": "=SUMSQ(-1.6992475780313154e-301;-3.0148270295503585e-308)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 43,
+      "formula": "=SUMSQ(-1.3910070114923025e-301;1.5e-323)",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 44,
+      "formula": "=SUMSQ(-1.175830617236454;2.187855154620377;-3.7783589790467234e-151;-1.4480980833026675e+154;-2e-323)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 45,
+      "formula": "=SUMSQ(4.909420209549096e+150;-1.204730651143789e+308;-1.2684708490878076;-1.63227526e-316;-1.326427310210219e+154;-5.43856104922906e-151)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 46,
+      "formula": "=SUMSQ(-2.119124242226745e-162;-2.0601128344970377e+154)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMSQ",
+      "case": 47,
+      "formula": "=SUMSQ(1.435359384489512e+154)",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 0,
+      "formula": "=SUMPRODUCT({5.138513911763578e-151;5.138513911763578e-151;1.5e-162};{-0.5604266511948935;0.5604266511948935;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 1,
+      "formula": "=SUMPRODUCT({1.3066895046407213e+154;2.6790345425794572e+154;-5.6277191821040586e-151;2.650767698068529e-308;1.6862036103702236;2.8357491733559264};{1.9007297579744862e-162;-1.57644273e-316;1.4322915840011922e+308;1.4175117718504662e+308;1.609195724273108e+301;-4.49284444595401e-151})",
+      "expected_bits": "7e84423f2900f0d6",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 2,
+      "formula": "=SUMPRODUCT({1.5802401297718766e+301;2.0371022032570307e+154;-1.034403808650421;-1.7426165658715418e+308;-1.6834282377505198e+308;2.1665900073399666e-162};{-5.4820909140853705e-151;-1.276543687021296;-5.59709644283128e-151;-5e-324;1.5e-323;1.3349885447644616})",
+      "expected_bits": "dfff0adb0ad0aa96",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 3,
+      "formula": "=SUMPRODUCT({-1.3553855740690313e+154;-1.3553855740690313e+154;1.5e-162};{-5.193651934427127e-163;5.193651934427127e-163;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 4,
+      "formula": "=SUMPRODUCT({-1.316656912072429e+301;-4.275292798473928e-163};{-1.62672463e-316;1.07419876e-316})",
+      "expected_bits": "3ce34abe2150d55b",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 5,
+      "formula": "=SUMPRODUCT({-0.9603051379934303;-4.021387083227207e-163;-9.004882197117062e+153;-3.533243789349054e-163;2.953002121623959e-163;-6.12048864652321e+150};{1.4806194057999675e+301;-1.41701046e-316;-4.2287624689481755e-162;1.815210942441212e-301;-1.5e-323;-7.571625230248447e+153})",
+      "expected_bits": "7f30e39b8d0235b1",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 6,
+      "formula": "=SUMPRODUCT({-2.1909387328980935e-162;-2.1909387328980935e-162;1.5e-162};{-0.7501127701147687;0.7501127701147687;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 7,
+      "formula": "=SUMPRODUCT({-3.5480775977144714e-162;3.1737051707483745;0.8390040023460904};{1.3232319306705729e+154;3.965860910935451;2.3380748231014152})",
+      "expected_bits": "402d18a42675f239",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 8,
+      "formula": "=SUMPRODUCT({8.800713e-317};{3.400308274782934e+150})",
+      "expected_bits": "1d91a574215257bb",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 9,
+      "formula": "=SUMPRODUCT({-1e-323;-1e-323;1.5e-162};{-4.1701117784002393e-162;4.1701117784002393e-162;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 10,
+      "formula": "=SUMPRODUCT({-1.4343923174633393e+154;-2.2248508371925213e+154;-6.331740411906164e+150};{-1.86729796039442e-162;1.2787713639531993e-162;1.055951486040868e-301})",
+      "expected_bits": "be1ca0cd9b305d69",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 11,
+      "formula": "=SUMPRODUCT({0.784176278251436};{1.3504924109944565e-301})",
+      "expected_bits": "017227f33c513cbd",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 12,
+      "formula": "=SUMPRODUCT({8.756897257071982e+153;8.756897257071982e+153;1.5e-162};{-0.8020350675979816;0.8020350675979816;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 13,
+      "formula": "=SUMPRODUCT({-1e-323;-1.4824260584565694};{2.992379603584251e-308;1.6769353776886615e-301})",
+      "expected_bits": "81854f410c33e8ff",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 14,
+      "formula": "=SUMPRODUCT({-1.1537840228843326;5.4691441470610056e+150};{-1.1276350819613993e+154;8.462346372402865e+153})",
+      "expected_bits": "7f30df4fb0069235",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 15,
+      "formula": "=SUMPRODUCT({-1e-323;-1e-323;1.5e-162};{-4.2850717610690025e-163;4.2850717610690025e-163;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 16,
+      "formula": "=SUMPRODUCT({1.6028256809345907e-162;-3.916394007278381e-308;0.5266759720777201;-1e-323;-5.259416462404559e-163};{1.4249279623323554e-162;1.5004750678094565e+301;-2e-323;-3.5376943484179296e-162;1.1476393102805212e-301})",
+      "expected_bits": "bea3b7d55d6741ec",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 17,
+      "formula": "=SUMPRODUCT({1.76704028402502e-301;-0.9719512736551715;1.3020191322844324e-301;-2.901136225222324e-308;2e-323;4.0829464455574147e-162};{-1.951594821352953e+154;1.5e-323;3.9837746644778753e-163;-4.016298237688096e-151;-1.5364778352426938;-5.9599285064737376e+150})",
+      "expected_bits": "bdbac16e757a7bfb",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 18,
+      "formula": "=SUMPRODUCT({3.084175452781873e-151;3.084175452781873e-151;1.5e-162};{0.7625709626446789;-0.7625709626446789;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 19,
+      "formula": "=SUMPRODUCT({1.184151760666396;3.62499250740532e+150;-4.0258402162608494e-308;-1.4442109823380777e+308;1e-323};{0.5467326905485435;1.2158924398170666e+301;-1e-323;4.769417437515815e-163;-1.2652598056019806e+308})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 20,
+      "formula": "=SUMPRODUCT({-4.074693725787813e-308;1.591273228350708e-162};{-1.2461585330203862e+308;4.789391174358247e-151})",
+      "expected_bits": "40144f945a22f750",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 21,
+      "formula": "=SUMPRODUCT({3.054227220838366e-162;3.054227220838366e-162;1.5e-162};{-1.3349349004238945e-162;1.3349349004238945e-162;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 22,
+      "formula": "=SUMPRODUCT({-8.5662317e-317;-2.8105169506687586;2.8534012742525025e-308};{-1.5078666023392882e-301;1.561528597990075e+301;-0.5696975245668221})",
+      "expected_bits": "fe90621db5fcbde0",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 23,
+      "formula": "=SUMPRODUCT({9.625408688473292e+307};{-1.3477387368339875e+301})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 24,
+      "formula": "=SUMPRODUCT({-1.4677766e-316;-1.4677766e-316;1.5e-162};{-4.0830826737417305e+150;4.0830826737417305e+150;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 25,
+      "formula": "=SUMPRODUCT({2.207363478443151e+154;3.2348222338523164e-151;-1.4488912161027545e+154};{3.6074731018994444e-162;4.1951964391078216e+150;4.4403774316908184e-163})",
+      "expected_bits": "3ff5b690a6f7e04b",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 26,
+      "formula": "=SUMPRODUCT({-1.9900494749878687e-162;1e-323;3.825640380091017e-308;1.0955035750247076e-301;1.0038559398501199e+154};{2.1667636237208848e+154;-1.8804046657050672e+301;-2.205045989993958e-162;2.4441353916473363e-308;3.35086190302958e-308})",
+      "expected_bits": "be6726527289b3e3",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 27,
+      "formula": "=SUMPRODUCT({2.057787145499435;2.057787145499435;1.5e-162};{-3.58519994884511e-162;3.58519994884511e-162;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 28,
+      "formula": "=SUMPRODUCT({-1.9593180187440047e+301;-2.2949503361946495e+154;-1.1845934962127185;-1e-323;1.035877e-316};{1e-323;-2.6237556501619204e+154;-1.1763136879881894e+154;0.9594483280246393;3.054777881908199e-308})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 29,
+      "formula": "=SUMPRODUCT({1.9091732996286948e-162;-5e-324};{-1.5983663685651308e+301;1.5416990627696013e+154})",
+      "expected_bits": "dce47fff6cc85190",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 30,
+      "formula": "=SUMPRODUCT({-2.0268649181037937;-2.0268649181037937;1.5e-162};{-1.127367305409549;1.127367305409549;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 31,
+      "formula": "=SUMPRODUCT({-1.4709383119357074e+308;0.9269125489283547;-1.3542456e-316;-1.1875677845512037e-162;1.4871135233233057;-1.23078813e-316};{-2.704609930580359e-308;-0.9913610212468259;-1.5e-323;1.3689139733409166;1.0651708396597444e+308;6.3170877630203e+150})",
+      "expected_bits": "7fec3258ea6c7aff",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 32,
+      "formula": "=SUMPRODUCT({-0.6914093109574083;-0.9985132109608258;1.1588227733049952;-2.8872521822809847;1.65302157e-316;-1.5838980089400392e-301};{4.098433669526283e+150;-1e-323;-1.64739243e-316;1.861726588489607;-1.2505677e-316;-1.1520621531871291})",
+      "expected_bits": "df2bb39dd78247ca",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 33,
+      "formula": "=SUMPRODUCT({1e-323;1e-323;1.5e-162};{1.8504544069487606e-301;-1.8504544069487606e-301;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 34,
+      "formula": "=SUMPRODUCT({-2.3577373084592645};{1.079543179758936e+301})",
+      "expected_bits": "fe8300da5e62dd26",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 35,
+      "formula": "=SUMPRODUCT({1.2793099892599872e+308;1.2764957777993615e-162;-1.4104432e-316};{-5e-324;9.777219896218312e+153;5e-324})",
+      "expected_bits": "3e4acd4561b47d9e",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 36,
+      "formula": "=SUMPRODUCT({5e-324;5e-324;1.5e-162};{-5.976413005014503e-151;5.976413005014503e-151;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 37,
+      "formula": "=SUMPRODUCT({-1.5e-323;2.8719371890551164e-308;1.524862011562827e+301;-3.9270852344561615e-308};{1.788025110866914;-1.5059220368303637e+154;2.3459692701040713;-4.7695163031045936e-151})",
+      "expected_bits": "7e8ab556f1506ffc",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 38,
+      "formula": "=SUMPRODUCT({2.9220867386229756e-162};{1.2546176371749282})",
+      "expected_bits": "1e6a63ba3103197c",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 39,
+      "formula": "=SUMPRODUCT({2.2226781436041074e+154;2.2226781436041074e+154;1.5e-162};{-1.1109143768212228e+154;1.1109143768212228e+154;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 40,
+      "formula": "=SUMPRODUCT({1.6961275183274672e-301;-2.942011878875214e-308;-1.2124062551661066;0.5675718806377122};{1e-323;-5.0175680059193394e-151;1.1335737855716574e+308;-4.4860734664169485e-163})",
+      "expected_bits": "ffe876dad729d238",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 41,
+      "formula": "=SUMPRODUCT({5e-324;1e-323;3.9429914301256496e-163;1.962198816119143e-162;-1.449805791025705;0.8709917945690338};{3.454147660486804e-308;1.448698634872041e-301;2.7688333706582426e-308;-1.037846119880233e-301;-1.25877675e-316;1.4812114217841765e-162})",
+      "expected_bits": "1e5292c2ed126895",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 42,
+      "formula": "=SUMPRODUCT({-3.888572006627281e+150;-3.888572006627281e+150;1.5e-162};{1.5e-323;-1.5e-323;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 43,
+      "formula": "=SUMPRODUCT({5.231995596420469e-163};{1.00828285e-316})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 44,
+      "formula": "=SUMPRODUCT({0.8085537127530065;-1.56230435e-316;1.53756544e-316;-1.9381055412744197e+154;-1.7464880796394991e+308};{-1.717149660295831e+308;9.791606414101739e+153;-5e-324;-3.5919600353628487e-308;5.4764756157866164e-163})",
+      "expected_bits": "ffe8b6e808027230",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 45,
+      "formula": "=SUMPRODUCT({2.0766058893160663e+154;2.0766058893160663e+154;1.5e-162};{-0.5499126660993481;0.5499126660993481;1.5e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 46,
+      "formula": "=SUMPRODUCT({-2.0653574352175235;-1.5588230583967926;0.7096276624063037;5e-324;-1.1500458389966774e+154;-1.8992587562608446e-162};{0.5770250904343384;-1e-323;7.664184809432279e+153;-5e-324;1.5e-323;-1.7732279101698385e-162})",
+      "expected_bits": "5fd9f5f972b2db5e",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMPRODUCT",
+      "case": 47,
+      "formula": "=SUMPRODUCT({1.786089676236376;3.2302577164749606;4.62071307123799e-151;6.832865877378999e+153;1.1180742037447592e-162};{3.5063039985399804e-308;1.3245901656671688e+308;3.7934575779933745e-151;-2.6098494036868894e+154;4.140311445148711e-163})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 0,
+      "formula": "=SUMX2MY2({-2.242678007648876;1.9901276700658974;3.996161823842251e-151;1.64193157e-316;1.0};{-2.242678007648876;1.9901276700658974;3.996161823842251e-151;1.64193157e-316;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 1,
+      "formula": "=SUMX2MY2({0.5378154093873536;0.9330962125489505;-1.361251173587632e+308;3.9102278845408076e+150;1.6629841660021323e+301;4.2700752238520623e-308};{1.3865008247720561e-301;3.0474459466103537e-308;1.3810610441036423e+308;3.5526589527235395e+150;3.8363489191302487e-308;5e-324})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 2,
+      "formula": "=SUMX2MY2({-2.3747407602222688;1e-323;1.5e-323};{0.9237826154253116;2.0797266751825503e+154;-5.4607925703402546e+150})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 3,
+      "formula": "=SUMX2MY2({-3.152524558983919;1.0};{-3.152524558983919;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 4,
+      "formula": "=SUMX2MY2({5.112503896114396e-151;-8.880523e-317};{-1.9337533875085318e+154;-3.34095187562447e-308})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 5,
+      "formula": "=SUMX2MY2({2.4996121413275417e-308;1.7470485005552734;-4.638823077401996e+150;3.136455889193386;-1.4499837149945586e-162};{-1.0123959e-316;1.5155560683647942;0.9798809641244335;-3.276927740353973;-4.3696908333264927e-308})",
+      "expected_bits": "7e8010eaa8503503",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 6,
+      "formula": "=SUMX2MY2({-1.5461558825365465e+301;3.0602811147153397;1.0};{-1.5461558825365465e+301;3.0602811147153397;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 7,
+      "formula": "=SUMX2MY2({1.0036742228058268e+154;0.9562506632115286;-1.4476622308368539e+308;1.5347379015328864e-301};{-8.302628081535027e+153;4.814882503325104e+150;1.3680847e-316;-1e-323})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 8,
+      "formula": "=SUMX2MY2({-3.9901825220028526e-308;-1.4312293818970562e-162;-2.912856081865111e-162;2e-323;-2.8789963570312342};{1.3827237735746222e+301;-3.7369890084504123;-1e-323;2.2527100032503895e-162;-1.5e-323})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 9,
+      "formula": "=SUMX2MY2({1e-323;1.0};{1e-323;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 10,
+      "formula": "=SUMX2MY2({-1.0955186727921173e+301;-4.0226333552223974e-308;-1.1349008e-316;-2.4414836884656376e+154;1.1762315e-316;-4.627151543578481e-151};{3.9063658371592616;-1.5e-323;-3.3347480286504895e-308;-2.1613107941158682e+154;-1.0806747547405569e+308;2.0557049435147883e+154})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 11,
+      "formula": "=SUMX2MY2({-4.065056406359962e-163;5.680957593017327e+150;1.18109122883459e-162;2.423942890694984e-162;-1.5e-323;-5.797509480632639e+150};{3.0625438464885846e-162;1.7095344567737452;-3.4695141847527305e-162;-1.4894006202404905e-301;2.9086887030513157e-308;2.114108578335212e+154})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 12,
+      "formula": "=SUMX2MY2({-5e-324;1.0};{-5e-324;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 13,
+      "formula": "=SUMX2MY2({1.5671852788787856e-301;-6.1581490280729885e+150};{4.202577306696814e-308;2.6075762300306455})",
+      "expected_bits": "7e8c504677675280",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 14,
+      "formula": "=SUMX2MY2({1.1794476044041785e+154;2.925477896357583e-162;-1.5e-323;-1e-323};{-3.5493788578305084e+150;-5.5033360940576666e-151;3.528783572716233e-162;-3.272444544697864e-151})",
+      "expected_bits": "7fe8c328b8ae21fd",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 15,
+      "formula": "=SUMX2MY2({-2e-323;1.0};{-2e-323;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 16,
+      "formula": "=SUMX2MY2({2.826955219483598e-308};{-0.6568502525652984})",
+      "expected_bits": "bfdb9ce9ea7ee810",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 17,
+      "formula": "=SUMX2MY2({1.8779874814350974;-1.5e-323;-1.4214914e-316;-1.6562155557962422e+154;3.454787687702692e+150};{1.5e-323;-1.0647652761400805e-301;1.838162984087548;2.550095637779002e-162;-4.187829931939103e-151})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 18,
+      "formula": "=SUMX2MY2({1e-323;-6.156376589007885e+150;-1.5e-323;-1.5615867580689657e+301;-2.6183301254609938e+154;2.5709492196289044e-162;1.0};{1e-323;-6.156376589007885e+150;-1.5e-323;-1.5615867580689657e+301;-2.6183301254609938e+154;2.5709492196289044e-162;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 19,
+      "formula": "=SUMX2MY2({-1.3274098222192758e+308;2.218355148957077e-162;4.0733945928303486e+150;-1.447712364654485;-3.372579580523904e-163};{-0.9474475891135216;-1.3409877347904975e+301;2.575212560704218;-3.3013958114466043e-162;1.172327088705971e-162})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 20,
+      "formula": "=SUMX2MY2({-3.0465648134838825e-162;-1.36047324e-316;1.9132733637002966e-162;-1.7663828306641475e-301;-1e-323};{-2.4544936213278053e-308;1.8588465395479763e-162;-4.1624921275517166e-163;5e-324;9.844503790342267e+153})",
+      "expected_bits": "ffe14055da36ec43",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 21,
+      "formula": "=SUMX2MY2({0.9215977955109542;-2.773775643964832;-3.0312974921498225e-308;1e-323;3.1158672104381663e-162;4.134155999977195e-163;1.0};{0.9215977955109542;-2.773775643964832;-3.0312974921498225e-308;1e-323;3.1158672104381663e-162;4.134155999977195e-163;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 22,
+      "formula": "=SUMX2MY2({-3.66396861290368e-163;-1.8520611540042505e-162;-1.1789084084328474;-1.8360400418062176e-162;0.548968808832004};{-0.8823803850391124;1.221367106637416e+154;-1.6237518389566705e+301;3.150337108900493e-162;1.8937431978140752e-162})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 23,
+      "formula": "=SUMX2MY2({1.7094254102338693e+154;-2.3899997627258722e+154;1.5188626986598418e-301;1.8226651342939542e+154;3.481612003935349};{1.3715339e-316;2e-323;-1.1056487259379434e+154;2.8344696802092924;-2.3640749752039867e-162})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 24,
+      "formula": "=SUMX2MY2({-0.5121758796695264;-2e-323;-5.521566994003189e-163;3.26708932459034;5.1525428308378185e-163;1.0};{-0.5121758796695264;-2e-323;-5.521566994003189e-163;3.26708932459034;5.1525428308378185e-163;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 25,
+      "formula": "=SUMX2MY2({-5e-324;-1.5e-323;1.2092163773823337e+154;-4.8859076221393255e+150;5.151644452029587e+150};{-2.29444906547565e+154;-2e-323;9.400995e-317;1.5e-323;-3.528344934631346e+150})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 26,
+      "formula": "=SUMX2MY2({1.9138382321979631e-162;-5e-324;1.0108443897990807e+308;3.2198838493625677;-1.585261087941512e+301};{-2.6011952241494297e-308;1.4541822e-316;2.3770887833135997e-308;-1.8828402787077914e-162;-1.5836220640233579e-301})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 27,
+      "formula": "=SUMX2MY2({1.2671645898347108;-3.359774086746961e-163;3.539287397713259e-151;1.0};{1.2671645898347108;-3.359774086746961e-163;3.539287397713259e-151;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 28,
+      "formula": "=SUMX2MY2({5.3842369584267136e+150;-5.441291988401734e-163;-3.5947374008910034;-8.999087681502415e+153;3.066419258501161e-308;-5.110750969030289e-163};{3.120652317980524e-151;-2.380056909337926e+154;-1.9199009239939169;1.6664209038013367;-1e-323;1.3403522552520876e-301})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 29,
+      "formula": "=SUMX2MY2({4.207267170767696e-162};{-2.551452819837423e+154})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 30,
+      "formula": "=SUMX2MY2({1e-323;0.5867530436242978;1.070931261693214;0.635683705287256;1.0};{1e-323;0.5867530436242978;1.070931261693214;0.635683705287256;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 31,
+      "formula": "=SUMX2MY2({-4.3792987011182097e-162};{1.0756265e-316})",
+      "expected_bits": "0000000000000004",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 32,
+      "formula": "=SUMX2MY2({-0.8798818669585354;-2.4254152835354787;1.002483891620031e-301};{-0.6647240992341773;-1.5757755536999098e+308;5.358625950260282e-151})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 33,
+      "formula": "=SUMX2MY2({4.0532047566684746e-308;7.978703373898797e+153;1.0};{4.0532047566684746e-308;7.978703373898797e+153;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 34,
+      "formula": "=SUMX2MY2({-2.1970290445190288e-162;5.381109400159778e+150;1.2961336664489916e+308};{5.982674670970986e-151;-1.015975070367869e+308;-1e-323})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 35,
+      "formula": "=SUMX2MY2({-2.2443025182644006e-162;-1.4750097044289645e-162;-3.581425184158649e-151;-1.1959295435191064e+154;1.4084528651336736;-0.583559687968392};{3.5834219798699176e-308;6.4530525472496665e+150;5.1965974854286034e-151;-5.954908085573391e-151;3.586840251885126e+150;1.8943819807476765})",
+      "expected_bits": "7fe97590c77a4b98",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 36,
+      "formula": "=SUMX2MY2({-9.501850373061854e+153;-1.5931423148875363;-3.2565402876684706;-0.6053501013558943;3.7717946995376686e+150;-2.6568922939776107;1.0};{-9.501850373061854e+153;-1.5931423148875363;-3.2565402876684706;-0.6053501013558943;3.7717946995376686e+150;-2.6568922939776107;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 37,
+      "formula": "=SUMX2MY2({9.61864651815444e+307;-9.977038713452097e-302;1.8623157217571062e-301;1.5e-323;4.79607690217476e+150};{-2e-323;-2.468949825198155;-5.522883669839846e-151;-1.1828654005253288e-301;3.8548249344612516e-308})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 38,
+      "formula": "=SUMX2MY2({0.7115299270179941;-1.543311530671915e+154;5.20255700264377e+150};{1.2874556049790186e+154;-3.9034721288951836e-308;3.758538634925659e+150})",
+      "expected_bits": "7fd9c8ea0300938b",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 39,
+      "formula": "=SUMX2MY2({1.5e-323;1.014834681904685e+308;-3.659215960719953e+150;-0.6031907215975262;1.1074566626112007e+308;1.0};{1.5e-323;1.014834681904685e+308;-3.659215960719953e+150;-0.6031907215975262;1.1074566626112007e+308;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 40,
+      "formula": "=SUMX2MY2({-1.4215565019159368e+154;1.6526447931010357;-1.0194915e-316;2.242469804639443e+154;3.4533709778634827;-1.33248942046222};{-4.606232321804625e-151;1.1367367949103112e-162;-8.916620463565229e+153;-5.252599219251744e+150;1.3009772e-316;0.7805897966116279})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 41,
+      "formula": "=SUMX2MY2({2.7650637008864374};{-1e-323})",
+      "expected_bits": "401e9512353612c0",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 42,
+      "formula": "=SUMX2MY2({9.050212774108236e+153;-1.4135971677496898e+301;-4.941677722627229e-163;2.5214380115036804e-308;-2.060927479711279e-162;1.0};{9.050212774108236e+153;-1.4135971677496898e+301;-4.941677722627229e-163;2.5214380115036804e-308;-2.060927479711279e-162;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 43,
+      "formula": "=SUMX2MY2({1.2838230739839239e+308};{-4.5528765169347905e-163})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 44,
+      "formula": "=SUMX2MY2({1.1928224510157168e-162};{1.7621320102926252e-301})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 45,
+      "formula": "=SUMX2MY2({5e-324;1.0};{5e-324;0.0})",
+      "expected_bits": "3ff0000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 46,
+      "formula": "=SUMX2MY2({1.5e-323;1.8287319203853482e-301;-1.4047560011018839e-301;1.165259e-316;2.918806592462172};{-1.8158559824331707e-301;1.3648600923661594e+308;2.610447126985866e+154;5.494807222017591e-163;0.7483351283649798})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2MY2",
+      "case": 47,
+      "formula": "=SUMX2MY2({1.2813064186143745e+308};{-0.7273070159659784})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 0,
+      "formula": "=SUMX2PY2({1.5009975408093675e+154;-5e-324;-3.680590881905038e+150;-5.4212539119242487e-163;-1.48448347e-316;-1.7925478884974373};{1.5e-323;1.4623877997489447e+301;-1.7899672064053036;1.6025131e-316;1.0185786517761384;3.696170083759463})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 1,
+      "formula": "=SUMX2PY2({2.0655115880518458e+301;3.615221506831997e-151;1.2899357224532355e+308;-0.7538111646723252;-2.0432606181788761e+301};{-5e-324;1.0297651472012787e+154;-4.31906784101116e-151;-4.7538204492767744e-151;-1.102728621238145e+154})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 2,
+      "formula": "=SUMX2PY2({1.1224663822708134e+301};{-1.8711829509161828e+301})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 3,
+      "formula": "=SUMX2PY2({-5.497940613830946e+150;4.5976810569593585e-151;-1.51588547752379e+301};{4.541200704869718e+150;-2e-323;2.9857285298674574})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 4,
+      "formula": "=SUMX2PY2({4.24069054616581e-163;3.7631332933102097e-162;-2.4741162426189764e+154;-4.0078079624797694e-162;-1.702669763784828e-162;-3.795271380585117e-162};{-3.7611458439816875e-308;4.446880961511398e-308;1.03985147e-316;-1.278205041043592;-2e-323;-0.8919572167998342})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 5,
+      "formula": "=SUMX2PY2({4.46485677944776e+150;-3.0089590893093235e-163;-1.2131353948479462e+154};{2.2204126806744802e+154;-5.527878485461574e-163;-1e-323})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 6,
+      "formula": "=SUMX2PY2({1.2674915e-316;1.6552562267354743e+308;2.4558337525179077e-162;4.666927385631869e-163;-2.035157184875931e+301;-0.9677639807118146};{-5e-324;5.6417273818923296e-151;-3.9061543881040876e-151;3.8175400465487075e-151;0.5304819446843647;-1.18531878411036e-301})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 7,
+      "formula": "=SUMX2PY2({-1.1129749289413228e+308;-1.6289926783105146;-3.623525161178964e-162;-0.5520015575769724;2.0569766064567159e+301};{0.5366162434971066;-1.42196727722539e-162;1.02141877e-316;1e-323;-2.062654821462834e-162})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 8,
+      "formula": "=SUMX2PY2({-1.1799216e-316;1.5e-323;3.954179734530728;1.9558998739045771e+301;-1.2815829431737427e-162;-1.7373161232784576e+301};{1.2610034920918922e-301;1.1699706815490443e+301;1e-323;2.985738292470487e-163;0.7584626609383688;3.5905658664825474e-162})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 9,
+      "formula": "=SUMX2PY2({5.699384356862503e+150;-1.5e-323;-3.200860825917768e-151};{1.3496043787448679e+308;1.5e-323;-3.5065585234730205e-162})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 10,
+      "formula": "=SUMX2PY2({1e-323;-2.061695543444074e-162;-1.557673859752962e-301;-5e-324;-2.17581545542971e-162;5e-324};{5e-324;1e-323;5.320115551277631e-163;-1.2691686497634782e-301;5.173109982524633e-163;5.520297218563193e-151})",
+      "expected_bits": "018a1f4bbe813bd3",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 11,
+      "formula": "=SUMX2PY2({-4.3120030153596785e+150;-9.343375869344963e+307};{1.5e-323;-2.4814894146291768e+154})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 12,
+      "formula": "=SUMX2PY2({1.5091948269965785};{-2.1182969227772326e+301})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 13,
+      "formula": "=SUMX2PY2({-9.947600705196952e+153;-2.8505781636545605e-163;-3.766510497432121;-1.0829969589780362;-1.5583250017812008e+154;1.875752061311406e+154};{-1e-323;-0.8893904414415168;-3.704962199594369e-162;1.5806091602270554e+154;-2.0957861859571078e-162;-2.866518643424653e-308})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 14,
+      "formula": "=SUMX2PY2({1e-323;-3.7135251692185314};{-3.8710009238584534e-308;3.8300449091480444})",
+      "expected_bits": "403c75a2a804bb95",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 15,
+      "formula": "=SUMX2PY2({-5e-324;-5.895406833659881e-151;1.1202858e-316;1.5695491e-316;-1.3330183242839285e+308;5e-324};{-1.1415232709027882e-301;3.024209443811335e-163;-3.829471577380922e-163;-3.5336911057330584e+150;1.5e-323;-1.9298355082396352})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 16,
+      "formula": "=SUMX2PY2({1.2001072437602157e+308;4.25920459326244e-162;1.535365415205603e+301};{3.700724733082696e-162;-3.2984274160613523;-1.4466063514524276e-301})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 17,
+      "formula": "=SUMX2PY2({-5.18972227662044e+150;2.9997143735003144e-308};{-1.3227100282086232e-162;5.225547718107214e-163})",
+      "expected_bits": "7e841bcf67448c40",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 18,
+      "formula": "=SUMX2PY2({-1.1135050976538033e+154;0.5796772192737765;-3.894694617075132e+150;3.513919247936632e-308;5e-324;3.4556096564190124};{-3.45739789679024e+150;-3.181809470719e-163;-1.2348179052996441e+308;2.5972499041832724;1e-323;1.686330899329418e-301})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 19,
+      "formula": "=SUMX2PY2({2.2692865823395253e-308;2.017488695121182e+301};{-1.5326942915448483e+154;-3.1159002061374324e-162})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 20,
+      "formula": "=SUMX2PY2({2.277929884198667e-162;-1.4438110264469742e+308;7.93428598300673e+153;1e-323;1.2080869245432033e+154};{-1.2265567990485335e-301;-1e-323;0.5647309235466955;3.924133136771331;-2.916075869443467e-162})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 21,
+      "formula": "=SUMX2PY2({1.3843934588198978};{2.1785443826076464e+154})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 22,
+      "formula": "=SUMX2PY2({-3.9250828440336386e-163;-1.6215958362401247e-301;2.2250533729947677e+154;3.9623156261502395;4.7912857881911914e+150};{-1.4863970246979197e-301;-1.5369014920600785;3.195005812527683;-5.704066699438794e-151;-3.687038054509859e-163})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 23,
+      "formula": "=SUMX2PY2({-5.068972190586401e+150;3.369470630432915;3.2520090217484263};{-2.5728665484060236;1.68033828122065e+301;-1.328650325043107e+154})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 24,
+      "formula": "=SUMX2PY2({-5.101007758784586e-163;1.14767734e-316;-1.5788929270083685e+301;3.384063989785244e-162};{0.7978603671758682;-1.580703067954737e-162;-1.736415538080008e-301;3.62854562717278e-151})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 25,
+      "formula": "=SUMX2PY2({-1.31568343e-316;2.6624475117920876e+154;-3.4179320241224884};{-1.0896951e-316;8.7528556e-317;0.7001819093986711})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 26,
+      "formula": "=SUMX2PY2({7.120278456078641e+153;3.365988604022663e+150;-1e-323;1.5404696e-316;2.964901468150906;6.736493635334363e+153};{3.5135787697893916e-162;3.952536571171057;-2.166565665738608e-162;-5.623259642167123e-151;5e-324;0.5757630281742265})",
+      "expected_bits": "7fe11a42b5c35871",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 27,
+      "formula": "=SUMX2PY2({1.3706872094590333e-301;-3.3826352869561918;-3.1231539154193973e-163};{-1.3791621873040854;-4.004290921401717e+150;2.3993401392565704e+154})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 28,
+      "formula": "=SUMX2PY2({-5e-324;0.8841733658201097};{1.3858463768008354e+308;-1.760211023874518e+308})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 29,
+      "formula": "=SUMX2PY2({-2.7423461230657304e-162};{-0.8410956378638771})",
+      "expected_bits": "3fe6a35d2306938b",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 30,
+      "formula": "=SUMX2PY2({2.3340218800905336e+154;-1.5757654355920942e+154;-1.6371438496110384e+154;1.36928046e-316;-1.1446548690939401e-162};{-4.5051951000232e-163;-5e-324;1.0403226233093965e+154;4.4524901634348303e-163;1.2404379271793325e+154})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 31,
+      "formula": "=SUMX2PY2({7.347188341514371e+153;-1.5e-323};{1.4429861171782115e-301;-7.065867121734808e+153})",
+      "expected_bits": "7fe27f056c3b8bf9",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 32,
+      "formula": "=SUMX2PY2({1.7536458391427686e-162};{1.5e-323})",
+      "expected_bits": "0000000000000001",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 33,
+      "formula": "=SUMX2PY2({-1.1735579332249752e-301};{-8.773267633574901e+153})",
+      "expected_bits": "7fdb66fdc44e590d",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 34,
+      "formula": "=SUMX2PY2({-1.4673285553114468e+301;-1.851428793504956e+301;-3.678190170512764};{-1e-323;1e-323;-1.5e-323})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 35,
+      "formula": "=SUMX2PY2({1.7533731015904107e+154};{-3.0331686505634584e-162})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 36,
+      "formula": "=SUMX2PY2({4.694620471432585e-151;-5e-324};{-1.8866346019627386e+154;2e-323})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 37,
+      "formula": "=SUMX2PY2({-1.5e-323;-3.5200640308899655e-163;-1.4013582030461393e-162};{-9.0184297e-317;-1.2078471517984747e-162;-5.079411959649679e+150})",
+      "expected_bits": "7e83434c0a5806ad",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 38,
+      "formula": "=SUMX2PY2({-1.5409284176402195e+301;1.5362281620527784e-162;-4.398157591262837e+150;2.2597055112876636;4.0239260904208745e-163};{-0.5709926643526902;3.23098180664055e-308;2.792022484740974e-308;9.689463606467752e+153;-2.761908202748077})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 39,
+      "formula": "=SUMX2PY2({1.1204605227074752e-162;3.9627162275290996e-151;-9.856348249580905e+307;2.0959998854184172e+301;-2.626733876586199};{5.520581333773658e+150;-1.5805435521388986e+154;1.00844653e-316;-1.2967706030556085e+301;1e-323})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 40,
+      "formula": "=SUMX2PY2({1.981253057219014e+301};{1.5953408047314621})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 41,
+      "formula": "=SUMX2PY2({-1.0956121695696751e+308;-5.013035244631604e-151;1.10686475e-316;-8.497601e-317;-1e-323;1.1823515995153077e+308};{-1.5938121e-316;4.1633753338480803e-162;2.604646984854387e+154;-2.8424030379902897e-163;-1.5e-323;1.5521473877865482e-162})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 42,
+      "formula": "=SUMX2PY2({-1e-323;8.232015587640605e+153;1.2753689e-316};{5.9126145372511486e+150;6.214515386028506e+150;4.1827251125662805e-151})",
+      "expected_bits": "7fd82024284855ea",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 43,
+      "formula": "=SUMX2PY2({4.61987975859219e+150;-4.492393597591777e-163;1e-323;-3.611019990969698;-3.4544182049790845e-163;1.072953405133191e+301};{0.5629729589730487;5.255382548312987e-151;2.9213873270934565;1e-323;-1.045655005365102;1.1167396595278521e+308})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 44,
+      "formula": "=SUMX2PY2({1.5e-323;1.3104824310195446e-162;4.35845005041712e+150};{1.2833335147572289e+301;-4.0294100480874514e-308;3.326272817488642e-151})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 45,
+      "formula": "=SUMX2PY2({-2.771436111707048e-162;3.4098417291545175e-308;1.1447427493078902e+301;-2.6445270597321646;-0.9668967868932637};{4.4680988859839496e-151;-0.5776918085679728;-4.4289791378609415e-151;0.5949497487296608;2.7916449379758187e-308})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 46,
+      "formula": "=SUMX2PY2({1.1714058458673488e-162;2.0241872369627016e-162;-1e-323;-1.6252496615024113e+301;-2.1830723781403525e-162;-1.704297062047905e+301};{-2.1376098235908943e+154;2e-323;1.5e-323;-1.3136438823914438e+301;-1.1005158e-316;-3.716530914468542e-162})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMX2PY2",
+      "case": 47,
+      "formula": "=SUMX2PY2({5.3751883655335254e-163};{4.1545371228738834e-308})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 0
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 0,
+      "formula": "=SUMXMY2({-6.93267525081229e+153;-2.5559174773907167;-1.1189291e-316;6.30118393643144e+150;0.6741083931624254};{-6.932675250812289e+153;-2.5559174773907163;-1.11892905e-316;6.3011839364314396e+150;0.6741083931624253})",
+      "expected_bits": "7950000040000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 1,
+      "formula": "=SUMXMY2({1.4269240578143174e+308;-0.8898538281503178;-1.4312581242111239e-301;1.36894657e-316;-2.812697762828159e-163;2.7395097765534363e-162};{-2.887523129955463e-163;-1.4054945128759556e+154;2.002118898595037e+154;-1.3026334233492797e-301;1.1745721784576014e+301;9.977418451604021e-302})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 2,
+      "formula": "=SUMXMY2({-1.4383762705955177e+154;-1.4426134e-316;-2.371627688803213e-308;1.6799043109885622e+301};{-1.2005669646909051e+154;2e-323;1.151729248195455;-4.1913715089292845e+150})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 3,
+      "formula": "=SUMXMY2({-5.459126119684551e-151;1.7179853847995233e+301;-2.076316124559029;-4.0381485428091645e-162;-2.7658920134831626e-162;1.5e-323};{-5.4591261196845504e-151;1.717985384799523e+301;-2.0763161245590287;-4.038148542809164e-162;-2.765892013483162e-162;1e-323})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 4,
+      "formula": "=SUMXMY2({-2.960243500275856e-162};{-1.5e-323})",
+      "expected_bits": "0000000000000002",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 5,
+      "formula": "=SUMXMY2({5e-324;-3.818623536273063e+150;-5.2739757251897316e-163;-1.4929340987095854};{7.337649824872582e+153;3.3582266765364493e-308;-1.1712991382411055e-162;-1.1468362e-316})",
+      "expected_bits": "7fd32b06f3762de9",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 6,
+      "formula": "=SUMXMY2({5.087733363292168e-151;-1.4696070149059554e+154};{5.0877333632921676e-151;-1.469607014905955e+154})",
+      "expected_bits": "7970000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 7,
+      "formula": "=SUMXMY2({-5.622202555684108e-151;1.248161158814987e+301;5e-324};{-1e-323;1.3022959709492265e+301;1.5e-323})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 8,
+      "formula": "=SUMXMY2({-3.243077244620815e-162;-1.5666213822634787e-301;2.836443564827737e-162;-3.552656978681287e-308;-1e-323;1.18227305e-316};{1.190554926089937e+308;1.1401636406112251e+154;-3.882203404135965e-163;1e-323;2.6122605465083157e-162;3.7393098613084686e-151})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 9,
+      "formula": "=SUMXMY2({-1.3105250481672274e-162;-4.498903933008973e+150;1.5363490435047857e+301;-3.2142165092998155e-163};{-1.3105250481672272e-162;-4.498903933008972e+150;1.5363490435047855e+301;-3.214216509299815e-163})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 10,
+      "formula": "=SUMXMY2({-1.5e-323;3.848728323947219e-308;1.2953213925985129e+301;1e-323;1.1723666e-316;-3.2761742996601136e-162};{-1.059194909676574e+154;-1.5696540812478204e-162;-2.0198098188814132e+301;-1.944678704243206e-162;-2.195105362611811e+154;-3.8090471320450566e-151})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 11,
+      "formula": "=SUMXMY2({5e-324;8.916325e-317};{1.7352360592655935;-2.165547390296756e+154})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 12,
+      "formula": "=SUMXMY2({-1.26434027e-316;-2.4303285040106285e-308};{-1.2643402e-316;-2.430328504010628e-308})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 13,
+      "formula": "=SUMXMY2({6.14595446053733e+150;3.800283183948437e-162;4.56517488228716e+150};{-2.917353151464115e-162;1.1540270830054997e+154;0.8968559397566528})",
+      "expected_bits": "7fe7b4da388dafe4",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 14,
+      "formula": "=SUMXMY2({-1e-323};{2.2225396645542313e-162})",
+      "expected_bits": "0000000000000001",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 15,
+      "formula": "=SUMXMY2({1.346242599160811e-162;3.7925439255418203e-308;3.51406975547925;3.1760731031337804e-308};{1.3462425991608106e-162;3.79254392554182e-308;3.5140697554792495;3.17607310313378e-308})",
+      "expected_bits": "3990000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 16,
+      "formula": "=SUMXMY2({-3.849299941061013;-2.532966758011955;-1.6476745353016047;-0.9775424447904176};{1.1982531139916162e+154;4.238613139078208e-162;-1e-323;-1.2227960032442938e-301})",
+      "expected_bits": "7fe98eeb28644d59",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 17,
+      "formula": "=SUMXMY2({6.249877908874803e+150};{5.264047508121338e+150})",
+      "expected_bits": "7e3738229d6870a0",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 18,
+      "formula": "=SUMXMY2({-1.5040728256101257;5.98348942222932e-151;-1e-323;-3.474933809145271e-162;0.8662461189772278;-1.502063e-316};{-1.5040728256101255;5.9834894222293195e-151;-5e-324;-3.4749338091452704e-162;0.8662461189772277;-1.50206297e-316})",
+      "expected_bits": "3974000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 19,
+      "formula": "=SUMXMY2({3.441067262159725e-163;-4.3600238913205184e-308;0.9688592163513747;-1.4831915165715673e-301;1.8109887114751185e+301};{-4.1748409343631645e-162;2.5960626901917394e-162;1.6679111385200374e+308;0.686174549362007;1.8780797072174136e+301})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 20,
+      "formula": "=SUMXMY2({-1.3492123e-316;1.3069149479490408e+308;0.8855965494871879};{-1.767830222271959e+154;1.5717974483680774e+301;-4.060959466816084e-162})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 21,
+      "formula": "=SUMXMY2({1.6773403879697497e-301;-2.065659050181222e+154;1.870914862301032;-1.47907474e-316;-4.931483384808181e-163;1.6734504868289072e-162};{1.6773403879697495e-301;-2.0656590501812218e+154;1.8709148623010319;-1.4790747e-316;-4.9314833848081804e-163;1.673450486828907e-162})",
+      "expected_bits": "7970000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 22,
+      "formula": "=SUMXMY2({3.298911824945535e-162;-0.8388333941574808;1.4422930331111417e+301;-1.2967326453253956e-301};{1e-323;4.394689115862104e-163;-2.6762934567613177e+154;1.5361750563740636e+308})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 23,
+      "formula": "=SUMXMY2({-1e-323;-1.0326628285212207e-301;1.634327139224042e+154;-0.8218031284502147;-1e-323;5.2404801135204876e-163};{1.40741274e-316;2.321482041813159e-162;0.8249693507628189;-1.5e-323;1.9298536924341864e-162;1.148072092891675e+154})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 24,
+      "formula": "=SUMXMY2({1.5e-323};{1e-323})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 25,
+      "formula": "=SUMXMY2({7.942736038731246e+153;-1.236329640659721e+301};{1e-323;-4.81736988653057e-151})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 26,
+      "formula": "=SUMXMY2({1.014129e-316;-1.281810687550449e-301;1e-323};{4.3341321211657055e-162;-3.170762793635175e-151;1.6635650724015248e+301})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 27,
+      "formula": "=SUMXMY2({-2.8220457715446166e-163;2e-323};{-2.822045771544616e-163;1.5e-323})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 28,
+      "formula": "=SUMXMY2({-4.7932090425346636e-163;4.6527383952517984e-163;1.7937344527669803e+308;-1.2147516813515515e-301;5e-324;3.8264533529271303e-162};{5e-324;1.0274741547995848e-301;-1.1869420017132346e+154;-1.7861762760961216e-301;-2.2198528932572692e+154;-1.4254662069916406e+301})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 29,
+      "formula": "=SUMXMY2({1.344815645880994e+154;1.9616044802973231};{-9.038316256816856e+307;-2.602665004138744e-308})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 30,
+      "formula": "=SUMXMY2({-4.858603179861626e-163;1.291237089702122e-301;3.1328348699725146e-162};{-4.8586031798616254e-163;1.2912370897021218e-301;3.132834869972514e-162})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 31,
+      "formula": "=SUMXMY2({2.816504456946302e-308};{1.5e-323})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 32,
+      "formula": "=SUMXMY2({-1.3026697692128468e+154};{-2.8292896203204765})",
+      "expected_bits": "7fee34e96774d85a",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 33,
+      "formula": "=SUMXMY2({1e-323;-4.2146458717439325e-308;1.56142857e-316};{5e-324;-4.214645871743932e-308;1.5614285e-316})",
+      "expected_bits": "0000000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 34,
+      "formula": "=SUMXMY2({-0.687666435378916};{-1.6659461582929563e+308})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 35,
+      "formula": "=SUMXMY2({-1.5e-323;-3.9317064167314364e-163;1.1473452593498232e-301;-4.414494787466199e-162};{-2.0370693708142165e-162;1.5423975132861525e+301;-3.71897191969127;0.5163014416771371})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 36,
+      "formula": "=SUMXMY2({-0.9807483867233012;-4.3909758791893354e-163};{-0.9807483867233011;-4.390975879189335e-163})",
+      "expected_bits": "3950000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 37,
+      "formula": "=SUMXMY2({-1.9807159131152897e-162;-5e-324;4.0021223476860735e-163;-1e-323;-5.870475731649432e-151};{3.148986915274526e-308;5e-324;-1.2252098e-316;-3.8378451180353914e+150;-1.4663164859177733})",
+      "expected_bits": "7e75fe6624ce7177",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 38,
+      "formula": "=SUMXMY2({1.6191068021722732e+308;-1.5002361031698885;1.0822987416899745;-1e-323;-4.021966519216098e-151};{9.95491458868102e+307;8.927837e-317;1.5836564498185386;1.8279248597964143e+154;1.736007889400956})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 39,
+      "formula": "=SUMXMY2({1.077509e-316;-1.8099703909129528e+301;2.926728843023207e-308;-1e-323;-1.8734304079206662e-162};{1.07750895e-316;-1.8099703909129526e+301;2.9267288430232066e-308;-5e-324;-1.873430407920666e-162})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 40,
+      "formula": "=SUMXMY2({1.6368533095816646e+154;-5.4072459317873284e-163;1.4315007456082836e-162;3.2193439384787107e-162};{2.270147572673391e-162;-1.3349539639766139e+308;-1.5e-323;1e-323})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 41,
+      "formula": "=SUMXMY2({-3.619286689129923e-308;-1e-323;-8.647607e-317};{5e-324;1.2166263418318234e+154;0.964678132645033})",
+      "expected_bits": "7fea591b46ddb91c",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 42,
+      "formula": "=SUMXMY2({-1.4431235848550987e+301};{-1.4431235848550984e+301})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 43,
+      "formula": "=SUMXMY2({-1.8212520896283322;1e-323};{1.533401837877029e-162;2.5226005828581436e-162})",
+      "expected_bits": "400a8921e433234b",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 44,
+      "formula": "=SUMXMY2({1.5171094042586069};{4.267587944536625e-308})",
+      "expected_bits": "400269b83de2fb71",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 45,
+      "formula": "=SUMXMY2({-2.20151777677385e+154};{-2.2015177767738496e+154})",
+      "expected_bits": "7970000000000000",
+      "expected_error": null,
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 46,
+      "formula": "=SUMXMY2({-4.441660170345181e-308;-2.575536389618701;3.879900848484886};{-1.5257282983875179e+308;-1.6171722327590915e+301;1.4445199651270386})",
+      "expected_bits": null,
+      "expected_error": "Number",
+      "max_ulps": 8
+    },
+    {
+      "function": "SUMXMY2",
+      "case": 47,
+      "formula": "=SUMXMY2({-6.395814422512249e+150};{1.3840323125791105})",
+      "expected_bits": "7e8e8a8bc7730bd0",
+      "expected_error": null,
+      "max_ulps": 8
+    }
+  ]
+}

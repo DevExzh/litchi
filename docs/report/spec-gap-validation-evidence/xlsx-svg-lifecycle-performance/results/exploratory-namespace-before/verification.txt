@@ -1,0 +1,15 @@
+lane=inventory_shared_root_namespace_32
+receipt_schema=xlsx-svg-lifecycle-profile-v1
+sample_count=1
+expected_success=true
+actual_success=true
+semantic_ok=true
+output_exact=true
+alloc_balance_ok=true
+alloc_invalid=false
+alloc_failed=0
+source_copy_bytes=null
+staged_bytes=null
+source_manifest_before_after=identical
+acceptance_status=excluded; exploratory-only
+retained_source_bytes=see ../../xlsx-svg-source/retained-scope-probe.rs; separate source diagnostic, not this timer

@@ -11,7 +11,10 @@ use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
 
 use super::codec::{parse_external_link, patch_source};
-use super::model::{Conformance, Link, MAX_EXTERNAL_TARGET_BYTES, Target};
+use super::model::{
+    AlternateUrl, AlternateUrls, Conformance, Link, MAX_CACHE_TEXT_BYTES,
+    MAX_EXTERNAL_TARGET_BYTES, Target,
+};
 use super::{invalid, limit, validation};
 
 /// One external-link part together with its workbook package relationship.
@@ -56,7 +59,48 @@ pub fn build_external_link_part_with_conformance(
         )?,
         Link::Dde(_) => {},
     }
+    if let Link::Workbook(link) = kind {
+        add_alternate_target_relationships(&mut part, link.alternate_urls.as_ref())?;
+    }
     Ok(part)
+}
+
+fn add_alternate_target_relationships(
+    part: &mut BlobPart,
+    alternate_urls: Option<&AlternateUrls>,
+) -> Result<()> {
+    let Some(alternate_urls) = alternate_urls else {
+        return Ok(());
+    };
+    let mut seen = HashMap::<String, (String, String)>::new();
+    for url in [
+        alternate_urls.absolute_url.as_ref(),
+        alternate_urls.relative_url.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        let metadata = (url.target.clone(), url.relationship_type.clone());
+        if let Some(previous) = seen.insert(url.relationship_id.clone(), metadata.clone()) {
+            if previous != metadata {
+                return Err(invalid(format!(
+                    "alternate URL relationship ID '{}' has conflicting targets",
+                    url.relationship_id
+                )));
+            }
+            continue;
+        }
+        if part.rels().get(&url.relationship_id).is_some() {
+            continue;
+        }
+        part.rels_mut().add_relationship(
+            url.relationship_type.clone(),
+            url.target.clone(),
+            url.relationship_id.clone(),
+            true,
+        );
+    }
+    Ok(())
 }
 
 trait TargetMetadata {
@@ -135,29 +179,21 @@ pub fn load_external_link(
     workbook_relationship_id: String,
     index: u32,
 ) -> Result<Entry> {
+    if part.blob().len() > MAX_CACHE_TEXT_BYTES {
+        return Err(limit("external-link XML"));
+    }
     let mut kind = parse_external_link(part.blob())?;
     match &mut kind {
         Link::Workbook(book) => {
-            let relationship = part
-                .rels()
-                .get(&book.target.relationship_id)
-                .ok_or_else(|| {
-                    invalid(format!(
-                        "externalBook references missing relationship '{}'",
-                        book.target.relationship_id
-                    ))
-                })?;
-            if !relationship.is_external() {
-                return Err(invalid("externalBook target relationship must be external"));
+            resolve_external_target(part, &mut book.target, "externalBook")?;
+            if let Some(alternate_urls) = &mut book.alternate_urls {
+                if let Some(url) = &mut alternate_urls.absolute_url {
+                    resolve_external_target(part, url, "absoluteUrl")?;
+                }
+                if let Some(url) = &mut alternate_urls.relative_url {
+                    resolve_external_target(part, url, "relativeUrl")?;
+                }
             }
-            if !is_external_workbook_relationship(relationship.reltype()) {
-                return Err(invalid(format!(
-                    "externalBook target has invalid relationship type '{}'",
-                    relationship.reltype()
-                )));
-            }
-            book.target.target = relationship.target_ref().to_string();
-            book.target.relationship_type = relationship.reltype().to_string();
         },
         Link::Dde(_) => {},
         Link::Ole(link) => {
@@ -192,6 +228,70 @@ pub fn load_external_link(
         part_uri: part.partname().clone(),
         link: kind,
     })
+}
+
+trait ResolvableTarget {
+    fn relationship_id(&self) -> &str;
+    fn set_target(&mut self, target: String, relationship_type: String);
+}
+
+impl ResolvableTarget for Target {
+    fn relationship_id(&self) -> &str {
+        &self.relationship_id
+    }
+
+    fn set_target(&mut self, target: String, relationship_type: String) {
+        self.target = target;
+        self.relationship_type = relationship_type;
+    }
+}
+
+impl ResolvableTarget for AlternateUrl {
+    fn relationship_id(&self) -> &str {
+        &self.relationship_id
+    }
+
+    fn set_target(&mut self, target: String, relationship_type: String) {
+        self.target = target;
+        self.relationship_type = relationship_type;
+    }
+}
+
+fn resolve_external_target(
+    part: &dyn Part,
+    target: &mut impl ResolvableTarget,
+    description: &str,
+) -> Result<()> {
+    let relationship = part.rels().get(target.relationship_id()).ok_or_else(|| {
+        invalid(format!(
+            "{description} references missing relationship '{}'",
+            target.relationship_id()
+        ))
+    })?;
+    if !relationship.is_external() {
+        return Err(invalid(format!(
+            "{description} target relationship must be external"
+        )));
+    }
+    if !is_external_workbook_relationship(relationship.reltype()) {
+        return Err(invalid(format!(
+            "{description} target has invalid relationship type '{}'",
+            relationship.reltype()
+        )));
+    }
+    let target_ref = relationship.target_ref();
+    if target_ref.len() > MAX_EXTERNAL_TARGET_BYTES {
+        return Err(limit(&format!("{description} target URI")));
+    }
+    if target_ref.chars().any(|character| {
+        character.is_control() || character == '\u{fffe}' || character == '\u{ffff}'
+    }) {
+        return Err(invalid(format!(
+            "{description} target URI contains an invalid character"
+        )));
+    }
+    target.set_target(target_ref.to_owned(), relationship.reltype().to_string());
+    Ok(())
 }
 
 /// Load every external-link part owned by the workbook.
@@ -379,6 +479,21 @@ pub(crate) fn apply_entries(
     after: &[Entry],
     conformance: Conformance,
 ) -> Result<()> {
+    // Direct package APIs share this path with transactions.  Stage every
+    // mutation on a clone so a late graph/source failure cannot leave a
+    // caller-visible package with changed XML or relationships.
+    let mut candidate = package.clone();
+    apply_entries_in_place(&mut candidate, before, after, conformance)?;
+    *package = candidate;
+    Ok(())
+}
+
+fn apply_entries_in_place(
+    package: &mut OpcPackage,
+    before: &[Entry],
+    after: &[Entry],
+    conformance: Conformance,
+) -> Result<()> {
     validation::entries(after, conformance)?;
     let workbook_uri = package.main_document_part()?.partname().clone();
     let workbook = package.get_part(&workbook_uri)?;
@@ -472,66 +587,77 @@ fn replace_existing_part(
     if part.content_type() != litchi_opc::constants::content_type::SML_EXTERNAL_LINK {
         return Err(invalid("external-link replacement targets a non-link part"));
     }
+    if part.blob().len() > MAX_CACHE_TEXT_BYTES {
+        return Err(limit("external-link XML"));
+    }
     let source = part.blob().to_vec();
     let updated = patch_source(&source, &before.link, &after.link, conformance)?;
-    let mut current_target = target_of(&before.link).cloned();
-    let next_target = target_of(&after.link).cloned();
+    let current_targets = target_map(&before.link)?;
+    let next_targets = target_map(&after.link)?;
 
     let part = package.get_part_mut(&before.part_uri)?;
+    validate_target_relationship_update(part, &current_targets, &next_targets)?;
     part.set_blob(updated);
-    update_target_relationship(part, &mut current_target, next_target.as_ref())?;
+    update_target_relationships(part, &current_targets, &next_targets)?;
     Ok(())
 }
 
-fn update_target_relationship(
-    part: &mut dyn Part,
-    before: &mut Option<Target>,
-    after: Option<&Target>,
+fn validate_target_relationship_update(
+    part: &dyn Part,
+    before: &HashMap<String, Target>,
+    after: &HashMap<String, Target>,
 ) -> Result<()> {
-    match (before.take(), after) {
-        (Some(old), Some(new)) if old.relationship_id == new.relationship_id => {
-            part.rels_mut().add_relationship(
-                new.relationship_type.clone(),
-                new.target.clone(),
-                new.relationship_id.clone(),
-                true,
-            );
-        },
-        (Some(old), Some(new)) => {
-            if part.rels().get(&new.relationship_id).is_some()
-                && new.relationship_id != old.relationship_id
-            {
+    for id in after.keys() {
+        if part.rels().get(id).is_some() {
+            let represented_before = before.contains_key(id);
+            if !represented_before {
                 return Err(invalid(format!(
                     "external-link target relationship ID '{}' is already in use",
-                    new.relationship_id
+                    id
                 )));
             }
-            part.rels_mut().remove(&old.relationship_id);
-            part.rels_mut().add_relationship(
-                new.relationship_type.clone(),
-                new.target.clone(),
-                new.relationship_id.clone(),
-                true,
-            );
-        },
-        (Some(old), None) => {
-            part.rels_mut().remove(&old.relationship_id);
-        },
-        (None, Some(new)) => {
-            if part.rels().get(&new.relationship_id).is_some() {
-                return Err(invalid(format!(
-                    "external-link target relationship ID '{}' is already in use",
-                    new.relationship_id
-                )));
-            }
-            part.rels_mut().add_relationship(
-                new.relationship_type.clone(),
-                new.target.clone(),
-                new.relationship_id.clone(),
-                true,
-            );
-        },
-        (None, None) => {},
+        }
+    }
+    for id in before.keys() {
+        if after.contains_key(id) {
+            continue;
+        }
+        if part.rels().get(id).is_none() {
+            return Err(invalid(format!(
+                "external-link target relationship ID '{}' is missing",
+                id
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn update_target_relationships(
+    part: &mut dyn Part,
+    before: &HashMap<String, Target>,
+    after: &HashMap<String, Target>,
+) -> Result<()> {
+    for id in before.keys().filter(|id| !after.contains_key(*id)) {
+        part.rels_mut().remove(id);
+    }
+    for (id, target) in after {
+        let unchanged = before.get(id).is_some_and(|old| old == target);
+        if unchanged {
+            continue;
+        }
+        // `Relationships::add_relationship` intentionally preserves an
+        // existing ID for compatibility.  This owner is replacing an owned
+        // relationship, so remove the old physical record first; otherwise a
+        // successful semantic edit would continue resolving the stale target.
+        if before.contains_key(id) {
+            part.rels_mut().remove(id);
+        }
+        part.rels_mut().add_relationship(
+            target.relationship_type.clone(),
+            target.target.clone(),
+            id.clone(),
+            true,
+        );
     }
     Ok(())
 }
@@ -577,12 +703,43 @@ fn allocate_entries(package: &OpcPackage, links: &[Link]) -> Result<Vec<Entry>> 
     Ok(entries)
 }
 
-fn target_of(link: &Link) -> Option<&Target> {
-    match link {
-        Link::Workbook(link) => Some(&link.target),
-        Link::Dde(_) => None,
-        Link::Ole(link) => Some(&link.target),
+fn target_map(link: &Link) -> Result<HashMap<String, Target>> {
+    let mut targets = HashMap::new();
+    let values = match link {
+        Link::Workbook(link) => {
+            let mut values = vec![link.target.clone()];
+            if let Some(alternate_urls) = &link.alternate_urls {
+                if let Some(url) = &alternate_urls.absolute_url {
+                    values.push(Target {
+                        relationship_id: url.relationship_id.clone(),
+                        target: url.target.clone(),
+                        relationship_type: url.relationship_type.clone(),
+                    });
+                }
+                if let Some(url) = &alternate_urls.relative_url {
+                    values.push(Target {
+                        relationship_id: url.relationship_id.clone(),
+                        target: url.target.clone(),
+                        relationship_type: url.relationship_type.clone(),
+                    });
+                }
+            }
+            values
+        },
+        Link::Dde(_) => Vec::new(),
+        Link::Ole(link) => vec![link.target.clone()],
+    };
+    for target in values {
+        if let Some(previous) = targets.insert(target.relationship_id.clone(), target.clone())
+            && previous != target
+        {
+            return Err(invalid(format!(
+                "external-link target relationship ID '{}' has conflicting targets",
+                target.relationship_id
+            )));
+        }
     }
+    Ok(targets)
 }
 
 fn part_is_referenced(package: &OpcPackage, part_uri: &PackURI) -> bool {

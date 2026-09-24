@@ -5,6 +5,9 @@
 //! with [`crate::shapes`] and reuse the neutral `DrawingML` text-body model.
 
 use super::super::chart::Anchor;
+use litchi_spreadsheet_drawing::shape::Anchor as DrawingAnchor;
+
+use crate::error::{Result, allocation};
 
 /// One bounded worksheet or chartsheet drawing part.
 #[derive(Debug, Clone, Default)]
@@ -44,6 +47,12 @@ impl Drawing {
     #[must_use]
     pub fn len(&self) -> usize {
         self.objects.len()
+    }
+
+    pub(super) fn reserve_object(&mut self) -> Result<()> {
+        self.objects
+            .try_reserve(1)
+            .map_err(|source| allocation("SpreadsheetDrawing objects", source))
     }
 
     pub(super) fn push(&mut self, object: Object) {
@@ -88,21 +97,51 @@ impl Object {
 /// A `SpreadsheetDrawing` picture object.
 #[derive(Debug, Clone)]
 pub struct Picture {
-    /// Cell-based anchor used by the chart integration model.
+    /// Compatibility cell-based anchor used by the chart integration model.
+    ///
+    /// New code should use [`Self::drawing_anchor`] so one-cell and absolute
+    /// geometry is not projected into this legacy two-cell vocabulary.
     pub anchor: Anchor,
+    /// Complete `SpreadsheetDrawing` anchor geometry from the source.
+    ///
+    /// The added field means external struct literals must initialize it;
+    /// existing field readers and the legacy [`Self::anchor`] projection stay
+    /// available for callers that do not construct these values directly.
+    pub drawing_anchor: DrawingAnchor,
     /// Relationship ID for the picture image.
     pub relationship_id: String,
     /// Optional accessibility description from `xdr:cNvPr@descr`.
     pub description: Option<String>,
 }
 
+impl Picture {
+    /// Return the complete source anchor geometry.
+    #[must_use]
+    pub fn drawing_anchor(&self) -> &DrawingAnchor {
+        &self.drawing_anchor
+    }
+}
+
 /// A `SpreadsheetDrawing` chart object.
 #[derive(Debug, Clone)]
 pub struct Chart {
-    /// Cell-based anchor used by the chart integration model.
+    /// Compatibility cell-based anchor used by the chart integration model.
     pub anchor: Anchor,
+    /// Complete `SpreadsheetDrawing` anchor geometry from the source.
+    ///
+    /// As a public field this requires external struct literals to initialize
+    /// the geometry value; existing readers retain the legacy `anchor` field.
+    pub drawing_anchor: DrawingAnchor,
     /// Relationship ID for the chart part.
     pub relationship_id: String,
+}
+
+impl Chart {
+    /// Return the complete source anchor geometry.
+    #[must_use]
+    pub fn drawing_anchor(&self) -> &DrawingAnchor {
+        &self.drawing_anchor
+    }
 }
 
 /// The supported structural class of an unknown anchored object.
@@ -123,12 +162,45 @@ pub enum UnknownKind {
 /// An unsupported or inert anchored object.
 #[derive(Debug, Clone)]
 pub struct Unknown {
-    /// Cell-based anchor retained for structural navigation.
+    /// Compatibility cell-based anchor retained for structural navigation.
     pub anchor: Anchor,
+    /// Complete `SpreadsheetDrawing` anchor geometry from the source.
+    ///
+    /// As a public field this requires external struct literals to initialize
+    /// the geometry value; existing readers retain the legacy `anchor` field.
+    pub drawing_anchor: DrawingAnchor,
     /// Optional accessibility description from `xdr:cNvPr@descr`.
     pub description: Option<String>,
     /// Best-effort structural classification; payload remains inert.
     pub kind: UnknownKind,
+}
+
+impl Unknown {
+    /// Return the complete source anchor geometry.
+    #[must_use]
+    pub fn drawing_anchor(&self) -> &DrawingAnchor {
+        &self.drawing_anchor
+    }
+}
+
+/// A semantic worksheet drawing/content-part selector.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[must_use]
+pub struct ContentPartSelector {
+    /// Zero-based worksheet drawing position.
+    pub drawing: usize,
+    /// Zero-based direct core content-part position within that drawing.
+    pub content_part: usize,
+}
+
+impl ContentPartSelector {
+    /// Construct a zero-based drawing/content-part selector.
+    pub const fn new(drawing: usize, content_part: usize) -> Self {
+        Self {
+            drawing,
+            content_part,
+        }
+    }
 }
 
 /// Shared `DrawingML` text-body vocabulary used by `SpreadsheetDrawing` shapes.

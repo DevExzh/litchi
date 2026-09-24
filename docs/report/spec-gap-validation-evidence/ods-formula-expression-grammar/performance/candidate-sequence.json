@@ -1,0 +1,59 @@
+{
+  "batch": "ods-formula-expression-grammar-candidate",
+  "harness": "harness/run.py",
+  "warmups": 3,
+  "iterations": 15,
+  "jobs": [
+    {
+      "label": "candidate-comparable",
+      "group": "comparable",
+      "binary_sha256": "841a11f5464af5b2fc6cf76ee40fd56124f46818ac4ae3ef217b6cc2e1171a14",
+      "harness": "harness/run.py",
+      "harness_sha256": "6a92e819429e6eaf359d6186aa67d17f2f546980bb5a3e6633cb2259de433790",
+      "output": "candidate/raw.csv",
+      "warmups": 3,
+      "iterations": 15,
+      "started_at": null,
+      "finished_at": null,
+      "elapsed_seconds": null,
+      "status": 0,
+      "raw_sha256": "a5721bfcf75f36d9cbc7fd9b02eb3e22a0839347d8d02d2eec76146655ce5551",
+      "row_count": 12
+    },
+    {
+      "label": "candidate-literals",
+      "group": "literals",
+      "binary_sha256": "841a11f5464af5b2fc6cf76ee40fd56124f46818ac4ae3ef217b6cc2e1171a14",
+      "harness": "harness/run.py",
+      "harness_sha256": "6a92e819429e6eaf359d6186aa67d17f2f546980bb5a3e6633cb2259de433790",
+      "output": "candidate-literals/raw.csv",
+      "warmups": 3,
+      "iterations": 15,
+      "started_at": null,
+      "finished_at": null,
+      "elapsed_seconds": null,
+      "status": 0,
+      "raw_sha256": "98ef6b4c2c480a30407cd36589313dff34beedcba6dd261bdd991e00eda204f8",
+      "row_count": 9
+    },
+    {
+      "label": "candidate-expression",
+      "group": "expression",
+      "binary_sha256": "b0e2585b7d6791123a018085283e872c36c513b0cf70957fe7d6919ffd680746",
+      "harness": "expression-harness/run.py",
+      "harness_sha256": "8a724b2dc0a224ab10024adda8402cc43fdffc9aed6f9d3cf40abd46e6847acc",
+      "output": "expression/raw.csv",
+      "warmups": 3,
+      "iterations": 15,
+      "started_at": null,
+      "finished_at": null,
+      "elapsed_seconds": null,
+      "status": 0,
+      "raw_sha256": "6aff9ae45b2481903e474801e504f0b9d2c5cc66a956ecb7281b152c3ef65bf3",
+      "row_count": 24
+    }
+  ],
+  "order": "candidate-comparable, candidate-literals, candidate-expression",
+  "timestamps_recorded": false,
+  "measurement_note": "Candidate lane wall timestamps were not captured; raw CSVs, per-lane /usr/bin/time files, commands, and source/build receipts are authoritative. The expression group is candidate-only and has no tokenizer comparator."
+}

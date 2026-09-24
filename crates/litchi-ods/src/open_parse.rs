@@ -6,7 +6,7 @@
 //! calculation-settings parse ([`litchi_odf_common::calculation`]), the
 //! calculation-settings location scan ([`crate::settings::codec`]), the
 //! named-definition scan ([`crate::codec::names`]), and the worksheet parse
-//! ([`crate::worksheet::codec`]) over one shared `NsReader` event stream.
+//! ([`crate::worksheet::codec`]) over one shared namespace-aware event stream.
 //!
 //! Observable behavior is identical to the sequential passes: each handler
 //! keeps its own limits and error messages, a quick_xml read failure is
@@ -20,9 +20,9 @@
 //! the content validation has completed.
 
 use litchi_core::{Error, Result};
+use litchi_odf_common::ResolvedReader;
 use litchi_odf_common::calculation::{CalculationHandler, Settings};
 use quick_xml::events::Event;
-use quick_xml::reader::NsReader;
 
 use crate::authoring::ValidateHandler;
 use crate::codec::names::{self, NamesHandler};
@@ -89,7 +89,7 @@ impl OpenParse {
         let mut worksheet_error =
             crate::worksheet::validation::validate_content_xml_size(content_xml).err();
 
-        let mut reader = NsReader::from_str(content_xml);
+        let mut reader = ResolvedReader::from_xml(content_xml);
         let mut buffer = Vec::new();
         let mut validate = ValidateHandler::default();
         let mut calculation = CalculationHandler::default();

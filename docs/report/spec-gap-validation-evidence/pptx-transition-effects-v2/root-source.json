@@ -1,0 +1,35 @@
+{
+  "actor": "root",
+  "candidate": "/var/tmp/litchi-pptx-transition-effects-validation-20260910",
+  "base_commit": "995bdaf09352297bde17e6ed7d986360f8c10134",
+  "paths": [
+    {
+      "path": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "sha256": "9988db62c1175cc6fb210f19defe65be08c673d32158716f9de1a9f6a4f98431"
+    },
+    {
+      "path": "crates/litchi-pptx/src/presentation/transition.rs",
+      "sha256": "18b27ac0337f5e85d07b8cb048c664dff9f0096af905bc4d699598f67fc7eac2"
+    },
+    {
+      "path": "crates/litchi-pptx/src/transition/mod.rs",
+      "sha256": "9393de3023a30684b7d707147da7c222c991b2ee8189410700b731370eec04e7"
+    },
+    {
+      "path": "crates/litchi-pptx/src/transition/model.rs",
+      "sha256": "ddbd6da7d559c53f8b39817e78478af14f50cdf0a516174f00934e8e4fb0b489"
+    },
+    {
+      "path": "crates/litchi-pptx/src/transition/reader.rs",
+      "sha256": "1984b6dd6d9ad19eccc6318ef94019dc36ccffe820ba8bc8e6b5870b7a6f7585"
+    },
+    {
+      "path": "crates/litchi-pptx/src/transition/writer.rs",
+      "sha256": "8718cbb6c2b9c0369978c80c4b73fcfc1856f4a8412a164d434e293e9b3eb665"
+    },
+    {
+      "path": "crates/litchi-pptx/tests/source_backed_edit.rs",
+      "sha256": "61dcd2040bc7340f5223e798c7b1e74e92bb699abc5b8ed7ba96cb22c8ac2c0b"
+    }
+  ]
+}

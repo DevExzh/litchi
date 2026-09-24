@@ -1,0 +1,18 @@
+{
+  "schema": "litchi-security-corpus-publication-receipt-mismatch-audit-v1",
+  "recorded_utc": "2026-09-10T11:44:09Z",
+  "status": "preserved before revision; receipt r0 is superseded because one concrete path was stale",
+  "receipt_r0": "/var/tmp/litchi-security-corpus-v3-integration-982-publication-r0-mismatched.json",
+  "receipt_r0_sha256": "a456d59668fbe3ad5d8b00e767b47ef376380402741553c8edc8afa98c227e75",
+  "observed_provenance_r0": "/var/tmp/litchi-security-corpus-v3-integration-982-provenance-r0-observed.json",
+  "observed_provenance_r0_sha256": "f08ad864c3259bf75ce7c613fd9fc2e75361a0c8f03b5f9f3e84ce8081cb5b7d",
+  "path": "docs/performance/results/security-corpus-v3/integration-provenance.json",
+  "receipt_expected_sha256": "813d3b6057c273f78faaf39c96e7c89b56221d6cf0916bcb947e57f72701e28c",
+  "receipt_expected_bytes": 6968,
+  "observed_sha256": "f08ad864c3259bf75ce7c613fd9fc2e75361a0c8f03b5f9f3e84ce8081cb5b7d",
+  "observed_bytes": 7676,
+  "receipt_created_utc": "2026-09-10T11:37:38Z",
+  "provenance_created_utc": "2026-09-10T11:37:38Z",
+  "metadata_drift": "The r0 receipt records a 6968-byte provenance preimage (813d3b...), while the overlay provenance observed at preflight is 7676 bytes (f08ad8...). The source, preimages, payload, and other 59 concrete path records are unchanged.",
+  "superseded_by": "A new revisioned provenance/receipt pair will be generated after this preservation record."
+}

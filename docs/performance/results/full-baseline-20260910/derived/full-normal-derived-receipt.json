@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "transformation": "remove_mismatched_operation_metrics_only",
+  "raw_result_count": 201,
+  "raw_operation_metrics_count": 28,
+  "removed_operation_metrics_count": 25,
+  "derived_operation_metrics_count": 3,
+  "removed_rows": [
+    {
+      "index": 4,
+      "case": "opc_noop_save",
+      "corpus_archive_sha256": "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a"
+    },
+    {
+      "index": 5,
+      "case": "opc_mutated_save",
+      "corpus_archive_sha256": "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a"
+    },
+    {
+      "index": 22,
+      "case": "opc_noop_save",
+      "corpus_archive_sha256": "08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40"
+    },
+    {
+      "index": 23,
+      "case": "opc_mutated_save",
+      "corpus_archive_sha256": "08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40"
+    },
+    {
+      "index": 40,
+      "case": "opc_noop_save",
+      "corpus_archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4"
+    },
+    {
+      "index": 41,
+      "case": "opc_mutated_save",
+      "corpus_archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4"
+    },
+    {
+      "index": 58,
+      "case": "opc_noop_save",
+      "corpus_archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0"
+    },
+    {
+      "index": 59,
+      "case": "opc_mutated_save",
+      "corpus_archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0"
+    },
+    {
+      "index": 76,
+      "case": "opc_noop_save",
+      "corpus_archive_sha256": "c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb"
+    },
+    {
+      "index": 77,
+      "case": "opc_mutated_save",
+      "corpus_archive_sha256": "c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb"
+    },
+    {
+      "index": 94,
+      "case": "opc_noop_save",
+      "corpus_archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6"
+    },
+    {
+      "index": 95,
+      "case": "opc_mutated_save",
+      "corpus_archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6"
+    },
+    {
+      "index": 112,
+      "case": "opc_noop_save",
+      "corpus_archive_sha256": "c89c13841d987233e00cbf0fd9f40f35a56c463c5eb3aadd551fce1e008a9d35"
+    },
+    {
+      "index": 113,
+      "case": "opc_mutated_save",
+      "corpus_archive_sha256": "c89c13841d987233e00cbf0fd9f40f35a56c463c5eb3aadd551fce1e008a9d35"
+    },
+    {
+      "index": 130,
+      "case": "opc_noop_save",
+      "corpus_archive_sha256": "b8ed826dc5627314aa1f2442b6313158ef48bab7622dce0994b94afe8cc2cfd7"
+    },
+    {
+      "index": 131,
+      "case": "opc_mutated_save",
+      "corpus_archive_sha256": "b8ed826dc5627314aa1f2442b6313158ef48bab7622dce0994b94afe8cc2cfd7"
+    },
+    {
+      "index": 159,
+      "case": "xlsx_noop_commit_save",
+      "corpus_archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428"
+    },
+    {
+      "index": 161,
+      "case": "xlsx_one_cell_commit_save",
+      "corpus_archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428"
+    },
+    {
+      "index": 163,
+      "case": "xlsx_one_percent_commit_save",
+      "corpus_archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428"
+    },
+    {
+      "index": 174,
+      "case": "xlsx_noop_commit_save",
+      "corpus_archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+    },
+    {
+      "index": 176,
+      "case": "xlsx_one_cell_commit_save",
+      "corpus_archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+    },
+    {
+      "index": 178,
+      "case": "xlsx_one_percent_commit_save",
+      "corpus_archive_sha256": "9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+    },
+    {
+      "index": 189,
+      "case": "xlsx_noop_commit_save",
+      "corpus_archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+    },
+    {
+      "index": 191,
+      "case": "xlsx_one_cell_commit_save",
+      "corpus_archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+    },
+    {
+      "index": 193,
+      "case": "xlsx_one_percent_commit_save",
+      "corpus_archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714"
+    }
+  ],
+  "preserved_timing_and_sink_projection_sha256": "24e86e762cb85211fa7ab154a6cfa853b06041cea0e72493e4011c9eabce3371",
+  "non_removed_rows_unchanged": true,
+  "raw_file_sha256": "6510497c60ce6c7bd47cb46c7b51620655e9ad0ace404237521c4f0f753eb8ef",
+  "raw_json_sha256": "25800c3b44e175556ad5aacb3172d9be3eb021521ac4b1720c31c59b22f04b10",
+  "derived_file_sha256": "9a7d816f64ca10001e31f0770237cefbc131704c598c267a92b7b1486df1b1e1",
+  "derived_json_sha256": "35d90ffd8376d371e34a6aa5cfde6e64ff24413736e53bb8a5dc65b9af5c67d0"
+}

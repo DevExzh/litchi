@@ -1,0 +1,117 @@
+{
+  "base": "e7c82d0774ee3bd59a2de53f3080e98e2c7f945f",
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "commands": [
+    {
+      "name": "tests",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--no-fail-fast"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": ""
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": ""
+    },
+    {
+      "name": "rustdoc",
+      "argv": [
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--no-deps"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": "-D warnings"
+    },
+    {
+      "name": "format",
+      "argv": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-drawingml",
+        "-p",
+        "litchi-xlsb",
+        "--check"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": ""
+    },
+    {
+      "name": "boundaries",
+      "argv": [
+        "python3",
+        "tools/check_crate_boundaries.py"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": ""
+    },
+    {
+      "name": "policy-tests",
+      "argv": [
+        "python3",
+        "-m",
+        "unittest",
+        "tools.test_check_crate_boundaries"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": ""
+    },
+    {
+      "name": "diff",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "RUSTDOCFLAGS": ""
+    }
+  ],
+  "source_unchanged": true,
+  "test_totals_including_doctests": {
+    "passed": 1127,
+    "failed": 0,
+    "ignored": 12
+  },
+  "logs": {
+    "boundaries.log": "cdea9514ba7c77c1608a6e73b2eeaf093accc70aefd1c3591af13d73e8b871fa",
+    "clippy.log": "a58153a7d7e76a647650e4bc8e022a7632a00e8eaf705807a37d1ba699dcb1fe",
+    "diff.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "policy-tests.log": "65abe0da8608983098e61e46e55d9ca5419bf86cc541b15d7ac8046495cc2a83",
+    "rustdoc.log": "2d6082d6767d394a6b91a4b219dd468ba9ccecaf45e480ef942a36f33baffedc",
+    "tests.log": "5e1e0a927db65215d239d05f010207fedb6bd43335cd4b2ee2ce1266aced455b"
+  },
+  "passed": true
+}

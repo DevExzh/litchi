@@ -8592,8 +8592,8 @@ class BoundaryPolicyTests(unittest.TestCase):
         archive_edge = boundaries.Edge("litchi-iwa-archive", "litchi-iwa-package")
         all_policy_edges = self.policy.canonical_edges | self.policy.migration_edges
 
-        self.assertEqual(len(self.policy.packages), 64)
-        self.assertEqual(len(all_policy_edges), 241)
+        self.assertEqual(len(self.policy.packages), 65)
+        self.assertEqual(len(all_policy_edges), 244)
         self.assertEqual(len(self.policy.migration_debt), 11)
         self.assertEqual(
             [item.order for item in self.policy.migration_debt],
@@ -8650,10 +8650,31 @@ class BoundaryPolicyTests(unittest.TestCase):
                     boundaries.Edge("litchi-ppt", "soapberry-zip"),
                     boundaries.Edge("litchi-pptx", "soapberry-zip"),
                     boundaries.Edge("litchi-sign", "soapberry-zip"),
+                    boundaries.Edge("litchi-xlsb", "soapberry-zip"),
                     boundaries.Edge("litchi-xlsx", "soapberry-zip"),
                 }
             ),
         )
+
+    def test_xldm_is_the_shared_neutral_data_model_owner(self) -> None:
+        owner = "litchi-xldm"
+        shared_edges = {
+            boundaries.Edge("litchi-xlsb", owner),
+            boundaries.Edge("litchi-xlsx", owner),
+        }
+        canonical = self.policy.canonical_edges
+
+        self.assertIn(owner, self.policy.packages)
+        self.assertIn(owner, self.policy.runtime_neutral)
+        self.assertEqual(
+            {edge for edge in canonical if edge.dependency == owner},
+            shared_edges,
+        )
+        self.assertEqual(
+            {edge for edge in canonical if edge.dependent == owner},
+            set(),
+        )
+        self.assertTrue(shared_edges.isdisjoint(self.policy.dev_only_edges))
 
     def test_dev_only_edge_cannot_be_promoted(self) -> None:
         edge = min(self.policy.dev_only_edges)
