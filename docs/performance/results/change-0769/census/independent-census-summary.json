@@ -1,0 +1,75 @@
+{
+ "files": 1830,
+ "by_class": {
+  "aligned": 1762,
+  "unparsed": 29,
+  "bad-mini-chain": 37,
+  "tail-inside": 2
+ },
+ "by_directory_and_class": {
+  "3rdparty/Open-XML-SDK aligned": 7,
+  "3rdparty/libreoffice-core aligned": 705,
+  "3rdparty/libreoffice-core bad-mini-chain": 20,
+  "3rdparty/libreoffice-core unparsed": 25,
+  "3rdparty/poi aligned": 837,
+  "3rdparty/poi bad-mini-chain": 17,
+  "3rdparty/poi tail-inside": 2,
+  "3rdparty/poi unparsed": 3,
+  "test-data/libreoffice-core aligned": 17,
+  "test-data/libreoffice-core unparsed": 1,
+  "test-data/office-interop aligned": 6,
+  "test-data/ole aligned": 98,
+  "test-data/poi aligned": 92
+ },
+ "unaligned_roots": [
+  {
+   "path": "3rdparty/poi/test-data/poifs/BlockSize512.zvi",
+   "root_size": 11564,
+   "root_mod_64": 44,
+   "classes": [
+    "tail-inside"
+   ],
+   "streams_in_partial": [
+    {
+     "sid": 25,
+     "name": "\u0005DocumentSummaryInformation",
+     "size": 172,
+     "position": 2,
+     "last": true,
+     "need": 44,
+     "end": 11564,
+     "shape": "tail-inside"
+    }
+   ]
+  },
+  {
+   "path": "3rdparty/poi/test-data/poifs/BlockSize4096.zvi",
+   "root_size": 11564,
+   "root_mod_64": 44,
+   "classes": [
+    "tail-inside"
+   ],
+   "streams_in_partial": [
+    {
+     "sid": 25,
+     "name": "\u0005DocumentSummaryInformation",
+     "size": 172,
+     "position": 2,
+     "last": true,
+     "need": 44,
+     "end": 11564,
+     "shape": "tail-inside"
+    }
+   ]
+  },
+  {
+   "path": "3rdparty/poi/test-data/document/clusterfuzz-testcase-minimized-POIHWPFFuzzer-5832867957309440.doc",
+   "root_size": 3095,
+   "root_mod_64": 23,
+   "classes": [
+    "bad-mini-chain"
+   ],
+   "streams_in_partial": []
+  }
+ ]
+}

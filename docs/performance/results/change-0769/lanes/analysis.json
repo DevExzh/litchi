@@ -1,0 +1,127 @@
+{
+ "census": {
+  "base": {
+   "files": 1831,
+   "admitted": 1647,
+   "streams": 23475,
+   "reads": 140850,
+   "files_disagreeing": 1,
+   "admitted_streams_a_reader_refused": 1,
+   "open_verdicts_differ_between_opens": 0
+  },
+  "cand": {
+   "files": 1831,
+   "admitted": 1647,
+   "streams": 23475,
+   "reads": 140850,
+   "files_disagreeing": 0,
+   "admitted_streams_a_reader_refused": 0,
+   "open_verdicts_differ_between_opens": 0
+  },
+  "differing_files": [
+   {
+    "path": "gen/zvi-normalized.cfb",
+    "base": {
+     "open": "ok",
+     "open_ok_read_err": 1,
+     "agree": false,
+     "refused_reads": [
+      "err:Corrupted file: Mini sector out of bounds"
+     ]
+    },
+    "cand": {
+     "open": "ok",
+     "open_ok_read_err": 0,
+     "agree": true
+    }
+   }
+  ]
+ },
+ "verdicts": {
+  "base": {
+   "cases": 30504,
+   "opened": 2692,
+   "refused": 27812,
+   "reads_ok": 53257,
+   "reads_err": 52,
+   "opened_then_read_refused": 52
+  },
+  "cand": {
+   "cases": 30504,
+   "opened": 2692,
+   "refused": 27812,
+   "reads_ok": 53309,
+   "reads_err": 0
+  },
+  "base_reproduces_0767_recorded_outputs": true,
+  "changes": {
+   "admitted, reads refused -> admitted, every read returns": 52
+  },
+  "change_examples": {
+   "admitted, reads refused -> admitted, every read returns": [
+    {
+     "file": "004.jsonl",
+     "case": 222,
+     "faults": "dir@332288=(00000245,4927)"
+    },
+    {
+     "file": "007.jsonl",
+     "case": 114,
+     "faults": "dir@25600=(00000034,127);dir@25856=(00000000,5165)"
+    },
+    {
+     "file": "008.jsonl",
+     "case": 103,
+     "faults": "dir@24064=(00000031,127)"
+    }
+   ]
+  },
+  "unexplained_changes": [],
+  "cand_opened_then_read_refused": []
+ },
+ "sweep": {
+  "base": {
+   "copies": 21741,
+   "admitted": 11247,
+   "refused": 10494,
+   "reads_ok": 997828,
+   "reads_err": 14932,
+   "admitted_then_a_read_refused": 3906,
+   "readers_disagree": 1353,
+   "open_verdicts_differ_between_opens": 0,
+   "refusals": {
+    "err:Corrupted file: root mini stream chain ends before its declared length": 1408,
+    "err:Corrupted file: Mini stream references storage outside the root mini stream": 3701,
+    "err:Corrupted file: root mini stream chain exceeds its declared length": 265,
+    "err:Corrupted file: Invalid start marker for root mini stream chain": 5120
+   }
+  },
+  "cand": {
+   "copies": 21741,
+   "admitted": 8694,
+   "refused": 13047,
+   "reads_ok": 772065,
+   "reads_err": 0,
+   "admitted_then_a_read_refused": 0,
+   "readers_disagree": 0,
+   "open_verdicts_differ_between_opens": 0,
+   "refusals": {
+    "err:Corrupted file: root mini stream chain ends before its declared length": 1408,
+    "err:Corrupted file: Mini stream references storage outside the root mini stream": 6254,
+    "err:Corrupted file: root mini stream chain exceeds its declared length": 265,
+    "err:Corrupted file: Invalid start marker for root mini stream chain": 5120
+   }
+  },
+  "changes": {
+   "admitted, reads refused -> refused at open (outside the root mini stream)": 2553,
+   "admitted, reads refused -> admitted, every read returns": 1353
+  },
+  "unexplained_changes": [],
+  "cand_against_oracle": {
+   "('admitted', True)": 8694,
+   "('root chain length', True)": 6793,
+   "('outside', True)": 6254
+  },
+  "oracle_mismatches": []
+ }
+}

@@ -1,0 +1,761 @@
+{
+ "schema": "0769-inputs-v1",
+ "generated": [
+  {
+   "file": "v3-mini-1000.cfb",
+   "streams": 1000,
+   "stream_bytes": 2000,
+   "sector_size": 512,
+   "sha256": "4fd4cb2405fd90b256b48fd616c7bbb4b21e0a49e4966326c22ae3cb4e0428f2",
+   "bytes": 2323456,
+   "command": "probe --mode generate --streams 1000 --size 2000 --sector-size 512 --output gen/v3-mini-1000.cfb",
+   "verified_identical_to_0767": true
+  },
+  {
+   "file": "v3-mini-3000.cfb",
+   "streams": 3000,
+   "stream_bytes": 2000,
+   "sector_size": 512,
+   "sha256": "7356aabdd748e662e90e6a58eefe50d8db4418a516b1925c93022ea6476df1e5",
+   "bytes": 6967808,
+   "command": "probe --mode generate --streams 3000 --size 2000 --sector-size 512 --output gen/v3-mini-3000.cfb",
+   "verified_identical_to_0767": true
+  },
+  {
+   "file": "v3-mini-10000.cfb",
+   "streams": 10000,
+   "stream_bytes": 2000,
+   "sector_size": 512,
+   "sha256": "e892a23cbdfb7dc47a26e581fdbd1da334742f0b9e364799561ca6d7428b541c",
+   "bytes": 23223808,
+   "command": "probe --mode generate --streams 10000 --size 2000 --sector-size 512 --output gen/v3-mini-10000.cfb",
+   "verified_identical_to_0767": true
+  },
+  {
+   "file": "v3-regular-1000.cfb",
+   "streams": 1000,
+   "stream_bytes": 5000,
+   "sector_size": 512,
+   "sha256": "76f58b4730aa252244036c01a090f1eb644ce3e5aa8888db16df0b2b0023e0fe",
+   "bytes": 5290496,
+   "command": "probe --mode generate --streams 1000 --size 5000 --sector-size 512 --output gen/v3-regular-1000.cfb",
+   "verified_identical_to_0767": true
+  },
+  {
+   "file": "v3-regular-3000.cfb",
+   "streams": 3000,
+   "stream_bytes": 5000,
+   "sector_size": 512,
+   "sha256": "750d28c27c795950502e027911a74e6c0617aef84d0505bdc66954c685bc386b",
+   "bytes": 15870464,
+   "command": "probe --mode generate --streams 3000 --size 5000 --sector-size 512 --output gen/v3-regular-3000.cfb",
+   "verified_identical_to_0767": true
+  },
+  {
+   "file": "v3-regular-10000.cfb",
+   "streams": 10000,
+   "stream_bytes": 5000,
+   "sector_size": 512,
+   "sha256": "4a5fa3abfacedf40a3a5f9db36deddc4f018572e8475ded012d6cd853e80657f",
+   "bytes": 52897792,
+   "command": "probe --mode generate --streams 10000 --size 5000 --sector-size 512 --output gen/v3-regular-10000.cfb",
+   "verified_identical_to_0767": true
+  },
+  {
+   "file": "v4-mini-1000.cfb",
+   "streams": 1000,
+   "stream_bytes": 2000,
+   "sector_size": 4096,
+   "sha256": "8f95a8c5f19a08d31ad60f5987809f03446b745fa2b0a2ea35873f246e938974",
+   "bytes": 2318336,
+   "command": "probe --mode generate --streams 1000 --size 2000 --sector-size 4096 --output gen/v4-mini-1000.cfb",
+   "verified_identical_to_0767": true
+  },
+  {
+   "file": "v4-mini-3000.cfb",
+   "streams": 3000,
+   "stream_bytes": 2000,
+   "sector_size": 4096,
+   "sha256": "9c9e96db4e66656f106e61bff80b6b6aa0782b0514b6957706f73b74ec32a609",
+   "bytes": 6926336,
+   "command": "probe --mode generate --streams 3000 --size 2000 --sector-size 4096 --output gen/v4-mini-3000.cfb",
+   "verified_identical_to_0767": true
+  },
+  {
+   "file": "v4-mini-10000.cfb",
+   "streams": 10000,
+   "stream_bytes": 2000,
+   "sector_size": 4096,
+   "sha256": "678c9b90de91751202d87c93aab246856f7d57127f87b0aa2ed97994c18cfadb",
+   "bytes": 23072768,
+   "command": "probe --mode generate --streams 10000 --size 2000 --sector-size 4096 --output gen/v4-mini-10000.cfb",
+   "verified_identical_to_0767": true
+  },
+  {
+   "file": "v4-regular-1000.cfb",
+   "streams": 1000,
+   "stream_bytes": 5000,
+   "sector_size": 4096,
+   "sha256": "a9bf7ce67e3bb37c4f263fc29034cdc6466a40677f5505ff731051e049f8012a",
+   "bytes": 8335360,
+   "command": "probe --mode generate --streams 1000 --size 5000 --sector-size 4096 --output gen/v4-regular-1000.cfb",
+   "verified_identical_to_0767": true
+  },
+  {
+   "file": "v4-regular-3000.cfb",
+   "streams": 3000,
+   "stream_bytes": 5000,
+   "sector_size": 4096,
+   "sha256": "0faf627edec4d20d93a3c2e6b608c026ec5b0581de113d801417b8953d2384c9",
+   "bytes": 24989696,
+   "command": "probe --mode generate --streams 3000 --size 5000 --sector-size 4096 --output gen/v4-regular-3000.cfb",
+   "verified_identical_to_0767": true
+  },
+  {
+   "file": "v4-regular-10000.cfb",
+   "streams": 10000,
+   "stream_bytes": 5000,
+   "sector_size": 4096,
+   "sha256": "e9794183b7a6fdf572c4eb7db70392f89af00f0075362fe05b6f156f47a9b97d",
+   "bytes": 83288064,
+   "command": "probe --mode generate --streams 10000 --size 5000 --sector-size 4096 --output gen/v4-regular-10000.cfb",
+   "verified_identical_to_0767": true
+  }
+ ],
+ "generated_note": "Regenerated with this record's base probe (0767's generator, unchanged); every digest equals record 0767's inputs.json.",
+ "zvi_normalized": {
+  "file": "gen/zvi-normalized.cfb",
+  "sha256": "fd3d22bcbcbd1fd11b954226a708ee0eccf64f07969297b8a8e2801c873a431d",
+  "bytes": 51712,
+  "derived_from": "test-data/poi/test-data/poifs/BlockSize512.zvi (sha256 4454d6470f6c6c750b9494094f239cf7e70be5c9cb13a0adfb42fcc3a395c49c)",
+  "edit": "the 11 storage entries whose start sector is FREESECT get ENDOFCHAIN; no other byte changes (scripts/normalize_zvi.py)"
+ },
+ "lane_inputs": [
+  {
+   "file": "001.jsonl",
+   "input": "test-data/ole/doc/3endnotes.doc",
+   "sha256": "5317a69f37ce29dbd4fd6e8556c7566249bb8ad0a7dc17a27f8e96bd9f87a396",
+   "cases": 300
+  },
+  {
+   "file": "002.jsonl",
+   "input": "test-data/ole/doc/DiffFirstPageHeadFoot.doc",
+   "sha256": "674285298712213a7e0141182a2efc9d7f3ad6ebf4f5520b8405774ec3e5def0",
+   "cases": 300
+  },
+  {
+   "file": "003.jsonl",
+   "input": "test-data/ole/doc/FancyFoot.doc",
+   "sha256": "709fe8b695a9b12be35c7e81d93beb95afc8dc36422dfc0cbd605a3057d4ddc2",
+   "cases": 300
+  },
+  {
+   "file": "004.jsonl",
+   "input": "test-data/ole/doc/FloatingPictures.doc",
+   "sha256": "41cc0cd8f2d7390266f844f5bddbcd29d08ac5338abc33832d9c9a6ed5d0f85d",
+   "cases": 300
+  },
+  {
+   "file": "005.jsonl",
+   "input": "test-data/ole/doc/HeaderFooterProblematic.doc",
+   "sha256": "cd28e07f2496a91c4dabf1bb9201beb1744b164266f868210c4c2c0d235dacd5",
+   "cases": 300
+  },
+  {
+   "file": "006.jsonl",
+   "input": "test-data/ole/doc/HeaderFooterUnicode.doc",
+   "sha256": "8bd7fc9552bccb7b71a0dc34ffd801e7d3547d1317fd75d0c35fca3572f6fa4b",
+   "cases": 300
+  },
+  {
+   "file": "007.jsonl",
+   "input": "test-data/ole/doc/Lists.doc",
+   "sha256": "82b235ece31662a9b1b414f32a556d203261296e22689470a79007f0b29c37fa",
+   "cases": 300
+  },
+  {
+   "file": "008.jsonl",
+   "input": "test-data/ole/doc/NoHeadFoot.doc",
+   "sha256": "45e5df073f34314da6f39d2dad119fb2ef23470878fd2df67f632864cd92ea48",
+   "cases": 300
+  },
+  {
+   "file": "009.jsonl",
+   "input": "test-data/ole/doc/PasswordProtected.doc",
+   "sha256": "863d2216a6f5bb4cec0ea4131a05ae0822dbce347e2940155ef638c6d64935fe",
+   "cases": 300
+  },
+  {
+   "file": "010.jsonl",
+   "input": "test-data/ole/doc/PngPicture.doc",
+   "sha256": "259aa01f88c17bb4ad364d08ce62424959f51717b37d8a5578e3045f9eaede6b",
+   "cases": 300
+  },
+  {
+   "file": "011.jsonl",
+   "input": "test-data/ole/doc/ThreeColFoot.doc",
+   "sha256": "38a9da0842c25c62f64c5fadb16cb6ff9e2fe5cdea5312925020aa238aec24fc",
+   "cases": 300
+  },
+  {
+   "file": "012.jsonl",
+   "input": "test-data/ole/doc/ThreeColHead.doc",
+   "sha256": "199dcc99cbf6f7ca5ed5d57b5072e124c7776895f0669d7fac4227f4208a8ad6",
+   "cases": 300
+  },
+  {
+   "file": "013.jsonl",
+   "input": "test-data/ole/doc/ThreeColHeadFoot.doc",
+   "sha256": "e8c260238b10e20d89f3965f2eb2ee7e024a106833acc79e666c49a1782a637b",
+   "cases": 300
+  },
+  {
+   "file": "014.jsonl",
+   "input": "test-data/ole/doc/cfb-truncated-final-sector.doc",
+   "sha256": "f0e4f66622c0b5f8ee1af1931d5a216be84768f5bbe53b20f6e9a7deec563609",
+   "cases": 300
+  },
+  {
+   "file": "015.jsonl",
+   "input": "test-data/ole/doc/cfb-v3-uninitialized-size-high-word.doc",
+   "sha256": "d1fa9699291b09ede96267581629125417db2048ddf78361b5d5c9641de7aa7a",
+   "cases": 300
+  },
+  {
+   "file": "016.jsonl",
+   "input": "test-data/ole/doc/cjklist30.doc",
+   "sha256": "fc42656d6fdb0ae9caa1812a11b7c6889038e29a587f0b048c6b43820abc0ea8",
+   "cases": 300
+  },
+  {
+   "file": "017.jsonl",
+   "input": "test-data/ole/doc/cjklist31.doc",
+   "sha256": "a4a73895588459c127472ba4be04cb94ce4fde477e25f8688e25c168960b0d7d",
+   "cases": 300
+  },
+  {
+   "file": "018.jsonl",
+   "input": "test-data/ole/doc/cjklist34.doc",
+   "sha256": "d62464d5b1e022eb349d8550ca03dfe55beb983a45e57cca3cd288c05520f07e",
+   "cases": 300
+  },
+  {
+   "file": "019.jsonl",
+   "input": "test-data/ole/doc/cjklist35.doc",
+   "sha256": "22e5b23bf7430f520d196f610f9ae9f40b7e625362a6f4ab443e2cfc4dd7e4c9",
+   "cases": 300
+  },
+  {
+   "file": "020.jsonl",
+   "input": "test-data/ole/doc/commented-table.doc",
+   "sha256": "33d235c3dcf3f6ac41e0a2a867c06b86503c2b815eebf7c9e1fa4dd26838f2ff",
+   "cases": 300
+  },
+  {
+   "file": "021.jsonl",
+   "input": "test-data/ole/doc/documentProperties.doc",
+   "sha256": "3958e5c16a9089f07c1d7602e2e15b6032b586f1d1eeed6fe048af73535e36cb",
+   "cases": 300
+  },
+  {
+   "file": "022.jsonl",
+   "input": "test-data/ole/doc/duplicate-style-names.doc",
+   "sha256": "660e6f947d7af78764cd0bb1dfc90e6e37a634e1ab0642a406b470b73e6770ed",
+   "cases": 300
+  },
+  {
+   "file": "023.jsonl",
+   "input": "test-data/ole/doc/empty.doc",
+   "sha256": "5f421a3970c70f12296073478380c0849a54c03fb2f4842392c7d3c5039bf1eb",
+   "cases": 300
+  },
+  {
+   "file": "024.jsonl",
+   "input": "test-data/ole/doc/endingnote.doc",
+   "sha256": "f170880d7ff9820a56c252f14286dc99c1c658d8e157bacf0e5f0166d5a714be",
+   "cases": 300
+  },
+  {
+   "file": "025.jsonl",
+   "input": "test-data/ole/doc/equation.doc",
+   "sha256": "eccab1c32bf3ef27e36dfeb46b3ebfba4981666e0fe9364eef05fa55f6463980",
+   "cases": 300
+  },
+  {
+   "file": "026.jsonl",
+   "input": "test-data/ole/doc/first-header-footer.doc",
+   "sha256": "384bc3570ef6193116210c5afd4dcfdcc6a5b63a983dc94512844439ab1b5f6a",
+   "cases": 300
+  },
+  {
+   "file": "027.jsonl",
+   "input": "test-data/ole/doc/footnote.doc",
+   "sha256": "81a18ac63010789ca08c28de107658a308c758a3cfc667a6edf11ffe888d3e13",
+   "cases": 300
+  },
+  {
+   "file": "028.jsonl",
+   "input": "test-data/ole/doc/hyperlink.doc",
+   "sha256": "090c1e410cf91552c91e50585031900c48c659fbb9efe54bf12a35137b86b7e6",
+   "cases": 300
+  },
+  {
+   "file": "029.jsonl",
+   "input": "test-data/ole/doc/image-comment-at-char.doc",
+   "sha256": "a2ffbc4e799b7c5052d83d9e38646d1c96d177583420f5f5f5d7256add7a186e",
+   "cases": 300
+  },
+  {
+   "file": "030.jsonl",
+   "input": "test-data/ole/doc/inline-endnote-and-footnote.doc",
+   "sha256": "56585ab2faeeb3b2c3b1e8b03f67e87b9f04e360f03de08d312d854d0bdc2cda",
+   "cases": 300
+  },
+  {
+   "file": "031.jsonl",
+   "input": "test-data/ole/doc/lists-margins.doc",
+   "sha256": "536c7cb6589a89c632734298b7ac65a103b7fa0ceb9108c2a975ef197a0c175e",
+   "cases": 300
+  },
+  {
+   "file": "032.jsonl",
+   "input": "test-data/ole/doc/picture.doc",
+   "sha256": "b5a6b5edc2f4324b668cfea44fc71ac5488f13431405cf4fd90737fafed1d153",
+   "cases": 300
+  },
+  {
+   "file": "033.jsonl",
+   "input": "test-data/ole/doc/pictures_escher.doc",
+   "sha256": "84a68678fc525e763beabab7e79240e2bbf4cd6b7766eed3364681d38fed2457",
+   "cases": 300
+  },
+  {
+   "file": "034.jsonl",
+   "input": "test-data/ole/doc/table-merged-cells.doc",
+   "sha256": "54caf656de15de36bcaf418f86d49d15b24a090f1f60aecb84a4a55a47d8cbdb",
+   "cases": 300
+  },
+  {
+   "file": "035.jsonl",
+   "input": "test-data/ole/doc/tdf71749_with_footnote.doc",
+   "sha256": "380e28ebd98c34e88237d79f32ecc4d89992a6933898eb2ff8e1ad52b4ca4c72",
+   "cases": 300
+  },
+  {
+   "file": "036.jsonl",
+   "input": "test-data/ole/doc/testPictures.doc",
+   "sha256": "6f5224140f6381e7f7af069badcf8970a01ecb5630a2bbd30f155d164c767f66",
+   "cases": 300
+  },
+  {
+   "file": "037.jsonl",
+   "input": "test-data/ole/doc/watermark.doc",
+   "sha256": "e6e74961fc41a00744b0f945639b4194d72028bb05589b069f56a09befd970be",
+   "cases": 300
+  },
+  {
+   "file": "038.jsonl",
+   "input": "test-data/ole/doc/word6-no-table-stream.doc",
+   "sha256": "58ea3347378e85e7c8d19ad64e74ad533b2f51b30f047594b434f380712f8b50",
+   "cases": 300
+  },
+  {
+   "file": "039.jsonl",
+   "input": "test-data/ole/ppt/SampleShow.ppt",
+   "sha256": "64275a6685b8f267827178037dcc59de927475e56385725916f4c6039c7ce7f6",
+   "cases": 300
+  },
+  {
+   "file": "040.jsonl",
+   "input": "test-data/ole/ppt/empty.ppt",
+   "sha256": "cc2bd402a951c443d6296b855c49ad79710da2c6ffb16db3ebde55351621ae6a",
+   "cases": 300
+  },
+  {
+   "file": "041.jsonl",
+   "input": "test-data/ole/ppt/empty_textbox.ppt",
+   "sha256": "1352e2cc96b59fb9eae6787f4775405aa1257c41956736d9e1ea0ab7182e4be3",
+   "cases": 300
+  },
+  {
+   "file": "042.jsonl",
+   "input": "test-data/ole/ppt/ppt_with_png.ppt",
+   "sha256": "92865c21e43aa3a69a61371fed9ea50873a66e4a5ee5a24ede2af58db66aeeb3",
+   "cases": 300
+  },
+  {
+   "file": "043.jsonl",
+   "input": "test-data/ole/ppt/text-margins.ppt",
+   "sha256": "a27008c6fda5e17653febc45ac65ed702003efb49607079f186307a9c0a6ea56",
+   "cases": 300
+  },
+  {
+   "file": "044.jsonl",
+   "input": "test-data/ole/ppt/text_shapes.ppt",
+   "sha256": "70c63540abc705da64764a9bcb5380bde9655264c2c3f047c3ee4b7dded3de3f",
+   "cases": 300
+  },
+  {
+   "file": "045.jsonl",
+   "input": "test-data/ole/xls/ComplexFunctionTestCaseData.xls",
+   "sha256": "e64097dffec5a2c7ce9226efc204aa1187430a2e6bea57d0aa40deee60006bcd",
+   "cases": 300
+  },
+  {
+   "file": "046.jsonl",
+   "input": "test-data/ole/xls/ConditionalFormattingSamples copy.xls",
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7",
+   "cases": 300
+  },
+  {
+   "file": "047.jsonl",
+   "input": "test-data/ole/xls/ConditionalFormattingSamples.xls",
+   "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7",
+   "cases": 300
+  },
+  {
+   "file": "048.jsonl",
+   "input": "test-data/ole/xls/DateFormats.xls",
+   "sha256": "f3ac7e6f0f23e638cfeb0d34543e18f3b07cd93edd1e7a71be907c73a767310c",
+   "cases": 300
+  },
+  {
+   "file": "049.jsonl",
+   "input": "test-data/ole/xls/DateTimeToNumberTestCases.xls",
+   "sha256": "424f0d0c9a183458bfa3b7c09a8cbf4edcc9cec3d72b00e68e4bb0bf27292b6c",
+   "cases": 300
+  },
+  {
+   "file": "050.jsonl",
+   "input": "test-data/ole/xls/FormulaEvalTestData.xls",
+   "sha256": "c2040c1fac1088f1e112abef197ae1f9bcb03547861783b89c1d4281a42049d1",
+   "cases": 300
+  },
+  {
+   "file": "051.jsonl",
+   "input": "test-data/ole/xls/FormulaRefs.xls",
+   "sha256": "3843a69fd55c27258b4563ea9b9efe97bd0e18c73a5f82db59daa84b5334602d",
+   "cases": 300
+  },
+  {
+   "file": "052.jsonl",
+   "input": "test-data/ole/xls/FormulaSheetRange.xls",
+   "sha256": "7b5c3e6573bb05ea488c996a95190450871b6afeef9d4abe58393f92d8973a64",
+   "cases": 300
+  },
+  {
+   "file": "053.jsonl",
+   "input": "test-data/ole/xls/HyperlinksOnManySheets.xls",
+   "sha256": "e03ddd49d757af31b897ffcc394d733131dc28ab484f9cca484351810d0935af",
+   "cases": 300
+  },
+  {
+   "file": "054.jsonl",
+   "input": "test-data/ole/xls/Simple.xls",
+   "sha256": "2b5ec8298bacffdca61c50f6f7607da0a4e63cf76fa011c62f203e6a66bc072a",
+   "cases": 300
+  },
+  {
+   "file": "055.jsonl",
+   "input": "test-data/ole/xls/SimpleChart.xls",
+   "sha256": "8fbef881f6d869515eca2c36dde5b74bc5ffc900ec586b01d0b547234e111569",
+   "cases": 300
+  },
+  {
+   "file": "056.jsonl",
+   "input": "test-data/ole/xls/SimpleMacro.xls",
+   "sha256": "0e92c9bb018abd8a5f9121d65827c9e3bd280777219cb77a2efd70635143c00a",
+   "cases": 300
+  },
+  {
+   "file": "057.jsonl",
+   "input": "test-data/ole/xls/SimpleMultiCell.xls",
+   "sha256": "f8f04c014b7503e62fa52c3b194dfaf010140a36298764d07dd9d1837ab1d037",
+   "cases": 300
+  },
+  {
+   "file": "058.jsonl",
+   "input": "test-data/ole/xls/SimpleScatterChart.xls",
+   "sha256": "514e82ceda320555fd8ecf7b72de55e4aeb3641f778c6447fb5073b50a691444",
+   "cases": 300
+  },
+  {
+   "file": "059.jsonl",
+   "input": "test-data/ole/xls/SimpleWithAutofilter copy.xls",
+   "sha256": "cb257bdaa23f9b36061f598af134e3ac12f84dfd54c4faa82d7f0e8bae25d971",
+   "cases": 300
+  },
+  {
+   "file": "060.jsonl",
+   "input": "test-data/ole/xls/SimpleWithAutofilter.xls",
+   "sha256": "cb257bdaa23f9b36061f598af134e3ac12f84dfd54c4faa82d7f0e8bae25d971",
+   "cases": 300
+  },
+  {
+   "file": "061.jsonl",
+   "input": "test-data/ole/xls/SimpleWithChoose copy.xls",
+   "sha256": "86a1c556ad1f976e25032fd68cb4cbef856181320932c3640c61b42dbef663c6",
+   "cases": 300
+  },
+  {
+   "file": "062.jsonl",
+   "input": "test-data/ole/xls/SimpleWithChoose.xls",
+   "sha256": "86a1c556ad1f976e25032fd68cb4cbef856181320932c3640c61b42dbef663c6",
+   "cases": 300
+  },
+  {
+   "file": "063.jsonl",
+   "input": "test-data/ole/xls/SimpleWithColours copy.xls",
+   "sha256": "350ea9306c60c4d4bf7949858e75f3277cf702f7b684a8b0597d7b2ec718070e",
+   "cases": 300
+  },
+  {
+   "file": "064.jsonl",
+   "input": "test-data/ole/xls/SimpleWithColours.xls",
+   "sha256": "350ea9306c60c4d4bf7949858e75f3277cf702f7b684a8b0597d7b2ec718070e",
+   "cases": 300
+  },
+  {
+   "file": "065.jsonl",
+   "input": "test-data/ole/xls/SimpleWithComments copy.xls",
+   "sha256": "e3f2cc5b39c78c27fc6ab9dcc7a68ab61c5d63e1f2d2bb7fa5bd41e466e34639",
+   "cases": 300
+  },
+  {
+   "file": "066.jsonl",
+   "input": "test-data/ole/xls/SimpleWithComments.xls",
+   "sha256": "e3f2cc5b39c78c27fc6ab9dcc7a68ab61c5d63e1f2d2bb7fa5bd41e466e34639",
+   "cases": 300
+  },
+  {
+   "file": "067.jsonl",
+   "input": "test-data/ole/xls/SimpleWithDataFormat copy.xls",
+   "sha256": "46f9eb234edc8c3803742415ad3e6906ec96f3de3de299fdd2ac4202f0652413",
+   "cases": 300
+  },
+  {
+   "file": "068.jsonl",
+   "input": "test-data/ole/xls/SimpleWithDataFormat.xls",
+   "sha256": "46f9eb234edc8c3803742415ad3e6906ec96f3de3de299fdd2ac4202f0652413",
+   "cases": 300
+  },
+  {
+   "file": "069.jsonl",
+   "input": "test-data/ole/xls/SimpleWithFormula copy.xls",
+   "sha256": "da02c7e43e96d8c899ec21eb07118a63eafe3d0b7287ff067c33b1c3adc8b68c",
+   "cases": 300
+  },
+  {
+   "file": "070.jsonl",
+   "input": "test-data/ole/xls/SimpleWithFormula.xls",
+   "sha256": "da02c7e43e96d8c899ec21eb07118a63eafe3d0b7287ff067c33b1c3adc8b68c",
+   "cases": 300
+  },
+  {
+   "file": "071.jsonl",
+   "input": "test-data/ole/xls/SimpleWithImages copy.xls",
+   "sha256": "43ca8e823646683b5b5c6b235f30513235f9ac1158a3dff73442fe7c0b72ee55",
+   "cases": 300
+  },
+  {
+   "file": "072.jsonl",
+   "input": "test-data/ole/xls/SimpleWithImages-mac copy.xls",
+   "sha256": "c9152232dc6df9e080d35312796ffaed232ea43848c84fb3bd170fa94ee437ce",
+   "cases": 300
+  },
+  {
+   "file": "073.jsonl",
+   "input": "test-data/ole/xls/SimpleWithImages-mac.xls",
+   "sha256": "c9152232dc6df9e080d35312796ffaed232ea43848c84fb3bd170fa94ee437ce",
+   "cases": 300
+  },
+  {
+   "file": "074.jsonl",
+   "input": "test-data/ole/xls/SimpleWithImages.xls",
+   "sha256": "43ca8e823646683b5b5c6b235f30513235f9ac1158a3dff73442fe7c0b72ee55",
+   "cases": 300
+  },
+  {
+   "file": "075.jsonl",
+   "input": "test-data/ole/xls/SimpleWithPageBreaks copy.xls",
+   "sha256": "b0634993f101dcce02e368f733a98b86dd05b3e6e29e4c1fe119f5cf3344865f",
+   "cases": 300
+  },
+  {
+   "file": "076.jsonl",
+   "input": "test-data/ole/xls/SimpleWithPageBreaks.xls",
+   "sha256": "b0634993f101dcce02e368f733a98b86dd05b3e6e29e4c1fe119f5cf3344865f",
+   "cases": 300
+  },
+  {
+   "file": "077.jsonl",
+   "input": "test-data/ole/xls/SimpleWithPrintArea copy.xls",
+   "sha256": "bbc8d3c9b3d41319e66f04bd20132077e20c19340021b014674111a8a3fd0888",
+   "cases": 300
+  },
+  {
+   "file": "078.jsonl",
+   "input": "test-data/ole/xls/SimpleWithPrintArea.xls",
+   "sha256": "bbc8d3c9b3d41319e66f04bd20132077e20c19340021b014674111a8a3fd0888",
+   "cases": 300
+  },
+  {
+   "file": "079.jsonl",
+   "input": "test-data/ole/xls/SimpleWithSkip copy.xls",
+   "sha256": "54ea1c9ec234638d7c47888350fc8996080904914788e600bb93a77e6aca2639",
+   "cases": 300
+  },
+  {
+   "file": "080.jsonl",
+   "input": "test-data/ole/xls/SimpleWithSkip.xls",
+   "sha256": "54ea1c9ec234638d7c47888350fc8996080904914788e600bb93a77e6aca2639",
+   "cases": 300
+  },
+  {
+   "file": "081.jsonl",
+   "input": "test-data/ole/xls/SimpleWithStyling copy.xls",
+   "sha256": "029d30c42f2f328bbca166bfba986b9aa8def448b7e238177999cd76602fe87b",
+   "cases": 300
+  },
+  {
+   "file": "082.jsonl",
+   "input": "test-data/ole/xls/SimpleWithStyling.xls",
+   "sha256": "029d30c42f2f328bbca166bfba986b9aa8def448b7e238177999cd76602fe87b",
+   "cases": 300
+  },
+  {
+   "file": "083.jsonl",
+   "input": "test-data/ole/xls/SingleLetterRanges.xls",
+   "sha256": "2f70b43129876bda6049deb44e301ad65f2e5a806011a3969730d111ea64ca1f",
+   "cases": 300
+  },
+  {
+   "file": "084.jsonl",
+   "input": "test-data/ole/xls/WeekNumFunctionTestCaseData.xls",
+   "sha256": "412ac3c961af66c897102b92260f5ba6b5c51045e1fd92dcadfc92c648291bdd",
+   "cases": 300
+  },
+  {
+   "file": "085.jsonl",
+   "input": "test-data/ole/xls/WeekNumFunctionTestCaseData2013.xls",
+   "sha256": "e31ef3a53462d9e365cbc79478bc05762c47055e5f626ecd8fe97cd4dd5b44c2",
+   "cases": 300
+  },
+  {
+   "file": "086.jsonl",
+   "input": "test-data/ole/xls/WithChart.xls",
+   "sha256": "e72315361da2e7a59d50ad5f8b92dd7464004661014b2ab9b462c2c6a48b70f1",
+   "cases": 300
+  },
+  {
+   "file": "087.jsonl",
+   "input": "test-data/ole/xls/WithCheckBoxes.xls",
+   "sha256": "8281c55a88a92644525c1fa45540897c15097cdfcca1176e5edae7618a0421ab",
+   "cases": 300
+  },
+  {
+   "file": "088.jsonl",
+   "input": "test-data/ole/xls/WithConditionalFormatting.xls",
+   "sha256": "acbf5ac10902a62df0ea1ccf3c270a82a32d6750e6b231f1538bf4a56322e7c4",
+   "cases": 300
+  },
+  {
+   "file": "089.jsonl",
+   "input": "test-data/ole/xls/WithCustomViews.xls",
+   "sha256": "3c0c168f38498cc7a356ffaee82b19241ab022ca8813c4ebef286399c32cbd64",
+   "cases": 300
+  },
+  {
+   "file": "090.jsonl",
+   "input": "test-data/ole/xls/WithEmbeddedObjects.xls",
+   "sha256": "da5ba0f448eaca147b23dd18f4020398555242b348b7ae0d917ed53240877aa7",
+   "cases": 300
+  },
+  {
+   "file": "091.jsonl",
+   "input": "test-data/ole/xls/WithExtendedStyles.xls",
+   "sha256": "010a884f646e7a9dfcd0d5045a9385a47b0d8ccaa9b3831b70a779653ddcd5be",
+   "cases": 300
+  },
+  {
+   "file": "092.jsonl",
+   "input": "test-data/ole/xls/WithFormattedGraphTitle.xls",
+   "sha256": "8201089ca9e8449867763467cd6ae5bd5520a511313aefb04773d3fd848361b7",
+   "cases": 300
+  },
+  {
+   "file": "093.jsonl",
+   "input": "test-data/ole/xls/WithHyperlink.xls",
+   "sha256": "c85cc593fc2fdb5bb4f0e35b0f150c7f79d9772b13dac2fa3f25ec162d2cfd5a",
+   "cases": 300
+  },
+  {
+   "file": "094.jsonl",
+   "input": "test-data/ole/xls/WithThreeCharts.xls",
+   "sha256": "94a8664fd81ec2c1c9d27df9175d971dc269c41584d3711c7c99a37b2ceb0d51",
+   "cases": 300
+  },
+  {
+   "file": "095.jsonl",
+   "input": "test-data/ole/xls/WithTwoCharts.xls",
+   "sha256": "1de9f7be0d5dbda7ca49eb68c4572163a7fe798c1141c6557e95f3aae5216d15",
+   "cases": 300
+  },
+  {
+   "file": "096.jsonl",
+   "input": "test-data/ole/xls/WithTwoHyperLinks.xls",
+   "sha256": "139a3ace5945fd0a1e498dd6482365b4f7f2281c879b8dcd15e10b5fb0963aa9",
+   "cases": 300
+  },
+  {
+   "file": "097.jsonl",
+   "input": "test-data/ole/xls/empty.xls",
+   "sha256": "93670866067fa703c5ffeea42129f5712af24d6bf8dc90aa3e2a7f3811494036",
+   "cases": 300
+  },
+  {
+   "file": "098.jsonl",
+   "input": "test-data/ole/xls/password.xls",
+   "sha256": "3ad12a829132d9c157d213c623af9c534b1449c42e93ab39b17ca53c909ac412",
+   "cases": 300
+  },
+  {
+   "file": "099.jsonl",
+   "input": "test-data/poi/test-data/slideshow/45543.ppt",
+   "sha256": "218aaac542e5f9b567736407f2631defc65797c6ba2a7818f066e2f93bcfacaf",
+   "cases": 300
+  },
+  {
+   "file": "100.jsonl",
+   "input": "test-data/poi/test-data/slideshow/41246-1.ppt",
+   "sha256": "10596758d092302d1efc22282c31addd3ec2f994fdc763b561cef80fe2a6e147",
+   "cases": 300
+  },
+  {
+   "file": "gen-v3-mini-1000.jsonl",
+   "input": "gen/v3-mini-1000.cfb",
+   "sha256": "4fd4cb2405fd90b256b48fd616c7bbb4b21e0a49e4966326c22ae3cb4e0428f2",
+   "cases": 100
+  },
+  {
+   "file": "gen-v3-regular-1000.jsonl",
+   "input": "gen/v3-regular-1000.cfb",
+   "sha256": "76f58b4730aa252244036c01a090f1eb644ce3e5aa8888db16df0b2b0023e0fe",
+   "cases": 100
+  },
+  {
+   "file": "gen-v4-mini-1000.jsonl",
+   "input": "gen/v4-mini-1000.cfb",
+   "sha256": "8f95a8c5f19a08d31ad60f5987809f03446b745fa2b0a2ea35873f246e938974",
+   "cases": 100
+  },
+  {
+   "file": "gen-v4-regular-1000.jsonl",
+   "input": "gen/v4-regular-1000.cfb",
+   "sha256": "a9bf7ce67e3bb37c4f263fc29034cdc6466a40677f5505ff731051e049f8012a",
+   "cases": 100
+  }
+ ],
+ "census_inputs": "every file with the CFB signature under test-data/ and the gitignored 3rdparty/ reference corpora (1,830), plus gen/zvi-normalized.cfb; list in census-paths.txt",
+ "sweep_inputs": "the fault lane's 104 inputs plus gen/zvi-normalized.cfb; list in sweep-paths.txt"
+}
