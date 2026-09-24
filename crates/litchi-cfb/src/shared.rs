@@ -2644,14 +2644,6 @@ impl SharedOleFile {
                 .ok_or_else(|| {
                     OleError::CorruptedFile("Mini sector offset overflow".to_string())
                 })?;
-            let end = position
-                .checked_add(self.index.mini_sector_size)
-                .ok_or_else(|| OleError::CorruptedFile("Mini sector end overflow".to_string()))?;
-            if end > ministream.len() {
-                return Err(OleError::CorruptedFile(
-                    "Mini sector out of bounds".to_string(),
-                ));
-            }
             let output_start = index
                 .checked_mul(self.index.mini_sector_size)
                 .ok_or_else(|| {
@@ -2661,9 +2653,19 @@ impl SharedOleFile {
                 .checked_add(self.index.mini_sector_size)
                 .unwrap_or(usize::MAX)
                 .min(data.len());
-            data[output_start..output_end].copy_from_slice(
-                &ministream[position..position + output_end.saturating_sub(output_start)],
-            );
+            // Only the stream's bytes in this sector must lie inside the
+            // cached mini stream, which holds exactly the root size: the
+            // unused tail of the stream's last sector may extend past it, as
+            // open-time validation admits and the bounded direct read reads.
+            let end = position
+                .checked_add(output_end.saturating_sub(output_start))
+                .ok_or_else(|| OleError::CorruptedFile("Mini sector end overflow".to_string()))?;
+            if end > ministream.len() {
+                return Err(OleError::CorruptedFile(
+                    "Mini sector out of bounds".to_string(),
+                ));
+            }
+            data[output_start..output_end].copy_from_slice(&ministream[position..end]);
             sector = next_chain_sector(&self.index.minifat, sector, "MiniFAT")?;
             if index + 1 == required {
                 if sector != ENDOFCHAIN {
