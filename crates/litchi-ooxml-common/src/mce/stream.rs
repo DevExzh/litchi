@@ -1552,14 +1552,27 @@ impl Namespaces {
     /// The walk costs one comparison per declaration in scope, which an input
     /// controls; production lookups use [`Scope`], and this walk only checks
     /// it in debug builds.
-    fn walk(&self, prefix: &str, mut budget: usize) -> Option<Option<&str>> {
+    fn walk(&self, prefix: &str, budget: usize, counted: bool) -> Option<Option<&str>> {
+        let mut steps = 0usize;
+        let result = self.walk_steps(prefix, budget, &mut steps);
+        if counted {
+            #[cfg(test)]
+            super::scope::counter::steps(steps);
+        }
+        result
+    }
+
+    fn walk_steps(&self, prefix: &str, budget: usize, steps: &mut usize) -> Option<Option<&str>> {
         if prefix == "xml" {
             return Some(Some(XML_NS));
         }
         let mut layer = self.head.as_deref();
         while let Some(current) = layer {
             for (candidate, namespace) in current.local.iter().rev() {
-                budget = budget.checked_sub(1)?;
+                if *steps == budget {
+                    return None;
+                }
+                *steps += 1;
                 if candidate == prefix {
                     return Some(Some(namespace));
                 }
@@ -1594,7 +1607,7 @@ impl Namespaces {
         for (prefix, namespace) in &local {
             let bound = scope.get_outside(prefix, depth);
             debug_assert!(
-                self.walk(prefix, CROSS_CHECKED_DECLARATIONS)
+                self.walk(prefix, CROSS_CHECKED_DECLARATIONS, false)
                     .is_none_or(|walked| walked == bound),
                 "the prefix index disagrees with the declaration chain for {prefix:?}"
             );
@@ -1626,25 +1639,42 @@ impl Namespaces {
     }
 }
 
+/// Namespace declarations a lookup walks, innermost first, before it asks
+/// [`Scope`]. It covers every declaration in scope in the repository's real
+/// documents, whose largest element declares 38.
+const WALKED_DECLARATIONS: usize = 64;
+
 /// Namespace declarations one element's lookup may walk before the debug
 /// cross-check of [`Scope`] against the declaration chain gives up.
 const CROSS_CHECKED_DECLARATIONS: usize = 256;
 
-/// Prefix resolution at the element being processed: [`Scope`] answers, and
-/// debug builds cross-check its answer against the element's declaration
-/// chain while that walk stays short.
+/// Prefix resolution at the element being processed.
+///
+/// A prefix is first sought among the innermost [`WALKED_DECLARATIONS`]
+/// declarations of the element's chain, where an ordinary document binds it:
+/// a producer declares its namespaces on the root, a few dozen of them. Past
+/// that the answer comes from [`Scope`], in a logarithmic number of
+/// comparisons, so a lookup never costs more than a bounded walk however many
+/// declarations are in scope. Debug builds check that the two agree.
 #[derive(Clone, Copy)]
-struct Resolver<'s, 'c> {
-    scope: &'s Scope,
-    chain: &'c Namespaces,
+struct Resolver<'a> {
+    scope: &'a Scope,
+    chain: &'a Namespaces,
 }
 
-impl<'s> Resolver<'s, '_> {
-    fn get(self, prefix: &str) -> Option<&'s str> {
+impl<'a> Resolver<'a> {
+    fn get(self, prefix: &str) -> Option<&'a str> {
+        if let Some(walked) = self.chain.walk(prefix, WALKED_DECLARATIONS, true) {
+            debug_assert!(
+                walked == self.scope.get(prefix),
+                "the prefix index disagrees with the declaration chain for {prefix:?}"
+            );
+            return walked;
+        }
         let bound = self.scope.get(prefix);
         debug_assert!(
             self.chain
-                .walk(prefix, CROSS_CHECKED_DECLARATIONS)
+                .walk(prefix, CROSS_CHECKED_DECLARATIONS, false)
                 .is_none_or(|walked| walked == bound),
             "the prefix index disagrees with the declaration chain for {prefix:?}"
         );
@@ -1654,7 +1684,7 @@ impl<'s> Resolver<'s, '_> {
 
 /// Resolve prefixes against `scope`, cross-checked against the element's
 /// declaration chain `chain` in debug builds.
-const fn resolver<'s, 'c>(scope: &'s Scope, chain: &'c Namespaces) -> Resolver<'s, 'c> {
+const fn resolver<'a>(scope: &'a Scope, chain: &'a Namespaces) -> Resolver<'a> {
     Resolver { scope, chain }
 }
 
@@ -3251,7 +3281,7 @@ fn is_namespace_attribute(name: &[u8]) -> bool {
     name == b"xmlns" || name.starts_with(b"xmlns:")
 }
 
-fn expand_attribute(q: &[u8], ns: Resolver<'_, '_>, limits: &StreamLimits) -> Result<Name, Error> {
+fn expand_attribute(q: &[u8], ns: Resolver<'_>, limits: &StreamLimits) -> Result<Name, Error> {
     let lexical = str::from_utf8(q).map_err(xml_error)?;
     if lexical == "xmlns" {
         return Ok(Name {
@@ -3278,7 +3308,7 @@ fn expand_attribute(q: &[u8], ns: Resolver<'_, '_>, limits: &StreamLimits) -> Re
 
 fn expand(
     q: &str,
-    namespaces: Resolver<'_, '_>,
+    namespaces: Resolver<'_>,
     element: bool,
     limits: &StreamLimits,
 ) -> Result<Name, Error> {
@@ -3310,7 +3340,7 @@ fn expand(
 
 fn parse_target(
     token: &str,
-    namespaces: Resolver<'_, '_>,
+    namespaces: Resolver<'_>,
     wildcard: bool,
     limits: &StreamLimits,
 ) -> Result<NamePattern, Error> {

@@ -6,6 +6,8 @@
 //! scanning them would cost a number of comparisons the input chooses, once per
 //! element and per ignorable attribute. [`Patterns`] keeps exact names and
 //! whole-namespace wildcards in separate sets, so that test is two lookups.
+//! Each set is created with its first target, so an element without
+//! directives pays for none.
 
 use std::collections::HashSet;
 
@@ -32,14 +34,15 @@ impl NamePattern {
 /// The targets of one directive on one element.
 #[derive(Debug, Default)]
 pub(super) struct Patterns {
-    exact: HashSet<Name>,
-    namespaces: HashSet<String>,
+    exact: Option<HashSet<Name>>,
+    namespaces: Option<HashSet<String>>,
 }
 
 impl Patterns {
     /// Whether the directive names no target.
     pub(super) fn is_empty(&self) -> bool {
-        self.exact.is_empty() && self.namespaces.is_empty()
+        self.exact.as_ref().is_none_or(HashSet::is_empty)
+            && self.namespaces.as_ref().is_none_or(HashSet::is_empty)
     }
 
     /// Add one target; `false` when the directive already names it.
@@ -55,19 +58,27 @@ impl Patterns {
         let allocation = |source| Error::Allocation { resource, source };
         match pattern {
             NamePattern::Exact(name) => {
-                self.exact.try_reserve(1).map_err(allocation)?;
-                Ok(self.exact.insert(name))
+                let exact = self.exact.get_or_insert_with(HashSet::new);
+                exact.try_reserve(1).map_err(allocation)?;
+                Ok(exact.insert(name))
             },
             NamePattern::Namespace(namespace) => {
-                self.namespaces.try_reserve(1).map_err(allocation)?;
-                Ok(self.namespaces.insert(namespace))
+                let namespaces = self.namespaces.get_or_insert_with(HashSet::new);
+                namespaces.try_reserve(1).map_err(allocation)?;
+                Ok(namespaces.insert(namespace))
             },
         }
     }
 
     /// Whether a target matches `name`: the exact name, or its namespace.
     pub(super) fn matches(&self, name: &Name) -> bool {
-        self.exact.contains(name) || self.namespaces.contains(name.namespace.as_str())
+        self.exact
+            .as_ref()
+            .is_some_and(|exact| exact.contains(name))
+            || self
+                .namespaces
+                .as_ref()
+                .is_some_and(|namespaces| namespaces.contains(name.namespace.as_str()))
     }
 }
 
