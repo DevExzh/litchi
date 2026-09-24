@@ -1214,3 +1214,43 @@ fn the_pivot_view_editor_writes_astral_names_that_read_back() {
         .unwrap();
     assert_eq!(too_long(editor.finish()), ("PivotTable name", 256, 255));
 }
+
+/// A formula's tokens are encoded once, when it is set, and the write reuses
+/// them; replacing the cell drops them, so the write never emits the tokens
+/// of a formula the cell no longer holds.
+#[test]
+fn a_replaced_formula_cell_writes_what_it_holds_now() {
+    let expected = |formula: &str| {
+        let tokens = litchi_xls::writer::FormulaTokenizer::new()
+            .tokenize(formula)
+            .unwrap();
+        litchi_xls::writer::formula::encode_ptg_tokens(&tokens).unwrap()
+    };
+    let (mut writer, sheet) = one_sheet_writer("Formulas");
+    writer.write_formula(sheet, 1, 0, "1+2").unwrap();
+    writer.write_formula(sheet, 1, 1, "SUM(A1:B2)").unwrap();
+    writer.write_formula(sheet, 1, 2, "LEN(\"x\")").unwrap();
+    // A formula replaced by a string, by a number and by another formula.
+    writer.write_string(sheet, 1, 0, "text").unwrap();
+    writer.write_number(sheet, 1, 1, 7.0).unwrap();
+    writer.write_formula(sheet, 1, 2, "ABS(-3)*2").unwrap();
+    // A string replaced by a formula, and a formula with a leading `=`.
+    writer.write_string(sheet, 2, 0, "gone").unwrap();
+    writer.write_formula(sheet, 2, 0, "=MAX(1,2)").unwrap();
+    let workbook = read(written(&mut writer));
+    let worksheet = workbook.xls_worksheet(0).unwrap();
+    assert_eq!(
+        worksheet.get_cell(1, 0).unwrap().value(),
+        &CellValue::String("text".to_string())
+    );
+    assert!(worksheet.get_cell(1, 0).unwrap().formula_bytes().is_none());
+    assert!(worksheet.get_cell(1, 1).unwrap().formula_bytes().is_none());
+    assert_eq!(
+        worksheet.get_cell(1, 2).unwrap().formula_bytes(),
+        Some(expected("ABS(-3)*2").as_slice())
+    );
+    assert_eq!(
+        worksheet.get_cell(2, 0).unwrap().formula_bytes(),
+        Some(expected("MAX(1,2)").as_slice())
+    );
+}
