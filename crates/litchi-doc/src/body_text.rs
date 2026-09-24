@@ -1663,8 +1663,8 @@ impl Edit {
 
     /// Replaces one checked ordinary paragraph, simple table-cell value, or
     /// simple field cached result. Main-story targets may change length when
-    /// every `Selsf` CP has a deterministic splice-boundary mapping; an
-    /// interior or insertion-point ambiguity is refused. Non-main story
+    /// every `Selsf` CP has a deterministic splice-boundary mapping; a `Selsf`
+    /// CP strictly inside the replaced text is refused. Non-main story
     /// paragraphs require equal UTF-16 length.
     pub fn replace_text(&mut self, target: TextTarget, replacement: &str) -> Result<()> {
         let span = resolve_target(&self.editor, target)?;
