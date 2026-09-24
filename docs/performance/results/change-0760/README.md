@@ -1,7 +1,8 @@
 # Evidence for change 0760
 
 Record: [`../../0760-pptx-slide-root-memo-reapply.md`](../../0760-pptx-slide-root-memo-reapply.md).
-Base `1d1044e3ac`; measured head `dfde1e43bb` on
+Base `1d1044e3ac`; measured head `dfde1e43bb` (review fixes `daa38cffe3`, not
+re-measured: they change how entries are admitted, not the measured work) on
 `perf/0760-pptx-slide-root-memo-reapply` (the slide-root memo of change 0743's
 withdrawn `99ce9c5e34`, re-applied under ADR 0032). `performance_claim: none`.
 
@@ -19,7 +20,7 @@ withdrawn `99ce9c5e34`, re-applied under ADR 0032). `performance_claim: none`.
 | `probe/` | the probe source (`LITCHI_ROOT` stands for the checkout it is built against) |
 | `measure.py`, `analyze.py`, `probe_counters.py`, `counter_table.py`, `gate.sh` | the drivers used |
 | `binaries.sha256` | every measured binary |
-| `gates.txt` | every gate command at the measured head with its exit code, test totals and output tail, plus the base comparisons |
+| `gates.txt` | every gate command at the measured head with its exit code, test totals and output tail, the base comparisons, and the review round's re-run at `daa38cffe3` |
 | `cleanup.json` | what was removed and what was kept |
 | `log-sections.md` | ready-to-paste sections for `HOTSPOTS.md`, `REPORT.md` and `GOAL_AUDIT.md` |
 
