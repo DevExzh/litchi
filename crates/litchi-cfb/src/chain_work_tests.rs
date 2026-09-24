@@ -9,8 +9,8 @@
 //! - Reading every stream through one reader, whose chain buffers persist,
 //!   is held to a fresh reader per stream.
 //! - The work tests count the words the chain maps write and bound them by
-//!   the tables plus the chains: the work per stream does not grow with the
-//!   stream count.
+//!   the tables plus eight words per chain sector: the work per stream does
+//!   not grow with the stream count.
 
 #![allow(
     clippy::unwrap_used,
@@ -64,7 +64,13 @@ fn all_clear(map: &CheckedBitSet) -> bool {
 /// to a marker, or pointed outside the table. Returns the table and each
 /// chain's head and length before corruption.
 fn random_table(rng: &mut Rng) -> (Vec<u32>, Vec<(u32, usize)>) {
-    let len = 1 + rng.below(300);
+    // Short tables restore by clearing their words; long ones restore short
+    // chains sector by sector. Both are drawn.
+    let len = if rng.below(2) == 0 {
+        1 + rng.below(300)
+    } else {
+        2_000 + rng.below(6_000)
+    };
     let mut order: Vec<u32> = (0..u32::try_from(len).unwrap()).collect();
     for index in (1..order.len()).rev() {
         order.swap(index, rng.below(index + 1));
@@ -100,6 +106,13 @@ fn random_table(rng: &mut Rng) -> (Vec<u32>, Vec<(u32, usize)>) {
     (table, chains)
 }
 
+/// Whether a successful collection of `chain_len` sectors against `table`
+/// restores its map sector by sector (rather than by clearing the table's
+/// words).
+fn restores_by_sector(table: &[u32], chain_len: usize) -> bool {
+    chain_len * CLEAR_BY_SECTOR_RATIO < table.len().div_ceil(BITSET_WORD_BITS)
+}
+
 /// A start sector for one query: usually a chain head, sometimes anything.
 fn random_start(rng: &mut Rng, table: &[u32], chains: &[(u32, usize)]) -> (u32, usize) {
     let len_u32 = u32::try_from(table.len()).unwrap();
@@ -118,7 +131,7 @@ fn random_start(rng: &mut Rng, table: &[u32], chains: &[(u32, usize)]) -> (u32, 
 fn sector_chain_scratch_matches_fresh_maps_over_random_call_sequences() {
     let mut rng = Rng::new(0x0767_0001);
     let mut scratch = SectorChainScratch::default();
-    let (mut accepted, mut refused) = (0usize, 0usize);
+    let (mut accepted, mut refused, mut by_sector) = (0usize, 0usize, 0usize);
     for case in 0..400 {
         // Tables of different lengths through one scratch, so a short table
         // follows a long one and must not see its stale words.
@@ -149,6 +162,7 @@ fn sector_chain_scratch_matches_fresh_maps_over_random_call_sequences() {
             );
             if oracle.is_ok() {
                 accepted += 1;
+                by_sector += usize::from(restores_by_sector(&table, scratch.sectors().len()));
             } else {
                 refused += 1;
                 assert!(scratch.sectors().is_empty());
@@ -156,15 +170,19 @@ fn sector_chain_scratch_matches_fresh_maps_over_random_call_sequences() {
             }
         }
     }
-    // Both verdicts are well represented.
-    assert!(accepted > 800 && refused > 800, "{accepted} / {refused}");
+    // Both verdicts and both restorations are well represented.
+    assert!(accepted > 800 && refused > 500, "{accepted} / {refused}");
+    assert!(
+        by_sector > 150 && accepted - by_sector > 150,
+        "{by_sector} of {accepted}"
+    );
 }
 
 #[test]
 fn end_chain_scratch_matches_fresh_maps_over_random_call_sequences() {
     let mut rng = Rng::new(0x0767_0002);
     let mut scratch = EndChainScratch::default();
-    let (mut accepted, mut refused) = (0usize, 0usize);
+    let (mut accepted, mut refused, mut by_sector) = (0usize, 0usize, 0usize);
     for case in 0..400 {
         let (table, chains) = random_table(&mut rng);
         for query in 0..12 {
@@ -182,13 +200,18 @@ fn end_chain_scratch_matches_fresh_maps_over_random_call_sequences() {
             );
             if oracle.is_ok() {
                 accepted += 1;
+                by_sector += usize::from(restores_by_sector(&table, scratch.sectors().len()));
             } else {
                 refused += 1;
                 assert!(scratch.sectors().is_empty());
             }
         }
     }
-    assert!(accepted > 800 && refused > 800, "{accepted} / {refused}");
+    assert!(accepted > 800 && refused > 500, "{accepted} / {refused}");
+    assert!(
+        by_sector > 150 && accepted - by_sector > 150,
+        "{by_sector} of {accepted}"
+    );
 }
 
 /// A compound file of `sizes.len()` streams, the i-th of `sizes[i]` bytes;
@@ -644,11 +667,12 @@ fn validating_open_clears_chain_maps_in_proportion_to_the_chains() {
                 let (work, file) = open_work(&bytes);
                 let tables = table_words(&file.fat) + table_words(&file.minifat);
                 let chains = chain_sectors(&file);
-                // Growth covers each table once; each stream then clears at
-                // most its own chain.
+                // Growth covers each table once; each stream then writes at
+                // most eight words per sector of its own chain.
+                let ratio = u64::try_from(CLEAR_BY_SECTOR_RATIO).unwrap();
                 assert!(
-                    work <= tables + chains,
-                    "{sector_size}/{stream_size}/{count}: {work} words > {tables} + {chains}"
+                    work <= tables + ratio * chains,
+                    "{sector_size}/{stream_size}/{count}: {work} words > {tables} + {ratio} x {chains}"
                 );
                 // Clearing a table-sized map per stream, as before, costs
                 // the stream count times the table.
@@ -667,7 +691,8 @@ fn validating_open_clears_chain_maps_in_proportion_to_the_chains() {
                 per_stream.push(work as f64 / count as f64);
             }
             // Flat: the work per stream at 1,024 streams is within 10% of
-            // the work per stream at 64.
+            // the work per stream at 64 (the bound above holds at every
+            // count).
             assert!(
                 per_stream[2] <= per_stream[0] * 1.1,
                 "{sector_size}/{stream_size}: {per_stream:?}"
@@ -699,9 +724,10 @@ fn reading_every_stream_collects_chains_in_proportion_to_the_chains() {
                     .div_ceil(file.sector_size as u64);
                 let tables = table_words(&file.fat) + table_words(&file.minifat);
                 let chains = chain_sectors(&file) + root_sectors;
+                let ratio = u64::try_from(CLEAR_BY_SECTOR_RATIO).unwrap();
                 assert!(
-                    work <= tables + chains,
-                    "{sector_size}/{stream_size}/{count}: {work} words > {tables} + {chains}"
+                    work <= tables + ratio * chains,
+                    "{sector_size}/{stream_size}/{count}: {work} words > {tables} + {ratio} x {chains}"
                 );
                 per_stream.push(work as f64 / count as f64);
             }
