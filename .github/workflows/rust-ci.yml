@@ -166,7 +166,7 @@ jobs:
       # The facade's default feature set is empty and the performance harness
       # is a separate Cargo project, so neither suite is reachable from any
       # per-package selection below. These focused modes run first so stale
-      # expectations fail before the 45-root sweeps. The allocator subcommand
+      # expectations fail before the 46-root sweeps. The allocator subcommand
       # is deliberately serialized inside the harness mode because its tests
       # inspect a process-global counter.
       - name: Test the facade with the Office format leaves
