@@ -2,6 +2,9 @@
 
 Record: [0768-doc-protection-classification](../../0768-doc-protection-classification.md).
 Base `1d1044e3ac`; measured branch head `ac63852fc3` (the three code commits).
+The review follow-ups (`95b485a290`, `de2df97e1f`, `0792812830`, `83fa8563d7`)
+were gated and tested but not re-measured; their tests are in the crate, and
+their counts are in the record and in `gates.txt`.
 
 ## Contents
 
@@ -17,7 +20,7 @@ Base `1d1044e3ac`; measured branch head `ac63852fc3` (the three code commits).
 | `latency/superseded-toolchain-schedule.json` | the schedule of a first ABBA run discarded before analysis because its probe binaries had been built by the host's default toolchain (1.98.1) instead of the pinned 1.95.0; its raw reports were deleted |
 | `counters/` | exact timed-region instruction counts from callgrind (`scripts/cg_extract.py`), the 30 largest inclusive differences of the harness `large` run, and the Vec-growth callers; the callgrind profiles themselves were deleted |
 | `binaries.sha256` | the measured binaries, fixtures and the probe lockfile |
-| `environment.txt`, `gates.txt`, `cleanup.json`, `log-sections.md` | host, gate commands and exit codes, removed directories, ready-to-paste log sections |
+| `environment.txt`, `gates.txt`, `cleanup.json`, `log-sections.md` | host, gate commands and exit codes (the original change and, appended, the review follow-ups), removed directories, ready-to-paste log sections |
 | `scripts/diag_0768.rs` | the diagnostic that located the overflowing CHPX FKP page |
 
 ## How the binaries were built

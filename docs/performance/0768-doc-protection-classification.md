@@ -5,6 +5,9 @@ change (spec conformance, [MS-DOC]), not a safety relaxation: `authorize()`
 is unchanged, every document or range protection state is still refused by
 default, and every malformed or incomplete host shape is still refused under
 every policy. Its cost is measured below as evidence, not registered as a claim.
+An independent review found the protection boundary holds and returned
+merge-after-fixes; its follow-ups are in section "Independent review and
+follow-ups".
 
 OLE2 and OOXML remain the active priority. ODF optimization stays deferred until
 that goal completes; iWork is excluded.
@@ -17,7 +20,13 @@ Base `1d1044e3ac` (after the spec-gap merge, record 0759); branch
 | `a4767ba8a5` | `fix(doc)`: classify DOC protection from the MS-DOC protection fields (C1–C3 below); real fixtures replace the `with_valid_word97_dop` normalization in two tests |
 | `6b340fe0e9` | `fix(doc)`: keep a saved `Selsf` CP in place for an insertion at that CP; a CP strictly inside replaced or removed text stays refused |
 | `ac63852fc3` | `fix(doc)`: stop CHPX and PAPX FKP pages filled to the size estimate overwriting their BX array (found while testing the first two) |
-| record commit | this record, its evidence packet and the two `FEATURE_MATRIX.md` rows the change makes stale |
+| `e4022968db` | this record, its evidence packet and the two `FEATURE_MATRIX.md` rows the change makes stale |
+| `ab45d1d416` | `docs(doc)`: `EditProtection::Unrecognized` also names a DOP outside the table stream |
+| `95b485a290` | `fix(doc)`, review (required): a selected inline picture or shape moves after text inserted at its first CP |
+| `de2df97e1f` | `fix(doc)`, review: a tracked insertion after the main story's final paragraph mark is refused |
+| `0792812830` | `fix(doc)`, review: the public FKP builders refuse a property no page can hold instead of overlapping or panicking |
+| `83fa8563d7` | `fix(doc)`, review: the positional body-text source classifies protection with the shared classifier |
+| review record commit | the follow-ups' sections here, the second gate run and the packet updates |
 
 Evidence: [results/change-0768](results/change-0768/README.md).
 
@@ -64,6 +73,15 @@ FloatingPictures.doc. On the harness `large` DOC shape it swings from −20% to
 it is unchanged (median ratio 1.000, page faults equal). Every flag over 5% is
 listed under "Regression flags".
 
+**After the review.** A saved inline-picture or shape selection now moves with
+its object when text is inserted at it (the first version kept its CP, so the
+selection covered the new text); the positional body-text source gives the same
+protection verdict as the shared classifier on all 57 DOC files and on the
+review's 1,730 crafted records wherever it reads protection; the public FKP
+builders refuse a property no page can hold, which ends a panic the fresh writer
+reached with a table of 23 or more columns; and a tracked insertion after the
+final paragraph mark is refused. The follow-ups were not re-measured.
+
 ## Why this record exists
 
 The spec-gap branch (merged in 0759) replaced the pre-merge protection check with
@@ -83,8 +101,11 @@ the `Selsf` question against MS-DOC.
 ## What changed
 
 Scope: `crates/litchi-doc` only. No `unsafe`, no dependency, no limit relaxed,
-no public API changed (`EditProtection::Unrecognized` keeps its meaning; its
-documentation now lists what produces it).
+no public signature changed (`EditProtection::Unrecognized` keeps its meaning;
+its documentation now lists what produces it). The review follow-ups add typed
+refusals to `RevisionEditor::add_text` and to the public FKP builders, and let
+the positional body-text source open a protection shape it cannot prove as
+read-only instead of refusing it.
 
 ### C1: the FIB (`parts/protection/policy.rs`, `validate_fib_shape`)
 
@@ -159,20 +180,38 @@ non-bypassable).
 
 Determined against MS-DOC 2.9.244: the check refused more than the spec makes
 ambiguous. `Selsf` "specifies the last selection that was made to the document";
-MS-DOC defines no remapping for it, only field requirements. When text is
-inserted at a CP the record holds, the recorded position stays between the same
-original characters whichever side of the new text it takes, so no record
-information is lost; the choice is only where the caret sits relative to text the
-record never described. Keeping the CP (the new text follows it) is the one
-uniform choice that keeps every 2.9.244 requirement true: a whole-row
-selection's `cpFirst` MUST be the start of its row and its `cpLim` the end of its
-last row, a text block's `cpFirst` and `cpLim` MUST be line starts, and inserted
-text leaves each of those positions where it was. It is also the rule the remap
-already applied to the start of a replaced range, so a pure insertion is now the
-empty-range case of the same function (the special case was deleted). With it, a
-caret stays on its recorded CP (the `fInsEnd` line-end affinity is kept), and text
-inserted at a non-empty selection's first CP joins the selection, exactly as a
-replacement's text already did.
+MS-DOC defines no remapping for it, only field requirements and what each kind of
+selection is. When text is inserted at a CP the record holds, the recorded
+position stays between the same original characters whichever side of the new
+text it takes, so which side is right depends on what the record says the
+selection is. (Corrected after the review: the first version of this record
+said that keeping the CP was the one uniform choice for every kind.)
+
+- **Keep the CP (the new text follows it):** a character selection, an
+  insertion point, a text frame, whole table rows and a text block. A whole-row
+  selection's `cpFirst` MUST be the start of its row and its `cpLim` the end of
+  its last row, and a text block's `cpFirst` and `cpLim` MUST be line starts;
+  text inserted there leaves each of those positions where it was. Tracked text
+  has no paragraph mark, so text inserted at a frame's first CP joins the frame's
+  first paragraph and the frame still starts there. A caret stays on its
+  recorded CP (the `fInsEnd` line-end affinity is kept), and text inserted at a
+  character selection's first CP joins it, as a replacement's text already did.
+  This is also the rule the remap already applied to the start of a replaced
+  range, so a pure insertion is the empty-range case of the same function (the
+  special case was deleted).
+- **Move after the text (`95b485a290`):** an inline picture (`fGraphics`) is its
+  0x0001 character and a shape or floating picture (`fShape`) its 0x0008 anchor
+  (1.3.5, 2.8.27). Text inserted at the object's first CP is written in front of
+  that character, and the editor moves the `PlcfSpa` anchor with it, so every CP
+  of the record at the insertion point moves after the text and the selection
+  covers the object and none of the new text. Keeping the CP there, as
+  `6b340fe0e9` did, turned a picture selection `[p, p+1)` into `[p, p+k+1)` with
+  `fGraphics` still set.
+- **Refused:** a non-empty bullet or number selection (`fPrefix`, or `sty`
+  `styPrefix`), which has no character, so 2.9.244 gives its `cpLim` no defined
+  side (an empty one stays before the text like a caret); and a record that
+  claims an object and also a frame, a prefix, table cells or a block, whose
+  claims need opposite mappings.
 
 Still refused: a CP strictly inside replaced or removed text (body-text
 replacement, accepting a deletion, rejecting an insertion), because the
@@ -302,10 +341,88 @@ files outside `test-data/ole/doc` are in
   `fLockRev` moves from `Unrecognized` to `Document` (both refused by default).
 - **Selsf:** the remap result is re-parsed and bounded by the new text length, so
   an invalid record is still `Invalid`; inserting and then rejecting restores the
-  recorded bytes (tested on real fixtures).
+  recorded bytes (tested on real fixtures). The first version kept an object
+  selection's CP (fixed after the review, below).
 - **FKP:** the trim only runs when the exact placement overflows, which is exactly
   when the base wrote a page its own parser refuses; every golden and writer test
   is unchanged.
+
+## Independent review and follow-ups
+
+An independent review compared the base and this branch on the 57 DOC files, on
+1,730 crafted documents (every `DopBase` lock and combination, the password
+hash, `iDocProtCur` 0–7, DOP lengths 83–695, nFib variants, LibreOffice-shaped
+FIBs with protection, malformed ranges and encryption), on 148 `Selsf`
+insertion scenarios and on 300,000 CHPX and 300,000 PAPX builder
+configurations. It found the protection boundary holds: no document goes from
+`Document` to `None`, `Unknown` and `Unrecognized` stay refused under
+`AllowProtected`, and every `Selsf` rejection restored the recorded bytes. Of
+the builder configurations, CHPX pages are byte-identical wherever the base's
+were valid and 12,348 the base laid out invalidly are now valid; PAPX pages are
+identical in 227,082, fixed in 5,532, and invalid on both sides in 67,386 (a lone
+grpprl of 486 bytes or more, which follow-up 2 now refuses). Its verdict was
+merge-after-fixes; the fixes are new commits, with no history rewritten.
+
+1. **Object selections (required, `95b485a290`).** The rule is in section "The
+   `Selsf` check". Tests: each flag (`fGraphics`, `fShape`, `fFrame`, `fPrefix`,
+   `styPrefix`), empty object and prefix records, and the four conflicting
+   combinations; and a fixture test that points the `Selsf` at real inline
+   pictures (testPictures CP 8, FloatingPictures CP 4582) and shape anchors
+   (testPictures CP 100, FloatingPictures CP 5793, image-comment-at-char CP 3),
+   inserts there, checks that the selection still covers exactly that
+   character, and rejects the insertion back to the recorded bytes.
+2. **FKP builders on caller input (`0792812830`).** The public `PapxFkpBuilder`
+   placed a lone PAPX even after its size estimate failed: a grpprl of 486–507
+   bytes overlapped the BX and FC arrays, and from 508 bytes `511 − (len +
+   extra)` underflowed. The fresh writer reaches it: a table row keeps its table
+   properties in its row-end PAPX (22 bytes a column), and at the base
+   `Writer::add_table(1, n)` wrote rows of up to 21 columns correctly, wrote a
+   file the reader rejects at 22 ("malformed SPRM sequence"), and panicked in
+   `write_to` from 23 to 63 columns (`fkp.rs:353`, subtract with overflow). Both
+   builders now refuse, with `InvalidInput`, a property no page can hold, and
+   place entries with checked arithmetic; the CHPX builder also refuses a
+   grpprl over 255 bytes, which `Chpx.cb` cannot count, instead of cutting it to
+   255 bytes. A scan of the other page builders found no arithmetic that caller
+   input can underflow: the tracked-revision PAPX builder bounds runs at 510
+   bytes, places with `checked_sub` and refuses a lone oversized run; CHPX runs
+   are checked before the builder; `pack_dttm` bounds its year; the piece-table
+   splices take validated ranges. Tests: PAPX 485 fits (BX word offset 11); 486,
+   487, 507, 508, 509, 510, 511 and 4,096 are refused, as is an oversized entry
+   after a small one; CHPX 255 fits and 256 is refused; the fresh writer writes
+   21 columns and refuses 22, 23, 40 and 63. Writer goldens are unchanged.
+3. **One classifier (`83fa8563d7`).** The positional body-text source
+   (`body_text::source`) kept its own copy of the pre-0768 grammar (exact
+   `cswNew` and `cbRgFcLcb` per generation, the typed DOP parser, exact DOP
+   lengths), so a LibreOffice FIB failed at open and unusual DOPs were
+   `Unrecognized`. The shared classifier gains `classify_with`, which takes the
+   DOP and, only when a range-protection pointer declares data, the table
+   stream from the caller; `classify` wraps it. The source reads the complete
+   FIB and feeds its bounded readers to it, keeping its non-protection refusals
+   (encryption, macros, fields, drawings, revision authors) and its refusal of
+   revision marking in an unprotected document. A FIB or DOP shape the
+   classifier cannot prove, including a missing DOP, now opens read-only as
+   `Unknown` or `Unrecognized` (changed publication refused under every policy)
+   instead of failing to open, and nFib 0x00C0 is read as Word 97, as the
+   classifier reads it. Agreement tests: on all 57 DOC files, 49 identical
+   verdicts (`None`), 7 encrypted or pre-Word 97 files refused by the source
+   before it reads protection (shared verdict `Unknown`), and 1 invalid CFB
+   unreadable by both; on the review's 1,730 crafted records, 1,708 identical
+   verdicts (591 `Document`, 510 `None`, 507 `Unrecognized`, 100 `Unknown`), 20
+   encrypted-flag variants refused by the source's encryption gate, and 2
+   wrong-`cswNew` FIBs that break its `fcMin` check where the shared verdict is
+   `Unknown`. The source's tests use `documentProperties.doc` as checked in; the
+   helpers that rewrote its FIB and DOP for the old grammar are gone.
+4. **Insertion after the final paragraph mark (`de2df97e1f`, pre-existing).**
+   `add_text` accepted `cp == ccpText`, writing text after the main story's
+   final paragraph mark, which MS-DOC 2.3.1 requires to be the story's last
+   character. No editor in the crate defines append-after-the-mark semantics,
+   and moving the caller's CP would be a guessed edit, so it is refused like a
+   CP beyond the story; the documentation points to `ccpText − 1`. Every
+   existing caller inserts at CP 0. Test on NoHeadFoot.doc (ccpText 180): 180
+   and 181 are refused with no change, and 179 extends the last paragraph,
+   which still ends with its mark after reopening.
+5. **`fStyleLock` and `fStyleLockEnforced`** stay outside the classifier, as
+   recorded under "Findings outside this change".
 
 ## Measurement (control; no effect expected)
 
@@ -403,6 +520,11 @@ of glibc trim/mmap effect on the XLS writer.
 - No native Word or LibreOffice round trip of the edited files.
 - The `Selsf` rule is spec-conformant, not Word-observed: Word itself rewrites
   `Selsf` on every save.
+- The review follow-ups were not re-measured. On the measured paths they add a
+  size scan and one page-fit check per CHPX FKP page (no allocation) and a flag
+  test in the `Selsf` remap; the positional body-text source, which now reads
+  the complete FIB and no longer parses the typed DOP at open, is not on a
+  measured path.
 
 ## Findings outside this change (not fixed)
 
@@ -422,18 +544,30 @@ of glibc trim/mmap effect on the XLS writer.
   `binary_digital_signatures`, `doc_captions`, `dofr_edits`,
   `doc_mtef_equation_writer`, `saved_selection`, `vba_signatures`); several could
   now use the fixtures as checked in.
+- The fresh writer refuses, with a typed error, a table row whose table
+  properties exceed one PAPX FKP page (a plain row of 22 or more cells).
+  Writing it needs `sprmPHugePapx`, which stores the properties in the Data
+  stream as `PrcData`; litchi's reader expands it, but the tracked-revision
+  editor's PAPX rewrite reads grpprls from the FKP pages and does not model it.
+- An object selection whose object is removed (accepting a deletion, or
+  rejecting an insertion, of exactly that character) collapses to an empty
+  range at the removal point with its object flag still set, as at the base. It
+  covers no text, so it claims nothing false about content; refusing it would
+  newly refuse those edits.
 
 ## Verification
 
-All gates pass except the known `non_iwork_gate.py verify` failure
-(`litchi-xldm` inventory), which fails identically at the base; details in
-[gates.txt](results/change-0768/gates.txt): `cargo fmt --all --check`; `cargo
-check` of `litchi-doc` (all targets) and the facade with every format feature;
-warning-denied Clippy of `litchi-doc` (lib and all targets) and rustdoc;
-`cargo test -p litchi-doc` (1306 passed, 13 ignored) and the facade with
-`doc,docx,ppt,pptx,xls,xlsx,xlsb,odt` (382 passed, 7 ignored); crate
-boundaries; structural perf-claim check. Each intermediate commit was built and
-tested (1297, 1301, 1306 passed). The harness was not changed.
+All gates pass on `83fa8563d7`, the last code commit, except the known
+`non_iwork_gate.py verify` failure (`litchi-xldm` inventory), which fails
+identically at the base; details in [gates.txt](results/change-0768/gates.txt):
+`cargo fmt --all --check`; `cargo check` of `litchi-doc` (all targets) and the
+facade with every format feature; warning-denied Clippy of `litchi-doc` (lib
+and all targets) and rustdoc; `cargo test -p litchi-doc` (1326 passed, 13
+ignored) and the facade with `doc,docx,ppt,pptx,xls,xlsx,xlsb,odt` (382
+passed, 7 ignored); crate boundaries; structural perf-claim check. Every commit
+was built and tested on its own: 1297, 1301 and 1306 passed for the original
+change, then 1311, 1312, 1315 and 1326 for the review follow-ups. The harness
+was not changed.
 
 ## Cleanup
 
@@ -443,5 +577,7 @@ release harness and probe), `targets/0768-before` (≈4 GB), the detached base
 worktree `0768-before-src`, and the scratch directory (staged binaries, probe
 copies, callgrind profiles, raw runs; the raw JSON reports are kept here
 gzipped). The debug trees were deleted mid-task when the shared disk reached 0
-bytes free. The worktree and branch are kept. See
+bytes free. After the review follow-ups, the rebuilt `targets/0768` (gate and
+test builds) and the scratch directory were removed again once this record was
+committed. The worktree and branch are kept. See
 [cleanup.json](results/change-0768/cleanup.json).
