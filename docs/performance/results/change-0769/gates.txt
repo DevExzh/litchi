@@ -1,0 +1,76 @@
+# 0769 gates
+
+Run by scripts/gates.sh (cargo gates, in order) and then the three Python gates, on
+ebf20bba87 in /home/zhuhe/code/litchi-worktrees/0769-cfb-mini-sector-open-read-agreement,
+after all measurement. Commands and exit codes:
+
+worktree /home/zhuhe/code/litchi-worktrees/0769-cfb-mini-sector-open-read-agreement at ebf20bba87fab2fe2415182c5a7870ce1dc4ce17; CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/targets/0769/dev; CARGO_BUILD_JOBS=6; CARGO_INCREMENTAL=0; RUST_TEST_THREADS=6; TMPDIR=/home/zhuhe/code/litchi-worktrees/scratch/0769/tmp; rustc 1.95.0 (59807616e 2026-04-14)
+== fmt: cargo fmt --all --check
+exit=0
+== check-cfb-dependents: cargo check -p litchi-cfb -p litchi-ole-common -p litchi-doc -p litchi-ppt -p litchi-xls -p litchi-vba -p litchi-ograph -p litchi-crypto -p litchi-sign --all-targets --locked --offline
+exit=0
+== check-ooxml-transitive: cargo check -p litchi-opc -p litchi-ooxml-common -p litchi-drawingml -p litchi-spreadsheet-drawing -p litchi-docx -p litchi-pptx -p litchi-xlsx -p litchi-xlsb --all-targets --locked --offline
+exit=0
+== check-facade: cargo check -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --all-targets --locked --offline
+exit=0
+== clippy-cfb-lib: cargo clippy -p litchi-cfb --lib --no-deps --locked --offline -- -D warnings
+exit=0
+== clippy-cfb-all: cargo clippy -p litchi-cfb --all-targets --no-deps --locked --offline -- -D warnings
+exit=0
+== doc-cfb: env RUSTDOCFLAGS=-D warnings cargo doc -p litchi-cfb --no-deps --locked --offline
+exit=0
+== doc-cfb-private: env RUSTDOCFLAGS=-D warnings cargo doc -p litchi-cfb --no-deps --document-private-items --locked --offline
+exit=0
+== test-litchi-cfb: cargo test -p litchi-cfb --locked --offline
+exit=0
+== test-litchi-ole-common: cargo test -p litchi-ole-common --locked --offline
+exit=0
+== test-litchi-doc: cargo test -p litchi-doc --locked --offline
+exit=0
+== test-litchi-ppt: cargo test -p litchi-ppt --locked --offline
+exit=0
+== test-litchi-xls: cargo test -p litchi-xls --locked --offline
+exit=0
+== test-litchi-vba: cargo test -p litchi-vba --locked --offline
+exit=0
+== test-litchi-ograph: cargo test -p litchi-ograph --locked --offline
+exit=0
+== test-litchi-crypto: cargo test -p litchi-crypto --locked --offline
+exit=0
+== test-litchi-sign: cargo test -p litchi-sign --locked --offline
+exit=0
+== test-facade: cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline
+exit=0
+done
+== boundaries: python3 tools/check_crate_boundaries.py
+exit=0
+== non-iwork: python3 tools/non_iwork_gate.py verify
+exit=1
+== perf-claims: python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+exit=0
+
+## Test totals (passed / failed / ignored, summed over every test binary and doc tests)
+
+facade                  382   0   7
+litchi-cfb              510   0   1
+litchi-crypto            43   0   0
+litchi-doc             1293   0  13
+litchi-ograph            70   0   0
+litchi-ole-common       255   0   1
+litchi-ppt             1249   0  11
+litchi-sign              25   0   0
+litchi-vba               47   0   0
+litchi-xls             1611   0   1
+
+## Python gate output (last lines)
+### boundaries
+  [015] litchi-iwa -> litchi-numbers
+  [016] litchi-iwa -> litchi-numbers-wire
+  [017] litchi-iwa -> litchi-pages
+### non-iwork
+non-iWork release gate: workspace package inventory mismatch (unexpected: litchi-xldm)
+### perf-claims
+OK: 10 performance claims validated (structural)
+
+non-iwork: the known failure at the wave base (litchi-xldm inventory), listed in the wave briefing and fixed on another branch.
+The harness is unchanged, so its tests and the coverage validator were not run.

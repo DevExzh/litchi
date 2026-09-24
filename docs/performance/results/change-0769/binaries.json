@@ -1,0 +1,74 @@
+{
+ "schema": "0769-binaries-v1",
+ "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+ "arms": {
+  "base": {
+   "source": "97e558cef4 (record 0767's head; detached checkout /home/zhuhe/code/litchi-worktrees/0769-before-src)",
+   "binaries": {
+    "litchi-perf-baseline": {
+     "sha256": "112ea7139ac970713f69a31c8fb68f7e7a8d175d9176996be48f890f5bb9024b",
+     "bytes": 68318600
+    },
+    "probe": {
+     "sha256": "1152a4f153bde1fa62de305b0e886a2c6c5572c341c72cb5bb57db5a7972f962",
+     "bytes": 89724680
+    },
+    "probe_alloc": {
+     "sha256": "3f0dac7fce84be3a0193b49ccb6913a2add3bf5c73f837f7a813ff6fad66e604",
+     "bytes": 89728296
+    }
+   }
+  },
+  "cand": {
+   "source": "ebf20bba87 (branch perf/0769-cfb-mini-sector-open-read-agreement; production code of the retained version)",
+   "binaries": {
+    "litchi-perf-baseline": {
+     "sha256": "3f87646d5241782be12052f168ef277ad534953e1ef0b0c8665478db8f866e7f",
+     "bytes": 68333480
+    },
+    "probe": {
+     "sha256": "fabbc32c6bfad177659405cffb7706f65d3b2a6e6a791aab36010e49603c61f2",
+     "bytes": 89831984
+    },
+    "probe_alloc": {
+     "sha256": "f67d8f3c1b3c6d05c6569884f90037e5dcb31ea26e770a4f980960310929652e",
+     "bytes": 89835680
+    }
+   }
+  },
+  "cand-v1": {
+   "source": "d13c52a45f (the first version of the bound; matrix-v1 and counters-v1 only)",
+   "binaries": {
+    "litchi-perf-baseline": {
+     "sha256": "f706797e6f4f7f9fec72359ef6aed467eeec19a688ffc34d53a294d738d6c53b",
+     "bytes": 68333776
+    },
+    "probe": {
+     "sha256": "8be56c6b39f937f72e92f2139b55238b7bf29f372accf459718e8dfa50d9da82",
+     "bytes": 89841640
+    },
+    "probe_alloc": {
+     "sha256": "f3aec3a21748a1b55af8593a3d8d083bbd74d23431721a39df81d5aff0e49965",
+     "bytes": 89845256
+    }
+   }
+  }
+ },
+ "build_commands": {
+  "probe": "scripts/build-probe.sh ARM: RUSTUP_TOOLCHAIN=1.95.0 CARGO_BUILD_JOBS=6 RUSTFLAGS=\"--remap-path-prefix=TREE=/litchi --remap-path-prefix=<scratch>/probe=/probe\" cargo build --release --locked --offline --bins (manifests/ARM)",
+  "harness": "scripts/build-harness.sh ARM: RUSTUP_TOOLCHAIN=1.95.0 CARGO_BUILD_JOBS=6 RUSTFLAGS=\"--remap-path-prefix=TREE=/litchi\" cargo build --release --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline"
+ },
+ "root_cargo_lock_sha256": "6932fcc0995ea550ef973d9636cf386c3be8bb9c5070ea23e39d91accefb99ba",
+ "root_cargo_lock_note": "The gitignored root Cargo.lock copied into the worktree (record 0767's refreshed file, same digest); both legs used this identical file.",
+ "probe_cargo_lock_sha256": "b3df186235222c5e58993a6a3fe51b89cf41503ca0de8dd534ac41d03f2030da",
+ "harness_cargo_lock": "tools/perf-baseline/Cargo.lock as tracked at the base (unchanged)",
+ "note": "The candidate harness was built twice with the identical command: a temporary test mutation of file.rs overlapped the first build, so the second build (which recompiled litchi-cfb and its dependents from the committed source) is the measured binary. The probes were built from committed source only.",
+ "text_section_bytes": {
+  "base/probe": 2816195,
+  "base/litchi-perf-baseline": 44363833,
+  "cand/probe": 2822371,
+  "cand/litchi-perf-baseline": 44398025,
+  "cand-v1/probe": 2822563,
+  "cand-v1/litchi-perf-baseline": 44393689
+ }
+}

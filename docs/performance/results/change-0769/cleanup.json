@@ -1,0 +1,38 @@
+{
+ "schema": "0769-cleanup-v1",
+ "performed_by": "the implementer, after committing the record and packet",
+ "planned_removals_measured_before_deletion": [
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0769",
+   "bytes": 48256714650,
+   "size": "45G",
+   "what": "dev (the gate builds: check, clippy, doc and test builds of litchi-cfb, its dependents, the OOXML crates and the facade, with CARGO_INCREMENTAL=0), and the probe and harness release builds of the candidate and its first version"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0769-before",
+   "bytes": 2129758244,
+   "size": "2.0G",
+   "what": "probe and harness release builds of the base"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/0769-before-src",
+   "bytes": 279735280,
+   "size": "267M",
+   "what": "sparse detached checkout of 97e558cef4 for the base leg (docs/performance/results and the spec-gap evidence excluded; no build reads them), removed with git worktree remove --force"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/scratch/0769",
+   "bytes": 1201299975,
+   "size": "1.2G",
+   "what": "staged binaries of all three arms (744M; hashes in binaries.json), generated inputs (256M; regenerable, digests in inputs.json), argv0 symlinks, raw lane, matrix, counter and allocation outputs of both candidate versions (bundled or summarized in the packet), Callgrind outputs (summarized), record 0767's extracted fault-lane outputs, gate logs (summarized in gates.txt), the probe build tree (copied to the packet) and TMPDIR"
+  }
+ ],
+ "kept": [
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/0769-cfb-mini-sector-open-read-agreement",
+   "what": "the worktree, on branch perf/0769-cfb-mini-sector-open-read-agreement"
+  }
+ ],
+ "not_touched": "other agents' worktrees, targets and scratch directories; the main checkout; /tmp",
+ "packet_contents": "sources, scripts, compressed raw reports and summaries; no binaries, perf.data, Callgrind outputs or corpora"
+}
