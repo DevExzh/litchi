@@ -1905,9 +1905,12 @@ fn relationship_key(owner: &PackURI, relationship_id: &str) -> String {
     key
 }
 
+/// The stored spelling of `target` when the package holds it, found without
+/// decoding the part: a present part whose payload fails to decode is still
+/// that part (ADR 0030).
 fn canonical_target_key(workbook: &Workbook, target: &PackURI) -> String {
-    workbook.inner.package.get_part(target).map_or_else(
-        |_| normalized_uri_key(target),
+    workbook.inner.package.part_metadata(target).map_or_else(
+        || normalized_uri_key(target),
         |part| normalized_uri_key(part.partname()),
     )
 }
@@ -1921,8 +1924,8 @@ fn insert_graph_target(
     let canonical = workbook
         .inner
         .package
-        .get_part(target)
-        .map_or_else(|_| target.clone(), |part| part.partname().clone());
+        .part_metadata(target)
+        .map_or_else(|| target.clone(), |part| part.partname().clone());
     let candidate = normalized_uri_key_candidate(&canonical)?;
     if graph_targets.contains(candidate.as_ref()) {
         return Ok(());
