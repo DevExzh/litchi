@@ -10,6 +10,7 @@ use std::{borrow::Cow, collections::HashSet, rc::Rc, str, sync::Arc};
 use super::model::{
     Capabilities, Error, Limits, NAMESPACE, Name, OffsetLimits, Output, Report, XML_NS,
 };
+use super::patterns::{NamePattern, Patterns};
 use super::scope::{Scope, has_duplicate_prefix, sorted_prefixes};
 use crate::xml_name;
 
@@ -298,11 +299,6 @@ fn parse_decimal(digits: &[u8]) -> R<usize> {
 pub(crate) fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     memchr::memmem::find(haystack, needle)
 }
-#[derive(Clone, PartialEq, Eq, Hash)]
-enum NamePattern {
-    Exact(Name),
-    Namespace(String),
-}
 
 #[derive(Clone, Default)]
 struct Namespaces {
@@ -529,9 +525,9 @@ impl Inherited<'_> {
 struct DirectiveLayer {
     parent: Option<Arc<DirectiveLayer>>,
     ignorable: HashSet<String>,
-    process: HashSet<NamePattern>,
-    preserve_elements: HashSet<NamePattern>,
-    preserve_attributes: HashSet<NamePattern>,
+    process: Patterns,
+    preserve_elements: Patterns,
+    preserve_attributes: Patterns,
 }
 
 #[derive(Clone)]
@@ -580,11 +576,11 @@ impl Ctx {
 fn pattern_directive_matches(
     head: &Option<Arc<DirectiveLayer>>,
     name: &Name,
-    select: impl Fn(&DirectiveLayer) -> &HashSet<NamePattern>,
+    select: impl Fn(&DirectiveLayer) -> &Patterns,
 ) -> bool {
     let mut layer = head.as_deref();
     while let Some(current) = layer {
-        if matches_pattern(select(current), name) {
+        if select(current).matches(name) {
             return true;
         }
         if current.ignorable.contains(&name.namespace) {
@@ -998,26 +994,20 @@ fn start(
         }
     }
 
-    let mut local_process = HashSet::new();
-    let mut local_preserve_elements = HashSet::new();
-    let mut local_preserve_attributes = HashSet::new();
+    let mut local_process = Patterns::default();
+    let mut local_preserve_elements = Patterns::default();
+    let mut local_preserve_attributes = Patterns::default();
     for (name, value) in &directives {
         match *name {
             "Ignorable" => {},
             "ProcessContent" => {
                 for token in value.split_whitespace() {
                     let target = parse_qname_target(token, resolver(scope, &c.ns), true)?;
-                    let namespace = pattern_namespace(&target);
+                    let namespace = target.namespace();
                     if !local_ign.contains(namespace) && !c.is_ignorable(namespace) {
                         return Err(bad("ProcessContent target is not effectively ignorable"));
                     }
-                    local_process
-                        .try_reserve(1)
-                        .map_err(|source| Error::Allocation {
-                            resource: "MCE ProcessContent directives",
-                            source,
-                        })?;
-                    if !local_process.insert(target) {
+                    if !local_process.insert(target, "MCE ProcessContent directives")? {
                         return Err(bad("duplicate ProcessContent target"));
                     }
                 }
@@ -1025,16 +1015,10 @@ fn start(
             "PreserveElements" => {
                 for token in value.split_whitespace() {
                     let target = parse_qname_target(token, resolver(scope, &c.ns), true)?;
-                    if !local_ign.contains(pattern_namespace(&target)) {
+                    if !local_ign.contains(target.namespace()) {
                         return Err(bad("PreserveElements target is not locally ignorable"));
                     }
-                    local_preserve_elements
-                        .try_reserve(1)
-                        .map_err(|source| Error::Allocation {
-                            resource: "MCE PreserveElements directives",
-                            source,
-                        })?;
-                    if !local_preserve_elements.insert(target) {
+                    if !local_preserve_elements.insert(target, "MCE PreserveElements directives")? {
                         return Err(bad("duplicate PreserveElements target"));
                     }
                 }
@@ -1042,16 +1026,12 @@ fn start(
             "PreserveAttributes" => {
                 for token in value.split_whitespace() {
                     let target = parse_qname_target(token, resolver(scope, &c.ns), true)?;
-                    if !local_ign.contains(pattern_namespace(&target)) {
+                    if !local_ign.contains(target.namespace()) {
                         return Err(bad("PreserveAttributes target is not locally ignorable"));
                     }
-                    local_preserve_attributes.try_reserve(1).map_err(|source| {
-                        Error::Allocation {
-                            resource: "MCE PreserveAttributes directives",
-                            source,
-                        }
-                    })?;
-                    if !local_preserve_attributes.insert(target) {
+                    if !local_preserve_attributes
+                        .insert(target, "MCE PreserveAttributes directives")?
+                    {
                         return Err(bad("duplicate PreserveAttributes target"));
                     }
                 }
@@ -1413,18 +1393,6 @@ fn expand_parts<'q, 'n>(q: &'q str, ns: Resolver<'n, '_>, element: bool) -> R<(&
             .ok_or_else(|| bad(format!("unbound prefix {p}")))?
     };
     Ok((n, l))
-}
-fn pattern_namespace(pattern: &NamePattern) -> &str {
-    match pattern {
-        NamePattern::Exact(name) => &name.namespace,
-        NamePattern::Namespace(namespace) => namespace,
-    }
-}
-fn matches_pattern(patterns: &HashSet<NamePattern>, name: &Name) -> bool {
-    patterns.iter().any(|pattern| match pattern {
-        NamePattern::Exact(candidate) => candidate == name,
-        NamePattern::Namespace(namespace) => namespace == &name.namespace,
-    })
 }
 fn parse_qname_target(token: &str, ns: Resolver<'_, '_>, wildcard: bool) -> R<NamePattern> {
     let (prefix, local) = token

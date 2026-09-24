@@ -30,6 +30,8 @@ pub(super) struct Scope {
 impl Scope {
     /// The namespace `prefix` is bound to in scope.
     pub(super) fn get(&self, prefix: &str) -> Option<&str> {
+        #[cfg(test)]
+        counter::lookup();
         if prefix == "xml" {
             return Some(XML_NS);
         }
@@ -42,6 +44,8 @@ impl Scope {
     /// The namespace `prefix` is bound to by an element shallower than
     /// `depth`, that is in scope at the parent of the element at `depth`.
     pub(super) fn get_outside(&self, prefix: &str, depth: usize) -> Option<&str> {
+        #[cfg(test)]
+        counter::lookup();
         if prefix == "xml" {
             return Some(XML_NS);
         }
@@ -59,6 +63,8 @@ impl Scope {
 
     /// Whether the element at `depth` itself declares `prefix`.
     pub(super) fn declared_at(&self, prefix: &str, depth: usize) -> bool {
+        #[cfg(test)]
+        counter::lookup();
         self.prefixes
             .get(prefix)
             .and_then(|bindings| bindings.last())
@@ -154,6 +160,28 @@ pub(super) fn sorted_prefixes(local: &[(String, String)]) -> Result<Vec<&str>, E
     prefixes.extend(local.iter().map(|(prefix, _)| prefix.as_str()));
     prefixes.sort_unstable();
     Ok(prefixes)
+}
+
+/// Index operations, counted in tests so that they can bound the work a
+/// hostile document costs without measuring time.
+#[cfg(test)]
+pub(super) mod counter {
+    use core::cell::Cell;
+
+    thread_local! {
+        static LOOKUPS: Cell<usize> = const { Cell::new(0) };
+    }
+
+    pub(super) fn lookup() {
+        LOOKUPS.with(|count| count.set(count.get() + 1));
+    }
+
+    /// Run `work` and return its result with the index lookups it made.
+    pub(in crate::mce) fn counted<T>(work: impl FnOnce() -> T) -> (T, usize) {
+        LOOKUPS.with(|count| count.set(0));
+        let result = work();
+        (result, LOOKUPS.with(Cell::get))
+    }
 }
 
 #[cfg(test)]
