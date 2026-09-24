@@ -1,0 +1,54 @@
+## base-litchi-opc.log
+
+test owned_xml_part_ranges_are_byte_ranges_of_marked_bytes ... FAILED
+test topology_publication_splices_marked_manifests_like_unmarked_ones ... FAILED
+test eager_round_trip_of_marked_manifests_matches_the_unmarked_round_trip ... ok
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+PANIC owned_xml_part_ranges_are_byte_ranges_of_marked_bytes at crates/litchi-opc/tests/byte_order_marked_parts.rs:207:14:: called `Result::unwrap()` on an `Err` value: SourceBackedOverlayUnavailable { reason: "range does not identify a complete XML opening tag" }
+PANIC topology_publication_splices_marked_manifests_like_unmarked_ones at crates/litchi-opc/tests/byte_order_marked_parts.rs:152:57:: called `Result::unwrap()` on an `Err` value: InvalidContentTypesManifest("content-types root start range is invalid")
+
+## base-litchi-pptx.log
+
+test scene_spans_are_byte_offsets_into_the_marked_slide ... FAILED
+test a_naturally_marked_master_reads_and_saves_like_its_unmarked_twin ... ok
+test theme_scheme_replacement_of_a_marked_theme_matches_the_unmarked_one ... FAILED
+test layout_placeholder_and_font_edits_of_marked_parts_match_unmarked_edits ... FAILED
+test a_fully_marked_deck_reads_like_the_unmarked_deck ... ok
+test batched_text_edits_of_a_marked_slide_match_unmarked_edits ... FAILED
+test opened_transaction_edits_of_marked_slides_match_unmarked_edits ... FAILED
+test real_shape_tag_deck_marked_everywhere_reads_and_edits_like_the_original ... FAILED
+test result: FAILED. 2 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+PANIC scene_spans_are_byte_offsets_into_the_marked_slide at crates/litchi-pptx/tests/byte_order_marked_parts.rs:219:9:: assertion `left == right` failed
+PANIC theme_scheme_replacement_of_a_marked_theme_matches_the_unmarked_one at crates/litchi-pptx/tests/byte_order_marked_parts.rs:376:14:: called `Result::unwrap()` on an `Err` value: Drawing(Xml("ill-formed document: expected `</a:themeElemen<a:clrScheme>`, but `</a:clrScheme>` was found"))
+PANIC layout_placeholder_and_font_edits_of_marked_parts_match_unmarked_edits at crates/litchi-pptx/tests/byte_order_marked_parts.rs:325:14:: called `Result::unwrap()` on an `Err` value: Xml("position 125: attribute key must be directly followed by `=` or space")
+PANIC batched_text_edits_of_a_marked_slide_match_unmarked_edits at crates/litchi-pptx/tests/byte_order_marked_parts.rs:265:69:: called `Result::unwrap()` on an `Err` value: Xml("ill-formed document: expected `</afirste>`, but `</a:r>` was found")
+PANIC opened_transaction_edits_of_marked_slides_match_unmarked_edits at crates/litchi-pptx/tests/byte_order_marked_parts.rs:237:72:: called `Result::unwrap()` on an `Err` value: Xml("ill-formed document: expected `</aedited>`, but `</a:r>` was found")
+PANIC real_shape_tag_deck_marked_everywhere_reads_and_edits_like_the_original at crates/litchi-pptx/tests/byte_order_marked_parts.rs:287:73:: called `Result::unwrap()` on an `Err` value: MarkupCompatibility(NonConformant("invalid QName: invalid XML QName 'p:cS<!--litchi-mce-active-f2017a12c8a8a57e-00:0--'"))
+
+## base-litchi-docx.log
+
+test a_fully_marked_document_reads_and_saves_like_the_unmarked_document ... FAILED
+test a_semantic_edit_of_a_marked_main_part_matches_the_unmarked_edit ... FAILED
+test a_mutable_edit_of_a_marked_main_part_matches_the_unmarked_edit ... FAILED
+test protection_edits_of_a_marked_settings_part_match_unmarked_edits ... FAILED
+test settings_patches_of_the_marked_fixture_match_its_unmarked_twin ... FAILED
+test the_marked_alt_chunk_fixture_reads_and_edits_like_its_unmarked_twin ... ok
+test result: FAILED. 1 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+PANIC a_fully_marked_document_reads_and_saves_like_the_unmarked_document at crates/litchi-docx/tests/byte_order_marked_parts.rs:147:9:: assertion `left == right` failed: indented: false
+PANIC a_semantic_edit_of_a_marked_main_part_matches_the_unmarked_edit at crates/litchi-docx/tests/byte_order_marked_parts.rs:147:9:: assertion `left == right` failed: indented: false
+PANIC a_mutable_edit_of_a_marked_main_part_matches_the_unmarked_edit at crates/litchi-docx/tests/byte_order_marked_parts.rs:147:9:: assertion `left == right` failed: indented: false
+PANIC protection_edits_of_a_marked_settings_part_match_unmarked_edits at crates/litchi-docx/tests/byte_order_marked_parts.rs:147:9:: assertion `left == right` failed: indented: false
+PANIC settings_patches_of_the_marked_fixture_match_its_unmarked_twin at crates/litchi-docx/tests/byte_order_marked_parts.rs:147:9:: assertion `left == right` failed: indented: false
+
+## base-litchi-xlsx.log
+
+test a_fully_marked_workbook_reads_and_saves_like_the_unmarked_workbook ... ok
+test cell_edits_of_marked_indented_worksheets_match_unmarked_edits ... FAILED
+test source_backed_cell_edits_of_marked_parts_match_unmarked_edits ... FAILED
+test a_workbook_with_producer_marked_manifests_edits_like_its_unmarked_twin ... ok
+test sheet_catalog_view_and_hyperlink_edits_of_marked_parts_match_unmarked_edits ... FAILED
+test result: FAILED. 2 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+PANIC cell_edits_of_marked_indented_worksheets_match_unmarked_edits at crates/litchi-xlsx/tests/byte_order_marked_parts.rs:205:32:: called `Result::unwrap()` on an `Err` value: Xml(Malformed("changed SpreadsheetML XML is malformed: position 99: attribute key must be directly followed by `=` or space"))
+PANIC source_backed_cell_edits_of_marked_parts_match_unmarked_edits at crates/litchi-xlsx/tests/byte_order_marked_parts.rs:279:36:: called `Result::unwrap()` on an `Err` value: Invalid("value-only XML has a foreign element namespace")
+PANIC sheet_catalog_view_and_hyperlink_edits_of_marked_parts_match_unmarked_edits at crates/litchi-xlsx/tests/byte_order_marked_parts.rs:205:32:: called `Result::unwrap()` on an `Err` value: Invalid("ill-formed document: expected `</sheetData>`, but `</sheetDals>` was found")
+

@@ -1,0 +1,50 @@
+# Which marked members kept their mark (change 0765)
+
+Each differential scenario runs on a package whose XML members carry a mark, as
+given and indented. "dropped" lists the marked input members whose published
+output has no mark; every other marked member kept it. A dropped member is still
+byte-identical to the unmarked twin's output. The only drops are parts the
+library regenerates from a model.
+
+## litchi-docx
+- a_fully_marked_document_reads_and_saves_like_the_unmarked_document (indented=true): dropped []
+- a_fully_marked_document_reads_and_saves_like_the_unmarked_document (indented=false): dropped []
+- a_mutable_edit_of_a_marked_main_part_matches_the_unmarked_edit (indented=true): dropped ["word/_rels/document.xml.rels"]
+- a_mutable_edit_of_a_marked_main_part_matches_the_unmarked_edit (indented=false): dropped ["word/_rels/document.xml.rels"]
+- a_semantic_edit_of_a_marked_main_part_matches_the_unmarked_edit (indented=true): dropped []
+- a_semantic_edit_of_a_marked_main_part_matches_the_unmarked_edit (indented=false): dropped []
+- protection_edits_of_a_marked_settings_part_match_unmarked_edits (indented=true): dropped ["word/_rels/document.xml.rels"]
+- protection_edits_of_a_marked_settings_part_match_unmarked_edits (indented=false): dropped ["word/_rels/document.xml.rels"]
+- settings_patches_of_the_marked_fixture_match_its_unmarked_twin (indented=true): dropped []
+- settings_patches_of_the_marked_fixture_match_its_unmarked_twin (indented=false): dropped []
+- the_marked_alt_chunk_fixture_reads_and_edits_like_its_unmarked_twin (indented=true): dropped []
+- the_marked_alt_chunk_fixture_reads_and_edits_like_its_unmarked_twin (indented=false): dropped []
+
+## litchi-pptx
+- a_fully_marked_deck_reads_like_the_unmarked_deck (indented=true): dropped []
+- a_fully_marked_deck_reads_like_the_unmarked_deck (indented=false): dropped []
+- a_naturally_marked_master_reads_and_saves_like_its_unmarked_twin (indented=true): dropped []
+- a_naturally_marked_master_reads_and_saves_like_its_unmarked_twin (indented=false): dropped []
+- batched_text_edits_of_a_marked_slide_match_unmarked_edits (indented=true): dropped []
+- batched_text_edits_of_a_marked_slide_match_unmarked_edits (indented=false): dropped []
+- layout_placeholder_and_font_edits_of_marked_parts_match_unmarked_edits (indented=true): dropped ["[Content_Types].xml", "ppt/slideMasters/_rels/slideMaster1.xml.rels"]
+- layout_placeholder_and_font_edits_of_marked_parts_match_unmarked_edits (indented=false): dropped ["[Content_Types].xml", "ppt/slideMasters/_rels/slideMaster1.xml.rels"]
+- opened_transaction_edits_of_marked_slides_match_unmarked_edits (indented=true): dropped []
+- opened_transaction_edits_of_marked_slides_match_unmarked_edits (indented=false): dropped []
+- real_shape_tag_deck_marked_everywhere_reads_and_edits_like_the_original (indented=true): dropped ["ppt/tags/tag4.xml"]
+- real_shape_tag_deck_marked_everywhere_reads_and_edits_like_the_original (indented=false): dropped ["ppt/tags/tag4.xml"]
+- theme_scheme_replacement_of_a_marked_theme_matches_the_unmarked_one (indented=true): dropped []
+- theme_scheme_replacement_of_a_marked_theme_matches_the_unmarked_one (indented=false): dropped []
+
+## litchi-xlsx
+- a_fully_marked_workbook_reads_and_saves_like_the_unmarked_workbook (indented=true): dropped []
+- a_fully_marked_workbook_reads_and_saves_like_the_unmarked_workbook (indented=false): dropped []
+- a_workbook_with_producer_marked_manifests_edits_like_its_unmarked_twin (indented=true): dropped []
+- a_workbook_with_producer_marked_manifests_edits_like_its_unmarked_twin (indented=false): dropped []
+- cell_edits_of_marked_indented_worksheets_match_unmarked_edits (indented=true): dropped []
+- cell_edits_of_marked_indented_worksheets_match_unmarked_edits (indented=false): dropped []
+- sheet_catalog_view_and_hyperlink_edits_of_marked_parts_match_unmarked_edits (indented=true): dropped []
+- sheet_catalog_view_and_hyperlink_edits_of_marked_parts_match_unmarked_edits (indented=false): dropped []
+- source_backed_cell_edits_of_marked_parts_match_unmarked_edits (indented=true): dropped []
+- source_backed_cell_edits_of_marked_parts_match_unmarked_edits (indented=false): dropped []
+

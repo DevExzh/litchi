@@ -1,0 +1,19 @@
+Base 1d1044e3ac, test theme_scheme_replacement_of_a_marked_theme_matches_the_unmarked_one
+(crates/litchi-pptx/tests/byte_order_marked_parts.rs, indented run): put_colors + put_fonts
+on a marked, indented ppt/theme/theme1.xml succeeded and the package saved; the published
+member behind its mark differs from the unmarked twin's output as follows (a = marked, b = unmarked):
+
+lengths: marked-without-mark 8451, unmarked 8451
+insert: a[176:176] context b'">\n    <a:themeElements>\n <a:clrScheme xmlns:a="ht'
+      b[176:179] context b'">\n    <a:themeElements>\n    <a:clrScheme xmlns:a="ht'
+delete: a[860:863] context b'a:folHlink></a:clrScheme>me>\n <a:fontScheme xmlns:a="'
+      b[863:863] context b'a:folHlink></a:clrScheme>\n    <a:fontScheme xmlns:'
+insert: a[864:864] context b'lHlink></a:clrScheme>me>\n <a:fontScheme xmlns:a="h'
+      b[864:867] context b':folHlink></a:clrScheme>\n    <a:fontScheme xmlns:a="h'
+delete: a[3873:3876] context b'/a:minorFont></a:fontScheme>me>\n    <a:fmtScheme name'
+      b[3876:3876] context b'/a:minorFont></a:fontScheme>\n    <a:fmtScheme name'
+
+The stray `me>` after each replaced scheme is the old scheme end tag's last three bytes;
+three indentation bytes before each scheme were dropped. The output is well-formed, so the
+theme read-back and the publication audit accepted it. At 2a2c4a9791 the same scenario
+publishes the unmarked output behind the mark.
