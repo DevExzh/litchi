@@ -4,6 +4,7 @@ use crate::ast::*;
 use crate::omml::attributes::{get_attribute_value, parse_accent_type, parse_position_type};
 use crate::omml::elements::ElementContext;
 use crate::omml::properties::parse_accent_properties;
+use crate::omml::xml_attributes::first_wins;
 use quick_xml::events::BytesStart;
 
 /// Handler for accent elements
@@ -15,7 +16,7 @@ impl AccentHandler {
         context: &mut ElementContext<'arena>,
         _arena: &'arena bumpalo::Bump, // Unused: accent properties stored in context, no string allocation needed
     ) {
-        let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
+        let attrs: Vec<_> = first_wins(elem).filter_map(|a| a.ok()).collect();
 
         // Parse accent position from pos attribute
         let pos_val = get_attribute_value(&attrs, "pos");

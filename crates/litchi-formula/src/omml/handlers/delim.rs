@@ -4,6 +4,7 @@ use crate::ast::*;
 use crate::omml::attributes::{get_attribute_value, parse_fence_type};
 use crate::omml::elements::ElementContext;
 use crate::omml::properties::parse_delimiter_properties;
+use crate::omml::xml_attributes::first_wins;
 use quick_xml::events::BytesStart;
 
 /// Handler for delimiter (fenced) elements
@@ -15,7 +16,7 @@ impl DelimiterHandler {
         context: &mut ElementContext<'arena>,
         _arena: &'arena bumpalo::Bump,
     ) {
-        let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
+        let attrs: Vec<_> = first_wins(elem).filter_map(|a| a.ok()).collect();
 
         // Parse delimiter properties
         context.properties = parse_delimiter_properties(&attrs);

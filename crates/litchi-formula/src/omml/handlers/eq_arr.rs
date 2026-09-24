@@ -6,6 +6,7 @@ use crate::omml::attributes::{
 };
 use crate::omml::elements::ElementContext;
 use crate::omml::properties::parse_eq_arr_properties;
+use crate::omml::xml_attributes::first_wins;
 use quick_xml::events::BytesStart;
 
 /// Handler for equation array elements
@@ -17,7 +18,7 @@ impl EqArrHandler {
         context: &mut ElementContext<'arena>,
         _arena: &'arena bumpalo::Bump, // Unused: array rows are owned Vec, no arena allocation needed
     ) {
-        let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
+        let attrs: Vec<_> = first_wins(elem).filter_map(|a| a.ok()).collect();
 
         // Parse equation array properties
         context.properties = parse_eq_arr_properties(&attrs);

@@ -6,6 +6,7 @@ use crate::omml::handlers::*;
 use crate::omml::lookup::*;
 use crate::omml::properties::*;
 use crate::omml::utils::{validate_element_nesting, validate_omml_structure, *};
+use crate::omml::xml_attributes::first_wins;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 use std::borrow::Cow;
@@ -159,7 +160,7 @@ impl<'arena> OmmlParser<'arena> {
         let mut context = context_pool.get(element_type);
 
         // Parse attributes using SIMD-accelerated parsing with caching
-        let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
+        let attrs: Vec<_> = first_wins(elem).filter_map(|a| a.ok()).collect();
 
         // Performance optimization: Don't store attributes in context as they're never used
         // This eliminates a clone() and unsafe transmute on every element
@@ -597,7 +598,7 @@ impl<'arena> OmmlParser<'arena> {
         let mut context = context_pool.get(element_type);
 
         // Parse attributes
-        let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
+        let attrs: Vec<_> = first_wins(elem).filter_map(|a| a.ok()).collect();
 
         // Performance optimization: Don't store attributes in context as they're never used
         // This eliminates a clone() and unsafe transmute on every element

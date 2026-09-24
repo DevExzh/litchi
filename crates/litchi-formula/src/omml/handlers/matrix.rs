@@ -4,6 +4,7 @@ use crate::ast::*;
 use crate::omml::attributes::{get_attribute_value, parse_matrix_fence};
 use crate::omml::elements::{ElementContext, ElementType};
 use crate::omml::properties::parse_matrix_properties;
+use crate::omml::xml_attributes::first_wins;
 use quick_xml::events::BytesStart;
 
 /// Handler for matrix elements
@@ -15,7 +16,7 @@ impl MatrixHandler {
         context: &mut ElementContext<'arena>,
         _arena: &'arena bumpalo::Bump, // Unused: matrix elements are owned Vec, no string allocation
     ) {
-        let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
+        let attrs: Vec<_> = first_wins(elem).filter_map(|a| a.ok()).collect();
 
         // Parse matrix column spacing (mcs) attribute using SIMD-accelerated parsing
         let fence_val = get_attribute_value(&attrs, "mcs");

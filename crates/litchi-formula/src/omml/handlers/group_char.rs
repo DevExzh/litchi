@@ -4,6 +4,7 @@ use crate::ast::*;
 use crate::omml::attributes::{get_attribute_value, parse_position_type, parse_vertical_alignment};
 use crate::omml::elements::ElementContext;
 use crate::omml::properties::parse_group_char_properties;
+use crate::omml::xml_attributes::first_wins;
 use quick_xml::events::BytesStart;
 use std::borrow::Cow;
 
@@ -16,7 +17,7 @@ impl GroupCharHandler {
         context: &mut ElementContext<'arena>,
         _arena: &'arena bumpalo::Bump,
     ) {
-        let attrs: Vec<_> = elem.attributes().filter_map(|a| a.ok()).collect();
+        let attrs: Vec<_> = first_wins(elem).filter_map(|a| a.ok()).collect();
 
         // Parse group character properties
         context.properties = parse_group_char_properties(&attrs);
