@@ -2244,9 +2244,11 @@ impl RevisionEditor {
     /// Prepare the passive `Selsf` record for one main-story splice before a
     /// candidate is cloned. The record is remapped when each CP has a proven
     /// boundary mapping, including a CP at the point of a pure insertion, which
-    /// keeps its value; positions strictly inside replaced or removed text are
-    /// returned as an ambiguity so the body facade can expose its typed
-    /// dependency refusal.
+    /// keeps its value unless the record selects an inline picture or shape
+    /// whose character the text is inserted in front of; positions strictly
+    /// inside replaced or removed text, and text inserted at the first CP of a
+    /// non-empty list-prefix selection, are returned as an ambiguity so the
+    /// body facade can expose its typed dependency refusal.
     pub(crate) fn saved_selection_splice(
         &self,
         start: u32,

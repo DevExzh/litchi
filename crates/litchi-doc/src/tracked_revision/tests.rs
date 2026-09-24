@@ -368,3 +368,106 @@ fn protected_doc() -> Vec<u8> {
     package.put_stream(&table_path, table).unwrap();
     package.finish().unwrap()
 }
+
+/// Replaces a checked-in fixture's `Selsf` with a selection of the first
+/// main-story character `unit`, flagged `flags`, and returns the new bytes and
+/// that character's CP; `None` when the fixture has no such character or no
+/// `Selsf`.
+fn fixture_with_object_selection(name: &str, unit: u16, flags: u16) -> Option<(Vec<u8>, u32)> {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/ole/doc")
+        .join(name);
+    let bytes = std::fs::read(path).unwrap();
+    let editor = RevisionEditor::open(bytes.clone(), Limits::default()).unwrap();
+    let text = editor.main_story_text().unwrap();
+    let cp = u32::try_from(text.encode_utf16().position(|value| value == unit)?).unwrap();
+    let mut package = ObjectEditor::open(bytes, Targets::default(), Limits::default()).unwrap();
+    let word_path = ["WordDocument".to_string()];
+    let fib = FileInformationBlock::parse(package.stream(&word_path).unwrap()).unwrap();
+    let table_path = [if fib.which_table_stream() {
+        "1Table"
+    } else {
+        "0Table"
+    }
+    .to_string()];
+    let (offset, length) = fib.get_table_pointer(30)?;
+    if length != 36 {
+        return None;
+    }
+    let offset = usize::try_from(offset).unwrap();
+    let mut table = package.stream(&table_path).unwrap().to_vec();
+    let selsf = &mut table[offset..offset + 36];
+    selsf.fill(0);
+    selsf[0..2].copy_from_slice(&flags.to_le_bytes());
+    selsf[2] = 1;
+    selsf[4..8].copy_from_slice(&cp.to_le_bytes());
+    selsf[8..12].copy_from_slice(&(cp + 1).to_le_bytes());
+    selsf[20..24].copy_from_slice(&cp.to_le_bytes());
+    selsf[24..26].copy_from_slice(&1u16.to_le_bytes());
+    package.put_stream(&table_path, table).unwrap();
+    Some((package.finish().unwrap(), cp))
+}
+
+/// Change 0768 review: text inserted at a selected inline picture (its
+/// 0x0001 character) or floating shape (its 0x0008 anchor) is written in
+/// front of the object, so the saved selection moves with the object and
+/// covers none of the new text; rejecting the insertion restores the record.
+#[test]
+fn tracked_insertion_at_a_selected_object_moves_the_selection_with_the_object() {
+    let fixtures = [
+        "testPictures.doc",
+        "FloatingPictures.doc",
+        "picture.doc",
+        "PngPicture.doc",
+        "pictures_escher.doc",
+        "image-comment-at-char.doc",
+        "watermark.doc",
+    ];
+    for (unit, flags) in [(0x0001u16, 1u16 << 12), (0x0008, 1 << 8)] {
+        let mut tested = 0;
+        for name in fixtures {
+            let Some((source, cp)) = fixture_with_object_selection(name, unit, flags) else {
+                continue;
+            };
+            let mut editor = RevisionEditor::open(source, Limits::default()).unwrap();
+            let recorded = editor.saved_selection().unwrap().unwrap();
+            editor
+                .add_text(
+                    cp,
+                    "0768",
+                    RevisionKind::Insertion,
+                    RevisionMetadata::new("0768"),
+                )
+                .unwrap_or_else(|error| panic!("{name}: {error}"));
+            let moved = editor.saved_selection().unwrap().unwrap();
+            assert_eq!(
+                (moved.cp_first(), moved.cp_lim(), moved.cp_anchor()),
+                (cp + 4, cp + 5, cp + 4),
+                "{name} {unit:#06x}"
+            );
+            let text = editor
+                .main_story_text()
+                .unwrap()
+                .encode_utf16()
+                .collect::<Vec<_>>();
+            assert_eq!(text[cp as usize + 4], unit, "{name} {unit:#06x}");
+
+            let output = editor.clone().finish().unwrap();
+            let mut reopened = RevisionEditor::open(output, Limits::default()).unwrap();
+            let index = reopened
+                .revisions()
+                .unwrap()
+                .iter()
+                .position(|revision| revision.author == "0768")
+                .unwrap();
+            reopened.reject(index).unwrap();
+            assert_eq!(
+                reopened.saved_selection().unwrap().unwrap().bytes(),
+                recorded.bytes(),
+                "{name} {unit:#06x}"
+            );
+            tested += 1;
+        }
+        assert!(tested > 0, "no fixture has a main-story {unit:#06x}");
+    }
+}

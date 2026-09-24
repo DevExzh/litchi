@@ -23,9 +23,22 @@ const MAX_CP: i32 = i32::MAX;
 pub(crate) enum SavedSelectionSpliceError {
     /// The selected record or its context is malformed.
     Invalid(PackageError),
-    /// A CP lies strictly inside replaced or removed text, so the characters
-    /// it was recorded between no longer exist and no mapping is provable.
+    /// No mapping is provable: a CP lies strictly inside replaced or removed
+    /// text, so the characters it was recorded between no longer exist, or
+    /// text is inserted at the first CP of a selection whose kind leaves the
+    /// side of the new text undefined (see
+    /// [`SavedSelection::side_of_insertion_at_first_cp`]).
     Ambiguous,
+}
+
+/// The side of a pure insertion on which a recorded CP at the insertion point
+/// lands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum InsertionSide {
+    /// The CP keeps its value, so the inserted text follows it.
+    Before,
+    /// The CP moves past the inserted text, as the character it locates does.
+    After,
 }
 const MIN_TABLE_EDGE: i16 = -31_680;
 const MAX_TABLE_EDGE: i16 = 31_680;
@@ -379,7 +392,9 @@ impl SavedSelection {
     /// signed size delta, and the two exact range boundaries map to the
     /// corresponding new boundaries. A CP at the point of a pure insertion is
     /// the start boundary of an empty range and keeps its value, so the
-    /// inserted text follows the recorded position. An interior CP cannot be
+    /// inserted text follows the recorded position, except where text is
+    /// inserted at the first CP of a selected object, which moves after it
+    /// ([`Self::side_of_insertion_at_first_cp`]). An interior CP cannot be
     /// mapped without selecting a semantic point inside replaced text, so the
     /// operation is refused instead of retaining a stale coordinate.
     pub(crate) fn remap_for_splice(
@@ -389,14 +404,19 @@ impl SavedSelection {
         added: u32,
         new_ccp: u32,
     ) -> std::result::Result<[u8; SELSF_SIZE], SavedSelectionSpliceError> {
-        let cp_first = remap_splice_cp(self.cp_first, start, end, added)?;
-        let cp_lim = remap_splice_cp(self.cp_lim, start, end, added)?;
-        let cp_anchor = remap_splice_cp(self.cp_anchor, start, end, added)?;
+        let side = if start == end && start == self.cp_first {
+            self.side_of_insertion_at_first_cp()?
+        } else {
+            InsertionSide::Before
+        };
+        let cp_first = remap_splice_cp(self.cp_first, start, end, added, side)?;
+        let cp_lim = remap_splice_cp(self.cp_lim, start, end, added, side)?;
+        let cp_anchor = remap_splice_cp(self.cp_anchor, start, end, added, side)?;
         let cp_anchor_shrink = if self.is_block_selection() && !self.is_table_selection() {
             let cp_anchor_shrink = u32::try_from(self.cp_anchor_shrink).map_err(|_| {
                 SavedSelectionSpliceError::Invalid(corrupted("Selsf cpAnchorShrink is negative"))
             })?;
-            Some(remap_splice_cp(cp_anchor_shrink, start, end, added)?)
+            Some(remap_splice_cp(cp_anchor_shrink, start, end, added, side)?)
         } else {
             None
         };
@@ -424,6 +444,53 @@ impl SavedSelection {
         SavedSelection::parse_bytes(&replacement)
             .map(|_| replacement)
             .map_err(SavedSelectionSpliceError::Invalid)
+    }
+
+    /// The side on which text inserted at `cpFirst` lands, by what MS-DOC
+    /// says the selection is.
+    ///
+    /// Only a pure insertion reaches this rule, and the only pure insertion is
+    /// a tracked insertion of plain text, which has no paragraph mark or other
+    /// control character; the inserted text therefore belongs to the
+    /// paragraph that contains `cpFirst`.
+    ///
+    /// - An inline picture (`fGraphics`) is its 0x0001 character, and a shape
+    ///   or floating picture (`fShape`) is its 0x0008 anchor character
+    ///   (MS-DOC 1.3.5 and 2.8.27). Text inserted at the object's first CP is
+    ///   written before that character, and the editor moves the anchor's
+    ///   `PlcfSpa` CP with it, so every CP of the record at the insertion point
+    ///   moves after the text ([`InsertionSide::After`]): the selection still
+    ///   covers the object and none of the new text.
+    /// - A bullet or number (`fPrefix`, or `sty` `styPrefix`) has no character
+    ///   in the CP space. An empty record stays before the new text, which the
+    ///   list number precedes; for a non-empty record 2.9.244 gives `cpLim` no
+    ///   meaning, so the side of the new text is undefined and the insertion
+    ///   is refused.
+    /// - A record that claims an object and also a text frame, a list prefix,
+    ///   whole table cells or a text block needs opposite mappings for its
+    ///   claims, so the insertion is refused.
+    /// - Every other record keeps its CP ([`InsertionSide::Before`]): a
+    ///   character selection, which the new text joins as a replacement's
+    ///   text joins it when the replaced range starts there; an insertion
+    ///   point, which stays in front of the text; a text frame (`fFrame`),
+    ///   whose first paragraph the text joins, so the frame still starts at
+    ///   `cpFirst`; and whole table rows or a text block, whose `cpFirst` MUST
+    ///   remain the beginning of a row or a line (2.9.244), which it does.
+    fn side_of_insertion_at_first_cp(
+        &self,
+    ) -> std::result::Result<InsertionSide, SavedSelectionSpliceError> {
+        let object = self.is_graphics() || self.is_shape();
+        let prefix = self.is_prefix() || self.style == SelectionStyle::Prefix;
+        if object {
+            if self.is_frame() || prefix || self.is_table_selection() || self.is_block_selection() {
+                return Err(SavedSelectionSpliceError::Ambiguous);
+            }
+            return Ok(InsertionSide::After);
+        }
+        if prefix && self.cp_first < self.cp_lim {
+            return Err(SavedSelectionSpliceError::Ambiguous);
+        }
+        Ok(InsertionSide::Before)
     }
 
     /// Whether the selection was made from physical left to right.
@@ -980,20 +1047,21 @@ pub(crate) fn table_range(
 ///
 /// A CP at or before `start` keeps its value and a CP at or after `end` keeps
 /// its distance from the end, so every recorded position stays next to the
-/// character that bounded it. A pure insertion (`start == end`) at a recorded
-/// CP therefore lands after that position, which is the only choice MS-DOC
-/// 2.9.244 admits for every selection kind: a whole-row selection's `cpFirst`
-/// MUST be the beginning of its row, a text block's `cpFirst` and `cpLim`
-/// MUST be line beginnings, and inserted text leaves each of those positions
-/// where it was. Only a CP strictly inside replaced or removed text is
-/// ambiguous, because the characters it pointed between no longer exist.
+/// character that bounded it. For a pure insertion (`start == end`) a CP at
+/// the insertion point lands on `side` of the new text: it keeps its value
+/// unless the record selects an object whose character the text is inserted
+/// in front of ([`SavedSelection::side_of_insertion_at_first_cp`]). Only a CP
+/// strictly inside replaced or removed text is ambiguous here, because the
+/// characters it pointed between no longer exist.
 fn remap_splice_cp(
     cp: u32,
     start: u32,
     end: u32,
     added: u32,
+    side: InsertionSide,
 ) -> std::result::Result<u32, SavedSelectionSpliceError> {
-    if cp <= start {
+    let follows_insertion = start == end && cp == start && side == InsertionSide::After;
+    if cp <= start && !follows_insertion {
         return Ok(cp);
     }
     if cp == end {
@@ -1347,6 +1415,136 @@ mod tests {
             caret.remap_for_splice(3, 5, 4, 10),
             Err(SavedSelectionSpliceError::Ambiguous)
         ));
+    }
+
+    /// A record over the one character `[4, 5)` with `flags`.
+    fn one_character(flags: u16) -> Vec<u8> {
+        let mut data = record(flags);
+        data[8..12].copy_from_slice(&5i32.to_le_bytes());
+        data
+    }
+
+    #[test]
+    fn an_object_selection_moves_after_text_inserted_at_its_first_cp() {
+        const GRAPHICS: u16 = 1 << 12;
+        const SHAPE: u16 = 1 << 8;
+        for flags in [GRAPHICS, SHAPE, GRAPHICS | 1 << 2 | 1 << 3 | 1 << 6] {
+            let object = SavedSelection::parse_bytes(&one_character(flags)).unwrap();
+            // Text inserted at the object's character goes in front of it:
+            // the selection moves with the character and covers none of the
+            // new text.
+            let inserted = object.remap_for_splice(4, 4, 3, 11).unwrap();
+            assert_eq!(remapped_cps(&inserted), (7, 8, 7), "{flags:#06x}");
+            assert_eq!(&inserted[..4], &object.bytes()[..4], "{flags:#06x}");
+            assert_eq!(&inserted[12..20], &object.bytes()[12..20], "{flags:#06x}");
+            assert_eq!(&inserted[24..], &object.bytes()[24..], "{flags:#06x}");
+            // Rejecting that insertion removes 4..7 and restores the record.
+            let inserted = SavedSelection::parse_bytes(&inserted).unwrap();
+            assert_eq!(
+                inserted.remap_for_splice(4, 7, 0, 8).unwrap().as_slice(),
+                object.bytes(),
+                "{flags:#06x}"
+            );
+            // Before the object the text moves it; after it, it stays.
+            assert_eq!(
+                remapped_cps(&object.remap_for_splice(3, 3, 3, 11).unwrap()),
+                (7, 8, 7),
+                "{flags:#06x}"
+            );
+            assert_eq!(
+                object.remap_for_splice(5, 5, 3, 11).unwrap().as_slice(),
+                object.bytes(),
+                "{flags:#06x}"
+            );
+        }
+
+        // An empty object record locates the object's position and moves too.
+        let mut empty = record(GRAPHICS);
+        empty[8..12].copy_from_slice(&4i32.to_le_bytes());
+        let empty = SavedSelection::parse_bytes(&empty).unwrap();
+        assert_eq!(
+            remapped_cps(&empty.remap_for_splice(4, 4, 3, 11).unwrap()),
+            (7, 7, 7)
+        );
+
+        // A selection that began after the object's first CP keeps that anchor
+        // after the object's character.
+        let mut anchored = one_character(SHAPE);
+        anchored[20..24].copy_from_slice(&5i32.to_le_bytes());
+        let anchored = SavedSelection::parse_bytes(&anchored).unwrap();
+        assert_eq!(
+            remapped_cps(&anchored.remap_for_splice(4, 4, 3, 11).unwrap()),
+            (7, 8, 8)
+        );
+    }
+
+    #[test]
+    fn a_text_frame_keeps_its_first_cp_and_grows_by_text_inserted_there() {
+        // The inserted plain text joins the frame's first paragraph.
+        let frame = SavedSelection::parse_bytes(&record(1 << 9)).unwrap();
+        assert_eq!(
+            remapped_cps(&frame.remap_for_splice(4, 4, 3, 11).unwrap()),
+            (4, 11, 4)
+        );
+        assert_eq!(
+            remapped_cps(&frame.remap_for_splice(8, 8, 3, 11).unwrap()),
+            (4, 8, 4)
+        );
+    }
+
+    #[test]
+    fn a_list_prefix_selection_refuses_text_at_its_first_cp_unless_it_is_empty() {
+        let mut styled = one_character(0);
+        styled[24..26].copy_from_slice(&(SelectionStyle::Prefix as u16).to_le_bytes());
+        for data in [one_character(1 << 7), styled] {
+            let prefix = SavedSelection::parse_bytes(&data).unwrap();
+            assert!(matches!(
+                prefix.remap_for_splice(4, 4, 3, 11),
+                Err(SavedSelectionSpliceError::Ambiguous)
+            ));
+            // Elsewhere the ordinary mapping applies.
+            assert_eq!(
+                remapped_cps(&prefix.remap_for_splice(3, 3, 3, 11).unwrap()),
+                (7, 8, 7)
+            );
+            assert_eq!(
+                prefix.remap_for_splice(5, 5, 3, 11).unwrap().as_slice(),
+                prefix.bytes()
+            );
+        }
+
+        // An empty prefix record stays in front of the text, as a caret does.
+        let mut empty = record(1 << 7);
+        empty[8..12].copy_from_slice(&4i32.to_le_bytes());
+        let empty = SavedSelection::parse_bytes(&empty).unwrap();
+        assert_eq!(
+            remapped_cps(&empty.remap_for_splice(4, 4, 3, 11).unwrap()),
+            (4, 4, 4)
+        );
+    }
+
+    #[test]
+    fn an_object_that_also_claims_a_frame_prefix_cells_or_block_is_refused_at_its_first_cp() {
+        let mut cells = one_character(1 << 12 | 1 << 11);
+        cells[16..20].copy_from_slice(&0x0040_0000u32.to_le_bytes());
+        cells[32..34].copy_from_slice(&MIN_TABLE_EDGE.to_le_bytes());
+        cells[34..36].copy_from_slice(&MAX_TABLE_EDGE.to_le_bytes());
+        for data in [
+            one_character(1 << 12 | 1 << 9),
+            one_character(1 << 8 | 1 << 7),
+            cells,
+            one_character(1 << 8 | 1 << 13),
+        ] {
+            let selection = SavedSelection::parse_bytes(&data).unwrap();
+            assert!(matches!(
+                selection.remap_for_splice(4, 4, 3, 11),
+                Err(SavedSelectionSpliceError::Ambiguous)
+            ));
+            assert_eq!(
+                remapped_cps(&selection.remap_for_splice(3, 3, 3, 11).unwrap()),
+                (7, 8, 7)
+            );
+        }
     }
 
     #[test]
