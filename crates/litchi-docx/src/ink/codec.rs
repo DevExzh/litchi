@@ -1169,6 +1169,7 @@ fn select_active_offsets(
         max_namespace_bindings: MAX_NAMESPACE_DECLARATIONS,
         max_directive_tokens: max_nodes,
         max_choices_per_alternate: max_nodes.max(1),
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     };
     let limits = OffsetLimits {
         max_source_bytes: MAX_XML_BYTES,

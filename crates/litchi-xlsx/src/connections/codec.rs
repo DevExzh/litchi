@@ -140,6 +140,8 @@ impl Connections {
                 max_namespace_bindings: max_attributes.min(4096),
                 max_directive_tokens: events.min(4096),
                 max_choices_per_alternate: events.min(1024),
+                max_attributes_per_element:
+                    litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
             },
         )
         .map_err(|error| {

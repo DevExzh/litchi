@@ -1063,6 +1063,7 @@ fn bounded_settings_mce_limits(
         max_namespace_bindings,
         max_directive_tokens,
         max_choices_per_alternate,
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     })
 }
 

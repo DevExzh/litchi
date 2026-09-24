@@ -127,6 +127,7 @@ fn scan_slide_laser_traces(
         max_namespace_bindings: 4_096,
         max_directive_tokens: 4_096,
         max_choices_per_alternate: 1_024,
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     };
     let xml = process_markup_compatibility(xml_bytes, &capabilities, &mce_limits)?.xml;
     let mut reader = NsReader::from_reader(xml.as_ref());

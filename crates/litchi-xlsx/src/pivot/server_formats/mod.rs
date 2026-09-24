@@ -137,6 +137,7 @@ fn catalog_mce_limits(limits: ReadLimits) -> litchi_ooxml_common::mce::Limits {
         max_namespace_bindings: MAX_NAMESPACE_DECLARATIONS.min(caller_tokens),
         max_directive_tokens: directive_tokens,
         max_choices_per_alternate: MAX_REFERENCE_COUNT.min(1024).min(directive_tokens),
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     }
 }
 

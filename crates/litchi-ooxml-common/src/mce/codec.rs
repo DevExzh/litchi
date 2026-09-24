@@ -5,11 +5,12 @@ use quick_xml::{
     encoding::Decoder,
     events::{BytesStart, Event},
 };
-use std::{borrow::Cow, collections::HashSet, str, sync::Arc};
+use std::{borrow::Cow, collections::HashSet, rc::Rc, str, sync::Arc};
 
 use super::model::{
     Capabilities, Error, Limits, NAMESPACE, Name, OffsetLimits, Output, Report, XML_NS,
 };
+use super::scope::{Scope, has_duplicate_prefix, sorted_prefixes};
 use crate::xml_name;
 
 type R<T> = Result<T, Error>;
@@ -314,39 +315,63 @@ struct NamespaceLayer {
     local: Vec<(String, String)>,
 }
 
+/// Namespace declarations one element's lookup may walk before the debug
+/// cross-check of [`Scope`] against the declaration chain gives up.
+const CROSS_CHECKED_DECLARATIONS: usize = 256;
+
 impl Namespaces {
-    fn get(&self, prefix: &str) -> Option<&str> {
+    /// Resolve `prefix` by walking the declaration chain, or `None` when
+    /// `budget` declarations were visited first.
+    ///
+    /// The walk costs one comparison per declaration in scope, which an input
+    /// controls; production lookups use [`Scope`], and this walk only checks
+    /// it in debug builds.
+    fn walk(&self, prefix: &str, mut budget: usize) -> Option<Option<&str>> {
         if prefix == "xml" {
-            return Some(XML_NS);
+            return Some(Some(XML_NS));
         }
         let mut layer = self.head.as_deref();
         while let Some(current) = layer {
-            if let Some((_, namespace)) = current
-                .local
-                .iter()
-                .rev()
-                .find(|(candidate, _)| candidate == prefix)
-            {
-                return Some(namespace);
+            for (candidate, namespace) in current.local.iter().rev() {
+                budget = budget.checked_sub(1)?;
+                if candidate == prefix {
+                    return Some(Some(namespace));
+                }
             }
             layer = current.parent.as_deref();
         }
-        None
+        Some(None)
     }
 
-    fn with_local(&self, local: Vec<(String, String)>, lim: &Limits) -> R<Self> {
+    /// Add the declarations `local` of the element at `depth` to this chain,
+    /// the chain of its parent.
+    ///
+    /// `scope` must hold the bindings of this chain; whether it already holds
+    /// the element's own does not matter. Each prefix is compared with the
+    /// others once through a sort and resolved once through `scope`, so an
+    /// element's declarations cost `O(n log n)` whatever their number.
+    fn with_local(
+        &self,
+        local: Vec<(String, String)>,
+        lim: &Limits,
+        scope: &Scope,
+        depth: usize,
+    ) -> R<Self> {
         if local.is_empty() {
             return Ok(self.clone());
         }
+        if has_duplicate_prefix(&local)? {
+            return Err(bad("duplicate namespace declaration"));
+        }
         let mut bindings = self.bindings;
-        for (index, (prefix, _)) in local.iter().enumerate() {
-            if local[..index]
-                .iter()
-                .any(|(candidate, _)| candidate == prefix)
-            {
-                return Err(bad("duplicate namespace declaration"));
-            }
-            if self.get(prefix).is_none() {
+        for (prefix, _) in &local {
+            let bound = scope.get_outside(prefix, depth);
+            debug_assert!(
+                self.walk(prefix, CROSS_CHECKED_DECLARATIONS)
+                    .is_none_or(|walked| walked == bound),
+                "the prefix index disagrees with the declaration chain for {prefix:?}"
+            );
+            if bound.is_none() {
                 bindings = bindings
                     .checked_add(1)
                     .ok_or_else(|| limit("namespace bindings"))?;
@@ -363,34 +388,27 @@ impl Namespaces {
             bindings,
         })
     }
+}
 
-    /// Visit the declarations contributed by ancestors this codec does not
-    /// emit, innermost binding first and each prefix at most once.
-    ///
-    /// `head` is the namespace chain an element inherited and `stop` the chain
-    /// in effect at its nearest emitted ancestor. Everything between them was
-    /// declared on an `AlternateContent` wrapper, a `Choice`/`Fallback` branch
-    /// or a `ProcessContent` element that the output drops, so it has to be
-    /// re-declared on the first emitted descendant for every qualified name in
-    /// the output to resolve to the namespace it resolved to in the source.
-    fn for_each_hoisted(
-        head: Option<&Arc<NamespaceLayer>>,
-        stop: Option<&Arc<NamespaceLayer>>,
-        mut visit: impl FnMut(&str, &str) -> R<()>,
-    ) -> R<()> {
-        let mut layer = head;
-        while let Some(current) = layer {
-            if stop.is_some_and(|boundary| Arc::ptr_eq(current, boundary)) {
-                break;
-            }
-            for (prefix, namespace) in &current.local {
-                if prefix != "xml" && !shadowed_before(head, current, prefix) {
-                    visit(prefix, namespace)?;
-                }
-            }
-            layer = current.parent.as_ref();
-        }
-        Ok(())
+/// Prefix resolution at the element being processed: [`Scope`] answers, and
+/// debug builds cross-check its answer against the element's declaration
+/// chain while that walk stays short.
+#[derive(Clone, Copy)]
+struct Resolver<'s, 'c> {
+    scope: &'s Scope,
+    chain: &'c Namespaces,
+}
+
+impl<'s> Resolver<'s, '_> {
+    fn get(self, prefix: &str) -> Option<&'s str> {
+        let bound = self.scope.get(prefix);
+        debug_assert!(
+            self.chain
+                .walk(prefix, CROSS_CHECKED_DECLARATIONS)
+                .is_none_or(|walked| walked == bound),
+            "the prefix index disagrees with the declaration chain for {prefix:?}"
+        );
+        bound
     }
 }
 
@@ -407,42 +425,96 @@ fn hoists(head: Option<&Arc<NamespaceLayer>>, stop: Option<&Arc<NamespaceLayer>>
     }
 }
 
-/// Whether a layer nearer to `head` than `target` re-binds `prefix`, in which
-/// case `target`'s binding is not the effective one and must not be emitted.
-fn shadowed_before(
-    head: Option<&Arc<NamespaceLayer>>,
-    target: &Arc<NamespaceLayer>,
-    prefix: &str,
-) -> bool {
-    let mut layer = head;
-    while let Some(current) = layer {
-        if Arc::ptr_eq(current, target) {
-            return false;
-        }
-        if current
-            .local
-            .iter()
-            .any(|(candidate, _)| candidate == prefix)
-        {
-            return true;
-        }
-        layer = current.parent.as_ref();
+/// Declarations to re-declare on an emitted element, innermost first.
+type Hoisted = Rc<[(String, String)]>;
+
+/// The declarations a child of the top frame of `st` must re-declare when it
+/// is the first element emitted below the top frame's nearest emitted
+/// ancestor: the effective bindings declared between that ancestor and the
+/// top frame, innermost first and each prefix once, in the order the source
+/// declared them within one element.
+///
+/// Everything between them was declared on an `AlternateContent` wrapper, a
+/// `Choice`/`Fallback` branch or a `ProcessContent` element that the output
+/// drops, so it has to be re-declared on the first emitted descendant for
+/// every qualified name in the output to resolve to the namespace it resolved
+/// to in the source.
+///
+/// A frame's list extends its parent's: its own declarations first, then the
+/// parent's entries its declarations do not shadow. Each list is built at most
+/// once, the first time a child needs it, and a frame that declares nothing
+/// shares its parent's, so emitting a child costs work proportional to the
+/// declarations it re-declares rather than to every declaration in the
+/// dropped scopes.
+fn hoisted_for_children(st: &mut [Frame]) -> R<Hoisted> {
+    let Some(top) = st.len().checked_sub(1) else {
+        return Ok(Rc::from(Vec::new()));
+    };
+    // The lowest frame whose list has to be built: the ones below it are
+    // cached or contribute nothing.
+    let mut first = top;
+    while first > 0 && st[first].hoisted.is_none() && frame_hoists(&st[first - 1]) {
+        first -= 1;
     }
-    false
+    for index in first..=top {
+        if st[index].hoisted.is_some() {
+            continue;
+        }
+        let inherited = if index > 0 && frame_hoists(&st[index - 1]) {
+            st[index - 1]
+                .hoisted
+                .clone()
+                .ok_or_else(|| bad("MCE hoisting state is incomplete"))?
+        } else {
+            Rc::from(Vec::new())
+        };
+        let list = if !frame_hoists(&st[index]) {
+            Rc::from(Vec::new())
+        } else if st[index].declares {
+            let own = st[index]
+                .ctx
+                .ns
+                .head
+                .as_ref()
+                .map_or(&[][..], |layer| layer.local.as_slice());
+            let mut list = Vec::new();
+            reserve_exact(
+                &mut list,
+                own.len().saturating_add(inherited.len()),
+                "MCE hoisted namespace declarations",
+            )?;
+            list.extend(own.iter().filter(|(prefix, _)| prefix != "xml").cloned());
+            let own_prefixes = sorted_prefixes(own)?;
+            list.extend(
+                inherited
+                    .iter()
+                    .filter(|(prefix, _)| own_prefixes.binary_search(&prefix.as_str()).is_err())
+                    .cloned(),
+            );
+            Rc::from(list)
+        } else {
+            inherited
+        };
+        st[index].hoisted = Some(list);
+    }
+    st[top]
+        .hoisted
+        .clone()
+        .ok_or_else(|| bad("MCE hoisting state is incomplete"))
 }
 
-/// The namespace scope an element inherited, and the scope its output already
-/// carries, so that the writer can re-declare exactly the difference.
+/// Whether a child of `frame` inherits declarations its output lacks.
+fn frame_hoists(frame: &Frame) -> bool {
+    hoists(frame.ctx.ns.head.as_ref(), frame.emitted_ns.as_ref())
+}
+
+/// The namespace scope an element's output already carries at its nearest
+/// emitted ancestor; [`hoisted_for_children`] re-declares the difference.
 struct Inherited<'a> {
-    ns: Option<&'a Arc<NamespaceLayer>>,
     emitted: Option<&'a Arc<NamespaceLayer>>,
 }
 
 impl Inherited<'_> {
-    fn hoists(&self) -> bool {
-        hoists(self.ns, self.emitted)
-    }
-
     /// The scope children inherit as already emitted: this element's own scope
     /// when it reached the output, otherwise the scope it inherited.
     fn after(&self, ctx: &Ctx, emitted: bool) -> Option<Arc<NamespaceLayer>> {
@@ -611,6 +683,12 @@ struct Frame {
     /// emitted ancestor; declarations between it and `ctx.ns` are hoisted onto
     /// the first emitted descendant.
     emitted_ns: Option<Arc<NamespaceLayer>>,
+    /// Whether the element declared namespaces: its declarations are then the
+    /// layer at `ctx.ns.head`, and [`Scope`] holds them until it closes.
+    declares: bool,
+    /// The declarations its children re-declare when emitted, built by
+    /// [`hoisted_for_children`] the first time a child needs them.
+    hoisted: Option<Hoisted>,
 }
 
 /// One source attribute: its qualified name borrowed from the event, its
@@ -666,18 +744,21 @@ pub fn process_markup_compatibility<'a>(
     let mut out = BoundedOutput::new(xml.len(), lim.max_output_bytes)?;
     let mut rep = Report::default();
     let mut root = false;
+    let mut scope = Scope::default();
     let mut buf = Vec::new();
     loop {
         let d = r.decoder();
         match r.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => start(
-                &e, d, false, caps, lim, &mut stack, &mut out, &mut rep, &mut root,
+                &e, d, false, caps, lim, &mut stack, &mut out, &mut rep, &mut root, &mut scope,
             )?,
             Ok(Event::Empty(e)) => start(
-                &e, d, true, caps, lim, &mut stack, &mut out, &mut rep, &mut root,
+                &e, d, true, caps, lim, &mut stack, &mut out, &mut rep, &mut root, &mut scope,
             )?,
             Ok(Event::End(_)) => {
                 let f: Frame = stack.pop().ok_or_else(|| bad("unexpected end"))?;
+                // The frame was at depth `stack.len() + 1`.
+                scope.truncate(stack.len() + 1);
                 match f.mode {
                     Mode::Alt { choices: 0, .. } => {
                         return Err(bad("AlternateContent requires Choice"));
@@ -762,13 +843,25 @@ fn start(
     out: &mut BoundedOutput,
     rep: &mut Report,
     root: &mut bool,
+    scope: &mut Scope,
 ) -> R<()> {
     if st.len() >= lim.max_depth {
         return Err(limit("depth"));
     }
+    let depth = st.len() + 1;
     let q = str::from_utf8(e.name().into_inner()).map_err(xerr)?;
     let mut raw = Vec::new();
+    let mut attributes = 0usize;
     for a in e.attributes().with_checks(true) {
+        // Counted before the item is inspected: quick-xml has checked this
+        // attribute's name against the tag's earlier ones, a cost that grows
+        // with their number, so the limit bounds that work for the tag.
+        attributes = attributes
+            .checked_add(1)
+            .ok_or_else(|| limit("attributes per element"))?;
+        if attributes > lim.max_attributes_per_element {
+            return Err(limit("attributes per element"));
+        }
         let a = a.map_err(xerr)?;
         reserve_amortized(&mut raw, 1, "MCE attributes")?;
         raw.push(Attr {
@@ -793,16 +886,24 @@ fn start(
             local_namespaces.push((p.into(), a.value.as_ref().to_owned()));
         }
     }
-    if !local_namespaces.is_empty() {
-        c.ns = c.ns.with_local(local_namespaces, lim)?;
+    let declares = !local_namespaces.is_empty();
+    if declares {
+        c.ns = c.ns.with_local(local_namespaces, lim, scope, depth)?;
+        if let Some(layer) = c.ns.head.as_ref() {
+            scope.push(depth, &layer.local)?;
+        }
     }
-    let (namespace, local) = expand_parts(q, &c.ns, true)?;
+    let (namespace, local) = expand_parts(q, resolver(scope, &c.ns), true)?;
     let parent_active = st.last().is_none_or(|f| f.active);
     if c.opaque {
+        let hoisted = if parent_active {
+            hoisted_if_any(st)?
+        } else {
+            None
+        };
         let frame = {
             let parent = st.last();
             let inherited = Inherited {
-                ns: parent.and_then(|f| f.ctx.ns.head.as_ref()),
                 emitted: parent.and_then(|f| f.emitted_ns.as_ref()),
             };
             if parent_active {
@@ -815,7 +916,9 @@ fn start(
                     false,
                     rep,
                     e.as_ref(),
-                    &inherited,
+                    hoisted.as_deref(),
+                    scope,
+                    depth,
                 )?;
             }
             Frame {
@@ -823,9 +926,11 @@ fn start(
                 ctx: c,
                 mode: Mode::Emit(q.to_owned()),
                 active: parent_active,
+                declares,
+                hoisted: None,
             }
         };
-        return close(st, frame, empty, out);
+        return close(st, frame, empty, out, scope);
     }
 
     let mut directives = Vec::new();
@@ -834,7 +939,7 @@ fn start(
         if a.key == "xmlns" || a.key.starts_with("xmlns:") {
             continue;
         }
-        let (namespace, local) = expand_parts(a.key, &c.ns, false)?;
+        let (namespace, local) = expand_parts(a.key, resolver(scope, &c.ns), false)?;
         if namespace != NAMESPACE {
             continue;
         }
@@ -865,9 +970,9 @@ fn start(
             if !xml_name::is_ncname(prefix) || !seen.insert(prefix) {
                 return Err(bad("invalid or duplicate Ignorable prefix"));
             }
-            let uri =
-                c.ns.get(prefix)
-                    .ok_or_else(|| bad(format!("unbound Ignorable {prefix}")))?;
+            let uri = resolver(scope, &c.ns)
+                .get(prefix)
+                .ok_or_else(|| bad(format!("unbound Ignorable {prefix}")))?;
             if uri == NAMESPACE {
                 return Err(bad("MCE cannot be ignorable"));
             }
@@ -901,7 +1006,7 @@ fn start(
             "Ignorable" => {},
             "ProcessContent" => {
                 for token in value.split_whitespace() {
-                    let target = parse_qname_target(token, &c.ns, true)?;
+                    let target = parse_qname_target(token, resolver(scope, &c.ns), true)?;
                     let namespace = pattern_namespace(&target);
                     if !local_ign.contains(namespace) && !c.is_ignorable(namespace) {
                         return Err(bad("ProcessContent target is not effectively ignorable"));
@@ -919,7 +1024,7 @@ fn start(
             },
             "PreserveElements" => {
                 for token in value.split_whitespace() {
-                    let target = parse_qname_target(token, &c.ns, true)?;
+                    let target = parse_qname_target(token, resolver(scope, &c.ns), true)?;
                     if !local_ign.contains(pattern_namespace(&target)) {
                         return Err(bad("PreserveElements target is not locally ignorable"));
                     }
@@ -936,7 +1041,7 @@ fn start(
             },
             "PreserveAttributes" => {
                 for token in value.split_whitespace() {
-                    let target = parse_qname_target(token, &c.ns, true)?;
+                    let target = parse_qname_target(token, resolver(scope, &c.ns), true)?;
                     if !local_ign.contains(pattern_namespace(&target)) {
                         return Err(bad("PreserveAttributes target is not locally ignorable"));
                     }
@@ -957,9 +1062,9 @@ fn start(
                     if !xml_name::is_ncname(prefix) || !seen.insert(prefix) {
                         return Err(bad("invalid or duplicate MustUnderstand prefix"));
                     }
-                    let uri =
-                        c.ns.get(prefix)
-                            .ok_or_else(|| bad(format!("unbound MustUnderstand {prefix}")))?;
+                    let uri = resolver(scope, &c.ns)
+                        .get(prefix)
+                        .ok_or_else(|| bad(format!("unbound MustUnderstand {prefix}")))?;
                     if !caps.understands(uri) {
                         return Err(Error::MustUnderstand(uri.to_owned()));
                     }
@@ -992,10 +1097,14 @@ fn start(
     if namespace == NAMESPACE {
         match local {
             "AlternateContent" => {
-                validate_alternate_attributes(&raw, &c, caps, AlternateKind::Container)?;
+                validate_alternate_attributes(&raw, &c, scope, caps, AlternateKind::Container)?;
             },
-            "Choice" => validate_alternate_attributes(&raw, &c, caps, AlternateKind::Choice)?,
-            "Fallback" => validate_alternate_attributes(&raw, &c, caps, AlternateKind::Fallback)?,
+            "Choice" => {
+                validate_alternate_attributes(&raw, &c, scope, caps, AlternateKind::Choice)?;
+            },
+            "Fallback" => {
+                validate_alternate_attributes(&raw, &c, scope, caps, AlternateKind::Fallback)?;
+            },
             _ => {},
         }
     }
@@ -1034,7 +1143,8 @@ fn start(
                         }
                         count += 1;
                         ok &= caps.understands(
-                            c.ns.get(p)
+                            resolver(scope, &c.ns)
+                                .get(p)
                                 .ok_or_else(|| bad(format!("unbound Requires {p}")))?,
                         );
                     }
@@ -1070,7 +1180,6 @@ fn start(
         let frame = {
             let parent = st.last();
             let inherited = Inherited {
-                ns: parent.and_then(|f| f.ctx.ns.head.as_ref()),
                 emitted: parent.and_then(|f| f.emitted_ns.as_ref()),
             };
             Frame {
@@ -1078,9 +1187,11 @@ fn start(
                 ctx: c,
                 mode,
                 active,
+                declares,
+                hoisted: None,
             }
         };
-        return close(st, frame, empty, out);
+        return close(st, frame, empty, out, scope);
     }
     let mut active = parent_active;
     let mode = if namespace == NAMESPACE {
@@ -1105,7 +1216,7 @@ fn start(
             Mode::Emit(q.to_owned())
         } else if c.processes(element_name) {
             for a in &raw {
-                let (namespace, local) = expand_parts(a.key, &c.ns, false)?;
+                let (namespace, local) = expand_parts(a.key, resolver(scope, &c.ns), false)?;
                 if namespace == XML_NS && matches!(local, "base" | "lang" | "space") {
                     return Err(bad("xml context attribute on unwrapped element"));
                 }
@@ -1121,10 +1232,10 @@ fn start(
         Mode::Emit(q.to_owned())
     };
     let emitted = matches!(mode, Mode::Emit(_)) && active;
+    let hoisted = if emitted { hoisted_if_any(st)? } else { None };
     let frame = {
         let parent = st.last();
         let inherited = Inherited {
-            ns: parent.and_then(|f| f.ctx.ns.head.as_ref()),
             emitted: parent.and_then(|f| f.emitted_ns.as_ref()),
         };
         if emitted {
@@ -1137,7 +1248,9 @@ fn start(
                 true,
                 rep,
                 e.as_ref(),
-                &inherited,
+                hoisted.as_deref(),
+                scope,
+                depth,
             )?;
         }
         if st.is_empty() {
@@ -1151,13 +1264,42 @@ fn start(
             ctx: c,
             mode,
             active,
+            declares,
+            hoisted: None,
         }
     };
-    close(st, frame, empty, out)
+    close(st, frame, empty, out, scope)
 }
 
-fn close(st: &mut Vec<Frame>, f: Frame, empty: bool, out: &mut BoundedOutput) -> R<()> {
+/// The declarations the element being started re-declares, when its parent
+/// frame has dropped declarations to hoist.
+fn hoisted_if_any(st: &mut [Frame]) -> R<Option<Hoisted>> {
+    if st.last().is_some_and(frame_hoists) {
+        hoisted_for_children(st).map(Some)
+    } else {
+        Ok(None)
+    }
+}
+
+/// Resolve prefixes against `scope`, cross-checked against the element's
+/// declaration chain `chain` in debug builds.
+const fn resolver<'s, 'c>(scope: &'s Scope, chain: &'c Namespaces) -> Resolver<'s, 'c> {
+    Resolver { scope, chain }
+}
+
+/// Finish an element's start: an empty element closes at once, and its
+/// declarations leave `scope`; any other element's frame is pushed and keeps
+/// them until its end tag.
+fn close(
+    st: &mut Vec<Frame>,
+    f: Frame,
+    empty: bool,
+    out: &mut BoundedOutput,
+    scope: &mut Scope,
+) -> R<()> {
     if empty {
+        // The element would have been at depth `st.len() + 1`.
+        scope.truncate(st.len() + 1);
         match f.mode {
             Mode::Emit(q) if f.active => {
                 out.extend_from_slice(b"</")?;
@@ -1208,6 +1350,7 @@ enum AlternateKind {
 fn validate_alternate_attributes(
     raw: &[Attr<'_>],
     ctx: &Ctx,
+    scope: &Scope,
     caps: &Capabilities,
     kind: AlternateKind,
 ) -> R<()> {
@@ -1215,7 +1358,7 @@ fn validate_alternate_attributes(
         if attribute.key == "xmlns" || attribute.key.starts_with("xmlns:") {
             continue;
         }
-        let name = expand(attribute.key, &ctx.ns, false)?;
+        let name = expand(attribute.key, resolver(scope, &ctx.ns), false)?;
         if name.namespace.is_empty() {
             if matches!(kind, AlternateKind::Choice) && name.local_name == "Requires" {
                 continue;
@@ -1238,7 +1381,7 @@ fn validate_alternate_attributes(
     }
     Ok(())
 }
-fn expand(q: &str, ns: &Namespaces, element: bool) -> R<Name> {
+fn expand(q: &str, ns: Resolver<'_, '_>, element: bool) -> R<Name> {
     let (namespace, local) = expand_parts(q, ns, element)?;
     Ok(Name {
         namespace: namespace.to_owned(),
@@ -1253,7 +1396,7 @@ fn expand(q: &str, ns: &Namespaces, element: bool) -> R<Name> {
 /// `xml_name::QualifiedName`, whose `parse` reports `InvalidQualifiedName` for
 /// every lexical failure and reconstructs the same `prefix:local` split; this
 /// borrows that split from the caller's bytes instead of allocating it.
-fn expand_parts<'q, 'n>(q: &'q str, ns: &'n Namespaces, element: bool) -> R<(&'n str, &'q str)> {
+fn expand_parts<'q, 'n>(q: &'q str, ns: Resolver<'n, '_>, element: bool) -> R<(&'n str, &'q str)> {
     if !xml_name::is_qualified_name(q) {
         let error = xml_name::NameError::InvalidQualifiedName(q.to_owned());
         return Err(bad(format!("invalid QName: {error}")));
@@ -1283,7 +1426,7 @@ fn matches_pattern(patterns: &HashSet<NamePattern>, name: &Name) -> bool {
         NamePattern::Namespace(namespace) => namespace == &name.namespace,
     })
 }
-fn parse_qname_target(token: &str, ns: &Namespaces, wildcard: bool) -> R<NamePattern> {
+fn parse_qname_target(token: &str, ns: Resolver<'_, '_>, wildcard: bool) -> R<NamePattern> {
     let (prefix, local) = token
         .split_once(':')
         .ok_or_else(|| bad("preservation and processing targets must be prefixed QNames"))?;
@@ -1323,7 +1466,9 @@ fn write_start(
     filter: bool,
     rep: &mut Report,
     tag: &[u8],
-    inherited: &Inherited<'_>,
+    hoisted: Option<&[(String, String)]>,
+    scope: &Scope,
+    depth: usize,
 ) -> R<()> {
     // Decide the compatibility filter first, so the counters are identical
     // whether the tag is copied or rebuilt, and so the copy is taken only when
@@ -1344,7 +1489,7 @@ fn write_start(
             }
             continue;
         }
-        let (namespace, local) = expand_parts(a.key, &ctx.ns, false)?;
+        let (namespace, local) = expand_parts(a.key, resolver(scope, &ctx.ns), false)?;
         if filter && namespace == NAMESPACE {
             rep.ignored_attributes += 1;
             a.keep = false;
@@ -1371,9 +1516,8 @@ fn write_start(
         }
     }
 
-    let hoisted = inherited.hoists();
     if !rewrite
-        && !hoisted
+        && hoisted.is_none()
         && raw.iter().all(|a| matches!(a.value, Cow::Borrowed(_)))
         && !tag.iter().any(|byte| matches!(*byte, b'&' | b'<'))
     {
@@ -1387,14 +1531,18 @@ fn write_start(
 
     o.push(b'<')?;
     o.extend_from_slice(q.as_bytes())?;
-    if hoisted {
+    if let Some(hoisted) = hoisted {
         // Only the declarations of dropped ancestors are re-emitted here; an
         // element's own declarations are written by the attribute loop below,
         // in source order, exactly once.
-        let declared: &[Attr<'_>] = raw;
-        Namespaces::for_each_hoisted(inherited.ns, inherited.emitted, |p, u| {
-            if declares(declared, p) {
-                return Ok(());
+        for (p, u) in hoisted {
+            let own = scope.declared_at(p, depth);
+            debug_assert!(
+                raw.len() > CROSS_CHECKED_DECLARATIONS || own == declares(raw, p),
+                "the prefix index disagrees with the element's own declarations for {p:?}"
+            );
+            if own {
+                continue;
             }
             o.extend_from_slice(if p.is_empty() { b" xmlns" } else { b" xmlns:" })?;
             if !p.is_empty() {
@@ -1402,8 +1550,8 @@ fn write_start(
             }
             o.extend_from_slice(b"=\"")?;
             esc(o, u)?;
-            o.push(b'\"')
-        })?;
+            o.push(b'\"')?;
+        }
     }
     for a in raw.iter() {
         if !a.keep {
@@ -1421,6 +1569,9 @@ fn write_start(
 
 /// Whether the element already declares `prefix` itself, in which case the
 /// hoisted binding it shadows must not be emitted a second time.
+///
+/// Linear in the element's attributes: production code asks [`Scope`], and
+/// debug builds cross-check it with this.
 fn declares(raw: &[Attr<'_>], prefix: &str) -> bool {
     raw.iter().any(|a| {
         if prefix.is_empty() {

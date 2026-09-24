@@ -335,6 +335,8 @@ fn query_table_connection_id_with_limits(
             max_namespace_bindings: max_attributes.min(4096),
             max_directive_tokens: max_events.min(4096),
             max_choices_per_alternate: max_events.min(1024),
+            max_attributes_per_element:
+                litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
         },
     )
     .map_err(|error| {

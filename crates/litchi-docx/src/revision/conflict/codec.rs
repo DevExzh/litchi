@@ -758,6 +758,7 @@ fn active_starts(source: &[u8], limits: Limits) -> Result<HashSet<usize>> {
             .clamp(1, 4096),
         max_directive_tokens: limits.max_attributes.min(4096),
         max_choices_per_alternate: limits.max_attributes.min(1024),
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     };
     let selected = litchi_ooxml_common::mce::active_offsets(
         source,

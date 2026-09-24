@@ -1006,6 +1006,8 @@ fn active_offsets(source: &[u8], limits: &Limits) -> Result<HashSet<usize>> {
                 max_namespace_bindings: limits.max_bindings,
                 max_directive_tokens: limits.max_bindings,
                 max_choices_per_alternate: limits.max_content_controls,
+                max_attributes_per_element:
+                    litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
             },
         },
     )?;

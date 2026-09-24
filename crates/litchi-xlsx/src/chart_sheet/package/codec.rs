@@ -325,6 +325,7 @@ pub(super) fn parse_document_with_capabilities(
         max_namespace_bindings: MAX_NAMESPACE_BINDINGS,
         max_directive_tokens: 4096,
         max_choices_per_alternate: 1024,
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     };
     let processed = process_markup_compatibility(xml, capabilities, &limits)?.xml;
     let mut reader = NsReader::from_reader(processed.as_ref());
