@@ -1,0 +1,18 @@
+[
+  {
+    "name": "harness",
+    "command": [
+      "cargo",
+      "test",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--locked"
+    ],
+    "head": "f592ecc1b078698de3eb2a35bcf94b59746a9c36",
+    "tree": "c3c076acd0a3dde1b5b9575fe120156a5de2d83a",
+    "unstaged": 0,
+    "untracked": 0,
+    "exit_code": 101,
+    "seconds": 669.9
+  }
+]

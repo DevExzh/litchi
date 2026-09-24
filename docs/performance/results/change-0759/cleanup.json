@@ -1,0 +1,31 @@
+{
+  "change": "0759",
+  "date": "2026-09-24",
+  "performed_after": "merge commit f592ecc1b0, gates recorded in gates/",
+  "removed": [
+    {"path": "/home/zhuhe/code/litchi-worktrees/tip-head", "kind": "detached git worktree at e6cca92db2 (git worktree remove)", "size": "9.9 GiB"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/tip-inc", "kind": "detached git worktree at a67a38abf2 (git worktree remove)", "size": "3.7 GiB"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/merge", "kind": "build directory of the integration worktree", "size": "258 GiB"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/merge-harness", "kind": "build directory of the harness gate", "size": "20 GiB"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/tip-head", "kind": "build directory of tip-head", "size": "139 GiB"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/tip-inc", "kind": "build directory of tip-inc", "size": "197 GiB"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets", "kind": "now-empty parent directory", "size": "0"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/merge-scratch", "kind": "scratch: helper scripts, notes, raw gate and inventory output; everything the record cites is copied into this packet", "size": "18 MiB"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/merge-trial.log", "kind": "trial merge output (its conflict list is conflicts.txt here)", "size": "20 KiB"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/conflicts.txt", "kind": "raw conflict list (annotated copy is conflicts.txt here)", "size": "4 KiB"}
+  ],
+  "removed_by_subagents": [
+    "targets/merge-xlsx, targets/xlsx-tip-head, targets/xlsx-tip-inc and merge-scratch/xlsx-agent (XLSX subagent, about 56 GB)",
+    "targets/merge-xlsb-pptx, targets/xp-tip-head, targets/xp-tip-inc and merge-scratch/xp-agent (XLSB/PPTX subagent, about 56 GB)"
+  ],
+  "kept": [
+    "/home/zhuhe/code/litchi-worktrees/merge-spec-gaps (integration worktree on integration/spec-gap-merge), with its gitignored root Cargo.lock and a gitignored 3rdparty symlink to /home/zhuhe/code/litchi/3rdparty that the DOCX fixture tests read",
+    "branch integration/spec-gap-merge (not pushed); feat/office-format-completeness unchanged at e6cca92db2"
+  ],
+  "untouched": [
+    "/home/zhuhe/code/litchi-spec-gaps and its uncommitted changes",
+    "/home/zhuhe/code/litchi-worktrees/coord (not created by this merge)",
+    "other agents' worktrees and the main checkout",
+    "the main repository's rerere cache entries that git recorded when the merge was committed"
+  ]
+}

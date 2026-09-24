@@ -1,0 +1,25 @@
+[
+  {
+    "name": "coverage",
+    "command": [
+      "python3",
+      "tools/validate_crud_coverage_index.py",
+      "--index",
+      "docs/performance/crud-coverage-index-v1.json",
+      "--catalog",
+      "docs/performance/results/perf-corpus-manifest-v2.json",
+      "--selector-source",
+      "tools/perf-baseline/src/lib.rs",
+      "--checklist",
+      "docs/CRUD_Scenario_Checklist.md",
+      "--repo-root",
+      "."
+    ],
+    "head": "f592ecc1b078698de3eb2a35bcf94b59746a9c36",
+    "tree": "c3c076acd0a3dde1b5b9575fe120156a5de2d83a",
+    "unstaged": 0,
+    "untracked": 0,
+    "exit_code": 0,
+    "seconds": 0.92
+  }
+]

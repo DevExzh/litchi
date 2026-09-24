@@ -1,0 +1,1733 @@
+HEAD f592ecc1b078698de3eb2a35bcf94b59746a9c36
+TREE c3c076acd0a3dde1b5b9575fe120156a5de2d83a
+UNSTAGED 0 UNTRACKED 1
+$ cargo check --workspace --all-targets --locked --keep-going
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-opc)
+    Checking litchi-iwa v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-iwa)
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/remove_keynote_text_box.rs:26:61
+   |
+26 |     let removed = editor.remove_slide_text_box(slide_index, target.drawable_object_id)?;
+   |                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/remove_keynote_text_box.rs:30:9
+   |
+30 |         removed.text.drawable_object_id, removed.text.storage.id
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `litchi-iwa` (example "remove_keynote_text_box") generated 2 warnings
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/duplicate_keynote_text_box.rs:27:64
+   |
+27 |     let created = editor.duplicate_slide_text_box(slide_index, source.drawable_object_id, &text)?;
+   |                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/duplicate_keynote_text_box.rs:31:9
+   |
+31 |         created.drawable_object_id, created.storage.id, source.drawable_object_id
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/duplicate_keynote_text_box.rs:31:57
+   |
+31 |         created.drawable_object_id, created.storage.id, source.drawable_object_id
+   |                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideInfo::node_id`: legacy native Keynote slide-node object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/inspect_keynote_text_boxes.rs:15:26
+   |
+15 |             slide.index, slide.node_id, slide.slide_id, slide.name
+   |                          ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/inspect_keynote_text_boxes.rs:15:41
+   |
+15 |             slide.index, slide.node_id, slide.slide_id, slide.name
+   |                                         ^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/inspect_keynote_text_boxes.rs:29:66
+   |
+29 |                 Some(editor.slide_text_box_geometry(slide.index, text.drawable_object_id)?)
+   |                                                                  ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/inspect_keynote_text_boxes.rs:34:68
+   |
+34 |                 Some(editor.slide_text_box_properties(slide.index, text.drawable_object_id)?)
+   |                                                                    ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/inspect_keynote_text_boxes.rs:39:65
+   |
+39 |                 Some(editor.slide_text_box_columns(slide.index, text.drawable_object_id)?)
+   |                                                                 ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/inspect_keynote_text_boxes.rs:44:69
+   |
+44 |                 Some(editor.slide_text_box_text_layout(slide.index, text.drawable_object_id)?)
+   |                                                                     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/inspect_keynote_text_boxes.rs:51:17
+   |
+51 |                 text.drawable_object_id,
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `litchi-iwa` (example "duplicate_keynote_text_box") generated 3 warnings
+warning: `litchi-iwa` (example "inspect_keynote_text_boxes") generated 7 warnings
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/create_iwork_date_time_field.rs:54:17
+   |
+54 |                 text_box.drawable_object_id,
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: `litchi-iwa` (example "create_iwork_date_time_field") generated 1 warning
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/edit_keynote_text_box.rs:26:48
+   |
+26 |     editor.set_slide_text_storage(slide_index, text.drawable_object_id, &replacement)?;
+   |                                                ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/edit_keynote_text_box.rs:30:9
+   |
+30 |         text.drawable_object_id, text.storage.id, text.role
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `litchi-iwa` (example "edit_keynote_text_box") generated 2 warnings
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/create_keynote_text_box.rs:54:9
+   |
+54 |         created.drawable_object_id,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/create_keynote_text_box.rs:59:9
+   |
+59 |         created.drawable_object_id,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/create_keynote_text_box.rs:68:9
+   |
+68 |         created.drawable_object_id,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/create_keynote_text_box.rs:75:9
+   |
+75 |         created.drawable_object_id,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/create_keynote_text_box.rs:80:9
+   |
+80 |         created.drawable_object_id,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/create_keynote_text_box.rs:85:9
+   |
+85 |         created.drawable_object_id,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/create_keynote_text_box.rs:90:9
+   |
+90 |         created.drawable_object_id,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/create_keynote_text_box.rs:95:9
+   |
+95 |         created.drawable_object_id,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:100:9
+    |
+100 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:105:9
+    |
+105 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:110:9
+    |
+110 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:113:47
+    |
+113 |     editor.set_slide_text_box_text_outline(0, created.drawable_object_id, Outline::standard())?;
+    |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:114:46
+    |
+114 |     editor.set_slide_text_box_text_shadow(0, created.drawable_object_id, Shadow::standard())?;
+    |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:117:9
+    |
+117 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:122:9
+    |
+122 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:133:9
+    |
+133 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:145:9
+    |
+145 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:155:9
+    |
+155 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:160:9
+    |
+160 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:165:9
+    |
+165 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:170:9
+    |
+170 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:178:9
+    |
+178 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:187:9
+    |
+187 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:193:9
+    |
+193 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:203:13
+    |
+203 |             created.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:212:13
+    |
+212 |             created.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:222:13
+    |
+222 |             created.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:228:13
+    |
+228 |             created.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:238:13
+    |
+238 |             created.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:248:9
+    |
+248 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:258:9
+    |
+258 |         created.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:278:9
+    |
+278 |         tab_defaults_box.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:283:9
+    |
+283 |         tab_defaults_box.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:296:51
+    |
+296 |         .slide_text_box_named_paragraph_styles(0, named_style_box.drawable_object_id)?
+    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:302:9
+    |
+302 |         named_style_box.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:308:9
+    |
+308 |         named_style_box.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:314:9
+    |
+314 |         named_style_box.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:319:9
+    |
+319 |         named_style_box.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:324:9
+    |
+324 |         named_style_box.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:328:9
+    |
+328 |         named_style_box.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:334:9
+    |
+334 |         named_style_box.drawable_object_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/examples/create_keynote_text_box.rs:340:9
+    |
+340 |         created.drawable_object_id, created.storage.id
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `litchi-iwa` (example "create_keynote_text_box") generated 42 warnings
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/inspect_reachable_media.rs:22:62
+   |
+22 |                     &format!("slide[{}] id={}", slide.index, slide.slide_id),
+   |                                                              ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: `litchi-iwa` (example "inspect_reachable_media") generated 1 warning
+warning: value assigned to `editor` is never read
+  --> crates/litchi-iwa/examples/create_pages_table.rs:58:5
+   |
+58 |     editor = PagesEditor::from_bytes(&header_bytes)?;
+   |     ^^^^^^
+   |
+   = help: maybe it is overwritten before being read?
+   = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: `litchi-iwa` (example "create_pages_table") generated 1 warning
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideInfo::node_id`: legacy native Keynote slide-node object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/duplicate_keynote_slide.rs:20:35
+   |
+20 |         slide_index, slide.index, slide.node_id, slide.slide_id
+   |                                   ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/duplicate_keynote_slide.rs:20:50
+   |
+20 |         slide_index, slide.index, slide.node_id, slide.slide_id
+   |                                                  ^^^^^^^^^^^^^^
+
+warning: `litchi-iwa` (example "duplicate_keynote_slide") generated 2 warnings
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideInfo::node_id`: legacy native Keynote slide-node object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/add_keynote_slide.rs:29:22
+   |
+29 |         slide.index, slide.node_id, slide.slide_id
+   |                      ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated field `litchi_iwa::keynote::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+  --> crates/litchi-iwa/examples/add_keynote_slide.rs:29:37
+   |
+29 |         slide.index, slide.node_id, slide.slide_id
+   |                                     ^^^^^^^^^^^^^^
+
+warning: `litchi-iwa` (example "add_keynote_slide") generated 2 warnings
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/drop_cap/tests.rs:131:13
+    |
+131 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/drop_cap/tests.rs:140:17
+    |
+140 |                 keynote_box.drawable_object_id,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/drop_cap/tests.rs:147:52
+    |
+147 |             .slide_text_box_paragraph_drop_caps(0, keynote_box.drawable_object_id)
+    |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:531:50
+    |
+531 |     assert_keynote_style_lifecycle(&mut keynote, keynote_box.drawable_object_id);
+    |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:832:58
+    |
+832 |         .slide_text_box_applied_named_paragraph_style(0, first.drawable_object_id)
+    |                                                          ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:839:13
+    |
+839 |             first.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:844:23
+    |
+844 |     for object_id in [first.drawable_object_id, second.drawable_object_id] {
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:844:49
+    |
+844 |     for object_id in [first.drawable_object_id, second.drawable_object_id] {
+    |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:850:52
+    |
+850 |         .set_slide_text_box_paragraph_alignment(0, first.drawable_object_id, Alignment::Justified)
+    |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:853:67
+    |
+853 |         .redefine_applied_slide_text_box_named_paragraph_style(0, first.drawable_object_id)
+    |                                                                   ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:856:23
+    |
+856 |     for object_id in [first.drawable_object_id, second.drawable_object_id] {
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:856:49
+    |
+856 |     for object_id in [first.drawable_object_id, second.drawable_object_id] {
+    |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:1663:13
+     |
+1663 |             keynote_box.drawable_object_id,
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:1668:44
+     |
+1668 |         .set_slide_text_box_text_script(0, keynote_box.drawable_object_id, TextScript::Superscript)
+     |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:1674:44
+     |
+1674 |             .slide_text_box_text_script(0, keynote_box.drawable_object_id)
+     |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:1680:50
+     |
+1680 |             .reset_slide_text_box_text_script(0, keynote_box.drawable_object_id)
+     |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:1685:52
+     |
+1685 |             .slide_text_box_text_capitalization(0, keynote_box.drawable_object_id)
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:1816:44
+     |
+1816 |         .set_slide_text_box_text_script(0, keynote_box.drawable_object_id, TextScript::Superscript)
+     |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:1819:52
+     |
+1819 |         .set_slide_text_box_text_baseline_shift(0, keynote_box.drawable_object_id, keynote_shift)
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:1825:52
+     |
+1825 |             .slide_text_box_text_baseline_shift(0, keynote_box.drawable_object_id)
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:1831:58
+     |
+1831 |             .reset_slide_text_box_text_baseline_shift(0, keynote_box.drawable_object_id)
+     |                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:1836:44
+     |
+1836 |             .slide_text_box_text_script(0, keynote_box.drawable_object_id)
+     |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:1970:13
+     |
+1970 |             keynote_box.drawable_object_id,
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:1977:13
+     |
+1977 |             keynote_box.drawable_object_id,
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:1985:55
+     |
+1985 |             .slide_text_box_text_character_spacing(0, keynote_box.drawable_object_id)
+     |                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:1991:61
+     |
+1991 |             .reset_slide_text_box_text_character_spacing(0, keynote_box.drawable_object_id)
+     |                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:1996:52
+     |
+1996 |             .slide_text_box_text_capitalization(0, keynote_box.drawable_object_id)
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2128:13
+     |
+2128 |             keynote_box.drawable_object_id,
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2135:13
+     |
+2135 |             keynote_box.drawable_object_id,
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2143:47
+     |
+2143 |             .slide_text_box_text_ligatures(0, keynote_box.drawable_object_id)
+     |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2149:53
+     |
+2149 |             .reset_slide_text_box_text_ligatures(0, keynote_box.drawable_object_id)
+     |                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2154:52
+     |
+2154 |             .slide_text_box_text_capitalization(0, keynote_box.drawable_object_id)
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2280:13
+     |
+2280 |             keynote_box.drawable_object_id,
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2285:45
+     |
+2285 |         .set_slide_text_box_text_outline(0, keynote_box.drawable_object_id, Outline::standard())
+     |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2291:45
+     |
+2291 |             .slide_text_box_text_outline(0, keynote_box.drawable_object_id)
+     |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2297:51
+     |
+2297 |             .reset_slide_text_box_text_outline(0, keynote_box.drawable_object_id)
+     |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2302:52
+     |
+2302 |             .slide_text_box_text_capitalization(0, keynote_box.drawable_object_id)
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2428:13
+     |
+2428 |             keynote_box.drawable_object_id,
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2433:44
+     |
+2433 |         .set_slide_text_box_text_shadow(0, keynote_box.drawable_object_id, Shadow::standard())
+     |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2439:44
+     |
+2439 |             .slide_text_box_text_shadow(0, keynote_box.drawable_object_id)
+     |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2445:50
+     |
+2445 |             .reset_slide_text_box_text_shadow(0, keynote_box.drawable_object_id)
+     |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2450:52
+     |
+2450 |             .slide_text_box_text_capitalization(0, keynote_box.drawable_object_id)
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2584:13
+     |
+2584 |             keynote_box.drawable_object_id,
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2589:48
+     |
+2589 |         .set_slide_text_box_text_background(0, keynote_box.drawable_object_id, keynote_background)
+     |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2595:48
+     |
+2595 |             .slide_text_box_text_background(0, keynote_box.drawable_object_id)
+     |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2601:54
+     |
+2601 |             .reset_slide_text_box_text_background(0, keynote_box.drawable_object_id)
+     |                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2606:52
+     |
+2606 |             .slide_text_box_text_capitalization(0, keynote_box.drawable_object_id)
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2706:53
+     |
+2706 |         .set_slide_text_box_paragraph_background(0, keynote_box.drawable_object_id, background)
+     |                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2711:53
+     |
+2711 |             .slide_text_box_paragraph_background(0, keynote_box.drawable_object_id)
+     |                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2824:50
+     |
+2824 |         .set_slide_text_box_paragraph_borders(0, keynote_box.drawable_object_id, borders)
+     |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2830:50
+     |
+2830 |             .slide_text_box_paragraph_borders(0, keynote_box.drawable_object_id)
+     |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2836:56
+     |
+2836 |             .reset_slide_text_box_paragraph_borders(0, keynote_box.drawable_object_id)
+     |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2944:47
+     |
+2944 |         .set_slide_text_box_paragraph_flow(0, keynote_box.drawable_object_id, flow)
+     |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2950:47
+     |
+2950 |             .slide_text_box_paragraph_flow(0, keynote_box.drawable_object_id)
+     |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:2956:53
+     |
+2956 |             .reset_slide_text_box_paragraph_flow(0, keynote_box.drawable_object_id)
+     |                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3052:13
+     |
+3052 |             keynote_box.drawable_object_id,
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3060:60
+     |
+3060 |             .slide_text_box_paragraph_writing_direction(0, keynote_box.drawable_object_id)
+     |                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3066:66
+     |
+3066 |             .reset_slide_text_box_paragraph_writing_direction(0, keynote_box.drawable_object_id,)
+     |                                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3218:13
+     |
+3218 |             keynote_box.drawable_object_id,
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3225:13
+     |
+3225 |             keynote_box.drawable_object_id,
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3233:64
+     |
+3233 |             .slide_text_box_paragraph_decimal_tab_character(0, keynote_box.drawable_object_id)
+     |                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3239:63
+     |
+3239 |             .slide_text_box_paragraph_default_tab_interval(0, keynote_box.drawable_object_id)
+     |                                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3247:17
+     |
+3247 |                 keynote_box.drawable_object_id,
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3253:63
+     |
+3253 |             .slide_text_box_paragraph_default_tab_interval(0, keynote_box.drawable_object_id)
+     |                                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3259:69
+     |
+3259 |             .reset_slide_text_box_paragraph_default_tab_interval(0, keynote_box.drawable_object_id,)
+     |                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3391:38
+     |
+3391 |         .slide_text_box_text_font(0, keynote_box.drawable_object_id)
+     |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3394:42
+     |
+3394 |         .set_slide_text_box_text_font(0, keynote_box.drawable_object_id, keynote_font.clone())
+     |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3400:42
+     |
+3400 |             .slide_text_box_text_font(0, keynote_box.drawable_object_id)
+     |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3406:48
+     |
+3406 |             .reset_slide_text_box_text_font(0, keynote_box.drawable_object_id)
+     |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3411:42
+     |
+3411 |             .slide_text_box_text_font(0, keynote_box.drawable_object_id)
+     |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3529:13
+     |
+3529 |             keynote_box.drawable_object_id,
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3537:52
+     |
+3537 |             .slide_text_box_text_capitalization(0, keynote_box.drawable_object_id)
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3543:58
+     |
+3543 |             .reset_slide_text_box_text_capitalization(0, keynote_box.drawable_object_id)
+     |                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3657:43
+     |
+3657 |         .set_slide_text_box_text_color(0, keynote_box.drawable_object_id, keynote_color)
+     |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3663:43
+     |
+3663 |             .slide_text_box_text_color(0, keynote_box.drawable_object_id)
+     |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3669:49
+     |
+3669 |             .reset_slide_text_box_text_color(0, keynote_box.drawable_object_id)
+     |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3801:49
+     |
+3801 |         .set_slide_text_box_text_decorations(0, keynote_box.drawable_object_id, keynote_decorations)
+     |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3807:49
+     |
+3807 |             .slide_text_box_text_decorations(0, keynote_box.drawable_object_id)
+     |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3813:55
+     |
+3813 |             .reset_slide_text_box_text_decorations(0, keynote_box.drawable_object_id)
+     |                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3818:49
+     |
+3818 |             .slide_text_box_text_decorations(0, keynote_box.drawable_object_id)
+     |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3959:39
+     |
+3959 |         .slide_text_box_text_style(0, keynote_box.drawable_object_id)
+     |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3964:13
+     |
+3964 |             keynote_box.drawable_object_id,
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3969:43
+     |
+3969 |         .set_slide_text_box_text_style(0, keynote_box.drawable_object_id, keynote_style)
+     |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3975:43
+     |
+3975 |             .slide_text_box_text_style(0, keynote_box.drawable_object_id)
+     |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3981:49
+     |
+3981 |             .reset_slide_text_box_text_style(0, keynote_box.drawable_object_id)
+     |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3986:43
+     |
+3986 |             .slide_text_box_text_style(0, keynote_box.drawable_object_id)
+     |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:3992:52
+     |
+3992 |             .slide_text_box_paragraph_alignment(0, keynote_box.drawable_object_id)
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4363:52
+     |
+4363 |         .set_slide_text_box_paragraph_alignment(0, created.drawable_object_id, Alignment::Justified)
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4366:55
+     |
+4366 |         .set_slide_text_box_paragraph_line_spacing(0, created.drawable_object_id, spacing)
+     |                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4369:50
+     |
+4369 |         .set_slide_text_box_paragraph_spacing(0, created.drawable_object_id, paragraph_spacing)
+     |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4372:50
+     |
+4372 |         .set_slide_text_box_paragraph_indents(0, created.drawable_object_id, indents)
+     |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4375:52
+     |
+4375 |         .set_slide_text_box_paragraph_tab_stops(0, created.drawable_object_id, tab_stops.clone())
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4381:55
+     |
+4381 |             .slide_text_box_paragraph_line_spacing(0, created.drawable_object_id)
+     |                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4387:50
+     |
+4387 |             .slide_text_box_paragraph_spacing(0, created.drawable_object_id)
+     |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4393:50
+     |
+4393 |             .slide_text_box_paragraph_indents(0, created.drawable_object_id)
+     |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4399:52
+     |
+4399 |             .slide_text_box_paragraph_tab_stops(0, created.drawable_object_id)
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4405:56
+     |
+4405 |             .reset_slide_text_box_paragraph_indents(0, created.drawable_object_id)
+     |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4410:50
+     |
+4410 |             .slide_text_box_paragraph_spacing(0, created.drawable_object_id)
+     |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4416:52
+     |
+4416 |             .slide_text_box_paragraph_tab_stops(0, created.drawable_object_id)
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4422:56
+     |
+4422 |             .reset_slide_text_box_paragraph_spacing(0, created.drawable_object_id)
+     |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4427:55
+     |
+4427 |             .slide_text_box_paragraph_line_spacing(0, created.drawable_object_id)
+     |                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4433:61
+     |
+4433 |             .reset_slide_text_box_paragraph_line_spacing(0, created.drawable_object_id)
+     |                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4438:52
+     |
+4438 |             .slide_text_box_paragraph_alignment(0, created.drawable_object_id)
+     |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/text/paragraph_alignment/tests.rs:4444:58
+     |
+4444 |             .reset_slide_text_box_paragraph_tab_stops(0, created.drawable_object_id)
+     |                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/level_tests.rs:120:47
+    |
+120 |         .set_slide_text_box_paragraph_list(0, keynote_box.drawable_object_id, ParagraphList::Bullet)
+    |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/level_tests.rs:125:13
+    |
+125 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/level_tests.rs:133:53
+    |
+133 |             .slide_text_box_paragraph_list_level(0, keynote_box.drawable_object_id, deep_start())
+    |                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/numbering_tests.rs:103:13
+    |
+103 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/numbering_tests.rs:110:13
+    |
+110 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/numbering_tests.rs:120:17
+    |
+120 |                 keynote_box.drawable_object_id,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+  --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:95:47
+   |
+95 |         .set_slide_text_box_paragraph_list(0, keynote_box.drawable_object_id, ParagraphList::Bullet)
+   |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:101:47
+    |
+101 |             .slide_text_box_paragraph_list(0, keynote_box.drawable_object_id)
+    |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:107:53
+    |
+107 |             .reset_slide_text_box_paragraph_list(0, keynote_box.drawable_object_id)
+    |                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:179:47
+    |
+179 |         .set_slide_text_box_paragraph_list(0, keynote_box.drawable_object_id, ParagraphList::Bullet)
+    |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:184:13
+    |
+184 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:192:54
+    |
+192 |             .slide_text_box_paragraph_list_bullet(0, keynote_box.drawable_object_id, paragraph,)
+    |                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:272:47
+    |
+272 |         .set_slide_text_box_paragraph_list(0, keynote_box.drawable_object_id, ParagraphList::Bullet)
+    |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:277:13
+    |
+277 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:287:17
+    |
+287 |                 keynote_box.drawable_object_id,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:369:47
+    |
+369 |         .set_slide_text_box_paragraph_list(0, keynote_box.drawable_object_id, ParagraphList::Bullet)
+    |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:374:13
+    |
+374 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:384:17
+    |
+384 |                 keynote_box.drawable_object_id,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:461:47
+    |
+461 |         .set_slide_text_box_paragraph_list(0, keynote_box.drawable_object_id, ParagraphList::Bullet)
+    |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:466:13
+    |
+466 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:476:17
+    |
+476 |                 keynote_box.drawable_object_id,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:556:13
+    |
+556 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:563:13
+    |
+563 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:573:17
+    |
+573 |                 keynote_box.drawable_object_id,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:650:13
+    |
+650 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:657:13
+    |
+657 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:667:17
+    |
+667 |                 keynote_box.drawable_object_id,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:770:13
+    |
+770 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:777:13
+    |
+777 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/paragraph_list/tests.rs:787:17
+    |
+787 |                 keynote_box.drawable_object_id,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/date_time_tests.rs:187:13
+    |
+187 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/date_time_tests.rs:196:49
+    |
+196 |             .slide_text_box_date_time_fields(0, keynote_box.drawable_object_id)
+    |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/date_time_tests.rs:202:51
+    |
+202 |         .remove_slide_text_box_date_time_field(0, keynote_box.drawable_object_id, keynote_field.id)
+    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/highlight_tests.rs:101:42
+    |
+101 |         .add_slide_text_box_highlight(0, keynote_box.drawable_object_id, text_range("Gamma"))
+    |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/highlight_tests.rs:106:43
+    |
+106 |             .slide_text_box_highlights(0, keynote_box.drawable_object_id)
+    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/highlight_tests.rs:112:45
+    |
+112 |         .remove_slide_text_box_highlight(0, keynote_box.drawable_object_id, keynote_highlight.id)
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/hyperlink_tests.rs:122:13
+    |
+122 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/hyperlink_tests.rs:130:43
+    |
+130 |             .slide_text_box_hyperlinks(0, keynote_box.drawable_object_id)
+    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/hyperlink_tests.rs:136:45
+    |
+136 |         .remove_slide_text_box_hyperlink(0, keynote_box.drawable_object_id, keynote_link.id)
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/language_tests.rs:162:46
+    |
+162 |             .slide_text_box_text_language(0, keynote_box.drawable_object_id, TextPosition::ZERO)
+    |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/language_tests.rs:169:13
+    |
+169 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/language_tests.rs:177:46
+    |
+177 |             .slide_text_box_text_language(0, keynote_box.drawable_object_id, french_start())
+    |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/text_comment_tests.rs:215:13
+    |
+215 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/text_comment_tests.rs:223:13
+    |
+223 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/text_comment_tests.rs:230:37
+    |
+230 |         .slide_text_box_comments(0, keynote_box.drawable_object_id)
+    |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/text_comment_tests.rs:236:48
+    |
+236 |             .slide_text_box_comment_replies(0, keynote_box.drawable_object_id, keynote_comment.id(),)
+    |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/text_comment_tests.rs:244:13
+    |
+244 |             keynote_box.drawable_object_id,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/text/text_comment_tests.rs:250:43
+    |
+250 |         .remove_slide_text_box_comment(0, keynote_box.drawable_object_id, keynote_comment.id())
+    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/slide_shapes.rs:1307:30
+     |
+1307 |                 .find(|text| text.drawable_object_id == created.drawable_object_id)
+     |                              ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/slide_shapes.rs:1969:42
+     |
+1969 |                 .set_slide_shape_text(0, text_box.drawable_object_id, "wrong type")
+     |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/slide_shapes.rs:1975:44
+     |
+1975 |                 .set_slide_shape_preset(0, text_box.drawable_object_id, Preset::Ellipse)
+     |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/keynote/editor/text_box_create.rs:494:45
+    |
+494 |                 .slide_text_box_geometry(0, created.drawable_object_id)
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/keynote/editor/text_box_create.rs:505:40
+    |
+505 |             .set_slide_text_storage(0, created.drawable_object_id, "Updated independently")
+    |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/keynote/editor/text_box_create.rs:508:42
+    |
+508 |             .duplicate_slide_text_box(0, created.drawable_object_id, "Independent copy")
+    |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/keynote/editor/text_box_create.rs:527:39
+    |
+527 |             .remove_slide_text_box(0, duplicate.drawable_object_id)
+    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/keynote/editor/text_box_create.rs:530:39
+    |
+530 |             .remove_slide_text_box(0, created.drawable_object_id)
+    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/keynote/editor/text_box_create.rs:615:32
+    |
+615 |             .text_box_graph(0, created.drawable_object_id)
+    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/keynote/editor/text_box_create.rs:620:39
+    |
+620 |         assert_eq!(graph.drawable_id, created.drawable_object_id);
+    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:2033:16
+     |
+2033 |     assert_eq!(text[2].drawable_object_id, 17);
+     |                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:2165:16
+     |
+2165 |     assert_eq!(created.drawable_object_id, 23);
+     |                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:2204:26
+     |
+2204 |             .find(|item| item.drawable_object_id == 17)
+     |                          ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:2261:26
+     |
+2261 |             .find(|text| text.drawable_object_id == 17)
+     |                          ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:2302:26
+     |
+2302 |             .find(|text| text.drawable_object_id == 17)
+     |                          ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:2362:16
+     |
+2362 |     assert_eq!(created.drawable_object_id, 23);
+     |                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:2364:28
+     |
+2364 |         .text_box_graph(0, created.drawable_object_id)
+     |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:2392:35
+     |
+2392 |         .remove_slide_text_box(0, created.drawable_object_id)
+     |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:2436:35
+     |
+2436 |         .remove_slide_text_box(0, created.drawable_object_id)
+     |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:2837:22
+     |
+2837 |         .decode_type(created.slide_id, TEST_SLIDE_MESSAGE_TYPE, "KN.SlideArchive")
+     |                      ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:2843:52
+     |
+2843 |     assert_eq!(image.super_.parent, Some(reference(created.slide_id)));
+     |                                                    ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:2917:22
+     |
+2917 |         .decode_type(created.slide_id, TEST_SLIDE_MESSAGE_TYPE, "KN.SlideArchive")
+     |                      ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:2923:52
+     |
+2923 |     assert_eq!(movie.super_.parent, Some(reference(created.slide_id)));
+     |                                                    ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:2996:22
+     |
+2996 |         .decode_type(created.slide_id, TEST_SLIDE_MESSAGE_TYPE, "KN.SlideArchive")
+     |                      ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:3002:52
+     |
+3002 |     assert_eq!(movie.super_.parent, Some(reference(created.slide_id)));
+     |                                                    ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:3122:25
+     |
+3122 |     for slide_id in [4, created.slide_id] {
+     |                         ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:3730:22
+     |
+3730 |         .decode_type(created.slide_id, 5, "KN.SlideArchive")
+     |                      ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::node_id`: legacy native Keynote slide-node object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:3811:16
+     |
+3811 |     assert_ne!(created.node_id, 3);
+     |                ^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:3812:16
+     |
+3812 |     assert_ne!(created.slide_id, 4);
+     |                ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:3818:49
+     |
+3818 |         .archive(&format!("Index/Slide-{}.iwa", created.slide_id))
+     |                                                 ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:3820:41
+     |
+3820 |     let slide_object = component.object(created.slide_id).unwrap();
+     |                                         ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:3830:60
+     |
+3830 |             .contains_entry(&format!("Index/Slide-{}.iwa", created.slide_id))
+     |                                                            ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:3956:49
+     |
+3956 |         .archive(&format!("Index/Slide-{}.iwa", created.slide_id))
+     |                                                 ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::node_id`: legacy native Keynote slide-node object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:3988:40
+     |
+3988 |     let cloned_node = &document.object(created.node_id).unwrap().messages[0].data;
+     |                                        ^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideInfo::slide_id`: legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility
+    --> crates/litchi-iwa/src/keynote/editor/tests.rs:4006:26
+     |
+4006 |         &HashMap::from([(created.slide_id, 4)]),
+     |                          ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `pages::editor::PagesEditor::set_drawable_comment`: legacy raw-ID Pages drawable-comment API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner
+   --> crates/litchi-iwa/src/pages/editor/audio.rs:620:14
+    |
+620 |             .set_drawable_comment(created.drawable_object_id, "Remove after review")
+    |              ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `pages::editor::PagesEditor::set_drawable_comment`: legacy raw-ID Pages drawable-comment API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner
+   --> crates/litchi-iwa/src/pages/editor/movies.rs:788:14
+    |
+788 |             .set_drawable_comment(created.drawable_object_id, "Remove this movie after review")
+    |              ^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/shapes/text_columns.rs:423:44
+    |
+423 |             .set_slide_text_box_columns(0, keynote_box.drawable_object_id, &three)
+    |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/shapes/text_columns.rs:428:44
+    |
+428 |                 .slide_text_box_columns(0, keynote_box.drawable_object_id)
+    |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/shapes/text_columns.rs:434:50
+    |
+434 |                 .reset_slide_text_box_columns(0, keynote_box.drawable_object_id)
+    |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/shapes/text_layout/style.rs:492:48
+    |
+492 |             .set_slide_text_box_text_layout(0, keynote_box.drawable_object_id, layout)
+    |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/shapes/text_layout/style.rs:497:48
+    |
+497 |                 .slide_text_box_text_layout(0, keynote_box.drawable_object_id)
+    |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `keynote::editor::KeynoteSlideTextInfo::drawable_object_id`: legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility
+   --> crates/litchi-iwa/src/shapes/text_layout/style.rs:503:54
+    |
+503 |                 .reset_slide_text_box_text_layout(0, keynote_box.drawable_object_id)
+    |                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `litchi-iwa` (lib test) generated 195 warnings
+error[E0308]: mismatched types
+  --> crates/litchi-iwa/examples/create_pages_donut_chart.rs:63:5
+   |
+62 |   fn donut_data() -> litchi_iwa::Result<ChartData> {
+   |                      ----------------------------- expected `Result<ChartData, litchi_iwa::Error>` because of return type
+63 | /     ChartData::new(
+64 | |         vec!["North".to_owned(), "South".to_owned(), "West".to_owned()],
+65 | |         vec!["Revenue".to_owned()],
+66 | |         vec![vec![Some(12.0)], vec![Some(18.0)], vec![Some(24.0)]],
+67 | |     )
+   | |_____^ expected `Result<ChartData, Error>`, found `Result<ChartData, DataError>`
+   |
+   = note: expected enum `Result<_, litchi_iwa::Error>`
+              found enum `Result<_, litchi_iwa_common::chart::data::DataError>`
+
+warning: use of deprecated field `litchi_iwa_protos::tsd::MovieArchive::loop_option_as_integer`
+    --> crates/litchi-keynote/src/package/slide_movie_playback.rs:1736:13
+     |
+1736 |             loop_option_as_integer: Some(u32::from_le_bytes((-1_i32).to_le_bytes())),
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated field `litchi_iwa_protos::tsd::MovieArchive::loop_option_as_integer`
+    --> crates/litchi-keynote/src/package/slide_movie_playback.rs:1773:13
+     |
+1773 |             loop_option_as_integer: Some(1),
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `litchi_iwa_protos::kn::SlideNodeArchive::has_builds`
+   --> crates/litchi-keynote/src/package/slide_table_merges/reader.rs:535:29
+    |
+535 | ...                   has_builds: false,
+    |                       ^^^^^^^^^^^^^^^^^
+
+warning: `litchi-keynote` (lib test) generated 3 warnings
+error[E0308]: mismatched types
+  --> crates/litchi-iwa/examples/create_keynote_donut_chart.rs:68:5
+   |
+67 |   fn donut_data() -> litchi_iwa::Result<ChartData> {
+   |                      ----------------------------- expected `Result<ChartData, litchi_iwa::Error>` because of return type
+68 | /     ChartData::new(
+69 | |         vec!["North".to_owned(), "South".to_owned(), "West".to_owned()],
+70 | |         vec!["Revenue".to_owned()],
+71 | |         vec![vec![Some(12.0)], vec![Some(18.0)], vec![Some(24.0)]],
+72 | |     )
+   | |_____^ expected `Result<ChartData, Error>`, found `Result<ChartData, DataError>`
+   |
+   = note: expected enum `Result<_, litchi_iwa::Error>`
+              found enum `Result<_, litchi_iwa_common::chart::data::DataError>`
+
+warning: use of deprecated field `generated::kn::BuildArchive::duration`
+   --> crates/litchi-iwa-protos/src/keynote_build_creation_codec.rs:916:20
+    |
+916 |         assert_eq!(audio.duration, movie.duration);
+    |                    ^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated field `generated::kn::BuildArchive::duration`
+   --> crates/litchi-iwa-protos/src/keynote_build_creation_codec.rs:916:36
+    |
+916 |         assert_eq!(audio.duration, movie.duration);
+    |                                    ^^^^^^^^^^^^^^
+
+warning: `litchi-iwa-protos` (lib test) generated 2 warnings
+For more information about this error, try `rustc --explain E0308`.
+error[E0308]: mismatched types
+  --> crates/litchi-iwa/examples/create_keynote_pie_chart.rs:57:5
+   |
+56 |   fn pie_data() -> litchi_iwa::Result<ChartData> {
+   |                    ----------------------------- expected `Result<ChartData, litchi_iwa::Error>` because of return type
+57 | /     ChartData::new(
+58 | |         vec!["North".to_owned(), "South".to_owned(), "West".to_owned()],
+59 | |         vec!["Revenue".to_owned()],
+60 | |         vec![vec![Some(12.0)], vec![Some(18.0)], vec![Some(24.0)]],
+61 | |     )
+   | |_____^ expected `Result<ChartData, Error>`, found `Result<ChartData, DataError>`
+   |
+   = note: expected enum `Result<_, litchi_iwa::Error>`
+              found enum `Result<_, litchi_iwa_common::chart::data::DataError>`
+
+error: could not compile `litchi-iwa` (example "create_pages_donut_chart") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-iwa` (example "create_keynote_donut_chart") due to 1 previous error
+error[E0308]: mismatched types
+  --> crates/litchi-iwa/examples/create_numbers_donut_chart.rs:68:5
+   |
+67 |   fn donut_data() -> litchi_iwa::Result<ChartData> {
+   |                      ----------------------------- expected `Result<ChartData, litchi_iwa::Error>` because of return type
+68 | /     ChartData::new(
+69 | |         vec!["North".to_owned(), "South".to_owned(), "West".to_owned()],
+70 | |         vec!["Revenue".to_owned()],
+71 | |         vec![vec![Some(12.0)], vec![Some(18.0)], vec![Some(24.0)]],
+72 | |     )
+   | |_____^ expected `Result<ChartData, Error>`, found `Result<ChartData, DataError>`
+   |
+   = note: expected enum `Result<_, litchi_iwa::Error>`
+              found enum `Result<_, litchi_iwa_common::chart::data::DataError>`
+
+error: could not compile `litchi-iwa` (example "create_keynote_pie_chart") due to 1 previous error
+error[E0308]: mismatched types
+  --> crates/litchi-iwa/examples/create_numbers_pie_chart.rs:57:5
+   |
+56 |   fn pie_data() -> litchi_iwa::Result<ChartData> {
+   |                    ----------------------------- expected `Result<ChartData, litchi_iwa::Error>` because of return type
+57 | /     ChartData::new(
+58 | |         vec!["North".to_owned(), "South".to_owned(), "West".to_owned()],
+59 | |         vec!["Revenue".to_owned()],
+60 | |         vec![vec![Some(12.0)], vec![Some(18.0)], vec![Some(24.0)]],
+61 | |     )
+   | |_____^ expected `Result<ChartData, Error>`, found `Result<ChartData, DataError>`
+   |
+   = note: expected enum `Result<_, litchi_iwa::Error>`
+              found enum `Result<_, litchi_iwa_common::chart::data::DataError>`
+
+error: could not compile `litchi-iwa` (example "create_numbers_donut_chart") due to 1 previous error
+error[E0308]: mismatched types
+  --> crates/litchi-iwa/examples/create_pages_pie_chart.rs:53:5
+   |
+52 |   fn pie_data() -> litchi_iwa::Result<ChartData> {
+   |                    ----------------------------- expected `Result<ChartData, litchi_iwa::Error>` because of return type
+53 | /     ChartData::new(
+54 | |         vec!["North".to_owned(), "South".to_owned(), "West".to_owned()],
+55 | |         vec!["Revenue".to_owned()],
+56 | |         vec![vec![Some(12.0)], vec![Some(18.0)], vec![Some(24.0)]],
+57 | |     )
+   | |_____^ expected `Result<ChartData, Error>`, found `Result<ChartData, DataError>`
+   |
+   = note: expected enum `Result<_, litchi_iwa::Error>`
+              found enum `Result<_, litchi_iwa_common::chart::data::DataError>`
+
+error: could not compile `litchi-iwa` (example "create_numbers_pie_chart") due to 1 previous error
+error: could not compile `litchi-iwa` (example "create_pages_pie_chart") due to 1 previous error
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-ooxml-common)
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-ppt)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-spreadsheet-drawing)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-pptx)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-docx)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-xlsx)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-xlsb)
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi)
+    Checking litchi-py v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/pyo3-litchi)
+exit 101

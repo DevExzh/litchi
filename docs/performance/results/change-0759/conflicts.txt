@@ -1,0 +1,67 @@
+# 65 conflicts of the trial merge e6cca92db2 + a67a38abf2 (base f0ab67b55d)
+# kind	path	resolved by	resolution
+content	crates/litchi-cfb/src/directory_name.rs	OLE2 subagent	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-cfb/src/writer/core.rs	OLE2 subagent	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-cfb/src/writer/sequential.rs	OLE2 subagent	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-doc/src/body_text.rs	OLE2 subagent	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-doc/src/tracked_revision/package.rs	OLE2 subagent	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-docx/src/document/mod.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-docx/src/document/transaction.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-docx/src/document/transaction/durable.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-docx/src/namespace.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-docx/src/package/codec.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-docx/src/package/model.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-docx/src/paragraph/codec/content.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-docx/src/paragraph/model.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-docx/src/settings/document/codec.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-docx/src/source_backed.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-docx/src/writer/hyperlink.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-docx/src/writer/run.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+modify/delete	crates/litchi-iwa/examples/create_keynote_audio.rs	coordinator	deletion kept (ours, 76aee7e6ac)
+content	crates/litchi-odg/docs/FEATURE_MATRIX.md	ODG subagent	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-odg/src/model/shape.rs	ODG subagent	see record 0759 judgements/adaptations and resolution-notes.md
+add/add	crates/litchi-odg/src/model/transition.rs	ODG subagent	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-odg/src/package/snapshot.rs	ODG subagent	see record 0759 judgements/adaptations and resolution-notes.md
+add/add	crates/litchi-odg/tests/page_transitions.rs	ODG subagent	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-ole-common/src/object/codec.rs	OLE2 subagent	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-ole-common/src/object/editor.rs	OLE2 subagent	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-ole-common/src/object/snapshot.rs	OLE2 subagent	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-ooxml-common/src/mce/codec.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-ooxml-common/src/web/package/transaction.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-opc/src/error.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-opc/src/lib.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-opc/src/package.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-opc/src/pkgreader.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-opc/src/pkgwriter.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-opc/src/rel.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-opc/src/source_backed.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-opc/src/xml_splice.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-opc/tests/source_xml_publication.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-pptx/src/presentation/source.rs	coordinator (text); XLSB/PPTX subagent (semantics)	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-pptx/src/shape/reader.rs	coordinator (text); XLSB/PPTX subagent (semantics)	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-xlsb/src/cell_values/root.rs	coordinator (text); XLSB/PPTX subagent (semantics)	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-xlsb/src/cell_values/workbook.rs	coordinator (text); XLSB/PPTX subagent (semantics)	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-xlsb/src/cell_watches/workbook.rs	coordinator (text); XLSB/PPTX subagent (semantics)	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-xlsb/src/sparkline/workbook.rs	coordinator (text); XLSB/PPTX subagent (semantics)	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-xlsb/src/workbook/package.rs	coordinator (text); XLSB/PPTX subagent (semantics)	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs	coordinator (text); XLSX subagent (semantics)	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs	coordinator (text); XLSX subagent (semantics)	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs	coordinator (text); XLSX subagent (semantics)	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs	coordinator (text); XLSX subagent (semantics)	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-xlsx/src/raw/worksheet/selected.rs	coordinator (text); XLSX subagent (semantics)	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-xlsx/src/survey.rs	coordinator (text); XLSX subagent (semantics)	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-xlsx/src/workbook/data_model/package.rs	coordinator (text); XLSX subagent (semantics)	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs	coordinator (text); XLSX subagent (semantics)	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/soapberry-zip/src/office.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	crates/soapberry-zip/src/preserve.rs	coordinator	ours (judgement 1) + two adapted incoming tests
+content	docs/adr/0024-current-topology.md	coordinator	union + 2026-09-24 merged-inventory amendment
+content	docs/performance/ADR_COMPLIANCE.md	coordinator	union of sections (numbered newest first, then incoming unnumbered)
+content	docs/performance/BASELINE.md	coordinator	union of sections (numbered newest first, then incoming unnumbered)
+content	docs/performance/CRUD_COVERAGE.md	coordinator	union of sections (numbered newest first, then incoming unnumbered)
+content	docs/performance/GOAL_AUDIT.md	coordinator	union of sections (numbered newest first, then incoming unnumbered)
+content	docs/performance/REPORT.md	coordinator	union of sections (numbered newest first, then incoming unnumbered)
+content	tools/perf-baseline/README.md	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	tools/perf-baseline/src/bin/xlsb_crud.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	tools/perf-baseline/src/corpus_manifest.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	tools/perf-baseline/src/lib.rs	coordinator	see record 0759 judgements/adaptations and resolution-notes.md
+content	tools/test_check_crate_boundaries.py	coordinator	see record 0759 judgements/adaptations and resolution-notes.md

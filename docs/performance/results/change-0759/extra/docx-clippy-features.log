@@ -1,0 +1,38 @@
+HEAD f592ecc1b078698de3eb2a35bcf94b59746a9c36
+TREE c3c076acd0a3dde1b5b9575fe120156a5de2d83a
+$ cargo clippy -p litchi-docx --lib --no-deps --locked  -- -D warnings
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.10s
+exit 0
+$ cargo clippy -p litchi-docx --lib --no-deps --locked --features encryption -- -D warnings
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.13s
+exit 0
+$ cargo clippy -p litchi-docx --lib --no-deps --locked --features fonts -- -D warnings
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.37s
+exit 0
+$ cargo clippy -p litchi-docx --lib --no-deps --locked --features automatic-fonts -- -D warnings
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.22s
+exit 0
+$ cargo clippy -p litchi-docx --lib --no-deps --locked --features vba-inspection -- -D warnings
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.06s
+exit 0
+$ cargo clippy -p litchi-docx --lib --no-deps --locked --features sign -- -D warnings
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.18s
+exit 0
+$ cargo clippy -p litchi-docx --lib --no-deps --locked --all-features -- -D warnings
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.21s
+exit 0
+$ cargo clippy -p litchi-docx --all-targets --no-deps --locked  -- -D warnings
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.38s
+exit 0
+$ cargo clippy -p litchi-docx --all-targets --no-deps --locked --all-features -- -D warnings
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi-worktrees/merge-spec-gaps/crates/litchi-docx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.56s
+exit 0
