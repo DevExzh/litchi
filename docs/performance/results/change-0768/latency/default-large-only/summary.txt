@@ -1,0 +1,5 @@
+r0: A p50 809914 ns, 74471 page faults | B p50 835799 ns, 75563 page faults | B/A 1.032
+r1: A p50 814049 ns, 74463 page faults | B p50 835719 ns, 75559 page faults | B/A 1.027
+r2: A p50 804274 ns, 74472 page faults | B p50 830259 ns, 75552 page faults | B/A 1.032
+r3: A p50 821959 ns, 74471 page faults | B p50 831129 ns, 75561 page faults | B/A 1.011
+median B/A 1.029

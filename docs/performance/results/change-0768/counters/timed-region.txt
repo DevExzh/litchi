@@ -1,0 +1,16 @@
+probe_docnohf_format: 1,624,955 -> 1,618,967 Ir/lifecycle (-0.37%)
+probe_docfloat_format: 22,093,511 -> 21,909,149 Ir/lifecycle (-0.83%)
+harness_doc_semantic_one_edit_save/tiny: timed 6,381,797 -> 6,346,911 (-0.55%)
+    body_text::Snapshot::edit: 1,204,031 -> 1,183,809
+    body_text::Edit::replace_paragraph: 2,693,330 -> 2,696,117
+    body_text::Edit::commit: 2,323,570 -> 2,307,884
+    body_text::Snapshot::finish: 160,866 -> 159,101
+    parts::protection::policy::classify: 144,694 -> 27,966
+    writer::fkp::ChpxFkpBuilder::generate_pages: 7,078 -> 7,541
+harness_doc_semantic_one_edit_save/large: timed 44,936,553 -> 45,056,754 (+0.27%)
+    body_text::Snapshot::edit: 4,887,109 -> 4,892,962
+    body_text::Edit::replace_paragraph: 12,837,416 -> 12,901,210
+    body_text::Edit::commit: 26,882,042 -> 26,932,937
+    body_text::Snapshot::finish: 329,986 -> 329,645
+    parts::protection::policy::classify: 42,223 -> 8,058
+    writer::fkp::ChpxFkpBuilder::generate_pages: 82,814 -> 97,688

@@ -1,0 +1,20 @@
+== harness_doc_semantic_one_edit_save/large
+   p50 median A 824959 ns  B 655636 ns | paired p50 ratio geomean 0.8035 [0.7918, 0.8203] median 0.7932
+   mean paired ratio geomean 0.8541 [0.8407, 0.8716]
+   process instructions A 7.3520e+09 B 7.2534e+09 ratio 0.98655 | cycles ratio 0.9803 [0.9707, 0.9907]
+   per-round p50 ratios: 0.806, 0.795, 0.791, 0.858, 0.789, 0.788, 0.790, 0.812 (max 0.858)
+== harness_doc_semantic_one_edit_save/tiny
+   p50 median A 40580 ns  B 39113 ns | paired p50 ratio geomean 0.9616 [0.9503, 0.9699] median 0.9650
+   mean paired ratio geomean 0.9539 [0.9316, 0.9803]
+   process instructions A 7.3520e+09 B 7.2534e+09 ratio 0.98655 | cycles ratio 0.9803 [0.9707, 0.9907]
+   per-round p50 ratios: 0.962, 0.927, 0.961, 0.965, 0.966, 0.965, 0.966, 0.980 (max 0.980)
+== probe_docfloat_format
+   p50 median A 1050078 ns  B 1013562 ns | paired p50 ratio geomean 0.9938 [0.9400, 1.0617] median 0.9823
+   mean paired ratio geomean 1.0135 [0.9774, 1.0600]
+   process instructions A 2.7111e+09 B 2.7109e+09 ratio 1.00174 | cycles ratio 1.0034 [0.9922, 1.0173]
+   per-round p50 ratios: 1.020, 1.029, 0.958, 1.207, 0.881, 0.996, 0.969, 0.922 (max 1.207)
+== probe_docnohf_format
+   p50 median A 108551 ns  B 108348 ns | paired p50 ratio geomean 0.9921 [0.9660, 1.0174] median 1.0013
+   mean paired ratio geomean 0.9955 [0.9761, 1.0146]
+   process instructions A 3.8786e+08 B 3.8419e+08 ratio 0.99067 | cycles ratio 0.9912 [0.9847, 0.9969]
+   per-round p50 ratios: 1.035, 1.021, 0.965, 0.951, 1.037, 0.930, 1.006, 0.997 (max 1.037)

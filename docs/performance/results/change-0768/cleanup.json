@@ -1,0 +1,42 @@
+{
+ "change": "0768",
+ "date": "2026-09-24",
+ "binary_identities_recorded_before_removal": "binaries.sha256",
+ "removed_before_the_record_commit": [
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0768/debug",
+   "approx_bytes": 45097156608,
+   "contents": "debug test, check, clippy and rustdoc builds of litchi-doc and the facade (all gate runs) and the temporary probe/diagnostic examples; deleted mid-task when the shared disk reached 0 bytes free, after every gate had run"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0768-before/debug",
+   "approx_bytes": 1288490188,
+   "contents": "the base-side build of the temporary corpus probe example"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0768",
+   "approx_bytes": 3113851289,
+   "contents": "after-leg release builds of litchi-perf-baseline and the 0730 probe (identities in binaries.sha256)"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/targets/0768-before",
+   "approx_bytes": 3006477107,
+   "contents": "before-leg release builds of litchi-perf-baseline and the 0730 probe (identities in binaries.sha256)"
+  },
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/0768-before-src",
+   "contents": "detached worktree of the base 1d1044e3ac, removed with git worktree remove --force"
+  }
+ ],
+ "removed_immediately_after_the_record_commit": [
+  {
+   "path": "/home/zhuhe/code/litchi-worktrees/scratch/0768/*",
+   "contents": "staged binaries (bin/A, bin/B), fixture copies, the two probe source copies and their shared lockfile, callgrind profiles, raw run directories (kept here gzipped), the superseded 1.98.1-toolchain run, gate logs, file backups used to split the commits, and TMPDIR"
+  }
+ ],
+ "kept": [
+  "the worktree /home/zhuhe/code/litchi-worktrees/0768-doc-protection-classification and branch perf/0768-doc-protection-classification",
+  "this packet (raw JSON reports gzipped; no binaries, profiles or corpora)"
+ ],
+ "not_created": "no files under /tmp; TMPDIR pointed into the scratch directory"
+}
