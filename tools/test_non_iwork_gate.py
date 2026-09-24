@@ -103,6 +103,7 @@ FIXTURE_BULK_PACKAGES = frozenset(
         "litchi-spreadsheet-drawing",
         "litchi-vba",
         "litchi-word",
+        "litchi-xldm",
         "litchi-xls",
         "litchi-xlsb",
         "litchi-xlsx",
@@ -171,6 +172,7 @@ FIXTURE_WORKSPACE_PACKAGES = frozenset(
         "litchi-spreadsheet-drawing",
         "litchi-vba",
         "litchi-word",
+        "litchi-xldm",
         "litchi-xls",
         "litchi-xlsb",
         "litchi-xlsx",
@@ -377,14 +379,14 @@ class NonIworkGateTests(unittest.TestCase):
 
     def test_exact_package_partition_and_feature_closure(self) -> None:
         self.assertEqual(self.plan.packages.keys(), FIXTURE_WORKSPACE_PACKAGES)
-        self.assertEqual(len(self.plan.packages), 64)
+        self.assertEqual(len(self.plan.packages), 65)
         self.assertEqual(len(self.plan.iwork_packages), 17)
         self.assertEqual(self.plan.iwork_packages, FIXTURE_IWORK_PACKAGES)
         self.assertEqual(len(self.plan.unsafe_facade_dependents), 1)
         self.assertEqual(self.plan.unsafe_facade_dependents, {"litchi-py"})
         self.assertEqual(len(self.plan.excluded_packages), 18)
         self.assertEqual(self.plan.excluded_packages, FIXTURE_EXCLUDED_PACKAGES)
-        self.assertEqual(len(self.plan.bulk_packages), 45)
+        self.assertEqual(len(self.plan.bulk_packages), 46)
         self.assertEqual(self.plan.bulk_packages, FIXTURE_BULK_PACKAGES)
         self.assertEqual(self.plan.unsafe_facade_features, FIXTURE_UNSAFE_FACADE_FEATURES)
         self.assertEqual(self.plan.safe_facade_features, FIXTURE_SAFE_FACADE_FEATURES)
@@ -611,7 +613,7 @@ class NonIworkGateTests(unittest.TestCase):
 
         with mock.patch.object(gate, "_run_capped_capture", side_effect=fake_capture):
             bulk_count, facade_count = gate.verify_dependency_trees("cargo", self.plan)
-        self.assertEqual(bulk_count, 45)
+        self.assertEqual(bulk_count, 46)
         self.assertEqual(facade_count, len(self.plan.safe_facade_features))
         self.assertEqual(len(calls), 2 + len(self.plan.safe_facade_features))
         self.assertTrue(all("--locked" not in argv for argv in calls))
@@ -707,8 +709,8 @@ class NonIworkGateTests(unittest.TestCase):
         specs = gate.command_specs("cargo", self.plan, "lib-tests")
         bulk_tests = [spec for spec in specs if spec.scope.startswith("bulk-test/")]
         bulk_cleans = [spec for spec in specs if spec.scope.startswith("bulk-clean/")]
-        self.assertEqual(len(bulk_tests), 45)
-        self.assertEqual(len(bulk_cleans), 45)
+        self.assertEqual(len(bulk_tests), 46)
+        self.assertEqual(len(bulk_cleans), 46)
         self.assertEqual(specs[-2].scope, "facade-safe-features")
         self.assertEqual(specs[-1].scope, "facade-clean")
         self.assertEqual(specs[-3].scope, "facade-default-feature")
@@ -2206,7 +2208,7 @@ class NonIworkGateTests(unittest.TestCase):
                 "--no-fail-fast",
             ),
         )
-        # One standalone project has none of the 45-root fan-out the bulk
+        # One standalone project has none of the 46-root fan-out the bulk
         # modes serialize against, so its test threads stay at Cargo's
         # default; serializing them measured 1,870 s of test execution
         # against 581 s for the same 531 passing tests.

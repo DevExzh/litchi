@@ -5,7 +5,7 @@ The workspace deliberately keeps the Apple iWork packages in the same Cargo
 workspace as the Office and ODF packages.  This gate is the cheap, explicit
 non-iWork slice: it derives the package and facade-feature sets from Cargo
 metadata, checks every selected dependency tree, and then runs the requested
-Cargo operation with the 45 ordinary packages plus the safe facade feature
+Cargo operation with the 46 ordinary packages plus the safe facade feature
 closure.  Library tests and the other high-memory modes serialize package
 roots; library tests clean each successful root's artifacts to keep its test
 target from retaining every package's test binaries at once.
@@ -68,7 +68,7 @@ IWORK_LEAF_PACKAGES = frozenset(
 IWORK_PACKAGE_PREFIX = "litchi-iwa"
 EXPECTED_IWORK_PACKAGES = 17
 EXPECTED_EXCLUDED_PACKAGES = 18
-EXPECTED_BULK_PACKAGES = 45
+EXPECTED_BULK_PACKAGES = 46
 
 # The release gate is intentionally audited against the current workspace
 # topology, not merely package counts.  A rename, swap, or newly added member
@@ -157,6 +157,7 @@ EXPECTED_BULK_PACKAGE_NAMES = frozenset(
         "litchi-spreadsheet-drawing",
         "litchi-vba",
         "litchi-word",
+        "litchi-xldm",
         "litchi-xls",
         "litchi-xlsb",
         "litchi-xlsx",
@@ -225,6 +226,7 @@ EXPECTED_WORKSPACE_PACKAGE_NAMES = frozenset(
         "litchi-spreadsheet-drawing",
         "litchi-vba",
         "litchi-word",
+        "litchi-xldm",
         "litchi-xls",
         "litchi-xlsb",
         "litchi-xlsx",
@@ -1628,7 +1630,7 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
         #
         # Unlike the workspace modes this main command does not serialize its
         # test threads.  The bulk modes serialize because a single invocation
-        # over 45 roots keeps every test binary alive until the final link; one
+        # over 46 roots keeps every test binary alive until the final link; one
         # standalone project has no such fan-out, and serializing its 531-test
         # default suite measured 1,870 s against 581 s at Cargo's default
         # parallelism.  The allocator binary is a separate command below: its
@@ -1725,7 +1727,7 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
             )
         )
         return tuple(specs)
-    # All features are intentional for bulk roots: each of the 45 packages
+    # All features are intentional for bulk roots: each of the 46 packages
     # must prove that its non-default feature surface remains non-iWork.  Each
     # root is isolated so Cargo does not retain every high-memory target in a
     # single workspace invocation.  The facade is selected separately with
