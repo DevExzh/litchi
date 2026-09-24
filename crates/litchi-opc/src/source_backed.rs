@@ -22,6 +22,7 @@ use crate::rel::{Relationship, Relationships, TargetMode};
 use crate::xml_splice::SourceXmlPart;
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::{
     ExecutionContext, ExecutionError, OwnedSource, ReadAt, Reservation, Resource, SourceVersion,
 };
@@ -1184,6 +1185,9 @@ where
     })?;
 
     let mut reader = NsReader::from_reader(bytes);
+    // Raw splice boundaries are byte offsets into `bytes`, whose leading
+    // byte-order mark precedes reader position zero.
+    let origin = ReaderOrigin::of(bytes);
     // Keep lexical source positions stable while parsing ranges.  The source
     // catalog's retained event gauge trims whitespace Text events, so that
     // gauge is counted separately below rather than changing the parser mode
@@ -1248,8 +1252,9 @@ where
             events,
             limits.max_xml_events() as u64,
         )?;
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| overlay_unavailable("relationship XML event position exceeds usize"))?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| overlay_unavailable("relationship XML event position exceeds usize"))?;
         let decoder = reader.decoder();
         let (resolved_namespace, event) = reader.read_resolved_event()?;
         if !matches!(&event, Event::Text(text) if relationship_xml_whitespace(text.as_ref())) {
@@ -1260,7 +1265,7 @@ where
         let opc_namespace = matches!(resolved_namespace,
             ResolveResult::Bound(Namespace(value))
                 if value == namespace::OPC_RELATIONSHIPS.as_bytes());
-        let event_end = usize::try_from(reader.buffer_position()).map_err(|_| {
+        let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
             overlay_unavailable("relationship XML event end position exceeds usize")
         })?;
         if event_end < event_start || event_end > bytes.len() {

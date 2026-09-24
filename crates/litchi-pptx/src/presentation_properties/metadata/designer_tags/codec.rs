@@ -2,6 +2,7 @@
 
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -344,13 +345,14 @@ fn remove_occurrence(
 
 fn parse_nodes(xml: &[u8], limits: Limits) -> Result<Vec<Node>> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut nodes = Vec::<Node>::new();
     let mut stack = Vec::<usize>::new();
     let mut root_closed = false;
     let mut events = 0usize;
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event()
@@ -366,7 +368,7 @@ fn parse_nodes(xml: &[u8], limits: Limits) -> Result<Vec<Node>> {
             }
         }
         let empty = matches!(&event, Event::Empty(_));
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 if root_closed && stack.is_empty() {
@@ -782,9 +784,10 @@ fn copy_name(value: &[u8], limits: Limits) -> Result<Vec<u8>> {
     Ok(result)
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| invalid("Designer-tag owner XML position does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("Designer-tag owner XML position does not fit usize"))
 }
 
 struct Output {

@@ -4,6 +4,7 @@
 //! formula-like carriers and markup-compatibility alternatives are rejected
 //! before publication instead of being guessed at.
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml::decode_xml_reference;
 use quick_xml::XmlVersion;
@@ -107,6 +108,7 @@ pub(crate) fn rewrite(
         })
         .collect::<Vec<_>>();
     let mut reader = NsReader::from_reader(content);
+    let origin = ReaderOrigin::of(content);
     let mut stack = Vec::<Frame>::new();
     let mut replacements = Vec::new();
     let mut saw_titles = false;
@@ -114,13 +116,13 @@ pub(crate) fn rewrite(
     let mut captured_text_bytes = 0usize;
 
     loop {
-        let event_start = position(&reader)?;
+        let event_start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
             .map_err(|error| invalid(format!("sheet-reference XML scan failed: {error}")))?
             .into_owned();
-        let event_end = position(&reader)?;
+        let event_end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -658,9 +660,10 @@ fn is_mce_name(namespace: &ResolveResult<'_>, element: &BytesStart<'_>, local: &
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == MCE)
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source| invalid("sheet-reference XML position does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("sheet-reference XML position does not fit usize"))
 }
 
 #[cfg(test)]

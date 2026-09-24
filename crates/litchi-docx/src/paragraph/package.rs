@@ -2,6 +2,7 @@
 
 use crate::error::Result;
 use crate::hyperlink::Hyperlink;
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::rel::Relationships;
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
@@ -79,6 +80,7 @@ fn parse_hyperlink(source: &XmlRef, rels: &Relationships) -> Result<InlineHyperl
     }
     let link = links.remove(0);
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     let mut capture = None::<(usize, usize)>;
@@ -89,14 +91,14 @@ fn parse_hyperlink(source: &XmlRef, rels: &Relationships) -> Result<InlineHyperl
     let mut saw_root = false;
 
     loop {
-        let start = usize::try_from(reader.buffer_position()).map_err(|_conversion_error| {
+        let start = origin.offset(reader.buffer_position()).ok_or_else(|| {
             crate::Error::InvalidFormat("hyperlink child offset does not fit usize".into())
         })?;
         let event = reader
             .read_event()
             .map_err(|error| crate::Error::Xml(error.to_string()))?
             .into_owned();
-        let end = usize::try_from(reader.buffer_position()).map_err(|_conversion_error| {
+        let end = origin.offset(reader.buffer_position()).ok_or_else(|| {
             crate::Error::InvalidFormat("hyperlink child offset does not fit usize".into())
         })?;
         match event {

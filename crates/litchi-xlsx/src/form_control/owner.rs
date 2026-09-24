@@ -12,6 +12,7 @@
     reason = "the scanner follows the worksheet, relationship, drawing, and VML wire order"
 )]
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
@@ -5142,6 +5143,9 @@ fn mce_branch_ranges(
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
+    // Provenance ranges are byte ranges of `xml`, whose leading byte-order
+    // mark precedes reader position zero.
+    let origin = ReaderOrigin::of(xml);
     let mut elements = Vec::<MceElementFrame>::new();
     let mut alternates = Vec::<Option<MceAlternateFrame>>::new();
     let mut selected = Vec::new();
@@ -5165,13 +5169,15 @@ fn mce_branch_ranges(
                 limits.max_mce_events,
             ));
         }
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|error| owner_invalid(format!("MCE source position overflow: {error}")))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| owner_invalid("MCE source position overflow"))?;
         let event = reader
             .read_event()
             .map_err(|error| owner_invalid(error.to_string()))?;
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|error| owner_invalid(format!("MCE source position overflow: {error}")))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| owner_invalid("MCE source position overflow"))?;
         let resolver = reader.resolver().clone();
         match event {
             Event::Start(element) => {

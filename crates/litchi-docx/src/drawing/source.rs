@@ -10,6 +10,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_drawingml::svg_blip::{self, Namespace as SvgNamespace, SvgBlip};
 use litchi_ooxml_common::{xml::xsd_token_atom, xml_name::is_ncname};
 use quick_xml::XmlVersion;
@@ -1273,13 +1274,14 @@ impl<'a> Scanner<'a> {
 
     fn run(mut self) -> Result<SourceDrawing<'a>> {
         let mut reader = NsReader::from_reader(self.source);
+        let origin = ReaderOrigin::of(self.source);
         reader.config_mut().trim_text(false);
         reader.config_mut().check_end_names = true;
         reader.config_mut().check_comments = true;
         let mut buffer = Vec::new();
 
         loop {
-            let event_start = position(&reader)?;
+            let event_start = position(&reader, origin)?;
             let decoder = reader.decoder();
             let (resolved, event) = reader
                 .read_resolved_event_into(&mut buffer)
@@ -1288,7 +1290,7 @@ impl<'a> Scanner<'a> {
             // only a static namespace identity, so no resolver-owned URI or
             // event clone is needed before the caller limits are checked.
             let resolved = resolved_tag(resolved, decoder)?;
-            let event_end = position(&reader)?;
+            let event_end = position(&reader, origin)?;
             self.nodes = self.nodes.checked_add(1).ok_or_else(|| {
                 limit("DOCX drawing XML nodes", self.nodes, self.limits.max_nodes)
             })?;
@@ -3027,9 +3029,10 @@ fn validate_processing_instruction(instruction: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("DOCX drawing XML offset exceeds usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("DOCX drawing XML offset exceeds usize"))
 }
 
 fn xml_error(error: impl fmt::Display) -> Error {

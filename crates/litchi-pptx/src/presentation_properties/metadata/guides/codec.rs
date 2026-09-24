@@ -2,6 +2,7 @@
 
 use super::model::{Color, ColorKind, Guide, Guides, List, Orientation};
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -171,6 +172,7 @@ struct SourceLayout {
 
 fn scan_source(source: &[u8]) -> Result<SourceLayout> {
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     let mut stack: Vec<SourceFrame> = Vec::new();
     let mut root = None;
     let mut root_close = None;
@@ -180,8 +182,9 @@ fn scan_source(source: &[u8]) -> Result<SourceLayout> {
     let mut nodes = 0usize;
 
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_err| invalid("presentation-guide XML offset overflow"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("presentation-guide XML offset overflow"))?;
         let decoder = reader.decoder();
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
@@ -238,7 +241,9 @@ fn scan_source(source: &[u8]) -> Result<SourceLayout> {
                     root_namespace = presentation_namespace(&namespace);
                     root = Some(SourceSpan {
                         start,
-                        end: reader.buffer_position() as usize,
+                        end: origin.offset(reader.buffer_position()).ok_or_else(|| {
+                            invalid("presentation-guide XML position exceeds usize")
+                        })?,
                         close_start: start,
                         empty: true,
                         qname,
@@ -249,7 +254,9 @@ fn scan_source(source: &[u8]) -> Result<SourceLayout> {
                     }
                     ext_list = Some(SourceSpan {
                         start,
-                        end: reader.buffer_position() as usize,
+                        end: origin.offset(reader.buffer_position()).ok_or_else(|| {
+                            invalid("presentation-guide XML position exceeds usize")
+                        })?,
                         close_start: start,
                         empty: true,
                         qname,
@@ -266,7 +273,9 @@ fn scan_source(source: &[u8]) -> Result<SourceLayout> {
                     }
                     targets[index] = Some(SourceSpan {
                         start,
-                        end: reader.buffer_position() as usize,
+                        end: origin.offset(reader.buffer_position()).ok_or_else(|| {
+                            invalid("presentation-guide XML position exceeds usize")
+                        })?,
                         close_start: start,
                         empty: true,
                         qname,
@@ -281,8 +290,9 @@ fn scan_source(source: &[u8]) -> Result<SourceLayout> {
                 if frame.local != local {
                     return Err(invalid("mismatched presentation-guide closing element"));
                 }
-                let end = usize::try_from(reader.buffer_position())
-                    .map_err(|_err| invalid("presentation-guide XML offset overflow"))?;
+                let end = origin
+                    .offset(reader.buffer_position())
+                    .ok_or_else(|| invalid("presentation-guide XML offset overflow"))?;
                 let span = SourceSpan {
                     start: frame.start,
                     end,

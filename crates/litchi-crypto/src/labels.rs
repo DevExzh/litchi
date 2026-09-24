@@ -7,6 +7,7 @@ use std::collections::HashSet;
 use std::fmt;
 
 use bitflags::bitflags;
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 
@@ -168,6 +169,9 @@ pub fn parse(xml: &[u8]) -> Result<List, Error> {
     }
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(false);
+    // Offsets address `xml`, whose leading byte-order mark precedes reader
+    // position zero.
+    let origin = ReaderOrigin::of(xml);
     let mut buffer = Vec::new();
 
     let declaration = read_event(&mut reader, &mut buffer)?;
@@ -199,8 +203,9 @@ pub fn parse(xml: &[u8]) -> Result<List, Error> {
 
     loop {
         buffer.clear();
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_err| invalid("XML position overflows usize"))?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XML position overflows usize"))?;
         match read_event(&mut reader, &mut buffer)? {
             Event::Empty(element) if has_name(&element, &prefixes, b"label") => {
                 if extension_list_seen {
@@ -329,10 +334,13 @@ fn parse_extension_list(
     prefixes: &HashSet<Vec<u8>>,
     result: &mut List,
 ) -> Result<(), Error> {
+    // `xml` is the reader's input; extension bytes are sliced from it.
+    let origin = ReaderOrigin::of(xml);
     loop {
         buffer.clear();
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_err| invalid("XML position overflows usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XML position overflows usize"))?;
         match read_event(reader, buffer)? {
             Event::Start(element) if has_name(&element, prefixes, b"ext") => {
                 validate_inherited_namespace(&element, prefixes, reader.decoder())?;
@@ -344,8 +352,9 @@ fn parse_extension_list(
                     return Err(invalid("too many extension entries"));
                 }
                 consume_extension(reader, buffer, prefixes)?;
-                let end = usize::try_from(reader.buffer_position())
-                    .map_err(|_err| invalid("XML position overflows usize"))?;
+                let end = origin
+                    .offset(reader.buffer_position())
+                    .ok_or_else(|| invalid("XML position overflows usize"))?;
                 result.extensions.push(Extension {
                     uri,
                     xml: xml
@@ -921,6 +930,42 @@ mod tests {
                 .contains(&format!("xmlns:x=\"{NAMESPACE}\""))
         );
         assert_eq!(parse(&round_trip).unwrap(), parsed);
+    }
+
+    /// Change 0765: a stream that begins with a UTF-8 byte-order mark keeps
+    /// its extension bytes exact and reports errors at byte offsets of the
+    /// stream, three bytes after the reader's uncounted positions.
+    #[test]
+    fn a_byte_order_marked_stream_parses_and_reports_like_an_unmarked_one() {
+        let plain = format!(
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?><x:labelList xmlns:x=\"{NAMESPACE}\"><x:extLst><x:ext uri=\"urn:test\"><future:data xmlns:future=\"urn:future\" value=\"1\"/></x:ext></x:extLst></x:labelList>"
+        );
+        let marked = format!("\u{feff}{plain}");
+        assert_eq!(
+            parse(marked.as_bytes()).unwrap(),
+            parse(plain.as_bytes()).unwrap()
+        );
+
+        let plain = format!(
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?><x:labelList xmlns:x=\"{NAMESPACE}\"><x:unknown/></x:labelList>"
+        );
+        let marked = format!("\u{feff}{plain}");
+        let offset = |xml: &str| {
+            let message = parse(xml.as_bytes()).unwrap_err().to_string();
+            let start = message.find("at byte ").unwrap() + "at byte ".len();
+            message[start..]
+                .chars()
+                .take_while(char::is_ascii_digit)
+                .collect::<String>()
+                .parse::<usize>()
+                .unwrap()
+        };
+        let plain_offset = offset(&plain);
+        assert_eq!(
+            &plain.as_bytes()[plain_offset..plain_offset + 10],
+            b"<x:unknown"
+        );
+        assert_eq!(offset(&marked), plain_offset + 3);
     }
 
     #[test]

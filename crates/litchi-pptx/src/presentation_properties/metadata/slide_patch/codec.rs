@@ -8,6 +8,7 @@
 
 use super::super::is_presentationml_name;
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -75,6 +76,7 @@ pub(crate) fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Ve
         return Err(limit("slide XML bytes"));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut root_seen = false;
@@ -83,8 +85,9 @@ pub(crate) fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Ve
     let mut empty_ext_lst: Option<(usize, usize)> = None;
     let mut root_end = None;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_err| invalid("slide XML offset overflow"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("slide XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
@@ -137,8 +140,9 @@ pub(crate) fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Ve
                     }
                     empty_ext_lst = Some((
                         start,
-                        usize::try_from(reader.buffer_position())
-                            .map_err(|_err| invalid("slide XML offset overflow"))?,
+                        origin
+                            .offset(reader.buffer_position())
+                            .ok_or_else(|| invalid("slide XML offset overflow"))?,
                     ));
                 }
             },

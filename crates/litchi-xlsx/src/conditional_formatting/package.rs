@@ -2,6 +2,7 @@
 
 use std::ops::Range as ByteRange;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::escape::escape;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
@@ -460,6 +461,7 @@ fn scan_layout(xml: &[u8]) -> Result<Layout> {
         return Err(invalid("conditional-formatting worksheet XML is too large"));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -481,9 +483,9 @@ fn scan_layout(xml: &[u8]) -> Result<Layout> {
                 "conditional-formatting worksheet exceeds event limit",
             ));
         }
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (resolved, event) = resolver.resolve_event(event);
         if exact(&resolved, X14) {
@@ -787,9 +789,10 @@ fn validate_owner_element(
     Ok(())
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source| invalid("conditional-formatting XML position does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("conditional-formatting XML position does not fit usize"))
 }
 
 fn spreadsheet_namespace(namespace: &ResolveResult<'_>) -> Option<&'static [u8]> {

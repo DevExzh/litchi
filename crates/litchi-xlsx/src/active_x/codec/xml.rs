@@ -12,6 +12,7 @@ use super::super::{
     MAX_SHAPE_ID, MAX_XML, REL, REL_STRICT, Result, SML, SML_STRICT, X14, XDR, XDR_STRICT, invalid,
     limit, xml_error,
 };
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -272,6 +273,7 @@ pub(crate) fn controls_span(xml: &[u8]) -> Result<ControlsLocation> {
         return Err(limit("worksheet XML bytes"));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut strict = false;
@@ -280,8 +282,9 @@ pub(crate) fn controls_span(xml: &[u8]) -> Result<ControlsLocation> {
     let mut controls_span = None;
     let mut insertion = None;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("worksheet XML offset overflow"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("worksheet XML offset overflow"))?;
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(xml_error)?;
@@ -335,8 +338,9 @@ pub(crate) fn controls_span(xml: &[u8]) -> Result<ControlsLocation> {
                     let start = controls_start
                         .take()
                         .ok_or_else(|| invalid("mismatched controls closing element"))?;
-                    let end = usize::try_from(reader.buffer_position())
-                        .map_err(|_source| invalid("worksheet XML offset overflow"))?;
+                    let end = origin
+                        .offset(reader.buffer_position())
+                        .ok_or_else(|| invalid("worksheet XML offset overflow"))?;
                     controls_span = Some((start, end));
                 }
                 if depth == 1 && element.local_name().as_ref() == b"worksheet" {

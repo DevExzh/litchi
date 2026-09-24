@@ -4,6 +4,7 @@ use super::codec::{validate_element_qname, validate_namespace_declaration, valid
 use super::{Columns, Margins, PageSize, Reference, Section, Start};
 use crate::error::{Error, Result};
 use crate::namespace::is_wordprocessing_namespace;
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::{Position, SourceVersion};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
@@ -649,6 +650,7 @@ fn parse_inventory(xml: &[u8], limits: &Limits) -> Result<Inventory> {
 
 fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     let mut element_stack = Vec::<Vec<u8>>::new();
@@ -671,14 +673,14 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
     };
 
     loop {
-        let event_start = offset(&reader)?;
+        let event_start = offset(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
-        let event_end = offset(&reader)?;
+        let event_end = offset(&reader, origin)?;
         events = events
             .checked_add(1)
             .ok_or_else(|| Error::InvalidFormat("section event counter overflow".into()))?;
@@ -1568,7 +1570,8 @@ fn enforce_limit(resource: &'static str, actual: usize, maximum: usize) -> Resul
     Ok(())
 }
 
-fn offset(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source_error| Error::InvalidFormat("section XML offset overflow".into()))
+fn offset(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::InvalidFormat("section XML offset overflow".into()))
 }

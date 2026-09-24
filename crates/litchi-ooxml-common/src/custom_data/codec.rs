@@ -6,6 +6,7 @@
 
 use super::model::{ExtensionList, Properties};
 use crate::{Error, Result, XmlError};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::QName;
@@ -565,12 +566,13 @@ fn decorated_extension_matches(
 
 fn extension_root_opening(xml: &[u8], limits: &Limits) -> Result<(Range<usize>, Vec<String>)> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut events = 0usize;
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let event = reader.read_event().map_err(xml_error)?;
         count_event(&mut events, limits)?;
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let element = match &event {
             Event::Start(element) | Event::Empty(element) => element,
             Event::Text(text) => {
@@ -1037,6 +1039,7 @@ fn parse_document_with_context(
     )?;
     validate_xml_characters(xml)?;
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut namespaces = NamespaceState::default();
     namespaces.seed(inherited_namespaces, limits)?;
     let mut stack = Vec::<Frame>::new();
@@ -1056,10 +1059,10 @@ fn parse_document_with_context(
     let mut saw_prolog_content = false;
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let event = reader.read_event().map_err(xml_error)?;
         count_event(&mut events, limits)?;
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         match event {
             Event::Start(element) => {
                 nodes = nodes
@@ -1769,9 +1772,12 @@ fn element_name(
     Ok((namespace, local.to_owned()))
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|error| invalid(format!("XML source offset does not fit usize: {error}")))
+/// The byte offset in the reader's input of its current position; `origin`
+/// is that input's [`ReaderOrigin`].
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("XML source offset does not fit usize"))
 }
 
 fn check_structure(nodes: usize, depth: usize, limits: &Limits) -> Result<()> {

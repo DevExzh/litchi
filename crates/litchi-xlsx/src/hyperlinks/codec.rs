@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::Relationships;
 use litchi_opc::constants::relationship_type as rt;
 use quick_xml::XmlVersion;
@@ -859,6 +860,7 @@ where
         )));
     }
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().check_end_names = false;
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
@@ -886,8 +888,9 @@ where
         let event = reader
             .read_event()
             .map_err(|error| invalid(format!("invalid XLSX worksheet hyperlink XML: {error}")))?;
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("XLSX worksheet XML position overflows usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XLSX worksheet XML position overflows usize"))?;
         match event {
             Event::Start(element) => {
                 let start = event_start(xml, end)?;

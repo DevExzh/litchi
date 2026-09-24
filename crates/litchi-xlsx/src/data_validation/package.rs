@@ -12,6 +12,7 @@ use super::{
     STRICT, X14,
 };
 use crate::error::Result;
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::decode_xml_reference;
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
@@ -166,6 +167,7 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<XmlScan> {
         return Err(invalid("data-validation worksheet XML is too large"));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -195,8 +197,9 @@ fn scan_data_validation_xml(xml: &[u8]) -> Result<XmlScan> {
         }
         let start = previous;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("data-validation XML offset overflow"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("data-validation XML offset overflow"))?;
         previous = end;
         let decoder = reader.decoder();
         let resolver = reader.resolver().clone();

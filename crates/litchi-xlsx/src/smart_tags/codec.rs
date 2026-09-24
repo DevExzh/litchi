@@ -1,5 +1,6 @@
 //! Bounded `SpreadsheetML` smart-tag XML conversion.
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use litchi_sheet::Cell as Address;
 use quick_xml::XmlVersion;
@@ -342,6 +343,7 @@ fn locate(xml: &[u8]) -> Result<Location> {
         return Err(invalid("smart-tag worksheet XML exceeds the size limit"));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -352,11 +354,13 @@ fn locate(xml: &[u8]) -> Result<Location> {
     let mut span = None;
     let mut insertion = None;
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("smart-tag XML offset overflow"))?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("smart-tag XML offset overflow"))?;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("smart-tag XML offset overflow"))?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("smart-tag XML offset overflow"))?;
         reject_unsafe_event(&event)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);

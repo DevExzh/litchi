@@ -4,6 +4,7 @@
 //! compact byte spans are allocated while indexing, so reading a large table
 //! does not duplicate its XML subtrees.
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::{
     DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE, decode_xml_reference,
     unqualified_attribute_value,
@@ -254,14 +255,16 @@ fn scan(xml: &[u8], target: &[u8]) -> Result<Vec<Span>> {
         return Err(limit("table XML bytes", MAX_XML_BYTES));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut stack: Vec<(usize, Vec<u8>, bool)> = Vec::new();
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
     let mut spans = Vec::new();
     let mut nodes = 0usize;
 
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_err| invalid("table XML offset exceeds usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("table XML offset exceeds usize"))?;
         let event = {
             let (namespace, event) = reader
                 .read_resolved_event()
@@ -296,8 +299,9 @@ fn scan(xml: &[u8], target: &[u8]) -> Result<Vec<Span>> {
                 _ => ScanEvent::Other,
             }
         };
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_err| invalid("table XML offset exceeds usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("table XML offset exceeds usize"))?;
         nodes = nodes
             .checked_add(1)
             .ok_or_else(|| invalid("table XML node count overflow"))?;

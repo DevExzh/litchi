@@ -7,6 +7,7 @@
     reason = "parser bindings are intentionally refined after validation"
 )]
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::constants::relationship_type;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -107,14 +108,18 @@ pub fn active(xml: &[u8], offsets: &[u32]) -> Result<Vec<u32>> {
 pub fn scan(xml: &[u8]) -> Result<BTreeMap<u32, Chunk>> {
     validate_xml(xml)?;
     let mut reader = NsReader::from_reader(xml);
+    // Chunk keys are byte offsets into `xml`, whose leading byte-order mark
+    // precedes reader position zero.
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut pending: Option<PendingChunk> = None;
     let mut chunks = BTreeMap::new();
 
     loop {
-        let event_start = u32::try_from(reader.buffer_position()).map_err(|_source_error| {
-            Error::Invalid("altChunk XML offset does not fit u32".into())
-        })?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .and_then(|offset| u32::try_from(offset).ok())
+            .ok_or_else(|| Error::Invalid("altChunk XML offset does not fit u32".into()))?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()

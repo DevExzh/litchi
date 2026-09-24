@@ -13,6 +13,7 @@
 
 use crate::alt::{Chunk, Rel, active};
 use crate::error::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::events::BytesStart;
 use quick_xml::events::Event;
@@ -249,14 +250,16 @@ struct FrozenPendingChunk {
 fn frozen_alt_scan(xml: &[u8]) -> Result<BTreeMap<u32, Chunk>> {
     frozen_alt_validate_xml(xml)?;
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut pending: Option<FrozenPendingChunk> = None;
     let mut chunks = BTreeMap::new();
 
     loop {
-        let event_start = u32::try_from(reader.buffer_position()).map_err(|_source_error| {
-            Error::Invalid("altChunk XML offset does not fit u32".into())
-        })?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .and_then(|offset| u32::try_from(offset).ok())
+            .ok_or_else(|| Error::Invalid("altChunk XML offset does not fit u32".into()))?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
@@ -615,13 +618,14 @@ fn frozen_scan_word_element_ranges(
     }
 
     let mut reader = NsReader::from_reader(xml_bytes);
+    let origin = ReaderOrigin::of(xml_bytes);
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
     let mut capture: Option<(usize, usize, usize)> = None;
     let mut nodes = 0usize;
     let mut total_depth = 0usize;
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+        let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
             Error::InvalidFormat("Word XML offset does not fit usize".to_string())
         })?;
         let event = {
@@ -703,7 +707,7 @@ fn frozen_scan_word_element_ranges(
                 | Event::GeneralRef(_) => ScanEvent::Other,
             }
         };
-        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+        let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
             Error::InvalidFormat("Word XML offset does not fit usize".to_string())
         })?;
 

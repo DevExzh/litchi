@@ -6,6 +6,7 @@ use super::xml::{
     Fragment, attr, attribute, close, only_attributes, open, resolve_namespace, scan,
 };
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 
@@ -334,12 +335,15 @@ fn locate_commands(xml: &[u8]) -> Result<Vec<(usize, usize, Changes)>> {
         return Err(invalid("comment change descriptor is too large"));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut stack = Vec::new();
     let mut output = Vec::new();
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XML source position exceeds usize"))?;
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(super::xml::xml_error)?;
@@ -355,7 +359,9 @@ fn locate_commands(xml: &[u8]) -> Result<Vec<(usize, usize, Changes)>> {
                 let local = String::from_utf8(element.local_name().as_ref().to_vec())
                     .map_err(super::xml::xml_error)?;
                 if namespace == PC226 && local == "cmChg" {
-                    let end = reader.buffer_position() as usize;
+                    let end = origin
+                        .offset(reader.buffer_position())
+                        .ok_or_else(|| invalid("XML source position exceeds usize"))?;
                     output.push((start, end, parse_comment_changes(&xml[start..end])?));
                 }
             },
@@ -369,7 +375,9 @@ fn locate_commands(xml: &[u8]) -> Result<Vec<(usize, usize, Changes)>> {
                     return Err(invalid("mismatched change command element"));
                 }
                 if open.namespace == PC226 && open.local == "cmChg" {
-                    let end = reader.buffer_position() as usize;
+                    let end = origin
+                        .offset(reader.buffer_position())
+                        .ok_or_else(|| invalid("XML source position exceeds usize"))?;
                     output.push((
                         open.start,
                         end,

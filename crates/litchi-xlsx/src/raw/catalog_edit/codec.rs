@@ -1,5 +1,6 @@
 //! `SpreadsheetML` scanning and exact-span XML primitives for catalog edits.
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::XmlVersion;
@@ -112,16 +113,17 @@ pub(super) fn rewrite_slot(
 
 pub(super) fn scan(content: &[u8]) -> Result<Layout> {
     let mut reader = NsReader::from_reader(content);
+    let origin = ReaderOrigin::of(content);
     let mut scanner = Scanner::default();
     let mut stack = Vec::<Frame>::new();
     loop {
-        let event_start = position(&reader)?;
+        let event_start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
             .map_err(|error| invalid(error.to_string()))?
             .into_owned();
-        let event_end = position(&reader)?;
+        let event_end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -754,7 +756,8 @@ fn is_order_dependency_name(namespace: &ResolveResult<'_>, element: &BytesStart<
     .any(|local| is_spreadsheetml_name(namespace, element.name(), local))
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source| invalid("workbook XML position does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("workbook XML position does not fit usize"))
 }

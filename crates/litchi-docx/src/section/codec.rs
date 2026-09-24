@@ -43,6 +43,7 @@ use super::model::{
 use crate::error::{Error, Result};
 use crate::header_footer::Kind;
 use crate::namespace::is_wordprocessing_namespace;
+use litchi_core::xml::ReaderOrigin;
 use litchi_drawingml::coordinate::{Coordinate, Unit};
 use litchi_ooxml_common::xml_name::{is_ncname, is_qualified_name};
 use quick_xml::events::{BytesStart, Event};
@@ -735,6 +736,7 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
         )));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
 
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
@@ -755,7 +757,7 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
     let mut nodes = 0usize;
 
     loop {
-        let event_start = offset(&reader)?;
+        let event_start = offset(&reader, origin)?;
         let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event()
@@ -782,7 +784,7 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
         }
         let word_element = is_word_element(&namespace, &fragment_prefix);
         let event_word_namespace = resolved_word_namespace(&namespace);
-        let event_end = offset(&reader)?;
+        let event_end = offset(&reader, origin)?;
         if matches!(event, Event::Start(_) | Event::Empty(_)) {
             nodes = nodes.checked_add(1).ok_or_else(|| {
                 Error::InvalidFormat("section XML element counter overflow".into())
@@ -1276,19 +1278,22 @@ pub(crate) fn parse_universal_twips(value: &str, description: &str) -> Result<i6
 
 fn direct_children(xml: &[u8]) -> Result<Vec<(String, Vec<u8>)>> {
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     let mut root = false;
     let mut start = None;
     let mut output = Vec::new();
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_source_error| Error::InvalidFormat("section XML offset overflow".into()))?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::InvalidFormat("section XML offset overflow".into()))?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_source_error| Error::InvalidFormat("section XML offset overflow".into()))?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::InvalidFormat("section XML offset overflow".into()))?;
         match event {
             Event::Start(element) => {
                 if depth == 0 {
@@ -1554,9 +1559,10 @@ fn required_attribute(raw: &Raw, xml: &[u8], name: &[u8]) -> Result<String> {
     })
 }
 
-fn offset(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source_error| Error::InvalidFormat("section XML offset overflow".into()))
+fn offset(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::InvalidFormat("section XML offset overflow".into()))
 }
 
 fn element_prefix(element: &BytesStart<'_>) -> Option<Vec<u8>> {

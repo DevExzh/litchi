@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::{OpcPackage, Part};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -130,6 +131,7 @@ pub(crate) fn read_owner(xml: &[u8]) -> Result<Owner> {
     }
 
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut namespaces = HashMap::<String, String>::new();
     let mut stack = Vec::<OwnerFrame>::new();
     let mut entries = Vec::<Zoom>::new();
@@ -144,8 +146,9 @@ pub(crate) fn read_owner(xml: &[u8]) -> Result<Owner> {
     let mut roots = 0usize;
 
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_err| Error::Invalid("zoom XML offset exceeds usize".into()))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Invalid("zoom XML offset exceeds usize".into()))?;
         let decoder = reader.decoder();
         let (namespace, event) = {
             let (namespace, event) = reader
@@ -153,8 +156,9 @@ pub(crate) fn read_owner(xml: &[u8]) -> Result<Owner> {
                 .map_err(|error| Error::Xml(error.to_string()))?;
             (resolved_namespace(namespace)?, event.into_owned())
         };
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_err| Error::Invalid("zoom XML offset exceeds usize".into()))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Invalid("zoom XML offset exceeds usize".into()))?;
 
         match event {
             Event::Start(element) => {
@@ -821,14 +825,16 @@ fn parse_dom(raw: &[u8], inherited: &HashMap<String, String>) -> Result<Dom> {
     xml.extend_from_slice(raw);
     xml.extend_from_slice(b"</z:root>");
     let mut reader = NsReader::from_reader(xml.as_slice());
+    let origin = ReaderOrigin::of(xml.as_slice());
     let mut namespaces = inherited.clone();
     namespaces.insert("z".into(), WRAPPER_NS.into());
     let mut frames = Vec::<DomFrame>::new();
     let mut root = None;
     let mut nodes = 0usize;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_err| Error::Invalid("zoom DOM offset exceeds usize".into()))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Invalid("zoom DOM offset exceeds usize".into()))?;
         let decoder = reader.decoder();
         let (namespace, event) = {
             let (namespace, event) = reader
@@ -836,8 +842,9 @@ fn parse_dom(raw: &[u8], inherited: &HashMap<String, String>) -> Result<Dom> {
                 .map_err(|error| Error::Xml(error.to_string()))?;
             (resolved_namespace(namespace)?, event.into_owned())
         };
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_err| Error::Invalid("zoom DOM offset exceeds usize".into()))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Invalid("zoom DOM offset exceeds usize".into()))?;
         match event {
             Event::Start(element) => {
                 nodes += 1;

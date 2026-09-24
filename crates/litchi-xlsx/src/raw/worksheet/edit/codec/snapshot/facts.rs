@@ -21,6 +21,7 @@
 //! would accept identically. A decline is never an error: the commit then
 //! runs today's scan and produces today's bytes and today's diagnostics.
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_sheet::{COLUMNS, Cell as Address, ROWS, Rect};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -660,6 +661,7 @@ pub(crate) fn materialize_cell(content: &[u8], fact: &CellFact) -> Result<Option
         return Ok(None);
     };
     let mut reader = Reader::from_reader(slice);
+    let origin = ReaderOrigin::of(slice);
     reader.config_mut().check_end_names = true;
     let decoder = reader.decoder();
     let Ok(first) = reader.read_event() else {
@@ -673,7 +675,7 @@ pub(crate) fn materialize_cell(content: &[u8], fact: &CellFact) -> Result<Option
     if element.name().local_name().as_ref() != b"c" {
         return Ok(None);
     }
-    let tag_end = start + relative_position(&reader)?;
+    let tag_end = start + relative_position(&reader, origin)?;
     let slot_tag = cell_tag(&element, decoder)?;
     if empty {
         if tag_end != end {
@@ -696,11 +698,11 @@ pub(crate) fn materialize_cell(content: &[u8], fact: &CellFact) -> Result<Option
     let mut child_start = 0usize;
     let close_start;
     loop {
-        let cursor = start + relative_position(&reader)?;
+        let cursor = start + relative_position(&reader, origin)?;
         let Ok(event) = reader.read_event() else {
             return Ok(None);
         };
-        let after = start + relative_position(&reader)?;
+        let after = start + relative_position(&reader, origin)?;
         match event {
             Event::Start(child) => {
                 if !admitted_child(&child, depth) {
@@ -753,7 +755,7 @@ pub(crate) fn materialize_cell(content: &[u8], fact: &CellFact) -> Result<Option
             Event::DocType(_) => return Ok(None),
         }
     }
-    if start + relative_position(&reader)? != end {
+    if start + relative_position(&reader, origin)? != end {
         return Ok(None);
     }
     Ok(Some(CellSlot {
@@ -806,9 +808,10 @@ pub(crate) fn materialize_tag(content: &[u8], span: Span) -> Result<Option<Tag>>
     Ok(Some(tag(&element, decoder)?))
 }
 
-fn relative_position(reader: &Reader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source| invalid("worksheet XML position does not fit usize"))
+fn relative_position(reader: &Reader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("worksheet XML position does not fit usize"))
 }
 
 #[cfg(test)]

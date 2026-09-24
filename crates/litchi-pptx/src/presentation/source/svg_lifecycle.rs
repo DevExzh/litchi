@@ -10,6 +10,7 @@
 
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::reader::{NsReader, Reader};
@@ -630,11 +631,9 @@ where
             source,
         })?;
     for layout in &layouts {
-        // The source owner range is authoritative.  In particular, the
-        // semantic Scene index reports spans in its BOM-stripped scanner
-        // buffer, which is three bytes early for a BOM-prefixed source.  Use
-        // the raw range captured by the full-slide owner walk so relationship
-        // parsing never consumes the preceding `...r/>` bytes.
+        // The source owner range is authoritative: it comes from the
+        // full-slide owner walk, which also validates the picture layout, so
+        // relationship parsing uses it rather than the Scene fragment.
         let _scene_picture_xml = picture_xmls
             .next()
             .ok_or_else(|| Error::Invalid("picture layout/source count differs".into()))?;
@@ -1264,6 +1263,7 @@ fn ext_list_contains_only_svg(xml: &[u8], ext_list: &ElementRange, svg: ByteRang
         .get(ext_list.start_end..end)
         .ok_or_else(|| Error::Invalid("extLst child range is outside slide XML".into()))?;
     let mut reader = NsReader::from_reader(children);
+    let origin = ReaderOrigin::of(children);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
@@ -1271,13 +1271,15 @@ fn ext_list_contains_only_svg(xml: &[u8], ext_list: &ElementRange, svg: ByteRang
     let mut depth = 0usize;
     let mut direct_ext_start = None;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("extLst child offset exceeds usize".into()))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Invalid("extLst child offset exceeds usize".into()))?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("extLst child end exceeds usize".into()))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Invalid("extLst child end exceeds usize".into()))?;
         match event {
             Event::Start(element) => {
                 if depth == 0 {
@@ -1501,29 +1503,23 @@ fn root_element_range(xml: &[u8]) -> Result<ByteRange> {
     // quick-xml reports offsets relative to the byte stream it consumes.  A
     // UTF-8 BOM is legal before the document element but is not represented
     // by an event, so source ranges must include it when they are applied to
-    // the original slide bytes.
-    let source_prefix = if xml.starts_with(b"\xEF\xBB\xBF") {
-        3
-    } else {
-        0
-    };
+    // the original slide bytes: the reader origin adds it.
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
     let mut root = None;
     let mut buffer = Vec::new();
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("slide XML root offset exceeds usize".into()))?
-            .checked_add(source_prefix)
+        let start = origin
+            .offset(reader.buffer_position())
             .ok_or_else(|| Error::Invalid("slide XML root offset exceeds usize".into()))?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("slide XML root end exceeds usize".into()))?
-            .checked_add(source_prefix)
+        let end = origin
+            .offset(reader.buffer_position())
             .ok_or_else(|| Error::Invalid("slide XML root end exceeds usize".into()))?;
         match event {
             Event::Start(_) => {
@@ -1574,23 +1570,17 @@ fn relationship_id_is_referenced_elsewhere(
     let selected = selected_picture_layout(slide_xml, selected_image_position)?;
     let selected_extension = selected.svg_extension;
     let mut reader = Reader::from_reader(slide_xml);
-    let source_prefix = if slide_xml.starts_with(b"\xEF\xBB\xBF") {
-        3usize
-    } else {
-        0usize
-    };
+    let origin = ReaderOrigin::of(slide_xml);
     let mut buffer = Vec::new();
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("SVG relationship scan position overflows".into()))?
-            .checked_add(source_prefix)
+        let event_start = origin
+            .offset(reader.buffer_position())
             .ok_or_else(|| Error::Invalid("SVG relationship scan position overflows".into()))?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| Error::Invalid("SVG relationship scan position overflows".into()))?
-            .checked_add(source_prefix)
+        let event_end = origin
+            .offset(reader.buffer_position())
             .ok_or_else(|| Error::Invalid("SVG relationship scan position overflows".into()))?;
         match event {
             Event::Start(element) | Event::Empty(element) => {

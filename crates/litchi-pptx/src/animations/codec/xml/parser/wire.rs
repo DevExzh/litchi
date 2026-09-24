@@ -13,6 +13,7 @@ use super::validation::{
     parse_xml_bool,
 };
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -29,6 +30,14 @@ struct RecursiveNodeFrame {
 
 pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
     let mut reader = NsReader::from_reader(xml.as_bytes());
+    // The retained timing source is sliced from `xml`, whose leading
+    // byte-order mark precedes reader position zero.
+    let origin = ReaderOrigin::of(xml.as_bytes());
+    let offset = |position: u64| {
+        origin
+            .offset(position)
+            .ok_or_else(|| invalid("animation timing offset exceeds usize"))
+    };
     let mut depth = 0usize;
     let mut count = 0usize;
     let mut timing_depth = None;
@@ -40,7 +49,7 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
     let mut condition: Option<(usize, bool, TimeCondition)> = None;
     let mut source_range = None;
     loop {
-        let event_start = reader.buffer_position();
+        let event_start = offset(reader.buffer_position())?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -310,7 +319,7 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
                 {
                     source_range = Some(
                         timing_start.ok_or_else(|| invalid("animation timing start is missing"))?
-                            ..reader.buffer_position(),
+                            ..offset(reader.buffer_position())?,
                     );
                     timing_depth = None;
                 }
@@ -326,7 +335,6 @@ pub(super) fn parse_recursive_timing_tree(xml: &str) -> Result<TimingTree> {
         return Err(invalid("incomplete recursive animation timing tree"));
     }
     let range = source_range.ok_or_else(|| invalid("animation timing subtree is missing"))?;
-    let range = (range.start as usize)..(range.end as usize);
     let source = xml
         .get(range)
         .ok_or_else(|| invalid("animation timing range is invalid"))?
@@ -384,6 +392,7 @@ fn p14_attribute(
 
 pub(super) fn parse_processed_timing(xml: &[u8], require_valid_targets: bool) -> Result<Sequence> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(true);
     let mut parser = TimingParser::new(require_valid_targets);
     let mut depth = 0usize;
@@ -391,8 +400,9 @@ pub(super) fn parse_processed_timing(xml: &[u8], require_valid_targets: bool) ->
     let mut text_bytes = 0usize;
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_err| invalid("animation XML offset does not fit usize"))?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("animation XML offset does not fit usize"))?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
@@ -400,8 +410,9 @@ pub(super) fn parse_processed_timing(xml: &[u8], require_valid_targets: bool) ->
             .into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_err| invalid("animation XML offset does not fit usize"))?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("animation XML offset does not fit usize"))?;
         nodes = nodes
             .checked_add(1)
             .ok_or_else(|| invalid("animation XML node counter overflow"))?;

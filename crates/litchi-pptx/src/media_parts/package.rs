@@ -5,6 +5,7 @@ use super::{
     STRICT_AUDIO_REL, STRICT_VIDEO_REL, TimeParseError, bounded, ct, document_conformance, invalid,
     limit, parse, rt, validate_id, write_pictures, xml_error,
 };
+use litchi_core::xml::ReaderOrigin;
 
 /// # Errors
 ///
@@ -225,12 +226,14 @@ pub fn store(
 
 fn insert_pictures(xml: &[u8], fragment: &[u8], conformance: Conformance) -> Result<Vec<u8>> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut sp_tree_depth = None;
     let mut position = None;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_err| invalid("slide XML offset overflow"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("slide XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {

@@ -10,6 +10,7 @@
 
 use std::{collections::HashSet, ops::Range, sync::Arc};
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml_name::{is_ncname, is_qualified_name};
 use quick_xml::{
@@ -447,6 +448,7 @@ fn preflight_namespace_limits(xml: &[u8]) -> Result<()> {
 fn scan_attribute(xml: &[u8]) -> Result<ParsedAttribute> {
     preflight_namespace_limits(xml)?;
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
@@ -456,16 +458,17 @@ fn scan_attribute(xml: &[u8]) -> Result<ParsedAttribute> {
     let mut buffer = Vec::new();
     let mut parsed = None;
     loop {
-        let event_start = position(&reader)?;
+        let event_start = position(&reader, origin)?;
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(xml_event_error)?;
         let namespace_result = resolved_namespace(&resolved);
         let event = event.into_owned();
-        let event_end = position(&reader)?;
+        let event_end = position(&reader, origin)?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                if event_start != 0 || parsed.is_some() {
+                // Only a leading byte-order mark may precede the tag.
+                if event_start != origin.skipped() || parsed.is_some() {
                     return Err(invalid(
                         "formatcode2 attribute fragment must contain one start tag",
                     ));
@@ -1033,6 +1036,7 @@ fn apply_replacements(
 fn scan(xml: &[u8]) -> Result<Parsed> {
     preflight_namespace_limits(xml)?;
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
@@ -1056,13 +1060,13 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
     let mut root_empty = false;
 
     loop {
-        let event_start = position(&reader)?;
+        let event_start = position(&reader, origin)?;
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(xml_event_error)?;
         let namespace = resolved_namespace(&resolved)?;
         let event = event.into_owned();
-        let event_end = position(&reader)?;
+        let event_end = position(&reader, origin)?;
         if !root_seen && !matches!(&event, Event::Decl(_) | Event::Eof) {
             pre_root_event_seen = true;
         }
@@ -1836,9 +1840,10 @@ fn validate_processing_instruction(instruction: &BytesPI<'_>) -> Result<()> {
     validate_xml_text(content, "formatcode2 processing-instruction")
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("formatcode2 XML position exceeds usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("formatcode2 XML position exceeds usize"))
 }
 
 fn xml_error(error: impl std::fmt::Display) -> Error {

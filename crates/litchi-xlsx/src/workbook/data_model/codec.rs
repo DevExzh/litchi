@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::ops::Range;
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, PrefixDeclaration, ResolveResult};
@@ -639,15 +640,18 @@ fn locate_model_time_groupings(xml: &[u8]) -> Result<TimeGroupingSpans> {
         return Err(limit("extension bytes"));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut stack: Vec<ElementFrame> = Vec::new();
     let mut found = TimeGroupingSpans::default();
     let mut nodes = 0usize;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_source| limit("modelTimeGroupings source position"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| limit("modelTimeGroupings source position"))?;
         let event = reader.read_event().map_err(xml_error)?;
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_source| limit("modelTimeGroupings source position"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| limit("modelTimeGroupings source position"))?;
         match event {
             Event::Start(element) => {
                 nodes = nodes.checked_add(1).ok_or_else(|| limit("XML structure"))?;
@@ -1316,17 +1320,20 @@ pub(crate) fn rewrite_data_model_extension(
     fragment: Option<&[u8]>,
 ) -> Result<litchi_opc::OwnedXmlPart> {
     let mut reader = NsReader::from_reader(source.bytes());
+    let origin = ReaderOrigin::of(source.bytes());
     let mut depth = 0usize;
     let mut root_tag = None;
     let mut list_tag = None;
     let mut model_tag = None;
     let mut in_list = false;
     loop {
-        let start =
-            usize::try_from(reader.buffer_position()).map_err(|_| limit("rewrite position"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| limit("rewrite position"))?;
         let event = reader.read_event().map_err(xml_error)?;
-        let end =
-            usize::try_from(reader.buffer_position()).map_err(|_| limit("rewrite position"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| limit("rewrite position"))?;
         let is_start = matches!(&event, Event::Start(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
@@ -1413,13 +1420,16 @@ pub(crate) fn rewrite_load_version(
     let (owner_start, owner_end) = find_data_model_extension(xml, core)?
         .ok_or_else(|| invalid("workbook has no Data Model extension"))?;
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     loop {
-        let start =
-            usize::try_from(reader.buffer_position()).map_err(|_| limit("rewrite position"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| limit("rewrite position"))?;
         let event = reader.read_event().map_err(xml_error)?;
-        let end =
-            usize::try_from(reader.buffer_position()).map_err(|_| limit("rewrite position"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| limit("rewrite position"))?;
         let is_start = matches!(&event, Event::Start(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
@@ -1467,15 +1477,18 @@ pub(crate) fn rewrite_load_version(
 
 fn find_data_model_extension(xml: &[u8], core: &str) -> Result<Option<(usize, usize)>> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut open = None;
     let mut found = None;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_source| limit("rewrite position"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| limit("rewrite position"))?;
         let event = reader.read_event().map_err(xml_error)?;
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_source| limit("rewrite position"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| limit("rewrite position"))?;
         match event {
             Event::Start(element) => {
                 let namespace = resolved(reader.resolver().resolve_element(element.name()).0)?;
@@ -1665,6 +1678,7 @@ pub(crate) fn parse_document_with_base(xml: &[u8], initial_base: Option<&str>) -
     }
     std::str::from_utf8(xml).map_err(xml_error)?;
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut stack: Vec<Node> = Vec::new();
     let mut contexts: Vec<XmlContext> = Vec::new();
     let initial_context = XmlContext {
@@ -1676,9 +1690,13 @@ pub(crate) fn parse_document_with_base(xml: &[u8], initial_base: Option<&str>) -
     let mut strings = 0usize;
     let mut opaque_depth = None;
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Data Model XML offset exceeds usize"))?;
         let event = reader.read_event().map_err(xml_error)?;
-        let end = reader.buffer_position() as usize;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Data Model XML offset exceeds usize"))?;
         if opaque_depth.is_some() {
             let capture = stack
                 .last()

@@ -13,6 +13,7 @@ use litchi_ooxml_common::mce::{Capabilities, Limits, Name, process_markup_compat
 
 use litchi_ooxml_common::private::{in_scope_declarations, with_in_scope_namespaces};
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::encoding::Decoder;
 
 use quick_xml::events::{BytesStart, Event};
@@ -296,6 +297,7 @@ pub(crate) fn capture_conditional_formatting(xml: &[u8]) -> Result<Vec<Captured>
 fn parse_container(fragment: &Captured) -> Result<Formatting> {
     let wrapped = wrap(&fragment.prefix, &fragment.bytes);
     let mut reader = NsReader::from_reader(wrapped.as_slice());
+    let origin = ReaderOrigin::of(wrapped.as_slice());
     let mut ranges = Vec::new();
     let mut pivot = false;
     let mut rules = Vec::new();
@@ -305,13 +307,13 @@ fn parse_container(fragment: &Captured) -> Result<Formatting> {
     let mut depth = 0usize;
     loop {
         let decoder = reader.decoder();
-        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source| {
-            invalid("conditional-formatting XML offset exceeds platform size")
-        })?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("conditional-formatting XML offset exceeds platform size"))?;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source| {
-            invalid("conditional-formatting XML offset exceeds platform size")
-        })?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("conditional-formatting XML offset exceeds platform size"))?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         if let Some((capture_depth, formulas, writer)) = capture.as_mut() {
@@ -473,6 +475,7 @@ fn parse_rule(raw: &[u8], source: Source) -> Result<Rule> {
         .map(|value| parse_dxf(&value.bytes, Inherited::Verbatim))
         .transpose()?;
     let mut reader = NsReader::from_reader(wrapped.as_slice());
+    let origin = ReaderOrigin::of(wrapped.as_slice());
     let mut rule = Rule {
         source,
         rule_type: None,
@@ -498,13 +501,13 @@ fn parse_rule(raw: &[u8], source: Source) -> Result<Rule> {
     let mut payload = PayloadBuilder::new(source);
     loop {
         let decoder = reader.decoder();
-        let event_start = usize::try_from(reader.buffer_position()).map_err(|_source| {
-            invalid("conditional-formatting XML offset exceeds platform size")
-        })?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("conditional-formatting XML offset exceeds platform size"))?;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let event_end = usize::try_from(reader.buffer_position()).map_err(|_source| {
-            invalid("conditional-formatting XML offset exceeds platform size")
-        })?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("conditional-formatting XML offset exceeds platform size"))?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {

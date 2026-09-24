@@ -5,6 +5,7 @@
 //! This module edits only that boolean and inserts the minimal view structure
 //! when no direct view exists and schema order is unambiguous.
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::XmlVersion;
@@ -258,16 +259,17 @@ fn verify(content: &[u8], selected: bool, context: Context<'_>) -> Result<()> {
 
 fn scan(content: &[u8]) -> Result<Layout> {
     let mut reader = NsReader::from_reader(content);
+    let origin = ReaderOrigin::of(content);
     let mut scanner = Scanner::default();
     let mut stack = Vec::<Frame>::new();
     loop {
-        let event_start = position(&reader)?;
+        let event_start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
             .map_err(|error| invalid(error.to_string()))?
             .into_owned();
-        let event_end = position(&reader)?;
+        let event_end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -660,9 +662,10 @@ fn is_mce_name(namespace: &ResolveResult<'_>, element: &BytesStart<'_>, local: &
         && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == MCE)
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source| invalid("sheet XML position does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("sheet XML position does not fit usize"))
 }
 
 #[cfg(test)]

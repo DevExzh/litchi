@@ -2,6 +2,7 @@
 
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
@@ -765,13 +766,14 @@ fn active_choice(
     // Read from the slide root so inherited PML and MCE bindings remain in
     // scope. A detached AlternateContent fragment cannot resolve those names.
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut stack: Vec<Option<ActiveChoice>> = Vec::new();
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let (namespace, event) = reader.resolver().resolve_event(event);
         match event {
             Event::Start(element) => {
@@ -983,9 +985,10 @@ fn transition_start_offsets(
         .get(owner.clone())
         .ok_or_else(|| invalid("AlternateContent owner range is outside its slide"))?;
     let mut reader = NsReader::from_reader(owner_bytes);
+    let origin = ReaderOrigin::of(owner_bytes);
     let mut offsets = Vec::new();
     loop {
-        let local_start = position(&reader)?;
+        let local_start = position(&reader, origin)?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -1019,14 +1022,15 @@ fn transition_element_range(xml: &[u8], wanted_start: usize) -> Result<Option<Ra
         return Err(invalid("transition offset is outside its slide"));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut stack: Vec<Vec<u8>> = Vec::new();
     let mut wanted = None;
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         match event {
             Event::Start(element) => {
                 let name = element.name().as_ref().to_vec();
@@ -1062,13 +1066,14 @@ fn transition_element_range(xml: &[u8], wanted_start: usize) -> Result<Option<Ra
 
 fn first_transition_range(xml: &str) -> Result<Range<usize>> {
     let mut reader = NsReader::from_reader(xml.as_bytes());
+    let origin = ReaderOrigin::of(xml.as_bytes());
     let mut stack: Vec<(Vec<u8>, usize)> = Vec::new();
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let (namespace, event) = reader.resolver().resolve_event(event);
         match event {
             Event::Start(element) => {
@@ -1076,11 +1081,11 @@ fn first_transition_range(xml: &str) -> Result<Range<usize>> {
                 stack.push((element.name().as_ref().to_vec(), start));
                 if is_transition {
                     loop {
-                        let inner_end = position(&reader)?;
+                        let inner_end = position(&reader, origin)?;
                         let event = reader
                             .read_event()
                             .map_err(|error| Error::Xml(error.to_string()))?;
-                        let final_end = position(&reader)?;
+                        let final_end = position(&reader, origin)?;
                         match event {
                             Event::Start(element) => {
                                 stack.push((element.name().as_ref().to_vec(), inner_end));
@@ -1401,6 +1406,7 @@ fn validate_target(value: &Transition, operation: &'static str) -> Result<()> {
 
 fn locate(xml: &[u8], operation: &'static str) -> Result<Layout> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut root_seen = false;
@@ -1416,11 +1422,11 @@ fn locate(xml: &[u8], operation: &'static str) -> Result<Layout> {
     let mut child_counts = [0u8; 5];
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let (namespace, event) = reader.resolver().resolve_event(event);
         match event {
             Event::Start(element) => {
@@ -1970,9 +1976,10 @@ fn enter_depth(depth: usize) -> Result<usize> {
     }
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_error| invalid("source-backed transition XML position exceeds usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("source-backed transition XML position exceeds usize"))
 }
 
 fn invalid(message: &str) -> Error {

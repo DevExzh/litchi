@@ -7,6 +7,7 @@ use super::{
     allocation, invalid, limit, xml_error,
 };
 use crate::Result;
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
@@ -287,6 +288,7 @@ pub(super) fn scan(xml: &[u8]) -> Result<Parsed> {
     }
     std::str::from_utf8(xml).map_err(xml_error)?;
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
     let mut nodes = 0usize;
@@ -299,10 +301,10 @@ pub(super) fn scan(xml: &[u8]) -> Result<Parsed> {
     let mut open = None;
 
     loop {
-        let start = xml_position(&reader)?;
+        let start = xml_position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader.read_event().map_err(xml_error)?.into_owned();
-        let end = xml_position(&reader)?;
+        let end = xml_position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -765,7 +767,8 @@ fn bump_node(nodes: &mut usize) -> Result<()> {
     }
 }
 
-fn xml_position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| invalid("table-style XML offset exceeds usize"))
+fn xml_position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("table-style XML offset exceeds usize"))
 }

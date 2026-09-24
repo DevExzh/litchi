@@ -30,6 +30,7 @@ use crate::tag::{
     validate_selected_relationship,
 };
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{OffsetLimits, active_offsets};
 use litchi_opc::{OpcPackage, PackURI, Part as OpcPart, XmlPart};
 use quick_xml::events::{BytesStart, Event};
@@ -421,6 +422,7 @@ fn raw_shape_span(
         ActiveShapes::Offsets(active.into_iter().peekable())
     };
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut frames = Vec::new();
     let mut nodes = 0usize;
     let mut mapped = 0usize;
@@ -428,7 +430,7 @@ fn raw_shape_span(
     let mut selected = None;
 
     loop {
-        let start = xml_position(&reader)?;
+        let start = xml_position(&reader, origin)?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let classification = match &event {
             Event::Start(element) | Event::Empty(element) => Some((
@@ -438,7 +440,7 @@ fn raw_shape_span(
             _ => None,
         };
         drop(namespace);
-        let end = xml_position(&reader)?;
+        let end = xml_position(&reader, origin)?;
         match event {
             Event::Start(_) => {
                 bump_nodes(&mut nodes)?;
@@ -568,10 +570,11 @@ fn raw_shape_offsets(xml: &[u8]) -> Result<Vec<u32>> {
         });
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut offsets = Vec::new();
     let mut nodes = 0usize;
     loop {
-        let start = xml_position(&reader)?;
+        let start = xml_position(&reader, origin)?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
@@ -626,6 +629,7 @@ pub(super) fn scan_layout(xml: &[u8], shape_span: Range<usize>) -> Result<Layout
     let active = active_pml_offsets(xml, &shape_span)?;
     let mut active = active.into_iter().peekable();
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut raw = Vec::new();
     let mut semantic = Vec::new();
@@ -639,11 +643,11 @@ pub(super) fn scan_layout(xml: &[u8], shape_span: Range<usize>) -> Result<Layout
     let mut anchor = None;
 
     loop {
-        let start = xml_position(&reader)?;
+        let start = xml_position(&reader, origin)?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let profile = pml(&namespace);
         drop(namespace);
-        let end = xml_position(&reader)?;
+        let end = xml_position(&reader, origin)?;
         if start >= shape_span.end && raw.is_empty() && conformance.is_some() {
             break;
         }

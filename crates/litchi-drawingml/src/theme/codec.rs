@@ -2,6 +2,7 @@
 
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::process_ooxml;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::events::{BytesStart, Event};
@@ -788,14 +789,17 @@ fn adjust_replacement_namespace(
 
 fn replacement_root_attribute_range(xml: &[u8], wanted: &[u8]) -> Result<Option<Range<usize>>> {
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("theme replacement offset exceeds usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("theme replacement offset exceeds usize"))?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("theme replacement offset exceeds usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("theme replacement offset exceeds usize"))?;
         match event {
             Event::Start(_) | Event::Empty(_) => {
                 let raw = xml
@@ -889,6 +893,7 @@ fn direct_scheme_range(xml: &[u8], target: &[u8]) -> Result<Option<Range<usize>>
         return Err(invalid("unsupported theme scheme for replacement"));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().check_end_names = true;
     reader
         .resolver_mut()
@@ -899,13 +904,15 @@ fn direct_scheme_range(xml: &[u8], target: &[u8]) -> Result<Option<Range<usize>>
     let mut found = None;
     let mut target_namespace = None;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("theme XML offset exceeds usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("theme XML offset exceeds usize"))?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_error| invalid("theme XML offset exceeds usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("theme XML offset exceeds usize"))?;
         let (namespace, event) = reader.resolver().resolve_event(event);
         reject_unknown_namespace(&namespace)?;
         nodes = nodes

@@ -2,6 +2,7 @@
 
 use super::{Conformance, Limits, Trace, TracePoint, read_with, validate, write};
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::part::Part;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
@@ -114,6 +115,7 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Vec<u8>> {
         return Err(limit("slide XML bytes", MAX_SLIDE_XML_BYTES));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut root_seen = false;
@@ -122,8 +124,9 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Vec<u8>> {
     let mut empty_ext = None;
 
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_err| Error::Invalid("slide XML offset overflow".to_owned()))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Invalid("slide XML offset overflow".to_owned()))?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -178,7 +181,7 @@ fn insert_extension_fragment(xml: &[u8], fragment: &str) -> Result<Vec<u8>> {
                     }
                     empty_ext = Some((
                         start,
-                        usize::try_from(reader.buffer_position()).map_err(|_err| {
+                        origin.offset(reader.buffer_position()).ok_or_else(|| {
                             Error::Invalid("slide XML offset overflow".to_owned())
                         })?,
                     ));

@@ -5,6 +5,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{
     Capabilities, Limits as MceLimits, NAMESPACE as MCE_NAMESPACE, OffsetLimits, active_offsets,
     process_markup_compatibility,
@@ -708,18 +709,19 @@ pub(crate) fn rewrite(source: &[u8], located: &Located, value: Option<Value>) ->
 
 fn scan_raw(source: &[u8]) -> Result<Scan> {
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);
     let mut scan = Scan::default();
     let mut stack = Vec::new();
     let mut buffer = Vec::new();
     let mut nodes_seen = 0usize;
     loop {
-        let before = position(&reader)?;
+        let before = position(&reader, origin)?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(xml_error)?
             .into_owned();
-        let after = position(&reader)?;
+        let after = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -2262,9 +2264,10 @@ fn attribute_ranges(raw: &[u8], key: &[u8]) -> Result<Option<(Range<usize>, Rang
     Ok(None)
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("legacy comment collaboration XML offset does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("legacy comment collaboration XML offset does not fit usize"))
 }
 
 fn limit(resource: &'static str, maximum: usize) -> Error {

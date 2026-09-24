@@ -8,6 +8,7 @@ use super::validation::{
     bounded, invalid, limit, validate_date_time, validate_guid, validate_model, validate_namespaces,
 };
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::process_ooxml;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -77,6 +78,7 @@ pub(super) fn parse_comment_list(xml: &[u8]) -> Result<List> {
     }
     let bytes = selected.as_ref();
     let mut reader = NsReader::from_reader(bytes);
+    let origin = ReaderOrigin::of(bytes);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut stack: Vec<Frame> = Vec::new();
@@ -89,7 +91,9 @@ pub(super) fn parse_comment_list(xml: &[u8]) -> Result<List> {
     let mut reply_count = 0usize;
 
     loop {
-        let start_offset = reader.buffer_position() as usize;
+        let start_offset = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XML source position exceeds usize"))?;
         let decoder = reader.decoder();
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
@@ -144,7 +148,9 @@ pub(super) fn parse_comment_list(xml: &[u8]) -> Result<List> {
                         &frame.kind,
                         bytes,
                         start_offset,
-                        reader.buffer_position() as usize,
+                        origin
+                            .offset(reader.buffer_position())
+                            .ok_or_else(|| invalid("XML source position exceeds usize"))?,
                         &mut comments,
                     )?;
                     if matches!(frame.kind, FrameKind::Root) {
@@ -166,7 +172,9 @@ pub(super) fn parse_comment_list(xml: &[u8]) -> Result<List> {
                     &frame.kind,
                     bytes,
                     0,
-                    reader.buffer_position() as usize,
+                    origin
+                        .offset(reader.buffer_position())
+                        .ok_or_else(|| invalid("XML source position exceeds usize"))?,
                     &mut comments,
                 )?;
                 if matches!(frame.kind, FrameKind::Root) {

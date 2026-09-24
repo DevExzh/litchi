@@ -27,6 +27,7 @@ use std::{
     sync::Arc,
 };
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml_name::is_qualified_name;
 use quick_xml::{
@@ -721,8 +722,11 @@ fn parse_candidate(xml: &[u8], scanned: &Scanned) -> Result<(Option<Family>, Opt
 }
 
 fn scan(xml: &[u8]) -> Result<Scanned> {
-    let bom_len = usize::from(xml.starts_with(b"\xEF\xBB\xBF")) * 3;
+    // The scan splits off the first byte-order mark itself; a second one,
+    // which the reader would drop uncounted, is the parsed slice's origin.
+    let bom_len = ReaderOrigin::of(xml).skipped();
     let parse_xml = &xml[bom_len..];
+    let origin = ReaderOrigin::of(parse_xml);
     let mut reader = NsReader::from_reader(parse_xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
@@ -755,7 +759,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
     let mut nodes = 0usize;
 
     loop {
-        let event_start = position(&reader, bom_len)?;
+        let event_start = position(&reader, origin, bom_len)?;
         let (resolved, event) = reader.read_resolved_event().map_err(xml_error)?;
         match &event {
             Event::Start(element) | Event::Empty(element) => {
@@ -767,7 +771,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
             _ => {},
         }
         let namespace = resolved_namespace(&resolved)?;
-        let event_end = position(&reader, bom_len)?;
+        let event_end = position(&reader, origin, bom_len)?;
         if !root_seen && !matches!(&event, Event::Decl(_) | Event::Eof) {
             pre_root_markup = true;
         }
@@ -1816,13 +1820,15 @@ fn remove_inherited_namespace_declarations(
 }
 
 fn family_root_open_range(bytes: &[u8]) -> Result<Range<usize>> {
-    let bom_len = usize::from(bytes.starts_with(b"\xEF\xBB\xBF")) * 3;
-    let mut reader = NsReader::from_reader(&bytes[bom_len..]);
+    let bom_len = ReaderOrigin::of(bytes).skipped();
+    let parse_bytes = &bytes[bom_len..];
+    let origin = ReaderOrigin::of(parse_bytes);
+    let mut reader = NsReader::from_reader(parse_bytes);
     reader.config_mut().trim_text(false);
     loop {
-        let start = position(&reader, bom_len)?;
+        let start = position(&reader, origin, bom_len)?;
         let (_, event) = reader.read_resolved_event().map_err(xml_error)?;
-        let end = position(&reader, bom_len)?;
+        let end = position(&reader, origin, bom_len)?;
         match event {
             Event::Start(_) | Event::Empty(_) => return Ok(start..end),
             Event::Eof => return Err(invalid("Theme Family root element is missing")),
@@ -2479,10 +2485,13 @@ fn empty_element_slash(xml: &[u8]) -> Option<usize> {
     (cursor > 0 && xml[cursor - 1] == b'/').then_some(cursor - 1)
 }
 
-fn position(reader: &NsReader<&[u8]>, offset: usize) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("Theme XML offset exceeds usize"))?
-        .checked_add(offset)
+/// The byte offset in the complete input of the reader's position: the
+/// reader reads the input after its first `offset` bytes, and `origin` is the
+/// [`ReaderOrigin`] of that slice.
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin, offset: usize) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .and_then(|position| position.checked_add(offset))
         .ok_or_else(|| invalid("Theme XML offset exceeds usize"))
 }
 

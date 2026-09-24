@@ -1,8 +1,4 @@
 #![expect(
-    clippy::cast_possible_truncation,
-    reason = "OOXML numeric values are bounded before conversion"
-)]
-#![expect(
     clippy::let_underscore_must_use,
     reason = "the builder return is intentionally ignored after mutation"
 )]
@@ -28,6 +24,7 @@
 
 use std::fmt::Write as _;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::escape::escape;
 use quick_xml::events::{BytesStart, Event};
@@ -66,19 +63,24 @@ impl Tree {
         }
 
         let mut reader = NsReader::from_reader(xml);
+        let origin = ReaderOrigin::of(xml);
         reader.config_mut().check_end_names = true;
         let mut nodes = Vec::new();
         let mut stack = Vec::new();
         let mut root = None;
 
         loop {
-            let event_start = reader.buffer_position() as usize;
+            let event_start = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| invalid("web-settings XML position exceeds usize"))?;
             let (namespace, event) = reader
                 .read_resolved_event()
                 .map_err(|error| Error::Xml(error.to_string()))?;
             let word = is_wordprocessing_namespace(&namespace);
             let event = event.into_owned();
-            let event_end = reader.buffer_position() as usize;
+            let event_end = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| invalid("web-settings XML position exceeds usize"))?;
             match event {
                 Event::Start(element) => {
                     let parent = stack.last().copied();

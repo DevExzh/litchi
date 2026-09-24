@@ -5,6 +5,7 @@ use std::ops::Range;
 use super::model::{Map, Override, Role, Slot, Value};
 use crate::presentation_properties::metadata::is_presentationml_name;
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::process_ooxml;
 use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use quick_xml::events::{BytesStart, Event};
@@ -55,10 +56,11 @@ pub(crate) fn locate_source(xml: &[u8], source: &Source) -> Result<Located> {
 
 fn locate(xml: &[u8], source: Source, value: Value) -> Result<Located> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut state = ScanState::default();
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -414,9 +416,10 @@ fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Resu
     Ok(output)
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| Error::Invalid("color-map XML offset does not fit usize".to_string()))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::Invalid("color-map XML offset does not fit usize".to_string()))
 }
 
 impl Role {

@@ -11,6 +11,7 @@ use std::fmt::Write as _;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::xml_splice::authored_xml_requires_source_proof;
@@ -2530,6 +2531,7 @@ fn direct_embedded_images(
     execution_context: Option<&ExecutionContext>,
 ) -> Result<DirectSlideGraphics> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
     let mut scene_depth = None;
@@ -2555,8 +2557,9 @@ fn direct_embedded_images(
         })?;
     loop {
         check_execution(execution_context)?;
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("source slide XML position overflows usize"))?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("source slide XML position overflows usize"))?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -2565,8 +2568,9 @@ fn direct_embedded_images(
         let chart = is_chart(&namespace);
         let is_start = matches!(&event, Event::Start(_));
         let is_empty = matches!(&event, Event::Empty(_));
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("source slide XML position overflows usize"))?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("source slide XML position overflows usize"))?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 let local = element.local_name();
@@ -3326,16 +3330,19 @@ fn stage_inserted_source_xml(
         .ok_or_else(|| invalid("source XML insertion length underflow"))?;
     let mut boundaries = Vec::new();
     let mut reader = NsReader::from_reader(source_bytes);
+    let origin = ReaderOrigin::of(source_bytes);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("source XML insertion boundary exceeds usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("source XML insertion boundary exceeds usize"))?;
         let event = reader.read_event().map_err(|error| {
             invalid(format!("source XML insertion boundary is invalid: {error}"))
         })?;
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("source XML insertion boundary exceeds usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("source XML insertion boundary exceeds usize"))?;
         match event {
             Event::Start(_) | Event::Empty(_) | Event::End(_) => {
                 boundaries.push(start);

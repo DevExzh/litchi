@@ -2,6 +2,7 @@
 
 use std::{borrow::Cow, str};
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, process_markup_compatibility};
 use litchi_ooxml_common::xml::{
     DRAWINGML_CHART_NAMESPACE, DRAWINGML_NAMESPACE, STRICT_DRAWINGML_CHART_NAMESPACE,
@@ -452,15 +453,18 @@ impl<'a> Scanner<'a> {
 
     fn scan(mut self) -> Result<(Vec<Record>, String)> {
         let mut reader = NsReader::from_reader(self.xml);
+        // Spans are byte offsets into the owner XML, whose leading
+        // byte-order mark precedes reader position zero.
+        let origin = ReaderOrigin::of(self.xml);
         loop {
-            let start = position(&reader)?;
+            let start = position(&reader, origin)?;
             let decoder = reader.decoder();
             // A slice reader's events borrow the input, not the reader, and the
             // resolved namespace borrows the reader only until the next read.
             // Neither needs a per-event copy: owning the event or cloning the
             // resolver would reproduce exactly these bytes and bindings.
             let event = reader.read_event()?;
-            let end = position(&reader)?;
+            let end = position(&reader, origin)?;
             let (namespace, event) = reader.resolver().resolve_event(event);
             match event {
                 Event::Start(element) => {
@@ -1487,7 +1491,8 @@ fn has_forbidden_attribute(
     Ok(false)
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| Error::Invalid("shape XML position does not fit usize".into()))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::Invalid("shape XML position does not fit usize".into()))
 }

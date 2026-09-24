@@ -5,6 +5,7 @@ use std::mem::size_of;
 use std::ops::Range;
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::{ExecutionContext, ReadAt, Resource};
 use litchi_opc::{
     AuthoredXmlFragment, OpcPackage, PackURI, ReadLimits, SourceBackedPackage, SourceCacheLimits,
@@ -1214,16 +1215,21 @@ fn text_splice_ranges(before: &[u8], after: &[u8]) -> Vec<(Range<usize>, Vec<u8>
 
 fn xml_text_ranges(source: &[u8]) -> Vec<(Range<usize>, Vec<u8>)> {
     let mut reader = Reader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut ranges = Vec::new();
     loop {
-        let start = reader.buffer_position() as usize;
+        let Some(start) = origin.offset(reader.buffer_position()) else {
+            return Vec::new();
+        };
         let Ok(event) = reader.read_event_into(&mut buffer) else {
             return Vec::new();
         };
-        let end = reader.buffer_position() as usize;
+        let Some(end) = origin.offset(reader.buffer_position()) else {
+            return Vec::new();
+        };
         if let Event::Text(_) = event {
             if let Some(value) = source.get(start..end) {
                 ranges.push((start..end, value.to_vec()));
@@ -1353,6 +1359,7 @@ fn mirror_error(error: super::mirror::MirrorError) -> Error {
 
 fn find_client_data<'a>(source: &'a [u8], vml_id: &str) -> Result<ClientDataSource<'a>> {
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
@@ -1362,12 +1369,16 @@ fn find_client_data<'a>(source: &'a [u8], vml_id: &str) -> Result<ClientDataSour
     let mut client: Option<(usize, Vec<u8>, Vec<u8>)> = None;
     let mut found_client: Option<(usize, usize, Vec<u8>)> = None;
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("form-control XML offset exceeds usize"))?;
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| invalid(error.to_string()))?;
         let namespace = finder_namespace(resolved)?;
-        let end = reader.buffer_position() as usize;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("form-control XML offset exceeds usize"))?;
         match event {
             Event::Start(element) => {
                 let local = element.local_name();

@@ -11,6 +11,7 @@ use crate::chart::data::TitleText;
 use crate::chart::reader;
 use crate::chart::types::{AxisPosition, DisplayBlanks};
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::xml::{escape_xml, unescape_xml};
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
@@ -69,6 +70,9 @@ impl Document {
         }
 
         let mut reader = Reader::from_reader(Cursor::new(xml));
+        // A cursor's first fill holds the whole input, so the reader drops a
+        // leading byte-order mark exactly as a slice reader does.
+        let origin = ReaderOrigin::of(xml);
         reader.config_mut().trim_text(false);
         let mut buffer = Vec::new();
         let mut stack = Vec::new();
@@ -78,8 +82,9 @@ impl Document {
             let event = reader
                 .read_event_into(&mut buffer)
                 .map_err(|error| Error::Xml(error.to_string()))?;
-            let end = usize::try_from(reader.buffer_position())
-                .map_err(|_error| Error::Invalid("chart XML position exceeds usize".into()))?;
+            let end = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| Error::Invalid("chart XML position exceeds usize".into()))?;
             match event {
                 Event::Start(element) => {
                     if nodes.len() >= validation::MAX_XML_NODES {

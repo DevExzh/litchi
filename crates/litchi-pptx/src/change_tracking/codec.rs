@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -263,6 +264,7 @@ fn read_at(xml: &[u8], owner: Owner, root_range: Option<&Range<usize>>) -> Resul
         });
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut frames = Vec::<Frame>::new();
     let mut nodes = 0usize;
@@ -276,14 +278,14 @@ fn read_at(xml: &[u8], owner: Owner, root_range: Option<&Range<usize>>) -> Resul
     let mut active = root_range.is_none();
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let (resolved_namespace, borrowed_event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
         let namespace = namespace_kind(&resolved_namespace);
         let event = borrowed_event.into_owned();
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         if !active {
             let enters_root = matches!(event, Event::Start(_) | Event::Empty(_))
                 && root_range
@@ -707,9 +709,10 @@ fn replace(xml: &[u8], range: Range<usize>, replacement: &[u8]) -> Result<Vec<u8
     Ok(value)
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| invalid("change-tracking XML position exceeds usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("change-tracking XML position exceeds usize"))
 }
 
 fn bump_node(nodes: &mut usize) -> Result<()> {

@@ -2,6 +2,7 @@
 
 use std::{fmt, io::Write, sync::Arc};
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml_name::is_qualified_name;
 use quick_xml::{
     XmlVersion,
@@ -592,6 +593,7 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
         return Err(limit("ink actions source bytes", MAX_SOURCE_BYTES));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
@@ -611,10 +613,10 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
     let mut legacy_fragment = false;
 
     loop {
-        let start = pos(&reader)?;
+        let start = pos(&reader, origin)?;
         let event = reader.read_event().map_err(xml_error)?;
         let (resolved, event) = reader.resolver().resolve_event(event);
-        let end = pos(&reader)?;
+        let end = pos(&reader, origin)?;
         let is_declaration = matches!(&event, Event::Decl(_));
         match event {
             Event::Decl(declaration)
@@ -821,6 +823,7 @@ fn read_profile_with_source(xml: &[u8], owned_source: Option<Arc<[u8]>>) -> Resu
         return Err(limit("ink actions source bytes", MAX_SOURCE_BYTES));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
@@ -836,10 +839,10 @@ fn read_profile_with_source(xml: &[u8], owned_source: Option<Arc<[u8]>>) -> Resu
     let mut preamble_content_seen = false;
 
     loop {
-        let start = pos(&reader)?;
+        let start = pos(&reader, origin)?;
         let event = reader.read_event().map_err(xml_error)?;
         let (resolved, event) = reader.resolver().resolve_event(event);
-        let end = pos(&reader)?;
+        let end = pos(&reader, origin)?;
         let is_declaration = matches!(&event, Event::Decl(_));
         match event {
             Event::Decl(declaration)
@@ -2367,9 +2370,10 @@ fn copy_source(xml: &[u8]) -> Result<Arc<[u8]>> {
     source.extend_from_slice(xml);
     Ok(Arc::from(source.into_boxed_slice()))
 }
-fn pos<R: std::io::BufRead>(reader: &NsReader<R>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("ink actions offset exceeds usize"))
+fn pos<R: std::io::BufRead>(reader: &NsReader<R>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("ink actions offset exceeds usize"))
 }
 fn increment_nodes(nodes: &mut usize) -> Result<()> {
     let next = nodes

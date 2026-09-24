@@ -8,6 +8,7 @@ use super::super::{Event, Reader, XmlVersion};
 use super::semantic::{enforce_count_with, escape_attr, invalid, limit, parse_bool};
 use crate::mce::process_markup_compatibility;
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -384,6 +385,9 @@ pub(in crate::web) fn parse_xml_owned(xml: Vec<u8>, limits: &Limits) -> Result<X
         return limit("web extension XML bytes", limits.xml_bytes, xml.len());
     }
     let mut reader = Reader::from_reader(xml.as_slice());
+    // Raw fragments are byte ranges of `xml`, whose leading byte-order mark
+    // precedes reader position zero.
+    let origin = ReaderOrigin::of(xml.as_slice());
     reader.config_mut().trim_text(false);
     reader.config_mut().check_comments = true;
     let mut buffer = Vec::new();
@@ -392,11 +396,13 @@ pub(in crate::web) fn parse_xml_owned(xml: Vec<u8>, limits: &Limits) -> Result<X
     let mut declaration_seen = false;
     let mut content_seen = false;
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|error| Error::Invalid(format!("XML event offset is too large: {error}")))?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Invalid("XML event offset is too large".into()))?;
         let event = reader.read_event_into(&mut buffer)?;
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|error| Error::Invalid(format!("XML event offset is too large: {error}")))?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Invalid("XML event offset is too large".into()))?;
         let declaration_or_eof = matches!(&event, Event::Decl(_) | Event::Eof);
         match event {
             Event::Decl(declaration) => {

@@ -27,6 +27,7 @@ use super::model::{
 };
 use super::validation::validate_opaque_xml;
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -94,6 +95,7 @@ impl Extensions {
         }
 
         let mut reader = NsReader::from_reader(xml);
+        let origin = ReaderOrigin::of(xml);
         reader.config_mut().check_end_names = true;
         reader.config_mut().check_comments = true;
         reader.config_mut().trim_text(false);
@@ -104,12 +106,12 @@ impl Extensions {
         let mut pending: Option<Extension> = None;
 
         loop {
-            let event_start = position(&reader)?;
+            let event_start = position(&reader, origin)?;
             let event = reader
                 .read_event()
                 .map_err(|error| xml_error(error.to_string()))?
                 .into_owned();
-            let event_end = position(&reader)?;
+            let event_end = position(&reader, origin)?;
             let resolver = reader.resolver().clone();
 
             match event {
@@ -527,6 +529,7 @@ pub(crate) fn rewrite(xml: &[u8], next: &Extensions) -> Result<Vec<u8>> {
 
 fn locate_layout(xml: &[u8]) -> Result<Layout> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
     reader.config_mut().trim_text(false);
@@ -538,12 +541,12 @@ fn locate_layout(xml: &[u8]) -> Result<Layout> {
     let mut root_closed = false;
 
     loop {
-        let event_start = position(&reader)?;
+        let event_start = position(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| xml_error(error.to_string()))?
             .into_owned();
-        let event_end = position(&reader)?;
+        let event_end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
 
         match event {
@@ -948,9 +951,10 @@ fn count_node(nodes: &mut usize) -> Result<()> {
     Ok(())
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source_error| invalid("settings XML offset does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("settings XML offset does not fit usize"))
 }
 
 fn active_bindings(reader: &NsReader<&[u8]>) -> Vec<(Option<Vec<u8>>, Vec<u8>)> {
@@ -1052,13 +1056,15 @@ fn capture_unknown(
     parent_depth: usize,
     nodes: &mut usize,
 ) -> Result<Vec<u8>> {
+    // `xml` is the reader's input; `start` and the capture are offsets in it.
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 1usize;
     loop {
         let event = reader
             .read_event()
             .map_err(|error| xml_error(error.to_string()))?
             .into_owned();
-        let end = position(reader)?;
+        let end = position(reader, origin)?;
         match event {
             Event::Start(_) => {
                 count_node(nodes)?;

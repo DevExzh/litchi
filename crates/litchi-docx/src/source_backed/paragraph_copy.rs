@@ -9,6 +9,7 @@
 use std::io::Write;
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::{Position, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, Part, SourceArtifact};
@@ -1568,6 +1569,7 @@ enum Scope {
 fn scan_document(xml: &[u8], limits: Limits) -> Result<Layout> {
     check_limit("XML bytes", limits.max_xml_bytes, xml.len())?;
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut stack = Vec::new();
@@ -1593,8 +1595,9 @@ fn scan_document(xml: &[u8], limits: Limits) -> Result<Layout> {
     let mut word_namespace: Option<Vec<u8>> = None;
 
     loop {
-        let event_start =
-            usize::try_from(reader.buffer_position()).map_err(|_error| Error::InvalidDurable)?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or(Error::InvalidDurable)?;
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|_error| Error::Refused(Refusal::ComplexDocument))?;
@@ -1650,8 +1653,9 @@ fn scan_document(xml: &[u8], limits: Limits) -> Result<Layout> {
                     reserve_one(&mut paragraphs, "paragraph ranges")?;
                     paragraphs.push(Range {
                         start: event_start,
-                        end: usize::try_from(reader.buffer_position())
-                            .map_err(|_error| Error::InvalidDurable)?,
+                        end: origin
+                            .offset(reader.buffer_position())
+                            .ok_or(Error::InvalidDurable)?,
                     });
                 }
             },
@@ -1679,8 +1683,9 @@ fn scan_document(xml: &[u8], limits: Limits) -> Result<Layout> {
                     reserve_one(&mut paragraphs, "paragraph ranges")?;
                     paragraphs.push(Range {
                         start: paragraph_start.take().ok_or(Error::InvalidDurable)?,
-                        end: usize::try_from(reader.buffer_position())
-                            .map_err(|_error| Error::InvalidDurable)?,
+                        end: origin
+                            .offset(reader.buffer_position())
+                            .ok_or(Error::InvalidDurable)?,
                     });
                 } else if scope == Scope::Body {
                     body_end = Some(event_start);

@@ -8,6 +8,7 @@
 )]
 
 use crate::namespace::is_wordprocessing_namespace;
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::encoding::Decoder;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -168,20 +169,23 @@ pub(crate) fn scan_with_block_ranges(
     let mut ranges = Vec::new();
     let mut range_error = None;
     let mut reader = quick_xml::reader::NsReader::from_reader(xml);
+    // Offsets address `xml`, whose leading byte-order mark (a second one,
+    // after the writer split off the first) precedes reader position zero.
+    let origin = ReaderOrigin::of(xml);
     let mut alt_scanner = AltScanState::new();
 
     loop {
         // Keep the established alternative-format offset refusal ahead of the
         // range walk. A range-side usize refusal is remembered so a later
         // alternative-format error retains its existing precedence.
-        let raw_start = reader.buffer_position();
-        let event_start = u32::try_from(raw_start).map_err(|_source_error| {
-            Error::Invalid("altChunk XML offset does not fit u32".into())
-        })?;
+        let raw_start = origin.offset(reader.buffer_position());
+        let event_start = raw_start
+            .and_then(|offset| u32::try_from(offset).ok())
+            .ok_or_else(|| Error::Invalid("altChunk XML offset does not fit u32".into()))?;
         let event_start_usize = if range_error.is_none() {
-            match usize::try_from(raw_start) {
-                Ok(value) => Some(value),
-                Err(_source_error) => {
+            match raw_start {
+                Some(value) => Some(value),
+                None => {
                     range_error = Some(Error::InvalidFormat(
                         "Word XML offset does not fit usize".to_string(),
                     ));
@@ -211,9 +215,9 @@ pub(crate) fn scan_with_block_ranges(
                 },
             };
             if let Some(scan_event) = scan_event {
-                let event_end = match usize::try_from(reader.buffer_position()) {
-                    Ok(value) => Some(value),
-                    Err(_source_error) => {
+                let event_end = match origin.offset(reader.buffer_position()) {
+                    Some(value) => Some(value),
+                    None => {
                         range_error = Some(Error::InvalidFormat(
                             "Word XML offset does not fit usize".to_string(),
                         ));

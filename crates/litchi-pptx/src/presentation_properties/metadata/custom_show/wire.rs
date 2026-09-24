@@ -8,6 +8,7 @@
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, Part};
 use quick_xml::events::{BytesStart, Event};
@@ -440,6 +441,7 @@ fn scan_layout(xml: &[u8]) -> Result<Layout> {
         return Err(limit("custom-show PresentationML source bytes"));
     }
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut stack = Vec::<Frame>::new();
     let mut root_close = None;
@@ -454,7 +456,9 @@ fn scan_layout(xml: &[u8]) -> Result<Layout> {
     let mut saw_root = false;
 
     loop {
-        let before = reader.buffer_position() as usize;
+        let before = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XML source position exceeds usize"))?;
         let decoder = reader.decoder();
         match reader.read_event() {
             Ok(Event::Start(element)) => {
@@ -515,7 +519,9 @@ fn scan_layout(xml: &[u8]) -> Result<Layout> {
                 value.close_start = before;
                 attach_frame(
                     value,
-                    reader.buffer_position() as usize,
+                    origin
+                        .offset(reader.buffer_position())
+                        .ok_or_else(|| invalid("XML source position exceeds usize"))?,
                     &mut stack,
                     xml,
                     &mut root_children,
@@ -536,7 +542,9 @@ fn scan_layout(xml: &[u8]) -> Result<Layout> {
                 let was_root = value.kind == FrameKind::Root;
                 attach_frame(
                     value,
-                    reader.buffer_position() as usize,
+                    origin
+                        .offset(reader.buffer_position())
+                        .ok_or_else(|| invalid("XML source position exceeds usize"))?,
                     &mut stack,
                     xml,
                     &mut root_children,

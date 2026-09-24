@@ -8,6 +8,7 @@
 use std::ops::Range;
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, PackURI};
 use quick_xml::events::{BytesStart, Event};
@@ -406,6 +407,7 @@ fn locate(xml: &[u8], shape: Range<usize>, limits: Limits) -> Result<Located> {
         return Err(limit("Designer slide XML bytes", limits.xml_bytes()));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut stack = Vec::<Frame>::new();
     stack
@@ -417,14 +419,14 @@ fn locate(xml: &[u8], shape: Range<usize>, limits: Limits) -> Result<Located> {
     let mut located = Located::default();
     let mut events = 0usize;
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let pml = pml_namespace(&namespace);
         let p202 = is_p202(&namespace);
         let event = event.into_owned();
         let empty = matches!(&event, Event::Empty(_));
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         if !matches!(&event, Event::Eof) {
             events = events
                 .checked_add(1)
@@ -1013,9 +1015,10 @@ fn fallible_copy_vec(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
 fn copy(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
     fallible_copy_vec(value, resource)
 }
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| Error::Invalid("Designer properties XML offset does not fit usize".into()))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::Invalid("Designer properties XML offset does not fit usize".into()))
 }
 fn close_start(xml: &[u8], end: usize) -> usize {
     xml[..end]

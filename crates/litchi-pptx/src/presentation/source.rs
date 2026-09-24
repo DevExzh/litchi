@@ -4,6 +4,7 @@
 //! OPC catalog and mandatory presentation root, then resolves only slide
 //! metadata. A slide body is loaded when a selected [`SourceSlide`] is read.
 
+use litchi_core::xml::ReaderOrigin;
 use std::io::{Read, Write};
 #[cfg(any(unix, windows))]
 use std::path::Path;
@@ -3634,6 +3635,7 @@ fn parse_picture_relationship_inner(
     max_output_bytes: u64,
 ) -> Result<PictureRelationship> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut stack: Vec<(PictureNode, Vec<u8>)> = Vec::new();
     let mut root_seen = false;
     let mut picture_stage = 0_u8;
@@ -3649,11 +3651,11 @@ fn parse_picture_relationship_inner(
     let mut relationship = None;
     let mut root_namespace_declarations = Vec::<(Vec<u8>, Vec<u8>)>::new();
     loop {
-        let event_start = position(&reader)?;
+        let event_start = position(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let event_end = position(&reader)?;
+        let event_end = position(&reader, origin)?;
         let (namespace, event) = reader.resolver().resolve_event(event);
         let is_start = matches!(&event, Event::Start(_));
         match event {
@@ -4755,9 +4757,10 @@ fn is_svg_content_type(content_type: &str) -> bool {
         .is_some_and(|value| value.trim().eq_ignore_ascii_case("image/svg+xml"))
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_error| Error::Invalid("source-backed picture XML position exceeds usize".into()))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::Invalid("source-backed picture XML position exceeds usize".into()))
 }
 
 fn is_mce_namespace(namespace: &ResolveResult<'_>) -> bool {

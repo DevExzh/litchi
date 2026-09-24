@@ -23,6 +23,7 @@ use crate::chart::Chart;
 use crate::package::error::{Error, Result};
 use crate::writer::Image;
 use crate::writer::shape::{ConnectionShapeSpec, Emitter, GroupSpec, ShapeSpec};
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use std::fmt::Write as _;
@@ -283,11 +284,14 @@ pub(crate) fn next_drawing_object_id(source: &[u8]) -> Result<u32> {
 
 fn drawing_root_end(source: &[u8]) -> Result<usize> {
     let mut reader = quick_xml::Reader::from_reader(source);
+    // The insertion point is a byte offset into `source`, whose leading
+    // byte-order mark precedes reader position zero.
+    let origin = ReaderOrigin::of(source);
     let mut depth = 0usize;
     loop {
-        let position = usize::try_from(reader.buffer_position()).map_err(|error| {
-            Error::Encoding(format!("drawing XML position exceeds usize: {error}"))
-        })?;
+        let position = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Encoding("drawing XML position exceeds usize".to_string()))?;
         match reader
             .read_event()
             .map_err(|error| Error::Encoding(format!("invalid drawing XML: {error}")))?

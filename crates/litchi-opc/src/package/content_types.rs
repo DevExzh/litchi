@@ -7,6 +7,7 @@ use crate::error::OpcError;
 use crate::limits::ReadResource;
 use crate::source_backed::content_types_plan::collapse_xml_token;
 use crate::source_backed::escaped_xml_attribute_len;
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 use std::sync::Arc as SharedArc;
@@ -368,6 +369,7 @@ pub(crate) fn without_part_overrides(
     let mut reader = NsReader::from_reader(source.bytes());
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
+    let origin = ReaderOrigin::of(source.bytes());
     let mut depth = 0usize;
     let mut updates = Vec::new();
     updates
@@ -377,9 +379,9 @@ pub(crate) fn without_part_overrides(
             source,
         })?;
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = content_types_offset(&reader, origin)?;
         let event = reader.read_event()?;
-        let end = reader.buffer_position() as usize;
+        let end = content_types_offset(&reader, origin)?;
         if end < start || end > source.bytes().len() {
             return Err(OpcError::InvalidContentTypesManifest(
                 "content-types XML event range is invalid".into(),
@@ -536,15 +538,16 @@ pub(crate) fn with_part_overrides(
     let mut reader = NsReader::from_reader(source.bytes());
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
+    let origin = ReaderOrigin::of(source.bytes());
     let mut depth = 0usize;
     let mut root_tag = None;
     let mut root_name = None;
     let mut root_close = None;
     let mut root_empty = false;
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = content_types_offset(&reader, origin)?;
         let event = reader.read_event()?;
-        let end = reader.buffer_position() as usize;
+        let end = content_types_offset(&reader, origin)?;
         match event {
             Event::Start(element) if depth == 0 => {
                 if element.local_name().as_ref() != b"Types" {
@@ -715,6 +718,16 @@ fn cmp_ascii_case_insensitive(left: &str, right: &str) -> std::cmp::Ordering {
         }
     }
     left.len().cmp(&right.len())
+}
+
+/// The byte offset in the content-types bytes of `reader`'s position.
+///
+/// `origin` is the bytes' [`ReaderOrigin`]: the reader does not count a
+/// leading byte-order mark, and spans taken here splice the original bytes.
+fn content_types_offset(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin.offset(reader.buffer_position()).ok_or_else(|| {
+        OpcError::InvalidContentTypesManifest("content-types XML position overflows usize".into())
+    })
 }
 
 #[cfg(test)]

@@ -9,6 +9,7 @@
 
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -81,6 +82,7 @@ pub(crate) fn locate_controls(xml: &[u8]) -> Result<Vec<SourceControl>> {
         return Err(limit("control slide XML bytes", MAX_SLIDE_XML_BYTES));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     let mut c_sld_depth = None;
@@ -92,7 +94,7 @@ pub(crate) fn locate_controls(xml: &[u8]) -> Result<Vec<SourceControl>> {
     let mut root_closed = false;
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event()
@@ -211,6 +213,7 @@ pub(crate) fn locate_descriptor(xml: &[u8]) -> Result<SourceDescriptor> {
         return Err(limit("control descriptor XML bytes", MAX_SLIDE_XML_BYTES));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut root_seen = false;
     let mut root_closed = false;
@@ -218,7 +221,7 @@ pub(crate) fn locate_descriptor(xml: &[u8]) -> Result<SourceDescriptor> {
     let mut result = None;
     let mut nodes = 0usize;
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event()
@@ -702,9 +705,10 @@ fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Resu
     Ok(result)
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| invalid("ActiveX XML source offset overflow"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("ActiveX XML source offset overflow"))
 }
 
 fn opening_insert(element: &BytesStart<'_>, start: usize) -> Result<usize> {

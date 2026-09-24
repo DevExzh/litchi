@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use quick_xml::{Reader, events::Event};
 
@@ -636,13 +637,18 @@ fn validate_model_connection_extensions(xml: &[u8]) -> Result<()> {
 // model-connection identity check.
 pub(super) fn parse_connections_document(xml: &[u8]) -> Result<super::codec::Node> {
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut filtered: Option<Vec<u8>> = None;
     let mut cursor = 0;
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Data Model XML offset exceeds usize"))?;
         match reader.read_event() {
             Ok(Event::PI(_)) => {
-                let end = reader.buffer_position() as usize;
+                let end = origin
+                    .offset(reader.buffer_position())
+                    .ok_or_else(|| invalid("Data Model XML offset exceeds usize"))?;
                 if start < cursor || end < start || end > xml.len() {
                     return Err(invalid("invalid Connections processing-instruction span"));
                 }

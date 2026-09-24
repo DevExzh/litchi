@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{
     Capabilities, Limits as MceLimits, NAMESPACE as MCE_NAMESPACE, OffsetLimits, active_offsets,
     process_markup_compatibility,
@@ -327,15 +328,16 @@ fn semantic_value(xml: &[u8]) -> Result<Option<bool>> {
 
 fn scan_raw(source: &[u8]) -> Result<RawScan> {
     let mut reader = NsReader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     let mut raw = RawScan::default();
     let mut buffer = Vec::new();
     loop {
-        let before = position(&reader)?;
+        let before = position(&reader, origin)?;
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(xml_error)?
             .into_owned();
-        let after = position(&reader)?;
+        let after = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -686,9 +688,10 @@ fn parse_bool(value: &str) -> Result<bool> {
     }
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("presentation-properties XML offset does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("presentation-properties XML offset does not fit usize"))
 }
 
 fn limit(resource: &'static str, maximum: usize) -> Error {

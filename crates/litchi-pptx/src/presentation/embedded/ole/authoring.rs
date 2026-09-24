@@ -4,6 +4,7 @@ use super::package::load_slide;
 use super::{Limits, Mode};
 use crate::presentation::embedded::{MAX_XML_DEPTH, invalid, is_presentationml_name, limit};
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
@@ -131,13 +132,15 @@ fn frame_xml(
 
 fn insert_frame(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut root_seen = false;
     let mut tree_depth = None;
     let mut insertion = None;
     loop {
-        let before = usize::try_from(reader.buffer_position())
-            .map_err(|_err| invalid("slide XML offset overflow"))?;
+        let before = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("slide XML offset overflow"))?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;

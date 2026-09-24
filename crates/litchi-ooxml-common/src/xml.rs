@@ -1,5 +1,6 @@
 //! Shared, namespace-aware OOXML decoding helpers.
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesRef, BytesStart, Event};
@@ -172,6 +173,9 @@ pub fn is_omml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: 
 }
 
 /// Locate exact `<oMath>` byte ranges in transitional or strict OMML XML.
+///
+/// Each range is a byte offset and length in `xml_bytes`, counting a leading
+/// UTF-8 byte-order mark (change 0765).
 /// # Errors
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
@@ -193,6 +197,9 @@ where
     }
 
     let mut reader = Reader::from_reader(xml_bytes);
+    // Emitted ranges are byte offsets into `xml_bytes`, whose leading
+    // byte-order mark precedes reader position zero.
+    let origin = ReaderOrigin::of(xml_bytes);
     let mut tracker = BindingTracker::new();
     let mut pending_pop = false;
     let mut capture: Option<(usize, usize)> = None;
@@ -204,9 +211,9 @@ where
             tracker.pop();
             pending_pop = false;
         }
-        let event_start = usize::try_from(reader.buffer_position()).map_err(|error| {
-            XmlError::Invalid(format!("OMML offset does not fit usize: {error}"))
-        })?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| XmlError::Invalid("OMML offset does not fit usize".into()))?;
         let event = {
             let event = reader
                 .read_event()
@@ -290,9 +297,9 @@ where
                 | Event::GeneralRef(_) => ScanEvent::Other,
             }
         };
-        let event_end = usize::try_from(reader.buffer_position()).map_err(|error| {
-            XmlError::Invalid(format!("OMML offset does not fit usize: {error}"))
-        })?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| XmlError::Invalid("OMML offset does not fit usize".into()))?;
 
         match event {
             ScanEvent::Start => capture = Some((event_start, 1)),
@@ -480,14 +487,15 @@ mod tests {
         }
 
         let mut reader = NsReader::from_reader(xml_bytes);
+        let origin = ReaderOrigin::of(xml_bytes);
         let mut capture: Option<(usize, usize)> = None;
         let mut ranges = Vec::new();
         let mut depth = 0usize;
         let mut nodes = 0usize;
         loop {
-            let event_start = usize::try_from(reader.buffer_position()).map_err(|error| {
-                XmlError::Invalid(format!("OMML offset does not fit usize: {error}"))
-            })?;
+            let event_start = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| XmlError::Invalid("OMML offset does not fit usize".into()))?;
             let event = {
                 let (namespace, event) = reader
                     .read_resolved_event()
@@ -544,9 +552,9 @@ mod tests {
                     _ => ScanEvent::Other,
                 }
             };
-            let event_end = usize::try_from(reader.buffer_position()).map_err(|error| {
-                XmlError::Invalid(format!("OMML offset does not fit usize: {error}"))
-            })?;
+            let event_end = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| XmlError::Invalid("OMML offset does not fit usize".into()))?;
             match event {
                 ScanEvent::Start => capture = Some((event_start, 1)),
                 ScanEvent::NestedStart => {

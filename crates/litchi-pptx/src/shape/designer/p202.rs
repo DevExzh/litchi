@@ -2,6 +2,7 @@
 
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -163,6 +164,7 @@ fn parse(xml: &[u8], limits: Limits, proven_prefix: Option<&[u8]>, root: Root) -
         return Err(limit("Designer payload bytes", limits.xml_bytes()));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut frames = Vec::new();
     frames
@@ -181,7 +183,7 @@ fn parse(xml: &[u8], limits: Limits, proven_prefix: Option<&[u8]>, root: Root) -
     let mut root_closed = false;
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let event = event.into_owned();
@@ -195,7 +197,7 @@ fn parse(xml: &[u8], limits: Limits, proven_prefix: Option<&[u8]>, root: Root) -
         }
         let namespace_ok = is_p202(namespace, proven_prefix);
         let empty = matches!(&event, Event::Empty(_));
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 let local = element.local_name();
@@ -451,9 +453,10 @@ fn parse_bool(value: &str) -> Result<bool> {
     }
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| invalid("Designer XML offset does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("Designer XML offset does not fit usize"))
 }
 
 struct Output {

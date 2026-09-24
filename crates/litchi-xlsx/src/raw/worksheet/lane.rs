@@ -42,6 +42,7 @@
 //! replay the events into their own state, so a decline never leaves partial
 //! state behind.
 
+use litchi_core::xml::ReaderOrigin;
 use memchr::memchr2;
 use quick_xml::events::Event as ReaderEvent;
 use quick_xml::name::{NamespaceResolver, QName};
@@ -53,9 +54,6 @@ use crate::raw::namespace::is_spreadsheetml_name;
 /// Upper bound on attributes in one lane tag. Longer tags are declined so
 /// the pairwise duplicate check stays a small bounded loop.
 const MAX_TAG_ATTRIBUTES: usize = 32;
-
-/// The UTF-8 byte-order mark `quick_xml`'s slice reader skips uncounted.
-const UTF8_BOM: &[u8] = b"\xEF\xBB\xBF";
 
 const ROW_CLOSE: &[u8] = b"</row>";
 const CELL_CLOSE: &[u8] = b"</c>";
@@ -172,30 +170,25 @@ pub(crate) struct Entry {
 }
 
 impl Entry {
-    /// Locate the `<sheetData>` start tag a slice reader just delivered.
+    /// Locate the `<sheetData>` start tag a slice reader over `content` just
+    /// delivered.
     ///
     /// `event_start` and `position` are the reader's positions before and
     /// after the event and `name` is the element's qualified name. The lane
-    /// works in offsets into `content`, so the reader's positions are used
-    /// only after the tag they claim to delimit is found at exactly those
-    /// offsets: `<`, the same name bytes, and a closing `>`.
-    ///
-    /// A part that starts with a UTF-8 byte-order mark always declines:
-    /// `quick_xml`'s slice reader drops the mark without counting it, so its
-    /// positions are three bytes short of document offsets there. Such a part
-    /// keeps the ordinary reader for all three passes. `None` keeps the
-    /// ordinary reader.
+    /// works in offsets into `content`, so the positions are converted
+    /// through `content`'s [`ReaderOrigin`] — a leading UTF-8 byte-order mark
+    /// precedes reader position zero — and used only after the tag they claim
+    /// to delimit is found at exactly those offsets: `<`, the same name bytes,
+    /// and a closing `>`. `None` keeps the ordinary reader.
     pub(crate) fn locate(
         content: &[u8],
         event_start: u64,
         name: &[u8],
         position: u64,
     ) -> Option<Self> {
-        if content.starts_with(UTF8_BOM) {
-            return None;
-        }
-        let tag_start = usize::try_from(event_start).ok()?;
-        let position = usize::try_from(position).ok()?;
+        let origin = ReaderOrigin::of(content);
+        let tag_start = origin.offset(event_start)?;
+        let position = origin.offset(position)?;
         if content.get(tag_start) != Some(&b'<') {
             return None;
         }
@@ -266,10 +259,20 @@ pub(crate) fn splice_without_body(
 
 /// Advance a reader over the spliced prefix whose events were already
 /// delivered, stopping exactly at the lane entry.
-pub(crate) fn skip_to(reader: &mut NsReader<&[u8]>, position: usize) -> crate::Result<()> {
+///
+/// `spliced` is the reader's input and `position` the entry's offset in it;
+/// the reader's positions are converted through the input's
+/// [`ReaderOrigin`], so a byte-order-marked prefix stops at the same entry.
+pub(crate) fn skip_to(
+    reader: &mut NsReader<&[u8]>,
+    spliced: &[u8],
+    position: usize,
+) -> crate::Result<()> {
+    let origin = ReaderOrigin::of(spliced);
     loop {
-        let at = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("worksheet XML position does not fit usize"))?;
+        let at = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("worksheet XML position does not fit usize"))?;
         if at == position {
             return Ok(());
         }
@@ -1098,13 +1101,20 @@ mod tests {
     }
 
     #[test]
-    fn byte_order_marked_parts_always_decline() {
-        let mut content = UTF8_BOM.to_vec();
+    fn byte_order_marked_parts_locate_at_document_offsets() {
+        let mut content = b"\xEF\xBB\xBF".to_vec();
         content.extend_from_slice(b"<w><sheetData><row/></sheetData></w>");
-        // quick-xml reports positions without the mark; neither those nor the
-        // document offsets are taken.
-        assert!(Entry::locate(&content, 3, b"sheetData", 14).is_none());
+        // quick-xml reports positions without the mark; the entry is at the
+        // document offsets three bytes later.
+        let entry = Entry::locate(&content, 3, b"sheetData", 14).expect("marked entry");
+        assert_eq!(entry.position, 17);
+        assert_eq!(entry.name(&content).expect("name"), b"sheetData");
+        // Document offsets passed as reader positions no longer align.
         assert!(Entry::locate(&content, 6, b"sheetData", 17).is_none());
+        // The reader over the spliced document stops at the same entry.
+        let mut reader = NsReader::from_reader(content.as_slice());
+        skip_to(&mut reader, &content, entry.position).expect("skip to the entry");
+        assert_eq!(reader.buffer_position(), 14);
     }
 
     #[test]

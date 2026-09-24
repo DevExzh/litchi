@@ -2,6 +2,7 @@
 
 use super::{invalid_source, validate_source_xml};
 use crate::{OpcError, PackURI, ReadLimits, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::{events::Event, reader::NsReader};
 use std::{collections::HashMap, fmt, ops::Range, sync::Arc};
 
@@ -52,6 +53,11 @@ struct ElementBounds {
 /// Validated XML captured from an owned package's trusted source or compact
 /// authored part. Constructors are private; arbitrary XML cannot be marked as
 /// source-preserved. Cloning retains the shared immutable source allocation.
+///
+/// Every tag range an edit method takes is a byte range of
+/// [`bytes`](Self::bytes), counting a leading UTF-8 byte-order mark: slice
+/// the bytes to find the tag (change 0765; before it, the scanner compared
+/// ranges with reader positions that skip the mark).
 #[derive(Clone, PartialEq, Eq)]
 pub struct OwnedXmlPart {
     pub(crate) name: PackURI,
@@ -198,13 +204,14 @@ impl OwnedXmlPart {
             })?;
         let mut pending = HashMap::new();
         let mut reader = NsReader::from_reader(self.bytes.as_slice());
+        let origin = ReaderOrigin::of(self.bytes.as_slice());
         let mut next = 0usize;
         while next < updates.len() {
-            let start = reader.buffer_position() as usize;
+            let start = owned_offset(&reader, origin)?;
             let event = reader
                 .read_event()
                 .map_err(|error| invalid_source(error.to_string()))?;
-            let end = reader.buffer_position() as usize;
+            let end = owned_offset(&reader, origin)?;
             if matches!(event, Event::Eof) || start > updates[next].start_tag.start {
                 return Err(invalid_source(
                     "update does not identify a complete XML opening tag",
@@ -490,16 +497,15 @@ impl OwnedXmlPart {
             return Err(invalid_source("invalid XML opening-tag range"));
         }
         let mut reader = NsReader::from_reader(self.bytes.as_slice());
+        let origin = ReaderOrigin::of(self.bytes.as_slice());
         let mut depth = 0usize;
         let mut owner = None;
         loop {
-            let start = usize::try_from(reader.buffer_position())
-                .map_err(|error| invalid_source(error.to_string()))?;
+            let start = owned_offset(&reader, origin)?;
             let event = reader
                 .read_event()
                 .map_err(|error| invalid_source(error.to_string()))?;
-            let end = usize::try_from(reader.buffer_position())
-                .map_err(|error| invalid_source(error.to_string()))?;
+            let end = owned_offset(&reader, origin)?;
             let empty = matches!(&event, Event::Empty(_));
             match event {
                 Event::Start(element) | Event::Empty(element) => {
@@ -587,14 +593,13 @@ impl OwnedXmlPart {
             return Err(invalid_source("owned XML attribute value must be escaped"));
         }
         let mut reader = NsReader::from_reader(self.bytes.as_slice());
+        let origin = ReaderOrigin::of(self.bytes.as_slice());
         let insertion = loop {
-            let start = usize::try_from(reader.buffer_position())
-                .map_err(|error| invalid_source(error.to_string()))?;
+            let start = owned_offset(&reader, origin)?;
             let event = reader
                 .read_event()
                 .map_err(|error| invalid_source(error.to_string()))?;
-            let end = usize::try_from(reader.buffer_position())
-                .map_err(|error| invalid_source(error.to_string()))?;
+            let end = owned_offset(&reader, origin)?;
             let empty = matches!(&event, Event::Empty(_));
             match event {
                 Event::Start(element) | Event::Empty(element) if start_tag == (start..end) => {
@@ -736,6 +741,17 @@ impl OwnedXmlPart {
             bytes: Arc::new(bytes),
         })
     }
+}
+
+/// The byte offset in the owned XML of `reader`'s position.
+///
+/// `origin` is the owned bytes' [`ReaderOrigin`]: the reader does not count a
+/// leading byte-order mark, while every tag range this module accepts and
+/// splices is a byte range of the owned bytes.
+fn owned_offset(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid_source("owned XML position does not fit usize"))
 }
 
 #[cfg(test)]

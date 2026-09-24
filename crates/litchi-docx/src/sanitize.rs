@@ -9,6 +9,7 @@
 
 use crate::error::{Error, Result};
 use crate::namespace::is_wordprocessing_namespace;
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -509,6 +510,7 @@ fn scan_with_root(
     }
 
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
     let mut depth = 0usize;
@@ -519,7 +521,7 @@ fn scan_with_root(
     let mut distinct_relationships = Vec::new();
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
@@ -527,7 +529,7 @@ fn scan_with_root(
             .into_owned();
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
 
         match event {
             Event::Start(element) => {
@@ -919,9 +921,10 @@ fn append_before_and_skip(
     Ok(())
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source_error| invalid("main-document XML offset does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("main-document XML offset does not fit usize"))
 }
 
 fn require_nonzero(resource: &str, value: usize) -> Result<()> {

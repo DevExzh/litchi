@@ -1,5 +1,6 @@
 //! Lossless extended-properties synchronization for worksheet structure.
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml::decode_xml_reference;
 use quick_xml::XmlVersion;
@@ -404,6 +405,7 @@ pub(crate) fn remove_sheets(
 
 fn scan(content: &[u8]) -> Result<(Option<Vector>, Vec<Title>, Vec<Variant>)> {
     let mut reader = NsReader::from_reader(content);
+    let origin = ReaderOrigin::of(content);
     let mut stack = Vec::<Frame>::new();
     let mut title_vector = None;
     let mut titles = Vec::new();
@@ -411,13 +413,13 @@ fn scan(content: &[u8]) -> Result<(Option<Vector>, Vec<Title>, Vec<Variant>)> {
     let mut pending_variant = None::<Variant>;
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
             .map_err(|error| invalid(format!("extended-properties scan failed: {error}")))?
             .into_owned();
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -677,9 +679,10 @@ fn sibling_name(name: &str, local: &str) -> String {
     )
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source| invalid("extended-properties byte position does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("extended-properties byte position does not fit usize"))
 }
 
 #[cfg(test)]

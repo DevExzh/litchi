@@ -2,6 +2,7 @@
 
 use crate::error::{Error, Result};
 use crate::page_setup::parse_worksheet_page_setup_relationship_id;
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::events::Event;
@@ -234,6 +235,7 @@ fn add_reference_to_worksheet(
     conformance: PrinterSettingsConformance,
 ) -> Result<Vec<u8>> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let later = [
         b"headerFooter".as_slice(),
         b"rowBreaks",
@@ -257,13 +259,15 @@ fn add_reference_to_worksheet(
     let mut insert = None;
     let mut page_setup = None;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("worksheet XML offset overflow"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("worksheet XML offset overflow"))?;
         let event = reader.read_event().map_err(xml_error)?.into_owned();
         let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(event);
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("worksheet XML offset overflow"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("worksheet XML offset overflow"))?;
         match event {
             Event::Start(element) => {
                 let core = exact(&namespace, conformance.sml());

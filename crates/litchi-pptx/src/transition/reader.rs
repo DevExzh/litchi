@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, InScopeNamespaces, process_markup_compatibility};
 use litchi_ooxml_common::private::in_scope_declarations;
 use litchi_ooxml_common::xml::{unqualified_attribute_value, xsd_token_atom};
@@ -157,6 +158,7 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
 
     let bytes = processed.as_ref();
     let mut reader = NsReader::from_reader(bytes);
+    let origin = ReaderOrigin::of(bytes);
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut selected_depth = None;
@@ -164,10 +166,10 @@ pub fn read_with(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
     let mut capture = None;
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader.read_event()?.into_owned();
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
 
@@ -972,9 +974,10 @@ fn enter_depth(depth: usize, limit: usize) -> Result<usize> {
     }
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| Error::Invalid("transition XML position does not fit usize".into()))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::Invalid("transition XML position does not fit usize".into()))
 }
 
 fn is_auxiliary(namespace: &ResolveResult<'_>, name: QName<'_>) -> bool {

@@ -2,6 +2,7 @@
 
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -96,6 +97,7 @@ pub(super) fn read(xml: &[u8]) -> Result<Source> {
     }
 
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     let mut frames = Vec::<Frame>::new();
     let mut nodes = 0usize;
@@ -109,12 +111,12 @@ pub(super) fn read(xml: &[u8]) -> Result<Source> {
     let mut root_closed = false;
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let namespace = namespace_kind(namespace);
         let event = event.into_owned();
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
 
         match event {
             Event::Start(element) => {
@@ -663,9 +665,10 @@ fn mark_other(frame: &mut Frame) {
     }
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| invalid("designer XML offset does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("designer XML offset does not fit usize"))
 }
 
 fn frame_close_start(end: usize, xml: &[u8]) -> usize {

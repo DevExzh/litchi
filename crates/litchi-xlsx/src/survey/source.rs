@@ -1,6 +1,7 @@
 //! Scalar publication against retained Survey XML.
 
 use super::*;
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::{OwnedAttributeUpdate, OwnedXmlPart};
 use std::ops::Range;
 
@@ -333,12 +334,17 @@ fn rewrite_aligned(
         maximum: limits.max_part_bytes(),
     };
     let mut reader = NsReader::from_reader(source.bytes());
+    let origin = ReaderOrigin::of(source.bytes());
     let mut stack = Vec::new();
     let mut question = 0usize;
     loop {
-        let start = reader.buffer_position() as usize;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Survey XML position exceeds usize"))?;
         let event = reader.read_event().map_err(xml_error)?;
-        let end = reader.buffer_position() as usize;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Survey XML position exceeds usize"))?;
         let paired = matches!(&event, Event::Start(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {

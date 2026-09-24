@@ -21,6 +21,7 @@ use super::super::paragraph::MutableParagraph;
 use super::super::section::SectionProperties;
 use super::super::table::MutableTable;
 use super::super::toc::TableOfContents;
+use litchi_core::xml::ReaderOrigin;
 
 /// The document body containing all content elements.
 #[derive(Debug)]
@@ -147,6 +148,7 @@ impl DocumentBody {
             });
         }
         let mut reader = NsReader::from_reader(bytes);
+        let origin = ReaderOrigin::of(bytes);
         let mut body = Self::new();
         let mut depth = 0usize;
         let mut body_depth = None;
@@ -156,10 +158,9 @@ impl DocumentBody {
         let mut capture: Option<(PreservedBodyKind, usize, usize)> = None;
 
         loop {
-            let event_start =
-                usize::try_from(reader.buffer_position()).map_err(|_source_error| {
-                    Error::InvalidFormat("Word document offset does not fit usize".to_string())
-                })?;
+            let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+                Error::InvalidFormat("Word document offset does not fit usize".to_string())
+            })?;
             let event = {
                 let (namespace, event) = reader
                     .read_resolved_event()
@@ -202,7 +203,7 @@ impl DocumentBody {
                     | Event::GeneralRef(_) => ScanEvent::Other,
                 }
             };
-            let event_end = usize::try_from(reader.buffer_position()).map_err(|_source_error| {
+            let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
                 Error::InvalidFormat("Word document offset does not fit usize".to_string())
             })?;
 

@@ -7,6 +7,7 @@ use super::super::story::{
 use crate::document::{
     HyperlinkTextReplacement, Refusal, Snapshot, TransactionError, TransactionResult,
 };
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::PackURI;
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -255,14 +256,15 @@ fn root_layout(source: &[u8], kind: StoryKind) -> Result<RootLayout> {
         },
     };
     let mut reader = Reader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     reader.config_mut().check_end_names = true;
     reader.config_mut().allow_unmatched_ends = false;
     let mut root = None;
     let mut depth = 0usize;
     loop {
-        let before = usize::try_from(reader.buffer_position()).map_err(|_error| {
-            Error::InvalidFormat("story XML position does not fit usize".into())
-        })?;
+        let before = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::InvalidFormat("story XML position does not fit usize".into()))?;
         match reader.read_event().map_err(Error::from)? {
             Event::Start(element) => {
                 depth += 1;
@@ -274,7 +276,7 @@ fn root_layout(source: &[u8], kind: StoryKind) -> Result<RootLayout> {
                     }
                     root = Some((
                         before,
-                        usize::try_from(reader.buffer_position()).map_err(|_error| {
+                        origin.offset(reader.buffer_position()).ok_or_else(|| {
                             Error::InvalidFormat("story XML position does not fit usize".into())
                         })?,
                         element.name().as_ref().to_vec(),

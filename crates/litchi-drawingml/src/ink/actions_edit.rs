@@ -13,6 +13,7 @@ use std::{
     sync::Arc,
 };
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml_name::{is_ncname, is_qualified_name};
 use quick_xml::{
     Reader, XmlVersion,
@@ -3684,15 +3685,18 @@ fn action_insertion(profile: &Profile, source: &[u8], parent: ActionParent) -> R
 
 fn root_tag(source: &[u8]) -> Result<TagRange> {
     let mut reader = Reader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("ink action root offset exceeds usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("ink action root offset exceeds usize"))?;
         let event = reader
             .read_event()
             .map_err(|error| xml_error(error.to_string()))?;
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("ink action root offset exceeds usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("ink action root offset exceeds usize"))?;
         match event {
             Event::Start(_) => {
                 return Ok(TagRange {
@@ -4840,17 +4844,20 @@ fn count_nodes_in_spans(source: &[u8], spans: &[SourceSpan]) -> Result<usize> {
         return Ok(0);
     }
     let mut reader = Reader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);
     let mut nodes = 0usize;
     let mut span_index = 0usize;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("ink action XML node offset exceeds usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("ink action XML node offset exceeds usize"))?;
         let event = reader
             .read_event()
             .map_err(|error| xml_error(error.to_string()))?;
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("ink action XML node offset exceeds usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("ink action XML node offset exceeds usize"))?;
         match event {
             Event::Start(_) | Event::Empty(_) => {
                 while span_index < spans.len() && start >= spans[span_index].end() {
@@ -5231,15 +5238,18 @@ fn index_opaque_payload(profile: &Profile, span: SourceSpan, index: &mut IdIndex
         return Err(invalid("ink action opaque payload source range is empty"));
     }
     let mut reader = Reader::from_reader(payload);
+    let origin = ReaderOrigin::of(payload);
     reader.config_mut().trim_text(false);
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("ink action opaque payload offset exceeds usize"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("ink action opaque payload offset exceeds usize"))?;
         let event = reader
             .read_event()
             .map_err(|error| xml_error(error.to_string()))?;
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("ink action opaque payload offset exceeds usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("ink action opaque payload offset exceeds usize"))?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 let element_span = SourceSpan::new(
@@ -5730,14 +5740,16 @@ fn element_close_start(source: &[u8], span: SourceSpan) -> Result<usize> {
     }
     let fragment = &source[span.start()..span.end()];
     let mut reader = Reader::from_reader(fragment);
+    let origin = ReaderOrigin::of(fragment);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     loop {
         let event = reader
             .read_event()
             .map_err(|error| xml_error(error.to_string()))?;
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("ink action closing offset exceeds usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("ink action closing offset exceeds usize"))?;
         match event {
             Event::Start(_) => depth = depth.saturating_add(1),
             Event::Empty(_) if depth == 0 => {
@@ -5763,14 +5775,16 @@ fn element_close_start(source: &[u8], span: SourceSpan) -> Result<usize> {
 
 fn root_close_start(source: &[u8]) -> Result<usize> {
     let mut reader = Reader::from_reader(source);
+    let origin = ReaderOrigin::of(source);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
     loop {
         let event = reader
             .read_event()
             .map_err(|error| xml_error(error.to_string()))?;
-        let end = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("ink action root offset exceeds usize"))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("ink action root offset exceeds usize"))?;
         match event {
             Event::Start(_) => depth += 1,
             Event::Empty(_) if depth == 0 => {

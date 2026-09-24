@@ -21,6 +21,7 @@ use super::model::{
 use super::transaction::Change;
 use super::validation;
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -1230,6 +1231,7 @@ fn attribute_insert_offset(tag: &[u8]) -> Option<usize> {
 fn locate_definitions(xml: &[u8]) -> Result<Layout> {
     validation::validate_xml(xml)?;
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut layout = Layout::default();
@@ -1238,12 +1240,12 @@ fn locate_definitions(xml: &[u8]) -> Result<Layout> {
     let mut nodes = 0usize;
 
     loop {
-        let event_start = position(&reader)?;
+        let event_start = position(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let event_end = position(&reader)?;
+        let event_end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let decoder = reader.decoder();
         let (namespace, event) = resolver.resolve_event(event);
@@ -1556,9 +1558,10 @@ fn skip_name(tag: &[u8], index: &mut usize) -> Result<()> {
     Ok(())
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source_error| invalid("numbering XML offset does not fit usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("numbering XML offset does not fit usize"))
 }
 
 /// Parse a standalone `WordprocessingML` numbering payload.

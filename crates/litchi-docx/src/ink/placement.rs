@@ -16,6 +16,7 @@
 
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::OwnedXmlPart;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -207,6 +208,7 @@ pub(crate) fn retarget_many(
     }
 
     let mut reader = reader(bytes);
+    let origin = ReaderOrigin::of(bytes);
     let mut stack_depth = 0usize;
     let mut target_index = 0usize;
     let mut active_target: Option<ActiveRetarget> = None;
@@ -223,7 +225,7 @@ pub(crate) fn retarget_many(
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let event_end = position(reader.buffer_position())?;
+        let event_end = position(origin, reader.buffer_position())?;
         let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -417,6 +419,7 @@ pub(crate) fn retarget_fallbacks(
     }
 
     let mut reader = reader(bytes);
+    let origin = ReaderOrigin::of(bytes);
     let mut stack: Vec<FallbackFrame> = Vec::new();
     stack
         .try_reserve(limits.max_xml_depth)
@@ -450,7 +453,7 @@ pub(crate) fn retarget_fallbacks(
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let event_end = position(reader.buffer_position())?;
+        let event_end = position(origin, reader.buffer_position())?;
         let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -809,6 +812,7 @@ pub(crate) fn fallback_start(
     }
 
     let mut reader = reader(source);
+    let origin = ReaderOrigin::of(source);
     let mut stack: Vec<HostFrame> = Vec::new();
     let mut nodes = 0usize;
     let mut root_seen = false;
@@ -820,7 +824,7 @@ pub(crate) fn fallback_start(
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let event_end = position(reader.buffer_position())?;
+        let event_end = position(origin, reader.buffer_position())?;
         let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -1020,6 +1024,7 @@ fn scan_paragraph_candidates(
         return Err(limit("story XML bytes", source.len(), MAX_XML_BYTES));
     }
     let mut reader = reader(source);
+    let origin = ReaderOrigin::of(source);
     let mut stack: Vec<ScanFrame> = Vec::new();
     let mut candidates = Vec::new();
     candidates
@@ -1038,7 +1043,7 @@ fn scan_paragraph_candidates(
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
-        let event_position = position(reader.buffer_position())?;
+        let event_position = position(origin, reader.buffer_position())?;
         let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
@@ -1710,10 +1715,12 @@ fn opening_span(
     Ok((start, event_end))
 }
 
-fn position(position: u64) -> Result<usize> {
-    usize::try_from(position).map_err(|error| {
-        Error::Invalid(format!("DOCX source position does not fit usize: {error}"))
-    })
+/// The byte offset in the reader's input of reader position `position`;
+/// `origin` is that input's [`ReaderOrigin`].
+fn position(origin: ReaderOrigin, position: u64) -> Result<usize> {
+    origin
+        .offset(position)
+        .ok_or_else(|| Error::Invalid("DOCX source position does not fit usize".into()))
 }
 
 fn to_u32(offset: usize) -> Result<u32> {

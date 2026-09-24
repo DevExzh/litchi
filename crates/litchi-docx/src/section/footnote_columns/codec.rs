@@ -23,6 +23,7 @@
 
 use crate::error::{Error, Result};
 use crate::namespace::is_wordprocessing_namespace;
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -161,6 +162,7 @@ pub(crate) fn read_with_context(xml: &[u8], context: &Context) -> Result<Parsed>
     }
 
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     context.install(&mut reader)?;
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
@@ -180,13 +182,13 @@ pub(crate) fn read_with_context(xml: &[u8], context: &Context) -> Result<Parsed>
     let mut unsafe_insertion_child = false;
 
     loop {
-        let event_start = offset(&reader)?;
+        let event_start = offset(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let event_end = offset(&reader)?;
+        let event_end = offset(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
 
@@ -1101,9 +1103,10 @@ fn namespace_uri(namespace: &ResolveResult<'_>) -> Option<Vec<u8>> {
     }
 }
 
-fn offset(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source_error| Error::InvalidFormat("section XML offset overflow".into()))
+fn offset(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::InvalidFormat("section XML offset overflow".into()))
 }
 
 fn too_deep() -> Error {

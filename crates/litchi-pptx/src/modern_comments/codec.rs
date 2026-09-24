@@ -7,6 +7,7 @@ mod authors {
     use super::super::model::{Author, Authors, NamespaceDeclaration};
     use super::super::{MAX_AUTHORS, MAX_BYTES, MAX_DEPTH, MAX_NODES, MAX_STRING_BYTES, P188};
     use crate::{Error, Result};
+    use litchi_core::xml::ReaderOrigin;
     use litchi_ooxml_common::{custom_xml::valid_guid, mce::process_ooxml};
     use quick_xml::encoding::Decoder;
     use quick_xml::events::{BytesStart, Event};
@@ -39,6 +40,7 @@ mod authors {
         }
         let bytes = selected.as_ref();
         let mut reader = NsReader::from_reader(bytes);
+        let origin = ReaderOrigin::of(bytes);
         reader.config_mut().trim_text(false);
         let mut buffer = Vec::new();
         let mut stack: Vec<Frame> = Vec::new();
@@ -50,7 +52,9 @@ mod authors {
         let mut nodes = 0usize;
 
         loop {
-            let start = reader.buffer_position() as usize;
+            let start = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| invalid("XML source position exceeds usize"))?;
             let decoder = reader.decoder();
             let (resolved, event) = reader
                 .read_resolved_event_into(&mut buffer)
@@ -103,7 +107,9 @@ mod authors {
                         attach_extension(
                             &frame.kind,
                             bytes,
-                            reader.buffer_position() as usize,
+                            origin
+                                .offset(reader.buffer_position())
+                                .ok_or_else(|| invalid("XML source position exceeds usize"))?,
                             &mut authors,
                         )?;
                         if matches!(frame.kind, FrameKind::Root) {
@@ -124,7 +130,9 @@ mod authors {
                     attach_extension(
                         &frame.kind,
                         bytes,
-                        reader.buffer_position() as usize,
+                        origin
+                            .offset(reader.buffer_position())
+                            .ok_or_else(|| invalid("XML source position exceeds usize"))?,
                         &mut authors,
                     )?;
                     if matches!(frame.kind, FrameKind::Root) {

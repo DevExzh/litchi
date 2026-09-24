@@ -11,6 +11,7 @@ use crate::{
     OpcError, OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart, PackURI, ReadLimits,
     ReadResource, Result, TargetMode,
 };
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::{events::Event, reader::NsReader};
 use std::collections::HashSet;
 use std::ops::Range;
@@ -718,6 +719,7 @@ fn scan_relationship_source(
     let mut reader = NsReader::from_reader(source);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
+    let origin = ReaderOrigin::of(source);
     let mut depth = 0usize;
     let mut root_name = None;
     let mut root_tag = None;
@@ -744,9 +746,9 @@ fn scan_relationship_source(
             event_count as u64,
             limits.max_xml_events() as u64,
         )?;
-        let start = reader.buffer_position() as usize;
+        let start = relationship_offset(&reader, origin)?;
         let event = reader.read_event()?;
-        let end = reader.buffer_position() as usize;
+        let end = relationship_offset(&reader, origin)?;
         if end < start || end > source.len() {
             return Err(invalid("relationship XML event range is invalid"));
         }
@@ -952,11 +954,12 @@ impl OwnedRelationships {
         let mut reader = NsReader::from_reader(self.bytes());
         reader.config_mut().trim_text(false);
         reader.config_mut().check_end_names = true;
+        let origin = ReaderOrigin::of(self.bytes());
         let mut depth = 0usize;
         loop {
-            let start = reader.buffer_position() as usize;
+            let start = relationship_offset(&reader, origin)?;
             let event = reader.read_event()?;
-            let end = reader.buffer_position() as usize;
+            let end = relationship_offset(&reader, origin)?;
             let empty = matches!(&event, Event::Empty(_));
             match event {
                 Event::Start(element) | Event::Empty(element) => {
@@ -1066,15 +1069,16 @@ impl OwnedRelationships {
         let mut reader = NsReader::from_reader(self.bytes());
         reader.config_mut().trim_text(false);
         reader.config_mut().check_end_names = true;
+        let origin = ReaderOrigin::of(self.bytes());
         let mut depth = 0usize;
         let mut root_tag = None;
         let mut root_name = None;
         let mut root_close = None;
         let mut root_empty = false;
         loop {
-            let start = reader.buffer_position() as usize;
+            let start = relationship_offset(&reader, origin)?;
             let event = reader.read_event()?;
-            let end = reader.buffer_position() as usize;
+            let end = relationship_offset(&reader, origin)?;
             match event {
                 Event::Start(element) if depth == 0 => {
                     if element.local_name().as_ref() != b"Relationships" {
@@ -1607,6 +1611,16 @@ fn check_relationship_attributes(
 
 fn invalid(message: impl Into<String>) -> OpcError {
     OpcError::InvalidRelationship(message.into())
+}
+
+/// The byte offset in the relationship bytes of `reader`'s position.
+///
+/// `origin` is the bytes' [`ReaderOrigin`]: the reader does not count a
+/// leading byte-order mark, and spans taken here splice the original bytes.
+fn relationship_offset(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("relationship XML position overflows usize"))
 }
 
 #[cfg(test)]

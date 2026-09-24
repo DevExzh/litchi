@@ -5,6 +5,7 @@
 //! or the caller's selected ranges.
 
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::private::BindingTracker;
 use litchi_ooxml_common::xml::{
     DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE, decode_xml_reference,
@@ -203,6 +204,9 @@ pub fn extract(xml_bytes: &[u8], paragraph_separator: Option<char>) -> Result<St
 
 /// Scan checked byte ranges for `DrawingML` elements with the requested local name.
 ///
+/// Reported starts are byte offsets into `xml_bytes`, counting a leading
+/// UTF-8 byte-order mark (change 0765).
+///
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
@@ -221,6 +225,7 @@ pub fn scan_ranges(
     }
 
     let mut reader = Reader::from_reader(xml_bytes);
+    let origin = ReaderOrigin::of(xml_bytes);
     let mut tracker = BindingTracker::new();
     let mut pending_pop = false;
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
@@ -232,8 +237,9 @@ pub fn scan_ranges(
             tracker.pop();
             pending_pop = false;
         }
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_err| Error::Invalid("DrawingML offset does not fit usize".to_string()))?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Invalid("DrawingML offset does not fit usize".to_string()))?;
         let event = {
             let event = reader
                 .read_event()
@@ -328,8 +334,9 @@ pub fn scan_ranges(
                 _ => ScanEvent::Other,
             }
         };
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_err| Error::Invalid("DrawingML offset does not fit usize".to_string()))?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| Error::Invalid("DrawingML offset does not fit usize".to_string()))?;
 
         match event {
             ScanEvent::Start => capture = Some((event_start, 1)),
@@ -563,15 +570,16 @@ mod tests {
         }
 
         let mut reader = NsReader::from_reader(xml_bytes);
+        let origin = ReaderOrigin::of(xml_bytes);
         let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
         let mut capture: Option<(usize, usize)> = None;
         let mut depth = 0usize;
         let mut nodes = 0usize;
         let mut ranges = Vec::new();
         loop {
-            let event_start = usize::try_from(reader.buffer_position()).map_err(|_error| {
-                Error::Invalid("DrawingML offset does not fit usize".to_string())
-            })?;
+            let event_start = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| Error::Invalid("DrawingML offset does not fit usize".to_string()))?;
             let event = {
                 let (namespace, event) = reader
                     .read_resolved_event()
@@ -651,9 +659,9 @@ mod tests {
                     _ => ScanEvent::Other,
                 }
             };
-            let event_end = usize::try_from(reader.buffer_position()).map_err(|_error| {
-                Error::Invalid("DrawingML offset does not fit usize".to_string())
-            })?;
+            let event_end = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| Error::Invalid("DrawingML offset does not fit usize".to_string()))?;
             match event {
                 ScanEvent::Start => capture = Some((event_start, 1)),
                 ScanEvent::NestedStart => {

@@ -13,6 +13,7 @@ use super::{
     MAX_XML_BYTES, MCE_NS, PML, STRICT_PML, invalid, limit,
 };
 use crate::error::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits, OffsetLimits, active_offsets};
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, Part};
@@ -628,9 +629,11 @@ pub(super) fn patch_embedding_flag(xml: &[u8], enabled: bool) -> Result<Vec<u8>>
 
 pub(super) fn presentation_start_tag(xml: &[u8]) -> Result<(usize, usize)> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_err| invalid("presentation XML offset overflow"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("presentation XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
@@ -639,8 +642,9 @@ pub(super) fn presentation_start_tag(xml: &[u8]) -> Result<(usize, usize)> {
                 {
                     return Err(invalid("expected a PresentationML presentation root"));
                 }
-                let end = usize::try_from(reader.buffer_position())
-                    .map_err(|_err| invalid("presentation XML offset overflow"))?;
+                let end = origin
+                    .offset(reader.buffer_position())
+                    .ok_or_else(|| invalid("presentation XML offset overflow"))?;
                 return Ok((start, end));
             },
             Event::Decl(_) | Event::Comment(_) => {},
@@ -796,6 +800,7 @@ pub(super) fn active_direct_elements(xml: &[u8], conformance: Conformance) -> Re
         return Err(limit("presentation XML bytes"));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut frames = Vec::<DirectFrame>::new();
     let mut elements = Vec::<DirectElement>::new();
     let mut offsets = Vec::<u32>::new();
@@ -803,8 +808,9 @@ pub(super) fn active_direct_elements(xml: &[u8], conformance: Conformance) -> Re
     let mut root_close = None;
     let mut nodes = 0usize;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_err| invalid("presentation XML offset overflow"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("presentation XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
@@ -886,8 +892,9 @@ pub(super) fn active_direct_elements(xml: &[u8], conformance: Conformance) -> Re
                 if is_pml && rank.is_some() {
                     elements.push(DirectElement {
                         start,
-                        end: usize::try_from(reader.buffer_position())
-                            .map_err(|_err| invalid("presentation XML offset overflow"))?,
+                        end: origin
+                            .offset(reader.buffer_position())
+                            .ok_or_else(|| invalid("presentation XML offset overflow"))?,
                         rank,
                     });
                     offsets.push(
@@ -901,8 +908,9 @@ pub(super) fn active_direct_elements(xml: &[u8], conformance: Conformance) -> Re
                     .pop()
                     .ok_or_else(|| invalid("unexpected presentation closing element"))?;
                 if let Some(index) = frame.element {
-                    let end = usize::try_from(reader.buffer_position())
-                        .map_err(|_err| invalid("presentation XML offset overflow"))?;
+                    let end = origin
+                        .offset(reader.buffer_position())
+                        .ok_or_else(|| invalid("presentation XML offset overflow"))?;
                     let len = elements.len();
                     elements
                         .get_mut(index)

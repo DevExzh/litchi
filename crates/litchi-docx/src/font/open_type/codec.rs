@@ -15,6 +15,7 @@
 
 use crate::error::{Error, Result};
 use crate::paragraph::is_fragment_word_name;
+use litchi_core::xml::ReaderOrigin;
 use quick_xml::Reader;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -128,6 +129,7 @@ fn locate(xml: &[u8]) -> Result<(Layout, OpenType)> {
     }
 
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
 
@@ -142,12 +144,12 @@ fn locate(xml: &[u8]) -> Result<(Layout, OpenType)> {
     let mut nodes = 0usize;
 
     loop {
-        let event_start = offset(&reader)?;
+        let event_start = offset(&reader, origin)?;
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
-        let event_end = offset(&reader)?;
+        let event_end = offset(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         if depth == 0
@@ -747,9 +749,10 @@ fn name_local(name: &[u8]) -> &[u8] {
         .unwrap_or(name)
 }
 
-fn offset(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_source_error| Error::InvalidFormat("Word OpenType XML offset overflow".into()))
+fn offset(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| Error::InvalidFormat("Word OpenType XML offset overflow".into()))
 }
 
 fn is_empty_element_start(element: &BytesStart<'_>) -> bool {

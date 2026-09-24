@@ -8,6 +8,7 @@ use crate::presentation::embedded::{
     MAX_XML_DEPTH, increment_nodes, invalid, is_presentationml_name, limit,
 };
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
@@ -166,14 +167,16 @@ fn insert_into_shape_tree(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
         ));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut root_seen = false;
     let mut tree_depth = None;
     let mut insertion = None;
     loop {
-        let before = usize::try_from(reader.buffer_position())
-            .map_err(|_err| invalid("slide XML offset overflow"))?;
+        let before = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("slide XML offset overflow"))?;
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;

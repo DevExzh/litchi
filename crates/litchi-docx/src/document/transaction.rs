@@ -9,6 +9,7 @@ mod scan_differential_tests;
 use std::mem::size_of;
 use std::sync::Arc;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_core::{ExecutionContext, Position, Reservation, Resource, SourceVersion};
 use litchi_ooxml_common::private::{BindingTracker, split_qualified_name};
 use litchi_ooxml_common::properties::time::DateTime;
@@ -33,6 +34,7 @@ pub use litchi_core::patch::{
 };
 
 pub(crate) const MAX_DOCUMENT_XML_BYTES: usize = 32 * 1024 * 1024;
+#[cfg(test)]
 const UTF8_BYTE_ORDER_MARK: &[u8] = b"\xEF\xBB\xBF";
 const UTF8_BYTE_ORDER_MARK_TEXT: &str = "\u{feff}";
 const MAX_DOCUMENT_DEPTH: usize = 256;
@@ -5968,6 +5970,9 @@ fn preserves_body_child_shape(before: &[u8], after: &[u8]) -> bool {
 /// treat that as "fall back to the full rescan", never as a document refusal.
 fn body_child_shape(fragment: &[u8]) -> Option<BodyChildShape> {
     let mut reader = Reader::from_reader(fragment);
+    // A fragment that begins with a byte-order mark does not start with its
+    // element, so its origin makes it fall back to the full rescan below.
+    let origin = ReaderOrigin::of(fragment);
     let mut shape = BodyChildShape {
         nodes: 0,
         max_depth: 0,
@@ -5977,9 +5982,9 @@ fn body_child_shape(fragment: &[u8]) -> Option<BodyChildShape> {
     let mut root_seen = false;
     let mut root_closed = false;
     loop {
-        let event_start = usize::try_from(reader.buffer_position()).ok()?;
+        let event_start = origin.offset(reader.buffer_position())?;
         let event = reader.read_event().ok()?;
-        let event_end = usize::try_from(reader.buffer_position()).ok()?;
+        let event_end = origin.offset(reader.buffer_position())?;
         match event {
             Event::Start(_) => {
                 if root_closed {
@@ -6249,22 +6254,18 @@ fn scan_document_with_context(
     let mut namespace_scopes = context.map(|_| Vec::<usize>::new());
     // quick-xml consumes a leading UTF-8 BOM before its first event and does
     // not include those bytes in `buffer_position()`. Layout ranges address
-    // the retained source buffer, so carry the prefix into every event span
-    // used below. This keeps managed and unmanaged scans on the same source
-    // coordinates and preserves exact paragraph/table slices.
-    let bom_offset =
-        usize::from(xml.starts_with(UTF8_BYTE_ORDER_MARK)) * UTF8_BYTE_ORDER_MARK.len();
+    // the retained source buffer, so the reader origin carries the mark into
+    // every event span used below. This keeps managed and unmanaged scans on
+    // the same source coordinates and preserves exact paragraph/table slices.
+    let origin = ReaderOrigin::of(xml);
 
     loop {
         if let Some(context) = context {
             context.check().map_err(managed_execution)?;
         }
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_conversion_error| {
-                crate::Error::InvalidFormat("document offset does not fit usize".into())
-            })?
-            .checked_add(bom_offset)
-            .ok_or_else(|| crate::Error::InvalidFormat("document offset overflow".into()))?;
+        let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+            crate::Error::InvalidFormat("document offset does not fit usize".into())
+        })?;
         // `NsReader` applies the deferred pop of the previous `End` or `Empty`
         // scope when it is asked for the next event.
         if pending_pop {
@@ -6292,12 +6293,9 @@ fn scan_document_with_context(
             Event::End(_) => pending_pop = true,
             _ => {},
         }
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_conversion_error| {
-                crate::Error::InvalidFormat("document offset does not fit usize".into())
-            })?
-            .checked_add(bom_offset)
-            .ok_or_else(|| crate::Error::InvalidFormat("document offset overflow".into()))?;
+        let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+            crate::Error::InvalidFormat("document offset does not fit usize".into())
+        })?;
         let event_bytes = event_end.saturating_sub(event_start).max(1);
         let (event_namespace_bindings, active_namespace_bindings) = if namespace_bindings.is_some()
         {
@@ -6592,31 +6590,24 @@ fn scan_document_with_context_nsreader_oracle(
     let mut namespace_scopes = context.map(|_| Vec::<usize>::new());
     // quick-xml consumes a leading UTF-8 BOM before its first event and does
     // not include those bytes in `buffer_position()`. Layout ranges address
-    // the retained source buffer, so carry the prefix into every event span
-    // used below. This keeps managed and unmanaged scans on the same source
-    // coordinates and preserves exact paragraph/table slices.
-    let bom_offset =
-        usize::from(xml.starts_with(UTF8_BYTE_ORDER_MARK)) * UTF8_BYTE_ORDER_MARK.len();
+    // the retained source buffer, so the reader origin carries the mark into
+    // every event span used below. This keeps managed and unmanaged scans on
+    // the same source coordinates and preserves exact paragraph/table slices.
+    let origin = ReaderOrigin::of(xml);
 
     loop {
         if let Some(context) = context {
             context.check().map_err(managed_execution)?;
         }
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_conversion_error| {
-                crate::Error::InvalidFormat("document offset does not fit usize".into())
-            })?
-            .checked_add(bom_offset)
-            .ok_or_else(|| crate::Error::InvalidFormat("document offset overflow".into()))?;
+        let event_start = origin.offset(reader.buffer_position()).ok_or_else(|| {
+            crate::Error::InvalidFormat("document offset does not fit usize".into())
+        })?;
         let raw_event = reader
             .read_event()
             .map_err(|error| crate::Error::Xml(error.to_string()))?;
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_conversion_error| {
-                crate::Error::InvalidFormat("document offset does not fit usize".into())
-            })?
-            .checked_add(bom_offset)
-            .ok_or_else(|| crate::Error::InvalidFormat("document offset overflow".into()))?;
+        let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+            crate::Error::InvalidFormat("document offset does not fit usize".into())
+        })?;
         let event_bytes = event_end.saturating_sub(event_start).max(1);
         let (event_namespace_bindings, active_namespace_bindings) = if namespace_bindings.is_some()
         {
@@ -7205,6 +7196,7 @@ fn scan_revision_fragment(
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
 ) -> Result<RevisionFragmentInfo, Refusal> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     for (prefix, namespace) in inherited_namespaces {
         let prefix = prefix
             .as_deref()
@@ -7229,14 +7221,16 @@ fn scan_revision_fragment(
     let mut nodes = 0usize;
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_error| Refusal::RevisionDependency)?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::RevisionDependency)?;
         let raw_event = reader
             .read_event()
             .map_err(|_error| Refusal::RevisionDependency)?;
         let (namespace, event) = reader.resolver().resolve_event(raw_event);
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_error| Refusal::RevisionDependency)?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::RevisionDependency)?;
         if matches!(event, Event::Start(_) | Event::Empty(_)) {
             nodes = nodes.checked_add(1).ok_or(Refusal::RevisionDependency)?;
             if nodes > MAX_DOCUMENT_NODES {
@@ -8238,6 +8232,7 @@ fn revision_tag_name_replacement_at(
 
 fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut fragment_prefix = FragmentPrefix::Unseen;
     let mut root_depth = None;
     let mut run_depth = None;
@@ -8248,8 +8243,9 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
     let mut saw_root = false;
 
     loop {
-        let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_conversion_error| Refusal::ComplexContent)?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::ComplexContent)?;
         let raw_event = reader
             .read_event()
             .map_err(|_xml_error| Refusal::ComplexContent)?
@@ -8258,8 +8254,9 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> Result<TextOwner, Refusal> {
         // the complete namespace environment for every event.
         let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(raw_event);
-        let event_end = usize::try_from(reader.buffer_position())
-            .map_err(|_conversion_error| Refusal::ComplexContent)?;
+        let event_end = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::ComplexContent)?;
 
         match event {
             Event::Start(element) => {
@@ -8896,6 +8893,7 @@ fn select_direct_child_with_context(
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
 ) -> Result<Range, Refusal> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     for (prefix, namespace) in inherited_namespaces {
         let prefix = prefix
             .as_deref()
@@ -8912,10 +8910,10 @@ fn select_direct_child_with_context(
     let mut index = 0usize;
     let mut saw_root = false;
     loop {
-        let start = usize::try_from(reader.buffer_position()).map_err(|_error| missing)?;
+        let start = origin.offset(reader.buffer_position()).ok_or(missing)?;
         let raw_event = reader.read_event().map_err(|_error| missing)?;
         let (namespace, event) = reader.resolver().resolve_event(raw_event);
-        let end = usize::try_from(reader.buffer_position()).map_err(|_error| missing)?;
+        let end = origin.offset(reader.buffer_position()).ok_or(missing)?;
         match event {
             Event::Start(element) => {
                 depth = depth.checked_add(1).ok_or(missing)?;

@@ -10,6 +10,7 @@ use super::super::sections::{List as SectionList, Section};
 use super::model::{Graph, Reference};
 use crate::presentation_properties::metadata::{escape_xml, new_guid};
 use crate::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::OpcPackage;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
@@ -972,6 +973,7 @@ struct XmlLayout {
 
 fn scan_layout(xml: &[u8]) -> Result<XmlLayout> {
     let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut stack = Vec::<Frame>::new();
     let mut direct = Vec::new();
     let mut custom = Vec::new();
@@ -979,7 +981,9 @@ fn scan_layout(xml: &[u8]) -> Result<XmlLayout> {
     let mut root_close = None;
     let mut nodes = 0usize;
     loop {
-        let before = reader.buffer_position() as usize;
+        let before = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XML source position exceeds usize"))?;
         let decoder = reader.decoder();
         match reader.read_event() {
             Ok(Event::Start(element)) => {
@@ -1004,7 +1008,9 @@ fn scan_layout(xml: &[u8]) -> Result<XmlLayout> {
                 let local = local_name(element.name().as_ref())?;
                 let span = Span {
                     start: before,
-                    end: reader.buffer_position() as usize,
+                    end: origin
+                        .offset(reader.buffer_position())
+                        .ok_or_else(|| invalid("XML source position exceeds usize"))?,
                     close_start: before,
                     local: local.clone(),
                 };
@@ -1028,7 +1034,9 @@ fn scan_layout(xml: &[u8]) -> Result<XmlLayout> {
                     .ok_or_else(|| invalid("unexpected closing element"))?;
                 let span = Span {
                     start: frame.start,
-                    end: reader.buffer_position() as usize,
+                    end: origin
+                        .offset(reader.buffer_position())
+                        .ok_or_else(|| invalid("XML source position exceeds usize"))?,
                     close_start: before,
                     local: frame.local,
                 };

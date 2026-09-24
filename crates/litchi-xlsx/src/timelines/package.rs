@@ -16,6 +16,7 @@ use super::{
     limit, xml_error,
 };
 use crate::error::{Error, Result};
+use litchi_core::xml::ReaderOrigin;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use quick_xml::events::Event;
@@ -525,13 +526,15 @@ fn insert_extension(
         )));
     }
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
     let mut open_ext = None;
     let mut empty_ext = None;
     let mut root_close = None;
     loop {
-        let start = usize::try_from(reader.buffer_position())
-            .map_err(|_source| invalid("XML offset overflow"))?;
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XML offset overflow"))?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let mut empty_candidate = None;
         match event {
@@ -585,8 +588,9 @@ fn insert_extension(
             | Event::GeneralRef(_) => {},
         }
         if let Some((start, qname)) = empty_candidate {
-            let end = usize::try_from(reader.buffer_position())
-                .map_err(|_source| invalid("XML offset overflow"))?;
+            let end = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| invalid("XML offset overflow"))?;
             empty_ext = Some((start, end, qname));
         }
     }

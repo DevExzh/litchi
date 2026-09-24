@@ -7,6 +7,7 @@
     reason = "parser bindings are refined after each bounded validation step"
 )]
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, OffsetLimits, active_offsets};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -1193,14 +1194,18 @@ fn mce_output_limit(marked_bytes: usize, max_nodes: usize, max_depth: usize) -> 
     Ok(expanded.min(MAX_OUTPUT_BYTES))
 }
 
+/// The offset of the start tag that ended at reader position
+/// `event_position`; `xml` is the reader's input, whose [`ReaderOrigin`]
+/// converts the position to a byte offset.
 fn element_offset(
     event_position: u64,
     element: &BytesStart<'_>,
     empty: bool,
     xml: &[u8],
 ) -> Result<u32> {
-    let end = usize::try_from(event_position)
-        .map_err(|error| Error::Invalid(format!("XML position does not fit usize: {error}")))?;
+    let end = ReaderOrigin::of(xml)
+        .offset(event_position)
+        .ok_or_else(|| invalid("XML position does not fit usize"))?;
     let suffix = if empty { 3 } else { 2 };
     let consumed = element
         .as_ref()

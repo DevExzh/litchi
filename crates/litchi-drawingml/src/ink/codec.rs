@@ -2,6 +2,7 @@
 
 use std::{fmt, io::Write, sync::Arc};
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml_name::is_qualified_name;
 use quick_xml::{
     XmlVersion,
@@ -300,6 +301,7 @@ fn validate_selected_spans(
 
 fn scan(xml: &[u8], mut projection: Projection<'_>) -> Result<Parsed> {
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
@@ -318,10 +320,10 @@ fn scan(xml: &[u8], mut projection: Projection<'_>) -> Result<Parsed> {
     let mut legacy_fragment = false;
 
     loop {
-        let start = position(&reader, "InkML")?;
+        let start = position(&reader, origin, "InkML")?;
         let event = reader.read_event().map_err(xml_error)?;
         let (resolved, event) = reader.resolver().resolve_event(event);
-        let end = position(&reader, "InkML")?;
+        let end = position(&reader, origin, "InkML")?;
         let is_declaration = matches!(&event, Event::Decl(_));
         match event {
             Event::Decl(declaration)
@@ -1298,9 +1300,14 @@ fn copy_source(xml: &[u8]) -> Result<Arc<Vec<u8>>> {
     Ok(Arc::new(source))
 }
 
-fn position<R: std::io::BufRead>(reader: &NsReader<R>, what: &str) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid(format!("{what} offset exceeds usize")))
+fn position<R: std::io::BufRead>(
+    reader: &NsReader<R>,
+    origin: ReaderOrigin,
+    what: &str,
+) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid(format!("{what} offset exceeds usize")))
 }
 
 fn increment_nodes(nodes: &mut usize) -> Result<()> {

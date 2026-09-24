@@ -2,6 +2,7 @@
 
 use std::ops::Range;
 
+use litchi_core::xml::ReaderOrigin;
 use litchi_drawingml::model3d as drawing;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::events::Event;
@@ -82,6 +83,7 @@ pub(crate) fn locate(xml: &[u8]) -> Result<Inventory> {
     }
 
     let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut shape_stack = Vec::new();
@@ -92,13 +94,13 @@ pub(crate) fn locate(xml: &[u8]) -> Result<Inventory> {
     let mut nodes = 0usize;
 
     loop {
-        let start = position(&reader)?;
+        let start = position(&reader, origin)?;
         let decoder = reader.decoder();
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(xml_error)?
             .into_owned();
-        let end = position(&reader)?;
+        let end = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         nodes = nodes
@@ -288,9 +290,10 @@ fn is_namespace(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
     matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == expected)
 }
 
-fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_err| invalid("model3d XML offset exceeds usize"))
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("model3d XML offset exceeds usize"))
 }
 
 fn xml_error(error: quick_xml::Error) -> Error {
