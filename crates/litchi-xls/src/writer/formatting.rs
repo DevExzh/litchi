@@ -11,9 +11,59 @@
 //! - **PALETTE**: Color palette
 
 use super::super::{Error, Result};
-use super::string_limits::{NUMBER_FORMAT_UNITS, ensure_utf16_len_within};
+use super::string_limits::{
+    FONT_NAME_UNITS, NUMBER_FORMAT_UNITS, ensure_utf16_len_within, record_len, u8_len, utf16_len,
+};
 use std::collections::HashMap;
 use std::io::Write;
+
+/// `Font` records a workbook can address: `FontIndex` skips 4 and MUST be
+/// at most 1022 ([MS-XLS] 2.5.129), which names 1022 records. The reader
+/// refuses a font it cannot address.
+pub(crate) const MAX_FONTS: usize = 1022;
+
+/// `Format` records the globals grammar allows, `8*218Format` ([MS-XLS]
+/// 2.1.7.20.1), less the eight locale-dependent built-ins this writer always
+/// emits. The reader refuses a 219th `Format` record.
+pub(crate) const MAX_CUSTOM_NUMBER_FORMATS: usize = 218 - 8;
+
+/// XF records a 16-bit `XFIndex` ([MS-XLS] 2.5.282) can address; the reader
+/// refuses more.
+pub(crate) const MAX_XF_RECORDS: usize = 65_536;
+
+/// XF records when an `XFCRC` record is written, as it is for `XFExt`
+/// records and for pivot tables: `XFCRC.cxfs` is 16 through 4050 ([MS-XLS]
+/// 2.4.354), and the reader refuses anything else.
+pub(crate) const MAX_XF_RECORDS_WITH_XFCRC: usize = 4050;
+
+/// The fifteen built-in style XFs, the default cell XF and the five built-in
+/// number-format style XFs that precede user cell XFs.
+const FIXED_XF_RECORDS: usize = 15 + 1 + 5;
+
+/// The first XF index the pivot-table XFs may take.
+const PIVOT_XF_START_INDEX: usize = 64;
+
+/// The XF records pivot-table formatting appends.
+const PIVOT_XF_RECORDS: usize = 3;
+
+/// Cell formats a writer can hold (the default one included): their XFs, the
+/// fixed XFs before them and the pivot XFs after them fill the XF index
+/// space. The pivot XFs are reserved even without a pivot table, so adding a
+/// pivot table can never overflow it.
+pub(crate) const MAX_CELL_FORMATS: usize = MAX_XF_RECORDS - PIVOT_XF_RECORDS - FIXED_XF_RECORDS + 1;
+
+/// The XF records [`FormattingManager::write_formats`] emits for `formats`
+/// cell formats (the default one included), with or without pivot XFs.
+pub(crate) const fn xf_record_count_for(formats: usize, pivot: bool) -> usize {
+    let base = FIXED_XF_RECORDS + formats.saturating_sub(1);
+    if !pivot {
+        base
+    } else if base > PIVOT_XF_START_INDEX {
+        base + PIVOT_XF_RECORDS
+    } else {
+        PIVOT_XF_START_INDEX + PIVOT_XF_RECORDS
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct PivotXfIndices {
@@ -198,6 +248,53 @@ impl Default for Font {
     }
 }
 
+impl Font {
+    /// Refuses a font a BIFF8 `Font` record ([MS-XLS] 2.4.122) cannot store
+    /// and litchi's reader would refuse: a name that is empty, holds a NUL or
+    /// is longer than 31 UTF-16 code units ([`Error::StringTooLong`]); a
+    /// height other than 0 or 20 through 8191 twips; a weight other than 0
+    /// or 100 through 1000; an underline style other than 0x00, 0x01, 0x02,
+    /// 0x21 or 0x22; or a color that is not a font color index.
+    pub(crate) fn validate(&self) -> Result<()> {
+        if self.name.is_empty() {
+            return Err(Error::InvalidData(
+                "font name must not be empty".to_string(),
+            ));
+        }
+        ensure_utf16_len_within(&self.name, FONT_NAME_UNITS, "font name")?;
+        if self.name.contains('\0') {
+            return Err(Error::InvalidData(
+                "font name must not contain a NUL character".to_string(),
+            ));
+        }
+        if self.height != 0 && !(20..=8191).contains(&self.height) {
+            return Err(Error::InvalidData(format!(
+                "font height {} twips is outside 0 and 20 through 8191",
+                self.height
+            )));
+        }
+        if self.weight != 0 && !(100..=1000).contains(&self.weight) {
+            return Err(Error::InvalidData(format!(
+                "font weight {} is outside 0 and 100 through 1000",
+                self.weight
+            )));
+        }
+        if !matches!(self.underline, 0x00 | 0x01 | 0x02 | 0x21 | 0x22) {
+            return Err(Error::InvalidData(format!(
+                "font underline style {:#04x} is not a BIFF8 underline",
+                self.underline
+            )));
+        }
+        if !crate::font::valid_color_index(self.color_index) {
+            return Err(Error::InvalidData(format!(
+                "font color {:#06x} is not a BIFF8 font color index",
+                self.color_index
+            )));
+        }
+        Ok(())
+    }
+}
+
 /// Cell borders
 #[derive(Debug, Clone, Default)]
 pub struct Borders {
@@ -310,35 +407,18 @@ impl Default for CellStyle {
 ///
 /// Returns an error if validation, decoding, encoding, or the requested operation fails.
 pub fn write_font<W: Write>(writer: &mut W, font: &Font) -> Result<()> {
-    let mut name_end = 0;
-    let mut name_len = 0;
-    for (offset, character) in font.name.char_indices() {
-        let character_len = character.len_utf16();
-        if name_len + character_len > 31 {
-            break;
-        }
-        name_len += character_len;
-        name_end = offset + character.len_utf8();
-    }
-    if name_len == 0 {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "BIFF8 font name must contain 1..=31 UTF-16 code units",
-        )
-        .into());
-    }
-    let name = &font.name[..name_end];
+    // Registration refuses such a font; the encoder refuses it too rather
+    // than cutting its name.
+    font.validate()?;
+    let name = font.name.as_str();
+    let name_len = u8_len(utf16_len(name), "font name")?;
 
     // Fixed payload is 14 bytes of properties:
     // - Height (2) + Attributes (2) + ColorIdx (2) + Weight (2)
     // - Escapement (2) + Underline (1) + Family (1) + Charset (1) + Reserved (1)
     // BIFF8 FONT requires an uncompressed UTF-16LE ShortXLUnicodeString.
-    let data_len = 14 + 1 + 1 + (name_len * 2);
-    super::biff::write_record_header(
-        writer,
-        0x0031,
-        crate::utils::truncate_usize_to_u16(data_len),
-    )?;
+    let data_len = record_len("Font", 14 + 1 + 1 + usize::from(name_len) * 2)?;
+    super::biff::write_record_header(writer, 0x0031, data_len)?;
 
     // Font height in twips
     writer.write_all(&font.height.to_le_bytes())?;
@@ -372,7 +452,7 @@ pub fn write_font<W: Write>(writer: &mut W, font: &Font) -> Result<()> {
     writer.write_all(&[0])?;
 
     // Font name length
-    writer.write_all(&[crate::utils::truncate_usize_to_u8(name_len)])?;
+    writer.write_all(&[name_len])?;
 
     // FONT narrows ShortXLUnicodeString: fHighByte MUST equal 1.
     writer.write_all(&[0x01])?;
@@ -459,6 +539,14 @@ pub fn write_xf<W: Write>(writer: &mut W, xf: &ExtendedFormat, is_style_xf: bool
     Ok(())
 }
 
+/// Where a number format pattern would be registered.
+enum NumberFormatSlot<'p> {
+    /// A built-in or already registered format with this index.
+    Existing(u16),
+    /// A new custom format with this index and normalized pattern.
+    New(u16, &'p str),
+}
+
 /// Formatting manager for tracking fonts and formats
 #[derive(Debug)]
 pub struct FormattingManager {
@@ -509,18 +597,90 @@ impl FormattingManager {
         manager
     }
 
-    /// Add a font and return its index
-    pub fn add_font(&mut self, font: Font) -> u16 {
-        let index = crate::utils::truncate_usize_to_u16(self.fonts.len());
+    /// Add a font and return its BIFF8 `FontIndex`.
+    ///
+    /// The first four fonts are the defaults 0 through 3; `FontIndex` skips 4
+    /// ([MS-XLS] 2.5.129), so the first added font is 5. Use the returned
+    /// value as [`ExtendedFormat::font_index`].
+    ///
+    /// # Errors
+    ///
+    /// Refuses a font [`Font`] cannot store in a BIFF8 `Font` record (see its
+    /// fields; a name longer than 31 UTF-16 code units is
+    /// [`Error::StringTooLong`]) and, with [`Error::TooMany`], a font past
+    /// the 1022 a `FontIndex` can address. A refused font leaves the manager
+    /// unchanged.
+    pub fn add_font(&mut self, font: Font) -> Result<u16> {
+        font.validate()?;
+        let index = self.next_font_index()?;
         self.fonts.push(font);
-        index
+        Ok(index)
     }
 
-    /// Add a format and return its index
-    pub fn add_format(&mut self, format: ExtendedFormat) -> u16 {
-        let index = crate::utils::truncate_usize_to_u16(self.formats.len());
+    /// The `FontIndex` the next added font takes, or [`Error::TooMany`] when
+    /// no index is left.
+    fn next_font_index(&self) -> Result<u16> {
+        if self.fonts.len() >= MAX_FONTS {
+            return Err(Error::TooMany {
+                collection: "fonts",
+                limit: MAX_FONTS,
+            });
+        }
+        let physical = self.fonts.len();
+        let logical = if physical < 4 { physical } else { physical + 1 };
+        u16::try_from(logical).map_err(|_error| Error::TooMany {
+            collection: "fonts",
+            limit: MAX_FONTS,
+        })
+    }
+
+    /// Add a cell format (XF) and return the identifier the `*_with_format`
+    /// writer methods take.
+    ///
+    /// # Errors
+    ///
+    /// Refuses, with [`Error::InvalidData`], a format whose
+    /// [`ExtendedFormat::font_index`] names no font of this manager (4 names
+    /// none) or whose [`ExtendedFormat::format_index`] names no built-in or
+    /// registered number format, and with [`Error::TooMany`] a format past
+    /// the XF records a 16-bit XF index can address. A refused format leaves
+    /// the manager unchanged.
+    pub fn add_format(&mut self, format: ExtendedFormat) -> Result<u16> {
+        self.check_format(&format)?;
+        let index = self.next_format_index()?;
         self.formats.push(format);
-        index
+        Ok(index)
+    }
+
+    fn check_format(&self, format: &ExtendedFormat) -> Result<()> {
+        if self.get_font(format.font_index).is_none() {
+            return Err(Error::InvalidData(format!(
+                "cell format refers to font index {}, which names no font",
+                format.font_index
+            )));
+        }
+        if !self.contains_number_format_id(format.format_index) {
+            return Err(Error::InvalidData(format!(
+                "cell format refers to number format {}, which is neither built in nor registered",
+                format.format_index
+            )));
+        }
+        Ok(())
+    }
+
+    /// The identifier the next added cell format takes, or
+    /// [`Error::TooMany`] when the XF index space is full.
+    fn next_format_index(&self) -> Result<u16> {
+        if self.formats.len() >= MAX_CELL_FORMATS {
+            return Err(Error::TooMany {
+                collection: "cell formats",
+                limit: MAX_CELL_FORMATS - 1,
+            });
+        }
+        u16::try_from(self.formats.len()).map_err(|_error| Error::TooMany {
+            collection: "cell formats",
+            limit: MAX_CELL_FORMATS - 1,
+        })
     }
 
     /// Register a number format pattern and return its BIFF format index.
@@ -536,9 +696,25 @@ impl FormattingManager {
     ///
     /// A `Format` record holds 1 through 255 UTF-16 code units ([MS-XLS]
     /// 2.4.126): an empty pattern is refused with [`Error::InvalidData`] and a
-    /// longer one with [`Error::StringTooLong`]. A refused pattern leaves the
-    /// manager unchanged.
+    /// longer one with [`Error::StringTooLong`]. A workbook holds at most 210
+    /// custom formats (the globals grammar allows 218 `Format` records and
+    /// the writer always emits eight built-in ones), so a new one past that is
+    /// refused with [`Error::TooMany`]. A refused pattern leaves the manager
+    /// unchanged.
     pub fn register_number_format(&mut self, pattern: &str) -> Result<u16> {
+        match self.number_format_slot(pattern)? {
+            NumberFormatSlot::Existing(index) => Ok(index),
+            NumberFormatSlot::New(index, normalized) => {
+                self.number_formats.push((index, normalized.to_string()));
+                self.number_format_map.insert(normalized.to_string(), index);
+                Ok(index)
+            },
+        }
+    }
+
+    /// The index `pattern` has or would take, checked as
+    /// [`Self::register_number_format`] checks it, without registering it.
+    fn number_format_slot<'p>(&self, pattern: &'p str) -> Result<NumberFormatSlot<'p>> {
         validate_number_format(pattern)?;
         // Normalize "TEXT" alias used by POI to "@".
         let normalized = if pattern.eq_ignore_ascii_case("TEXT") {
@@ -549,21 +725,25 @@ impl FormattingManager {
 
         // Built-in lookup
         if let Some(idx) = builtin_number_format_index(normalized) {
-            return Ok(idx);
+            return Ok(NumberFormatSlot::Existing(idx));
         }
 
         // Existing custom format
         if let Some(&idx) = self.number_format_map.get(normalized) {
-            return Ok(idx);
+            return Ok(NumberFormatSlot::Existing(idx));
         }
 
+        if self.number_formats.len() >= MAX_CUSTOM_NUMBER_FORMATS {
+            return Err(Error::TooMany {
+                collection: "custom number formats",
+                limit: MAX_CUSTOM_NUMBER_FORMATS,
+            });
+        }
         // Allocate new user-defined format index starting at 164, as in BIFF8.
-        let next_index = self.next_custom_format_index();
-        self.number_formats
-            .push((next_index, normalized.to_string()));
-        self.number_format_map
-            .insert(normalized.to_string(), next_index);
-        Ok(next_index)
+        Ok(NumberFormatSlot::New(
+            self.next_custom_format_index(),
+            normalized,
+        ))
     }
 
     /// Register a high-level `CellStyle` and return its internal style index.
@@ -579,8 +759,9 @@ impl FormattingManager {
     /// # Errors
     ///
     /// Refuses the style's number format as [`Self::register_number_format`]
-    /// does, before registering its font or XF, so a refused style leaves the
-    /// manager unchanged.
+    /// does, its font as [`Self::add_font`] does and its XF as
+    /// [`Self::add_format`] does. Every check runs before anything is
+    /// registered, so a refused style leaves the manager unchanged.
     pub fn register_cell_style(&mut self, style: CellStyle) -> Result<u16> {
         let CellStyle {
             font,
@@ -592,15 +773,26 @@ impl FormattingManager {
             number_format,
         } = style;
 
-        // The number format is the only fallible part, so it is registered
-        // first; the font and XF tables are separate and keep their indices.
-        let format_index = match number_format.as_deref() {
-            Some(pattern) => self.register_number_format(pattern)?,
-            None => 0,
+        font.validate()?;
+        let font_index = self.next_font_index()?;
+        let xf_index = self.next_format_index()?;
+        let format_slot = match number_format.as_deref() {
+            Some(pattern) => Some(self.number_format_slot(pattern)?),
+            None => None,
         };
-        let font_index = self.add_font(font);
 
-        let xf = ExtendedFormat {
+        // Every check passed; nothing below can fail.
+        let format_index = match format_slot {
+            None => 0,
+            Some(NumberFormatSlot::Existing(index)) => index,
+            Some(NumberFormatSlot::New(index, normalized)) => {
+                self.number_formats.push((index, normalized.to_string()));
+                self.number_format_map.insert(normalized.to_string(), index);
+                index
+            },
+        };
+        self.fonts.push(font);
+        self.formats.push(ExtendedFormat {
             font_index,
             format_index,
             h_align,
@@ -608,19 +800,25 @@ impl FormattingManager {
             text_wrap,
             borders,
             fill,
-        };
-
-        Ok(self.add_format(xf))
+        });
+        Ok(xf_index)
     }
 
     pub fn enable_pivot_xfs(&mut self) {
         self.pivot_xfs_enabled = true;
     }
 
+    pub(crate) const fn pivot_xfs_enabled(&self) -> bool {
+        self.pivot_xfs_enabled
+    }
+
+    /// The XF indices of the three pivot-table XFs: index 64 onwards, or the
+    /// first index after the user cell XFs when those reach past 63.
     #[must_use]
     pub fn pivot_xf_indices(&self) -> PivotXfIndices {
-        const TARGET_PIVOT_XF_START_INDEX: u16 = 64;
-        let base = TARGET_PIVOT_XF_START_INDEX;
+        let base = xf_record_count_for(self.formats.len(), false).max(PIVOT_XF_START_INDEX);
+        // `MAX_CELL_FORMATS` keeps the three pivot XFs inside the index space.
+        let base = u16::try_from(base).unwrap_or(u16::MAX - 2);
         PivotXfIndices {
             header_accent: base,
             row_label: base + 1,
@@ -628,10 +826,15 @@ impl FormattingManager {
         }
     }
 
-    /// Get font by index
+    /// Get a font by its BIFF8 `FontIndex` (4 names no font).
     #[must_use]
     pub fn get_font(&self, index: u16) -> Option<&Font> {
-        self.fonts.get(index as usize)
+        let physical = match index {
+            0..=3 => usize::from(index),
+            4 => return None,
+            _ => usize::from(index) - 1,
+        };
+        self.fonts.get(physical)
     }
 
     /// Get format by index
@@ -735,7 +938,6 @@ impl FormattingManager {
         }
 
         if self.pivot_xfs_enabled {
-            const TARGET_PIVOT_XF_START_INDEX: u16 = 64;
             const PIVOT_HEADER_ACCENT: [u8; 20] = [
                 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x02, 0xC0, 0x60,
@@ -748,11 +950,10 @@ impl FormattingManager {
                 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x10, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x02, 0xC0, 0x20,
             ];
-            let emitted_xf_count = 15u16
-                + 1
-                + 5
-                + crate::utils::truncate_usize_to_u16(self.formats.len()).saturating_sub(1);
-            let pad_count = TARGET_PIVOT_XF_START_INDEX.saturating_sub(emitted_xf_count);
+            // Pad with default cell XFs up to index 64, where the pivot XFs
+            // start unless the user cell XFs already reach past it.
+            let emitted_xf_count = xf_record_count_for(self.formats.len(), false);
+            let pad_count = PIVOT_XF_START_INDEX.saturating_sub(emitted_xf_count);
             let default_payload = if let Some(default_cell_xf) = self.formats.first() {
                 let mut buf = Vec::with_capacity(20);
                 write_xf(&mut buf, default_cell_xf, false)?;
@@ -782,20 +983,17 @@ impl FormattingManager {
 
     /// Total number of XF records `write_formats` emits, including the
     /// pivot padding and extension XFs when pivot XFs are enabled.
-    pub(crate) fn xf_record_count(&self) -> u16 {
-        const BUILTIN_STYLE_XF_COUNT: u16 = 15;
-        const BUILTIN_STYLE_FORMAT_XF_COUNT: u16 = 5;
-        const PIVOT_XF_START_INDEX: u16 = 64;
-        const PIVOT_XF_COUNT: u16 = 3;
-        let base = BUILTIN_STYLE_XF_COUNT
-            + 1
-            + BUILTIN_STYLE_FORMAT_XF_COUNT
-            + crate::utils::truncate_usize_to_u16(self.formats.len()).saturating_sub(1);
-        if self.pivot_xfs_enabled {
-            base.max(PIVOT_XF_START_INDEX) + PIVOT_XF_COUNT
-        } else {
-            base
-        }
+    pub(crate) fn xf_record_count(&self) -> usize {
+        xf_record_count_for(self.formats.len(), self.pivot_xfs_enabled)
+    }
+
+    /// The XF records `write_formats` would emit after adding
+    /// `added_formats` cell formats and, when `pivot`, the pivot XFs.
+    pub(crate) fn xf_record_count_with(&self, added_formats: usize, pivot: bool) -> usize {
+        xf_record_count_for(
+            self.formats.len().saturating_add(added_formats),
+            pivot || self.pivot_xfs_enabled,
+        )
     }
 
     /// Compute the next available user-defined number format index.
@@ -977,14 +1175,18 @@ mod tests {
     fn test_formatting_manager() {
         let mut mgr = FormattingManager::new();
 
-        let font_idx = mgr.add_font(Font {
-            name: "Times".to_string(),
-            weight: FONT_WEIGHT_BOLD,
-            ..Default::default()
-        });
+        let font_idx = mgr
+            .add_font(Font {
+                name: "Times".to_string(),
+                weight: FONT_WEIGHT_BOLD,
+                ..Default::default()
+            })
+            .unwrap();
 
-        assert_eq!(font_idx, 4); // Indices 0..3 are default fonts
-        assert_eq!(mgr.get_font(4).unwrap().name, "Times");
+        // Indices 0..3 are the default fonts, and FontIndex skips 4.
+        assert_eq!(font_idx, 5);
+        assert_eq!(mgr.get_font(5).unwrap().name, "Times");
+        assert!(mgr.get_font(4).is_none());
     }
 
     #[test]
@@ -1021,7 +1223,7 @@ mod tests {
             text_wrap: true,
             ..Default::default()
         };
-        let idx = mgr.add_format(xf);
+        let idx = mgr.add_format(xf).unwrap();
         assert_eq!(idx, 1); // Index 0 is default format
         let retrieved = mgr.get_format(1).unwrap();
         assert_eq!(retrieved.font_index, 1);

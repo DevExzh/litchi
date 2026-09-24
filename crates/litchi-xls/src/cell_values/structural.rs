@@ -124,27 +124,24 @@ pub(super) fn apply(
     Ok(workbook)
 }
 
+/// The worksheet-name rule of [MS-XLS] 2.4.28, which the reader enforces
+/// ([`crate::records::sheet_name_fault`]).
 pub(super) fn validate_sheet_name(name: &str) -> Result<()> {
-    let units = name.encode_utf16().count();
-    if name.is_empty() || units > 31 {
-        return Err(Error::InvalidData(
+    use crate::records::SheetNameFault;
+    match crate::records::sheet_name_fault(name) {
+        None => Ok(()),
+        Some(SheetNameFault::Empty | SheetNameFault::TooLong { .. }) => Err(Error::InvalidData(
             "BIFF8 worksheet names must contain 1 through 31 UTF-16 units".into(),
-        ));
-    }
-    if name
-        .chars()
-        .any(|ch| matches!(ch, ':' | '\\' | '/' | '?' | '*' | '[' | ']'))
-    {
-        return Err(Error::InvalidData(
+        )),
+        Some(SheetNameFault::ForbiddenCharacter('\0')) | Some(SheetNameFault::EdgeApostrophe) => {
+            Err(Error::InvalidData(
+                "BIFF8 worksheet name has a forbidden quote or NUL".into(),
+            ))
+        },
+        Some(SheetNameFault::ForbiddenCharacter(_)) => Err(Error::InvalidData(
             "BIFF8 worksheet name contains a forbidden character".into(),
-        ));
+        )),
     }
-    if name.starts_with('\'') || name.ends_with('\'') || name.chars().any(|ch| ch == '\0') {
-        return Err(Error::InvalidData(
-            "BIFF8 worksheet name has a forbidden quote or NUL".into(),
-        ));
-    }
-    Ok(())
 }
 
 pub(super) fn certify_sst_insertion(

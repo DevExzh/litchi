@@ -14,6 +14,11 @@
 //! - MS-XLS sections 2.4.271–2.4.283
 //! - Reader counterpart: `crate::pivot_table`
 
+use crate::writer::string_limits::{
+    PIVOT_CACHE_FIELD_NAME_UNITS, PIVOT_DATA_FIELD_NAME_UNITS, PIVOT_DATA_ITEM_NAME_UNITS,
+    PIVOT_FIELD_NAME_UNITS, PIVOT_ITEM_NAME_UNITS, PIVOT_TABLE_NAME_UNITS, checked_utf16_len,
+    pivot_cache_string_units, record_len, u16_len,
+};
 use crate::{Error, Result};
 use std::io::Write;
 
@@ -30,14 +35,11 @@ use super::validation::{validate_sxdbb_index, validate_sxdbb_inputs};
 
 /// Encode a string as `XLUnicodeStringNoCch`: `[flags: u8][chars...]`.
 ///
-/// Uses compressed Latin-1 for ASCII strings, UTF-16LE otherwise.
-/// Returns an **empty** `Vec` for an empty string (no flags byte),
-/// matching the reader's `read_xl_string_no_cch` which returns
-/// immediately when `cch == 0`.
+/// Uses compressed Latin-1 for ASCII strings, UTF-16LE otherwise. The option
+/// byte is present for an empty string too: the structure always begins with
+/// it ([MS-XLS] 2.5.296), and the reader's `read_xl_string_no_cch` consumes
+/// it when `cch` is zero.
 pub(super) fn encode_xl_string_no_cch(s: &str) -> Vec<u8> {
-    if s.is_empty() {
-        return Vec::new();
-    }
     if s.is_ascii() {
         let mut buf = Vec::with_capacity(1 + s.len());
         buf.push(0x00); // flags: compressed
@@ -105,16 +107,29 @@ pub(crate) fn write_sxvs<W: Write>(writer: &mut W, source_type: u16) -> Result<(
 ///     var  stData          — XLUnicodeStringNoCch
 /// ```
 pub(crate) fn write_sxview<W: Write>(writer: &mut W, cfg: &SxViewConfig<'_>) -> Result<()> {
+    // cchTableName and cchDataName count UTF-16 code units ([MS-XLS] 2.4.313).
+    let cch_name = u16_len(
+        checked_utf16_len(cfg.name, PIVOT_TABLE_NAME_UNITS, "PivotTable name")?,
+        "PivotTable name",
+    )?;
+    let cch_data = u16_len(
+        checked_utf16_len(
+            cfg.data_field_name,
+            PIVOT_DATA_FIELD_NAME_UNITS,
+            "PivotTable data field name",
+        )?,
+        "PivotTable data field name",
+    )?;
+    if cch_data == 0 {
+        return Err(Error::InvalidData(
+            "PivotTable data field name must not be empty".to_string(),
+        ));
+    }
     let name_bytes = encode_xl_string_no_cch(cfg.name);
     let data_name_bytes = encode_xl_string_no_cch(cfg.data_field_name);
 
-    let cch_name = crate::utils::truncate_usize_to_u16(cfg.name.chars().count());
-    let cch_data = crate::utils::truncate_usize_to_u16(cfg.data_field_name.chars().count());
-
     // Fixed header: 44 bytes + variable name strings
-    let data_len = 44u16
-        + crate::utils::truncate_usize_to_u16(name_bytes.len())
-        + crate::utils::truncate_usize_to_u16(data_name_bytes.len());
+    let data_len = record_len("SXView", 44 + name_bytes.len() + data_name_bytes.len())?;
 
     write_record_header(writer, 0x00B0, data_len)?;
 
@@ -153,18 +168,25 @@ pub(crate) fn write_sxview<W: Write>(writer: &mut W, cfg: &SxViewConfig<'_>) -> 
 
 /// Write an SXVD record.
 pub(crate) fn write_sxvd<W: Write>(writer: &mut W, cfg: &SxVdConfig<'_>) -> Result<()> {
+    // cchName counts UTF-16 code units: 1 through 255, or 0xFFFF for no
+    // name ([MS-XLS] 2.4.309).
     let (cch_name, name_bytes) = match cfg.name {
         Some(n) => {
-            let bytes = encode_xl_string_no_cch(n);
+            let units = checked_utf16_len(n, PIVOT_FIELD_NAME_UNITS, "PivotTable field name")?;
+            if units == 0 {
+                return Err(Error::InvalidData(
+                    "PivotTable field name must not be empty".to_string(),
+                ));
+            }
             (
-                crate::utils::truncate_usize_to_u16(n.chars().count()),
-                bytes,
+                u16_len(units, "PivotTable field name")?,
+                encode_xl_string_no_cch(n),
             )
         },
         None => (0xFFFFu16, Vec::new()),
     };
 
-    let data_len = 10u16 + crate::utils::truncate_usize_to_u16(name_bytes.len());
+    let data_len = record_len("Sxvd", 10 + name_bytes.len())?;
 
     write_record_header(writer, 0x00B1, data_len)?;
     writer.write_all(&cfg.axis.to_le_bytes())?; // 0
@@ -183,18 +205,20 @@ pub(crate) fn write_sxvd<W: Write>(writer: &mut W, cfg: &SxVdConfig<'_>) -> Resu
 
 /// Write an SXVI record.
 pub(crate) fn write_sxvi<W: Write>(writer: &mut W, cfg: &SxViConfig<'_>) -> Result<()> {
+    // cchName counts UTF-16 code units: at most 254, or 0xFFFF for no name
+    // ([MS-XLS] 2.4.312).
     let (cch_name, name_bytes) = match cfg.name {
-        Some(n) => {
-            let bytes = encode_xl_string_no_cch(n);
-            (
-                crate::utils::truncate_usize_to_u16(n.chars().count()),
-                bytes,
-            )
-        },
+        Some(n) => (
+            u16_len(
+                checked_utf16_len(n, PIVOT_ITEM_NAME_UNITS, "PivotTable item name")?,
+                "PivotTable item name",
+            )?,
+            encode_xl_string_no_cch(n),
+        ),
         None => (0xFFFFu16, Vec::new()),
     };
 
-    let data_len = 8u16 + crate::utils::truncate_usize_to_u16(name_bytes.len());
+    let data_len = record_len("SXVI", 8 + name_bytes.len())?;
 
     write_record_header(writer, 0x00B2, data_len)?;
     writer.write_all(&cfg.item_type.to_le_bytes())?; // 0
@@ -215,17 +239,25 @@ pub(crate) fn write_sxvi<W: Write>(writer: &mut W, cfg: &SxViConfig<'_>) -> Resu
 /// When `cfg.name` is empty, `cchName` is set to `0xFFFF` (not present),
 /// matching the convention used by SXVD / SXVI.
 pub(crate) fn write_sxdi<W: Write>(writer: &mut W, cfg: &SxDiConfig<'_>) -> Result<()> {
+    // cchName counts UTF-16 code units: 1 through 255, or 0xFFFF for no
+    // name ([MS-XLS] 2.4.278).
     let (cch_name, name_bytes) = if cfg.name.is_empty() {
         (0xFFFFu16, Vec::new())
     } else {
-        let bytes = encode_xl_string_no_cch(cfg.name);
         (
-            crate::utils::truncate_usize_to_u16(cfg.name.chars().count()),
-            bytes,
+            u16_len(
+                checked_utf16_len(
+                    cfg.name,
+                    PIVOT_DATA_ITEM_NAME_UNITS,
+                    "PivotTable data item name",
+                )?,
+                "PivotTable data item name",
+            )?,
+            encode_xl_string_no_cch(cfg.name),
         )
     };
 
-    let data_len = 14u16 + crate::utils::truncate_usize_to_u16(name_bytes.len());
+    let data_len = record_len("SXDI", 14 + name_bytes.len())?;
 
     write_record_header(writer, 0x00C5, data_len)?;
     writer.write_all(&cfg.source_field_index.to_le_bytes())?; // 0
@@ -255,7 +287,7 @@ pub(crate) fn write_sxpi<W: Write>(writer: &mut W, entries: &[(u16, u16, u16)]) 
     if entries.is_empty() {
         return Ok(());
     }
-    let data_len = crate::utils::truncate_usize_to_u16(entries.len() * 6);
+    let data_len = record_len("SXPI", entries.len().saturating_mul(6))?;
     write_record_header(writer, 0x00B6, data_len)?;
     for &(item_idx, field_idx, obj_id) in entries {
         writer.write_all(&field_idx.to_le_bytes())?; // mnField
@@ -338,8 +370,8 @@ pub(crate) fn write_sxex<W: Write>(writer: &mut W, cfg: &SxExConfig) -> Result<(
 ///      u16  unknown       = 0x0100
 /// ```
 fn write_qsi_sx_tag<W: Write>(writer: &mut W, table_name: &str) -> Result<()> {
-    let name_bytes = encode_xl_unicode_string(table_name);
-    let data_len = 16u16 + crate::utils::truncate_usize_to_u16(name_bytes.len()) + 2;
+    let name_bytes = encode_xl_unicode_string(table_name, "PivotTable name")?;
+    let data_len = record_len("QsiSXTag", 16 + name_bytes.len() + 2)?;
 
     write_record_header(writer, 0x0802, data_len)?;
     writer.write_all(&0x0802u16.to_le_bytes())?;
@@ -357,11 +389,7 @@ fn write_qsi_sx_tag<W: Write>(writer: &mut W, table_name: &str) -> Result<()> {
 }
 
 fn write_sxaddl_record<W: Write>(writer: &mut W, sxc: u8, sxd: u8, payload: &[u8]) -> Result<()> {
-    write_record_header(
-        writer,
-        0x0864,
-        crate::utils::truncate_usize_to_u16(6 + payload.len()),
-    )?;
+    write_record_header(writer, 0x0864, record_len("SXAddl", 6 + payload.len())?)?;
     writer.write_all(&0x0864u16.to_le_bytes())?;
     writer.write_all(&0x0000u16.to_le_bytes())?;
     writer.write_all(&[sxc, sxd])?;
@@ -370,12 +398,14 @@ fn write_sxaddl_record<W: Write>(writer: &mut W, sxc: u8, sxd: u8, payload: &[u8
 }
 
 fn write_sxaddl_name_record<W: Write>(writer: &mut W, sxc: u8, name: &str) -> Result<()> {
-    let mut payload = Vec::with_capacity(6 + name.len().saturating_mul(2));
-    payload.extend_from_slice(
-        &crate::utils::truncate_usize_to_u32(name.chars().count()).to_le_bytes(),
-    );
+    // XLUnicodeStringSegmentedSXADDL: cchTotal counts UTF-16 code units, as
+    // does the one segment's cch.
+    let segment = encode_xl_unicode_string(name, "PivotTable SXAddl name")?;
+    let units = u32::from(u16::from_le_bytes([segment[0], segment[1]]));
+    let mut payload = Vec::with_capacity(6 + segment.len());
+    payload.extend_from_slice(&units.to_le_bytes());
     payload.extend_from_slice(&0u16.to_le_bytes());
-    payload.extend_from_slice(&encode_xl_unicode_string(name));
+    payload.extend_from_slice(&segment);
     write_sxaddl_record(writer, sxc, 0x00, &payload)
 }
 
@@ -732,9 +762,13 @@ pub(crate) fn write_dconref<W: Write>(
     // Virtual path = 0x02 + sheet_name (self-referential encoded URL)
     let vpath: String = format!("\x02{sheet_name}");
     let vpath_bytes = encode_xl_string_no_cch(&vpath);
-    let cch_file = crate::utils::truncate_usize_to_u16(vpath.chars().count());
+    // cchFile counts the path's UTF-16 code units ([MS-XLS] 2.4.86).
+    let cch_file = u16_len(
+        checked_utf16_len(&vpath, usize::from(u16::MAX), "PivotCache source path")?,
+        "PivotCache source path",
+    )?;
 
-    let data_len = 6u16 + 2 + crate::utils::truncate_usize_to_u16(vpath_bytes.len());
+    let data_len = record_len("DConRef", 6 + 2 + vpath_bytes.len())?;
 
     write_record_header(writer, 0x0051, data_len)?;
     writer.write_all(&first_row.to_le_bytes())?; // 0
@@ -765,8 +799,8 @@ pub(crate) fn write_dconref<W: Write>(
 /// 18  var  userName      — ShortXLUnicodeString (empty = 3 bytes)
 /// ```
 pub(super) fn write_sxdb<W: Write>(writer: &mut W, cfg: &SxDbConfig) -> Result<()> {
-    let user_name_bytes = encode_xl_unicode_string(""); // empty XLUnicodeString = 3 bytes
-    let data_len = 18u16 + crate::utils::truncate_usize_to_u16(user_name_bytes.len());
+    let user_name_bytes = encode_xl_unicode_string("", "PivotCache user name")?; // empty XLUnicodeString = 3 bytes
+    let data_len = record_len("SXDB", 18 + user_name_bytes.len())?;
     write_record_header(writer, 0x00C6, data_len)?;
     writer.write_all(&cfg.record_count.to_le_bytes())?; //  0: mnSrcRecs
     writer.write_all(&cfg.stream_id.to_le_bytes())?; //  4: mnStrmId
@@ -792,9 +826,10 @@ pub(super) fn write_sxdb<W: Write>(writer: &mut W, cfg: &SxDbConfig) -> Result<(
 /// This is the standard Excel string format used by SXFDB field names
 /// and SXDB userName (verified against `LibreOffice` `XclExpString` default
 /// constructor which uses 16-bit character count).
-fn encode_xl_unicode_string(s: &str) -> Vec<u8> {
-    let cch = crate::utils::truncate_usize_to_u16(s.chars().count());
-    if s.is_ascii() {
+fn encode_xl_unicode_string(s: &str, field: &'static str) -> Result<Vec<u8>> {
+    // cch counts UTF-16 code units.
+    let cch = u16_len(checked_utf16_len(s, usize::from(u16::MAX), field)?, field)?;
+    Ok(if s.is_ascii() {
         let mut buf = Vec::with_capacity(3 + s.len());
         buf.extend_from_slice(&cch.to_le_bytes()); // 2-byte character count
         buf.push(0x00); // flags: compressed Latin-1
@@ -809,7 +844,7 @@ fn encode_xl_unicode_string(s: &str) -> Vec<u8> {
             buf.extend_from_slice(&ch.to_le_bytes());
         }
         buf
-    }
+    })
 }
 
 /// Write an SXFDB record (pivot cache field definition).
@@ -826,8 +861,14 @@ fn encode_xl_unicode_string(s: &str) -> Vec<u8> {
 /// 14  var  ShortXLUnicodeString — field name
 /// ```
 pub(super) fn write_sxfdb<W: Write>(writer: &mut W, cfg: &SxFdbConfig<'_>) -> Result<()> {
-    let name_bytes = encode_xl_unicode_string(cfg.name);
-    let data_len = 14u16 + crate::utils::truncate_usize_to_u16(name_bytes.len());
+    // stFieldName is at most 255 characters ([MS-XLS] 2.4.283).
+    checked_utf16_len(
+        cfg.name,
+        PIVOT_CACHE_FIELD_NAME_UNITS,
+        "PivotCache field name",
+    )?;
+    let name_bytes = encode_xl_unicode_string(cfg.name, "PivotCache field name")?;
+    let data_len = record_len("SXFDB", 14 + name_bytes.len())?;
 
     // Build flags:
     //   String fields with items: fAllAtoms(bit0) | DATA_STR(0x0480) = 0x0481
@@ -870,16 +911,23 @@ pub(super) fn write_sxfdb<W: Write>(writer: &mut W, cfg: &SxFdbConfig<'_>) -> Re
 ///
 /// The data is an `XLUnicodeString` (u16 cch + u8 flags + chars).
 pub(super) fn write_sxstring<W: Write>(writer: &mut W, value: &str) -> Result<()> {
-    let cch = crate::utils::truncate_usize_to_u16(value.chars().count());
+    // cch counts UTF-16 code units; SXString has no continuation, so the
+    // string has to fit one record ([MS-XLS] 2.4.304).
+    let units = checked_utf16_len(
+        value,
+        pivot_cache_string_units(value.is_ascii()),
+        "PivotCache string item",
+    )?;
+    let cch = u16_len(units, "PivotCache string item")?;
     if value.is_ascii() {
-        let data_len = 3u16 + cch; // u16 cch + u8 flags(0) + cch bytes
+        let data_len = record_len("SXString", 3 + units)?; // u16 cch + u8 flags(0) + cch bytes
         write_record_header(writer, 0x00CD, data_len)?;
         writer.write_all(&cch.to_le_bytes())?;
         writer.write_all(&[0x00])?; // flags: compressed
         writer.write_all(value.as_bytes())?;
     } else {
         let utf16: Vec<u16> = value.encode_utf16().collect();
-        let data_len = 3u16 + crate::utils::truncate_usize_to_u16(utf16.len()) * 2;
+        let data_len = record_len("SXString", 3 + utf16.len() * 2)?;
         write_record_header(writer, 0x00CD, data_len)?;
         writer.write_all(&cch.to_le_bytes())?;
         writer.write_all(&[0x01])?; // flags: UTF-16LE
@@ -979,9 +1027,11 @@ pub(crate) fn write_sxli<W: Write>(
     if line_count == 0 {
         return Ok(());
     }
-    let line_size = 8u32 + 2 * u32::from(index_count);
-    let total = line_size * u32::from(line_count);
-    write_record_header(writer, 0x00B5, crate::utils::truncate_u32_to_u16(total))?;
+    // SXLI may continue into Continue records (PIVOTLI = SXLI *Continue), but
+    // litchi's reader reads one record, so the lines have to fit it.
+    let line_size = 8 + 2 * usize::from(index_count);
+    let total = line_size.saturating_mul(usize::from(line_count));
+    write_record_header(writer, 0x00B5, record_len("SXLI", total)?)?;
 
     let last_line = line_count - 1;
     for line_idx in 0..line_count {
@@ -1048,7 +1098,7 @@ pub(crate) fn write_sxivd<W: Write>(writer: &mut W, field_indices: &[u16]) -> Re
     if field_indices.is_empty() {
         return Ok(());
     }
-    let data_len = crate::utils::truncate_usize_to_u16(field_indices.len() * 2);
+    let data_len = record_len("SXIVD", field_indices.len().saturating_mul(2))?;
     write_record_header(writer, 0x00B4, data_len)?;
     for &idx in field_indices {
         writer.write_all(&idx.to_le_bytes())?;
@@ -1203,7 +1253,7 @@ pub(crate) fn generate_pivot_cache_stream(info: &PivotCacheStreamInfo<'_>) -> Re
                     write_record_header(
                         &mut buf,
                         0x00D9,
-                        crate::utils::truncate_usize_to_u16(value.item_to_group.len() * 2),
+                        record_len("SXGroupInfo", value.item_to_group.len().saturating_mul(2))?,
                     )?;
                     for index in &value.item_to_group {
                         buf.extend_from_slice(&index.to_le_bytes());

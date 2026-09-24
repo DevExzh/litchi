@@ -6,6 +6,19 @@ use crate::{Error, Result};
 use std::io::Write;
 
 use super::{write_record, write_record_header};
+use crate::writer::string_limits::{
+    AUTOFILTER_STRING_UNITS, INTERNAL_HYPERLINK_FIXED_BYTES, INTERNAL_HYPERLINK_UNITS,
+    WEB_HYPERLINK_FIXED_BYTES, WEB_HYPERLINK_UNITS, ensure_utf16_len_within, record_len, u8_len,
+    utf16_len,
+};
+
+/// [`INTERNAL_HYPERLINK_FIXED_BYTES`] as the record header counts it.
+const INTERNAL_HYPERLINK_FIXED_BYTES_U16: u16 = 36;
+/// [`WEB_HYPERLINK_FIXED_BYTES`] as the record header counts it.
+const WEB_HYPERLINK_FIXED_BYTES_U16: u16 = 52;
+const _: () =
+    assert!(INTERNAL_HYPERLINK_FIXED_BYTES == INTERNAL_HYPERLINK_FIXED_BYTES_U16 as usize);
+const _: () = assert!(WEB_HYPERLINK_FIXED_BYTES == WEB_HYPERLINK_FIXED_BYTES_U16 as usize);
 
 fn write_unicode_string<W: Write>(writer: &mut W, value: &str) -> Result<()> {
     let units = value.encode_utf16().collect::<Vec<_>>();
@@ -621,15 +634,13 @@ pub(super) fn write_autofilter<W: Write>(
         grbit |= 0x0020;
     }
 
-    let (doper1, str1) = cond1.to_doper();
-    let (doper2, str2) = cond2.to_doper();
+    let (doper1, str1) = cond1.to_doper()?;
+    let (doper2, str2) = cond2.to_doper()?;
 
     let str1_bytes = encode_autofilter_string(str1);
     let str2_bytes = encode_autofilter_string(str2);
 
-    let data_len = 24u16
-        + crate::utils::truncate_usize_to_u16(str1_bytes.len())
-        + crate::utils::truncate_usize_to_u16(str2_bytes.len());
+    let data_len = record_len("AutoFilter", 24 + str1_bytes.len() + str2_bytes.len())?;
     write_record_header(writer, 0x009E, data_len)?;
 
     writer.write_all(&column_index.to_le_bytes())?;
@@ -658,12 +669,51 @@ pub enum AutoFilterConditionWrite {
 }
 
 impl AutoFilterConditionWrite {
+    /// Refuses a condition an `AFDOper` ([MS-XLS] 2.5.5) cannot store: a
+    /// comparison operator outside 1 through 6, a number that is not a
+    /// finite, normal, non-negative-zero `Xnum` (2.5.342), or a string that
+    /// is empty or longer than the 255 UTF-16 code units `AFDOperStr.cch`
+    /// (2.5.8) counts.
+    pub(crate) fn validate(&self) -> Result<()> {
+        let operator = match self {
+            Self::None => return Ok(()),
+            Self::Number { operator, value } => {
+                if !value.is_finite()
+                    || value.is_subnormal()
+                    || (*value == 0.0 && value.is_sign_negative())
+                {
+                    return Err(Error::InvalidData(format!(
+                        "AutoFilter number {value} is not a finite, normal Xnum"
+                    )));
+                }
+                *operator
+            },
+            Self::String { operator, value } => {
+                if value.is_empty() {
+                    return Err(Error::InvalidData(
+                        "AutoFilter string condition must not be empty".to_string(),
+                    ));
+                }
+                ensure_utf16_len_within(value, AUTOFILTER_STRING_UNITS, "AutoFilter string")?;
+                *operator
+            },
+            Self::Bool { operator, .. } | Self::MatchAll { operator } => *operator,
+        };
+        if !(0x01..=0x06).contains(&operator) {
+            return Err(Error::InvalidData(format!(
+                "AutoFilter comparison operator {operator:#04x} is outside 0x01 through 0x06"
+            )));
+        }
+        Ok(())
+    }
+
     /// Serialize to a 10-byte DOPER structure + optional string.
     ///
     /// Returns `(doper: [u8; 10], optional_string: Option<&str>)`.
-    fn to_doper(&self) -> ([u8; 10], Option<&str>) {
+    fn to_doper(&self) -> Result<([u8; 10], Option<&str>)> {
+        self.validate()?;
         let mut doper = [0u8; 10];
-        match self {
+        Ok(match self {
             Self::None => (doper, None),
             Self::Number { operator, value } => {
                 doper[0] = 0x04; // vt = IEEE double
@@ -674,9 +724,12 @@ impl AutoFilterConditionWrite {
             Self::String { operator, value } => {
                 doper[0] = 0x06; // vt = string
                 doper[1] = *operator;
-                // doper[2] = unused, doper[3] = byte length of string
-                let byte_len = crate::utils::truncate_usize_to_u8(value.len().min(255));
-                doper[3] = byte_len;
+                // AFDOperStr in an AutoFilter record ([MS-XLS] 2.5.8): four
+                // unused bytes, then `cch` (UTF-16 code units) and
+                // `fCompare`, which is 0 when the string holds a `?` or `*`
+                // wildcard and 1 otherwise.
+                doper[6] = u8_len(utf16_len(value), "AutoFilter string")?;
+                doper[7] = u8::from(!value.contains(['?', '*']));
                 (doper, Some(value.as_str()))
             },
             Self::Bool { operator, value } => {
@@ -691,7 +744,7 @@ impl AutoFilterConditionWrite {
                 doper[1] = *operator;
                 (doper, None)
             },
-        }
+        })
     }
 }
 
@@ -806,20 +859,73 @@ pub(super) fn write_sheet_protection<W: Write>(
     Ok(())
 }
 
-fn encode_web_url_bytes(url: &str) -> Vec<u8> {
-    // For URL hyperlinks we follow Apache POI's HyperlinkRecord layout:
-    // the address is stored as a UTF-16LE string with a single trailing
-    // NUL character and the length field contains the size in bytes
-    // (2 bytes per character).
-    let mut terminated = String::with_capacity(url.len().saturating_add(1));
-    terminated.push_str(url);
-    terminated.push('\0');
+/// How a hyperlink target is written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HyperlinkKind {
+    /// A location in this workbook, written as the `HLink` location string.
+    Internal,
+    /// A URL, written as a URL moniker.
+    Web,
+}
 
-    let mut out = Vec::with_capacity(terminated.len().saturating_mul(2));
-    for unit in terminated.encode_utf16() {
-        out.extend_from_slice(&unit.to_le_bytes());
+/// The kind of a hyperlink target and the text written for it, or `None`
+/// for an empty target, which writes no hyperlink.
+///
+/// Surrounding whitespace is not part of a target. A target is internal when
+/// it starts with `internal:` (which is not written), or when it is not a
+/// web, FTP or `mailto:` address, contains `!` and contains no `://`.
+pub(crate) fn classify_hyperlink(url: &str) -> Option<(HyperlinkKind, &str)> {
+    let trimmed = url.trim();
+    if trimmed.is_empty() {
+        return None;
     }
-    out
+    let is_web_like = trimmed.starts_with("http://")
+        || trimmed.starts_with("https://")
+        || trimmed.starts_with("ftp://")
+        || trimmed.starts_with("mailto:");
+    let is_internal = trimmed.starts_with("internal:")
+        || (!is_web_like && trimmed.contains('!') && !trimmed.contains("://"));
+    Some(if is_internal {
+        (
+            HyperlinkKind::Internal,
+            trimmed.strip_prefix("internal:").unwrap_or(trimmed),
+        )
+    } else {
+        (HyperlinkKind::Web, trimmed)
+    })
+}
+
+/// Refuses a hyperlink target an `HLink` record cannot hold: one with a NUL
+/// (the `HyperlinkString` and URL moniker end at their only NUL), or one
+/// longer than the UTF-16 code units left in the record after its fixed
+/// fields ([`INTERNAL_HYPERLINK_UNITS`] for a location,
+/// [`WEB_HYPERLINK_UNITS`] for a URL; `HLink` has no continuation).
+pub(crate) fn validate_hyperlink_target(url: &str) -> Result<()> {
+    let Some((kind, target)) = classify_hyperlink(url) else {
+        return Ok(());
+    };
+    if target.contains('\0') {
+        return Err(Error::InvalidData(
+            "hyperlink target must not contain a NUL character".to_string(),
+        ));
+    }
+    match kind {
+        HyperlinkKind::Internal => ensure_utf16_len_within(
+            target,
+            INTERNAL_HYPERLINK_UNITS,
+            "internal hyperlink target",
+        ),
+        HyperlinkKind::Web => ensure_utf16_len_within(target, WEB_HYPERLINK_UNITS, "hyperlink URL"),
+    }
+}
+
+/// Writes `value` and its terminating NUL as UTF-16LE code units.
+fn write_terminated_utf16<W: Write>(writer: &mut W, value: &str) -> Result<()> {
+    for unit in value.encode_utf16() {
+        writer.write_all(&unit.to_le_bytes())?;
+    }
+    writer.write_all(&[0, 0])?;
+    Ok(())
 }
 
 fn write_hyperlink_web<W: Write>(
@@ -830,10 +936,6 @@ fn write_hyperlink_web<W: Write>(
     col2: u16,
     url: &str,
 ) -> Result<()> {
-    if url.is_empty() {
-        return Ok(());
-    }
-
     // Constants taken from PhpSpreadsheet's writeUrlWeb implementation.
     const UNKNOWN1: [u8; 20] = [
         0xD0, 0xC9, 0xEA, 0x79, 0xF9, 0xBA, 0xCE, 0x11, 0x8C, 0x82, 0x00, 0xAA, 0x00, 0x4B, 0xA9,
@@ -844,26 +946,24 @@ fn write_hyperlink_web<W: Write>(
         0x0B,
     ];
 
-    let url_bytes = encode_web_url_bytes(url);
-    let url_len = u32::try_from(url_bytes.len()).map_err(|_error| {
-        Error::InvalidData("Hyperlink URL exceeds BIFF8 length limit".to_string())
-    })?;
+    // For URL hyperlinks we follow Apache POI's HyperlinkRecord layout: the
+    // address is stored as UTF-16LE with a single trailing NUL, and the
+    // length field holds its size in bytes (MS-OSHARED 2.3.7.6).
+    ensure_utf16_len_within(url, WEB_HYPERLINK_UNITS, "hyperlink URL")?;
+    let url_bytes = (utf16_len(url) + 1) * 2;
 
-    // Base size (0x34) matches POI's HyperlinkRecord.getDataSize():
+    // The fixed size (0x34) matches POI's HyperlinkRecord.getDataSize():
     //  - 8 bytes Ref8U (rwFirst, rwLast, colFirst, colLast)
     //  - 16 bytes GUID
     //  - 4 bytes streamVersion
     //  - 4 bytes linkOpts
     //  - 16 bytes URL moniker CLSID
     //  - 4 bytes address length (byte count)
-    let data_len = 0x34u32.saturating_add(url_len);
-    if data_len > u32::from(u16::MAX) {
-        return Err(Error::InvalidData(
-            "Hyperlink record exceeds BIFF8 length limit".to_string(),
-        ));
-    }
+    let data_len = record_len("HLink", WEB_HYPERLINK_FIXED_BYTES + url_bytes)?;
+    // `record_len` proved the whole payload, and so the URL, fits a record.
+    let url_len = u32::from(data_len) - u32::from(WEB_HYPERLINK_FIXED_BYTES_U16);
 
-    write_record_header(writer, 0x01B8, crate::utils::truncate_u32_to_u16(data_len))?;
+    write_record_header(writer, 0x01B8, data_len)?;
 
     writer.write_all(&row1.to_le_bytes())?;
     writer.write_all(&row2.to_le_bytes())?;
@@ -877,9 +977,7 @@ fn write_hyperlink_web<W: Write>(
 
     writer.write_all(&UNKNOWN2)?;
     writer.write_all(&url_len.to_le_bytes())?;
-    writer.write_all(&url_bytes)?;
-
-    Ok(())
+    write_terminated_utf16(writer, url)
 }
 
 fn write_hyperlink_internal<W: Write>(
@@ -888,44 +986,27 @@ fn write_hyperlink_internal<W: Write>(
     row2: u16,
     col1: u16,
     col2: u16,
-    url: &str,
+    target: &str,
 ) -> Result<()> {
-    if url.is_empty() {
-        return Ok(());
-    }
-
     const UNKNOWN1: [u8; 20] = [
         0xD0, 0xC9, 0xEA, 0x79, 0xF9, 0xBA, 0xCE, 0x11, 0x8C, 0x82, 0x00, 0xAA, 0x00, 0x4B, 0xA9,
         0x0B, 0x02, 0x00, 0x00, 0x00,
     ];
 
-    // Strip explicit internal: prefix if present.
-    let target = url.strip_prefix("internal:").unwrap_or(url);
+    // The location is a HyperlinkString (MS-OSHARED 2.3.7.9): its length
+    // counts UTF-16 code units, including the terminating NUL.
+    ensure_utf16_len_within(
+        target,
+        INTERNAL_HYPERLINK_UNITS,
+        "internal hyperlink target",
+    )?;
+    let units = utf16_len(target) + 1;
+    let data_len = record_len("HLink", INTERNAL_HYPERLINK_FIXED_BYTES + units * 2)?;
+    // `record_len` proved the whole payload, and so the location, fits a
+    // record; its code units are half of what follows the fixed fields.
+    let units = (u32::from(data_len) - u32::from(INTERNAL_HYPERLINK_FIXED_BYTES_U16)) / 2;
 
-    // Append a single NUL terminator, then encode as UTF-16LE.
-    let mut terminated = String::with_capacity(target.len().saturating_add(1));
-    terminated.push_str(target);
-    terminated.push('\0');
-
-    let char_count = terminated.chars().count();
-    let mut wide = Vec::with_capacity(char_count.saturating_mul(2));
-    for unit in terminated.encode_utf16() {
-        wide.extend_from_slice(&unit.to_le_bytes());
-    }
-
-    let url_len = u32::try_from(char_count).map_err(|_error| {
-        Error::InvalidData("Internal hyperlink target is too long".to_string())
-    })?;
-
-    let data_len =
-        0x24u32.saturating_add(u32::from(crate::utils::truncate_usize_to_u16(wide.len())));
-    if data_len > u32::from(u16::MAX) {
-        return Err(Error::InvalidData(
-            "Internal hyperlink record exceeds BIFF8 length limit".to_string(),
-        ));
-    }
-
-    write_record_header(writer, 0x01B8, crate::utils::truncate_u32_to_u16(data_len))?;
+    write_record_header(writer, 0x01B8, data_len)?;
 
     writer.write_all(&row1.to_le_bytes())?;
     writer.write_all(&row2.to_le_bytes())?;
@@ -937,10 +1018,8 @@ fn write_hyperlink_internal<W: Write>(
     // Option flags: 0x00000008 for internal document reference.
     writer.write_all(&0x0000_0008u32.to_le_bytes())?;
 
-    writer.write_all(&url_len.to_le_bytes())?;
-    writer.write_all(&wide)?;
-
-    Ok(())
+    writer.write_all(&units.to_le_bytes())?;
+    write_terminated_utf16(writer, target)
 }
 
 /// Write HLINK (hyperlink) record for a single cell or cell range.
@@ -985,23 +1064,15 @@ pub(super) fn write_hyperlink<W: Write>(
     let r1 = crate::utils::truncate_u32_to_u16(row1);
     let r2 = crate::utils::truncate_u32_to_u16(row2);
 
-    let trimmed = url.trim();
-    if trimmed.is_empty() {
-        return Ok(());
-    }
-
-    let is_web_like = trimmed.starts_with("http://")
-        || trimmed.starts_with("https://")
-        || trimmed.starts_with("ftp://")
-        || trimmed.starts_with("mailto:");
-
-    let is_internal = trimmed.starts_with("internal:")
-        || (!is_web_like && trimmed.contains('!') && !trimmed.contains("://"));
-
-    if is_internal {
-        write_hyperlink_internal(writer, r1, r2, col1, col2, trimmed)
-    } else {
-        write_hyperlink_web(writer, r1, r2, col1, col2, trimmed)
+    validate_hyperlink_target(url)?;
+    match classify_hyperlink(url) {
+        None => Ok(()),
+        Some((HyperlinkKind::Internal, target)) => {
+            write_hyperlink_internal(writer, r1, r2, col1, col2, target)
+        },
+        Some((HyperlinkKind::Web, target)) => {
+            write_hyperlink_web(writer, r1, r2, col1, col2, target)
+        },
     }
 }
 

@@ -85,6 +85,28 @@ pub enum Error {
         /// The most UTF-16 code units the field can store.
         limit: usize,
     },
+    /// A BIFF8 collection cannot hold one more entry.
+    ///
+    /// The writer returns this before it changes anything.
+    TooMany {
+        /// The collection that is full, such as `"custom number formats"`.
+        collection: &'static str,
+        /// The most entries BIFF8 (or litchi's reader) can store.
+        limit: usize,
+    },
+    /// A record's payload is longer than a BIFF8 record can hold, and the
+    /// record has no continuation.
+    ///
+    /// The writer returns this before it produces any output; it never
+    /// truncates or wraps a record length.
+    RecordTooLong {
+        /// The record, such as `"XFExt"`.
+        record: &'static str,
+        /// The payload length in bytes.
+        bytes: usize,
+        /// The most payload bytes the record can hold.
+        limit: usize,
+    },
     /// A decoded worksheet cannot be edited through the create-only worksheet API.
     ///
     /// Use a source-checked transaction when one exists for the selected XLS
@@ -171,6 +193,17 @@ impl fmt::Display for Error {
             } => write!(
                 f,
                 "{field} has {utf16_units} UTF-16 code units; BIFF8 stores at most {limit}"
+            ),
+            Error::TooMany { collection, limit } => {
+                write!(f, "{collection} are full: BIFF8 stores at most {limit}")
+            },
+            Error::RecordTooLong {
+                record,
+                bytes,
+                limit,
+            } => write!(
+                f,
+                "{record} record needs {bytes} payload bytes; a BIFF8 record holds at most {limit}"
             ),
             Error::SourceBoundWorksheetMutation { operation } => write!(
                 f,

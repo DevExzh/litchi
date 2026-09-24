@@ -2,9 +2,10 @@ use super::super::model::validate_pivot_table_config;
 use super::super::{
     CellPos, CellValue, PivotCacheValue, PivotCellXfRole, PivotFieldConfig, PivotTableConfig,
     WritableCell, WritablePivotDataItem, WritablePivotField, WritablePivotItem, WritablePivotTable,
-    WritableWorksheet, Writer,
+    Writer,
 };
 use crate::error::{Error, Result};
+use crate::writer::formatting::MAX_XF_RECORDS_WITH_XFCRC;
 
 impl Writer {
     /// Add a pivot table definition to a worksheet.
@@ -19,19 +20,32 @@ impl Writer {
     /// * `config` — pivot table configuration (see [`PivotTableConfig`])
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// Refuses, before changing the writer, a configuration whose ranges,
+    /// fields or cache rows are inconsistent; a string longer than its
+    /// record's `cch` allows, counted in UTF-16 code units
+    /// ([`Error::StringTooLong`]: the table name 255, the data field name
+    /// 254, a field name 255, an item name 254, a data item name 255, a
+    /// cache field name 255, and a cache string item as many as one
+    /// `SXString` record holds — 8,221 when ASCII, 4,110 otherwise); an empty
+    /// data field name or field name, or a source worksheet name BIFF8 cannot
+    /// store ([`Error::InvalidData`]); and a pivot table in a workbook whose XF
+    /// table would pass the 4050 records its `XFCRC` record counts
+    /// ([`Error::TooMany`]).
     pub fn add_pivot_table(&mut self, sheet: usize, config: PivotTableConfig) -> Result<()> {
         validate_pivot_table_config(&config)?;
-        let worksheet = self
-            .worksheets
-            .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        // A pivot table writes an XFCRC record, which counts at most 4050 XF
+        // records, including the three pivot XFs this adds.
+        if self.fmt.xf_record_count_with(0, true) > MAX_XF_RECORDS_WITH_XFCRC {
+            return Err(super::workbook::xfcrc_capacity_error());
+        }
+        if sheet >= self.worksheets.len() {
+            return Err(Error::WorksheetNotFound(format!("Sheet {sheet}")));
+        }
 
         // Generate pivot output cells BEFORE consuming config.fields / config.data_items.
         // Excel validates that DIMENSIONS and cell content are consistent with the
         // pivot table definition; missing cells cause a "corrupt file" repair dialog.
-        Self::generate_pivot_output_cells(worksheet, &config)?;
-        self.fmt.enable_pivot_xfs();
+        let output_cells = Self::generate_pivot_output_cells(&config)?;
 
         let fields: Vec<WritablePivotField> = config
             .fields
@@ -97,7 +111,7 @@ impl Writer {
             })
             .collect();
 
-        worksheet.add_pivot_table(WritablePivotTable {
+        let table = WritablePivotTable {
             name: config.name,
             source_type: config.source_type,
             source_sheet_name: config.source_sheet_name,
@@ -119,7 +133,26 @@ impl Writer {
             data_items,
             page_entries: config.page_entries,
             source_data: config.source_data,
-        });
+        };
+        // The workbook write emits the view with this call; running it into a
+        // sink now refuses a view no record can hold before anything changes,
+        // since no API removes a pivot table.
+        crate::writer::core::stream::write_pivot_table_view(
+            &mut std::io::sink(),
+            &table,
+            0,
+            false,
+        )?;
+
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        for cell in output_cells {
+            worksheet.add_cell(cell);
+        }
+        worksheet.add_pivot_table(table);
+        self.fmt.enable_pivot_xfs();
 
         Ok(())
     }
@@ -136,10 +169,7 @@ impl Writer {
     /// (first_data_row+i, 0)  : row item name       (fdr+i, fdc+j)         : aggregated value
     /// (last_row, 0)          : "Grand Total"        (lr, fdc+j)            : column totals
     /// ```
-    fn generate_pivot_output_cells(
-        ws: &mut WritableWorksheet,
-        cfg: &PivotTableConfig,
-    ) -> Result<()> {
+    fn generate_pivot_output_cells(cfg: &PivotTableConfig) -> Result<Vec<WritableCell>> {
         // Identify fields per axis.
         let row_field = cfg.fields.iter().find(|f| f.axis == 0x0001);
         let col_field = cfg.fields.iter().find(|f| f.axis == 0x0002);
@@ -335,10 +365,7 @@ impl Writer {
             CellValue::Number(grand_total),
             Some(PivotCellXfRole::Value),
         )?;
-        for cell in staged {
-            ws.add_cell(cell);
-        }
-        Ok(())
+        Ok(staged)
     }
 
     /// Sort a field's cache items alphabetically and return the sorted labels

@@ -1,4 +1,5 @@
 use super::super::super::biff::AutoFilterConditionWrite;
+use super::super::conditional_format::write_legacy_rule;
 use super::super::model::{a1_cell, prepare_data_validation};
 use super::super::{
     AutoFilterColumnDef, AutoFilterRange, CellPos, CellValue, ConditionalFormat,
@@ -9,6 +10,17 @@ use super::super::{
 };
 use crate::error::{Error, Result};
 use std::collections::HashSet;
+
+/// Refuses one more conditional-format group once a worksheet's groups fill
+/// the 15-bit identifier space their `CondFmt` and `CondFmt12` records share.
+fn check_conditional_format_identifier(worksheet: &super::super::WritableWorksheet) -> Result<()> {
+    if worksheet.conditional_formats.len() + worksheet.conditional_formats12.len() >= 32_768 {
+        return Err(Error::InvalidData(
+            "conditional-format group count exceeds the 15-bit BIFF identifier space".to_string(),
+        ));
+    }
+    Ok(())
+}
 
 impl Writer {
     /// # Errors
@@ -109,7 +121,13 @@ impl Writer {
     /// ```
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// Returns [`Error::StringTooLong`] for a string condition longer than
+    /// the 255 UTF-16 code units an `AFDOperStr` counts, and
+    /// [`Error::InvalidData`] for an empty string condition, a comparison
+    /// operator outside 0x01 through 0x06, or a number BIFF8 cannot store (a
+    /// non-finite, subnormal or negative-zero value). A refused condition
+    /// leaves the worksheet unchanged. Also returns an error when the
+    /// worksheet, its `AutoFilter` range or the relative column is invalid.
     pub fn add_filter_condition(
         &mut self,
         sheet: usize,
@@ -118,6 +136,8 @@ impl Writer {
         cond1: AutoFilterConditionWrite,
         cond2: AutoFilterConditionWrite,
     ) -> Result<()> {
+        cond1.validate()?;
+        cond2.validate()?;
         let worksheet = self
             .worksheets
             .get_mut(sheet)
@@ -571,7 +591,11 @@ impl Writer {
 
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// Refuses, when it is called, a range outside the BIFF8 grid and a rule
+    /// whose formulas the write could not encode (the tokenizer rejects one,
+    /// or a string constant is longer than 255 UTF-16 code units); a refused
+    /// rule leaves the worksheet unchanged. Also returns an error for an
+    /// unknown worksheet.
     pub fn add_conditional_format(&mut self, sheet: usize, cf: ConditionalFormat) -> Result<()> {
         if cf.first_row > cf.last_row
             || cf.first_col > cf.last_col
@@ -582,11 +606,15 @@ impl Writer {
                 "add_conditional_format: first row/col must be <= last row/col".to_string(),
             ));
         }
+        // The write encodes the rule with the same call; no API removes a
+        // conditional format, so a rule it would refuse must not get in.
+        write_legacy_rule(&mut std::io::sink(), &cf.format_type, cf.pattern.as_ref())?;
 
         let worksheet = self
             .worksheets
             .get_mut(sheet)
             .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        check_conditional_format_identifier(worksheet)?;
 
         worksheet.add_conditional_format(cf);
 
@@ -624,12 +652,18 @@ impl Writer {
             }
         }
         for rule in &group.rules {
-            rule.format_type.to_biff_payload()?;
+            write_legacy_rule(
+                &mut std::io::sink(),
+                &rule.format_type,
+                rule.pattern.as_ref(),
+            )?;
         }
-        self.worksheets
+        let worksheet = self
+            .worksheets
             .get_mut(sheet)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?
-            .add_conditional_format_group(group);
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        check_conditional_format_identifier(worksheet)?;
+        worksheet.add_conditional_format_group(group);
         Ok(())
     }
 
@@ -668,12 +702,7 @@ impl Writer {
             .worksheets
             .get_mut(sheet)
             .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
-        if worksheet.conditional_formats.len() + worksheet.conditional_formats12.len() >= 32_768 {
-            return Err(Error::InvalidData(
-                "conditional-format group count exceeds the 15-bit BIFF identifier space"
-                    .to_string(),
-            ));
-        }
+        check_conditional_format_identifier(worksheet)?;
         let mut priorities = worksheet
             .conditional_formats12
             .iter()

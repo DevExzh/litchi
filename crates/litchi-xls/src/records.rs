@@ -216,18 +216,7 @@ impl BoundSheetRecord {
         // Skip 2 bytes and parse the name
         let name_data = &data[6..];
         let name = utils::parse_short_string(name_data, encoding)?;
-        let name_length = name.encode_utf16().count();
-        let forbidden = |character| {
-            matches!(
-                character,
-                '\0' | '\u{0003}' | ':' | '\\' | '*' | '?' | '/' | '[' | ']'
-            )
-        };
-        if !(1..=31).contains(&name_length)
-            || name.chars().any(forbidden)
-            || name.starts_with('\'')
-            || name.ends_with('\'')
-        {
+        if sheet_name_fault(&name).is_some() {
             return Err(Error::InvalidRecord {
                 record_type: 0x0085,
                 message: format!("Invalid BoundSheet8 sheet name: {name:?}"),
@@ -241,6 +230,60 @@ impl BoundSheetRecord {
             name,
         })
     }
+}
+
+/// The most UTF-16 code units a worksheet name holds, `BoundSheet8.stName`
+/// ([MS-XLS] 2.4.28).
+pub(crate) const SHEET_NAME_UNITS: usize = 31;
+
+/// Why a string cannot be a BIFF8 worksheet name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SheetNameFault {
+    /// The name is empty.
+    Empty,
+    /// The name has more than [`SHEET_NAME_UNITS`] UTF-16 code units.
+    TooLong {
+        /// The name's length in UTF-16 code units.
+        utf16_units: usize,
+    },
+    /// The name contains a character a worksheet name MUST NOT contain.
+    ForbiddenCharacter(char),
+    /// The name begins or ends with an apostrophe.
+    EdgeApostrophe,
+}
+
+/// Whether a worksheet name MUST NOT contain `character`: NUL, U+0003 or
+/// one of `: \ * ? / [ ]` ([MS-XLS] 2.4.28).
+pub(crate) const fn is_forbidden_sheet_name_character(character: char) -> bool {
+    matches!(
+        character,
+        '\0' | '\u{0003}' | ':' | '\\' | '*' | '?' | '/' | '[' | ']'
+    )
+}
+
+/// Why `name` cannot be a worksheet name under [MS-XLS] 2.4.28, or `None`
+/// when it can: 1 through 31 UTF-16 code units, none of the forbidden
+/// characters, and no apostrophe at either end. The reader refuses a
+/// workbook with such a name, so the writer and the editors refuse to
+/// author one.
+pub(crate) fn sheet_name_fault(name: &str) -> Option<SheetNameFault> {
+    if name.is_empty() {
+        return Some(SheetNameFault::Empty);
+    }
+    let utf16_units = name.encode_utf16().count();
+    if utf16_units > SHEET_NAME_UNITS {
+        return Some(SheetNameFault::TooLong { utf16_units });
+    }
+    if let Some(character) = name
+        .chars()
+        .find(|character| is_forbidden_sheet_name_character(*character))
+    {
+        return Some(SheetNameFault::ForbiddenCharacter(character));
+    }
+    if name.starts_with('\'') || name.ends_with('\'') {
+        return Some(SheetNameFault::EdgeApostrophe);
+    }
+    None
 }
 
 /// Codepage/encoding information

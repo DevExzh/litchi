@@ -46,18 +46,6 @@ fn too_long<T: std::fmt::Debug>(result: Result<T, Error>) -> (&'static str, usiz
     }
 }
 
-/// Writes `writer`, requiring a [`Error::StringTooLong`] refusal that leaves
-/// the destination untouched.
-fn refused_write(writer: &mut Writer) -> (&'static str, usize, usize) {
-    let mut output = Cursor::new(Vec::new());
-    let result = writer.write_to(&mut output);
-    assert!(
-        output.get_ref().is_empty(),
-        "a refused write produced output"
-    );
-    too_long(result)
-}
-
 /// Strings of exactly `units` UTF-16 code units: ASCII (compressed on the
 /// wire), Latin-1 and CJK (two and three UTF-8 bytes per unit), and one that
 /// ends with a surrogate pair.
@@ -298,14 +286,14 @@ fn formula_string_literals_up_to_255_units_are_written_whole_and_one_more_is_ref
     for literal in strings_of(256) {
         let mut writer = Writer::new();
         let sheet = writer.add_worksheet("Formulas").unwrap();
-        // Formula text is tokenized when the workbook is written.
-        writer
-            .write_formula(sheet, 0, 0, &format!("\"{literal}\""))
-            .unwrap();
+        // Since change 0766 formula text is tokenized when it is set, so the
+        // refusal comes from `write_formula` and leaves the cell unset.
         assert_eq!(
-            refused_write(&mut writer),
+            too_long(writer.write_formula(sheet, 0, 0, &format!("\"{literal}\""))),
             ("formula string literal", 256, 255)
         );
+        let workbook = read(written(&mut writer));
+        assert!(workbook.xls_worksheet(0).unwrap().get_cell(0, 0).is_none());
     }
 }
 

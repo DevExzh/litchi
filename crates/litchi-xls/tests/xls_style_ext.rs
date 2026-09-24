@@ -29,7 +29,7 @@ fn style_extensions_round_trip_through_writer_and_reader() {
     let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Styles").unwrap();
     writer.write_string(sheet, 0, 0, "content").unwrap();
-    writer.set_style_extensions(extensions());
+    writer.set_style_extensions(extensions()).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 

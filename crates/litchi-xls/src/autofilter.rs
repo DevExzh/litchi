@@ -229,12 +229,12 @@ fn parse_doper(data: &[u8], offset: usize) -> Result<(FilterCondition, usize)> {
             (op, FilterValue::Number(val), 0)
         },
         0x06 => {
-            // String
+            // String: an AFDOperStr ([MS-XLS] 2.5.8) whose four unused bytes
+            // precede `cch`, the character count of the string that follows
+            // the two DOPER structures, and `fCompare`.
             let op = FilterOperator::from_u8(data[offset + 1]);
-            // data[offset+2] is unused, data[offset+3] is the byte length of string
-            let cb = data[offset + 3] as usize;
-            // The string bytes follow the two DOPER structures
-            (op, FilterValue::None, cb)
+            let cch = usize::from(data[offset + 6]);
+            (op, FilterValue::None, cch)
         },
         0x08 => {
             // Boolean / error
@@ -301,7 +301,8 @@ pub fn parse_autofilter(data: &[u8]) -> Result<AutoFilterColumn> {
 
     if str_bytes1 > 0 && str_offset < data.len() {
         let available = data.len() - str_offset;
-        if available >= 3 {
+        // The option byte and at least one character.
+        if available >= 2 {
             // XLUnicodeStringNoCch: 1-byte flags, then string data
             let flags = data[str_offset];
             str_offset += 1;
@@ -481,9 +482,10 @@ mod tests {
         // doper1: string, operator = Equal (0x02)
         data.push(0x06); // vt = string
         data.push(0x02); // operator = Equal
-        data.push(0x00); // unused
+        data.extend_from_slice(&[0u8; 4]); // AFDOperStr.unused1
         data.push(0x03); // cch = 3
-        data.extend_from_slice(&[0u8; 6]); // remainder of doper1
+        data.push(0x01); // fCompare: no wildcard
+        data.extend_from_slice(&[0u8; 2]); // reserved1, unused2
 
         // doper2: unused
         data.extend_from_slice(&[0u8; 10]);
@@ -495,6 +497,61 @@ mod tests {
         let col = parse_autofilter(&data).unwrap();
         assert_eq!(col.condition1.operator, FilterOperator::Equal);
         assert_eq!(col.condition1.value, FilterValue::String("abc".to_string()));
+    }
+
+    fn unhex(value: &str) -> Vec<u8> {
+        (0..value.len())
+            .step_by(2)
+            .map(|index| u8::from_str_radix(&value[index..index + 2], 16).unwrap())
+            .collect()
+    }
+
+    /// `AutoFilter` records saved by Excel and LibreOffice: each keeps
+    /// `AFDOperStr.cch` in the seventh byte of its DOPER ([MS-XLS] 2.5.8),
+    /// with unrelated bytes where this crate once looked for it.
+    #[test]
+    fn parses_string_conditions_saved_by_excel_and_libreoffice() {
+        for (payload, entry, expected) in [
+            // Apache POI test-data/spreadsheet/46250.xls
+            (
+                "05000500060280b92403090100300000000000000000000000456e6368696c616461",
+                5,
+                "Enchilada",
+            ),
+            // Apache POI test-data/spreadsheet/StringContinueRecords.xls
+            (
+                "090004000602606cfb00030100000000000000000000000000596573",
+                9,
+                "Yes",
+            ),
+            // LibreOffice sc/qa/extras/testdocuments/AutoFilter.xls
+            (
+                "0300000006020000000007000000000200000000000000000073746172742e2a",
+                3,
+                "start.*",
+            ),
+        ] {
+            let column = parse_autofilter(&unhex(payload)).unwrap();
+            assert_eq!(column.column_index, entry);
+            assert_eq!(column.condition1.operator, FilterOperator::Equal);
+            assert_eq!(
+                column.condition1.value,
+                FilterValue::String(expected.to_string())
+            );
+            assert_eq!(column.condition2.operator, FilterOperator::NoFilter);
+        }
+    }
+
+    #[test]
+    fn parses_a_one_character_string_condition() {
+        let mut data = vec![0, 0, 0, 0, 0x06, 0x02, 0, 0, 0, 0, 1, 1, 0, 0];
+        data.extend_from_slice(&[0u8; 10]);
+        data.extend_from_slice(&[0x00, b'x']);
+        let column = parse_autofilter(&data).unwrap();
+        assert_eq!(
+            column.condition1.value,
+            FilterValue::String("x".to_string())
+        );
     }
 
     #[test]

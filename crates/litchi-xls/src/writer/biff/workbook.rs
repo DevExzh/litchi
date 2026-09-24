@@ -1,7 +1,7 @@
 //! Workbook-level BIFF8 record writers.
 
 use crate::writer::string_limits::{
-    NUMBER_FORMAT_UNITS, WORKSHEET_NAME_UNITS, checked_utf16_len, u8_len, u16_len,
+    NUMBER_FORMAT_UNITS, WORKSHEET_NAME_UNITS, checked_utf16_len, record_len, u8_len, u16_len,
 };
 use crate::{Error, Result};
 use std::io::Write;
@@ -372,7 +372,7 @@ pub(super) fn write_style_ext<W: Write>(writer: &mut W, value: &crate::StyleExt)
     write_record_header(
         writer,
         crate::style_ext::STYLE_EXT_RECORD_TYPE,
-        crate::utils::truncate_usize_to_u16(payload.len()),
+        record_len("StyleExt", payload.len())?,
     )?;
     writer.write_all(&payload)?;
     Ok(())
@@ -446,7 +446,7 @@ pub(super) fn write_xf_ext<W: Write>(writer: &mut W, value: &crate::XfExt) -> Re
     write_record_header(
         writer,
         crate::xf_ext::XF_EXT_RECORD_TYPE,
-        crate::utils::truncate_usize_to_u16(payload.len()),
+        record_len("XFExt", payload.len())?,
     )?;
     writer.write_all(&payload)?;
     Ok(())
@@ -956,22 +956,35 @@ fn write_dde_or_ole_supbook<W: Write>(
     Ok(())
 }
 
-fn write_crn<W: Write>(
-    writer: &mut W,
-    row: &crate::writer::core::ExternalCacheRowOptions,
-) -> Result<()> {
+/// The `CRN` record ([MS-XLS] 2.4.65) for one external cache row: `colLast`,
+/// `colFirst`, `row` and one `SerAr` per value. `CRN` has no continuation,
+/// so a row whose values do not fit one record is refused with
+/// [`Error::RecordTooLong`] (split it into several rows instead).
+pub(crate) fn crn_payload(row: &crate::writer::core::ExternalCacheRowOptions) -> Result<Vec<u8>> {
+    let last_column = row
+        .values
+        .len()
+        .checked_sub(1)
+        .and_then(|span| usize::from(row.first_column).checked_add(span))
+        .and_then(|last| u8::try_from(last).ok())
+        .ok_or_else(|| Error::InvalidData("external CRN column range is invalid".to_string()))?;
     let mut data = Vec::new();
-    data.push(row.first_column + crate::utils::truncate_usize_to_u8(row.values.len()) - 1);
+    data.push(last_column);
     data.push(row.first_column);
     data.extend_from_slice(&row.row.to_le_bytes());
     for value in &row.values {
         data.extend_from_slice(&encode_ser_ar(value)?);
     }
-    write_record_header(
-        writer,
-        0x005a,
-        crate::utils::truncate_usize_to_u16(data.len()),
-    )?;
+    record_len("CRN", data.len())?;
+    Ok(data)
+}
+
+fn write_crn<W: Write>(
+    writer: &mut W,
+    row: &crate::writer::core::ExternalCacheRowOptions,
+) -> Result<()> {
+    let data = crn_payload(row)?;
+    write_record_header(writer, 0x005a, record_len("CRN", data.len())?)?;
     writer.write_all(&data)?;
     Ok(())
 }

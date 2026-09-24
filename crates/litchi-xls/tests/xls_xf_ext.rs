@@ -21,7 +21,7 @@ fn xf_extensions_round_trip_through_writer_and_reader() {
     let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Ext").unwrap();
     writer.write_string(sheet, 0, 0, "content").unwrap();
-    writer.set_xf_extensions(extensions());
+    writer.set_xf_extensions(extensions()).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 
@@ -35,9 +35,16 @@ fn xf_extension_index_is_validated_against_the_xf_table() {
     let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Ext").unwrap();
     writer.write_string(sheet, 0, 0, "content").unwrap();
-    writer.set_xf_extensions(vec![XfExt::try_new(4000, Vec::new()).unwrap()]);
+    // Refused when it is set, since change 0766; the writer still writes.
+    assert!(
+        writer
+            .set_xf_extensions(vec![XfExt::try_new(4000, Vec::new()).unwrap()])
+            .is_err()
+    );
     let mut output = Cursor::new(Vec::new());
-    assert!(writer.write_to(&mut output).is_err());
+    writer.write_to(&mut output).unwrap();
+    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    assert!(workbook.formatting().xf_extensions().is_empty());
 }
 
 #[test]

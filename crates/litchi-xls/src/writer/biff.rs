@@ -57,9 +57,10 @@ pub(crate) use pivot::{
     write_sxex, write_sxivd, write_sxli, write_sxpi, write_sxvd, write_sxvdex, write_sxvi,
     write_sxview, write_sxvs,
 };
-pub(crate) use pivot_xfext::write_pivot_xfext_block;
+pub(crate) use pivot_xfext::write_pivot_xf_extensions;
 pub(crate) use validation::{DvConfig, DvalConfig};
 pub use worksheet::AutoFilterConditionWrite;
+pub(crate) use worksheet::{classify_hyperlink, validate_hyperlink_target};
 
 fn map_frame_error(error: litchi_biff::Error) -> Error {
     match error {
@@ -314,7 +315,7 @@ pub(crate) fn write_protect<W: Write>(writer: &mut W, protect: bool) -> Result<(
     workbook::write_protect(writer, protect)
 }
 
-pub(crate) use workbook::ExternSheetMode;
+pub(crate) use workbook::{ExternSheetMode, crn_payload};
 
 pub(crate) fn write_external_link_table<W: Write>(
     writer: &mut W,

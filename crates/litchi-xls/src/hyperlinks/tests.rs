@@ -259,3 +259,39 @@ fn test_record_type_constant() {
     assert_eq!(RECORD_TYPE, 0x01B8);
     assert_eq!(TOOLTIP_RECORD_TYPE, 0x0800);
 }
+
+/// A URL without the optional serialization tail whose own last characters
+/// spell the tail's GUID is still a URL: the tail follows the URL's NUL.
+#[test]
+fn a_url_ending_in_the_serialization_guid_is_not_a_tail() {
+    let guid_units = URL_SERIAL_GUID
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|pair| u16::from_le_bytes(*pair))
+        .collect::<Vec<_>>();
+    let mut units = "https://x/".encode_utf16().collect::<Vec<_>>();
+    units.extend_from_slice(&guid_units);
+    units.extend_from_slice(&[u16::from(b'a'), u16::from(b'b'), u16::from(b'c')]);
+    let expected = String::from_utf16(&units).unwrap();
+
+    let mut data = base(0x03);
+    data.extend_from_slice(&URL_MONIKER_CLSID);
+    let mut url = Vec::new();
+    for unit in units.iter().copied().chain(std::iter::once(0)) {
+        url.extend_from_slice(&unit.to_le_bytes());
+    }
+    data.extend_from_slice(&(url.len() as u32).to_le_bytes());
+    data.extend_from_slice(&url);
+
+    let link = parse_hlink_record(&data).unwrap();
+    assert_eq!(link.address(), Some(expected.as_str()));
+    // The same URL with a real tail still parses its URI flags.
+    assert_eq!(
+        parse_hlink_record(&url_link())
+            .unwrap()
+            .moniker()
+            .map(|moniker| matches!(moniker, HyperlinkMoniker::Url(url) if url.serialization_uri_flags() == Some(0xABA5))),
+        Some(true)
+    );
+}

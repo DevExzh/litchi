@@ -13,6 +13,8 @@ impl Writer {
     /// - Name MUST NOT be empty.
     /// - Name length MUST be at most 255 UTF-16 code units (`Lbl.cch` is a
     ///   byte counting them), refused with [`Error::StringTooLong`].
+    /// - Name MUST NOT contain NUL, which litchi's reader refuses in a
+    ///   user-defined `Lbl` name.
     fn validate_defined_name(name: &str) -> Result<()> {
         if name.is_empty() {
             return Err(Error::InvalidData(
@@ -20,7 +22,13 @@ impl Writer {
             ));
         }
 
-        ensure_utf16_len_within(name, DEFINED_NAME_UNITS, "defined name")
+        ensure_utf16_len_within(name, DEFINED_NAME_UNITS, "defined name")?;
+        if name.contains('\0') {
+            return Err(Error::InvalidData(
+                "Defined name must not contain a NUL character".to_string(),
+            ));
+        }
+        Ok(())
     }
 
     /// Define a workbook-scoped named range.
@@ -31,8 +39,10 @@ impl Writer {
     /// # Errors
     ///
     /// Returns [`Error::StringTooLong`] for a name longer than 255 UTF-16 code
-    /// units, the reference's parse error for an unsupported reference, and an
-    /// error if any other validation fails; a refused name leaves the writer
+    /// units, [`Error::InvalidData`] for an empty name or one containing NUL,
+    /// [`Error::TooMany`] past the 65,535 names a workbook holds, the
+    /// reference's parse error for an unsupported reference, and an error if
+    /// any other validation fails; a refused name leaves the writer
     /// unchanged.
     pub fn define_name(&mut self, name: &str, reference: &str) -> Result<()> {
         Self::validate_defined_name(name)?;
@@ -135,6 +145,13 @@ impl Writer {
     /// checked: its reference encodes and its comment fits `NameCmt`. A
     /// refused name is not stored, so the writer stays able to write.
     fn push_defined_name(&mut self, name: DefinedName) -> Result<()> {
+        // The reader refuses a workbook with more than 65,535 `Lbl` records.
+        if self.defined_names.len() + self.defined_name_records.len() >= usize::from(u16::MAX) {
+            return Err(Error::TooMany {
+                collection: "defined names",
+                limit: usize::from(u16::MAX),
+            });
+        }
         name.to_biff_formula()?;
         if let Some(comment) = &name.comment {
             ensure_utf16_len_within(comment, NAME_COMMENT_UNITS, "defined-name comment")?;
