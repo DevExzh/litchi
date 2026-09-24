@@ -103,7 +103,19 @@ impl Scope {
 
     /// Remove every binding declared at `depth` or deeper: those of an element
     /// that has closed and of anything it left open.
+    #[inline]
     pub(super) fn truncate(&mut self, depth: usize) {
+        if self
+            .added
+            .last()
+            .is_some_and(|(declared, _)| *declared >= depth)
+        {
+            self.remove_from(depth);
+        }
+    }
+
+    #[cold]
+    fn remove_from(&mut self, depth: usize) {
         while self
             .added
             .last()
@@ -162,8 +174,8 @@ pub(super) fn sorted_prefixes(local: &[(String, String)]) -> Result<Vec<&str>, E
     Ok(prefixes)
 }
 
-/// Index operations, counted in tests so that they can bound the work a
-/// hostile document costs without measuring time.
+/// Index operations and walked declarations, counted in tests so that they
+/// can bound the work a hostile document costs without measuring time.
 #[cfg(test)]
 pub(super) mod counter {
     use core::cell::Cell;
@@ -176,7 +188,13 @@ pub(super) mod counter {
         LOOKUPS.with(|count| count.set(count.get() + 1));
     }
 
-    /// Run `work` and return its result with the index lookups it made.
+    /// Count `steps` declarations a production lookup walked.
+    pub(in crate::mce) fn steps(steps: usize) {
+        LOOKUPS.with(|count| count.set(count.get() + steps));
+    }
+
+    /// Run `work` and return its result with the index lookups it made and
+    /// the declarations its lookups walked.
     pub(in crate::mce) fn counted<T>(work: impl FnOnce() -> T) -> (T, usize) {
         LOOKUPS.with(|count| count.set(0));
         let result = work();

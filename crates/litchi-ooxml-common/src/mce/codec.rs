@@ -311,6 +311,11 @@ struct NamespaceLayer {
     local: Vec<(String, String)>,
 }
 
+/// Namespace declarations a lookup walks, innermost first, before it asks
+/// [`Scope`]. It covers every declaration in scope in the repository's real
+/// documents, whose largest element declares 38.
+pub(super) const WALKED_DECLARATIONS: usize = 64;
+
 /// Namespace declarations one element's lookup may walk before the debug
 /// cross-check of [`Scope`] against the declaration chain gives up.
 const CROSS_CHECKED_DECLARATIONS: usize = 256;
@@ -322,14 +327,27 @@ impl Namespaces {
     /// The walk costs one comparison per declaration in scope, which an input
     /// controls; production lookups use [`Scope`], and this walk only checks
     /// it in debug builds.
-    fn walk(&self, prefix: &str, mut budget: usize) -> Option<Option<&str>> {
+    fn walk(&self, prefix: &str, budget: usize, counted: bool) -> Option<Option<&str>> {
+        let mut steps = 0usize;
+        let result = self.walk_steps(prefix, budget, &mut steps);
+        if counted {
+            #[cfg(test)]
+            super::scope::counter::steps(steps);
+        }
+        result
+    }
+
+    fn walk_steps(&self, prefix: &str, budget: usize, steps: &mut usize) -> Option<Option<&str>> {
         if prefix == "xml" {
             return Some(Some(XML_NS));
         }
         let mut layer = self.head.as_deref();
         while let Some(current) = layer {
             for (candidate, namespace) in current.local.iter().rev() {
-                budget = budget.checked_sub(1)?;
+                if *steps == budget {
+                    return None;
+                }
+                *steps += 1;
                 if candidate == prefix {
                     return Some(Some(namespace));
                 }
@@ -363,7 +381,7 @@ impl Namespaces {
         for (prefix, _) in &local {
             let bound = scope.get_outside(prefix, depth);
             debug_assert!(
-                self.walk(prefix, CROSS_CHECKED_DECLARATIONS)
+                self.walk(prefix, CROSS_CHECKED_DECLARATIONS, false)
                     .is_none_or(|walked| walked == bound),
                 "the prefix index disagrees with the declaration chain for {prefix:?}"
             );
@@ -386,21 +404,33 @@ impl Namespaces {
     }
 }
 
-/// Prefix resolution at the element being processed: [`Scope`] answers, and
-/// debug builds cross-check its answer against the element's declaration
-/// chain while that walk stays short.
+/// Prefix resolution at the element being processed.
+///
+/// A prefix is first sought among the innermost [`WALKED_DECLARATIONS`]
+/// declarations of the element's chain, where an ordinary document binds it:
+/// a producer declares its namespaces on the root, a few dozen of them. Past
+/// that the answer comes from [`Scope`], in a logarithmic number of
+/// comparisons, so a lookup never costs more than a bounded walk however many
+/// declarations are in scope. Debug builds check that the two agree.
 #[derive(Clone, Copy)]
-struct Resolver<'s, 'c> {
-    scope: &'s Scope,
-    chain: &'c Namespaces,
+struct Resolver<'a> {
+    scope: &'a Scope,
+    chain: &'a Namespaces,
 }
 
-impl<'s> Resolver<'s, '_> {
-    fn get(self, prefix: &str) -> Option<&'s str> {
+impl<'a> Resolver<'a> {
+    fn get(self, prefix: &str) -> Option<&'a str> {
+        if let Some(walked) = self.chain.walk(prefix, WALKED_DECLARATIONS, true) {
+            debug_assert!(
+                walked == self.scope.get(prefix),
+                "the prefix index disagrees with the declaration chain for {prefix:?}"
+            );
+            return walked;
+        }
         let bound = self.scope.get(prefix);
         debug_assert!(
             self.chain
-                .walk(prefix, CROSS_CHECKED_DECLARATIONS)
+                .walk(prefix, CROSS_CHECKED_DECLARATIONS, false)
                 .is_none_or(|walked| walked == bound),
             "the prefix index disagrees with the declaration chain for {prefix:?}"
         );
@@ -413,6 +443,7 @@ impl<'s> Resolver<'s, '_> {
 ///
 /// `with_local` shares the parent layer verbatim when an element declares
 /// nothing, so distinct pointers imply at least one intervening declaration.
+#[inline]
 fn hoists(head: Option<&Arc<NamespaceLayer>>, stop: Option<&Arc<NamespaceLayer>>) -> bool {
     match (head, stop) {
         (None, _) => false,
@@ -442,6 +473,8 @@ type Hoisted = Rc<[(String, String)]>;
 /// shares its parent's, so emitting a child costs work proportional to the
 /// declarations it re-declares rather than to every declaration in the
 /// dropped scopes.
+#[cold]
+#[inline(never)]
 fn hoisted_for_children(st: &mut [Frame]) -> R<Hoisted> {
     let Some(top) = st.len().checked_sub(1) else {
         return Ok(Rc::from(Vec::new()));
@@ -500,6 +533,7 @@ fn hoisted_for_children(st: &mut [Frame]) -> R<Hoisted> {
 }
 
 /// Whether a child of `frame` inherits declarations its output lacks.
+#[inline]
 fn frame_hoists(frame: &Frame) -> bool {
     hoists(frame.ctx.ns.head.as_ref(), frame.emitted_ns.as_ref())
 }
@@ -550,14 +584,7 @@ impl Ctx {
     }
 
     fn is_ignorable(&self, namespace: &str) -> bool {
-        let mut layer = self.directives.as_deref();
-        while let Some(current) = layer {
-            if current.ignorable.contains(namespace) {
-                return true;
-            }
-            layer = current.parent.as_deref();
-        }
-        false
+        ignorable_in(&self.directives, namespace)
     }
 
     fn processes(&self, name: &Name) -> bool {
@@ -571,6 +598,18 @@ impl Ctx {
     fn preserves_attribute(&self, name: &Name) -> bool {
         pattern_directive_matches(&self.directives, name, |layer| &layer.preserve_attributes)
     }
+}
+
+/// Whether a directive layer from `head` outward makes `namespace` ignorable.
+fn ignorable_in(head: &Option<Arc<DirectiveLayer>>, namespace: &str) -> bool {
+    let mut layer = head.as_deref();
+    while let Some(current) = layer {
+        if current.ignorable.contains(namespace) {
+            return true;
+        }
+        layer = current.parent.as_deref();
+    }
+    false
 }
 
 fn pattern_directive_matches(
@@ -603,12 +642,14 @@ impl BoundedOutput {
         Ok(Self { bytes, max })
     }
 
+    #[inline]
     fn extend_from_slice(&mut self, value: &[u8]) -> R<()> {
         self.reserve(value.len())?;
         self.bytes.extend_from_slice(value);
         Ok(())
     }
 
+    #[inline]
     fn push(&mut self, value: u8) -> R<()> {
         self.reserve(1)?;
         self.bytes.push(value);
@@ -959,112 +1000,8 @@ fn start(
         directives.push((local, a.value.as_ref()));
     }
 
-    let mut local_ign = HashSet::new();
-    if let Some((_, value)) = directives.iter().find(|(name, _)| *name == "Ignorable") {
-        let mut seen = HashSet::new();
-        for prefix in value.split_whitespace() {
-            if !xml_name::is_ncname(prefix) || !seen.insert(prefix) {
-                return Err(bad("invalid or duplicate Ignorable prefix"));
-            }
-            let uri = resolver(scope, &c.ns)
-                .get(prefix)
-                .ok_or_else(|| bad(format!("unbound Ignorable {prefix}")))?;
-            if uri == NAMESPACE {
-                return Err(bad("MCE cannot be ignorable"));
-            }
-            local_ign
-                .try_reserve(1)
-                .map_err(|source| Error::Allocation {
-                    resource: "MCE Ignorable directives",
-                    source,
-                })?;
-            local_ign.insert(uri.to_owned());
-        }
-    }
-    let mut new_ignorable = HashSet::new();
-    for namespace in &local_ign {
-        if !c.is_ignorable(namespace) {
-            new_ignorable
-                .try_reserve(1)
-                .map_err(|source| Error::Allocation {
-                    resource: "MCE effective Ignorable directives",
-                    source,
-                })?;
-            new_ignorable.insert(namespace.clone());
-        }
-    }
-
-    let mut local_process = Patterns::default();
-    let mut local_preserve_elements = Patterns::default();
-    let mut local_preserve_attributes = Patterns::default();
-    for (name, value) in &directives {
-        match *name {
-            "Ignorable" => {},
-            "ProcessContent" => {
-                for token in value.split_whitespace() {
-                    let target = parse_qname_target(token, resolver(scope, &c.ns), true)?;
-                    let namespace = target.namespace();
-                    if !local_ign.contains(namespace) && !c.is_ignorable(namespace) {
-                        return Err(bad("ProcessContent target is not effectively ignorable"));
-                    }
-                    if !local_process.insert(target, "MCE ProcessContent directives")? {
-                        return Err(bad("duplicate ProcessContent target"));
-                    }
-                }
-            },
-            "PreserveElements" => {
-                for token in value.split_whitespace() {
-                    let target = parse_qname_target(token, resolver(scope, &c.ns), true)?;
-                    if !local_ign.contains(target.namespace()) {
-                        return Err(bad("PreserveElements target is not locally ignorable"));
-                    }
-                    if !local_preserve_elements.insert(target, "MCE PreserveElements directives")? {
-                        return Err(bad("duplicate PreserveElements target"));
-                    }
-                }
-            },
-            "PreserveAttributes" => {
-                for token in value.split_whitespace() {
-                    let target = parse_qname_target(token, resolver(scope, &c.ns), true)?;
-                    if !local_ign.contains(target.namespace()) {
-                        return Err(bad("PreserveAttributes target is not locally ignorable"));
-                    }
-                    if !local_preserve_attributes
-                        .insert(target, "MCE PreserveAttributes directives")?
-                    {
-                        return Err(bad("duplicate PreserveAttributes target"));
-                    }
-                }
-            },
-            "MustUnderstand" => {
-                let mut seen = HashSet::new();
-                for prefix in value.split_whitespace() {
-                    if !xml_name::is_ncname(prefix) || !seen.insert(prefix) {
-                        return Err(bad("invalid or duplicate MustUnderstand prefix"));
-                    }
-                    let uri = resolver(scope, &c.ns)
-                        .get(prefix)
-                        .ok_or_else(|| bad(format!("unbound MustUnderstand {prefix}")))?;
-                    if !caps.understands(uri) {
-                        return Err(Error::MustUnderstand(uri.to_owned()));
-                    }
-                }
-            },
-            _ => unreachable!(),
-        }
-    }
-    if !new_ignorable.is_empty()
-        || !local_process.is_empty()
-        || !local_preserve_elements.is_empty()
-        || !local_preserve_attributes.is_empty()
-    {
-        c.directives = Some(Arc::new(DirectiveLayer {
-            parent: c.directives.take(),
-            ignorable: new_ignorable,
-            process: local_process,
-            preserve_elements: local_preserve_elements,
-            preserve_attributes: local_preserve_attributes,
-        }));
+    if !directives.is_empty() {
+        apply_directives(&c.ns, &mut c.directives, &directives, caps, scope)?;
     }
     let mut name = (!caps.extensions.is_empty()).then(|| Name {
         namespace: namespace.to_owned(),
@@ -1251,8 +1188,132 @@ fn start(
     close(st, frame, empty, out, scope)
 }
 
+/// Apply one element's compatibility directives to its context: the
+/// `Ignorable` namespaces it adds, the `ProcessContent`, `PreserveElements`
+/// and `PreserveAttributes` targets, and the `MustUnderstand` check.
+///
+/// Only an element that carries a directive calls this, so an ordinary
+/// element builds none of these sets.
+fn apply_directives(
+    ns: &Namespaces,
+    head: &mut Option<Arc<DirectiveLayer>>,
+    directives: &[(&str, &str)],
+    caps: &Capabilities,
+    scope: &Scope,
+) -> R<()> {
+    let mut local_ign = HashSet::new();
+    if let Some((_, value)) = directives.iter().find(|(name, _)| *name == "Ignorable") {
+        let mut seen = HashSet::new();
+        for prefix in value.split_whitespace() {
+            if !xml_name::is_ncname(prefix) || !seen.insert(prefix) {
+                return Err(bad("invalid or duplicate Ignorable prefix"));
+            }
+            let uri = resolver(scope, ns)
+                .get(prefix)
+                .ok_or_else(|| bad(format!("unbound Ignorable {prefix}")))?;
+            if uri == NAMESPACE {
+                return Err(bad("MCE cannot be ignorable"));
+            }
+            local_ign
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "MCE Ignorable directives",
+                    source,
+                })?;
+            local_ign.insert(uri.to_owned());
+        }
+    }
+    let mut new_ignorable = HashSet::new();
+    for namespace in &local_ign {
+        if !ignorable_in(head, namespace) {
+            new_ignorable
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "MCE effective Ignorable directives",
+                    source,
+                })?;
+            new_ignorable.insert(namespace.clone());
+        }
+    }
+
+    let mut local_process = Patterns::default();
+    let mut local_preserve_elements = Patterns::default();
+    let mut local_preserve_attributes = Patterns::default();
+    for (name, value) in directives {
+        match *name {
+            "Ignorable" => {},
+            "ProcessContent" => {
+                for token in value.split_whitespace() {
+                    let target = parse_qname_target(token, resolver(scope, ns), true)?;
+                    let namespace = target.namespace();
+                    if !local_ign.contains(namespace) && !ignorable_in(head, namespace) {
+                        return Err(bad("ProcessContent target is not effectively ignorable"));
+                    }
+                    if !local_process.insert(target, "MCE ProcessContent directives")? {
+                        return Err(bad("duplicate ProcessContent target"));
+                    }
+                }
+            },
+            "PreserveElements" => {
+                for token in value.split_whitespace() {
+                    let target = parse_qname_target(token, resolver(scope, ns), true)?;
+                    if !local_ign.contains(target.namespace()) {
+                        return Err(bad("PreserveElements target is not locally ignorable"));
+                    }
+                    if !local_preserve_elements.insert(target, "MCE PreserveElements directives")? {
+                        return Err(bad("duplicate PreserveElements target"));
+                    }
+                }
+            },
+            "PreserveAttributes" => {
+                for token in value.split_whitespace() {
+                    let target = parse_qname_target(token, resolver(scope, ns), true)?;
+                    if !local_ign.contains(target.namespace()) {
+                        return Err(bad("PreserveAttributes target is not locally ignorable"));
+                    }
+                    if !local_preserve_attributes
+                        .insert(target, "MCE PreserveAttributes directives")?
+                    {
+                        return Err(bad("duplicate PreserveAttributes target"));
+                    }
+                }
+            },
+            "MustUnderstand" => {
+                let mut seen = HashSet::new();
+                for prefix in value.split_whitespace() {
+                    if !xml_name::is_ncname(prefix) || !seen.insert(prefix) {
+                        return Err(bad("invalid or duplicate MustUnderstand prefix"));
+                    }
+                    let uri = resolver(scope, ns)
+                        .get(prefix)
+                        .ok_or_else(|| bad(format!("unbound MustUnderstand {prefix}")))?;
+                    if !caps.understands(uri) {
+                        return Err(Error::MustUnderstand(uri.to_owned()));
+                    }
+                }
+            },
+            _ => unreachable!(),
+        }
+    }
+    if !new_ignorable.is_empty()
+        || !local_process.is_empty()
+        || !local_preserve_elements.is_empty()
+        || !local_preserve_attributes.is_empty()
+    {
+        *head = Some(Arc::new(DirectiveLayer {
+            parent: head.take(),
+            ignorable: new_ignorable,
+            process: local_process,
+            preserve_elements: local_preserve_elements,
+            preserve_attributes: local_preserve_attributes,
+        }));
+    }
+    Ok(())
+}
+
 /// The declarations the element being started re-declares, when its parent
 /// frame has dropped declarations to hoist.
+#[inline]
 fn hoisted_if_any(st: &mut [Frame]) -> R<Option<Hoisted>> {
     if st.last().is_some_and(frame_hoists) {
         hoisted_for_children(st).map(Some)
@@ -1263,7 +1324,7 @@ fn hoisted_if_any(st: &mut [Frame]) -> R<Option<Hoisted>> {
 
 /// Resolve prefixes against `scope`, cross-checked against the element's
 /// declaration chain `chain` in debug builds.
-const fn resolver<'s, 'c>(scope: &'s Scope, chain: &'c Namespaces) -> Resolver<'s, 'c> {
+const fn resolver<'a>(scope: &'a Scope, chain: &'a Namespaces) -> Resolver<'a> {
     Resolver { scope, chain }
 }
 
@@ -1361,7 +1422,7 @@ fn validate_alternate_attributes(
     }
     Ok(())
 }
-fn expand(q: &str, ns: Resolver<'_, '_>, element: bool) -> R<Name> {
+fn expand(q: &str, ns: Resolver<'_>, element: bool) -> R<Name> {
     let (namespace, local) = expand_parts(q, ns, element)?;
     Ok(Name {
         namespace: namespace.to_owned(),
@@ -1376,7 +1437,7 @@ fn expand(q: &str, ns: Resolver<'_, '_>, element: bool) -> R<Name> {
 /// `xml_name::QualifiedName`, whose `parse` reports `InvalidQualifiedName` for
 /// every lexical failure and reconstructs the same `prefix:local` split; this
 /// borrows that split from the caller's bytes instead of allocating it.
-fn expand_parts<'q, 'n>(q: &'q str, ns: Resolver<'n, '_>, element: bool) -> R<(&'n str, &'q str)> {
+fn expand_parts<'q, 'n>(q: &'q str, ns: Resolver<'n>, element: bool) -> R<(&'n str, &'q str)> {
     if !xml_name::is_qualified_name(q) {
         let error = xml_name::NameError::InvalidQualifiedName(q.to_owned());
         return Err(bad(format!("invalid QName: {error}")));
@@ -1394,7 +1455,7 @@ fn expand_parts<'q, 'n>(q: &'q str, ns: Resolver<'n, '_>, element: bool) -> R<(&
     };
     Ok((n, l))
 }
-fn parse_qname_target(token: &str, ns: Resolver<'_, '_>, wildcard: bool) -> R<NamePattern> {
+fn parse_qname_target(token: &str, ns: Resolver<'_>, wildcard: bool) -> R<NamePattern> {
     let (prefix, local) = token
         .split_once(':')
         .ok_or_else(|| bad("preservation and processing targets must be prefixed QNames"))?;

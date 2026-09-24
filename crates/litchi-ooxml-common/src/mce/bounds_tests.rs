@@ -1,12 +1,14 @@
 //! Record 0764: the per-element attribute limit and the bounded namespace and
 //! directive work of both MCE processors on hostile documents.
 //!
-//! Work is bounded by counting prefix-index lookups, each a logarithmic
-//! B-tree operation, rather than by measuring time.
+//! Work is bounded by counting operations rather than by measuring time: each
+//! prefix-index lookup (a logarithmic B-tree operation) and each declaration a
+//! lookup walks before it asks the index, at most
+//! [`WALKED_DECLARATIONS`] per lookup.
 
 use std::{convert::Infallible, io::Cursor};
 
-use super::codec::process_markup_compatibility;
+use super::codec::{WALKED_DECLARATIONS, process_markup_compatibility};
 use super::model::{Capabilities, DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT, Error, Limits, Report};
 use super::scope::counter::counted;
 use super::stream::{
@@ -134,22 +136,30 @@ fn shadowed_chain(depth: usize, width: usize, attributes: usize) -> String {
 fn lookups_do_not_walk_shadowed_declarations() {
     let (depth, width, attributes) = (64, 500, 1_000);
     let xml = shadowed_chain(depth, width, attributes);
-    // Every declaration is resolved once to count new bindings, and every
-    // name about once more; a chain walk would compare `depth * width`
-    // declarations for each of the `attributes` names.
-    let names = depth * width + attributes + depth + 4;
+    // Every declaration is resolved once in the index to count new bindings;
+    // every element and attribute name, at most three times, by a walk of at
+    // most WALKED_DECLARATIONS declarations and one index lookup. A chain walk
+    // would compare `depth * width` declarations for each attribute name.
+    let names = attributes + depth + 4;
+    let bound = depth * width + 3 * (WALKED_DECLARATIONS + 1) * names;
     let walked = depth * width * attributes;
+    assert!(bound * 100 < walked);
 
-    let (result, lookups) = counted(|| codec(&xml, &Limits::default()));
+    let (result, operations) = counted(|| codec(&xml, &Limits::default()));
     let (output, _) = result.expect("the document is valid");
     assert!(output.ends_with("</s></r>"), "{output}");
-    assert!(lookups <= 3 * names, "{lookups} lookups for {names} names");
-    assert!(3 * names * 100 < walked);
+    assert!(
+        operations <= bound,
+        "{operations} operations, bound {bound}"
+    );
 
-    let (result, lookups) = counted(|| stream(&xml, &StreamLimits::default()));
+    let (result, operations) = counted(|| stream(&xml, &StreamLimits::default()));
     let events = result.expect("the stream accepts the document");
     assert_eq!(events.last().map(String::as_str), Some("{urn:z}e"));
-    assert!(lookups <= 3 * names, "{lookups} lookups for {names} names");
+    assert!(
+        operations <= bound,
+        "{operations} operations, bound {bound}"
+    );
 }
 
 #[test]
