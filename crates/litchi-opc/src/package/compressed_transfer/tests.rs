@@ -728,8 +728,10 @@ fn a_capture_is_framed_only_for_the_allocation_it_was_verified_against() {
     assert_eq!(raw_member(&output, &COPIED[1..]).method, 8);
 }
 
-#[test]
-fn a_data_descriptor_that_disagrees_is_refused() {
+/// The source archive with the photo's data-descriptor CRC flipped, so the
+/// descriptor disagrees with the central record while the payload itself is
+/// intact.
+fn disagreeing_descriptor_archive() -> Vec<u8> {
     let mut archive = source_archive(Mode::DeflatedDescriptor, false);
     let (_start, end) = compressed_range(&archive, PHOTO);
     // The descriptor follows the payload: optional signature, then CRC.
@@ -739,15 +741,60 @@ fn a_data_descriptor_that_disagrees_is_refused() {
         end
     };
     archive[crc] ^= 0xff;
-    // Every ingress now validates each member's local framing before it
-    // admits the member's encryption flags (merge record 0759 carries the
-    // spec-gap branch's admission check onto the deferred open). A descriptor
-    // that disagrees with its central record is therefore refused at open,
-    // with a typed error, and can never reach a transfer.
-    let error = OpcPackage::from_vec(archive).expect_err("a disagreeing descriptor is refused");
+    archive
+}
+
+#[test]
+fn a_data_descriptor_that_disagrees_is_refused() {
+    // Every `OpcPackage` ingress is in-memory, and since merge 0759 the
+    // in-memory (slice) admission indexes each member's local framing,
+    // descriptor included, before the package exists. A descriptor that
+    // disagrees with its central record is therefore refused at open, with a
+    // typed error, so no package that could issue a transfer holds it. A
+    // positional (source-backed) open does not check descriptors: it admits
+    // the member and refuses at the first read.
+    let error = OpcPackage::from_vec(disagreeing_descriptor_archive())
+        .expect_err("a disagreeing descriptor is refused");
     assert!(
         matches!(error, OpcError::ZipError(_)),
         "the refusal is typed: {error:?}"
+    );
+}
+
+#[test]
+fn the_transfer_capture_never_captures_a_disagreeing_descriptor() {
+    // The transfer copies a member's compressed span verbatim, so its own
+    // capture must refuse this framing whatever the open checked. The open
+    // above no longer lets such a member reach it, so the capture is driven
+    // here through the positional index `owned_transfer_index` builds, which,
+    // like every positional index, admits the member.
+    let capture = |archive: Vec<u8>| {
+        let length = archive.len() as u64;
+        let limits = ReadLimits::default();
+        let index = soapberry_zip::office::IndexedArchive::from_reader_with_limits(
+            std::sync::Arc::new(archive),
+            length,
+            limits.zip_limits(),
+        )
+        .expect("the positional index admits the member");
+        let entry_id = index.entry_id(PHOTO).expect("photo member");
+        let member = super::TransferMember {
+            index: &index,
+            entry_id,
+            limits,
+        };
+        super::verified_capture(&member, &photo_bytes()).map(|captured| captured.is_some())
+    };
+    // Control: the same member with its descriptor intact is captured, so the
+    // refusal below is the descriptor's.
+    assert!(
+        capture(source_archive(Mode::DeflatedDescriptor, false)).expect("intact member"),
+        "an intact descriptor-bearing member is captured"
+    );
+    let captured = capture(disagreeing_descriptor_archive());
+    assert!(
+        matches!(captured, Ok(false)),
+        "a disagreeing descriptor is a content fault, never a capture: {captured:?}"
     );
 }
 
