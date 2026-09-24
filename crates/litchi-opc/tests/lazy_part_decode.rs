@@ -118,6 +118,42 @@ fn part_metadata_separates_absence_from_a_failed_decode_without_decoding() {
 }
 
 #[test]
+fn batch_relationship_to_a_corrupt_present_part_targets_an_existing_part() {
+    let mut package =
+        OpcPackage::from_vec(corrupt_bad_member(archive())).expect("corruption is deferred");
+    let root = uri("/");
+    let content_types = package.source_content_types().expect("manifest token");
+    let expected = package.source_relationships(&root).expect("root token");
+    let replacement = expected
+        .with_relationship(
+            "urn:test:bad",
+            "custom/bad.bin",
+            "rIdBad",
+            litchi_opc::TargetMode::Internal,
+            1 << 20,
+        )
+        .expect("edge to the corrupt member");
+
+    // Whether a relationship target exists is a question about names; the
+    // target's payload is neither read nor needed, so its decode refusal
+    // must not be reported as a missing part.
+    package
+        .try_add_parts_with_source_tokens(
+            content_types.bytes(),
+            &content_types,
+            &expected,
+            &replacement,
+            Vec::new(),
+        )
+        .expect("a present part is an existing target");
+    assert_eq!(package.deferred_decode_counters(), Some((0, 0)));
+    assert!(matches!(
+        package.get_part(&uri(BAD_URI)),
+        Err(OpcError::ZipError(_))
+    ));
+}
+
+#[test]
 fn failed_first_access_is_stable_and_never_becomes_an_empty_generated_part() {
     let source = corrupt_bad_member(archive());
     let bad = uri(BAD_URI);
