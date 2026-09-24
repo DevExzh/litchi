@@ -1467,12 +1467,9 @@ fn collect_chart_graph(source: &Workbook, root: PackURI) -> Result<ChartGraph> {
                 ));
             }
             let target = relationship.target_partname()?;
-            let is_calculation_chain = relationship.reltype()
-                == crate::calculation_chain::RELATIONSHIP_TYPE
-                || source.package.get_part(&target).is_ok_and(|part| {
-                    part.content_type() == crate::calculation_chain::CONTENT_TYPE
-                });
-            if is_calculation_chain || !chart_owned_uri(&target) {
+            if targets_calculation_chain(&source.package, relationship, &target)
+                || !chart_owned_uri(&target)
+            {
                 return Err(refused(
                     DrawingTransferRefusal::WorkbookGlobalChartDependency(
                         target.as_str().to_string(),
@@ -1484,6 +1481,24 @@ fn collect_chart_graph(source: &Workbook, root: PackURI) -> Result<ChartGraph> {
     }
     parts.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
     Ok(ChartGraph { root, parts })
+}
+
+/// Whether a chart-graph edge reaches a calculation chain, by its
+/// relationship type or by the target's declared content type.
+///
+/// The content type is package metadata, so it is read without decoding the
+/// target (ADR 0030). A calculation chain whose payload fails to decode is
+/// still one. Deciding it by decoding would read it as "not a calculation
+/// chain" and let the walk continue into a workbook-global part.
+fn targets_calculation_chain(
+    package: &litchi_opc::OpcPackage,
+    relationship: &litchi_opc::Relationship,
+    target: &PackURI,
+) -> bool {
+    relationship.reltype() == crate::calculation_chain::RELATIONSHIP_TYPE
+        || package
+            .part_metadata(target)
+            .is_some_and(|part| part.content_type() == crate::calculation_chain::CONTENT_TYPE)
 }
 
 fn chart_owned_uri(uri: &PackURI) -> bool {
@@ -2046,6 +2061,61 @@ mod tests {
                 DrawingTransferRefusal::WorkbookGlobalChartDependency(target)
             ) if target == target_uri.as_str()
         ));
+    }
+
+    #[test]
+    fn a_calculation_chain_whose_payload_fails_to_decode_is_still_one() {
+        // `collect_chart_graph` runs `parse_chart_resources` first, which reads
+        // every part a chart graph may contain and so refuses an undecodable
+        // one with its decode error. The walk's own classification is tested
+        // here directly: it answers from metadata, never decoding the target.
+        let (mut source, chart_uri, target_uri) = chart_fixture_with_chain_edge(
+            "/xl/customCalcChain.bin",
+            crate::calculation_chain::CONTENT_TYPE,
+            rt::PACKAGE,
+        );
+        source
+            .package
+            .get_part_mut(&target_uri)
+            .unwrap()
+            .set_blob(b"calculation-chain-payload-that-will-not-decode".to_vec());
+        let mut bytes = litchi_opc::PackageWriter::to_bytes(&source.package).unwrap();
+        // Damage the first byte of the target member's data, found through
+        // its local header.
+        let member = b"xl/customCalcChain.bin";
+        let header = bytes
+            .windows(4)
+            .enumerate()
+            .find_map(|(offset, window)| {
+                (window == b"PK\x03\x04"
+                    && bytes.get(offset + 30..offset + 30 + member.len())
+                        == Some(member.as_slice()))
+                .then_some(offset)
+            })
+            .expect("target member local header");
+        let name_length = usize::from(u16::from_le_bytes([bytes[header + 26], bytes[header + 27]]));
+        let extra_length =
+            usize::from(u16::from_le_bytes([bytes[header + 28], bytes[header + 29]]));
+        bytes[header + 30 + name_length + extra_length] ^= 0xff;
+        let package = litchi_opc::OpcPackage::from_vec(bytes).expect("the deferred open admits it");
+        let relationship = package
+            .part_metadata(&chart_uri)
+            .expect("chart part")
+            .rels()
+            .get("rIdCalculationChainTest")
+            .expect("chart chain relationship")
+            .clone();
+
+        assert!(targets_calculation_chain(
+            &package,
+            &relationship,
+            &target_uri
+        ));
+        assert_eq!(package.deferred_decode_counters(), Some((0, 0)));
+        assert!(
+            package.get_part(&target_uri).is_err(),
+            "the target's payload fails to decode"
+        );
     }
 
     #[test]
