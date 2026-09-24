@@ -948,6 +948,17 @@ impl<W> ZipArchiveWriter<W> {
         state
     }
 
+    /// [`Self::take_reusable_deflate`] for an owned (authored) entry, which
+    /// compresses at the owned level through the staged protocol.
+    fn take_owned_deflate(&mut self) -> Box<ReusableDeflateState> {
+        let mut state = self
+            .reusable_deflate
+            .take()
+            .unwrap_or_else(|| Box::new(ReusableDeflateState::with_level(OWNED_DEFLATE_LEVEL)));
+        state.begin_owned_member();
+        state
+    }
+
     /// Returns a finished Deflate state to the archive for the next member.
     pub(crate) fn restore_reusable_deflate(&mut self, state: Box<ReusableDeflateState>) {
         self.reusable_deflate = Some(state);
@@ -1913,9 +1924,11 @@ where
     /// constructing a self-referential wrapper around `ZipArchiveWriter`.
     ///
     /// The entry writer accepts uncompressed bytes through [`Write`]. `Store`
-    /// forwards those bytes directly and `Deflate` compresses them
-    /// incrementally. Other compression methods are rejected before the local
-    /// header is emitted.
+    /// forwards those bytes directly and `Deflate` compresses them in fixed
+    /// 16 KiB chunks cut at absolute member offsets (see
+    /// [`ZipOwnedEntryWriter`]), so the member's compressed bytes do not
+    /// depend on the caller's write sizes. Other compression methods are
+    /// rejected before the local header is emitted.
     pub fn start_file_owned(
         self,
         name: &str,
@@ -2028,7 +2041,7 @@ where
         }
 
         let reusable_deflate = if options.compression_method == CompressionMethod::Deflate {
-            Some(self.take_reusable_deflate())
+            Some(self.take_owned_deflate())
         } else {
             None
         };
@@ -2461,6 +2474,37 @@ impl<W> OwnedCompressedEntry<W> {
 /// fresh vector allocation for every member.
 const REUSABLE_DEFLATE_OUTPUT_BUFFER_SIZE: usize = 32 * 1024;
 
+/// The zlib level of every borrowed Deflate member: flate2's default, the
+/// level [`DeflateEncoder`] and the preservation writer use.
+const DEFAULT_DEFLATE_LEVEL: u32 = 6;
+
+/// Uncompressed bytes an owned Deflate entry hands the codec per call.
+///
+/// This is a frozen format constant of the authored (owned-entry) path, fixed
+/// by change 0762. An owned Deflate member is cut into chunks at the absolute
+/// member offsets `k * OWNED_DEFLATE_STAGE_BYTES`; the codec receives each
+/// chunk only once it is complete (or when the caller flushes or finishes the
+/// entry), always with an empty output buffer, and the entry finishes with a
+/// single `Finish` and no sync flush. The raw Deflate stream zlib-rs emits
+/// depends on how its input is split into calls, so this is what makes an
+/// owned member's bytes a pure function of the member's bytes (and of the
+/// offsets of explicit [`Write::flush`] calls), independent of how the caller
+/// split its writes. Changing the value changes every authored package's
+/// bytes; it must not change without a new change record.
+pub(crate) const OWNED_DEFLATE_STAGE_BYTES: usize = 16 * 1024;
+
+/// The zlib level of owned (authored) Deflate members.
+///
+/// Level 5 runs zlib-rs's `deflate_medium` like level 6 but ends its match
+/// search at a chain of 32 and a match of 32 bytes instead of 128 and 128.
+/// Change 0762 measured it against level 6 under the staged protocol: on the
+/// streaming DOCX, XLSX and PPTX corpora the archives are the same size to
+/// within 0.01% and the XLSX sheet compresses in about half the time; on
+/// every member of the workspace's real DOCX, XLSX and PPTX fixtures it is
+/// 0.21% to 0.23% larger and 7% to 22% faster. Borrowed members, including
+/// every member the preservation writer regenerates, keep level 6.
+const OWNED_DEFLATE_LEVEL: u32 = 5;
+
 /// Reusable state for one raw Deflate stream at a time.
 ///
 /// The state is held by its owner — the archive writer between successfully
@@ -2470,11 +2514,12 @@ const REUSABLE_DEFLATE_OUTPUT_BUFFER_SIZE: usize = 32 * 1024;
 /// unfinished entry drops the compressor instead of returning a partially
 /// finished stream to its owner.
 ///
-/// Reuse is byte-transparent: [`Compress::reset`] restores the same level,
-/// strategy and window the constructor selects, and the pending-output
-/// boundaries below reproduce flate2's `zio::Writer` call sequence exactly, so
-/// a reused stream emits the same bytes a fresh [`DeflateEncoder`] would.
-#[derive(Debug)]
+/// Reuse is byte-transparent: [`Compress::reset`] restores the strategy and
+/// window the constructor selects and [`Self::begin_member`] restores the
+/// default level, and the pending-output boundaries below reproduce flate2's
+/// `zio::Writer` call sequence exactly, so a reused borrowed stream emits the
+/// same bytes a fresh [`DeflateEncoder`] would. Owned (authored) members use
+/// the staged protocol of [`OWNED_DEFLATE_STAGE_BYTES`] instead.
 pub(crate) struct ReusableDeflateState {
     compressor: Compress,
     // Heap-resident so the struct itself stays a few words wide: it is moved
@@ -2489,32 +2534,119 @@ pub(crate) struct ReusableDeflateState {
     /// one finishes, so a save with a single Deflate member pays exactly the
     /// one construction it paid before this state existed and no reset at all.
     used: bool,
+    /// The level `compressor` currently runs at.
+    level: u32,
+    /// The owned member's current input chunk: the bytes at member offsets
+    /// `[k * OWNED_DEFLATE_STAGE_BYTES, k * OWNED_DEFLATE_STAGE_BYTES +
+    /// stage.len())`. Allocated once, on an owned entry's first write, and
+    /// reused by every later member; borrowed members never touch it.
+    stage: Vec<u8>,
+    /// Leading bytes of `stage` the codec has already consumed. Only an
+    /// explicit flush or a retried interrupted call leaves this between zero
+    /// and `stage.len()`.
+    stage_consumed: usize,
+}
+
+impl std::fmt::Debug for ReusableDeflateState {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Staged and pending bytes are member payload; only their counts are
+        // diagnostic.
+        formatter
+            .debug_struct("ReusableDeflateState")
+            .field("level", &self.level)
+            .field("used", &self.used)
+            .field(
+                "pending_bytes",
+                &self.pending_end.saturating_sub(self.pending_start),
+            )
+            .field("staged_bytes", &self.stage.len())
+            .field("stage_consumed", &self.stage_consumed)
+            .finish_non_exhaustive()
+    }
+}
+
+/// One codec call into `output`, returning the status and the input bytes
+/// consumed and output bytes produced, both checked against the buffers.
+fn run_codec(
+    compressor: &mut Compress,
+    output: &mut [u8],
+    input: &[u8],
+    flush: FlushCompress,
+) -> io::Result<(Status, usize, usize)> {
+    let before_in = compressor.total_in();
+    let before_out = compressor.total_out();
+    let status = compressor
+        .compress(input, output, flush)
+        .map_err(|_| reusable_deflate_error())?;
+    let consumed = compressor
+        .total_in()
+        .checked_sub(before_in)
+        .and_then(|value| usize::try_from(value).ok())
+        .ok_or_else(reusable_deflate_progress_error)?;
+    let produced = compressor
+        .total_out()
+        .checked_sub(before_out)
+        .and_then(|value| usize::try_from(value).ok())
+        .ok_or_else(reusable_deflate_progress_error)?;
+    if consumed > input.len() || produced > output.len() {
+        return Err(reusable_deflate_progress_error());
+    }
+    Ok((status, consumed, produced))
 }
 
 impl ReusableDeflateState {
     pub(crate) fn new() -> Self {
+        Self::with_level(DEFAULT_DEFLATE_LEVEL)
+    }
+
+    fn with_level(level: u32) -> Self {
         Self {
-            compressor: Compress::new(Compression::default(), false),
+            compressor: Compress::new(Compression::new(level), false),
             output: vec![0; REUSABLE_DEFLATE_OUTPUT_BUFFER_SIZE].into_boxed_slice(),
             pending_start: 0,
             pending_end: 0,
             used: false,
+            level,
+            stage: Vec::new(),
+            stage_consumed: 0,
         }
     }
 
-    /// Readies the state for one member, resetting the compressor only when a
-    /// previous member left a stream in it.
+    /// Readies the state for one borrowed member at the default level,
+    /// resetting the compressor only when a previous member left a stream in
+    /// it.
     ///
-    /// `Compress::reset` restores the level, strategy and window the
-    /// constructor selected, so the member that follows emits exactly the
-    /// bytes a freshly constructed encoder would.
+    /// `Compress::reset` restores the strategy and window the constructor
+    /// selected and keeps the level, which this restores to the default if an
+    /// owned member changed it, so the member that follows emits exactly the
+    /// bytes a freshly constructed default encoder would.
     pub(crate) fn begin_member(&mut self) {
+        self.begin_member_at(DEFAULT_DEFLATE_LEVEL);
+    }
+
+    /// Readies the state for one owned (authored) member.
+    fn begin_owned_member(&mut self) {
+        self.begin_member_at(OWNED_DEFLATE_LEVEL);
+    }
+
+    fn begin_member_at(&mut self, level: u32) {
         if self.used {
             self.compressor.reset();
             self.pending_start = 0;
             self.pending_end = 0;
+            // After `reset` the stream has seen no input, so zlib-rs changes
+            // only the matcher parameters and flushes nothing. Should it ever
+            // refuse, a fresh codec at `level` is the same state.
+            if self.level != level && self.compressor.set_level(Compression::new(level)).is_err() {
+                self.compressor = Compress::new(Compression::new(level), false);
+            }
+        } else if self.level != level {
+            self.compressor = Compress::new(Compression::new(level), false);
         }
+        self.level = level;
         self.used = true;
+        self.stage.clear();
+        self.stage_consumed = 0;
     }
 
     fn compress_once(
@@ -2522,28 +2654,12 @@ impl ReusableDeflateState {
         input: &[u8],
         flush: FlushCompress,
     ) -> io::Result<(Status, usize, usize)> {
-        let before_in = self.compressor.total_in();
-        let before_out = self.compressor.total_out();
-        let status = self
-            .compressor
-            .compress(input, &mut self.output[self.pending_end..], flush)
-            .map_err(|_| reusable_deflate_error())?;
-        let consumed = self
-            .compressor
-            .total_in()
-            .checked_sub(before_in)
-            .and_then(|value| usize::try_from(value).ok())
-            .ok_or_else(reusable_deflate_progress_error)?;
-        let produced = self
-            .compressor
-            .total_out()
-            .checked_sub(before_out)
-            .and_then(|value| usize::try_from(value).ok())
-            .ok_or_else(reusable_deflate_progress_error)?;
-        let available = self.output.len() - self.pending_end;
-        if consumed > input.len() || produced > available {
-            return Err(reusable_deflate_progress_error());
-        }
+        let (status, consumed, produced) = run_codec(
+            &mut self.compressor,
+            &mut self.output[self.pending_end..],
+            input,
+            flush,
+        )?;
         self.pending_end += produced;
         Ok((status, consumed, produced))
     }
@@ -2653,6 +2769,106 @@ impl ReusableDeflateState {
             }
         }
     }
+
+    /// Accepts the next bytes of an owned member into its current input
+    /// chunk.
+    ///
+    /// A chunk completed by an earlier call is handed to the codec first.
+    /// The call then copies `input` up to the next chunk boundary, at most,
+    /// and returns how many bytes it accepted. The codec never sees a partial
+    /// chunk here, so its calls do not depend on how the caller split its
+    /// writes. An error always means that this call accepted nothing: a
+    /// refused chunk stays staged, and a retry resumes it where the codec
+    /// stopped.
+    pub(crate) fn write_owned<W: Write + ?Sized>(
+        &mut self,
+        entry: &mut W,
+        input: &[u8],
+    ) -> io::Result<usize> {
+        if input.is_empty() {
+            return Ok(0);
+        }
+        if self.stage.len() == OWNED_DEFLATE_STAGE_BYTES {
+            self.compress_stage(entry)?;
+        }
+        if self.stage.capacity() < OWNED_DEFLATE_STAGE_BYTES {
+            // The chunk boundaries are part of the output, so a stage that
+            // cannot be allocated fails the write rather than falling back to
+            // an unstaged stream.
+            let additional = OWNED_DEFLATE_STAGE_BYTES - self.stage.len();
+            self.stage
+                .try_reserve_exact(additional)
+                .map_err(|_| owned_deflate_stage_allocation_error())?;
+        }
+        let room = OWNED_DEFLATE_STAGE_BYTES - self.stage.len();
+        let accepted = room.min(input.len());
+        self.stage.extend_from_slice(&input[..accepted]);
+        Ok(accepted)
+    }
+
+    /// Hands every staged byte the codec has not consumed yet to the codec,
+    /// draining the output buffer completely before each call and after the
+    /// last one, and empties the stage once it holds a complete chunk.
+    ///
+    /// Each codec call therefore sees the rest of the current chunk and the
+    /// whole output buffer; neither the sink's short writes nor a retried
+    /// interruption change the sequence of codec calls. Draining after the
+    /// last call sends a chunk's output to the sink in the same call that
+    /// compressed it.
+    fn compress_stage<W: Write + ?Sized>(&mut self, entry: &mut W) -> io::Result<()> {
+        while self.stage_consumed < self.stage.len() {
+            self.drain_pending(entry)?;
+            let input = self
+                .stage
+                .get(self.stage_consumed..)
+                .ok_or_else(reusable_deflate_progress_error)?;
+            let (_, consumed, produced) = run_codec(
+                &mut self.compressor,
+                &mut self.output[self.pending_end..],
+                input,
+                FlushCompress::None,
+            )?;
+            if consumed == 0 && produced == 0 {
+                return Err(reusable_deflate_progress_error());
+            }
+            self.pending_end += produced;
+            self.stage_consumed += consumed;
+        }
+        self.drain_pending(entry)?;
+        if self.stage.len() == OWNED_DEFLATE_STAGE_BYTES {
+            self.stage.clear();
+            self.stage_consumed = 0;
+        }
+        Ok(())
+    }
+
+    /// An owned member's explicit [`Write::flush`]: the staged bytes go to
+    /// the codec and their output to the sink, followed by the same sync
+    /// flush and sink flush a borrowed member performs, with the whole output
+    /// buffer free. The chunk boundaries after it stay at their absolute
+    /// offsets.
+    pub(crate) fn flush_owned<W: Write + ?Sized>(&mut self, entry: &mut W) -> io::Result<()> {
+        self.compress_stage(entry)?;
+        self.flush_to(entry)
+    }
+
+    /// Ends an owned member: the staged bytes go to the codec and the output
+    /// so far to the sink, the sink is flushed, and the final block follows.
+    /// Unlike [`Self::flush_to`] followed by [`Self::finish_to`], no sync
+    /// flush precedes the final block, which saves its empty stored block and
+    /// the block boundary it forces.
+    pub(crate) fn finish_owned<W: Write + ?Sized>(&mut self, entry: &mut W) -> io::Result<()> {
+        self.compress_stage(entry)?;
+        entry.flush()?;
+        self.finish_to(entry)
+    }
+}
+
+fn owned_deflate_stage_allocation_error() -> io::Error {
+    io::Error::new(
+        io::ErrorKind::OutOfMemory,
+        "owned Deflate input stage could not be allocated",
+    )
 }
 
 fn reusable_deflate_error() -> io::Error {
@@ -2768,14 +2984,23 @@ impl<W: Write> OwnedCompressor<W> {
         }
     }
 
+    /// Flushes the sink, ends the payload and publishes the entry's
+    /// descriptor and central record.
+    ///
+    /// A Store entry flushes its sink exactly as its `flush` does. A Deflate
+    /// entry ends its staged stream with [`ReusableDeflateState::finish_owned`],
+    /// which flushes the sink before the final block and never sync-flushes.
     fn finish(self, output: DataDescriptorOutput) -> Result<ZipArchiveWriter<W>, Error>
     where
         W: Write,
     {
         match self {
-            Self::Store(entry) => entry.finish(output),
+            Self::Store(mut entry) => {
+                entry.flush()?;
+                entry.finish(output)
+            },
             Self::Deflate(mut compressor) => {
-                compressor.state.finish_to(&mut compressor.entry)?;
+                compressor.state.finish_owned(&mut compressor.entry)?;
                 let mut archive = compressor.entry.finish(output)?;
                 archive.restore_reusable_deflate(compressor.state);
                 Ok(archive)
@@ -2789,7 +3014,7 @@ impl<W: Write> Write for OwnedCompressor<W> {
         match self {
             Self::Store(entry) => entry.write(buffer),
             Self::Deflate(compressor) => {
-                let result = compressor.state.write_to(&mut compressor.entry, buffer);
+                let result = compressor.state.write_owned(&mut compressor.entry, buffer);
                 if let Err(error) = &result {
                     if !io_error_is_interrupted(error) {
                         compressor.entry.archive.poison_directory_spool();
@@ -2804,7 +3029,7 @@ impl<W: Write> Write for OwnedCompressor<W> {
         match self {
             Self::Store(entry) => entry.flush(),
             Self::Deflate(compressor) => {
-                let result = compressor.state.flush_to(&mut compressor.entry);
+                let result = compressor.state.flush_owned(&mut compressor.entry);
                 if let Err(error) = &result {
                     if !io_error_is_interrupted(error) {
                         compressor.entry.archive.poison_directory_spool();
@@ -2961,10 +3186,16 @@ impl<W: Write> Write for OwnedCompressedEntry<W> {
 /// A consuming ZIP entry writer that owns its parent archive.
 ///
 /// The entry implements [`Write`] for uncompressed payload bytes. Store data
-/// is forwarded directly; Deflate data is compressed incrementally with a
-/// bounded working buffer. Calling [`Self::finish`] consumes the entry and
-/// returns the archive writer so another entry can be started without a
-/// borrow tied to the original archive value.
+/// is forwarded directly. Deflate data is batched: the entry cuts the member
+/// into 16 KiB chunks at absolute member offsets and hands the codec one
+/// complete chunk at a time, so the compressed bytes depend only on the
+/// member's bytes and on where [`Write::flush`] was called, never on how the
+/// caller split its writes. A write accepts at most up to the next chunk
+/// boundary, and compressed output (and any sink failure or compressed-limit
+/// refusal it meets) follows the input by up to one chunk; the output never
+/// exceeds a limit. Calling [`Self::finish`] consumes the entry and returns
+/// the archive writer so another entry can be started without a borrow tied
+/// to the original archive value.
 #[derive(Debug)]
 pub struct ZipOwnedEntryWriter<W: Write> {
     inner: Option<ZipDataWriter<OwnedCompressor<W>>>,
@@ -2991,6 +3222,10 @@ impl<W: Write> ZipOwnedEntryWriter<W> {
     }
 
     /// Number of compressed payload bytes accepted by this entry.
+    ///
+    /// A Deflate entry compresses its input a chunk at a time, so this count
+    /// trails [`Self::uncompressed_bytes`] by up to one chunk in addition to
+    /// the codec's own buffering.
     #[must_use]
     pub fn compressed_bytes(&self) -> u64 {
         self.inner
@@ -3000,6 +3235,9 @@ impl<W: Write> ZipOwnedEntryWriter<W> {
     }
 
     /// Finishes the entry and recovers the parent archive writer.
+    ///
+    /// The sink is flushed once, as by [`Write::flush`]; a Deflate entry then
+    /// ends its stream with one final block and no sync flush before it.
     pub fn finish(mut self) -> Result<ZipArchiveWriter<W>, Error>
     where
         W: Write,
@@ -3007,7 +3245,7 @@ impl<W: Write> ZipOwnedEntryWriter<W> {
         let inner = self.inner.take().ok_or_else(|| ErrorKind::InvalidInput {
             msg: "owned ZIP entry writer was already finished".to_string(),
         })?;
-        let (compressor, descriptor, crc_stage) = inner.finish_with_crc_stage()?;
+        let (compressor, descriptor, crc_stage) = inner.into_parts_with_crc_stage();
         let mut archive = compressor.finish(descriptor)?;
         archive.restore_reusable_crc_stage(crc_stage);
         Ok(archive)
@@ -3182,28 +3420,26 @@ impl<W> ZipDataWriter<W> {
     ///
     /// The `DataDescriptorOutput` contains the CRC32 checksum and uncompressed size,
     /// which is needed by `ZipEntryWriter::finish`.
-    pub fn finish(self) -> Result<(W, DataDescriptorOutput), Error>
-    where
-        W: Write,
-    {
-        self.finish_with_crc_stage()
-            .map(|(inner, output, _crc_stage)| (inner, output))
-    }
-
-    /// [`Self::finish`], also returning the emptied CRC-32 stage for reuse.
-    fn finish_with_crc_stage(mut self) -> Result<(W, DataDescriptorOutput, CrcStage), Error>
+    pub fn finish(mut self) -> Result<(W, DataDescriptorOutput), Error>
     where
         W: Write,
     {
         self.flush()?;
+        let (inner, output, _crc_stage) = self.into_parts_with_crc_stage();
+        Ok((inner, output))
+    }
+
+    /// Folds the staged CRC-32 and returns the inner writer, the descriptor
+    /// and the emptied stage, without flushing: an owned entry's compressor
+    /// flushes its sink itself as part of ending its stream.
+    fn into_parts_with_crc_stage(mut self) -> (W, DataDescriptorOutput, CrcStage) {
         self.crc_stage.fold_into(&mut self.crc);
         let output = DataDescriptorOutput {
             crc: self.crc,
             compressed_size: 0,
             uncompressed_size: self.uncompressed_bytes,
         };
-
-        Ok((self.inner, output, self.crc_stage))
+        (self.inner, output, self.crc_stage)
     }
 }
 

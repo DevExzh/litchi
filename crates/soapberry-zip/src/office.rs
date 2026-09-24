@@ -6672,6 +6672,14 @@ pub struct StreamingArchiveWriter<W: Write> {
 /// into a parent archive. [`Write`] accepts uncompressed bytes for either
 /// Store or Deflate output. [`Self::finish`] consumes the entry and recovers a
 /// [`StreamingArchiveWriter`] for the next member.
+///
+/// Deflate output is batched as described on
+/// [`crate::ZipOwnedEntryWriter`]: the member's compressed bytes depend on its
+/// bytes and explicit flushes, not on the caller's write sizes. The
+/// uncompressed entry and total size limits are checked on every write,
+/// exactly; a compressed-size or output limit is enforced before any byte
+/// reaches the sink, but its refusal, like a sink failure, can surface up to
+/// one 16 KiB chunk of input later than the write that caused it.
 pub struct StreamingArchiveEntry<W: Write> {
     entry: Option<crate::ZipOwnedEntryWriter<BoundedOutput<W>>>,
     limits: StreamingArchiveLimits,
