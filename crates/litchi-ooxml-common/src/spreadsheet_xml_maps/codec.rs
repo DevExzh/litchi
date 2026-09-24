@@ -10,6 +10,7 @@ use super::model::{
 };
 use super::validation::{validate_xml_map_info_ref_with_limits, validate_xml_map_info_with_limits};
 use crate::Result;
+use crate::xml::attributes::first_wins;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -819,9 +820,11 @@ fn add_inherited_bindings(
     mut e: BytesStart<'static>,
     bindings: &[(String, String)],
 ) -> BytesStart<'static> {
-    let declared: HashSet<Vec<u8>> = e
-        .attributes()
-        .with_checks(true)
+    // The tag's own declarations decide which inherited bindings to append;
+    // its bytes, duplicate attributes included, are kept as read. Each name
+    // counts at its first well-formed occurrence, at O(n log n) cost however
+    // often the tag repeats it.
+    let declared: HashSet<Vec<u8>> = first_wins(&e)
         .filter_map(std::result::Result::ok)
         .filter(|a| a.key.as_ref() == b"xmlns" || a.key.as_ref().starts_with(b"xmlns:"))
         .map(|a| a.key.as_ref().to_vec())

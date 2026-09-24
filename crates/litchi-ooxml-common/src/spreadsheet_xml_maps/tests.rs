@@ -347,3 +347,82 @@ fn borrowed_projection_serializes_and_patches_without_payload_clones() {
     .unwrap();
     assert_eq!(borrowed_patch, owned_patch);
 }
+
+/// The payload read back from the fixture's part with its schema payload
+/// replaced by `payload`.
+fn parsed_payload(payload: &str) -> Vec<u8> {
+    let value = fixture();
+    let xml =
+        String::from_utf8(serialize_xml_map_info(&value, XmlMapConformance::Transitional).unwrap())
+            .unwrap();
+    let original = std::str::from_utf8(value.schemas[0].payload_xml.as_deref().unwrap()).unwrap();
+    assert_eq!(xml.matches(original).count(), 1);
+    let xml = xml.replace(original, payload);
+    parse_xml_map_info(xml.as_bytes()).unwrap().schemas[0]
+        .payload_xml
+        .clone()
+        .unwrap()
+}
+
+#[test]
+fn opaque_payload_roots_keep_their_bytes_and_gain_only_undeclared_bindings() {
+    // `MapInfo` declares the default namespace, which each payload inherits.
+    let inherited = format!(r#" xmlns="{NS_TEXT}""#);
+    for (payload, expected) in [
+        (
+            r#"<x:schema xmlns:x="urn:test"/>"#.to_owned(),
+            format!(r#"<x:schema xmlns:x="urn:test"{inherited}/>"#),
+        ),
+        // Repeated attributes are kept as written.
+        (
+            r#"<x:schema xmlns:x="urn:test" a="1" a="2"/>"#.to_owned(),
+            format!(r#"<x:schema xmlns:x="urn:test" a="1" a="2"{inherited}/>"#),
+        ),
+        (
+            r#"<x:schema xmlns:x="urn:test" a="1" a="2"><x:child/></x:schema>"#.to_owned(),
+            format!(r#"<x:schema xmlns:x="urn:test" a="1" a="2"{inherited}><x:child/></x:schema>"#),
+        ),
+        // A repeated declaration still declares its name.
+        (
+            r#"<x:schema xmlns:x="urn:test" xmlns="urn:first" xmlns="urn:second"/>"#.to_owned(),
+            r#"<x:schema xmlns:x="urn:test" xmlns="urn:first" xmlns="urn:second"/>"#.to_owned(),
+        ),
+    ] {
+        assert_eq!(
+            String::from_utf8(parsed_payload(&payload)).unwrap(),
+            expected,
+            "{payload}"
+        );
+    }
+}
+
+#[test]
+fn a_declaration_inside_a_repeated_attribute_value_no_longer_hides_a_binding() {
+    // quick-xml resumed inside the repeated `a`'s value, read an `xmlns`
+    // there, and the inherited default namespace was not appended. The tag
+    // declares no default namespace, so it is appended now.
+    let payload = r#"<x:schema xmlns:x="urn:test" a="1" a="v xmlns='urn:phantom'"/>"#;
+    assert_eq!(
+        String::from_utf8(parsed_payload(payload)).unwrap(),
+        format!(
+            r#"<x:schema xmlns:x="urn:test" a="1" a="v xmlns='urn:phantom'" xmlns="{NS_TEXT}"/>"#
+        )
+    );
+}
+
+#[test]
+fn opaque_payload_roots_of_many_repeated_names_keep_their_bytes() {
+    // 20,000 names and 20,000 repeats of the last.
+    let mut attributes = String::new();
+    for index in 0..20_000 {
+        attributes.push_str(&format!(" n{index:05}=\"\""));
+    }
+    for _ in 0..20_000 {
+        attributes.push_str(" n19999=\"\"");
+    }
+    let payload = format!(r#"<x:schema xmlns:x="urn:test"{attributes}/>"#);
+    assert_eq!(
+        String::from_utf8(parsed_payload(&payload)).unwrap(),
+        format!(r#"<x:schema xmlns:x="urn:test"{attributes} xmlns="{NS_TEXT}"/>"#)
+    );
+}
