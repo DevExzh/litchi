@@ -1432,6 +1432,20 @@ impl OpcPackage {
         if !replacement.member_present && !relationships.is_empty() {
             return Err(invalid("absent relationship member has edges"));
         }
+        if replacement.member_present {
+            // The token becomes the owner's retained `.rels` source, which the
+            // writer publishes without its audit (change 0665). Its bytes came
+            // from the caller, so audit them before any mutation (ADR 0006).
+            let member = replacement
+                .owner
+                .rels_uri()
+                .map_err(OpcError::InvalidPackUri)?;
+            super::verified_metadata_token(
+                &member,
+                Arc::clone(&replacement.xml.bytes),
+                limits.max_relationship_xml_bytes(),
+            )?;
+        }
         let binding = RelationshipBinding::from_relationships(&relationships)?;
         self.source_relationships_xml
             .try_reserve(1)

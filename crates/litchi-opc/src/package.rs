@@ -820,6 +820,14 @@ impl OpcPackage {
                 "content-types replacement binding does not match its XML".to_owned(),
             ));
         }
+        // The token becomes the retained manifest, which the writer publishes
+        // without its audit (change 0665). Its bytes came from the caller, so
+        // audit them before any mutation (ADR 0006).
+        verified_metadata_token(
+            &replacement.xml.name,
+            Arc::clone(&replacement.xml.bytes),
+            limits.max_content_types_bytes(),
+        )?;
         self.revoke_exact_source();
         self.source_content_types_xml = Some(Arc::clone(&replacement.xml.bytes));
         self.source_content_types = Some(Arc::clone(&replacement.binding));
@@ -1428,11 +1436,17 @@ impl OpcPackage {
         if self.requires_signature_edit_policy() {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
-        self.try_add_source_part(Box::new(crate::BlobPart::new_shared(
-            source.name,
-            source.content_type,
-            source.bytes,
-        )))
+        let mut part = crate::BlobPart::new_shared(source.name, source.content_type, source.bytes);
+        // The part is recorded as source provenance below, and provenance
+        // exempts a payload from the writer's publication audit (change
+        // 0665). Its bytes came from the caller, so audit them now, before
+        // any mutation, and hand the part the proof (change 0754).
+        if xml_minifier::audit::package::is_xml_part(part.partname().as_str(), part.content_type())
+        {
+            let verified = verified_source_payload(part.partname(), part.blob_arc())?;
+            part.set_blob_verified(verified);
+        }
+        self.try_add_source_part(Box::new(part))
     }
 
     /// Add a validated source-preserving XML part from its shared payload.
@@ -1768,6 +1782,30 @@ impl OpcPackage {
             let verified = verified_source_payload(part.partname(), part.blob_arc())?;
             part.set_blob_verified(verified);
             xml_count += 1;
+        }
+        // The two tokens become the retained manifest and the owner's `.rels`
+        // source, which the writer publishes without its audit as well, so
+        // caller bytes are audited here too. A token equal to what the package
+        // already retains is that source, not caller XML, and stays exempt.
+        if replacement_content_types.bytes() != current_content_types.bytes() {
+            verified_metadata_token(
+                &replacement_content_types.xml.name,
+                Arc::clone(&replacement_content_types.xml.bytes),
+                self.read_limits.max_content_types_bytes(),
+            )?;
+        }
+        if replacement_relationships.member_present()
+            && replacement_relationships.bytes() != current_relationships.bytes()
+        {
+            let member = replacement_relationships
+                .owner()
+                .rels_uri()
+                .map_err(OpcError::InvalidPackUri)?;
+            verified_metadata_token(
+                &member,
+                replacement_relationships.bytes_arc(),
+                self.read_limits.max_relationship_xml_bytes(),
+            )?;
         }
         self.source_xml_parts
             .try_reserve(xml_count)
@@ -2768,11 +2806,62 @@ fn verified_source_payload(
     name: &PackURI,
     bytes: Arc<Vec<u8>>,
 ) -> Result<xml_minifier::audit::VerifiedSource> {
-    xml_minifier::audit::VerifiedSource::verify(bytes, xml_minifier::audit::Limits::default())
-        .map_err(|source| OpcError::XmlPublication {
+    verified_source_payload_with_limits(name, bytes, xml_minifier::audit::Limits::default())
+}
+
+fn verified_source_payload_with_limits(
+    name: &PackURI,
+    bytes: Arc<Vec<u8>>,
+    limits: xml_minifier::audit::Limits,
+) -> Result<xml_minifier::audit::VerifiedSource> {
+    xml_minifier::audit::VerifiedSource::verify(bytes, limits).map_err(|source| {
+        OpcError::XmlPublication {
             part: name.to_string(),
             source,
+        }
+    })
+}
+
+/// Audit a `[Content_Types].xml` or `.rels` token the package is about to
+/// retain as its source, under limits that honour the read policy.
+///
+/// The limits are the writer's defaults, except that the input, token and
+/// character-data budgets grow to cover the token, up to `admitted` (the read
+/// policy's limit for that member) and the audit's hard ceilings. A caller
+/// that explicitly raised the manifest or relationships limit can then install
+/// the source-derived token it was allowed to read. Every structural check
+/// still runs, and a token larger than `admitted` gets the default budgets
+/// and is refused.
+fn verified_metadata_token(
+    name: &PackURI,
+    bytes: Arc<Vec<u8>>,
+    admitted: usize,
+) -> Result<xml_minifier::audit::VerifiedSource> {
+    use xml_minifier::audit::Limits;
+    let defaults = Limits::default();
+    let covered = if bytes.len() <= admitted {
+        bytes.len()
+    } else {
+        0
+    };
+    let grown = Limits::builder()
+        .bytes(defaults.max_bytes().max(covered.min(Limits::BYTE_CEILING)))
+        .and_then(|builder| {
+            builder.token_bytes(
+                defaults
+                    .max_token_bytes()
+                    .max(covered.min(Limits::TOKEN_BYTE_CEILING)),
+            )
         })
+        .and_then(|builder| {
+            builder.text_bytes(
+                defaults
+                    .max_text_bytes()
+                    .max(covered.min(Limits::TEXT_BYTE_CEILING)),
+            )
+        })
+        .map_or(defaults, |builder| builder.build());
+    verified_source_payload_with_limits(name, bytes, grown)
 }
 
 fn try_owned_string(value: &str) -> Option<String> {
