@@ -1,0 +1,23 @@
+Binaries measured by change 0763 (deleted after measurement; digests only).
+
+Build command, identical for both legs, run in each leg's source tree with its own CARGO_TARGET_DIR
+(before: detached worktree 0762-before-src at 6ec785c265, targets/0763-before;
+ after: branch worktree at 1ab98ca669, targets/0763), with the root Cargo.lock copied in (the same
+lock as change 0762's) and the harness's own tools/perf-baseline/Cargo.lock unchanged:
+  CARGO_BUILD_JOBS=6 CARGO_INCREMENTAL=0 cargo build --release --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline
+  CARGO_BUILD_JOBS=6 CARGO_INCREMENTAL=0 cargo build --release --locked --offline --manifest-path tools/perf-baseline/Cargo.toml --features allocator-metrics --bin litchi-perf-baseline-alloc
+rustc 1.95.0 (59807616e 2026-04-14); default release profile of the harness workspace; no RUSTFLAGS.
+Both legs' binaries were copied to paths of equal length before measuring:
+  scratch/0762/bin/b/ (before) and scratch/0762/bin/a/ (after).
+The before binary differs from change 0762's after binary (fbaed864...) although the Rust source is the
+same: it was built at a different path, and path strings are embedded in the binary.
+
+before  native  9429d50ab6ca174565c41e360bea4a66f1c02608995e95ff212e63316bb6c659  68,523,160 bytes
+after   native  4b2db3e73a03cbb0b91a8c83528b58e1a9a6296da738f2edd3dd49883dfedc77  68,522,816 bytes
+before  alloc   d34bc7547f550e93ec0ae1c2a00c15b80db57e3ee9e88942d0e62caba3eccce8  68,404,872 bytes
+after   alloc   65aae0e25bbe63e75aed5e3bd1176e59787a41f01b736db1e9ed1592f3ced9a9  68,406,536 bytes
+
+Probes (sources in probe/; built with `cargo build --release --offline` and the workspace lock):
+  lease_diff    built twice from the same source, with ROOT = each tree (Cargo.toml.template);
+                transcripts compared byte for byte (probe/lease-diff-summary.txt)
+  atomic_count  built against the candidate tree; probe/atomic-count.txt

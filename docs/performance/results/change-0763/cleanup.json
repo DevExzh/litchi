@@ -1,0 +1,51 @@
+{
+  "records": ["0762", "0763"],
+  "performed": "2026-09-24, after every cited artifact was copied into the two packets and the record and packet of 0763 were committed; the verification below is committed afterwards",
+  "removed_earlier": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0763",
+      "bytes_approx": "1.3 GB",
+      "what": "release native and allocation harness builds of candidate 1ab98ca669 (digests in binaries.txt), removed as soon as the binaries were copied and measured"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0763-before",
+      "bytes_approx": "1.3 GB",
+      "what": "release native and allocation harness builds of 6ec785c265 for the before leg (digests in binaries.txt)"
+    },
+    {
+      "note": "change 0762's own removals (its 221 GB first target directory, its before-leg and probe targets) are listed in results/change-0762/cleanup.json"
+    }
+  ],
+  "removed": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0762",
+      "bytes": 17312457491,
+      "what": "shared debug target directory of both records' gate runs after the disk incident (test, clippy, check and rustdoc builds without debug information)"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0762-diff-before",
+      "bytes": 466119443,
+      "what": "release build of lease_diff against the base tree"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/targets/0762-diff-after",
+      "bytes": 469426740,
+      "what": "release builds of lease_diff and atomic_count against the candidate tree"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/0762-before-src",
+      "bytes": 10267389317,
+      "what": "detached sparse worktree used as the before leg of both records (1d1044e3ac for 0762, 6ec785c265 for 0763); git worktree remove --force, then git worktree prune"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/scratch/0762/*",
+      "bytes": 304314723,
+      "what": "scratch: the measured binary copies (digests in binaries.txt), raw reports (kept here gzip-compressed), the probes' full outputs and transcripts (digests and summaries kept), probe sources (kept), draft files, build, gate and test logs (results in gates.txt), TMPDIR"
+    }
+  ],
+  "kept": [
+    "/home/zhuhe/code/litchi-worktrees/0762-streaming-compression-and-leases (worktree) and branch perf/0762-streaming-compression-and-leases"
+  ],
+  "not_created": "TMPDIR pointed into scratch/0762; no build, measurement or evidence artifact was written to /tmp or to the main checkout, apart from the session tool's own command-output capture and the git metadata of the detached worktree, which its removal prunes",
+  "verified_after_removal": "pending: filled in by the follow-up commit"
+}

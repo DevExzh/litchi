@@ -1,0 +1,21 @@
+# flat perf profile, whole process (includes untimed corpus build and reopen gates), xlsx_streaming_create large, 20 samples, CPU 12, binary bin/b (change 0763 before leg)
+    20.90%  [.] zlib_rs::deflate::algorithm::medium::deflate_medium                                                             -      -
+    19.47%  [.] zlib_rs::deflate::longest_match::longest_match                                                                  -      -
+    10.20%  [.] litchi_core::execution::ExecutionContext::consume                                                               -      -
+     3.27%  [.] litchi_xlsx::streaming::push_escaped                                                                            -      -
+     3.01%  [.] zlib_rs::deflate::flush_block_only                                                                              -      -
+     2.49%  [.] sha2::sha256::x86_sha::compress                                                                                 -      -
+     1.88%  [.] quick_xml::reader::ns_reader::NsReader<R>::process_event                                                        -      -
+     1.59%  [.] __memmove_avx512_unaligned_erms                                                                                 -      -
+     1.39%  [.] ryu::pretty::format64                                                                                           -      -
+     1.26%  [.] litchi_core::execution::ExecutionContext::reserve_scoped                                                        -      -
+     1.24%  [.] <core::fmt::Formatter>::pad_integral                                                                            -      -
+     1.21%  [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell               -      -
+     1.21%  [.] crc32fast::specialized::pclmulqdq::calculate                                                                    -      -
+     1.09%  [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::drive                    -      -
+     1.07%  [.] quick_xml::name::NamespaceResolver::resolve_event                                                               -      -
+     1.01%  [.] zlib_rs::deflate::compare256::avx2::compare256                                                                  -      -
+     0.93%  [.] 0x0000000000241c9b                                                                                              -      -
+     0.86%  [k] 0xffffffff9f124131                                                                                              -      -
+     0.82%  [.] zlib_rs::deflate::slide_hash::avx2::slide_hash_chain                                                            -      -
+     0.79%  [k] 0xffffffff9f4acb5c                                                                                              -      -

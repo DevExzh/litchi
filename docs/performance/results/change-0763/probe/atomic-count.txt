@@ -1,0 +1,9 @@
+docx large: 655360 calls; leased-resource counter changes (claims + final releases): objects 64, work 98, input 92 = 254
+docx large: output-byte reservations (one per sink write) 41; memory reserve+release 2; fixed new() charges 2
+docx large: budget atomics per iteration with leases = 299
+docx large: exact accounting made 1048576 Objects/Work/InputBytes charges (one atomic each) plus the same output and fixed ones = 1048621
+docx large: settled counters objects 262149 work 6422530 input 6029312
+xlsx large: 131072 rows; leased-resource counter changes: objects 161, work 10 = 171
+xlsx large: output-byte reservations 126; budget atomics with leases = 297 (+ fixed new(): 1 memory, 7 objects/work, and the memory release)
+xlsx large: exact accounting made 786432 row charges (1 row Work + 4 cell Work + 1 Objects per row) + 1 finish Objects
+xlsx large: settled counters objects 655367 work 655361
