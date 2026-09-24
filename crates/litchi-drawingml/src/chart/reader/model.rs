@@ -5,6 +5,7 @@
 //! without changing the public chart model.
 
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::{SeenNames, first_wins};
 use litchi_ooxml_common::xml::{is_drawingml_chart_name, is_drawingml_name};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -99,13 +100,14 @@ impl<R: BufRead> ChartXmlReader<R> {
         element: &BytesStart<'_>,
     ) -> BytesStart<'static> {
         let mut root = element.to_owned();
-        let existing_names: Vec<Vec<u8>> = root
-            .attributes()
-            .filter_map(std::result::Result::ok)
-            .map(|attribute| attribute.key.as_ref().to_vec())
-            .collect();
+        // The first occurrence of each name counts and later duplicates are
+        // skipped, at a cost of O(n log n) however the tag repeats its names.
+        let mut existing_names = SeenNames::new();
+        for attribute in first_wins(element).flatten() {
+            existing_names.insert(attribute.key.into_inner());
+        }
         for (name, value) in &self.root_namespace_attributes {
-            if !existing_names.iter().any(|existing| existing == name) {
+            if !existing_names.contains(&name.as_slice()) {
                 root.push_attribute((name.as_slice(), value.as_slice()));
             }
         }

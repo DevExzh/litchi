@@ -912,6 +912,7 @@ pub fn write_contextual_to<W: Write>(
 /// XML codec for [`SvgBlip`].
 pub mod codec {
     use super::*;
+    use litchi_ooxml_common::xml::attributes::SeenNames;
 
     /// Read one complete `svgBlip` element.
     pub fn read(xml: &[u8]) -> Result<SvgBlip> {
@@ -1662,7 +1663,7 @@ pub mod codec {
         empty: bool,
     ) -> Result<SvgBlip> {
         let decoder = reader.decoder();
-        let namespaces = declarations(element, decoder)?;
+        let namespaces = declarations(element, decoder, MAX_NAMESPACE_DECLARATIONS)?;
         if namespaces.len() > MAX_NAMESPACE_DECLARATIONS {
             return Err(limit(
                 "SVG blip namespace declarations",
@@ -1730,7 +1731,7 @@ pub mod codec {
         ) -> Result<Self> {
             Ok(Self {
                 context,
-                local: declarations(element, decoder)?,
+                local: declarations(element, decoder, MAX_NAMESPACE_DECLARATIONS)?,
             })
         }
 
@@ -1983,6 +1984,9 @@ pub mod codec {
         let mut nodes = 0usize;
         let mut root_seen = false;
         let mut root_closed = false;
+        // `ContextResolver::new` has capped the root's declarations; this walk
+        // has never capped a descendant's, so it reads them all.
+        let descendant_declarations = usize::MAX;
 
         loop {
             let start = position(&reader, origin, "SVG contextual child")?;
@@ -2002,7 +2006,7 @@ pub mod codec {
                         }
                         root_seen = true;
                     }
-                    let local = declarations(&element, reader.decoder())?;
+                    let local = declarations(&element, reader.decoder(), descendant_declarations)?;
                     scope.push(local)?;
                     if depth > 0 {
                         validate_contextual_element(&scope, &element)?;
@@ -2035,7 +2039,7 @@ pub mod codec {
                         }
                         root_seen = true;
                     }
-                    let local = declarations(&element, reader.decoder())?;
+                    let local = declarations(&element, reader.decoder(), descendant_declarations)?;
                     scope.push(local)?;
                     if depth > 0 {
                         validate_contextual_element(&scope, &element)?;
@@ -2441,14 +2445,18 @@ pub mod codec {
         Ok(Reference { embedded, linked })
     }
 
+    /// `element`'s namespace declarations, refused at a repeated prefix and
+    /// at the first declaration past `maximum`, before its value is read.
     fn declarations(
         element: &BytesStart<'_>,
         decoder: quick_xml::encoding::Decoder,
+        maximum: usize,
     ) -> Result<Vec<Namespace>> {
         let mut result = Vec::new();
+        let mut prefixes = SeenNames::new();
         for attribute in element.attributes() {
             let attribute = attribute.map_err(xml_error)?;
-            let raw = attribute.key.as_ref();
+            let raw = attribute.key.into_inner();
             let prefix = if raw == b"xmlns" {
                 None
             } else if let Some(prefix) = raw.strip_prefix(b"xmlns:") {
@@ -2456,10 +2464,10 @@ pub mod codec {
             } else {
                 continue;
             };
-            if result
-                .iter()
-                .any(|item: &Namespace| item.prefix() == prefix)
-            {
+            if result.len() >= maximum {
+                return Err(limit("SVG blip namespace declarations", maximum));
+            }
+            if !prefixes.insert(prefix) {
                 return Err(invalid("SVG blip has duplicate namespace declarations"));
             }
             attribute

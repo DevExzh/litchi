@@ -10,6 +10,7 @@ use crate::chart::types::{
     TickLabelPosition, TickMark,
 };
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::first_wins;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
@@ -417,9 +418,11 @@ pub(super) fn missing_attribute(description: &str) -> Error {
     Error::Invalid(format!("{description} is missing its value"))
 }
 
+/// The value of `e`'s first well-formed `name` attribute; later duplicates
+/// are skipped at a cost of `O(log n)` per attribute.
 #[inline]
 pub(super) fn get_attr(e: &BytesStart<'_>, name: &[u8]) -> Option<Vec<u8>> {
-    e.attributes()
+    first_wins(e)
         .filter_map(std::result::Result::ok)
         .find(|a| a.key.as_ref() == name)
         .map(|a| a.value.to_vec())
