@@ -1561,27 +1561,18 @@ impl Namespaces {
     /// The walk costs one comparison per declaration in scope, which an input
     /// controls; production lookups use [`Scope`], and this walk only checks
     /// it in debug builds.
-    fn walk(&self, prefix: &str, budget: usize, counted: bool) -> Option<Option<&str>> {
-        let mut steps = 0usize;
-        let result = self.walk_steps(prefix, budget, &mut steps);
-        if counted {
-            #[cfg(test)]
-            super::scope::counter::steps(steps);
-        }
-        result
-    }
-
-    fn walk_steps(&self, prefix: &str, budget: usize, steps: &mut usize) -> Option<Option<&str>> {
+    fn walk(&self, prefix: &str, budget: usize) -> Option<Option<&str>> {
         if prefix == "xml" {
             return Some(Some(XML_NS));
         }
+        let mut steps = 0usize;
         let mut layer = self.head.as_deref();
         while let Some(current) = layer {
             for (candidate, namespace) in current.local.iter().rev() {
-                if *steps == budget {
+                if steps == budget {
                     return None;
                 }
-                *steps += 1;
+                steps += 1;
                 if candidate == prefix {
                     return Some(Some(namespace));
                 }
@@ -1616,7 +1607,7 @@ impl Namespaces {
         for (prefix, namespace) in &local {
             let bound = scope.get_outside(prefix, depth);
             debug_assert!(
-                self.walk(prefix, CROSS_CHECKED_DECLARATIONS, false)
+                self.walk(prefix, CROSS_CHECKED_DECLARATIONS)
                     .is_none_or(|walked| walked == bound),
                 "the prefix index disagrees with the declaration chain for {prefix:?}"
             );
@@ -1648,23 +1639,13 @@ impl Namespaces {
     }
 }
 
-/// Namespace declarations a lookup walks, innermost first, before it asks
-/// [`Scope`]. It covers every declaration in scope in the repository's real
-/// documents, whose largest element declares 38.
-const WALKED_DECLARATIONS: usize = 64;
-
 /// Namespace declarations one element's lookup may walk before the debug
 /// cross-check of [`Scope`] against the declaration chain gives up.
 const CROSS_CHECKED_DECLARATIONS: usize = 256;
 
-/// Prefix resolution at the element being processed.
-///
-/// A prefix is first sought among the innermost [`WALKED_DECLARATIONS`]
-/// declarations of the element's chain, where an ordinary document binds it:
-/// a producer declares its namespaces on the root, a few dozen of them. Past
-/// that the answer comes from [`Scope`], in a logarithmic number of
-/// comparisons, so a lookup never costs more than a bounded walk however many
-/// declarations are in scope. Debug builds check that the two agree.
+/// Prefix resolution at the element being processed: [`Scope`] answers, and
+/// debug builds cross-check its answer against the element's declaration
+/// chain while that walk stays short.
 #[derive(Clone, Copy)]
 struct Resolver<'a> {
     scope: &'a Scope,
@@ -1673,17 +1654,10 @@ struct Resolver<'a> {
 
 impl<'a> Resolver<'a> {
     fn get(self, prefix: &str) -> Option<&'a str> {
-        if let Some(walked) = self.chain.walk(prefix, WALKED_DECLARATIONS, true) {
-            debug_assert!(
-                walked == self.scope.get(prefix),
-                "the prefix index disagrees with the declaration chain for {prefix:?}"
-            );
-            return walked;
-        }
         let bound = self.scope.get(prefix);
         debug_assert!(
             self.chain
-                .walk(prefix, CROSS_CHECKED_DECLARATIONS, false)
+                .walk(prefix, CROSS_CHECKED_DECLARATIONS)
                 .is_none_or(|walked| walked == bound),
             "the prefix index disagrees with the declaration chain for {prefix:?}"
         );
@@ -1700,9 +1674,9 @@ const fn resolver<'a>(scope: &'a Scope, chain: &'a Namespaces) -> Resolver<'a> {
 struct DirectiveLayer {
     parent: Option<Arc<DirectiveLayer>>,
     ignorable: HashSet<String>,
-    process: Patterns,
-    preserve_elements: Patterns,
-    preserve_attributes: Patterns,
+    process: Patterns<String>,
+    preserve_elements: Patterns<String>,
+    preserve_attributes: Patterns<String>,
 }
 
 #[derive(Clone)]
@@ -1734,10 +1708,10 @@ impl Context {
         false
     }
 
-    fn matches(&self, name: &Name, select: impl Fn(&DirectiveLayer) -> &Patterns) -> bool {
+    fn matches(&self, name: &Name, select: impl Fn(&DirectiveLayer) -> &Patterns<String>) -> bool {
         let mut layer = self.directives.as_deref();
         while let Some(current) = layer {
-            if select(current).matches(name) {
+            if select(current).matches(name.namespace.as_str(), &name.local_name) {
                 return true;
             }
             if current.ignorable.contains(&name.namespace) {
@@ -1839,7 +1813,7 @@ impl<'a> Processor<'a> {
             raw_state_valid: false,
             finished: false,
             report: StreamReport::default(),
-            scope: Scope::default(),
+            scope: Scope::new(capabilities),
         }
     }
 
@@ -2757,7 +2731,7 @@ impl<'a> Processor<'a> {
         if declares && let Some(layer) = namespace.head.as_ref() {
             // Removed when the element's raw frame closes, or at once for an
             // empty element.
-            self.scope.push(depth, &layer.local)?;
+            self.scope.push(depth, &layer.local, self.capabilities)?;
         }
         let names = resolver(&self.scope, &namespace);
         let expanded_name = expand(qualified, names, true, self.limits)?;
@@ -3356,7 +3330,7 @@ fn parse_target(
     namespaces: Resolver<'_>,
     wildcard: bool,
     limits: &StreamLimits,
-) -> Result<NamePattern, Error> {
+) -> Result<NamePattern<String>, Error> {
     check_name_bytes(token.as_bytes(), limits)?;
     let (prefix, local) = token
         .split_once(':')
@@ -3382,10 +3356,10 @@ fn parse_target(
     if !xml_name::is_ncname(local) {
         return Err(bad("invalid compatibility target QName"));
     }
-    Ok(NamePattern::Exact(Name {
+    Ok(NamePattern::Exact(
         namespace,
-        local_name: clone_bounded_name_part(local, limits, "MCE stream target local name")?,
-    }))
+        clone_bounded_name_part(local, limits, "MCE stream target local name")?,
+    ))
 }
 
 fn check_name_bytes(name: &[u8], limits: &StreamLimits) -> Result<(), Error> {

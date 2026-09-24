@@ -12,7 +12,7 @@ use super::model::{
     Output, Report, XML_NS,
 };
 use super::patterns::{NamePattern, Patterns};
-use super::scope::{Scope, has_duplicate_prefix, sorted_prefixes};
+use super::scope::{Scope, Uri, UriId, has_duplicate_prefix, sorted_prefixes};
 use crate::xml_name;
 
 type R<T> = Result<T, Error>;
@@ -312,11 +312,6 @@ struct NamespaceLayer {
     local: Vec<(String, String)>,
 }
 
-/// Namespace declarations a lookup walks, innermost first, before it asks
-/// [`Scope`]. It covers every declaration in scope in the repository's real
-/// documents, whose largest element declares 38.
-pub(super) const WALKED_DECLARATIONS: usize = 64;
-
 /// Namespace declarations one element's lookup may walk before the debug
 /// cross-check of [`Scope`] against the declaration chain gives up.
 const CROSS_CHECKED_DECLARATIONS: usize = 256;
@@ -328,27 +323,18 @@ impl Namespaces {
     /// The walk costs one comparison per declaration in scope, which an input
     /// controls; production lookups use [`Scope`], and this walk only checks
     /// it in debug builds.
-    fn walk(&self, prefix: &str, budget: usize, counted: bool) -> Option<Option<&str>> {
-        let mut steps = 0usize;
-        let result = self.walk_steps(prefix, budget, &mut steps);
-        if counted {
-            #[cfg(test)]
-            super::scope::counter::steps(steps);
-        }
-        result
-    }
-
-    fn walk_steps(&self, prefix: &str, budget: usize, steps: &mut usize) -> Option<Option<&str>> {
+    fn walk(&self, prefix: &str, budget: usize) -> Option<Option<&str>> {
         if prefix == "xml" {
             return Some(Some(XML_NS));
         }
+        let mut steps = 0usize;
         let mut layer = self.head.as_deref();
         while let Some(current) = layer {
             for (candidate, namespace) in current.local.iter().rev() {
-                if *steps == budget {
+                if steps == budget {
                     return None;
                 }
-                *steps += 1;
+                steps += 1;
                 if candidate == prefix {
                     return Some(Some(namespace));
                 }
@@ -382,7 +368,7 @@ impl Namespaces {
         for (prefix, _) in &local {
             let bound = scope.get_outside(prefix, depth);
             debug_assert!(
-                self.walk(prefix, CROSS_CHECKED_DECLARATIONS, false)
+                self.walk(prefix, CROSS_CHECKED_DECLARATIONS)
                     .is_none_or(|walked| walked == bound),
                 "the prefix index disagrees with the declaration chain for {prefix:?}"
             );
@@ -405,14 +391,9 @@ impl Namespaces {
     }
 }
 
-/// Prefix resolution at the element being processed.
-///
-/// A prefix is first sought among the innermost [`WALKED_DECLARATIONS`]
-/// declarations of the element's chain, where an ordinary document binds it:
-/// a producer declares its namespaces on the root, a few dozen of them. Past
-/// that the answer comes from [`Scope`], in a logarithmic number of
-/// comparisons, so a lookup never costs more than a bounded walk however many
-/// declarations are in scope. Debug builds check that the two agree.
+/// Prefix resolution at the element being processed: [`Scope`] answers, with
+/// the namespace's identity, and debug builds cross-check the URI against the
+/// element's declaration chain while that walk stays short.
 #[derive(Clone, Copy)]
 struct Resolver<'a> {
     scope: &'a Scope,
@@ -420,19 +401,13 @@ struct Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
-    fn get(self, prefix: &str) -> Option<&'a str> {
-        if let Some(walked) = self.chain.walk(prefix, WALKED_DECLARATIONS, true) {
-            debug_assert!(
-                walked == self.scope.get(prefix),
-                "the prefix index disagrees with the declaration chain for {prefix:?}"
-            );
-            return walked;
-        }
-        let bound = self.scope.get(prefix);
+    /// The namespace `prefix` is bound to, with its identity.
+    fn resolve(self, prefix: &str) -> Option<Uri<'a>> {
+        let bound = self.scope.resolve(prefix);
         debug_assert!(
             self.chain
-                .walk(prefix, CROSS_CHECKED_DECLARATIONS, false)
-                .is_none_or(|walked| walked == bound),
+                .walk(prefix, CROSS_CHECKED_DECLARATIONS)
+                .is_none_or(|walked| walked == bound.map(|uri| uri.text)),
             "the prefix index disagrees with the declaration chain for {prefix:?}"
         );
         bound
@@ -559,10 +534,10 @@ impl Inherited<'_> {
 
 struct DirectiveLayer {
     parent: Option<Arc<DirectiveLayer>>,
-    ignorable: HashSet<String>,
-    process: Patterns,
-    preserve_elements: Patterns,
-    preserve_attributes: Patterns,
+    ignorable: HashSet<UriId>,
+    process: Patterns<UriId>,
+    preserve_elements: Patterns<UriId>,
+    preserve_attributes: Patterns<UriId>,
 }
 
 #[derive(Clone)]
@@ -584,28 +559,32 @@ impl Ctx {
         }
     }
 
-    fn is_ignorable(&self, namespace: &str) -> bool {
+    fn is_ignorable(&self, namespace: UriId) -> bool {
         ignorable_in(&self.directives, namespace)
     }
 
-    fn processes(&self, name: &Name) -> bool {
-        pattern_directive_matches(&self.directives, name, |layer| &layer.process)
+    fn processes(&self, namespace: UriId, local: &str) -> bool {
+        pattern_directive_matches(&self.directives, namespace, local, |layer| &layer.process)
     }
 
-    fn preserves_element(&self, name: &Name) -> bool {
-        pattern_directive_matches(&self.directives, name, |layer| &layer.preserve_elements)
+    fn preserves_element(&self, namespace: UriId, local: &str) -> bool {
+        pattern_directive_matches(&self.directives, namespace, local, |layer| {
+            &layer.preserve_elements
+        })
     }
 
-    fn preserves_attribute(&self, name: &Name) -> bool {
-        pattern_directive_matches(&self.directives, name, |layer| &layer.preserve_attributes)
+    fn preserves_attribute(&self, namespace: UriId, local: &str) -> bool {
+        pattern_directive_matches(&self.directives, namespace, local, |layer| {
+            &layer.preserve_attributes
+        })
     }
 }
 
 /// Whether a directive layer from `head` outward makes `namespace` ignorable.
-fn ignorable_in(head: &Option<Arc<DirectiveLayer>>, namespace: &str) -> bool {
+fn ignorable_in(head: &Option<Arc<DirectiveLayer>>, namespace: UriId) -> bool {
     let mut layer = head.as_deref();
     while let Some(current) = layer {
-        if current.ignorable.contains(namespace) {
+        if current.ignorable.contains(&namespace) {
             return true;
         }
         layer = current.parent.as_deref();
@@ -615,15 +594,16 @@ fn ignorable_in(head: &Option<Arc<DirectiveLayer>>, namespace: &str) -> bool {
 
 fn pattern_directive_matches(
     head: &Option<Arc<DirectiveLayer>>,
-    name: &Name,
-    select: impl Fn(&DirectiveLayer) -> &Patterns,
+    namespace: UriId,
+    local: &str,
+    select: impl Fn(&DirectiveLayer) -> &Patterns<UriId>,
 ) -> bool {
     let mut layer = head.as_deref();
     while let Some(current) = layer {
-        if select(current).matches(name) {
+        if select(current).matches(&namespace, local) {
             return true;
         }
-        if current.ignorable.contains(&name.namespace) {
+        if current.ignorable.contains(&namespace) {
             return false;
         }
         layer = current.parent.as_deref();
@@ -782,7 +762,7 @@ pub fn process_markup_compatibility<'a>(
     let mut out = BoundedOutput::new(xml.len(), lim.max_output_bytes)?;
     let mut rep = Report::default();
     let mut root = false;
-    let mut scope = Scope::default();
+    let mut scope = Scope::new(caps);
     let mut buf = Vec::new();
     loop {
         let d = r.decoder();
@@ -931,7 +911,7 @@ fn start(
     if declares {
         c.ns = c.ns.with_local(local_namespaces, lim, scope, depth)?;
         if let Some(layer) = c.ns.head.as_ref() {
-            scope.push(depth, &layer.local)?;
+            scope.push(depth, &layer.local, caps)?;
         }
     }
     let (namespace, local) = expand_parts(q, resolver(scope, &c.ns), true)?;
@@ -953,7 +933,6 @@ fn start(
                     q,
                     &c,
                     &mut raw,
-                    caps,
                     false,
                     rep,
                     e.as_ref(),
@@ -981,7 +960,7 @@ fn start(
             continue;
         }
         let (namespace, local) = expand_parts(a.key, resolver(scope, &c.ns), false)?;
-        if namespace != NAMESPACE {
+        if !scope.is_mce(namespace.id) {
             continue;
         }
         if !matches!(
@@ -1005,26 +984,26 @@ fn start(
     }
 
     if !directives.is_empty() {
-        apply_directives(&c.ns, &mut c.directives, &directives, caps, scope)?;
+        apply_directives(&c.ns, &mut c.directives, &directives, scope)?;
     }
-    let mut name = (!caps.extensions.is_empty()).then(|| Name {
-        namespace: namespace.to_owned(),
-        local_name: local.to_owned(),
-    });
-    c.opaque = name
-        .as_ref()
-        .is_some_and(|name| caps.extensions.contains(name));
+    // Only a namespace an extension element lives in, a URI the caller chose,
+    // is compared with the extension names.
+    c.opaque = scope.has_extensions(namespace.id)
+        && caps.extensions.contains(&Name {
+            namespace: namespace.text.to_owned(),
+            local_name: local.to_owned(),
+        });
 
-    if namespace == NAMESPACE {
+    if scope.is_mce(namespace.id) {
         match local {
             "AlternateContent" => {
-                validate_alternate_attributes(&raw, &c, scope, caps, AlternateKind::Container)?;
+                validate_alternate_attributes(&raw, &c, scope, AlternateKind::Container)?;
             },
             "Choice" => {
-                validate_alternate_attributes(&raw, &c, scope, caps, AlternateKind::Choice)?;
+                validate_alternate_attributes(&raw, &c, scope, AlternateKind::Choice)?;
             },
             "Fallback" => {
-                validate_alternate_attributes(&raw, &c, scope, caps, AlternateKind::Fallback)?;
+                validate_alternate_attributes(&raw, &c, scope, AlternateKind::Fallback)?;
             },
             _ => {},
         }
@@ -1037,8 +1016,8 @@ fn start(
             fallback,
         } = &mut parent.mode
     {
-        if namespace != NAMESPACE {
-            if c.is_ignorable(namespace) && !caps.understands(namespace) {
+        if !scope.is_mce(namespace.id) {
+            if c.is_ignorable(namespace.id) && !scope.understood(namespace.id) {
                 rep.ignored_elements += 1;
                 Some((false, Mode::Skip))
             } else {
@@ -1063,10 +1042,11 @@ fn start(
                             return Err(bad("invalid Requires prefix"));
                         }
                         count += 1;
-                        ok &= caps.understands(
+                        ok &= scope.understood(
                             resolver(scope, &c.ns)
-                                .get(p)
-                                .ok_or_else(|| bad(format!("unbound Requires {p}")))?,
+                                .resolve(p)
+                                .ok_or_else(|| bad(format!("unbound Requires {p}")))?
+                                .id,
                         );
                     }
                     if count == 0 {
@@ -1115,7 +1095,7 @@ fn start(
         return close(st, frame, empty, out, scope);
     }
     let mut active = parent_active;
-    let mode = if namespace == NAMESPACE {
+    let mode = if scope.is_mce(namespace.id) {
         match local {
             "AlternateContent" => {
                 rep.alternate_content_count += 1;
@@ -1127,18 +1107,14 @@ fn start(
             },
             _ => return Err(bad("Choice/Fallback outside AlternateContent")),
         }
-    } else if c.is_ignorable(namespace) && !caps.understands(namespace) {
-        let element_name = name.get_or_insert_with(|| Name {
-            namespace: namespace.to_owned(),
-            local_name: local.to_owned(),
-        });
-        if c.preserves_element(element_name) {
+    } else if c.is_ignorable(namespace.id) && !scope.understood(namespace.id) {
+        if c.preserves_element(namespace.id, local) {
             rep.preserved_elements += 1;
             Mode::Emit(q.to_owned())
-        } else if c.processes(element_name) {
+        } else if c.processes(namespace.id, local) {
             for a in &raw {
                 let (namespace, local) = expand_parts(a.key, resolver(scope, &c.ns), false)?;
-                if namespace == XML_NS && matches!(local, "base" | "lang" | "space") {
+                if scope.is_xml(namespace.id) && matches!(local, "base" | "lang" | "space") {
                     return Err(bad("xml context attribute on unwrapped element"));
                 }
             }
@@ -1165,7 +1141,6 @@ fn start(
                 q,
                 &c,
                 &mut raw,
-                caps,
                 true,
                 rep,
                 e.as_ref(),
@@ -1202,10 +1177,9 @@ fn apply_directives(
     ns: &Namespaces,
     head: &mut Option<Arc<DirectiveLayer>>,
     directives: &[(&str, &str)],
-    caps: &Capabilities,
     scope: &Scope,
 ) -> R<()> {
-    let mut local_ign = HashSet::new();
+    let mut local_ign: HashSet<UriId> = HashSet::new();
     if let Some((_, value)) = directives.iter().find(|(name, _)| *name == "Ignorable") {
         let mut seen = HashSet::new();
         for prefix in value.split_whitespace() {
@@ -1213,9 +1187,9 @@ fn apply_directives(
                 return Err(bad("invalid or duplicate Ignorable prefix"));
             }
             let uri = resolver(scope, ns)
-                .get(prefix)
+                .resolve(prefix)
                 .ok_or_else(|| bad(format!("unbound Ignorable {prefix}")))?;
-            if uri == NAMESPACE {
+            if scope.is_mce(uri.id) {
                 return Err(bad("MCE cannot be ignorable"));
             }
             local_ign
@@ -1224,19 +1198,19 @@ fn apply_directives(
                     resource: "MCE Ignorable directives",
                     source,
                 })?;
-            local_ign.insert(uri.to_owned());
+            local_ign.insert(uri.id);
         }
     }
-    let mut new_ignorable = HashSet::new();
+    let mut new_ignorable: HashSet<UriId> = HashSet::new();
     for namespace in &local_ign {
-        if !ignorable_in(head, namespace) {
+        if !ignorable_in(head, *namespace) {
             new_ignorable
                 .try_reserve(1)
                 .map_err(|source| Error::Allocation {
                     resource: "MCE effective Ignorable directives",
                     source,
                 })?;
-            new_ignorable.insert(namespace.clone());
+            new_ignorable.insert(*namespace);
         }
     }
 
@@ -1249,8 +1223,8 @@ fn apply_directives(
             "ProcessContent" => {
                 for token in value.split_whitespace() {
                     let target = parse_qname_target(token, resolver(scope, ns), true)?;
-                    let namespace = target.namespace();
-                    if !local_ign.contains(namespace) && !ignorable_in(head, namespace) {
+                    let namespace = *target.namespace();
+                    if !local_ign.contains(&namespace) && !ignorable_in(head, namespace) {
                         return Err(bad("ProcessContent target is not effectively ignorable"));
                     }
                     if !local_process.insert(target, "MCE ProcessContent directives")? {
@@ -1289,10 +1263,10 @@ fn apply_directives(
                         return Err(bad("invalid or duplicate MustUnderstand prefix"));
                     }
                     let uri = resolver(scope, ns)
-                        .get(prefix)
+                        .resolve(prefix)
                         .ok_or_else(|| bad(format!("unbound MustUnderstand {prefix}")))?;
-                    if !caps.understands(uri) {
-                        return Err(Error::MustUnderstand(uri.to_owned()));
+                    if !scope.understood(uri.id) {
+                        return Err(Error::MustUnderstand(uri.text.to_owned()));
                     }
                 }
             },
@@ -1396,42 +1370,34 @@ fn validate_alternate_attributes(
     raw: &[Attr<'_>],
     ctx: &Ctx,
     scope: &Scope,
-    caps: &Capabilities,
     kind: AlternateKind,
 ) -> R<()> {
     for attribute in raw {
         if attribute.key == "xmlns" || attribute.key.starts_with("xmlns:") {
             continue;
         }
-        let name = expand(attribute.key, resolver(scope, &ctx.ns), false)?;
-        if name.namespace.is_empty() {
-            if matches!(kind, AlternateKind::Choice) && name.local_name == "Requires" {
+        let (namespace, local) = expand_parts(attribute.key, resolver(scope, &ctx.ns), false)?;
+        if namespace.text.is_empty() {
+            if matches!(kind, AlternateKind::Choice) && local == "Requires" {
                 continue;
             }
             return Err(bad("unexpected unprefixed AlternateContent attribute"));
         }
-        if name.namespace == XML_NS && matches!(name.local_name.as_str(), "lang" | "space") {
+        if scope.is_xml(namespace.id) && matches!(local, "lang" | "space") {
             return Err(bad(
                 "xml:lang and xml:space are forbidden on AlternateContent markup",
             ));
         }
-        if name.namespace == NAMESPACE || name.namespace == XML_NS {
+        if scope.is_mce(namespace.id) || scope.is_xml(namespace.id) {
             continue;
         }
-        if !caps.understands(&name.namespace) && !ctx.is_ignorable(&name.namespace) {
+        if !scope.understood(namespace.id) && !ctx.is_ignorable(namespace.id) {
             return Err(bad(
                 "AlternateContent attribute namespace is neither understood nor ignorable",
             ));
         }
     }
     Ok(())
-}
-fn expand(q: &str, ns: Resolver<'_>, element: bool) -> R<Name> {
-    let (namespace, local) = expand_parts(q, ns, element)?;
-    Ok(Name {
-        namespace: namespace.to_owned(),
-        local_name: local.into(),
-    })
 }
 
 /// Resolve one qualified name against the in-scope declarations without
@@ -1441,7 +1407,7 @@ fn expand(q: &str, ns: Resolver<'_>, element: bool) -> R<Name> {
 /// `xml_name::QualifiedName`, whose `parse` reports `InvalidQualifiedName` for
 /// every lexical failure and reconstructs the same `prefix:local` split; this
 /// borrows that split from the caller's bytes instead of allocating it.
-fn expand_parts<'q, 'n>(q: &'q str, ns: Resolver<'n>, element: bool) -> R<(&'n str, &'q str)> {
+fn expand_parts<'q, 'n>(q: &'q str, ns: Resolver<'n>, element: bool) -> R<(Uri<'n>, &'q str)> {
     if !xml_name::is_qualified_name(q) {
         let error = xml_name::NameError::InvalidQualifiedName(q.to_owned());
         return Err(bad(format!("invalid QName: {error}")));
@@ -1449,17 +1415,17 @@ fn expand_parts<'q, 'n>(q: &'q str, ns: Resolver<'n>, element: bool) -> R<(&'n s
     let (p, l) = q.split_once(':').unwrap_or(("", q));
     let n = if p.is_empty() {
         if element {
-            ns.get("").unwrap_or_default()
+            ns.resolve("").unwrap_or(Uri::NONE)
         } else {
-            ""
+            Uri::NONE
         }
     } else {
-        ns.get(p)
+        ns.resolve(p)
             .ok_or_else(|| bad(format!("unbound prefix {p}")))?
     };
     Ok((n, l))
 }
-fn parse_qname_target(token: &str, ns: Resolver<'_>, wildcard: bool) -> R<NamePattern> {
+fn parse_qname_target(token: &str, ns: Resolver<'_>, wildcard: bool) -> R<NamePattern<UriId>> {
     let (prefix, local) = token
         .split_once(':')
         .ok_or_else(|| bad("preservation and processing targets must be prefixed QNames"))?;
@@ -1467,10 +1433,10 @@ fn parse_qname_target(token: &str, ns: Resolver<'_>, wildcard: bool) -> R<NamePa
         return Err(bad("invalid compatibility target QName"));
     }
     let namespace = ns
-        .get(prefix)
-        .map(str::to_owned)
-        .ok_or_else(|| bad(format!("unbound compatibility target prefix {prefix}")))?;
-    if namespace == NAMESPACE {
+        .resolve(prefix)
+        .ok_or_else(|| bad(format!("unbound compatibility target prefix {prefix}")))?
+        .id;
+    if ns.scope.is_mce(namespace) {
         return Err(bad("compatibility target cannot use the MCE namespace"));
     }
     if local == "*" {
@@ -1481,10 +1447,7 @@ fn parse_qname_target(token: &str, ns: Resolver<'_>, wildcard: bool) -> R<NamePa
     if !xml_name::is_ncname(local) {
         return Err(bad("invalid compatibility target QName"));
     }
-    Ok(NamePattern::Exact(Name {
-        namespace,
-        local_name: local.into(),
-    }))
+    Ok(NamePattern::Exact(namespace, local.into()))
 }
 #[allow(
     clippy::too_many_arguments,
@@ -1495,7 +1458,6 @@ fn write_start(
     q: &str,
     ctx: &Ctx,
     raw: &mut [Attr<'_>],
-    caps: &Capabilities,
     filter: bool,
     rep: &mut Report,
     tag: &[u8],
@@ -1523,23 +1485,18 @@ fn write_start(
             continue;
         }
         let (namespace, local) = expand_parts(a.key, resolver(scope, &ctx.ns), false)?;
-        if filter && namespace == NAMESPACE {
+        if filter && scope.is_mce(namespace.id) {
             rep.ignored_attributes += 1;
             a.keep = false;
             rewrite = true;
             continue;
         }
         if filter
-            && !namespace.is_empty()
-            && ctx.is_ignorable(namespace)
-            && !caps.understands(namespace)
+            && !namespace.text.is_empty()
+            && ctx.is_ignorable(namespace.id)
+            && !scope.understood(namespace.id)
         {
-            // Only a preservation decision needs the owned expanded name.
-            let n = Name {
-                namespace: namespace.to_owned(),
-                local_name: local.into(),
-            };
-            if ctx.preserves_attribute(&n) {
+            if ctx.preserves_attribute(namespace.id, local) {
                 rep.preserved_attributes += 1;
             } else {
                 rep.ignored_attributes += 1;
