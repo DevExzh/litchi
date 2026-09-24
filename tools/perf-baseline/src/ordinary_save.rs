@@ -465,6 +465,11 @@ pub(crate) struct OrdinarySaveSummary {
     pub(crate) phase: &'static str,
     pub(crate) timing_scope: &'static str,
     pub(crate) atomic_publication_steps: &'static str,
+    /// The `--save-durability` level the timed saves used (change 0761).
+    /// Absent when the flag was not given: the documented `save` ran, which
+    /// is the `full` level.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) save_durability: Option<&'static str>,
     pub(crate) corpus: SaveEvidence,
     /// SHA-256 of every retained sample's published artifact, and whether all
     /// of them agree with the corpus's reference publication.
@@ -511,6 +516,28 @@ const ATOMIC_STEPS: &str = "litchi_opc::atomic::replace_with: destination permis
                             sibling temporary creation in the destination's own directory, the \
                             publication write, permission preservation, sync_all on the temporary, \
                             persist (rename) over the destination, parent-directory sync";
+
+const ATOMIC_STEPS_FILE_ONLY: &str = "litchi_opc::atomic::replace_with_durability(FileOnly): \
+                                      destination permission probe, sibling temporary creation \
+                                      in the destination's own directory, the publication write, \
+                                      permission preservation, sync_all on the temporary, persist \
+                                      (rename) over the destination; no parent-directory sync";
+
+const ATOMIC_STEPS_NO_SYNC: &str = "litchi_opc::atomic::replace_with_durability(NoSync): \
+                                    destination permission probe, sibling temporary creation in \
+                                    the destination's own directory, the publication write, \
+                                    permission preservation, persist (rename) over the \
+                                    destination; no sync_all and no parent-directory sync";
+
+/// The atomic publication steps a save at `durability` takes; `None` is the
+/// documented `save`, which is the full level.
+fn atomic_steps(durability: Option<litchi_core::Durability>) -> &'static str {
+    match durability {
+        Some(litchi_core::Durability::FileOnly) => ATOMIC_STEPS_FILE_ONLY,
+        Some(litchi_core::Durability::NoSync) => ATOMIC_STEPS_NO_SYNC,
+        _ => ATOMIC_STEPS,
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Byte accounting
@@ -750,6 +777,24 @@ impl Owner {
             Self::Docx(package) => package.save(path)?,
             Self::Xlsx(workbook) => workbook.save(path)?,
             Self::Pptx(package) => package.save(path)?,
+        }
+        Ok(())
+    }
+
+    /// The documented save-to-path entry point, or its explicit
+    /// `save_with_durability` form when a level was selected (change 0761).
+    fn save_at(
+        &mut self,
+        path: &Path,
+        durability: Option<litchi_core::Durability>,
+    ) -> Result<(), Box<dyn Error>> {
+        let Some(durability) = durability else {
+            return self.save(path);
+        };
+        match self {
+            Self::Docx(package) => package.save_with_durability(path, durability)?,
+            Self::Xlsx(workbook) => workbook.save_with_durability(path, durability)?,
+            Self::Pptx(package) => package.save_with_durability(path, durability)?,
         }
         Ok(())
     }
@@ -1287,6 +1332,7 @@ fn publish_reference(corpus: &SaveCorpus, repeat_save: bool) -> Result<String, B
 // Measurement
 // ---------------------------------------------------------------------------
 
+#[cfg(test)]
 pub(crate) fn run_case(
     case: Case,
     phase: Phase,
@@ -1294,6 +1340,28 @@ pub(crate) fn run_case(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
+    run_case_with_durability(case, phase, corpus, warmup_iterations, samples, None)
+}
+
+/// [`run_case`] with the timed saves at an explicit durability level
+/// (`--save-durability`, change 0761). `None` times the documented `save`.
+/// Only the phases that save to a path accept a level.
+pub(crate) fn run_case_with_durability(
+    case: Case,
+    phase: Phase,
+    corpus: &SaveCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+    durability: Option<litchi_core::Durability>,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if durability.is_some() && matches!(phase, Phase::Edit | Phase::CountingPublish) {
+        return Err(format!(
+            "--save-durability applies only to the lifecycle and atomic_publish ordinary-save \
+             phases, not to {}",
+            phase.as_str()
+        )
+        .into());
+    }
     let expected = corpus.evidence.published_sha256.clone();
     let expected_edit = sha256_hex(corpus.evidence.edit_outcome.as_bytes());
     let budget = usize::try_from(corpus.evidence.published_bytes)?
@@ -1327,7 +1395,7 @@ pub(crate) fn run_case(
                 let started = Instant::now();
                 let mut owner = Owner::open(corpus.format, corpus.workspace.source())?;
                 let outcome = owner.edit(corpus)?;
-                owner.save(&corpus.workspace.destination)?;
+                owner.save_at(&corpus.workspace.destination, durability)?;
                 let duration = started.elapsed();
                 let allocation = region.finish();
                 #[cfg(feature = "ordinary-save-process-metrics")]
@@ -1373,7 +1441,7 @@ pub(crate) fn run_case(
                 let process_before = process_metrics::Snapshot::read().ok();
                 let region = allocation_metrics::begin();
                 let started = Instant::now();
-                owner.save(&corpus.workspace.destination)?;
+                owner.save_at(&corpus.workspace.destination, durability)?;
                 let duration = started.elapsed();
                 let allocation = region.finish();
                 #[cfg(feature = "ordinary-save-process-metrics")]
@@ -1487,7 +1555,8 @@ pub(crate) fn run_case(
             origin: corpus.origin.as_str(),
             phase: phase.as_str(),
             timing_scope: phase.timing_scope(),
-            atomic_publication_steps: ATOMIC_STEPS,
+            atomic_publication_steps: atomic_steps(durability),
+            save_durability: durability.map(litchi_core::Durability::as_str),
             corpus: corpus.evidence.clone(),
             published_sha256,
             publications_identical,
@@ -1683,6 +1752,67 @@ mod tests {
                 .to_string()
                 .contains("DOCX and PPTX only")
         );
+    }
+
+    #[test]
+    fn save_durability_levels_publish_the_reference_and_record_their_level() {
+        let corpus = build_corpus(Format::Docx, Origin::Generated, None, None).unwrap();
+        for (phase, case) in [
+            (Phase::Lifecycle, Case::DocxOrdinarySaveLifecycle),
+            (Phase::AtomicPublish, Case::DocxOrdinarySaveAtomicPublish),
+        ] {
+            let default = run_case(case, phase, &corpus, 0, 1).unwrap();
+            let default = serde_json::to_value(default.source.unwrap()).unwrap();
+            assert!(default["ordinary_save"].get("save_durability").is_none());
+            assert_eq!(
+                default["ordinary_save"]["atomic_publication_steps"],
+                ATOMIC_STEPS
+            );
+            for level in [
+                litchi_core::Durability::Full,
+                litchi_core::Durability::FileOnly,
+                litchi_core::Durability::NoSync,
+            ] {
+                // `run_case_with_durability` refuses a sample whose published
+                // digest differs from the reference, so success proves the
+                // level publishes the reference bytes.
+                let result =
+                    run_case_with_durability(case, phase, &corpus, 0, 2, Some(level)).unwrap();
+                let source = result
+                    .source
+                    .as_ref()
+                    .and_then(|source| source.ordinary_save.as_ref())
+                    .expect("ordinary-save source metadata");
+                assert!(source.publications_identical);
+                assert_eq!(source.save_durability, Some(level.as_str()));
+                assert_eq!(source.atomic_publication_steps, atomic_steps(Some(level)));
+            }
+        }
+        for (phase, case) in [
+            (Phase::Edit, Case::DocxOrdinarySaveEdit),
+            (
+                Phase::CountingPublish,
+                Case::DocxOrdinarySaveCountingPublish,
+            ),
+        ] {
+            assert!(
+                run_case_with_durability(
+                    case,
+                    phase,
+                    &corpus,
+                    0,
+                    1,
+                    Some(litchi_core::Durability::NoSync)
+                )
+                .is_err()
+            );
+        }
+        assert_eq!(
+            crate::parse_save_durability(Some("file-only".to_owned())).unwrap(),
+            litchi_core::Durability::FileOnly
+        );
+        assert!(crate::parse_save_durability(Some("fsync".to_owned())).is_err());
+        assert!(crate::parse_save_durability(None).is_err());
     }
 
     #[test]
