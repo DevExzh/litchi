@@ -1,0 +1,28 @@
+{
+  "case": "mce_declaration_flood",
+  "elapsed_ns": [
+    255421,
+    344671,
+    328912,
+    255141,
+    254351,
+    337802,
+    323852,
+    254591,
+    263681,
+    316162,
+    322501,
+    256182,
+    263531,
+    315061,
+    320522
+  ],
+  "input_bytes": 477862,
+  "input_sha256": "8fab7b82825d13d80017804219dee12708a549cf1bc9d0389a291552a9c1efa0",
+  "outcomes": [
+    "err:markup compatibility resource limit exceeded: attributes per element"
+  ],
+  "p50_ns": 315061,
+  "samples": 15,
+  "warmup": 3
+}

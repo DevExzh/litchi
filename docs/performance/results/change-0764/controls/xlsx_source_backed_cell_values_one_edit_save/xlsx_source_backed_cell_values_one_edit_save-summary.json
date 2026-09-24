@@ -1,0 +1,536 @@
+{
+ "case": "xlsx_source_backed_cell_values_one_edit_save",
+ "kind": "harness",
+ "binaries": {
+  "before": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/a/litchi-perf-baseline",
+  "after": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/b/litchi-perf-baseline"
+ },
+ "core": 16,
+ "rounds": 4,
+ "samples_per_process": 15,
+ "warmup_per_process": 3,
+ "process_counters": [
+  {
+   "round": 1,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 34147485589,
+   "cycles": 12113832392
+  },
+  {
+   "round": 1,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 34217301645,
+   "cycles": 12148471059
+  },
+  {
+   "round": 1,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 34216015449,
+   "cycles": 12099307106
+  },
+  {
+   "round": 1,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 34144714357,
+   "cycles": 12113244771
+  },
+  {
+   "round": 2,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 34146488864,
+   "cycles": 12098790785
+  },
+  {
+   "round": 2,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 34216873251,
+   "cycles": 12074582900
+  },
+  {
+   "round": 2,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 34220552065,
+   "cycles": 12111602372
+  },
+  {
+   "round": 2,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 34146959219,
+   "cycles": 12145650830
+  },
+  {
+   "round": 3,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 34152507708,
+   "cycles": 12107609185
+  },
+  {
+   "round": 3,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 34217693230,
+   "cycles": 12203568961
+  },
+  {
+   "round": 3,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 34219588790,
+   "cycles": 12162600368
+  },
+  {
+   "round": 3,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 34150662025,
+   "cycles": 12172572988
+  },
+  {
+   "round": 4,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 34152447087,
+   "cycles": 12138803781
+  },
+  {
+   "round": 4,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 34219702098,
+   "cycles": 12140483054
+  },
+  {
+   "round": 4,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 34219032896,
+   "cycles": 12213411124
+  },
+  {
+   "round": 4,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 34150515263,
+   "cycles": 12076572668
+  }
+ ],
+ "median_process_instructions": {
+  "before": 34149000426.0,
+  "after": 34218363063.0
+ },
+ "median_process_cycles": {
+  "before": 12113538581.5,
+  "after": 12144477056.5
+ },
+ "series": [
+  {
+   "series": "medium",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r1-A1.json",
+     "samples": 15,
+     "p50_ns": 4117066,
+     "p95_ns": 4153766,
+     "mean_ns": 4120079.6666666665,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r1-B1.json",
+     "samples": 15,
+     "p50_ns": 4157925,
+     "p95_ns": 4256116,
+     "mean_ns": 4184247.1333333333,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r1-B2.json",
+     "samples": 15,
+     "p50_ns": 4144961,
+     "p95_ns": 4158470,
+     "mean_ns": 4168026.7333333334,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r1-A2.json",
+     "samples": 15,
+     "p50_ns": 4126920,
+     "p95_ns": 4204140,
+     "mean_ns": 4140951.1333333333,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r2-A1.json",
+     "samples": 15,
+     "p50_ns": 4098009,
+     "p95_ns": 4191340,
+     "mean_ns": 4120075.2,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r2-B1.json",
+     "samples": 15,
+     "p50_ns": 4198400,
+     "p95_ns": 4272970,
+     "mean_ns": 4191514.2,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r2-B2.json",
+     "samples": 15,
+     "p50_ns": 4143669,
+     "p95_ns": 4170389,
+     "mean_ns": 4149936.6,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r2-A2.json",
+     "samples": 15,
+     "p50_ns": 4128000,
+     "p95_ns": 4152220,
+     "mean_ns": 4132628.6,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r3-A1.json",
+     "samples": 15,
+     "p50_ns": 4142979,
+     "p95_ns": 4278920,
+     "mean_ns": 4165894.8666666667,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r3-B1.json",
+     "samples": 15,
+     "p50_ns": 4147249,
+     "p95_ns": 4237479,
+     "mean_ns": 4161161.6666666665,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r3-B2.json",
+     "samples": 15,
+     "p50_ns": 4207729,
+     "p95_ns": 4424900,
+     "mean_ns": 4246727.6,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r3-A2.json",
+     "samples": 15,
+     "p50_ns": 4136659,
+     "p95_ns": 4170409,
+     "mean_ns": 4135316.4,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r4-A1.json",
+     "samples": 15,
+     "p50_ns": 4166019,
+     "p95_ns": 4294970,
+     "mean_ns": 4191832.533333333,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r4-B1.json",
+     "samples": 15,
+     "p50_ns": 4141589,
+     "p95_ns": 4177230,
+     "mean_ns": 4148898.466666667,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r4-B2.json",
+     "samples": 15,
+     "p50_ns": 4161100,
+     "p95_ns": 4183680,
+     "mean_ns": 4161068.0,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r4-A2.json",
+     "samples": 15,
+     "p50_ns": 4138739,
+     "p95_ns": 4158530,
+     "mean_ns": 4138057.6666666665,
+     "outcomes": null
+    }
+   ],
+   "median_p50_ns": {
+    "before": 4132329.5,
+    "after": 4152587.0
+   },
+   "paired_ratios_after_over_before": [
+    1.0099243004605707,
+    1.0043715410039449,
+    1.0244975059840034,
+    1.003795784883721,
+    1.001030659339572,
+    1.0171805314385354,
+    0.9941358884825057,
+    1.005402853381187
+   ],
+   "paired_ratio_median": 1.004887197192566,
+   "paired_ratio_bootstrap_95": [
+    1.001030659339572,
+    1.0171805314385354
+   ]
+  },
+  {
+   "series": "dense-sparse",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r1-A1.json",
+     "samples": 15,
+     "p50_ns": 26707521,
+     "p95_ns": 26797301,
+     "mean_ns": 26708964.533333335,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r1-B1.json",
+     "samples": 15,
+     "p50_ns": 26960271,
+     "p95_ns": 27601737,
+     "mean_ns": 27102740.2,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r1-B2.json",
+     "samples": 15,
+     "p50_ns": 26885853,
+     "p95_ns": 27190155,
+     "mean_ns": 26911406.666666668,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r1-A2.json",
+     "samples": 15,
+     "p50_ns": 27416086,
+     "p95_ns": 27591947,
+     "mean_ns": 27448183.8,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r2-A1.json",
+     "samples": 15,
+     "p50_ns": 26670614,
+     "p95_ns": 26788405,
+     "mean_ns": 26671734.866666667,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r2-B1.json",
+     "samples": 15,
+     "p50_ns": 26740735,
+     "p95_ns": 26845925,
+     "mean_ns": 26733221.333333332,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r2-B2.json",
+     "samples": 15,
+     "p50_ns": 26897685,
+     "p95_ns": 27323278,
+     "mean_ns": 26953872.933333334,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r2-A2.json",
+     "samples": 15,
+     "p50_ns": 26960086,
+     "p95_ns": 27156746,
+     "mean_ns": 26997011.066666666,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r3-A1.json",
+     "samples": 15,
+     "p50_ns": 26856124,
+     "p95_ns": 26955245,
+     "mean_ns": 26856891.866666667,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r3-B1.json",
+     "samples": 15,
+     "p50_ns": 26985394,
+     "p95_ns": 27109755,
+     "mean_ns": 26984591.733333334,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r3-B2.json",
+     "samples": 15,
+     "p50_ns": 27081355,
+     "p95_ns": 27368636,
+     "mean_ns": 27115520.066666666,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r3-A2.json",
+     "samples": 15,
+     "p50_ns": 26796983,
+     "p95_ns": 26912624,
+     "mean_ns": 26820074.333333332,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r4-A1.json",
+     "samples": 15,
+     "p50_ns": 27587347,
+     "p95_ns": 27769298,
+     "mean_ns": 27605444.4,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r4-B1.json",
+     "samples": 15,
+     "p50_ns": 26913338,
+     "p95_ns": 27004999,
+     "mean_ns": 26947578.533333335,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r4-B2.json",
+     "samples": 15,
+     "p50_ns": 27094858,
+     "p95_ns": 27195200,
+     "mean_ns": 27126112.6,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "xlsx_source_backed_cell_values_one_edit_save-r4-A2.json",
+     "samples": 15,
+     "p50_ns": 26785437,
+     "p95_ns": 27246010,
+     "mean_ns": 26890784.066666666,
+     "outcomes": null
+    }
+   ],
+   "median_p50_ns": {
+    "before": 26826553.5,
+    "after": 26936804.5
+   },
+   "paired_ratios_after_over_before": [
+    1.0094636263695158,
+    0.9806597849160525,
+    1.0026291483203198,
+    0.9976854302319362,
+    1.0048134272838478,
+    1.0106120901744797,
+    0.9755681834864367,
+    1.011551836917949
+   ],
+   "paired_ratio_median": 1.0037212878020838,
+   "paired_ratio_bootstrap_95": [
+    0.9806597849160525,
+    1.0106120901744797
+   ]
+  }
+ ]
+}

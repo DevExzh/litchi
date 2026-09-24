@@ -1,0 +1,16 @@
+bookmark::tests::repeated_bookmark_attributes_keep_their_first_value                                 rc=0     0.10s
+drawing::tests::repeated_inventory_attributes_keep_their_first_value                                 rc=0     0.20s
+image::tests::repeated_inline_image_attributes_keep_their_first_value                                rc=0     0.20s
+styles::tests::repeated_style_attributes_keep_their_first_value                                      rc=0     0.20s
+document::transaction::attribute_tests::repeated_field_character_types_keep_their_first_value        rc=0     0.21s
+ink::placement::tests::repeated_choice_requirements_keep_their_first_value                           rc=0     0.20s
+paragraph::tests::repeated_run_property_attributes_keep_their_first_value                            rc=0     1.21s
+writer::section::codec::xml::tests::default_namespace_reset_is_read_from_its_first_occurrence        rc=0     0.11s
+writer::section::codec::xml::tests::repeated_child_attribute_names_are_refused_as_before             rc=0     0.21s
+chart::codec::attribute_tests::expanded_attribute_names_are_refused_once_repeated                    rc=0     0.80s
+section::codec::tests::repeated_section_attribute_names_are_refused_at_the_same_attribute            rc=0     0.50s
+numbering::tests::ignorable_prefix_lists_refuse_a_repeated_prefix_at_any_length                      rc=0     0.10s
+source_backed::tail_append::attribute_tests::opaque_attributes_refuse_repeats_as_before_and_accept_many_distinct_names rc=0     0.30s
+source_backed::tail_append::attribute_tests::directive_prefix_lookups_scan_the_bindings_in_scope_once rc=0     0.30s
+source_backed::tail_append::attribute_tests::prefix_lookup_matches_the_bindings_scan_in_every_scope  rc=0     0.10s
+source_backed::tail_append::attribute_tests::directive_facts_count_tokens_and_their_bound_namespaces rc=0     0.11s

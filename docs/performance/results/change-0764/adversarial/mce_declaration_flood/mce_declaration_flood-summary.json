@@ -1,0 +1,368 @@
+{
+ "case": "mce_declaration_flood",
+ "kind": "bounds",
+ "binaries": {
+  "before": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/a/xml_attribute_bounds",
+  "after": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/b/xml_attribute_bounds"
+ },
+ "core": 16,
+ "rounds": 4,
+ "samples_per_process": 15,
+ "warmup_per_process": 3,
+ "process_counters": [
+  {
+   "round": 1,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 60128315353,
+   "cycles": 12219665714
+  },
+  {
+   "round": 1,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 95162788,
+   "cycles": 25395589
+  },
+  {
+   "round": 1,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 95163329,
+   "cycles": 25495322
+  },
+  {
+   "round": 1,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 60128316528,
+   "cycles": 14121738624
+  },
+  {
+   "round": 2,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 60128316646,
+   "cycles": 13500430643
+  },
+  {
+   "round": 2,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 95162733,
+   "cycles": 25551099
+  },
+  {
+   "round": 2,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 95163654,
+   "cycles": 25684995
+  },
+  {
+   "round": 2,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 60128316097,
+   "cycles": 13096301210
+  },
+  {
+   "round": 3,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 60128316140,
+   "cycles": 14366828379
+  },
+  {
+   "round": 3,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 95162802,
+   "cycles": 25772497
+  },
+  {
+   "round": 3,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 95162447,
+   "cycles": 25344877
+  },
+  {
+   "round": 3,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 60128316158,
+   "cycles": 14268918662
+  },
+  {
+   "round": 4,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 60128315829,
+   "cycles": 12183580623
+  },
+  {
+   "round": 4,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 95163046,
+   "cycles": 25395324
+  },
+  {
+   "round": 4,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 95162578,
+   "cycles": 25601763
+  },
+  {
+   "round": 4,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 60128315682,
+   "cycles": 12959841426
+  }
+ ],
+ "median_process_instructions": {
+  "before": 60128316118.5,
+  "after": 95162795.0
+ },
+ "median_process_cycles": {
+  "before": 13298365926.5,
+  "after": 25523210.5
+ },
+ "series": [
+  {
+   "series": "default",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_declaration_flood-r1-A1.json",
+     "samples": 15,
+     "p50_ns": 151098124,
+     "p95_ns": 164007686,
+     "mean_ns": 153610709.86666667,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: namespace bindings"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_declaration_flood-r1-B1.json",
+     "samples": 15,
+     "p50_ns": 312552,
+     "p95_ns": 339411,
+     "mean_ns": 295828.13333333336,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: attributes per element"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_declaration_flood-r1-B2.json",
+     "samples": 15,
+     "p50_ns": 312471,
+     "p95_ns": 344532,
+     "mean_ns": 301244.13333333336,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: attributes per element"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_declaration_flood-r1-A2.json",
+     "samples": 15,
+     "p50_ns": 183081138,
+     "p95_ns": 184053303,
+     "mean_ns": 180562772.73333332,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: namespace bindings"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_declaration_flood-r2-A1.json",
+     "samples": 15,
+     "p50_ns": 163784836,
+     "p95_ns": 184702568,
+     "mean_ns": 171069886.8,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: namespace bindings"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_declaration_flood-r2-B1.json",
+     "samples": 15,
+     "p50_ns": 315061,
+     "p95_ns": 337802,
+     "mean_ns": 294158.73333333334,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: attributes per element"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_declaration_flood-r2-B2.json",
+     "samples": 15,
+     "p50_ns": 319622,
+     "p95_ns": 351021,
+     "mean_ns": 306167.4666666667,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: attributes per element"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_declaration_flood-r2-A2.json",
+     "samples": 15,
+     "p50_ns": 163312363,
+     "p95_ns": 181954714,
+     "mean_ns": 165903231.53333333,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: namespace bindings"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_declaration_flood-r3-A1.json",
+     "samples": 15,
+     "p50_ns": 182952079,
+     "p95_ns": 183882354,
+     "mean_ns": 182871633.4,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: namespace bindings"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_declaration_flood-r3-B1.json",
+     "samples": 15,
+     "p50_ns": 309052,
+     "p95_ns": 338271,
+     "mean_ns": 296996.73333333334,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: attributes per element"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_declaration_flood-r3-B2.json",
+     "samples": 15,
+     "p50_ns": 308262,
+     "p95_ns": 336321,
+     "mean_ns": 294721.4,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: attributes per element"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_declaration_flood-r3-A2.json",
+     "samples": 15,
+     "p50_ns": 182664057,
+     "p95_ns": 183772813,
+     "mean_ns": 179859761.46666667,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: namespace bindings"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_declaration_flood-r4-A1.json",
+     "samples": 15,
+     "p50_ns": 150242681,
+     "p95_ns": 161149833,
+     "mean_ns": 152253336.66666666,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: namespace bindings"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_declaration_flood-r4-B1.json",
+     "samples": 15,
+     "p50_ns": 311762,
+     "p95_ns": 341411,
+     "mean_ns": 294400.13333333336,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: attributes per element"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_declaration_flood-r4-B2.json",
+     "samples": 15,
+     "p50_ns": 310052,
+     "p95_ns": 342702,
+     "mean_ns": 296798.13333333336,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: attributes per element"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_declaration_flood-r4-A2.json",
+     "samples": 15,
+     "p50_ns": 162032108,
+     "p95_ns": 163879736,
+     "mean_ns": 162380970.8,
+     "outcomes": [
+      "err:markup compatibility resource limit exceeded: namespace bindings"
+     ]
+    }
+   ],
+   "median_p50_ns": {
+    "before": 163548599.5,
+    "after": 312116.5
+   },
+   "paired_ratios_after_over_before": [
+    0.0020685366020824986,
+    0.0017067350761169073,
+    0.0019236274107817892,
+    0.0019571206620774937,
+    0.0016892510961845917,
+    0.0016875898031762208,
+    0.002075056155314481,
+    0.0019135219792363622
+   ],
+   "paired_ratio_median": 0.0019185746950090756,
+   "paired_ratio_bootstrap_95": [
+    0.0016892510961845917,
+    0.0020685366020824986
+   ]
+  }
+ ]
+}

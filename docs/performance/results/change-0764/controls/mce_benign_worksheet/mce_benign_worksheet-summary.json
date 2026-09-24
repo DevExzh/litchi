@@ -1,0 +1,368 @@
+{
+ "case": "mce_benign_worksheet",
+ "kind": "bounds",
+ "binaries": {
+  "before": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/a/xml_attribute_bounds",
+  "after": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/b/xml_attribute_bounds"
+ },
+ "core": 16,
+ "rounds": 4,
+ "samples_per_process": 31,
+ "warmup_per_process": 3,
+ "process_counters": [
+  {
+   "round": 1,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 10072056272,
+   "cycles": 2194743662
+  },
+  {
+   "round": 1,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 9848542188,
+   "cycles": 2139016856
+  },
+  {
+   "round": 1,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 9848467939,
+   "cycles": 2162277442
+  },
+  {
+   "round": 1,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 10086977958,
+   "cycles": 2193336731
+  },
+  {
+   "round": 2,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 10139442443,
+   "cycles": 2231551900
+  },
+  {
+   "round": 2,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 9848473384,
+   "cycles": 2144778397
+  },
+  {
+   "round": 2,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 9847321679,
+   "cycles": 2147100674
+  },
+  {
+   "round": 2,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 10064399490,
+   "cycles": 2179130960
+  },
+  {
+   "round": 3,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 10079516501,
+   "cycles": 2178455500
+  },
+  {
+   "round": 3,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 9847322934,
+   "cycles": 2146787526
+  },
+  {
+   "round": 3,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 9847400728,
+   "cycles": 2148218499
+  },
+  {
+   "round": 3,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 10147301835,
+   "cycles": 2222545588
+  },
+  {
+   "round": 4,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 10064545903,
+   "cycles": 2212447620
+  },
+  {
+   "round": 4,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 9847259288,
+   "cycles": 2150213418
+  },
+  {
+   "round": 4,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 9848393868,
+   "cycles": 2175174117
+  },
+  {
+   "round": 4,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 10095696655,
+   "cycles": 2204751640
+  }
+ ],
+ "median_process_instructions": {
+  "before": 10083247229.5,
+  "after": 9847897298.0
+ },
+ "median_process_cycles": {
+  "before": 2199747651.0,
+  "after": 2147659586.5
+ },
+ "series": [
+  {
+   "series": "default",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_benign_worksheet-r1-A1.json",
+     "samples": 31,
+     "p50_ns": 14319492,
+     "p95_ns": 14612124,
+     "mean_ns": 14403839.064516129,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_benign_worksheet-r1-B1.json",
+     "samples": 31,
+     "p50_ns": 14011381,
+     "p95_ns": 14111762,
+     "mean_ns": 14029023.612903226,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_benign_worksheet-r1-B2.json",
+     "samples": 31,
+     "p50_ns": 14178842,
+     "p95_ns": 14225742,
+     "mean_ns": 14192262.193548387,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_benign_worksheet-r1-A2.json",
+     "samples": 31,
+     "p50_ns": 14337402,
+     "p95_ns": 14846505,
+     "mean_ns": 14397338.387096774,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_benign_worksheet-r2-A1.json",
+     "samples": 31,
+     "p50_ns": 14588924,
+     "p95_ns": 15223007,
+     "mean_ns": 14665382.967741935,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_benign_worksheet-r2-B1.json",
+     "samples": 31,
+     "p50_ns": 14059291,
+     "p95_ns": 14236112,
+     "mean_ns": 14087461.0,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_benign_worksheet-r2-B2.json",
+     "samples": 31,
+     "p50_ns": 14080451,
+     "p95_ns": 14169402,
+     "mean_ns": 14100336.548387097,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_benign_worksheet-r2-A2.json",
+     "samples": 31,
+     "p50_ns": 14283273,
+     "p95_ns": 14367003,
+     "mean_ns": 14302881.161290323,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_benign_worksheet-r3-A1.json",
+     "samples": 31,
+     "p50_ns": 14251393,
+     "p95_ns": 14335183,
+     "mean_ns": 14295142.387096774,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_benign_worksheet-r3-B1.json",
+     "samples": 31,
+     "p50_ns": 14086882,
+     "p95_ns": 14117371,
+     "mean_ns": 14095333.967741935,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_benign_worksheet-r3-B2.json",
+     "samples": 31,
+     "p50_ns": 14067312,
+     "p95_ns": 14141592,
+     "mean_ns": 14099537.225806452,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_benign_worksheet-r3-A2.json",
+     "samples": 31,
+     "p50_ns": 14408833,
+     "p95_ns": 15541238,
+     "mean_ns": 14606217.516129032,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_benign_worksheet-r4-A1.json",
+     "samples": 31,
+     "p50_ns": 14531324,
+     "p95_ns": 14575654,
+     "mean_ns": 14536331.677419355,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_benign_worksheet-r4-B1.json",
+     "samples": 31,
+     "p50_ns": 14088552,
+     "p95_ns": 14415473,
+     "mean_ns": 14116144.387096774,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_benign_worksheet-r4-B2.json",
+     "samples": 31,
+     "p50_ns": 14260942,
+     "p95_ns": 14291532,
+     "mean_ns": 14268192.258064516,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_benign_worksheet-r4-A2.json",
+     "samples": 31,
+     "p50_ns": 14334172,
+     "p95_ns": 15036387,
+     "mean_ns": 14472856.225806452,
+     "outcomes": [
+      "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+     ]
+    }
+   ],
+   "median_p50_ns": {
+    "before": 14335787.0,
+    "after": 14083666.5
+   },
+   "paired_ratios_after_over_before": [
+    0.9784831054062533,
+    0.988940813684376,
+    0.9636962259862345,
+    0.9858000333677022,
+    0.9884564968491151,
+    0.9762978028824403,
+    0.9695298239857566,
+    0.9948912291550569
+   ],
+   "paired_ratio_median": 0.9821415693869777,
+   "paired_ratio_bootstrap_95": [
+    0.9699970144343374,
+    0.988940813684376
+   ]
+  }
+ ]
+}

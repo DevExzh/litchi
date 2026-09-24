@@ -1,0 +1,30 @@
+dup-with-space: checked
+   Ok a="1"
+   Err Duplicated(8, 2)
+   Ok b="evil"
+   Err ExpectedEq(22)
+dup-with-space: unchecked
+   Ok a="1"
+   Ok a="x b='evil'"
+dup-unquoted-first: checked
+   Err UnquotedValue(4)
+   Err Duplicated(6, 2)
+dup-unquoted-first: unchecked
+   Err UnquotedValue(4)
+   Ok a="1"
+dup-plain: checked
+   Ok a="1"
+   Ok b="2"
+   Err Duplicated(14, 2)
+   Ok c="4"
+dup-plain: unchecked
+   Ok a="1"
+   Ok b="2"
+   Ok a="3"
+   Ok c="4"
+tolerant distinct=1000 repeats=1000 tag_bytes=15891 ok=1000 elapsed=1.337362ms
+   fail-fast ok_prefix=1000 elapsed=28.85µs
+tolerant distinct=4000 repeats=4000 tag_bytes=70891 ok=4000 elapsed=18.128762ms
+   fail-fast ok_prefix=4000 elapsed=127.66µs
+tolerant distinct=16000 repeats=16000 tag_bytes=308891 ok=16000 elapsed=186.620997ms
+   fail-fast ok_prefix=16000 elapsed=608.97µs

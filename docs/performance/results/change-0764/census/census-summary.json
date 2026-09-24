@@ -1,0 +1,123 @@
+{
+ "test-data (OOXML and ODF packages)": {
+  "packages": 406,
+  "members_parsed": 7529,
+  "unique_member_digests": 4442,
+  "elements": 1180744,
+  "parse_failures": 27,
+  "max_attributes_per_element": 43,
+  "max_declarations_per_element": 38,
+  "max_declarations_in_scope_including_shadowed": 39,
+  "max_distinct_prefixes_in_scope": 38,
+  "max_depth": 24,
+  "members_by_largest_element_attribute_count_power_of_two_bucket": {
+   "2": 20,
+   "4": 3637,
+   "8": 2771,
+   "16": 780,
+   "32": 191,
+   "64": 130
+  },
+  "top_elements_by_attributes": [
+   {
+    "package": "test-data/libreoffice-core/reportdesign/qa/unit/data/roundTrip.odb",
+    "member": "reports/Obj22/content.xml",
+    "max_attributes": 43,
+    "element": "style:text-properties"
+   },
+   {
+    "package": "test-data/libreoffice-core/reportdesign/qa/unit/data/roundTrip.odb",
+    "member": "reports/Obj61/content.xml",
+    "max_attributes": 43,
+    "element": "style:text-properties"
+   },
+   {
+    "package": "test-data/libreoffice-core/reportdesign/qa/unit/data/roundTrip.odb",
+    "member": "reports/Obj62/content.xml",
+    "max_attributes": 43,
+    "element": "style:text-properties"
+   }
+  ]
+ },
+ "test-data (OOXML packages only)": {
+  "packages": 337,
+  "members_parsed": 7162,
+  "unique_member_digests": 4119,
+  "elements": 1156343,
+  "parse_failures": 1,
+  "max_attributes_per_element": 37,
+  "max_declarations_per_element": 36,
+  "max_declarations_in_scope_including_shadowed": 39,
+  "max_distinct_prefixes_in_scope": 36,
+  "max_depth": 24,
+  "members_by_largest_element_attribute_count_power_of_two_bucket": {
+   "2": 20,
+   "4": 3559,
+   "8": 2696,
+   "16": 707,
+   "32": 145,
+   "64": 35
+  },
+  "top_elements_by_attributes": [
+   {
+    "package": "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx",
+    "member": "word/header2.xml",
+    "max_attributes": 37,
+    "element": "w:hdr"
+   },
+   {
+    "package": "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx",
+    "member": "word/commentsExtensible.xml",
+    "max_attributes": 37,
+    "element": "w16cex:commentsExtensible"
+   },
+   {
+    "package": "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx",
+    "member": "word/footer2.xml",
+    "max_attributes": 36,
+    "element": "w:ftr"
+   }
+  ]
+ },
+ "docs/ (evidence packets, incl. fuzz corpora)": {
+  "packages": 1697,
+  "members_parsed": 6195,
+  "unique_member_digests": 560,
+  "elements": 6624888,
+  "parse_failures": 1412,
+  "max_attributes_per_element": 37,
+  "max_declarations_per_element": 36,
+  "max_declarations_in_scope_including_shadowed": 39,
+  "max_distinct_prefixes_in_scope": 36,
+  "max_depth": 22,
+  "members_by_largest_element_attribute_count_power_of_two_bucket": {
+   "0": 29,
+   "2": 815,
+   "4": 3868,
+   "8": 1029,
+   "16": 198,
+   "32": 170,
+   "64": 86
+  },
+  "top_elements_by_attributes": [
+   {
+    "package": "docs/performance/results/change-0709/oracle/artifacts/refusal-after-refused-edit-save.docx",
+    "member": "word/header2.xml",
+    "max_attributes": 37,
+    "element": "w:hdr"
+   },
+   {
+    "package": "docs/performance/results/change-0709/oracle/artifacts/refusal-after-refused-edit-to-stream.docx",
+    "member": "word/header2.xml",
+    "max_attributes": 37,
+    "element": "w:hdr"
+   },
+   {
+    "package": "docs/performance/results/change-0709/oracle/artifacts/refusal-no-edit-save.docx",
+    "member": "word/header2.xml",
+    "max_attributes": 37,
+    "element": "w:hdr"
+   }
+  ]
+ }
+}

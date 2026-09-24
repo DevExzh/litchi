@@ -1,0 +1,28 @@
+{
+  "case": "audit_attribute_flood",
+  "elapsed_ns": [
+    9653899,
+    9577958,
+    9693259,
+    9624899,
+    9528658,
+    9535809,
+    9574428,
+    9541198,
+    9523089,
+    9590078,
+    9550718,
+    9574829,
+    9659949,
+    9604929,
+    9634568
+  ],
+  "input_bytes": 2088897,
+  "input_sha256": "51d835947bbcaf73d32ca4ffda6738555b079aed90847fc895b0b1f20c18cb77",
+  "outcomes": [
+    "ok:Report { attributes: 200000, bytes: 2088897, events: 2, max_depth: 1, text_bytes: 0 }"
+  ],
+  "p50_ns": 9577958,
+  "samples": 15,
+  "warmup": 3
+}

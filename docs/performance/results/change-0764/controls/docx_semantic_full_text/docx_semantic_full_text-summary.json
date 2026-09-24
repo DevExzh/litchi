@@ -1,0 +1,736 @@
+{
+ "case": "docx_semantic_full_text",
+ "kind": "harness",
+ "binaries": {
+  "before": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/a/litchi-perf-baseline",
+  "after": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/b/litchi-perf-baseline"
+ },
+ "core": 16,
+ "rounds": 4,
+ "samples_per_process": 15,
+ "warmup_per_process": 3,
+ "process_counters": [
+  {
+   "round": 1,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 8274462418,
+   "cycles": 2686370947
+  },
+  {
+   "round": 1,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 8274058100,
+   "cycles": 2678478045
+  },
+  {
+   "round": 1,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 8275493176,
+   "cycles": 2701570833
+  },
+  {
+   "round": 1,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 8277896792,
+   "cycles": 2646886161
+  },
+  {
+   "round": 2,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 8270712143,
+   "cycles": 2611892727
+  },
+  {
+   "round": 2,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 8271330713,
+   "cycles": 2594426496
+  },
+  {
+   "round": 2,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 8274341557,
+   "cycles": 2584331994
+  },
+  {
+   "round": 2,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 8276075119,
+   "cycles": 2571553721
+  },
+  {
+   "round": 3,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 8270527160,
+   "cycles": 2538165891
+  },
+  {
+   "round": 3,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 8269544980,
+   "cycles": 2692013936
+  },
+  {
+   "round": 3,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 8272085651,
+   "cycles": 2656814522
+  },
+  {
+   "round": 3,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 8277194417,
+   "cycles": 2576134998
+  },
+  {
+   "round": 4,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 8270189873,
+   "cycles": 2510745560
+  },
+  {
+   "round": 4,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 8276192158,
+   "cycles": 2522634473
+  },
+  {
+   "round": 4,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 8268619633,
+   "cycles": 2570764383
+  },
+  {
+   "round": 4,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 8271467716,
+   "cycles": 2613422831
+  }
+ ],
+ "median_process_instructions": {
+  "before": 8272965067.0,
+  "after": 8273071875.5
+ },
+ "median_process_cycles": {
+  "before": 2594013862.5,
+  "after": 2625620509.0
+ },
+ "series": [
+  {
+   "series": "tiny",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r1-A1.json",
+     "samples": 15,
+     "p50_ns": 6290,
+     "p95_ns": 6490,
+     "mean_ns": 6294.0,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r1-B1.json",
+     "samples": 15,
+     "p50_ns": 6500,
+     "p95_ns": 6700,
+     "mean_ns": 6519.333333333333,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r1-B2.json",
+     "samples": 15,
+     "p50_ns": 6660,
+     "p95_ns": 6850,
+     "mean_ns": 6644.0,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r1-A2.json",
+     "samples": 15,
+     "p50_ns": 6330,
+     "p95_ns": 6400,
+     "mean_ns": 6314.666666666667,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r2-A1.json",
+     "samples": 15,
+     "p50_ns": 6270,
+     "p95_ns": 6500,
+     "mean_ns": 6338.666666666667,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r2-B1.json",
+     "samples": 15,
+     "p50_ns": 6700,
+     "p95_ns": 6800,
+     "mean_ns": 6688.733333333334,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r2-B2.json",
+     "samples": 15,
+     "p50_ns": 6380,
+     "p95_ns": 6550,
+     "mean_ns": 6406.066666666667,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r2-A2.json",
+     "samples": 15,
+     "p50_ns": 6260,
+     "p95_ns": 6460,
+     "mean_ns": 6284.666666666667,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r3-A1.json",
+     "samples": 15,
+     "p50_ns": 6300,
+     "p95_ns": 6420,
+     "mean_ns": 6286.666666666667,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r3-B1.json",
+     "samples": 15,
+     "p50_ns": 6650,
+     "p95_ns": 6800,
+     "mean_ns": 6654.666666666667,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r3-B2.json",
+     "samples": 15,
+     "p50_ns": 7540,
+     "p95_ns": 7690,
+     "mean_ns": 7545.4,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r3-A2.json",
+     "samples": 15,
+     "p50_ns": 6230,
+     "p95_ns": 6380,
+     "mean_ns": 6237.4,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r4-A1.json",
+     "samples": 15,
+     "p50_ns": 6350,
+     "p95_ns": 6430,
+     "mean_ns": 6348.066666666667,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r4-B1.json",
+     "samples": 15,
+     "p50_ns": 6570,
+     "p95_ns": 6730,
+     "mean_ns": 6606.066666666667,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r4-B2.json",
+     "samples": 15,
+     "p50_ns": 6490,
+     "p95_ns": 6740,
+     "mean_ns": 6494.0,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r4-A2.json",
+     "samples": 15,
+     "p50_ns": 6260,
+     "p95_ns": 6470,
+     "mean_ns": 6260.0,
+     "outcomes": null
+    }
+   ],
+   "median_p50_ns": {
+    "before": 6280.0,
+    "after": 6610.0
+   },
+   "paired_ratios_after_over_before": [
+    1.0333863275039745,
+    1.052132701421801,
+    1.0685805422647527,
+    1.0191693290734825,
+    1.0555555555555556,
+    1.2102728731942216,
+    1.0346456692913386,
+    1.036741214057508
+   ],
+   "paired_ratio_median": 1.0444369577396544,
+   "paired_ratio_bootstrap_95": [
+    1.0333863275039745,
+    1.0685805422647527
+   ]
+  },
+  {
+   "series": "medium",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r1-A1.json",
+     "samples": 15,
+     "p50_ns": 39041,
+     "p95_ns": 39380,
+     "mean_ns": 38980.13333333333,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r1-B1.json",
+     "samples": 15,
+     "p50_ns": 40661,
+     "p95_ns": 41110,
+     "mean_ns": 40670.26666666667,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r1-B2.json",
+     "samples": 15,
+     "p50_ns": 41810,
+     "p95_ns": 49020,
+     "mean_ns": 43169.6,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r1-A2.json",
+     "samples": 15,
+     "p50_ns": 38740,
+     "p95_ns": 39380,
+     "mean_ns": 39442.2,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r2-A1.json",
+     "samples": 15,
+     "p50_ns": 39381,
+     "p95_ns": 39730,
+     "mean_ns": 39396.2,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r2-B1.json",
+     "samples": 15,
+     "p50_ns": 41950,
+     "p95_ns": 42800,
+     "mean_ns": 41833.53333333333,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r2-B2.json",
+     "samples": 15,
+     "p50_ns": 41010,
+     "p95_ns": 48370,
+     "mean_ns": 42864.26666666667,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r2-A2.json",
+     "samples": 15,
+     "p50_ns": 39280,
+     "p95_ns": 40130,
+     "mean_ns": 39680.933333333334,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r3-A1.json",
+     "samples": 15,
+     "p50_ns": 39050,
+     "p95_ns": 40170,
+     "mean_ns": 39683.53333333333,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r3-B1.json",
+     "samples": 15,
+     "p50_ns": 41920,
+     "p95_ns": 49720,
+     "mean_ns": 43344.933333333334,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r3-B2.json",
+     "samples": 15,
+     "p50_ns": 47921,
+     "p95_ns": 48470,
+     "mean_ns": 47908.333333333336,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r3-A2.json",
+     "samples": 15,
+     "p50_ns": 38910,
+     "p95_ns": 46790,
+     "mean_ns": 40026.2,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r4-A1.json",
+     "samples": 15,
+     "p50_ns": 39571,
+     "p95_ns": 40180,
+     "mean_ns": 40273.53333333333,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r4-B1.json",
+     "samples": 15,
+     "p50_ns": 41240,
+     "p95_ns": 42680,
+     "mean_ns": 41585.666666666664,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r4-B2.json",
+     "samples": 15,
+     "p50_ns": 40450,
+     "p95_ns": 41950,
+     "mean_ns": 41056.86666666667,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r4-A2.json",
+     "samples": 15,
+     "p50_ns": 39111,
+     "p95_ns": 39390,
+     "mean_ns": 39074.2,
+     "outcomes": null
+    }
+   ],
+   "median_p50_ns": {
+    "before": 39080.5,
+    "after": 41525.0
+   },
+   "paired_ratios_after_over_before": [
+    1.041494838759253,
+    1.079246257098606,
+    1.0652345039486046,
+    1.0440427698574337,
+    1.0734955185659412,
+    1.231585710614238,
+    1.0421773521012863,
+    1.0342358927156043
+   ],
+   "paired_ratio_median": 1.0546386369030192,
+   "paired_ratio_bootstrap_95": [
+    1.041494838759253,
+    1.079246257098606
+   ]
+  },
+  {
+   "series": "large",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r1-A1.json",
+     "samples": 15,
+     "p50_ns": 1896539,
+     "p95_ns": 1930170,
+     "mean_ns": 1897314.6666666667,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r1-B1.json",
+     "samples": 15,
+     "p50_ns": 1984460,
+     "p95_ns": 2022410,
+     "mean_ns": 1986924.0,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r1-B2.json",
+     "samples": 15,
+     "p50_ns": 2001781,
+     "p95_ns": 2078790,
+     "mean_ns": 2035913.6666666667,
+     "outcomes": null
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r1-A2.json",
+     "samples": 15,
+     "p50_ns": 1917419,
+     "p95_ns": 1975980,
+     "mean_ns": 1927137.7333333334,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r2-A1.json",
+     "samples": 15,
+     "p50_ns": 1946359,
+     "p95_ns": 1961470,
+     "mean_ns": 1944568.8666666667,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r2-B1.json",
+     "samples": 15,
+     "p50_ns": 2026801,
+     "p95_ns": 2101580,
+     "mean_ns": 2034761.4666666666,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r2-B2.json",
+     "samples": 15,
+     "p50_ns": 1964509,
+     "p95_ns": 1987800,
+     "mean_ns": 1958840.4,
+     "outcomes": null
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r2-A2.json",
+     "samples": 15,
+     "p50_ns": 1910730,
+     "p95_ns": 1930370,
+     "mean_ns": 1908680.8666666667,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r3-A1.json",
+     "samples": 15,
+     "p50_ns": 1862240,
+     "p95_ns": 1898309,
+     "mean_ns": 1869100.2666666666,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r3-B1.json",
+     "samples": 15,
+     "p50_ns": 1981980,
+     "p95_ns": 2018071,
+     "mean_ns": 1986303.2666666666,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r3-B2.json",
+     "samples": 15,
+     "p50_ns": 2329342,
+     "p95_ns": 2357332,
+     "mean_ns": 2327570.6,
+     "outcomes": null
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r3-A2.json",
+     "samples": 15,
+     "p50_ns": 1872570,
+     "p95_ns": 1885159,
+     "mean_ns": 1869467.3333333333,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r4-A1.json",
+     "samples": 15,
+     "p50_ns": 1895990,
+     "p95_ns": 1917299,
+     "mean_ns": 1894066.8,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r4-B1.json",
+     "samples": 15,
+     "p50_ns": 1979130,
+     "p95_ns": 2012690,
+     "mean_ns": 1981071.2666666666,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "docx_semantic_full_text-r4-B2.json",
+     "samples": 15,
+     "p50_ns": 1959369,
+     "p95_ns": 1986000,
+     "mean_ns": 1955651.4,
+     "outcomes": null
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "docx_semantic_full_text-r4-A2.json",
+     "samples": 15,
+     "p50_ns": 1900919,
+     "p95_ns": 1937579,
+     "mean_ns": 1900688.7333333334,
+     "outcomes": null
+    }
+   ],
+   "median_p50_ns": {
+    "before": 1898729.0,
+    "after": 1983220.0
+   },
+   "paired_ratios_after_over_before": [
+    1.0463586564789862,
+    1.043997686473327,
+    1.0413294772444344,
+    1.0281457872122173,
+    1.0642989088409658,
+    1.2439278638448763,
+    1.043850442249168,
+    1.0307482854345713
+   ],
+   "paired_ratio_median": 1.0439240643612475,
+   "paired_ratio_bootstrap_95": [
+    1.0307482854345713,
+    1.0642989088409658
+   ]
+  }
+ ]
+}

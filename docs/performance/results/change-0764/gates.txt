@@ -1,0 +1,80 @@
+# Gates for record 0764, run on the final branch head (bcf67f07c8 plus this record's docs)
+# Environment: CARGO_TARGET_DIR=<scratch target>, CARGO_BUILD_JOBS=6, CARGO_INCREMENTAL=0 (after the coordinator's disk note), TMPDIR under the scratch dir.
+
+$ cargo fmt --all --check
+exit=0
+
+$ cargo check -p xml-minifier -p litchi-opc -p litchi-ooxml-common -p litchi-drawingml -p litchi-formula -p litchi-docx -p litchi-pptx -p litchi-xlsx -p litchi-xldm -p litchi-xlsb -p litchi-spreadsheet-drawing -p litchi-imgconv -p litchi-ppt -p litchi --all-targets --locked --offline
+warning: function `fixture` is never used
+  --> crates/litchi/tests/unexpected_format.rs:15:4
+warning: function `assert_unexpected` is never used
+  --> crates/litchi/tests/unexpected_format.rs:22:4
+warning: function `assert_boxed_unexpected` is never used
+  --> crates/litchi/tests/unexpected_format.rs:30:4
+warning: `litchi` (test "unexpected_format") generated 3 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 28.43s
+exit=0
+
+$ cargo clippy -p xml-minifier -p litchi-opc -p litchi-ooxml-common -p litchi-drawingml -p litchi-formula -p litchi-docx -p litchi-pptx -p litchi-xlsx -p litchi-xldm --lib --no-deps --locked --offline -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 25.54s
+exit=0
+
+$ cargo clippy -p xml-minifier -p litchi-opc -p litchi-ooxml-common -p litchi-drawingml -p litchi-formula -p litchi-docx -p litchi-pptx -p litchi-xlsx -p litchi-xldm --all-targets --no-deps --locked --offline --keep-going -- -D warnings
+error: called `.err().expect()` on a `Result` value
+   --> crates/litchi-pptx/src/opened/tests.rs:464:14
+error: called `.err().expect()` on a `Result` value
+   --> crates/litchi-pptx/src/opened/tests.rs:538:10
+error: called `.err().expect()` on a `Result` value
+   --> crates/litchi-pptx/src/opened/tests.rs:557:10
+error: could not compile `litchi-pptx` (lib test) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+warning: build failed, waiting for other jobs to finish...
+exit=101
+
+$ cargo clippy -p xml-minifier -p litchi-opc -p litchi-ooxml-common -p litchi-drawingml -p litchi-formula -p litchi-docx -p litchi-xlsx -p litchi-xldm --all-targets --no-deps --locked --offline -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 30.43s
+exit=0
+
+$ RUSTDOCFLAGS="-D warnings" cargo doc -p xml-minifier -p litchi-opc -p litchi-ooxml-common -p litchi-drawingml -p litchi-formula -p litchi-docx -p litchi-pptx -p litchi-xlsx -p litchi-xldm --no-deps --locked --offline
+   Generated /home/zhuhe/code/litchi-worktrees/targets/0764/doc/litchi_docx/index.html and 8 other files
+exit=0
+
+$ cargo test -p xml-minifier -p litchi-opc -p litchi-ooxml-common -p litchi-drawingml -p litchi-formula -p litchi-docx -p litchi-pptx -p litchi-xlsx -p litchi-xldm -p litchi-xlsb -p litchi-spreadsheet-drawing -p litchi-imgconv -p litchi-ppt -p litchi-sign -p litchi-crypto --locked --offline --no-fail-fast
+passed 9904 failed 0 ignored 76
+test binaries: 384
+exit=0
+(an earlier run of the same command failed to link while the shared disk was full; it was rerun after cleanup)
+
+$ cargo test -p litchi-odf-common -p litchi-odp -p litchi-odt -p litchi-imgconv --locked --offline --no-fail-fast   (audit dependents, before the sub-implementer merges)
+0 failures
+exit=0
+
+$ cargo test -p litchi --features doc,docx,ppt,pptx,xls,xlsx,xlsb,odt --locked --offline --no-fail-fast
+passed 382 failed 0 ignored 7
+exit=0
+
+$ python3 tools/check_crate_boundaries.py
+  [015] litchi-iwa -> litchi-numbers
+  [016] litchi-iwa -> litchi-numbers-wire
+  [017] litchi-iwa -> litchi-pages
+exit=0
+
+$ python3 tools/non_iwork_gate.py verify
+non-iWork release gate: workspace package inventory mismatch (unexpected: litchi-xldm)
+exit=1
+
+$ python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --mode structural
+OK: 10 performance claims validated (structural)
+exit=0
+
+$ python3 tools/validate_crud_coverage_index.py --index docs/performance/crud-coverage-index-v1.json --catalog docs/performance/results/perf-corpus-manifest-v2.json --selector-source tools/perf-baseline/src/lib.rs --checklist docs/CRUD_Scenario_Checklist.md --repo-root .
+validated non-iWork CRUD coverage index: 15 categories, 33 mapped selectors (contract-only; no run timing report supplied)
+exit=0
+
+$ cargo test --manifest-path tools/perf-baseline/Cargo.toml --locked --offline --no-fail-fast
+passed 577 failed 2 ignored 1
+test pptx_native_image::tests::shapes_original_and_resaved_keep_their_typed_behavior ... FAILED
+test tests::fresh_writer_corpora_are_deterministic_and_identify_the_packaged_stream ... FAILED
+test result: FAILED. 552 passed; 2 failed; 1 ignored; 0 measured; 0 filtered out; finished in 670.12s
+(both are the known failures at base 1d1044e3ac listed in the wave briefing)
+exit=101

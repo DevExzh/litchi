@@ -1,0 +1,368 @@
+{
+ "case": "mce_benign_document",
+ "kind": "bounds",
+ "binaries": {
+  "before": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/a/xml_attribute_bounds",
+  "after": "/home/zhuhe/code/litchi-worktrees/scratch/0764/bin/b/xml_attribute_bounds"
+ },
+ "core": 16,
+ "rounds": 4,
+ "samples_per_process": 31,
+ "warmup_per_process": 3,
+ "process_counters": [
+  {
+   "round": 1,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 1230953399,
+   "cycles": 273321725
+  },
+  {
+   "round": 1,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 1214649686,
+   "cycles": 267049476
+  },
+  {
+   "round": 1,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 1214686665,
+   "cycles": 267945791
+  },
+  {
+   "round": 1,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 1230968439,
+   "cycles": 274127993
+  },
+  {
+   "round": 2,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 1230943239,
+   "cycles": 273845654
+  },
+  {
+   "round": 2,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 1215105531,
+   "cycles": 268003616
+  },
+  {
+   "round": 2,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 1214623134,
+   "cycles": 266899566
+  },
+  {
+   "round": 2,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 1231505662,
+   "cycles": 272366796
+  },
+  {
+   "round": 3,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 1230960996,
+   "cycles": 275878379
+  },
+  {
+   "round": 3,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 1214735282,
+   "cycles": 268462055
+  },
+  {
+   "round": 3,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 1215019347,
+   "cycles": 269373599
+  },
+  {
+   "round": 3,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 1230991052,
+   "cycles": 278096451
+  },
+  {
+   "round": 4,
+   "leg": "A1",
+   "arm": "A",
+   "instructions": 1230995200,
+   "cycles": 274617041
+  },
+  {
+   "round": 4,
+   "leg": "B1",
+   "arm": "B",
+   "instructions": 1214623213,
+   "cycles": 268406294
+  },
+  {
+   "round": 4,
+   "leg": "B2",
+   "arm": "B",
+   "instructions": 1214888673,
+   "cycles": 270254537
+  },
+  {
+   "round": 4,
+   "leg": "A2",
+   "arm": "A",
+   "instructions": 1230981446,
+   "cycles": 278467468
+  }
+ ],
+ "median_process_instructions": {
+  "before": 1230974942.5,
+  "after": 1214710973.5
+ },
+ "median_process_cycles": {
+  "before": 274372517.0,
+  "after": 268204955.0
+ },
+ "series": [
+  {
+   "series": "default",
+   "processes": [
+    {
+     "round": 1,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_benign_document-r1-A1.json",
+     "samples": 31,
+     "p50_ns": 1778779,
+     "p95_ns": 1787289,
+     "mean_ns": 1779156.7419354839,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_benign_document-r1-B1.json",
+     "samples": 31,
+     "p50_ns": 1736579,
+     "p95_ns": 1744639,
+     "mean_ns": 1736775.9032258065,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_benign_document-r1-B2.json",
+     "samples": 31,
+     "p50_ns": 1745209,
+     "p95_ns": 1751699,
+     "mean_ns": 1746361.7419354839,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    },
+    {
+     "round": 1,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_benign_document-r1-A2.json",
+     "samples": 31,
+     "p50_ns": 1785429,
+     "p95_ns": 1798239,
+     "mean_ns": 1786720.6451612904,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_benign_document-r2-A1.json",
+     "samples": 31,
+     "p50_ns": 1783319,
+     "p95_ns": 1795470,
+     "mean_ns": 1785114.2258064516,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_benign_document-r2-B1.json",
+     "samples": 31,
+     "p50_ns": 1744379,
+     "p95_ns": 1753789,
+     "mean_ns": 1743971.0967741935,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_benign_document-r2-B2.json",
+     "samples": 31,
+     "p50_ns": 1736978,
+     "p95_ns": 1744499,
+     "mean_ns": 1737398.4838709678,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    },
+    {
+     "round": 2,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_benign_document-r2-A2.json",
+     "samples": 31,
+     "p50_ns": 1771769,
+     "p95_ns": 1789929,
+     "mean_ns": 1774142.2258064516,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_benign_document-r3-A1.json",
+     "samples": 31,
+     "p50_ns": 1808159,
+     "p95_ns": 1820400,
+     "mean_ns": 1797165.8709677418,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_benign_document-r3-B1.json",
+     "samples": 31,
+     "p50_ns": 1746229,
+     "p95_ns": 1758819,
+     "mean_ns": 1749110.7741935484,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_benign_document-r3-B2.json",
+     "samples": 31,
+     "p50_ns": 1752949,
+     "p95_ns": 1767229,
+     "mean_ns": 1753804.677419355,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    },
+    {
+     "round": 3,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_benign_document-r3-A2.json",
+     "samples": 31,
+     "p50_ns": 1810859,
+     "p95_ns": 1819479,
+     "mean_ns": 1812246.935483871,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A1",
+     "arm": "A",
+     "report": "mce_benign_document-r4-A1.json",
+     "samples": 31,
+     "p50_ns": 1789859,
+     "p95_ns": 1801069,
+     "mean_ns": 1791245.8709677418,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B1",
+     "arm": "B",
+     "report": "mce_benign_document-r4-B1.json",
+     "samples": 31,
+     "p50_ns": 1746689,
+     "p95_ns": 1759129,
+     "mean_ns": 1747563.3548387096,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "B2",
+     "arm": "B",
+     "report": "mce_benign_document-r4-B2.json",
+     "samples": 31,
+     "p50_ns": 1742529,
+     "p95_ns": 1775509,
+     "mean_ns": 1756496.322580645,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    },
+    {
+     "round": 4,
+     "leg": "A2",
+     "arm": "A",
+     "report": "mce_benign_document-r4-A2.json",
+     "samples": 31,
+     "p50_ns": 1818740,
+     "p95_ns": 1832519,
+     "mean_ns": 1815272.0967741935,
+     "outcomes": [
+      "ok:6b03c07a9f6beb0db94a430fa91db24d5843a436f57ef5f337459bb783dd8229"
+     ]
+    }
+   ],
+   "median_p50_ns": {
+    "before": 1787644.0,
+    "after": 1744794.0
+   },
+   "paired_ratios_after_over_before": [
+    0.9762758611384551,
+    0.9774732011186107,
+    0.9781643104795048,
+    0.9803636930096418,
+    0.9657496934727532,
+    0.9680207017774437,
+    0.9758807816705115,
+    0.9580968142780166
+   ],
+   "paired_ratio_median": 0.9760783214044833,
+   "paired_ratio_bootstrap_95": [
+    0.9657496934727532,
+    0.9781643104795048
+   ]
+  }
+ ]
+}
