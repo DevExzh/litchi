@@ -146,8 +146,42 @@ fn build_case(name: &str) -> Result<Case, Box<dyn Error>> {
             input: attribute_flood(200_000).into_bytes(),
             run: run_audit_source,
         },
+        // Benign controls: real producer parts that name the MCE namespace,
+        // read from the repository's fixtures (run from the worktree root).
+        "mce_benign_worksheet" => Case {
+            input: fixture_member(BENIGN_WORKBOOK, BENIGN_WORKSHEET)?,
+            run: run_mce_codec_baseline,
+        },
+        "mce_benign_document" => Case {
+            input: fixture_member(BENIGN_DOCUMENT, "word/document.xml")?,
+            run: run_mce_codec_baseline,
+        },
+        "mce_stream_benign_worksheet" => Case {
+            input: fixture_member(BENIGN_WORKBOOK, BENIGN_WORKSHEET)?,
+            run: run_mce_stream_baseline,
+        },
+        "audit_benign_worksheet" => Case {
+            input: fixture_member(BENIGN_WORKBOOK, BENIGN_WORKSHEET)?,
+            run: run_audit_source,
+        },
+        "docx_styles_benign" => Case {
+            input: fixture_member(BENIGN_STYLES, "word/styles.xml")?,
+            run: run_docx_styles,
+        },
         _ => return Err(format!("unknown case {name}").into()),
     })
+}
+
+const BENIGN_WORKBOOK: &str = "test-data/ooxml/xlsx/StructuredRefs-lots-with-lookups.xlsx";
+const BENIGN_WORKSHEET: &str = "xl/worksheets/sheet3.xml";
+const BENIGN_DOCUMENT: &str = "test-data/ooxml/docx/drawing.docx";
+const BENIGN_STYLES: &str =
+    "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx";
+
+fn fixture_member(package: &str, member: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+    let bytes = std::fs::read(package)?;
+    let archive = ArchiveReader::new(&bytes)?;
+    Ok(archive.read(member)?)
 }
 
 fn declaration_flood(count: usize) -> String {
@@ -248,6 +282,21 @@ fn run_mce_codec(input: &[u8]) -> String {
 
 fn run_mce_stream(input: &[u8]) -> String {
     stream_digest(input, &Capabilities::new())
+}
+
+fn run_mce_codec_baseline(input: &[u8]) -> String {
+    match process_markup_compatibility(
+        input,
+        &Capabilities::ooxml_baseline(),
+        &MceLimits::default(),
+    ) {
+        Ok(output) => format!("ok:{}", sha256_hex(output.xml.as_ref())),
+        Err(error) => format!("err:{error}"),
+    }
+}
+
+fn run_mce_stream_baseline(input: &[u8]) -> String {
+    stream_digest(input, &Capabilities::ooxml_baseline())
 }
 
 fn run_docx_styles(input: &[u8]) -> String {
