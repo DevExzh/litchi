@@ -66,6 +66,10 @@ This packet backs [record 0759](../../0759-spec-gap-branch-merge.md).
   - the promotion script, which verifies that only the DOC corpora changed,
     and its summary of old and new identities.
 
+- **[remaining-absence-probes.txt](remaining-absence-probes.txt).** Part
+  lookups that may still read a decode failure as absence. The review
+  follow-up found them and left them unchanged. Each needs its own review.
+
 [cleanup.json](cleanup.json) lists what was removed after the gates ran: the
 two tip worktrees, every build directory and the scratch directory. The
 integration worktree is kept.

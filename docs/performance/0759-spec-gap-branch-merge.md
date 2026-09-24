@@ -135,12 +135,23 @@ typed refusals are kept, no `unsafe` is added, and accepted ADRs bind.
      incoming side's security review specified.
    - Our 0623 read-count tests now remove exactly those probes, asserting one
      per entry, and keep their exact prefetch shapes (3, 9 and 13 reads).
-3. **Header disagreement is refused at open.**
-   - A central-directory CRC that disagrees with the local header or data
-     descriptor is now refused at open. This is framing, with no
-     decompression.
+3. **A disagreeing data descriptor is refused at open by in-memory
+   ingresses.** (Corrected after the review. The first version said every
+   ingress refused a CRC that disagrees with the local header or descriptor
+   at open.)
+   - Every `OpcPackage` constructor is in-memory, deferred or eager. Each
+     indexes every member's local framing at open, so a data descriptor whose
+     CRC disagrees with the central record is refused there. This is framing,
+     with no decompression.
+   - The positional (source-backed) ingress and the catalog probe read only
+     an 8-byte local-header prefix per member at admission. They admit such a
+     member, and the positional ingress refuses it at the first read.
+   - No ingress compares a sized member's local-header CRC with the central
+     record at open.
    - A payload that fails its CRC still surfaces at first decode, as ADR 0030
-     requires.
+     requires. For the eager ingress, which decodes everything, that is at
+     open.
+   - `crates/litchi-opc/tests/zip_admission_ingress.rs` pins this timing.
    - Our fixtures that simulated payload corruption by flipping only the
      central CRC now flip it consistently in all three places, so they still
      test first-read refusal (XLSB threaded comments, PPTX master/layout).
@@ -165,8 +176,16 @@ typed refusals are kept, no `unsafe` is added, and accepted ADRs bind.
      InkAction operations only.
    - The incoming XLSX SVG census moved from `Edit::new` to the first SVG
      operation, so ordinary edits stay lazy.
-   - Only `PartNotFound` means "absent" (0661). Incoming probes that read any
-     error as absence were rewritten.
+   - Only `PartNotFound` means "absent" (0661). (Corrected after the review.
+     The first version said every incoming probe that read any error as
+     absence was rewritten.) The merge rewrote the probes its conflicts
+     touched. The review found six more that read any `get_part` error as
+     absence, and nine more of the same class came up while fixing them. All
+     fifteen now decide presence with the new no-decode
+     `OpcPackage::part_metadata`, and propagate the decode error wherever they
+     read the payload (see *Post-merge fixes*). Other probes of the same class
+     remain, listed in
+     [remaining-absence-probes.txt](results/change-0759/remaining-absence-probes.txt).
 6. **CFB directory names.**
    - The incoming spec-correct case folding is kept; our ASCII fast path
      (0559) sits on top.
@@ -380,13 +399,14 @@ None was fixed here:
 - (3) needs the incoming owner to say which refusal message is intended.
 - (4)–(6) belong to the tips' owners, and iWork is out of scope.
 
+After the merge, (1), (2), (3) and (6) were fixed on this branch; see
+*Post-merge fixes*. (4) and (5), both iWork, remain.
+
 ## Open risks and follow-ups
 
-- **DOC fresh-writer identity (pre-existing 2).**
-  - Until it is re-baselined, `doc_fresh_write_to` rows have a new corpus
-    identity. They cannot be compared with pre-merge DOC fresh-writer
-    measurements.
-  - Owner decision: re-pin and regenerate the catalog, or keep the old bytes.
+- **DOC fresh-writer identity (pre-existing 2).** Resolved: re-pinned under
+  owner decision 4. `doc_fresh_write_to` rows are not comparable with
+  pre-merge DOC fresh-writer measurements (see *Post-merge fixes*).
 - **Admission cost on range sources.** Positional opens now make one small
   read per ZIP member. 0623 and 0632's other read savings stand. Coalescing
   the probes (for example, through the structural prefetch) is a candidate
@@ -400,7 +420,8 @@ None was fixed here:
   checks existed; their numbers describe the pre-merge code.
 - **Incoming-side inconsistency.** `litchi-cfb` no longer folds
   supplementary-plane characters, but `litchi-ole-common`'s `cfb_path.rs`
-  still does, and one test relies on it. Not changed here.
+  still did, and one test relied on it. Resolved after the merge (review
+  item 8, see *Post-merge fixes*).
 - **Stale sentence.** `CRUD_COVERAGE.md` still says the v2 index covers "all
   443 current selectors". That dated sentence is in a shared log and was left
   as written; the index now binds 533.
@@ -414,7 +435,32 @@ None was fixed here:
 - Re-baselining the DOC fresh-writer corpus.
 - Fixes to the pre-existing failures above.
 
-## Follow-up: DOC fresh-writer corpus identity
+## Post-merge fixes
+
+These commits follow the merge record on `integration/spec-gap-merge`
+(`b3cf1545f7..`). The first group fixes four of the six pre-existing
+failures. The second group answers the coordinator's independent review of
+the merge. Items 4 and 5, the iWork failures, stay with their owners.
+
+### Pre-existing failures fixed
+
+| Failure | Fix | Commit |
+|---|---|---|
+| 1. non-iWork inventory | `litchi-xldm` registered as the 46th bulk package (65 workspace packages), in the gate and its independent test fixture | `545a1eef02` |
+| 2. DOC fresh-writer identity | re-pinned (below) | `6c0aeb487b` |
+| 3. PPTX resaved-shapes refusal | the fixture's picture has an empty `<a:stretch/>`, and since the incoming `511818cd81` the inventory parses the raw source range, so the validator's empty-stretch check fires first. The test now asserts `Invalid` with that refusal; the validator and its order are unchanged | `363464194e` |
+| 6. facade `unit_arg` | the markdown-less `DocxSourceCache` is a unit struct instead of `()` | `efc1accd65` |
+
+A merge-caused failure that no gate runs was also fixed. The incoming
+`bfdc911c05` pinned its own 31-corpus catalog in
+`test_warm_and_cold_rows_share_corpus_with_distinct_dimensions`; it now pins
+the merged 43 (`497f0cf887`).
+
+One open question for the incoming owner: ECMA-376's
+`CT_StretchInfoProperties` is understood to make `a:fillRect` optional, so
+refusing an empty stretch may be stricter than the schema.
+
+### DOC fresh-writer corpus identity
 
 Pre-existing failure 2 is resolved by re-pinning, under owner decision 4
 (record 0758), which accepts new deterministic bytes from creation writers.
@@ -445,6 +491,91 @@ Pre-existing failure 2 is resolved by re-pinning, under owner decision 4
   `tools/perf_abba_summary.py` still pins 0274's `doc_owner_public_phases`
   contract, the old DOC identities included. It is unchanged, so a new ABBA
   run of that selector would need its own re-pin.
+
+### Review follow-up
+
+Each item was fixed with a regression test. Where practical, the test was seen
+failing before its fix. Item numbers are the review's.
+
+- **Shared helper (`8fb6bbb3ef`).** `OpcPackage::part_metadata` resolves
+  names exactly as `get_part` does and never decodes, so `None` means only
+  "absent". Every absence fix below uses it.
+- **2. Managed revision dispositions (`fa3c3435a0`).** `apply_revision`,
+  `accept_revision` and `reject_revision`, and the raw replay path, now run
+  `ensure_unmanaged` first. They are refused like `replace_revision_text`
+  (`UnsafeEdit`), with no state or budget change.
+- **3. Revisions query admission (`3490a14427`).** `revisions_with_limits`
+  now checks execution, admits and charges the parser workspace, parses, and
+  checks again, like `extract_text`.
+- **4. Decode failures read as absence.** Every site now decides presence from
+  metadata and propagates the decode error where it reads the payload:
+  - the six named sites: Web Extensions durable, `package_has_part` and the
+    absent-closure check (`086275d8ce`); OPC batch relationship targets
+    (`8ac14e35a9`); Ink durable size and equality (`e2bed4e65d`); XLSB
+    calculation-chain classification (`4d2597374c`);
+  - nine more of the same class found while fixing them: the present-closure
+    check of the Web Extensions restore (`086275d8ce`); Ink `capture_part`
+    (`e2bed4e65d`); the Ink source guard (`6e13db9188`); mail-merge targets
+    (`2a74cbea73`); font-embedding settings (`782361cc47`); the `altChunk`
+    namespace choice (`0833d667c0`); the two review nits (below).
+
+  The XLSB change is not observable on the public path, because
+  `parse_chart_resources` reads, and refuses, every part of a chart graph
+  first. Its test exercises the classification directly. The remaining sites
+  are in
+  [remaining-absence-probes.txt](results/change-0759/remaining-absence-probes.txt).
+  Judgement 5 is corrected above.
+- **5. Content-types pristine proof (`92874f1916`).** Preservation copies the
+  source `[Content_Types].xml` only while the package still holds the
+  manifest allocation the open captured (`Arc::ptr_eq`). A replaced manifest
+  that describes the same parts is now published on both the preservation
+  route and the full writer.
+- **6. Record and test accuracy (`a498b24dc6`).**
+  - Judgement 3 is corrected above.
+  - The `compressed_transfer` comment now says only in-memory ingresses refuse
+    a disagreeing descriptor at open.
+  - The transfer's own descriptor check is exercised again through the
+    positional index it uses. It never captures such a member, and a control
+    shows an intact one is captured.
+  - `tests/zip_admission_ingress.rs` commits the reviewer's probes:
+    encryption, including local-only flags and bit 6, is refused on every
+    ingress for a member nothing reads; benign streaming members open; a
+    payload CRC failure waits for first decode. It also pins the timing
+    stated in judgement 3.
+- **7. Caller XML audited before it becomes provenance (`12a004a4e1`).** These
+  routes now run the publication audit (`VerifiedSource`, source policy)
+  before any mutation, as `try_replace_owned_xml_part` did:
+  - `try_add_owned_xml_part(_bytes)`;
+  - `try_replace_content_types(_with_limits)`;
+  - `try_replace_relationships(_with_limits)`;
+  - the batch's manifest and `.rels` tokens.
+
+  The test input is a root `xml:space="bogus"`, which the source validator
+  and the typed parsers accept and the audit refuses. Manifest and
+  relationship tokens are audited with budgets grown to the size the read
+  policy admitted, so the XLSB elevated-limits restore of an 8 MiB
+  source-derived manifest still works. Tokens equal to the retained source
+  are exempt.
+- **8. CFB path folding (`51d37be9c6`).** Object paths compare names with
+  `litchi_cfb::DirectoryNameKey`. Sibling storages "𐐀" and "𐐨" now resolve and
+  remove as distinct entries. The one test that relied on the old fold
+  (`object_stream_delete`) is adapted to the MS-CFB rule.
+- **Nits.**
+  - The `stylesWithEffects` graph walk (`38469c8a5e`) and the XLSX SVG graph
+    walk (`67bcfbedb1`) read names and relationships from metadata.
+  - `PartPayload::bytes`/`arc` are now `decoded_or_empty`/`decoded_arc_or_empty`,
+    with their contract documented (`a6c43f9be6`).
+- **`--all-features` goldens (`fc68c07f62`).** Three PPTX cross-copy goldens
+  (0742, 0751) failed only with `font-subset`, identically on the pre-merge
+  tip `e6cca92db2`, so the merge did not cause them. `allsorts`' default
+  `flate2_zlib` switched flate2 to C zlib, which flate2 prefers over
+  `zlib-rs`, so output bytes depended on the feature set. `allsorts` now uses
+  `flate2_zlib-rs`. The goldens are unchanged, and `libz-sys` left the graph.
+
+### Gates after the fixes
+
+The 16-gate runner runs on the commit that adds this section. The next
+commit adds its logs and results.
 
 ## Cleanup
 
