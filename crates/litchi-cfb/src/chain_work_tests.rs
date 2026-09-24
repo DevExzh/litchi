@@ -788,3 +788,106 @@ fn a_reader_reuses_its_chain_buffers_across_reads_and_errors() {
     assert_eq!(file.stream_chain.visited.words.len(), word_count);
     assert_eq!(file.stream_chain.sectors.capacity(), capacity);
 }
+
+/// Review follow-up (record 0769): a reader frees a chain buffer whose
+/// capacity exceeds `RETAINED_CHAIN_SCRATCH_BYTES` after the read that used
+/// it, on the FAT and MiniFAT paths and on success and error alike, keeps a
+/// buffer at or below the threshold, and keeps its visited map.
+#[test]
+fn a_reader_frees_an_oversized_chain_buffer_after_each_read() {
+    let limit = RETAINED_CHAIN_SCRATCH_BYTES / size_of::<u32>();
+    let sizes: Vec<usize> = (0..12)
+        .map(|index| if index % 2 == 0 { 700 } else { 9_000 })
+        .collect();
+    let bytes = build_file(SECTOR_SIZE_V3, &sizes);
+    let mut file = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let paths = file.list_streams();
+    let expected = read_every_stream(&mut OleFile::open(Cursor::new(bytes)).unwrap(), &paths);
+    assert!(expected.iter().all(Result::is_ok));
+    // Cover both tables, so the map's buffer is fixed from here on.
+    assert_eq!(read_every_stream(&mut file, &paths), expected);
+    let words = file.stream_chain.visited.words.as_ptr();
+
+    let streams = stream_entries(&file);
+    let path_of = |sid: usize| {
+        let name = &file.dir_entries[sid].as_ref().unwrap().name;
+        paths
+            .iter()
+            .position(|path| path.last() == Some(name))
+            .unwrap()
+    };
+    let mini = path_of(streams.iter().find(|stream| stream.1).unwrap().0);
+    let regular = path_of(streams.iter().find(|stream| !stream.1).unwrap().0);
+
+    for index in [regular, mini] {
+        let refs: Vec<&str> = paths[index].iter().map(String::as_str).collect();
+        // An oversized buffer is freed by the read, which still succeeds.
+        file.stream_chain.sectors.reserve_exact(limit + 1);
+        assert!(file.stream_chain.sectors.capacity() > limit);
+        assert_eq!(outcome(file.open_stream(&refs)), expected[index]);
+        assert_eq!(file.stream_chain.sectors.capacity(), 0);
+        // A buffer exactly at the threshold is kept.
+        file.stream_chain.sectors = Vec::with_capacity(limit);
+        let kept = file.stream_chain.sectors.as_ptr();
+        assert_eq!(outcome(file.open_stream(&refs)), expected[index]);
+        assert_eq!(file.stream_chain.sectors.as_ptr(), kept);
+        assert_eq!(file.stream_chain.sectors.capacity(), limit);
+        file.stream_chain.sectors = Vec::new();
+        // The visited map is the same buffer, and all-clear.
+        assert_eq!(file.stream_chain.visited.words.as_ptr(), words);
+        assert!(all_clear(&file.stream_chain.visited));
+    }
+
+    // A failed read frees an oversized buffer too.
+    let regular_stream = streams.iter().find(|stream| !stream.1).unwrap();
+    let saved = file.fat.clone();
+    let chain = chain_of(&file.fat, regular_stream.2);
+    file.fat[usize::try_from(chain[chain.len() - 1]).unwrap()] = chain[0];
+    file.stream_chain.sectors.reserve_exact(limit + 1);
+    let refs: Vec<&str> = paths[regular].iter().map(String::as_str).collect();
+    assert_eq!(
+        outcome(file.open_stream(&refs)),
+        Err(format!(
+            "Corrupted file: Cycle detected in FAT chain at sector {}",
+            chain[0]
+        ))
+    );
+    assert_eq!(file.stream_chain.sectors.capacity(), 0);
+    assert!(all_clear(&file.stream_chain.visited));
+    file.fat = saved;
+    assert_eq!(read_every_stream(&mut file, &paths), expected);
+}
+
+/// Review follow-up (record 0769): the MiniFAT read, like the FAT read, holds
+/// its chain buffers outside the reader while it works and puts them back,
+/// so mini stream reads keep reusing one scratch, all-clear after each.
+#[test]
+fn a_mini_stream_read_puts_its_chain_buffers_back() {
+    let bytes = build_file(SECTOR_SIZE_V4, &[700, 1_500, 64, 3_000, 9_000]);
+    let mut file = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let paths = file.list_streams();
+    let expected = read_every_stream(&mut OleFile::open(Cursor::new(bytes)).unwrap(), &paths);
+    let mini: Vec<usize> = (0..paths.len())
+        .filter(|&index| expected[index].as_ref().unwrap().len() < 4096)
+        .collect();
+    assert_eq!(mini.len(), 4);
+    // The first mini read loads the root mini stream through the FAT read,
+    // then collects its own chain; both put their buffers back.
+    let first: Vec<&str> = paths[mini[0]].iter().map(String::as_str).collect();
+    assert_eq!(outcome(file.open_stream(&first)), expected[mini[0]]);
+    let words = file.stream_chain.visited.words.len();
+    let capacity = file.stream_chain.sectors.capacity();
+    assert!(
+        words > 0 && capacity > 0,
+        "{words} words, {capacity} entries"
+    );
+    for _ in 0..3 {
+        for &index in &mini {
+            let refs: Vec<&str> = paths[index].iter().map(String::as_str).collect();
+            assert_eq!(outcome(file.open_stream(&refs)), expected[index]);
+            assert_eq!(file.stream_chain.visited.words.len(), words);
+            assert_eq!(file.stream_chain.sectors.capacity(), capacity);
+            assert!(all_clear(&file.stream_chain.visited));
+        }
+    }
+}
