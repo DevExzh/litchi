@@ -15,7 +15,7 @@ mod policy;
 mod tests;
 
 pub use model::{Mode, Range, Ranges, Reserved, Role, Selector, User};
-pub(crate) use policy::classify;
 pub use policy::{
     AuthorizationError, EditProtection, PackagePatch, ProtectionAuthorization, ProtectionPolicy,
 };
+pub(crate) use policy::{classify, classify_with};
