@@ -86,7 +86,7 @@ fn default_limit_is_documented_and_within_the_ceiling() {
         defaults.max_element_attributes(),
         Limits::DEFAULT_ELEMENT_ATTRIBUTES
     );
-    assert!(Limits::DEFAULT_ELEMENT_ATTRIBUTES <= Limits::ELEMENT_ATTRIBUTE_CEILING);
+    const { assert!(Limits::DEFAULT_ELEMENT_ATTRIBUTES <= Limits::ELEMENT_ATTRIBUTE_CEILING) };
     assert_eq!(
         Limits::ceiling(Resource::ElementAttributes),
         Limits::ELEMENT_ATTRIBUTE_CEILING

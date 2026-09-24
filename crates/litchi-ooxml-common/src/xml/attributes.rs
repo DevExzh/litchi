@@ -52,7 +52,7 @@ pub fn first_wins<'a>(tag: &'a BytesStart<'_>) -> FirstWins<'a> {
     attributes.with_checks(false);
     FirstWins {
         attributes,
-        base: &**tag,
+        base: tag,
         seen: FirstSeen::default(),
     }
 }
@@ -181,7 +181,7 @@ impl<K: Ord> SeenNames<K> {
     #[must_use]
     pub fn contains(&self, key: &K) -> bool {
         if self.ordered.is_empty() {
-            self.linear.iter().any(|seen| seen == key)
+            self.linear.contains(key)
         } else {
             self.ordered.contains(key)
         }
@@ -190,7 +190,7 @@ impl<K: Ord> SeenNames<K> {
     /// Insert `key`; `false` when it was already present.
     pub fn insert(&mut self, key: K) -> bool {
         if self.ordered.is_empty() {
-            if self.linear.iter().any(|seen| *seen == key) {
+            if self.linear.contains(&key) {
                 return false;
             }
             if self.linear.len() < LINEAR_NAMES {
