@@ -4118,6 +4118,10 @@ struct Options {
     /// Caller-named OOXML files for the opt-in `*_real_file_ordinary_save_*`
     /// selectors (change 0638). Repeatable, at most one per format.
     ooxml_files: Vec<PathBuf>,
+    /// Explicit durability level for the timed saves of the ordinary-save
+    /// lifecycle and atomic-publish selectors (change 0761). `None` times the
+    /// documented `save`.
+    save_durability: Option<litchi_core::Durability>,
 }
 
 #[derive(Debug)]
@@ -12541,12 +12545,13 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     let (_, _, phase) = case
                         .ordinary_save_plan()
                         .ok_or("ordinary-save case has no plan")?;
-                    results.push(ordinary_save::run_case(
+                    results.push(ordinary_save::run_case_with_durability(
                         case,
                         phase,
                         &corpus,
                         options.warmup_iterations,
                         options.samples,
+                        options.save_durability,
                     )?);
                 }
             }
@@ -12872,6 +12877,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
     let mut marker_evidence = None;
     let mut ole2_files: Vec<PathBuf> = Vec::new();
     let mut ooxml_files: Vec<PathBuf> = Vec::new();
+    let mut save_durability = None;
     let mut arguments = std::env::args().skip(1);
 
     while let Some(argument) = arguments.next() {
@@ -13001,12 +13007,19 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
                     arguments.next().ok_or("--ooxml-file requires PATH")?,
                 ));
             },
+            "--save-durability" => {
+                save_durability = Some(parse_save_durability(arguments.next())?);
+            },
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
             },
             _ => return Err(format!("unrecognized argument {argument:?}; use --help").into()),
         }
+    }
+
+    if save_durability.is_some() && !cases.iter().any(|case| case.is_ordinary_save()) {
+        return Err("--save-durability applies only to the ordinary-save selectors".into());
     }
 
     Ok(Options {
@@ -13034,6 +13047,22 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
         marker_evidence,
         ole2_files,
         ooxml_files,
+        save_durability,
+    })
+}
+
+/// Parses `--save-durability full|file-only|no-sync` (change 0761).
+fn parse_save_durability(value: Option<String>) -> Result<litchi_core::Durability, Box<dyn Error>> {
+    let value = value.ok_or("--save-durability requires full, file-only, or no-sync")?;
+    [
+        litchi_core::Durability::Full,
+        litchi_core::Durability::FileOnly,
+        litchi_core::Durability::NoSync,
+    ]
+    .into_iter()
+    .find(|level| level.as_str() == value)
+    .ok_or_else(|| {
+        format!("--save-durability {value:?} is not one of full, file-only, or no-sync").into()
     })
 }
 
@@ -14371,6 +14400,9 @@ fn usage_text() -> String {
            --ooxml-file PATH           OOXML file for the opt-in\n\
                                        *_real_file_ordinary_save_* selectors; repeatable,\n\
                                        at most one DOCX, one XLSX and one PPTX per run\n\
+           --save-durability LEVEL     full, file-only or no-sync: time the ordinary-save\n\
+                                       *_lifecycle and *_atomic_publish saves through\n\
+                                       save_with_durability at LEVEL (default: save)\n\
            --help                      Show this help"
     )
 }
