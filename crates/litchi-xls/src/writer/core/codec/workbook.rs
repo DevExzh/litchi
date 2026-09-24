@@ -4,6 +4,16 @@ use super::super::{
     WorkbookWindowOptions, Writer,
 };
 use crate::error::{Error, Result};
+use crate::writer::formatting::MAX_XF_RECORDS_WITH_XFCRC;
+use crate::writer::string_limits::record_len;
+
+/// The refusal of an XF table an `XFCRC` record cannot count.
+pub(super) const fn xfcrc_capacity_error() -> Error {
+    Error::TooMany {
+        collection: "XF records of a workbook with XFExt records or a pivot table",
+        limit: MAX_XF_RECORDS_WITH_XFCRC,
+    }
+}
 
 impl Writer {
     /// Set the date system (1900 vs 1904)
@@ -133,17 +143,72 @@ impl Writer {
         self.mdx_metadata = metadata;
     }
 
+    /// Whether the workbook writes an `XFCRC` record, which caps its XF
+    /// table at 4050 records ([MS-XLS] 2.4.354): it does for `XFExt` records
+    /// and for pivot tables.
+    fn writes_xfcrc(&self) -> bool {
+        !self.xf_extensions.is_empty() || self.fmt.pivot_xfs_enabled()
+    }
+
+    /// Refuses, with [`Error::TooMany`], `added` more cell XFs when an
+    /// `XFCRC` record caps the XF table and they would take it past 4050
+    /// records.
+    pub(super) fn check_xf_capacity(&self, added: usize) -> Result<()> {
+        if self.writes_xfcrc()
+            && self.fmt.xf_record_count_with(added, false) > MAX_XF_RECORDS_WITH_XFCRC
+        {
+            return Err(xfcrc_capacity_error());
+        }
+        Ok(())
+    }
+
     /// Set the `XFExt` formatting property extensions (MS-XLS 2.4.355)
-    /// emitted after the XF table. Each extension's `xf_index` is validated
-    /// against the written XF record count when the workbook is saved.
-    pub fn set_xf_extensions(&mut self, xf_extensions: Vec<crate::XfExt>) {
+    /// emitted after the XF table.
+    ///
+    /// # Errors
+    ///
+    /// Refuses the whole list, leaving the previous one in place, when an
+    /// extension's `xf_index` names no XF record the workbook writes; when
+    /// its record would be longer than one BIFF8 record holds
+    /// ([`Error::RecordTooLong`]; `XFExt` has no continuation); or when the
+    /// workbook already has more than the 4050 XF records an `XFCRC` record
+    /// allows ([`Error::TooMany`]). An XF record, once written, stays
+    /// written, so an index accepted here stays valid.
+    pub fn set_xf_extensions(&mut self, xf_extensions: Vec<crate::XfExt>) -> Result<()> {
+        if !xf_extensions.is_empty() {
+            let xf_count = self.fmt.xf_record_count();
+            if xf_count > MAX_XF_RECORDS_WITH_XFCRC {
+                return Err(xfcrc_capacity_error());
+            }
+            for extension in &xf_extensions {
+                if usize::from(extension.xf_index()) >= xf_count {
+                    return Err(Error::InvalidData(format!(
+                        "XFExt references XF index {} but only {xf_count} XF records are written",
+                        extension.xf_index()
+                    )));
+                }
+                record_len("XFExt", extension.to_payload()?.len())?;
+            }
+        }
         self.xf_extensions = xf_extensions;
+        Ok(())
     }
 
     /// Set the `StyleExt` cell-style extensions (MS-XLS 2.4.270) emitted
     /// after the built-in STYLE records.
-    pub fn set_style_extensions(&mut self, style_extensions: Vec<crate::StyleExt>) {
+    ///
+    /// # Errors
+    ///
+    /// Refuses the whole list, leaving the previous one in place, when an
+    /// extension does not encode or its record would be longer than one
+    /// BIFF8 record holds ([`Error::RecordTooLong`]; `StyleExt` has no
+    /// continuation).
+    pub fn set_style_extensions(&mut self, style_extensions: Vec<crate::StyleExt>) -> Result<()> {
+        for extension in &style_extensions {
+            record_len("StyleExt", extension.to_payload()?.len())?;
+        }
         self.style_extensions = style_extensions;
+        Ok(())
     }
 
     /// # Errors

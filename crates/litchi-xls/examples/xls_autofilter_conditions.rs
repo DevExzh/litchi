@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         2, // column index within filter range (0-based)
         false,
         AutoFilterConditionWrite::Number {
-            operator: 0x06, // >
+            operator: 0x04, // > ([MS-XLS] 2.5.5 grbitSign)
             value: 50.0,
         },
         AutoFilterConditionWrite::None,
@@ -180,11 +180,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         2,
         false, // AND
         AutoFilterConditionWrite::Number {
-            operator: 0x07, // >=
+            operator: 0x06, // >=
             value: 10.0,
         },
         AutoFilterConditionWrite::Number {
-            operator: 0x05, // <=
+            operator: 0x03, // <=
             value: 30.0,
         },
     )?;

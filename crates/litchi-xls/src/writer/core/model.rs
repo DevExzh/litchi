@@ -5,6 +5,11 @@ use super::worksheet::WritableWorksheet;
 use crate::encryption::WriterEncryption;
 use crate::error::{Error, Result};
 use crate::page_setup::{PrintComments, PrintErrors, PrintOrder, PrintOrientation};
+use crate::writer::string_limits::{
+    PIVOT_CACHE_FIELD_NAME_UNITS, PIVOT_DATA_FIELD_NAME_UNITS, PIVOT_DATA_ITEM_NAME_UNITS,
+    PIVOT_FIELD_NAME_UNITS, PIVOT_ITEM_NAME_UNITS, PIVOT_TABLE_NAME_UNITS, ensure_utf16_len_within,
+    pivot_cache_string_units,
+};
 use crate::{DifferentialFormat, TableStyle, TableStyles, XfProperty};
 use std::collections::HashSet;
 /// Public configuration for adding a pivot table via [`Writer::add_pivot_table`].
@@ -118,7 +123,91 @@ impl PivotCacheValue {
     }
 }
 
+/// Refuses a PivotTable string its record cannot hold: `field` names the
+/// string, `minimum` is its least length in UTF-16 code units and `limit`
+/// its greatest.
+fn check_pivot_string(
+    value: &str,
+    field: &'static str,
+    minimum: usize,
+    limit: usize,
+) -> Result<()> {
+    if value.is_empty() && minimum > 0 {
+        return Err(Error::InvalidData(format!("{field} must not be empty")));
+    }
+    ensure_utf16_len_within(value, limit, field)
+}
+
+/// Refuses a PivotCache string item or group item an `SXString` record
+/// ([MS-XLS] 2.4.304) cannot hold: `SXString` has no continuation, and the
+/// writer stores a non-ASCII string as UTF-16.
+fn check_pivot_cache_item(item: &crate::PivotCacheItem) -> Result<()> {
+    if let crate::PivotCacheItem::String(value) = item {
+        ensure_utf16_len_within(
+            value,
+            pivot_cache_string_units(value.is_ascii()),
+            "PivotCache string item",
+        )?;
+    }
+    Ok(())
+}
+
+/// The string lengths [MS-XLS] 2.4.278–2.4.313 allow in a PivotTable's
+/// view, field, item, data-item and cache-field records, counted in UTF-16
+/// code units as their `cch` fields count them.
+fn validate_pivot_table_strings(config: &PivotTableConfig) -> Result<()> {
+    check_pivot_string(&config.name, "PivotTable name", 0, PIVOT_TABLE_NAME_UNITS)?;
+    check_pivot_string(
+        &config.data_field_name,
+        "PivotTable data field name",
+        1,
+        PIVOT_DATA_FIELD_NAME_UNITS,
+    )?;
+    // The DConRef self-reference names the source worksheet.
+    if crate::records::sheet_name_fault(&config.source_sheet_name).is_some() {
+        return Err(Error::InvalidData(format!(
+            "PivotTable source worksheet name {:?} is not a BIFF8 worksheet name",
+            config.source_sheet_name
+        )));
+    }
+    for field in &config.fields {
+        if let Some(name) = &field.name {
+            check_pivot_string(name, "PivotTable field name", 1, PIVOT_FIELD_NAME_UNITS)?;
+        }
+        check_pivot_string(
+            &field.cache_name,
+            "PivotCache field name",
+            0,
+            PIVOT_CACHE_FIELD_NAME_UNITS,
+        )?;
+        for item in &field.items {
+            if let Some(name) = &item.name {
+                check_pivot_string(name, "PivotTable item name", 0, PIVOT_ITEM_NAME_UNITS)?;
+            }
+        }
+        for item in &field.cache_items {
+            check_pivot_cache_item(item)?;
+        }
+        if let Some(grouping) = &field.grouping {
+            for item in grouping.group_items() {
+                check_pivot_cache_item(item)?;
+            }
+        }
+    }
+    for data_item in &config.data_items {
+        // An empty data-item name is written as absent (`cchName` 0xFFFF).
+        check_pivot_string(
+            &data_item.name,
+            "PivotTable data item name",
+            0,
+            PIVOT_DATA_ITEM_NAME_UNITS,
+        )?;
+    }
+    Ok(())
+}
+
 pub(super) fn validate_pivot_table_config(config: &PivotTableConfig) -> Result<()> {
+    validate_pivot_table_strings(config)?;
     if config.source_first_row > config.source_last_row
         || config.source_first_col > config.source_last_col
         || config.first_row > config.last_row
@@ -885,6 +974,8 @@ impl ExternalWorkbookOptions {
                         _ => {},
                     }
                 }
+                // One CRN record holds the row; it has no continuation.
+                crate::writer::biff::crn_payload(row)?;
             }
         }
         Ok(())

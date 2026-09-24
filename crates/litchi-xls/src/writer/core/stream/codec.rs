@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::writer::biff;
-use crate::writer::formatting::FormattingManager;
+use crate::writer::formatting::{FormattingManager, MAX_XF_RECORDS_WITH_XFCRC};
 use crate::writer::formula::{FormulaTokenizer, encode_ptg_tokens};
 use crate::{Error, Result};
 
@@ -155,30 +155,36 @@ pub(crate) fn generate_workbook_stream(
     fmt.write_fonts(&mut stream)?;
     fmt.write_number_formats(&mut stream)?;
     fmt.write_formats(&mut stream)?;
-    if !xf_extensions.is_empty() {
+    // XFS = 16*XF [XFCRC 16*4050XFExt] precedes the DXF records: one XFCRC
+    // counts the XF table, then come the caller's extensions and the pivot
+    // tables' own.
+    if !xf_extensions.is_empty() || has_pivot_tables {
         let xf_count = fmt.xf_record_count();
+        let cxfs = u16::try_from(xf_count)
+            .ok()
+            .filter(|count| usize::from(*count) <= MAX_XF_RECORDS_WITH_XFCRC)
+            .ok_or(Error::TooMany {
+                collection: "XF records of a workbook with XFExt records or a pivot table",
+                limit: MAX_XF_RECORDS_WITH_XFCRC,
+            })?;
         for extension in xf_extensions {
-            if extension.xf_index() >= xf_count {
+            if usize::from(extension.xf_index()) >= xf_count {
                 return Err(Error::InvalidData(format!(
                     "XFExt references XF index {} but only {xf_count} XF records are written",
                     extension.xf_index()
                 )));
             }
         }
-        // XFS = 16*XF [XFCRC 16*4050XFExt]: the extensions follow the XF
-        // table directly; the pivot path writes its own XFCRC block later.
-        if !has_pivot_tables {
-            biff::write_xfcrc(&mut stream, xf_count)?;
-        }
+        biff::write_xfcrc(&mut stream, cxfs)?;
         for extension in xf_extensions {
             biff::write_xf_ext(&mut stream, extension)?;
+        }
+        if has_pivot_tables {
+            biff::write_pivot_xf_extensions(&mut stream, fmt.pivot_xf_indices())?;
         }
     }
     if let Some(styles) = custom_table_styles {
         biff::write_differential_formats(&mut stream, styles.differential_formats())?;
-    }
-    if has_pivot_tables {
-        biff::write_pivot_xfext_block(&mut stream)?;
     }
 
     // Built-in STYLE records to align with Excel / POI
@@ -1169,22 +1175,10 @@ pub(crate) fn generate_workbook_stream(
                     crate::utils::truncate_usize_to_u16(identifier),
                 )?;
                 for rule in &group.rules {
-                    let (condition_type, comparison_op, formula1, formula2) =
-                        rule.format_type.to_biff_payload()?;
-                    let pattern = rule.pattern.as_ref().map(|pat| {
-                        (
-                            pat.pattern as u16,
-                            pat.foreground_color & 0x7f,
-                            pat.background_color & 0x7f,
-                        )
-                    });
-                    biff::write_cfrule(
+                    super::super::conditional_format::write_legacy_rule(
                         &mut stream,
-                        condition_type,
-                        comparison_op,
-                        &formula1,
-                        &formula2,
-                        pattern,
+                        &rule.format_type,
+                        rule.pattern.as_ref(),
                     )?;
                 }
             }
@@ -1251,180 +1245,12 @@ pub(crate) fn generate_workbook_stream(
             .iter()
             .zip(worksheet_pivot_cache_identities)
         {
-            let field_count = crate::utils::truncate_usize_to_u16(pt.fields.len());
-            let data_field_count = crate::utils::truncate_usize_to_u16(pt.data_items.len());
-
-            // Collect field indices per axis.
-            let mut row_field_indices: Vec<u16> = Vec::new();
-            let mut col_field_indices: Vec<u16> = Vec::new();
-            let mut page_field_count: u16 = 0;
-            for (i, f) in pt.fields.iter().enumerate() {
-                match f.axis {
-                    0x0001 => row_field_indices.push(crate::utils::truncate_usize_to_u16(i)),
-                    0x0002 => col_field_indices.push(crate::utils::truncate_usize_to_u16(i)),
-                    0x0004 => page_field_count += 1,
-                    _ => {},
-                }
-            }
-
-            let effective_data_axis = pt.data_axis;
-            let mut effective_data_position = pt.data_position;
-
-            // LibreOffice keeps single-data-field pivots row-oriented without the
-            // EXC_SXIVD_DATA pseudo-field. The data layout pseudo-field is only
-            // relevant when there are multiple data fields.
-            if data_field_count <= 1 {
-                effective_data_position = 0xFFFF;
-            } else {
-                let target_axis = match effective_data_axis {
-                    0x0002 => Some(&mut col_field_indices),
-                    0x0001 => Some(&mut row_field_indices),
-                    _ => None,
-                };
-
-                if let Some(axis_fields) = target_axis {
-                    if let Some(existing_pos) = axis_fields.iter().position(|&idx| idx == 0xFFFE) {
-                        if axis_fields.last().copied() == Some(0xFFFE) {
-                            effective_data_position = 0xFFFF;
-                        } else {
-                            effective_data_position =
-                                crate::utils::truncate_usize_to_u16(existing_pos);
-                        }
-                    } else {
-                        axis_fields.push(0xFFFE);
-                        effective_data_position = 0xFFFF;
-                    }
-                }
-            }
-
-            let row_fields = crate::utils::truncate_usize_to_u16(row_field_indices.len());
-            let col_fields = crate::utils::truncate_usize_to_u16(col_field_indices.len());
-
-            // cRw / cCol = visible data body dimensions.
-            // Per LO Finalize():
-            //   rnDataXclCol = rnXclCol1 + mnRowFields
-            //   rnDataXclRow = rnXclRow1 + mnColFields + 1
-            //   mnDataCols = rnXclCol2 - rnDataXclCol + 1
-            //   mnDataRows = rnXclRow2 - rnDataXclRow + 1
-            let data_row_count = pt.last_row.saturating_sub(pt.first_data_row) + 1;
-            let data_col_count = pt.last_col.saturating_sub(pt.first_data_col) + 1;
-
-            let cache_index = identity.cache_index;
-
-            // 1) SXVIEW — view definition
-            biff::write_sxview(
+            write_pivot_table_view(
                 &mut stream,
-                &biff::SxViewConfig {
-                    first_row: pt.first_row,
-                    last_row: pt.last_row,
-                    first_col: pt.first_col,
-                    last_col: pt.last_col,
-                    first_header_row: pt.first_header_row,
-                    first_data_row: pt.first_data_row,
-                    first_data_col: pt.first_data_col,
-                    cache_index,
-                    data_axis: effective_data_axis,
-                    data_position: effective_data_position,
-                    field_count,
-                    row_field_count: row_fields,
-                    col_field_count: col_fields,
-                    page_field_count,
-                    data_field_count,
-                    data_row_count,
-                    data_col_count,
-                    // fRwGrand(0x01) | fColGrand(0x02) | fAutoFormat(0x08) | fAtrProc(0x200)
-                    flags: 0x020B,
-                    auto_format_index: 1,
-                    name: &pt.name,
-                    data_field_name: &pt.data_field_name,
-                },
+                pt,
+                identity.cache_index,
+                worksheet.view.is_selected(),
             )?;
-
-            // 2) Per-field: SXVD + SXVI items + SXVDEx
-            for field in &pt.fields {
-                biff::write_sxvd(
-                    &mut stream,
-                    &biff::SxVdConfig {
-                        axis: field.axis,
-                        subtotal_count: field.subtotal_count,
-                        subtotal_flags: field.subtotal_flags,
-                        item_count: crate::utils::truncate_usize_to_u16(field.items.len()),
-                        name: field.name.as_deref(),
-                    },
-                )?;
-
-                for item in &field.items {
-                    biff::write_sxvi(
-                        &mut stream,
-                        &biff::SxViConfig {
-                            item_type: item.item_type,
-                            flags: item.flags,
-                            cache_index: item.cache_index,
-                            name: item.name.as_deref(),
-                        },
-                    )?;
-                }
-
-                // SXVDEx — mandatory per LibreOffice
-                biff::write_sxvdex(&mut stream)?;
-            }
-
-            // 3) SXIVD — row field index list
-            biff::write_sxivd(&mut stream, &row_field_indices)?;
-
-            // 4) SXIVD — column field index list
-            biff::write_sxivd(&mut stream, &col_field_indices)?;
-
-            // 5) SXPI — page field entries
-            if !pt.page_entries.is_empty() {
-                biff::write_sxpi(&mut stream, &pt.page_entries)?;
-            }
-
-            // 6) SXDI — data items
-            for di in &pt.data_items {
-                biff::write_sxdi(
-                    &mut stream,
-                    &biff::SxDiConfig {
-                        source_field_index: di.source_field_index,
-                        function: di.function,
-                        display_format: di.display_format,
-                        base_field_index: di.base_field_index,
-                        base_item_index: di.base_item_index,
-                        num_format_index: di.num_format_index,
-                        name: &di.name,
-                    },
-                )?;
-            }
-
-            // 7) SXLI — row line items, then column line items
-            //    Per LO: WriteSxli(mnDataRows, mnRowFields) then
-            //             WriteSxli(mnDataCols, mnColFields)
-            biff::write_sxli(&mut stream, data_row_count, row_fields)?;
-            biff::write_sxli(&mut stream, data_col_count, col_fields)?;
-
-            // 8) SxEx — extended view properties
-            // Per LO Finalize(): mnPagePerRow = mnPageFields,
-            //                    mnPagePerCol = (mnPageFields > 0) ? 1 : 0
-            biff::write_sxex(
-                &mut stream,
-                &biff::SxExConfig {
-                    page_rows: page_field_count,
-                    page_cols: u16::from(page_field_count > 0),
-                    ..biff::SxExConfig::default()
-                },
-            )?;
-
-            let pivot_field_names: Vec<&str> = pt
-                .fields
-                .iter()
-                .map(|field| field.cache_name.as_str())
-                .collect();
-
-            biff::write_pivot_modern_extensions(&mut stream, &pt.name, &pivot_field_names)?;
-            biff::write_pivot_window2(&mut stream, worksheet.view.is_selected())?;
-            biff::write_plv(&mut stream)?;
-            biff::write_selection(&mut stream)?;
-            biff::write_sheet_ext(&mut stream)?;
         }
 
         // PHONETICINFO is a per-sheet record; emit the pivot-era stub at
@@ -1484,4 +1310,200 @@ pub(crate) fn generate_workbook_stream(
         toolbar: None,
         pivot_caches,
     })
+}
+
+/// Write one PivotTable view's records (MS-XLS 2.1.7.20.3, `PIVOTVIEW`).
+///
+/// `add_pivot_table` runs this into a sink when the table is added, so every
+/// refusal it can make happens then, before the writer changes.
+pub(crate) fn write_pivot_table_view<W: std::io::Write>(
+    stream: &mut W,
+    pt: &super::super::worksheet::WritablePivotTable,
+    cache_index: u16,
+    selected: bool,
+) -> Result<()> {
+    let count = |value: usize, what: &str| {
+        u16::try_from(value).map_err(|_error| {
+            Error::InvalidData(format!("PivotTable {what} count exceeds BIFF8 capacity"))
+        })
+    };
+    let field_count = count(pt.fields.len(), "field")?;
+    let data_field_count = count(pt.data_items.len(), "data item")?;
+
+    // Collect field indices per axis.
+    let mut row_field_indices: Vec<u16> = Vec::new();
+    let mut col_field_indices: Vec<u16> = Vec::new();
+    let mut page_field_count: u16 = 0;
+    for (i, f) in pt.fields.iter().enumerate() {
+        match f.axis {
+            0x0001 => row_field_indices.push(count(i, "field")?),
+            0x0002 => col_field_indices.push(count(i, "field")?),
+            // At most `field_count` fields, so this cannot overflow.
+            0x0004 => page_field_count = page_field_count.saturating_add(1),
+            _ => {},
+        }
+    }
+
+    let effective_data_axis = pt.data_axis;
+    let mut effective_data_position = pt.data_position;
+
+    // LibreOffice keeps single-data-field pivots row-oriented without the
+    // EXC_SXIVD_DATA pseudo-field. The data layout pseudo-field is only
+    // relevant when there are multiple data fields.
+    if data_field_count <= 1 {
+        effective_data_position = 0xFFFF;
+    } else {
+        let target_axis = match effective_data_axis {
+            0x0002 => Some(&mut col_field_indices),
+            0x0001 => Some(&mut row_field_indices),
+            _ => None,
+        };
+
+        if let Some(axis_fields) = target_axis {
+            if let Some(existing_pos) = axis_fields.iter().position(|&idx| idx == 0xFFFE) {
+                if axis_fields.last().copied() == Some(0xFFFE) {
+                    effective_data_position = 0xFFFF;
+                } else {
+                    effective_data_position = count(existing_pos, "field")?;
+                }
+            } else {
+                axis_fields.push(0xFFFE);
+                effective_data_position = 0xFFFF;
+            }
+        }
+    }
+
+    let row_fields = count(row_field_indices.len(), "row field")?;
+    let col_fields = count(col_field_indices.len(), "column field")?;
+
+    // cRw / cCol = visible data body dimensions.
+    // Per LO Finalize():
+    //   rnDataXclCol = rnXclCol1 + mnRowFields
+    //   rnDataXclRow = rnXclRow1 + mnColFields + 1
+    //   mnDataCols = rnXclCol2 - rnDataXclCol + 1
+    //   mnDataRows = rnXclRow2 - rnDataXclRow + 1
+    let data_row_count = count(
+        usize::from(pt.last_row.saturating_sub(pt.first_data_row)) + 1,
+        "data row",
+    )?;
+    let data_col_count = count(
+        usize::from(pt.last_col.saturating_sub(pt.first_data_col)) + 1,
+        "data column",
+    )?;
+
+    // 1) SXVIEW — view definition
+    biff::write_sxview(
+        stream,
+        &biff::SxViewConfig {
+            first_row: pt.first_row,
+            last_row: pt.last_row,
+            first_col: pt.first_col,
+            last_col: pt.last_col,
+            first_header_row: pt.first_header_row,
+            first_data_row: pt.first_data_row,
+            first_data_col: pt.first_data_col,
+            cache_index,
+            data_axis: effective_data_axis,
+            data_position: effective_data_position,
+            field_count,
+            row_field_count: row_fields,
+            col_field_count: col_fields,
+            page_field_count,
+            data_field_count,
+            data_row_count,
+            data_col_count,
+            // fRwGrand(0x01) | fColGrand(0x02) | fAutoFormat(0x08) | fAtrProc(0x200)
+            flags: 0x020B,
+            auto_format_index: 1,
+            name: &pt.name,
+            data_field_name: &pt.data_field_name,
+        },
+    )?;
+
+    // 2) Per-field: SXVD + SXVI items + SXVDEx
+    for field in &pt.fields {
+        biff::write_sxvd(
+            stream,
+            &biff::SxVdConfig {
+                axis: field.axis,
+                subtotal_count: field.subtotal_count,
+                subtotal_flags: field.subtotal_flags,
+                item_count: count(field.items.len(), "item")?,
+                name: field.name.as_deref(),
+            },
+        )?;
+
+        for item in &field.items {
+            biff::write_sxvi(
+                stream,
+                &biff::SxViConfig {
+                    item_type: item.item_type,
+                    flags: item.flags,
+                    cache_index: item.cache_index,
+                    name: item.name.as_deref(),
+                },
+            )?;
+        }
+
+        // SXVDEx — mandatory per LibreOffice
+        biff::write_sxvdex(stream)?;
+    }
+
+    // 3) SXIVD — row field index list
+    biff::write_sxivd(stream, &row_field_indices)?;
+
+    // 4) SXIVD — column field index list
+    biff::write_sxivd(stream, &col_field_indices)?;
+
+    // 5) SXPI — page field entries
+    if !pt.page_entries.is_empty() {
+        biff::write_sxpi(stream, &pt.page_entries)?;
+    }
+
+    // 6) SXDI — data items
+    for di in &pt.data_items {
+        biff::write_sxdi(
+            stream,
+            &biff::SxDiConfig {
+                source_field_index: di.source_field_index,
+                function: di.function,
+                display_format: di.display_format,
+                base_field_index: di.base_field_index,
+                base_item_index: di.base_item_index,
+                num_format_index: di.num_format_index,
+                name: &di.name,
+            },
+        )?;
+    }
+
+    // 7) SXLI — row line items, then column line items
+    //    Per LO: WriteSxli(mnDataRows, mnRowFields) then
+    //             WriteSxli(mnDataCols, mnColFields)
+    biff::write_sxli(stream, data_row_count, row_fields)?;
+    biff::write_sxli(stream, data_col_count, col_fields)?;
+
+    // 8) SxEx — extended view properties
+    // Per LO Finalize(): mnPagePerRow = mnPageFields,
+    //                    mnPagePerCol = (mnPageFields > 0) ? 1 : 0
+    biff::write_sxex(
+        stream,
+        &biff::SxExConfig {
+            page_rows: page_field_count,
+            page_cols: u16::from(page_field_count > 0),
+            ..biff::SxExConfig::default()
+        },
+    )?;
+
+    let pivot_field_names: Vec<&str> = pt
+        .fields
+        .iter()
+        .map(|field| field.cache_name.as_str())
+        .collect();
+
+    biff::write_pivot_modern_extensions(stream, &pt.name, &pivot_field_names)?;
+    biff::write_pivot_window2(stream, selected)?;
+    biff::write_plv(stream)?;
+    biff::write_selection(stream)?;
+    biff::write_sheet_ext(stream)?;
+    Ok(())
 }

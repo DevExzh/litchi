@@ -383,7 +383,7 @@ pub(crate) fn validate_font_table(fonts: &[Font]) -> Result<()> {
     Ok(())
 }
 
-fn valid_color_index(index: u16) -> bool {
+pub(crate) fn valid_color_index(index: u16) -> bool {
     matches!(index, 0x0000..=0x0041 | 0x004d..=0x004f | 0x0051 | 0x7fff)
 }
 

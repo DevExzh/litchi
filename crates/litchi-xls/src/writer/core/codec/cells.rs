@@ -1,7 +1,26 @@
 use super::super::super::formatting::{CellStyle, ExtendedFormat};
 use super::super::{CellPos, CellValue, Hyperlink, WritableCell, Writer};
 use crate::error::{Error, Result};
+use crate::writer::formula::{FormulaTokenizer, encode_ptg_tokens};
 use crate::writer::string_limits::{SHARED_STRING_UNITS, ensure_utf16_len_within};
+
+/// Refuses a formula cell the workbook write would refuse, by running the
+/// write's own steps for it — tokenizing, encoding and building its
+/// `Formula` record, into a sink — when the cell is set. The write repeats
+/// them unchanged: they depend only on the cell, its formula and metadata.
+fn check_formula_cell(pos: CellPos, formula: &str, metadata: crate::FormulaMetadata) -> Result<()> {
+    let expression = formula.strip_prefix('=').unwrap_or(formula);
+    let tokens = FormulaTokenizer::new().tokenize(expression)?;
+    let encoded = encode_ptg_tokens(&tokens)?;
+    crate::writer::biff::write_formula_with_metadata(
+        &mut std::io::sink(),
+        u32::from(pos.row()),
+        u16::from(pos.col()),
+        0,
+        &encoded,
+        metadata,
+    )
+}
 
 impl Writer {
     /// Write a string value to a cell
@@ -120,14 +139,20 @@ impl Writer {
     /// recognized by [`FormulaTokenizer`](crate::writer::FormulaTokenizer).
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// Refuses, when it is called, a formula the workbook could not be
+    /// written with: one the tokenizer rejects (such as `SUM(`), one that
+    /// encodes to no tokens, one with a string constant longer than 255
+    /// UTF-16 code units, or one whose `Formula` record would be longer than
+    /// one BIFF8 record. A refused formula leaves the cell unchanged. Also
+    /// returns an error for a cell outside the BIFF8 grid, an unknown
+    /// worksheet or format, or a cell that belongs to a formula group.
     pub fn write_formula(&mut self, sheet: usize, row: u32, col: u16, formula: &str) -> Result<()> {
         self.write_formula_with_format(sheet, row, col, formula, 0)
     }
 
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// Refuses a formula as [`Self::write_formula`] does, before staging it.
     pub fn write_formula_with_format(
         &mut self,
         sheet: usize,
@@ -137,6 +162,11 @@ impl Writer {
         format_id: u16,
     ) -> Result<()> {
         let pos = CellPos::try_new(row, col)?;
+        check_formula_cell(
+            pos,
+            formula,
+            crate::FormulaMetadata::new().with_always_calculate(true),
+        )?;
         self.write_cell(
             sheet,
             pos,
@@ -167,7 +197,8 @@ impl Writer {
     /// Write a formatted formula with explicit BIFF8 `Formula` metadata.
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// Refuses a formula as [`Self::write_formula`] does, and metadata the
+    /// `Formula` record cannot carry for this cell, before staging it.
     pub fn write_formula_with_format_and_metadata(
         &mut self,
         sheet: usize,
@@ -179,6 +210,7 @@ impl Writer {
     ) -> Result<()> {
         crate::formula_metadata::validate_for_write(&metadata)?;
         let pos = CellPos::try_new(row, col)?;
+        check_formula_cell(pos, formula, metadata.clone())?;
         self.write_cell_with_formula_metadata(
             sheet,
             pos,
@@ -213,13 +245,30 @@ impl Writer {
     /// # Errors
     ///
     /// Refuses the style's number format as [`Self::register_number_format`]
-    /// does, before registering anything, so a refused style leaves the writer
-    /// unchanged.
+    /// does; a font a BIFF8 `Font` record cannot store (a name that is empty,
+    /// holds a NUL or is longer than 31 UTF-16 code units, which is
+    /// [`Error::StringTooLong`], or a height, weight, underline or color
+    /// outside BIFF8's values); and, with [`Error::TooMany`], a font past the
+    /// 1022 BIFF8 can address or an XF past the XF index space (4050 XF
+    /// records once the workbook has `XFExt` records or a pivot table). Every
+    /// check runs before anything is registered, so a refused style leaves
+    /// the writer unchanged.
     pub fn add_cell_style(&mut self, style: CellStyle) -> Result<u16> {
+        self.check_xf_capacity(1)?;
         self.fmt.register_cell_style(style)
     }
 
-    pub fn add_cell_format(&mut self, format: ExtendedFormat) -> u16 {
+    /// Register a cell format (XF) and return the identifier the
+    /// `write_*_with_format` methods take.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a format whose font or number format index names nothing
+    /// registered, and a format past the XF index space, as
+    /// [`Self::add_cell_style`] does. A refused format leaves the writer
+    /// unchanged.
+    pub fn add_cell_format(&mut self, format: ExtendedFormat) -> Result<u16> {
+        self.check_xf_capacity(1)?;
         self.fmt.add_format(format)
     }
 
@@ -228,10 +277,15 @@ impl Writer {
     /// Row and column indices are 0-based, matching the rest of the XLS
     /// writer APIs. The hyperlink target can be a standard URL (http, https,
     /// ftp, mailto) or an internal reference such as `Sheet1!A1` or
-    /// `internal:Sheet1!A1`.
+    /// `internal:Sheet1!A1`. Surrounding whitespace is not part of the
+    /// target, and an empty target removes the cell's hyperlink.
     /// # Errors
     ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
+    /// Returns [`Error::StringTooLong`] for a target longer than one `HLink`
+    /// record holds (4,093 UTF-16 code units for an internal location, 4,085
+    /// for a URL) and [`Error::InvalidData`] for one containing a NUL
+    /// character, leaving the worksheet unchanged; and an error for a cell
+    /// outside the BIFF8 grid or a missing worksheet.
     pub fn set_hyperlink(&mut self, sheet: usize, row: u32, col: u16, url: &str) -> Result<()> {
         if row > u32::from(u16::MAX) {
             return Err(Error::InvalidData(
@@ -244,6 +298,7 @@ impl Writer {
                 "set_hyperlink: column index must be < 256 for BIFF8".to_string(),
             ));
         }
+        crate::writer::biff::validate_hyperlink_target(url)?;
 
         let worksheet = self
             .worksheets
@@ -256,13 +311,15 @@ impl Writer {
             !(h.first_row == row && h.last_row == row && h.first_col == col && h.last_col == col)
         });
 
-        worksheet.add_hyperlink(Hyperlink {
-            first_row: row,
-            last_row: row,
-            first_col: col,
-            last_col: col,
-            url: url.to_string(),
-        });
+        if crate::writer::biff::classify_hyperlink(url).is_some() {
+            worksheet.add_hyperlink(Hyperlink {
+                first_row: row,
+                last_row: row,
+                first_col: col,
+                last_col: col,
+                url: url.to_string(),
+            });
+        }
 
         Ok(())
     }

@@ -774,10 +774,8 @@ fn write_field_extension(out: &mut Vec<u8>, value: &PivotViewFieldExtension) -> 
     body.extend_from_slice(
         &value
             .subtotal_name
-            .as_ref()
-            .map_or(u16::MAX, |s| {
-                crate::utils::truncate_usize_to_u16(s.chars().count())
-            })
+            .as_deref()
+            .map_or(Ok(u16::MAX), |s| present_cch(s, "SXVDEx subtotal name"))?
             .to_le_bytes(),
     );
     body.extend_from_slice(&value.reserved);
@@ -799,10 +797,8 @@ fn write_view_extension(out: &mut Vec<u8>, v: &PivotViewExtension) -> Result<()>
     body.extend_from_slice(&v.format_count.to_le_bytes());
     for s in &strings[..3] {
         body.extend_from_slice(
-            &s.as_ref()
-                .map_or(u16::MAX, |x| {
-                    crate::utils::truncate_usize_to_u16(x.chars().count())
-                })
+            &s.as_deref()
+                .map_or(Ok(u16::MAX), |x| present_cch(x, "SxEx string"))?
                 .to_le_bytes(),
         );
     }
@@ -812,10 +808,8 @@ fn write_view_extension(out: &mut Vec<u8>, v: &PivotViewExtension) -> Result<()>
     body.extend_from_slice(&v.flags.to_le_bytes());
     for s in &strings[3..] {
         body.extend_from_slice(
-            &s.as_ref()
-                .map_or(u16::MAX, |x| {
-                    crate::utils::truncate_usize_to_u16(x.chars().count())
-                })
+            &s.as_deref()
+                .map_or(Ok(u16::MAX), |x| present_cch(x, "SxEx style name"))?
                 .to_le_bytes(),
         );
     }
@@ -835,7 +829,7 @@ fn write_query_tag(out: &mut Vec<u8>, v: &PivotQueryTag) -> Result<()> {
     body.push(v.minimum_refresh_version);
     body.push(16);
     body.push(v.first_created_version);
-    body.extend_from_slice(&full_string(&v.table_name));
+    body.extend_from_slice(&full_string(&v.table_name, "QsiSXTag name")?);
     body.extend_from_slice(&v.trailing_payload);
     record(out, QSI_SX_TAG_TYPE, &body)
 }
@@ -846,7 +840,10 @@ fn write_view_ex9(out: &mut Vec<u8>, v: &PivotViewEx9) -> Result<()> {
     body.extend_from_slice(&v.report_flags.to_le_bytes());
     body.extend_from_slice(&v.view_flags.to_le_bytes());
     body.extend_from_slice(&v.auto_format_index.to_le_bytes());
-    body.extend_from_slice(&full_string(&v.grand_total_name));
+    body.extend_from_slice(&full_string(
+        &v.grand_total_name,
+        "SXViewEx9 grand total name",
+    )?);
     record(out, SXVIEWEX9_TYPE, &body)
 }
 fn write_addl(out: &mut Vec<u8>, v: &PivotAdditionalExtension) -> Result<()> {
@@ -871,12 +868,23 @@ fn no_cch(value: &str) -> Vec<u8> {
         out
     }
 }
-fn full_string(value: &str) -> Vec<u8> {
-    let mut out = crate::utils::truncate_usize_to_u16(value.chars().count())
-        .to_le_bytes()
-        .to_vec();
+/// The `cch` of a present string, counted in UTF-16 code units as BIFF8
+/// counts it; 0xFFFF marks an absent string, so a present one is shorter.
+fn present_cch(value: &str, field: &'static str) -> Result<u16> {
+    let units =
+        crate::writer::string_limits::checked_utf16_len(value, usize::from(u16::MAX) - 1, field)?;
+    crate::writer::string_limits::u16_len(units, field)
+}
+
+/// An `XLUnicodeString`: its UTF-16 `cch`, then the option byte and text.
+fn full_string(value: &str, field: &'static str) -> Result<Vec<u8>> {
+    let cch = crate::writer::string_limits::u16_len(
+        crate::writer::string_limits::checked_utf16_len(value, usize::from(u16::MAX), field)?,
+        field,
+    )?;
+    let mut out = cch.to_le_bytes().to_vec();
     out.extend_from_slice(&no_cch(value));
-    out
+    Ok(out)
 }
 fn record(out: &mut Vec<u8>, kind: u16, body: &[u8]) -> Result<()> {
     if body.len() > MAX_RECORD {

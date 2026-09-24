@@ -121,6 +121,32 @@ pub struct ConditionalPattern {
     pub background_color: u16,
 }
 
+/// Write the `CFRule` record of one legacy rule. The workbook write calls
+/// this, and so do the registration checks, into a sink, so a rule the write
+/// would refuse is refused when it is added.
+pub(crate) fn write_legacy_rule<W: std::io::Write>(
+    writer: &mut W,
+    format_type: &ConditionalFormatType,
+    pattern: Option<&ConditionalPattern>,
+) -> Result<()> {
+    let (condition_type, comparison_op, formula1, formula2) = format_type.to_biff_payload()?;
+    let pattern = pattern.map(|pat| {
+        (
+            pat.pattern as u16,
+            pat.foreground_color & 0x7f,
+            pat.background_color & 0x7f,
+        )
+    });
+    crate::writer::biff::write_cfrule(
+        writer,
+        condition_type,
+        comparison_op,
+        &formula1,
+        &formula2,
+        pattern,
+    )
+}
+
 /// Conditional formatting rule applied to a rectangular cell range.
 ///
 /// Row and column indices are 0-based and inclusive at both ends.

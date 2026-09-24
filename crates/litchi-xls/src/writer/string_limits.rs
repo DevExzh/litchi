@@ -28,6 +28,77 @@ pub(crate) const FORMULA_STRING_UNITS: usize = 255;
 /// reader refuses longer format strings.
 pub(crate) const NUMBER_FORMAT_UNITS: usize = 255;
 
+/// `Font.fontName` holds 1 through 31 characters ([MS-XLS] 2.4.122).
+pub(crate) const FONT_NAME_UNITS: usize = 31;
+
+/// `AFDOperStr.cch`, the length of an AutoFilter string operand, is one byte
+/// and at least 1 ([MS-XLS] 2.5.8).
+pub(crate) const AUTOFILTER_STRING_UNITS: usize = 255;
+
+/// The payload of one BIFF8 record ([MS-XLS] 2.1.4). `HLink`, `XFExt`,
+/// `StyleExt`, `CRN` and `SXString` have no continuation records, so their
+/// whole payload has to fit.
+pub(crate) const RECORD_PAYLOAD_BYTES: usize = litchi_biff::MAX_RECORD_BYTES;
+
+/// `HLink` for an internal link: `Ref8U`, the CLSID, the stream version, the
+/// flags and the location's `HyperlinkString` length, before its characters.
+pub(crate) const INTERNAL_HYPERLINK_FIXED_BYTES: usize = 8 + 16 + 4 + 4 + 4;
+
+/// `HLink` for a URL: as for an internal link, plus the URL moniker CLSID.
+pub(crate) const WEB_HYPERLINK_FIXED_BYTES: usize = INTERNAL_HYPERLINK_FIXED_BYTES + 16;
+
+/// The longest internal hyperlink target: its UTF-16 code units and the NUL
+/// that terminates them fill the rest of one `HLink` record.
+pub(crate) const INTERNAL_HYPERLINK_UNITS: usize =
+    (RECORD_PAYLOAD_BYTES - INTERNAL_HYPERLINK_FIXED_BYTES) / 2 - 1;
+
+/// The longest URL hyperlink target, counted as for an internal one.
+pub(crate) const WEB_HYPERLINK_UNITS: usize =
+    (RECORD_PAYLOAD_BYTES - WEB_HYPERLINK_FIXED_BYTES) / 2 - 1;
+
+/// `SxView.cchTableName` is at most 0xFF ([MS-XLS] 2.4.313).
+pub(crate) const PIVOT_TABLE_NAME_UNITS: usize = 255;
+
+/// `SxView.cchDataName` is 1 through 0xFE ([MS-XLS] 2.4.313).
+pub(crate) const PIVOT_DATA_FIELD_NAME_UNITS: usize = 254;
+
+/// `Sxvd.cchName` is 1 through 255 when present ([MS-XLS] 2.4.309).
+pub(crate) const PIVOT_FIELD_NAME_UNITS: usize = 255;
+
+/// `SXVI.cchName` is at most 254 when present ([MS-XLS] 2.4.312).
+pub(crate) const PIVOT_ITEM_NAME_UNITS: usize = 254;
+
+/// `SXDI.cchName` is 1 through 0xFF when present ([MS-XLS] 2.4.278).
+pub(crate) const PIVOT_DATA_ITEM_NAME_UNITS: usize = 255;
+
+/// `SXFDB.stFieldName` is at most 255 characters ([MS-XLS] 2.4.283).
+pub(crate) const PIVOT_CACHE_FIELD_NAME_UNITS: usize = 255;
+
+/// `SXString`: the cache item's `cch`, its option byte and its characters
+/// fill one record ([MS-XLS] 2.4.304). A string is stored one byte per
+/// character only when it is ASCII.
+pub(crate) const fn pivot_cache_string_units(ascii: bool) -> usize {
+    let characters = RECORD_PAYLOAD_BYTES - 3;
+    if ascii { characters } else { characters / 2 }
+}
+
+/// Converts a record payload length to the record header's `u16`, refusing
+/// with [`Error::RecordTooLong`] a payload no BIFF8 record can hold.
+pub(crate) fn record_len(record: &'static str, bytes: usize) -> Result<u16> {
+    if bytes > RECORD_PAYLOAD_BYTES {
+        return Err(Error::RecordTooLong {
+            record,
+            bytes,
+            limit: RECORD_PAYLOAD_BYTES,
+        });
+    }
+    u16::try_from(bytes).map_err(|_error| Error::RecordTooLong {
+        record,
+        bytes,
+        limit: RECORD_PAYLOAD_BYTES,
+    })
+}
+
 /// The number of UTF-16 code units in `value`.
 pub(crate) fn utf16_len(value: &str) -> usize {
     if value.is_ascii() {

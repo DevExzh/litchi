@@ -5,7 +5,8 @@ use super::super::{
 };
 use crate::encryption::{WriterEncryption, validate_writer_encryption};
 use crate::error::{Error, Result};
-use crate::writer::string_limits::{WORKSHEET_NAME_UNITS, ensure_utf16_len_within};
+use crate::records::{SheetNameFault, sheet_name_fault};
+use crate::writer::string_limits::WORKSHEET_NAME_UNITS;
 use crate::{EncryptionProfile, WeakEncryptionPolicy};
 use zeroize::Zeroizing;
 
@@ -137,15 +138,37 @@ impl Writer {
     /// # Errors
     ///
     /// Returns [`Error::StringTooLong`] for a name longer than 31 UTF-16 code
-    /// units, and an error for an empty or duplicate name.
+    /// units; [`Error::InvalidData`] for an empty name, a name containing a
+    /// character BIFF8 forbids in worksheet names (NUL, U+0003 or one of
+    /// `: \ * ? / [ ]`) or beginning or ending with an apostrophe ([MS-XLS]
+    /// 2.4.28), and a duplicate name. A refused name adds nothing.
     pub fn add_worksheet(&mut self, name: &str) -> Result<usize> {
-        // Validate worksheet name
-        if name.is_empty() {
-            return Err(Error::InvalidData(
-                "Worksheet name must not be empty".to_string(),
-            ));
+        // Validate worksheet name: the rule litchi's reader enforces.
+        match sheet_name_fault(name) {
+            None => {},
+            Some(SheetNameFault::Empty) => {
+                return Err(Error::InvalidData(
+                    "Worksheet name must not be empty".to_string(),
+                ));
+            },
+            Some(SheetNameFault::TooLong { utf16_units }) => {
+                return Err(Error::StringTooLong {
+                    field: "worksheet name",
+                    utf16_units,
+                    limit: WORKSHEET_NAME_UNITS,
+                });
+            },
+            Some(SheetNameFault::ForbiddenCharacter(character)) => {
+                return Err(Error::InvalidData(format!(
+                    "Worksheet name {name:?} contains {character:?}, which BIFF8 forbids in worksheet names"
+                )));
+            },
+            Some(SheetNameFault::EdgeApostrophe) => {
+                return Err(Error::InvalidData(format!(
+                    "Worksheet name {name:?} begins or ends with an apostrophe"
+                )));
+            },
         }
-        ensure_utf16_len_within(name, WORKSHEET_NAME_UNITS, "worksheet name")?;
 
         // Check for duplicate names
         let normalized_name = name.to_lowercase();

@@ -2783,3 +2783,33 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
     }
     assert_eq!(checked, 10);
 }
+
+/// The editor renames with the rule the reader enforces ([MS-XLS] 2.4.28):
+/// until change 0766 it let U+0003 through, and the reader then refused the
+/// committed workbook.
+#[test]
+fn rename_refuses_every_worksheet_name_the_reader_refuses() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    for name in [
+        "", "a\u{3}b", "a\0b", "a:b", "a\\b", "a/b", "a?b", "a*b", "a[b", "a]b", "'a", "a'",
+    ] {
+        let mut transaction = source.transaction();
+        assert!(
+            matches!(
+                transaction.rename_sheet("Sheet1".into(), name),
+                Err(Error::InvalidData(_))
+            ),
+            "{name:?}"
+        );
+    }
+    let long = format!("{}\u{1F600}", "a".repeat(30));
+    let mut transaction = source.transaction();
+    assert!(transaction.rename_sheet("Sheet1".into(), &long).is_err());
+
+    let astral = format!("{}\u{1F600}", "a".repeat(29));
+    let mut transaction = source.transaction();
+    transaction.rename_sheet("Sheet1".into(), &astral).unwrap();
+    let commit = transaction.commit().unwrap();
+    let reopened = Workbook::new(Cursor::new(commit.snapshot().bytes().to_vec())).unwrap();
+    assert_eq!(reopened.sheets()[0].name(), astral);
+}

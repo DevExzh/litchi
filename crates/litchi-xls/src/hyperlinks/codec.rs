@@ -153,7 +153,11 @@ fn parse_url_moniker(cursor: &mut Cursor<'_>) -> Result<UrlMoniker> {
         return invalid(format!("invalid URLMoniker length: {length}"));
     }
     let data = cursor.take(length)?;
-    let has_tail = length >= 26 && data[length - 24..length - 8] == URL_SERIAL_GUID;
+    // The optional tail is 24 bytes after a NUL-terminated URL, so a URL
+    // whose own last characters spell the serialization GUID is not a tail.
+    let has_tail = length >= 26
+        && data[length - 24..length - 8] == URL_SERIAL_GUID
+        && data[length - 26..length - 24] == [0, 0];
     let (url_data, serialization_uri_flags) = if has_tail {
         let serial_version = u32::from_le_bytes(data[length - 8..length - 4].try_into().unwrap());
         if serial_version != 0 {
