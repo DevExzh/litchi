@@ -2327,6 +2327,28 @@ impl OpcPackage {
         crate::pkgwriter::PackageWriter::write(path, self)
     }
 
+    /// Atomically save the package to a file at a caller-chosen
+    /// [`Durability`](litchi_core::Durability).
+    ///
+    /// [`Self::save`] is this method at `Durability::Full`. Every level
+    /// publishes the same bytes through the same sibling temporary file and
+    /// rename, and leaves the destination untouched on a failure before the
+    /// rename; see [`crate::atomic::replace_with_durability`] for what each
+    /// level synchronizes. The level is not stored on the package, so
+    /// choosing one changes no save preference and does not revoke the
+    /// package's exact-source authorization.
+    ///
+    /// # Errors
+    /// As [`Self::save`], except that only `Durability::Full` can return
+    /// [`crate::OpcError::Committed`].
+    pub fn save_with_durability<P: AsRef<Path>>(
+        &self,
+        path: P,
+        durability: litchi_core::Durability,
+    ) -> Result<()> {
+        crate::pkgwriter::PackageWriter::write_with_durability(path, self, durability)
+    }
+
     /// Save the package to a stream.
     ///
     /// Writes the complete OPC package including all parts, relationships,
@@ -3746,6 +3768,39 @@ mod tests {
         ] {
             assert!(matches!(result, Err(OpcError::ZipError(_))));
         }
+    }
+
+    #[test]
+    fn every_durability_level_publishes_the_exact_source_and_keeps_its_authorization() {
+        let bytes = with_eocd_comment(create_minimal_docx(), b"exact source 0761");
+        let package = OpcPackage::from_vec(bytes.clone()).expect("open owned package");
+        let digest = package.exact_source_sha256();
+        assert!(digest.is_some());
+        let directory = tempfile::tempdir().unwrap();
+
+        let reference = directory.path().join("reference.docx");
+        package.save(&reference).unwrap();
+        assert_eq!(fs::read(&reference).unwrap(), bytes);
+
+        for durability in [
+            litchi_core::Durability::Full,
+            litchi_core::Durability::FileOnly,
+            litchi_core::Durability::NoSync,
+        ] {
+            let destination = directory
+                .path()
+                .join(format!("{}.docx", durability.as_str()));
+            fs::write(&destination, b"old destination").unwrap();
+            package
+                .save_with_durability(&destination, durability)
+                .unwrap();
+            // The exact no-op publication is untouched by the level, and the
+            // level, being no save preference, revokes nothing.
+            assert_eq!(fs::read(&destination).unwrap(), bytes, "{durability:?}");
+            assert!(package.is_unmodified_owned_source(), "{durability:?}");
+            assert_eq!(package.exact_source_sha256(), digest);
+        }
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 4);
     }
 
     #[test]

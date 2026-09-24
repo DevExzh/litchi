@@ -1106,15 +1106,45 @@ impl Workbook {
     ///
     /// Serialization, flushing, and file synchronization finish before the
     /// destination is replaced. Existing symbolic-link destinations are
-    /// refused instead of being followed or silently replaced.
+    /// refused instead of being followed or silently replaced. This is
+    /// [`Self::save_with_durability`] at `Durability::Full`.
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically save at a caller-chosen
+    /// [`Durability`](litchi_core::Durability).
+    ///
+    /// Every level serializes and flushes the same bytes into the same
+    /// sibling temporary artifact, refuses the same destinations and replaces
+    /// the destination with one rename, so a failure before the rename leaves
+    /// it untouched. A weaker level only skips the parent-directory sync
+    /// (`FileOnly`) or both the file and directory syncs (`NoSync`), with the
+    /// crash guarantees `Durability` states. The level applies to this call
+    /// only; the immutable workbook is unchanged.
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> Result<()> {
         self.ensure_ordinary_output("save")?;
-        self.save_plain(path)
+        self.save_plain_with_durability(path, durability)
     }
 
     /// Explicitly save the plaintext OPC package atomically.
     pub fn save_plain(&self, path: impl AsRef<Path>) -> Result<()> {
-        crate::writer::save(&self.inner.package, path)
+        self.save_plain_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Explicitly save the plaintext OPC package atomically at a
+    /// caller-chosen [`Durability`](litchi_core::Durability); see
+    /// [`Self::save_with_durability`].
+    pub fn save_plain_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> Result<()> {
+        crate::writer::save(&self.inner.package, path, durability)
     }
 
     /// Encryption profile retained from source ingress or the latest

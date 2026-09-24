@@ -72,12 +72,14 @@ use super::layout::{
     SectorLayoutReport, SourceLayout, StreamInput, plan_reuse,
 };
 use super::minifat::MiniFatBuilder;
+use super::{PublishFailure, PublishSteps, SystemSteps, TemporaryIdentity, publish_staged};
+use litchi_core::Durability;
 use smallvec::SmallVec;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ffi::OsString;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::hash::Hash;
-use std::io::{self, BufWriter, ErrorKind, Seek, SeekFrom, Write};
+use std::io::{self, ErrorKind, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -2024,37 +2026,70 @@ impl OleWriter {
     ///
     /// Returns an `OleError` if the file cannot be written, synced, or
     /// atomically moved into place; see [`Self::write_to`] for the
-    /// serialization errors.
+    /// serialization errors. If the destination was already replaced but its
+    /// parent directory could not be synchronized, the error is
+    /// [`OleError::Committed`].
     pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<(), OleError> {
-        self.save_with_parent_sync(path, sync_parent)
+        self.save_with_durability(path, Durability::Full)
     }
 
+    /// Save the OLE file to a file path at a caller-chosen [`Durability`].
+    ///
+    /// [`Self::save`] is this method at [`Durability::Full`]. Every level
+    /// writes the same bytes through the same sibling temporary file and
+    /// atomic replacement; a weaker level only skips the temporary-file
+    /// synchronization ([`Durability::NoSync`]) or the parent-directory
+    /// synchronization ([`Durability::FileOnly`] and [`Durability::NoSync`]),
+    /// with the crash guarantees [`Durability`] states.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`], except that only [`Durability::Full`] synchronizes
+    /// the parent directory and can therefore return [`OleError::Committed`],
+    /// and [`Durability::NoSync`] cannot fail to synchronize the file.
+    pub fn save_with_durability<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        durability: Durability,
+    ) -> Result<(), OleError> {
+        self.save_with_steps(path.as_ref(), durability, &mut SystemSteps)
+    }
+
+    #[cfg(test)]
     fn save_with_parent_sync<P, S>(&mut self, path: P, sync_parent: S) -> Result<(), OleError>
     where
         P: AsRef<Path>,
         S: FnOnce(&Path) -> io::Result<()>,
     {
-        let path_ref = path.as_ref();
-        let parent = parent_directory(path_ref);
-        let (temporary_path, file) = create_sibling_temp_file(path_ref)?;
+        self.save_with_steps(
+            path.as_ref(),
+            Durability::Full,
+            &mut super::testing::HookSteps::new(atomic_replace, sync_parent),
+        )
+    }
 
-        let result = (|| {
-            let mut buffered = BufWriter::new(file);
-            self.write_to(&mut buffered)?;
-            buffered.flush()?;
-            buffered.get_ref().sync_all()?;
-            drop(buffered);
-
-            atomic_replace(&temporary_path, path_ref)?;
-            sync_parent(parent).map_err(|source| OleError::Committed { source })?;
-            Ok(())
-        })();
-
-        if result.is_err() {
-            drop(fs::remove_file(&temporary_path));
-        }
-
-        result
+    pub(crate) fn save_with_steps<S: PublishSteps>(
+        &mut self,
+        path: &Path,
+        durability: Durability,
+        steps: &mut S,
+    ) -> Result<(), OleError> {
+        publish_staged(
+            path,
+            durability,
+            TemporaryIdentity::Unchecked,
+            steps,
+            |staging| self.write_to(staging),
+            |_staged_file, ()| Ok(()),
+        )
+        .map_err(|failure| match failure {
+            PublishFailure::Create(error) | PublishFailure::Caller(error) => error,
+            PublishFailure::Flush { source, .. }
+            | PublishFailure::SyncFile { source, .. }
+            | PublishFailure::Identity { source, .. }
+            | PublishFailure::Replace { source, .. } => OleError::Io(source),
+            PublishFailure::Committed { source, .. } => OleError::Committed { source },
+        })
     }
 }
 
@@ -2086,7 +2121,7 @@ pub(crate) fn create_sibling_temp_file(path: &Path) -> Result<(PathBuf, File), O
         temporary_name.push(format!(".litchi-cfb-{}-{counter}.tmp", std::process::id()));
         let temporary_path = parent.join(temporary_name);
 
-        match OpenOptions::new()
+        match fs::OpenOptions::new()
             .read(true)
             .write(true)
             .create_new(true)

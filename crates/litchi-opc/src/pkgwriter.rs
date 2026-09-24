@@ -11,6 +11,7 @@ use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
 use crate::part::Part;
 use crate::phys_pkg::PhysPkgWriter;
 use crate::rel::Relationships;
+use litchi_core::Durability;
 #[cfg(test)]
 use litchi_core::xml::escape_xml;
 use std::collections::{HashMap, HashSet};
@@ -1195,7 +1196,28 @@ impl PackageWriter {
     /// Returns an error if the package cannot be serialized (for example an
     /// invalid content type or partname) or if writing to the filesystem fails.
     pub fn write<P: AsRef<Path>>(path: P, package: &OpcPackage) -> Result<()> {
-        crate::atomic::replace(path.as_ref(), |writer| {
+        Self::write_with_durability(path, package, Durability::Full)
+    }
+
+    /// Atomically write an OPC package to a file at a caller-chosen
+    /// [`Durability`].
+    ///
+    /// [`Self::write`] is this method at [`Durability::Full`]. Every level
+    /// serializes the same bytes through the same sibling temporary file and
+    /// rename; see [`crate::atomic::replace_with_durability`] for what each
+    /// level synchronizes. The level is a property of this one call: it is
+    /// not stored on the package and does not revoke its exact-source
+    /// authorization.
+    ///
+    /// # Errors
+    /// As [`Self::write`], except that only [`Durability::Full`] can return
+    /// [`crate::OpcError::Committed`].
+    pub fn write_with_durability<P: AsRef<Path>>(
+        path: P,
+        package: &OpcPackage,
+        durability: Durability,
+    ) -> Result<()> {
+        crate::atomic::replace_with_durability(path.as_ref(), durability, |writer| {
             Self::write_to_stream(writer, package)
         })
     }

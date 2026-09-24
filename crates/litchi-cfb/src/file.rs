@@ -843,7 +843,7 @@ impl From<OleError> for litchi_core::Error {
             OleError::Allocation { resource, source } => {
                 litchi_core::Error::Allocation { resource, source }
             },
-            error @ OleError::Committed { .. } => litchi_core::Error::Other(error.to_string()),
+            OleError::Committed { source } => litchi_core::Error::Committed(source),
             OleError::LimitExceeded {
                 resource,
                 observed,
