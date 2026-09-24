@@ -2440,3 +2440,113 @@ fn rejects_invalid_scaling_on_every_axis_kind() {
         assert!(read(xml.as_bytes()).is_err());
     }
 }
+
+const CHART_NAMESPACE: &str = "http://schemas.openxmlformats.org/drawingml/2006/chart";
+const DRAWING_NAMESPACE: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
+const RELATIONSHIPS_NAMESPACE: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+/// ` n00000="" ...`: `distinct` names followed by as many repeats of the last.
+fn repeated_attribute_names(distinct: usize) -> String {
+    let mut attributes = String::new();
+    for index in 0..distinct {
+        attributes.push_str(&format!(" n{index:05}=\"\""));
+    }
+    let last = format!(" n{:05}=\"\"", distinct - 1);
+    for _ in 0..distinct {
+        attributes.push_str(&last);
+    }
+    attributes
+}
+
+#[test]
+fn chart_attributes_read_the_first_occurrence_of_a_repeated_name() {
+    for (elements, date_1904, rounded_corners) in [
+        (
+            r#"<c:date1904 val="1"/><c:roundedCorners val="0"/>"#,
+            true,
+            false,
+        ),
+        (
+            r#"<c:date1904 val="1" val="0"/><c:roundedCorners val="0" val="1"/>"#,
+            true,
+            false,
+        ),
+        (r#"<c:roundedCorners/>"#, false, true),
+    ] {
+        let xml = format!(
+            r#"<c:chartSpace xmlns:c="{CHART_NAMESPACE}">{elements}<c:chart><c:plotArea/></c:chart></c:chartSpace>"#
+        );
+        let chart = read(xml.as_bytes()).unwrap();
+        assert_eq!(chart.date_1904, date_1904, "{elements}");
+        assert_eq!(chart.rounded_corners, rounded_corners, "{elements}");
+    }
+}
+
+#[test]
+fn chart_attributes_are_found_on_tags_of_many_repeated_names() {
+    // 20,000 names and 20,000 repeats of the last: `val` is absent, after the
+    // repeats, or before them. quick-xml's checked iterator scans the
+    // distinct names once for every repeat on each lookup.
+    // Each value differs from the one the chart has without the element.
+    let names = repeated_attribute_names(20_000);
+    let xml = format!(
+        r#"<c:chartSpace xmlns:c="{CHART_NAMESPACE}"><c:date1904{names} val="1"/><c:roundedCorners{names}/><c:chart><c:plotArea/><c:plotVisOnly val="0"{names}/></c:chart></c:chartSpace>"#
+    );
+    let chart = read(xml.as_bytes()).unwrap();
+    assert!(chart.date_1904);
+    assert!(chart.rounded_corners);
+    assert!(!chart.plot_visible_only);
+}
+
+#[test]
+fn chart_fragment_roots_keep_their_bytes_and_gain_only_missing_root_declarations() {
+    let chart_space = |fragment: &str| {
+        format!(
+            r#"<c:chartSpace xmlns:c="{CHART_NAMESPACE}" xmlns:a="{DRAWING_NAMESPACE}"><c:chart><c:plotArea/></c:chart>{fragment}</c:chartSpace>"#
+        )
+    };
+    let xml = chart_space(&format!(
+        r#"<c:spPr xmlns:a="{DRAWING_NAMESPACE}" bwMode="auto"><a:noFill/></c:spPr>"#
+    ));
+    let chart = read(xml.as_bytes()).unwrap();
+    assert_eq!(
+        std::str::from_utf8(chart.shape_properties.as_ref().unwrap().as_xml()).unwrap(),
+        format!(
+            r#"<c:spPr xmlns:a="{DRAWING_NAMESPACE}" bwMode="auto" xmlns:c="{CHART_NAMESPACE}" xmlns:r="{RELATIONSHIPS_NAMESPACE}"><a:noFill/></c:spPr>"#
+        )
+    );
+
+    // A repeated name is refused where the captured fragment is validated,
+    // with the positions quick-xml reports in the source tag.
+    let xml = chart_space(r#"<c:spPr bwMode="auto" bwMode="white"><a:noFill/></c:spPr>"#);
+    let error = read(xml.as_bytes()).unwrap_err();
+    assert!(
+        matches!(
+            &error,
+            crate::Error::Xml(message)
+                if message == "position 21: duplicated attribute, previous declaration at position 7"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
+fn chart_fragment_roots_of_many_repeated_names_are_refused_as_before() {
+    // `c:spPr` then 20,000 names of 10 bytes each: the first repeat starts at
+    // byte 7 + 200,000 and repeats the name at byte 7 + 199,990.
+    let names = repeated_attribute_names(20_000);
+    let xml = format!(
+        r#"<c:chartSpace xmlns:c="{CHART_NAMESPACE}" xmlns:a="{DRAWING_NAMESPACE}"><c:chart><c:plotArea/></c:chart><c:spPr{names}><a:noFill/></c:spPr></c:chartSpace>"#
+    );
+    let error = read(xml.as_bytes()).unwrap_err();
+    assert!(
+        matches!(
+            &error,
+            crate::Error::Xml(message)
+                if message
+                    == "position 200007: duplicated attribute, previous declaration at position 199997"
+        ),
+        "{error}"
+    );
+}

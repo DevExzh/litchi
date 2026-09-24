@@ -347,3 +347,105 @@ fn retains_default_namespace_undeclaration_through_relationship_edits() {
     assert!(Namespace::new(Some("future"), "").is_err());
     assert!(read(br#"<asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" xmlns:future="" future:attr="x"/>"#).is_err());
 }
+
+/// ` xmlns:p00000="urn:0" ...`: `count` distinct namespace declarations.
+fn many_declarations(count: usize) -> String {
+    let mut declarations = String::new();
+    for index in 0..count {
+        declarations.push_str(&format!(r#" xmlns:p{index:05}="urn:{index}""#));
+    }
+    declarations
+}
+
+fn host_scope() -> NamespaceContext {
+    NamespaceContext::empty()
+        .child([
+            Namespace::new(Some("asvg"), NAMESPACE).unwrap(),
+            Namespace::new(Some("future"), "urn:example:future").unwrap(),
+        ])
+        .unwrap()
+}
+
+fn is_declaration_limit(error: &litchi_drawingml::Error) -> bool {
+    matches!(
+        error,
+        litchi_drawingml::Error::Limit {
+            resource: "SVG blip namespace declarations",
+            limit,
+        } if *limit == MAX_NAMESPACE_DECLARATIONS
+    )
+}
+
+#[test]
+fn root_declarations_are_accepted_up_to_the_limit_and_refused_past_it() {
+    let context = host_scope();
+    let at_limit = format!(
+        "<asvg:svgBlip{}/>",
+        many_declarations(MAX_NAMESPACE_DECLARATIONS)
+    );
+    let value = read_contextual(at_limit.as_bytes(), &context).expect("declarations at the limit");
+    assert_eq!(value.namespaces().len(), MAX_NAMESPACE_DECLARATIONS);
+
+    let standalone = format!(
+        r#"<asvg:svgBlip xmlns:asvg="{NAMESPACE}"{}/>"#,
+        many_declarations(MAX_NAMESPACE_DECLARATIONS - 1)
+    );
+    let value = read(standalone.as_bytes()).expect("standalone declarations at the limit");
+    assert_eq!(value.namespaces().len(), MAX_NAMESPACE_DECLARATIONS);
+
+    // One past the limit, and 50,000 past it: the same refusal, which no
+    // longer waits for every declaration to be read and compared.
+    for count in [MAX_NAMESPACE_DECLARATIONS + 1, 50_000] {
+        let declarations = many_declarations(count);
+        for over in [
+            format!("<asvg:svgBlip{declarations}/>"),
+            format!("<asvg:svgBlip{declarations}><future:payload/></asvg:svgBlip>"),
+        ] {
+            let error = read_contextual(over.as_bytes(), &context).unwrap_err();
+            assert!(is_declaration_limit(&error), "{count}: {error}");
+        }
+    }
+}
+
+#[test]
+fn contextual_descendants_keep_every_declaration_as_before() {
+    // A descendant's declarations were never capped per element on the
+    // contextual path; 50,000 distinct ones are still read and kept.
+    let child = format!("<future:payload{}/>", many_declarations(50_000));
+    let source = format!("<asvg:svgBlip>{child}</asvg:svgBlip>");
+    let value = read_contextual(source.as_bytes(), &host_scope()).expect("contextual descendant");
+    assert_eq!(value.children().len(), 1);
+    assert_eq!(value.children()[0].as_bytes(), child.as_bytes());
+}
+
+#[test]
+fn repeated_namespace_declarations_are_refused_as_before() {
+    let context = host_scope();
+    // quick-xml reports the repeated name before the codec compares prefixes.
+    let duplicated = r#"<asvg:svgBlip xmlns:p="urn:a" xmlns:p="urn:b"/>"#;
+    let error = read_contextual(duplicated.as_bytes(), &context).unwrap_err();
+    assert!(
+        matches!(
+            &error,
+            litchi_drawingml::Error::Xml(message)
+                if message == "position 29: duplicated attribute, previous declaration at position 13"
+        ),
+        "{error}"
+    );
+    let nested =
+        r#"<asvg:svgBlip><future:payload xmlns:p="urn:a" xmlns:p="urn:b"/></asvg:svgBlip>"#;
+    let error = read_contextual(nested.as_bytes(), &context).unwrap_err();
+    assert!(
+        matches!(
+            &error,
+            litchi_drawingml::Error::Xml(message)
+                if message == "position 31: duplicated attribute, previous declaration at position 15"
+        ),
+        "{error}"
+    );
+    let single =
+        r#"<asvg:svgBlip xmlns:p="urn:a"><future:payload xmlns:q="urn:b"/></asvg:svgBlip>"#;
+    let value = read_contextual(single.as_bytes(), &context).expect("one declaration each");
+    assert_eq!(value.namespaces().len(), 1);
+    assert_eq!(value.namespaces()[0].prefix(), Some("p"));
+}

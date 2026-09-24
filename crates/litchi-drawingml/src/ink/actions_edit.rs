@@ -14,6 +14,7 @@ use std::{
 };
 
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::{SeenNames, first_wins};
 use litchi_ooxml_common::xml_name::{is_ncname, is_qualified_name};
 use quick_xml::{
     Reader, XmlVersion,
@@ -1796,13 +1797,32 @@ fn payload_has_namespace_declaration(
     element: &quick_xml::events::BytesStart<'_>,
     prefix: &[u8],
 ) -> bool {
-    element.attributes().any(|attribute| {
+    first_wins(element).any(|attribute| {
         let Ok(attribute) = attribute else {
             return false;
         };
         let key = attribute.key.as_ref();
         (prefix.is_empty() && key == b"xmlns") || key.strip_prefix(b"xmlns:") == Some(prefix)
     })
+}
+
+/// The prefixes `element` declares, the empty prefix standing for `xmlns`:
+/// the set of `prefix` values for which
+/// [`payload_has_namespace_declaration`] holds, read in one pass so that a
+/// caller asking about many attributes of one tag scans it once.
+fn payload_declared_prefixes<'a>(
+    element: &'a quick_xml::events::BytesStart<'_>,
+) -> SeenNames<&'a [u8]> {
+    let mut prefixes = SeenNames::new();
+    for attribute in first_wins(element).flatten() {
+        let key = attribute.key.into_inner();
+        if key == b"xmlns" {
+            prefixes.insert(&[][..]);
+        } else if let Some(prefix) = key.strip_prefix(b"xmlns:") {
+            prefixes.insert(prefix);
+        }
+    }
+    prefixes
 }
 
 #[derive(Debug, Hash, PartialEq, Eq)]
@@ -2057,6 +2077,10 @@ fn validate_payload_attributes_with_namespaces<R: std::io::BufRead>(
     allow_inherited_namespace: bool,
 ) -> Result<()> {
     let mut expanded = HashSet::new();
+    // Whether the tag declares an attribute's unresolved prefix is a question
+    // about the whole tag. Read its declarations once, on the first such
+    // attribute, rather than scanning the tag again for each of them.
+    let mut declared_prefixes = None;
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
         let raw_key = attribute.key.as_ref();
@@ -2113,7 +2137,9 @@ fn validate_payload_attributes_with_namespaces<R: std::io::BufRead>(
             },
             ResolveResult::Unknown(prefix)
                 if allow_inherited_namespace
-                    && !payload_has_namespace_declaration(element, prefix.as_slice()) =>
+                    && !declared_prefixes
+                        .get_or_insert_with(|| payload_declared_prefixes(element))
+                        .contains(&prefix.as_slice()) =>
             {
                 let namespace = match prefix.as_slice() {
                     b"iact" => ACTION_NAMESPACE,
@@ -6013,5 +6039,122 @@ mod tests {
             .action(ActionDraft::new(ActionType::Add, "0").expect("action"))
             .expect("root action");
         assert!(draft.finish().is_err());
+    }
+
+    fn tag(content: &str) -> quick_xml::events::BytesStart<'static> {
+        let name_len = content.find(' ').unwrap_or(content.len());
+        quick_xml::events::BytesStart::from_content(content.to_owned(), name_len)
+    }
+
+    /// `e`, then `distinct` names, as many repeats of the last, and `tail`.
+    fn repeated_names(distinct: usize, tail: &str) -> quick_xml::events::BytesStart<'static> {
+        let mut content = String::from("e");
+        for index in 0..distinct {
+            content.push_str(&format!(" n{index:05}=\"\""));
+        }
+        let last = format!(" n{:05}=\"\"", distinct - 1);
+        for _ in 0..distinct {
+            content.push_str(&last);
+        }
+        content.push_str(tail);
+        tag(&content)
+    }
+
+    #[test]
+    fn payload_declared_prefixes_answer_what_the_per_prefix_scan_answers() {
+        for (content, declared) in [
+            ("e", &[][..]),
+            (
+                "e xmlns=\"urn:d\" xmlns:a=\"urn:a\" b:c=\"1\"",
+                &[&b""[..], b"a"][..],
+            ),
+            // A repeated declaration counts once, at its first occurrence.
+            ("e xmlns:a=\"urn:1\" xmlns:a=\"urn:2\"", &[&b"a"[..]]),
+            // `xmlns:` names the empty prefix, as it did.
+            ("e xmlns:=\"urn:x\"", &[&b""[..]]),
+            // A declaration after a malformed attribute still counts.
+            ("e bad=v xmlns:iact=\"urn:x\"", &[&b"iact"[..]]),
+        ] {
+            let element = tag(content);
+            let prefixes = payload_declared_prefixes(&element);
+            for prefix in [&b""[..], b"a", b"b", b"iact", b"inkml", b"xml"] {
+                let expected = declared.contains(&prefix);
+                assert_eq!(
+                    payload_has_namespace_declaration(&element, prefix),
+                    expected,
+                    "{content}"
+                );
+                assert_eq!(prefixes.contains(&prefix), expected, "{content}");
+            }
+        }
+    }
+
+    #[test]
+    fn namespace_declarations_are_found_on_tags_of_many_repeated_names() {
+        // 20,000 names, 20,000 repeats of the last, then one declaration.
+        let element = repeated_names(20_000, " xmlns:iact=\"urn:late\"");
+        assert!(payload_has_namespace_declaration(&element, b"iact"));
+        assert!(!payload_has_namespace_declaration(&element, b"inkml"));
+        let prefixes = payload_declared_prefixes(&element);
+        assert!(prefixes.contains(&&b"iact"[..]));
+        assert!(!prefixes.contains(&&b"inkml"[..]));
+    }
+
+    #[test]
+    fn inherited_attribute_prefixes_are_resolved_with_one_scan_of_their_tag() {
+        // 50,000 distinct attributes whose `iact` prefix the payload inherits:
+        // each asks whether its own tag declares `iact`.
+        let mut payload = String::from("<iact:transform");
+        for index in 0..50_000 {
+            payload.push_str(&format!(" iact:a{index:05}=\"\""));
+        }
+        payload.push_str("/>");
+        let mut reader = NsReader::from_reader(payload.as_bytes());
+        let Event::Empty(element) = reader.read_event().expect("payload root") else {
+            unreachable!("the payload is one empty element");
+        };
+        validate_payload_attributes_with_namespaces(&element, &reader, Limits::default(), true)
+            .expect("inherited prefixes resolve");
+
+        // The payload is refused by the per-element attribute cap, as before.
+        let error = validate_payload_fragment(
+            payload.as_bytes(),
+            Limits::default(),
+            PayloadRoot::Transform,
+            true,
+        )
+        .unwrap_err();
+        assert!(
+            matches!(
+                error,
+                Error::Limit {
+                    resource: "ink action XML attributes",
+                    limit,
+                } if limit == super::super::MAX_ATTRIBUTES_PER_ELEMENT
+            ),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn an_inherited_prefix_the_tag_also_declares_is_refused_as_before() {
+        let accepted = b"<iact:transform><child iact:x=\"1\"/></iact:transform>";
+        validate_payload_fragment(accepted, Limits::default(), PayloadRoot::Transform, true)
+            .expect("an inherited attribute prefix resolves");
+
+        // `bad=v` ends the reader's namespace scope before `xmlns:iact`, so
+        // `iact:x` is unresolved although its tag declares `iact`.
+        let refused = b"<iact:transform><child iact:x=\"1\" bad=v xmlns:iact=\"urn:other\"/></iact:transform>";
+        let error =
+            validate_payload_fragment(refused, Limits::default(), PayloadRoot::Transform, true)
+                .unwrap_err();
+        assert!(
+            matches!(
+                &error,
+                Error::Invalid(message)
+                    if message == "ink action opaque payload attribute uses an undeclared namespace prefix"
+            ),
+            "{error}"
+        );
     }
 }
