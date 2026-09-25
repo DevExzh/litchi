@@ -10,7 +10,9 @@
 //!   stream, the publication audits and the DOCX style reader over every XML
 //!   member of every OOXML package under the roots, and over generated MCE
 //!   documents, and records a digest of each outcome, so two builds can be
-//!   compared member by member.
+//!   compared member by member. `--aliasing N` (record 0771) adds `N`
+//!   generated documents whose prefixes alias one another and the fixed
+//!   namespaces, through both MCE processors.
 
 #![forbid(unsafe_code)]
 
@@ -189,6 +191,22 @@ fn build_case(name: &str) -> Result<Case, Box<dyn Error>> {
             input: review_long_uri(1_040_000, 4_000).into_bytes(),
             run: run_mce_stream_review,
         },
+        // Record 0771: element names and directive tokens in a namespace
+        // whose URI is at the stream's name limit: 4,000 empty elements in
+        // `z`, emitted or skipped as ignorable, and 4,000 elements that each
+        // make `z` ignorable and preserve its elements.
+        "mce_stream_long_uri_elements" => Case {
+            input: long_uri_elements((1 << 20) - 64, "", 4_000).into_bytes(),
+            run: run_mce_stream_count,
+        },
+        "mce_stream_long_uri_skipped" => Case {
+            input: long_uri_elements((1 << 20) - 64, r#" mc:Ignorable="z""#, 4_000).into_bytes(),
+            run: run_mce_stream_count,
+        },
+        "mce_stream_long_uri_tokens" => Case {
+            input: long_uri_tokens((1 << 20) - 64, 4_000).into_bytes(),
+            run: run_mce_stream_count,
+        },
         // Benign controls: real producer parts that name the MCE namespace,
         // read from the repository's fixtures (run from the worktree root).
         "mce_benign_worksheet" => Case {
@@ -202,6 +220,21 @@ fn build_case(name: &str) -> Result<Case, Box<dyn Error>> {
         "mce_stream_benign_worksheet" => Case {
             input: fixture_member(BENIGN_WORKBOOK, BENIGN_WORKSHEET)?,
             run: run_mce_stream_baseline,
+        },
+        // Record 0771: the stream on the real document part, and on both
+        // parts with observers that only count, so the timing is the
+        // stream's own work.
+        "mce_stream_benign_document" => Case {
+            input: fixture_member(BENIGN_DOCUMENT, "word/document.xml")?,
+            run: run_mce_stream_baseline,
+        },
+        "mce_stream_count_worksheet" => Case {
+            input: fixture_member(BENIGN_WORKBOOK, BENIGN_WORKSHEET)?,
+            run: run_mce_stream_count_baseline,
+        },
+        "mce_stream_count_document" => Case {
+            input: fixture_member(BENIGN_DOCUMENT, "word/document.xml")?,
+            run: run_mce_stream_count_baseline,
         },
         "audit_benign_worksheet" => Case {
             input: fixture_member(BENIGN_WORKBOOK, BENIGN_WORKSHEET)?,
@@ -239,6 +272,27 @@ fn long_uri(uri_bytes: usize, directives: &str, elements: usize, attributes: usi
     format!(
         r#"<r xmlns:mc="{MC}" xmlns:z="{uri}"{directives}>{}</r>"#,
         element.repeat(elements)
+    )
+}
+
+/// A root declaring `z` with a URI of `uri_bytes` bytes and `directives`,
+/// around `elements` empty elements in `z`.
+fn long_uri_elements(uri_bytes: usize, directives: &str, elements: usize) -> String {
+    let uri = format!("urn:{}", "u".repeat(uri_bytes.saturating_sub(4)));
+    format!(
+        r#"<r xmlns:mc="{MC}" xmlns:z="{uri}"{directives}>{}</r>"#,
+        "<z:e/>".repeat(elements)
+    )
+}
+
+/// A root declaring `z` with a URI of `uri_bytes` bytes, around `elements`
+/// empty elements that each make `z` ignorable and preserve every element in
+/// it: one `Ignorable` and one `PreserveElements` token per element.
+fn long_uri_tokens(uri_bytes: usize, elements: usize) -> String {
+    let uri = format!("urn:{}", "u".repeat(uri_bytes.saturating_sub(4)));
+    format!(
+        r#"<r xmlns:mc="{MC}" xmlns:z="{uri}">{}</r>"#,
+        r#"<e mc:Ignorable="z" mc:PreserveElements="z:*"/>"#.repeat(elements)
     )
 }
 
@@ -366,12 +420,21 @@ fn run_mce_stream(input: &[u8]) -> String {
 /// The MCE stream with observers that count events and attributes without
 /// reading any name, so the timing is the stream's own work.
 fn run_mce_stream_count(input: &[u8]) -> String {
+    stream_count(input, &Capabilities::new())
+}
+
+/// [`run_mce_stream_count`] with the OOXML baseline capabilities.
+fn run_mce_stream_count_baseline(input: &[u8]) -> String {
+    stream_count(input, &Capabilities::ooxml_baseline())
+}
+
+fn stream_count(input: &[u8], capabilities: &Capabilities) -> String {
     let mut raw = (0usize, 0usize);
     let mut semantic = (0usize, 0usize);
     let mut cursor = Cursor::new(input);
     let result = process_markup_compatibility_stream_with_observers(
         &mut cursor,
-        &Capabilities::new(),
+        capabilities,
         &StreamLimits::default(),
         |element| {
             raw.0 += 1;
@@ -663,10 +726,38 @@ fn differential(args: &[String]) -> Result<(), Box<dyn Error>> {
             );
         }
     }
+    // Record 0771: documents whose prefixes alias one another and the fixed
+    // namespaces, under three capability sets.
+    let aliasing: usize = option(args, "--aliasing").unwrap_or("0").parse()?;
+    let understood_a = understanding("urn:a");
+    for index in 0..aliasing {
+        let document = aliasing_document(index as u64);
+        let key = format!("aliasing::{index:06}");
+        for (label, capabilities) in [
+            ("bare", &bare),
+            ("baseline", &baseline),
+            ("understood", &understood_a),
+        ] {
+            let codec = match process_markup_compatibility(
+                document.as_bytes(),
+                capabilities,
+                &MceLimits::default(),
+            ) {
+                Ok(output) => format!("ok:{}:{:?}", sha256_hex(output.xml.as_ref()), output.report),
+                Err(error) => format!("err:{error}"),
+            };
+            results.insert(format!("{key}::mce_{label}"), codec);
+            results.insert(
+                format!("{key}::stream_{label}"),
+                stream_digest(document.as_bytes(), capabilities),
+            );
+        }
+    }
     let summary = serde_json::json!({
         "packages": packages.len(),
         "members": members,
         "generated": generated,
+        "aliasing": aliasing,
         "results": results,
     });
     std::fs::write(json, serde_json::to_vec(&summary)?)?;
@@ -674,8 +765,12 @@ fn differential(args: &[String]) -> Result<(), Box<dyn Error>> {
 }
 
 fn understanding_w() -> Capabilities {
+    understanding("urn:w")
+}
+
+fn understanding(namespace: &str) -> Capabilities {
     let mut capabilities = Capabilities::new();
-    capabilities.understand_namespace("urn:w");
+    capabilities.understand_namespace(namespace);
     capabilities
 }
 
@@ -852,4 +947,226 @@ fn children(random: &mut Xorshift, xml: &mut String, depth: usize) {
             },
         }
     }
+}
+
+// --------------------------------------------------------------------------
+// Record 0771: aliased namespaces
+// --------------------------------------------------------------------------
+
+const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
+const XMLNS_NAMESPACE: &str = "http://www.w3.org/2000/xmlns/";
+
+/// A deterministic pseudo-random document whose prefixes alias one another
+/// and the fixed namespaces: `b` may be bound to `a`'s URI, `x` to the `xml`
+/// namespace, `n` to the `xmlns` namespace and `m` to the markup
+/// compatibility namespace, at the root or again below it, beside
+/// default-namespace resets. Its attributes, elements and directive tokens
+/// name those namespaces through either prefix, so two names or targets that
+/// differ only in their prefix are the same name.
+fn aliasing_document(seed: u64) -> String {
+    let mut random = Xorshift(seed.wrapping_mul(0xd1b5_4a32_d192_ed03) | 1);
+    let mut xml = format!(r#"<r xmlns:mc="{MC}" xmlns:a="urn:a" xmlns:w="urn:w""#);
+    aliased_bindings(&mut random, &mut xml, true);
+    aliased_directives(&mut random, &mut xml);
+    aliased_attributes(&mut random, &mut xml);
+    xml.push('>');
+    aliased_children(&mut random, &mut xml, 0);
+    xml.push_str("</r>");
+    xml
+}
+
+/// Bind `b`, `x`, `n` and `m`, each to an alias or to a URI of its own: all
+/// four at the root, some of them on a descendant.
+fn aliased_bindings(random: &mut Xorshift, xml: &mut String, root: bool) {
+    let choices: [(&str, &str, &str); 4] = [
+        ("b", "urn:a", "urn:b"),
+        ("x", XML_NAMESPACE, "urn:x"),
+        ("n", XMLNS_NAMESPACE, "urn:n"),
+        ("m", MC, "urn:m"),
+    ];
+    for (prefix, alias, own) in choices {
+        if !root && random.below(3) != 0 {
+            continue;
+        }
+        let namespace = if random.below(2) == 0 { alias } else { own };
+        let _ = write!(xml, r#" xmlns:{prefix}="{namespace}""#);
+    }
+    if !root {
+        match random.below(6) {
+            0 => xml.push_str(r#" xmlns="""#),
+            1 => xml.push_str(r#" xmlns="urn:a""#),
+            2 => {
+                let _ = write!(xml, r#" xmlns="{XML_NAMESPACE}""#);
+            },
+            _ => {},
+        }
+    }
+}
+
+/// Between one and `most` distinct items of `pool`.
+fn pick<'a>(random: &mut Xorshift, pool: &[&'a str], most: u64) -> Vec<&'a str> {
+    let count = 1 + random.below(most);
+    let mut chosen: Vec<&str> = Vec::new();
+    for _ in 0..count {
+        let item = pool[random.below(pool.len() as u64) as usize];
+        if !chosen.contains(&item) {
+            chosen.push(item);
+        }
+    }
+    chosen
+}
+
+/// The prefix the root may bind to the same namespace as `prefix`.
+fn partner(prefix: &str) -> &str {
+    match prefix {
+        "a" => "b",
+        "b" => "a",
+        "x" => "xml",
+        "xml" => "x",
+        other => other,
+    }
+}
+
+/// Compatibility directives whose targets name an ignorable prefix, its
+/// alias, or now and then any prefix.
+fn aliased_directives(random: &mut Xorshift, xml: &mut String) {
+    const PREFIXES: [&str; 6] = ["a", "b", "x", "n", "xml", "w"];
+    let directive = if random.below(3) == 0 { "m" } else { "mc" };
+    if random.below(4) != 0 {
+        let ignorable = pick(random, &PREFIXES, 3);
+        let _ = write!(xml, r#" {directive}:Ignorable="{}""#, ignorable.join(" "));
+        let target = |random: &mut Xorshift, locals: &[&str]| -> String {
+            let chosen = ignorable[random.below(ignorable.len() as u64) as usize];
+            let prefix = match random.below(6) {
+                0 | 1 => partner(chosen),
+                2 => PREFIXES[random.below(PREFIXES.len() as u64) as usize],
+                _ => chosen,
+            };
+            let local = locals[random.below(locals.len() as u64) as usize];
+            format!("{prefix}:{local}")
+        };
+        for (name, locals, probability) in [
+            (
+                "PreserveAttributes",
+                &["*", "k", "lang", "space", "q"][..],
+                2,
+            ),
+            ("PreserveElements", &["keep", "*"][..], 3),
+            ("ProcessContent", &["u", "*"][..], 3),
+        ] {
+            if random.below(probability) != 0 {
+                continue;
+            }
+            let count = 1 + random.below(2);
+            let targets: Vec<String> = (0..count).map(|_| target(random, locals)).collect();
+            let _ = write!(xml, r#" {directive}:{name}="{}""#, targets.join(" "));
+        }
+    }
+    if random.below(12) == 0 {
+        let tokens = pick(random, &["a", "b", "w", "x", "xml"], 2);
+        let _ = write!(xml, r#" {directive}:MustUnderstand="{}""#, tokens.join(" "));
+    }
+}
+
+fn aliased_attributes(random: &mut Xorshift, xml: &mut String) {
+    let names = [
+        "a:k",
+        "b:k",
+        "x:lang",
+        "xml:lang",
+        "xml:space",
+        "n:q",
+        "d",
+        "w:v",
+        "b:v",
+    ];
+    // Two names that differ only in aliased prefixes are the same name, so
+    // most lists avoid the pair and a few keep it.
+    let alias = |name: &str| match name {
+        "a:k" => "b:k",
+        "b:k" => "a:k",
+        "x:lang" => "xml:lang",
+        "xml:lang" => "x:lang",
+        _ => "",
+    };
+    let count = random.below(4);
+    let mut used = Vec::new();
+    for _ in 0..count {
+        let name = names[random.below(names.len() as u64) as usize];
+        if used.contains(&name) || (used.contains(&alias(name)) && random.below(4) != 0) {
+            continue;
+        }
+        used.push(name);
+        let value = if name.ends_with(":space") {
+            "preserve"
+        } else {
+            "v"
+        };
+        let _ = write!(xml, r#" {name}="{value}""#);
+    }
+}
+
+fn aliased_children(random: &mut Xorshift, xml: &mut String, depth: usize) {
+    if depth >= 4 {
+        return;
+    }
+    let count = random.below(4);
+    for _ in 0..count {
+        let name = match random.below(12) {
+            0 => "a:u",
+            1 => "b:u",
+            2 => "x:u",
+            3 => "a:keep",
+            4 => "b:keep",
+            5 => "n:e",
+            6 => "w:e",
+            7 => "e",
+            8 => "x:keep",
+            9 => {
+                aliased_alternate(random, xml, depth);
+                continue;
+            },
+            10 => {
+                xml.push_str("t &amp; u");
+                continue;
+            },
+            _ => "b:other",
+        };
+        let _ = write!(xml, "<{name}");
+        if random.below(3) == 0 {
+            aliased_bindings(random, xml, false);
+        }
+        if random.below(4) == 0 {
+            aliased_directives(random, xml);
+        }
+        aliased_attributes(random, xml);
+        if random.below(3) == 0 {
+            xml.push_str("/>");
+        } else {
+            xml.push('>');
+            aliased_children(random, xml, depth + 1);
+            let _ = write!(xml, "</{name}>");
+        }
+    }
+}
+
+/// An `AlternateContent` whose markup names the compatibility namespace
+/// through `mc` or `m`, with `Requires` naming aliased prefixes.
+fn aliased_alternate(random: &mut Xorshift, xml: &mut String, depth: usize) {
+    let container = if random.below(2) == 0 { "mc" } else { "m" };
+    let choice = if random.below(2) == 0 { "mc" } else { "m" };
+    let requires = pick(random, &["a", "b", "w", "x", "xml", "n"], 2).join(" ");
+    let _ = write!(
+        xml,
+        r#"<{container}:AlternateContent><{choice}:Choice Requires="{requires}">"#
+    );
+    aliased_children(random, xml, depth + 1);
+    let _ = write!(xml, "</{choice}:Choice>");
+    if random.below(2) == 0 {
+        let fallback = if random.below(2) == 0 { "mc" } else { "m" };
+        let _ = write!(xml, "<{fallback}:Fallback>");
+        aliased_children(random, xml, depth + 1);
+        let _ = write!(xml, "</{fallback}:Fallback>");
+    }
+    let _ = write!(xml, "</{container}:AlternateContent>");
 }
