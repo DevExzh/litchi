@@ -161,8 +161,11 @@ and only for the sector that ends the stream.
 **The rejected alternative** refused any stream in the partial sector at
 open, treating the mini stream as ⌊root size / 64⌋ sectors. It is simpler,
 but it refuses files that MS-CFB allows and that a producer writes, and
-litchi's own range readers, overlay and splice already follow the byte
-bound.
+litchi's own range readers and overlay already follow the byte bound. (The
+splice checks only the first byte of each per-mini-sector span, at
+`splice.rs:489`; that is harmless because a span stays inside one 64-byte mini
+sector within the root chain's last sector, and A5 now bounds every byte —
+review correction.)
 
 ## What was changed
 
