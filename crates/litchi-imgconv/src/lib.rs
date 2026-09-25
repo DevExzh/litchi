@@ -5,6 +5,9 @@
 //! performs decompression, file adaptation, rasterization, and encoding.
 
 #![allow(missing_docs)]
+// quick-xml's checked attribute iteration is quadratic on hostile tags; read
+// attributes through `BytesStartExt` (record 0770, workspace `clippy.toml`).
+#![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 // `zerocopy` derives generate non-ASCII helper identifiers for the packed EMF
 // record definitions. Rust only permits this lint allowance at crate scope.
 #![allow(non_ascii_idents)]

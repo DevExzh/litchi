@@ -18,6 +18,7 @@ use super::super::{
     NAMESPACE, Namespace, RELATIONSHIP_NAMESPACE, RELATIONSHIP_NAMESPACE_STRICT, Raster,
     RasterChild, Reference,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// Read one complete `m3d:model3d` element.
 /// # Errors
@@ -555,7 +556,7 @@ fn reference_plain(
 ) -> Result<Reference> {
     let mut embedded = None;
     let mut linked = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let local = attribute.key.local_name();
         let is_relationship = attribute.key.prefix().is_some_and(|prefix| {
@@ -614,7 +615,7 @@ fn declarations_inner(
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<Vec<Namespace>> {
     let mut declarations = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let raw = attribute.key.as_ref();
         let prefix = if raw == b"xmlns" {

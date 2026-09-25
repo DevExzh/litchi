@@ -29,6 +29,7 @@ use crate::merge;
 use crate::raw;
 use crate::source_payload::SourcePayload;
 use crate::{Selector, WorksheetKind};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// An owning source-backed merged-range editor for one XLSX artifact.
 ///
@@ -1282,7 +1283,7 @@ fn attribute_value(
     name: &[u8],
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<Option<String>> {
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute =
             attribute.map_err(|error| invalid(format!("invalid worksheet attribute: {error}")))?;
         if attribute.key.local_name().as_ref() == name {

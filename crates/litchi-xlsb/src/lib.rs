@@ -6,6 +6,9 @@
 //! ordinary APIs.
 
 #![forbid(unsafe_code)]
+// quick-xml's checked attribute iteration is quadratic on hostile tags; read
+// attributes through `BytesStartExt` (record 0770, workspace `clippy.toml`).
+#![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 #![deny(
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,

@@ -23,6 +23,7 @@
 //! Based on Apache POI's `XWPFHeaderFooterPolicy` watermark implementation.
 use crate::error::{Error, Result};
 use litchi_core::xml::escape_xml;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -508,7 +509,7 @@ fn unqualified_attribute(
     resolver: &NamespaceResolver,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != name
             || !matches!(
@@ -928,7 +929,7 @@ fn apply_image_data(
     let Some((_, Some(candidate))) = shapes.last_mut() else {
         return Ok(());
     };
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"id" {
             continue;

@@ -14,6 +14,7 @@ use crate::error::{Error, Result};
 use crate::package::{StoryKind, StoryLimits};
 use crate::sanitize::{self, RelationshipState, Wrapper};
 use litchi_core::SourceVersion;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     PackURI, PartData, SourceArtifactFingerprint, SourceBackedPackage, SourceLineage,
@@ -1644,7 +1645,7 @@ fn inspect_story_element(
     if inside_hyperlink && !is_word {
         add_diagnostic(diagnostics, UnsupportedClass::UnknownOwner, 1)?;
     }
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (attribute_namespace, attribute_local) = resolver.resolve_attribute(attribute.key);
         if is_mce_namespace(&attribute_namespace) {
@@ -1676,7 +1677,7 @@ fn has_external_hyperlink_id(
     decoder: quick_xml::encoding::Decoder,
     relationships: &[RelationshipState],
 ) -> Result<bool> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if is_relationships_namespace(&namespace) && local.as_ref() == b"id" {
@@ -1858,7 +1859,7 @@ fn validate_dialect_attributes(
     dialect: Dialect,
     resolver: &NamespaceResolver,
 ) -> Result<()> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         validate_dialect_namespace(&namespace, dialect)?;

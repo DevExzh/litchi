@@ -32,6 +32,7 @@ use super::{
 };
 use crate::error::{Result, allocation, invalid};
 use crate::layout::Descent;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) const NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac";
 const MAX_XML_DEPTH: usize = 256;
@@ -707,7 +708,7 @@ pub(crate) fn descent(
     resolver: &NamespaceResolver,
 ) -> Result<Option<Descent>> {
     let mut result = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         let is_target = local.as_ref() == b"dyDescent"
@@ -738,7 +739,7 @@ pub(crate) fn attribute_name(
     resolver: &NamespaceResolver,
 ) -> Result<Option<Box<str>>> {
     let mut result = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if local.as_ref() != b"dyDescent"

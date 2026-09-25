@@ -34,6 +34,7 @@ use super::model::{
 use crate::error::{Result, allocation, invalid};
 use crate::raw::namespace::{SPREADSHEETML_NAMESPACE, STRICT_SPREADSHEETML_NAMESPACE};
 use crate::raw::worksheet::model::{MAX_XML_DEPTH, MAX_XML_EVENTS};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// Source byte range of one traversal event.
 #[derive(Debug, Clone, Copy)]
@@ -615,8 +616,7 @@ fn cell_column(reference: &[u8], row: u32) -> Option<u32> {
 /// bytes decode to themselves; the caller additionally restricts the value's
 /// alphabet so attribute-value normalization is the identity as well.
 fn raw_attribute<'a>(element: &'a BytesStart<'a>, name: &[u8]) -> Option<&'a [u8]> {
-    let mut attributes = element.attributes();
-    attributes.with_checks(false);
+    let attributes = element.unchecked_attributes();
     let mut found = None;
     for attribute in attributes {
         let attribute = attribute.ok()?;

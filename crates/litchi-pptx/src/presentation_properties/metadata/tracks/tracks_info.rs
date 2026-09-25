@@ -15,6 +15,7 @@ use quick_xml::reader::NsReader;
 
 use super::model::MediaKey;
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 pub(crate) const PML_STRICT: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
@@ -522,7 +523,7 @@ fn attr(
     start: usize,
 ) -> Result<Option<Attr>> {
     let mut result = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let raw_key = attribute.key.as_ref();
         let colon = raw_key.iter().position(|byte| *byte == b':');

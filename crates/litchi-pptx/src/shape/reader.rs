@@ -22,6 +22,7 @@ use super::model::{
     Bounds, Common, Kind, PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderRecord,
     PlaceholderTypeExtension, Record, Shape, Shapes, Span, TextSpan,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
@@ -1424,7 +1425,7 @@ fn validate_extension_attributes(
 ) -> Result<String> {
     let uri = unqualified_attribute_value(element, b"uri", decoder)?;
     let mut seen_non_namespace = false;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let key = attribute.key.as_ref();
         if key == b"xmlns" || key.starts_with(b"xmlns:") {
@@ -1480,7 +1481,7 @@ fn has_forbidden_attribute(
     element: &BytesStart<'_>,
     _decoder: quick_xml::encoding::Decoder,
 ) -> Result<bool> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let key = attribute.key.as_ref();
         if key == b"xmlns" || key.starts_with(b"xmlns:") {

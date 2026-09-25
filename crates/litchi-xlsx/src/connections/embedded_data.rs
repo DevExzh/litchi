@@ -24,6 +24,7 @@ use crate::error::{Error, Result};
 use crate::source_attributes::{
     escaped_xstring_len, try_escaped_xstring, validate_xml_characters, value_span,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const X14: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
 const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
@@ -638,7 +639,7 @@ fn parse_with_limits(
                 let mut attribute_count = 0usize;
                 let inherited_namespace_bytes = namespace_bytes;
                 let mut local_namespace_bytes = 0usize;
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(invalid)?;
                     attribute_count = attribute_count
                         .checked_add(1)

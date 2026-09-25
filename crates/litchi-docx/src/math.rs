@@ -26,6 +26,7 @@
 use crate::error::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_core::xml::escape_xml;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::{
     OMML_NAMESPACE_URI, decode_xml_reference, extract_omml_formulas, is_omml_name,
 };
@@ -435,7 +436,7 @@ fn validate_element_attributes(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<()> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
@@ -511,7 +512,7 @@ fn root_declares_namespace_binding(
     element: &BytesStart<'_>,
     prefix: Option<&[u8]>,
 ) -> Result<bool> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         match attribute.key.as_namespace_binding() {
             Some(PrefixDeclaration::Default) if prefix.is_none() => return Ok(true),

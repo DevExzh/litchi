@@ -18,6 +18,7 @@ use super::model::{
     MAX_EXTENSION_ATTRIBUTES, MAX_EXTENSION_BYTES, MAX_EXTENSION_DEPTH, MAX_OUTPUT_BYTES,
     MAX_REFERENCE_BYTES, MAX_XML_BYTES, STRICT_NS, Sheet, Step, TRANSITIONAL_NS, raw::Attr,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// Serialize a complete calculation chain with bounded allocation.
 pub fn write(chain: &Chain, conformance: Conformance) -> Result<Vec<u8>> {
@@ -238,7 +239,7 @@ fn preflight_raw_attributes(xml: &[u8]) -> Result<()> {
             .map_err(|error| invalid(format!("invalid calculation-chain XML: {error}")))?
         {
             Event::Start(element) | Event::Empty(element) => {
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| {
                         invalid(format!("invalid calculation-chain attribute: {error}"))
                     })?;
@@ -281,7 +282,7 @@ fn parse_root_attributes(
     resolver: &NamespaceResolver,
     builder: &mut Builder,
 ) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|error| invalid(format!("invalid calcChain attribute: {error}")))?;
         validate_raw_attribute_size(attribute.key.as_ref(), attribute.value.as_ref())?;
@@ -327,7 +328,7 @@ fn parse_cell(
     let mut thread = None;
     let mut array = None;
     let mut attrs = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid calculation-cell attribute: {error}")))?;
         validate_raw_attribute_size(attribute.key.as_ref(), attribute.value.as_ref())?;

@@ -45,6 +45,7 @@ use crate::header_footer::Kind;
 use crate::namespace::is_wordprocessing_namespace;
 use litchi_core::xml::ReaderOrigin;
 use litchi_drawingml::coordinate::{Coordinate, Unit};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::SeenNames;
 use litchi_ooxml_common::xml_name::{is_ncname, is_qualified_name};
 use quick_xml::events::{BytesStart, Event};
@@ -672,7 +673,7 @@ fn validate_attribute_qnames(
     decoder: quick_xml::encoding::Decoder,
     owner: &str,
 ) -> Result<()> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         validate_qname(attribute.key.as_ref(), owner, "attribute")?;
         let prefix = attribute.key.prefix();
@@ -1412,7 +1413,7 @@ fn attributes(raw: &Raw, xml: &[u8], family: AttributeFamily) -> Result<Vec<(Str
     // `O(log n)` rather than a scan of `result`. The names were validated as
     // UTF-8 above, so their bytes compare as the lossy strings in `result` do.
     let mut names = SeenNames::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let local_name = attribute.key.local_name().into_inner();
         let name = String::from_utf8_lossy(local_name).into_owned();
@@ -1526,7 +1527,7 @@ fn required_attribute(raw: &Raw, xml: &[u8], name: &[u8]) -> Result<String> {
         .map(|prefix| prefix.into_inner().to_vec());
     let element_namespace = resolver.resolve_element(element.name()).0;
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != name {
             continue;
@@ -1583,7 +1584,7 @@ fn root_namespace_bindings(
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<Vec<NamespaceBinding>> {
     let mut bindings = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let name = attribute.key.as_ref();
         let prefix = if name == b"xmlns" {

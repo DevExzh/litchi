@@ -29,6 +29,7 @@ use super::model::{
 };
 use crate::{Error, Result};
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, Writer, XmlVersion};
 use std::collections::{HashMap, HashSet};
@@ -1032,7 +1033,7 @@ fn push_node(
         .unwrap_or_default();
     namespaces.insert("xml".into(), "http://www.w3.org/XML/1998/namespace".into());
     let mut raw_attributes = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| Error::Xml(error.to_string()))?

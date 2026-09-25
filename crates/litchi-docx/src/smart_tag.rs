@@ -11,6 +11,7 @@
 use crate::error::{Error, Result};
 use crate::paragraph::extract_word_text;
 use litchi_core::XmlSlice;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::Reader;
@@ -174,7 +175,7 @@ fn optional_attribute(
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in start.attributes() {
+    for attribute in start.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != name {
             continue;

@@ -6,6 +6,7 @@ use crate::presentation::embedded::{
     limit, relationship_value, validate_root,
 };
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::count_up_to;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::encoding::Decoder;
@@ -344,7 +345,7 @@ fn attribute(
     expected_namespace: &[u8],
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| crate::Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != name {
             continue;

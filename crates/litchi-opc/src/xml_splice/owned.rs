@@ -1,6 +1,7 @@
 //! Checked source-preserving XML publication for the eager, owned OPC package.
 
 use super::{invalid_source, validate_source_xml};
+use crate::xml_attributes::BytesStartExt as _;
 use crate::{OpcError, PackURI, ReadLimits, Result};
 use litchi_core::xml::ReaderOrigin;
 use quick_xml::{events::Event, reader::NsReader};
@@ -245,7 +246,7 @@ impl OwnedXmlPart {
                     return Err(invalid_source("duplicate owned XML attribute update"));
                 }
             }
-            for attribute in element.attributes().with_checks(true) {
+            for attribute in element.checked_attributes() {
                 let attribute = attribute.map_err(|error| invalid_source(error.to_string()))?;
                 let Some(value) = pending.remove(attribute.key.as_ref()) else {
                     continue;
@@ -603,7 +604,7 @@ impl OwnedXmlPart {
             let empty = matches!(&event, Event::Empty(_));
             match event {
                 Event::Start(element) | Event::Empty(element) if start_tag == (start..end) => {
-                    for attribute in element.attributes().with_checks(true) {
+                    for attribute in element.checked_attributes() {
                         let attribute =
                             attribute.map_err(|error| invalid_source(error.to_string()))?;
                         if attribute.key.as_ref() == name.as_bytes() {
@@ -696,7 +697,7 @@ impl OwnedXmlPart {
                 .map_err(|error| invalid_source(error.to_string()))?
             {
                 Event::Start(element) | Event::Empty(element) => {
-                    for attribute in element.attributes().with_checks(true) {
+                    for attribute in element.checked_attributes() {
                         let attribute =
                             attribute.map_err(|error| invalid_source(error.to_string()))?;
                         let raw = attribute.value.as_ref();

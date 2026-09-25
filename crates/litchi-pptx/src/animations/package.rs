@@ -1,5 +1,6 @@
 use super::model::{GraphicBuildMode, Sequence};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::count_up_to;
 use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
 use quick_xml::events::{BytesStart, Event};
@@ -673,7 +674,7 @@ fn relationship_attribute(
     unqualified: bool,
 ) -> Result<Option<String>> {
     let mut found = None;
-    for value in element.attributes().with_checks(true) {
+    for value in element.checked_attributes() {
         let value = value.map_err(animation_relationship_xml_error)?;
         let (namespace, attribute_local) = reader.resolver().resolve_attribute(value.key);
         let matches_namespace = if unqualified {

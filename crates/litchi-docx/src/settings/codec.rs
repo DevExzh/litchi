@@ -24,6 +24,7 @@ use super::{
     TRANSITIONAL_WORD_NAMESPACE,
 };
 use crate::Result;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -580,7 +581,7 @@ fn word_attribute_value(
     resolver: &NamespaceResolver,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
         if attribute.key.local_name().as_ref() != name {
             continue;

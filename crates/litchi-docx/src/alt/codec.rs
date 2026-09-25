@@ -20,6 +20,7 @@ use super::model::{
     MAX_XML_DEPTH, Rel, STRICT_RELATIONSHIP, STRICT_RELATIONSHIP_NAMESPACE, STRICT_WORD_NAMESPACE,
     TRANSITIONAL_RELATIONSHIP_NAMESPACE, TRANSITIONAL_WORD_NAMESPACE,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 mod document_scan;
 pub(crate) use document_scan::scan_with_block_ranges;
@@ -322,7 +323,7 @@ fn relationship(
     resolver: &NamespaceResolver,
 ) -> Result<Rel> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"id" {
             continue;
@@ -362,7 +363,7 @@ fn parse_on_off(
     allow_legacy_values: bool,
 ) -> Result<bool> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"val" {
             continue;

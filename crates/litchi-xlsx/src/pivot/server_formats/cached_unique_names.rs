@@ -65,7 +65,7 @@ pub(super) fn scan_mce_branch(
     match local.as_ref() {
         b"Choice" => {
             let mut requires = None;
-            for attribute in element.attributes().with_checks(true) {
+            for attribute in element.checked_attributes() {
                 let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
                 let key = attribute.key.as_ref();
                 if key == b"Requires" {
@@ -161,7 +161,7 @@ pub(super) fn scan_mce_branch(
             Ok(Some(MceBranch::Choice(namespaces)))
         },
         b"Fallback" => {
-            for attribute in element.attributes().with_checks(true) {
+            for attribute in element.checked_attributes() {
                 let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
                 if !is_namespace_binding(attribute.key.as_ref())
                     && !qualified_attribute_is_ignorable(
@@ -203,7 +203,7 @@ pub(super) fn validate_mce_alternate_content_attributes(
     ignorable_scope: usize,
     ignorable_scopes: &[IgnorableScope],
 ) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         if is_namespace_binding(attribute.key.as_ref()) {
             continue;

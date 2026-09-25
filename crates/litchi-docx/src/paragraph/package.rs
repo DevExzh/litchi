@@ -8,6 +8,7 @@ use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
 
 use super::model::{Inline, InlineHyperlink, Paragraph, Run, XmlRef};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 impl Paragraph {
     /// Return ordered direct paragraph children with hyperlinks resolved.
@@ -113,7 +114,7 @@ fn parse_hyperlink(source: &XmlRef, rels: &Relationships) -> Result<InlineHyperl
                         ));
                     }
                     saw_root = true;
-                    for attribute_result in element.attributes() {
+                    for attribute_result in element.checked_attributes() {
                         let attribute = attribute_result
                             .map_err(|error| crate::Error::Xml(error.to_string()))?;
                         let value = attribute

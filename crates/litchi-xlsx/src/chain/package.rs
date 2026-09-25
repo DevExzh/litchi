@@ -14,6 +14,7 @@ use super::model::{
     CONTENT_TYPE, Chain, Conformance, MAX_XML_BYTES, RELATIONSHIP, STRICT_NS, STRICT_RELATIONSHIP,
     TRANSITIONAL_NS,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(super) const MAX_WORKBOOK_SHEETS: usize = 65_534;
 
@@ -193,7 +194,7 @@ fn validate_sheet_ids(package: &OpcPackage, workbook_uri: &PackURI, chain: &Chai
                     && matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == TRANSITIONAL_NS.as_bytes() || value == STRICT_NS.as_bytes()) =>
             {
                 let mut sheet_id = None;
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| {
                         invalid(format!("invalid workbook sheet attribute: {error}"))
                     })?;

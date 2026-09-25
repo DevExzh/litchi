@@ -9,6 +9,7 @@ use super::{
 use litchi_ooxml_common::mce::{
     Capabilities, Limits, NAMESPACE, Name, process_markup_compatibility,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::SeenNames;
 
 #[derive(Clone)]
@@ -579,7 +580,7 @@ fn make_node(
     // The expanded names in `attributes`, so that checking each attribute for
     // a duplicate costs O(log n) instead of a scan of the attributes so far.
     let mut expanded_names = SeenNames::new();
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let value = item
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)

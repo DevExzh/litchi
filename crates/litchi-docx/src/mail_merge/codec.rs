@@ -22,6 +22,7 @@ use crate::{Error, Result};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -786,7 +787,7 @@ fn make_node(
     resolver: &NamespaceResolver,
 ) -> Result<Node> {
     let mut attributes = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let raw = attribute.key.as_ref();
         if raw.len() > MAX_STRING_BYTES || attribute.value.len() > MAX_STRING_BYTES {

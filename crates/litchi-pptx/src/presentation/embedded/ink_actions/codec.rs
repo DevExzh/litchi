@@ -12,6 +12,7 @@ use quick_xml::reader::NsReader;
 use super::model::{AnchorFingerprint, Branch, Candidate, Dialect};
 use crate::presentation::embedded::{MAX_XML_DEPTH, increment_nodes, invalid, limit};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml_name::{is_ncname, is_qualified_name};
 
 pub(crate) const MC: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
@@ -677,7 +678,7 @@ fn requires_value(
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<Vec<Vec<u8>>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_ref() != b"Requires" {
             continue;
@@ -740,7 +741,7 @@ fn capture_relationship_attributes(
     element: &BytesStart<'_>,
     resolver: &quick_xml::name::NamespaceResolver,
 ) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"id" {
             continue;
@@ -823,7 +824,7 @@ fn validate_attributes(
     let mut namespaces = 0usize;
     let mut seen = Vec::<(Vec<u8>, Vec<u8>)>::new();
     let mut seen_namespace_prefixes = Vec::<Vec<u8>>::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         attributes = attributes
             .checked_add(1)

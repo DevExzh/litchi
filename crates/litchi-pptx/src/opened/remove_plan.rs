@@ -15,6 +15,7 @@ use super::model::{Slide, Snapshot, invalid};
 use super::patch::Patch;
 use super::patch::SinglePartChange;
 use crate::{Error, Result, SlideCopyRefusal, SlideRemovalRefusal};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
@@ -719,7 +720,7 @@ fn validate_presentation_owner(xml: &[u8], selected: &Slide) -> Result<()> {
                         "a slideshow range refers to slides by numeric position",
                     );
                 }
-                for attribute in element.attributes() {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     let key = attribute.key.as_ref();
                     if key == b"xmlns" || key.starts_with(b"xmlns:") {

@@ -10,6 +10,7 @@ use super::{
 };
 use crate::{Error, Result};
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::SeenNames;
 use litchi_opc::{OpcPackage, PackURI, Part, TargetMode};
 use quick_xml::XmlVersion;
@@ -420,7 +421,7 @@ pub(super) fn make_node(
     // Expanded names borrowed from the resolver and the tag: checking each
     // one costs O(log n), where scanning `attributes` would cost O(n).
     let mut expanded = SeenNames::new();
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let qname = item.key.as_ref();
         if qname == b"xmlns" || qname.starts_with(b"xmlns:") {

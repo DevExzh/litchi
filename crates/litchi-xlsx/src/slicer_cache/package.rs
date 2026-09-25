@@ -10,6 +10,7 @@ use super::{
     validate, write,
 };
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -533,7 +534,7 @@ fn root_namespaces(xml: &[u8]) -> Result<(&'static str, &'static str)> {
 }
 
 fn attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<String>> {
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(|error| invalid(error.to_string()))?;
         if item.key.as_ref() == name {
             return Ok(Some(

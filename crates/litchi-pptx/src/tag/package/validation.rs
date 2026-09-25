@@ -9,6 +9,7 @@ use super::super::{
 use super::model::{Anchor, AnchorIdentity, CommonSlidePhase, OwnerKind};
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::{OpcPackage, PackURI, Part as OpcPart};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -149,7 +150,7 @@ pub(super) fn anchor_relationship_id(
     conformance: super::super::Conformance,
 ) -> Result<AnchorIdentity> {
     let mut relationship_id = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         if local.as_ref() != b"id" || !relationship_namespace(&namespace, conformance) {
@@ -195,7 +196,7 @@ pub(crate) fn relationship_namespace(
 }
 
 pub(super) fn has_non_namespace_attrs(element: &BytesStart<'_>) -> Result<bool> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let name = attribute.key.as_ref();
         if name != b"xmlns" && !name.starts_with(b"xmlns:") {

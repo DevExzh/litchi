@@ -13,6 +13,7 @@
 use crate::error::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::custom_xml::valid_guid;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -542,7 +543,7 @@ fn parse_root_attributes(
     let mut uid = None;
     let mut xml_attributes = Vec::new();
     let mut retained_bytes = 0usize;
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let raw = std::str::from_utf8(item.key.as_ref())
             .map_err(xml_error)?
@@ -594,7 +595,7 @@ fn parse_pivot_table(
     let mut name = None;
     let mut xml_attributes = Vec::new();
     let mut retained_bytes = 0usize;
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let raw = std::str::from_utf8(item.key.as_ref())
             .map_err(xml_error)?
@@ -637,7 +638,7 @@ fn reject_attributes(
     decoder: Decoder,
     allowed: &[(&str, &str)],
 ) -> Result<()> {
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let raw = item.key.as_ref();
         if raw == b"xmlns" || raw.starts_with(b"xmlns:") {
@@ -1019,7 +1020,7 @@ fn validate_element_attributes(
     decoder: Decoder,
     retained: bool,
 ) -> Result<()> {
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let raw = std::str::from_utf8(item.key.as_ref()).map_err(xml_error)?;
         validate_attribute_name(raw)?;

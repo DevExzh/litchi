@@ -29,6 +29,7 @@ use crate::namespace::{
     WORDPROCESSINGML_NAMESPACE, is_wordprocessing_namespace,
 };
 use crate::paragraph::Paragraph;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) use durable::durable_transfer_operations;
 pub use durable::{Composition, History, JoinError, PreparedEdit, ThreeWayError, ThreeWayPlan};
@@ -6193,8 +6194,7 @@ fn event_namespace_binding_count(event: &Event<'_>) -> usize {
                 return 0;
             }
             element
-                .attributes()
-                .with_checks(false)
+                .unchecked_attributes()
                 .filter_map(Result::ok)
                 .filter(|attribute| attribute.key.as_namespace_binding().is_some())
                 .count()
@@ -7546,7 +7546,7 @@ fn validate_revision_element_attributes(
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<(), Refusal> {
     let mut attributes = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|_error| Refusal::RevisionDependency)?;
         if attribute.value.len() > MAX_REVISION_METADATA_VALUE_BYTES
             || attribute.value.contains(&b'<')
@@ -7695,7 +7695,7 @@ fn raw_revision_scope_attributes(
     let mut raw_attributes = raw_attributes.into_iter();
     let mut scope = Vec::new();
     scope
-        .try_reserve_exact(element.attributes().size_hint().0)
+        .try_reserve_exact(element.checked_attributes().size_hint().0)
         .map_err(|_error| Refusal::RevisionDependency)?;
     let mut seen_id = false;
     let mut seen_author = false;
@@ -7704,7 +7704,7 @@ fn raw_revision_scope_attributes(
     let mut seen_user_id = false;
     let mut seen_scope_attributes: Vec<(RevisionNamespaceKind, Vec<u8>)> = Vec::new();
     let mut attribute_count = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|_error| Refusal::RevisionDependency)?;
         attribute_count = attribute_count
             .checked_add(1)

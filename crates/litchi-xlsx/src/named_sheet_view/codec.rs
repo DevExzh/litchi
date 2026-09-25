@@ -29,6 +29,7 @@ use super::{
 use crate::data_type_icons::{
     SHOW_DATA_TYPE_ICONS_NAMESPACE, ShowDataTypeIcons, Target, codec::observe_event,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub fn parse_named_sheet_views(xml: &[u8]) -> Result<Views> {
     if xml.len() > MAX_PART_BYTES {
@@ -1770,7 +1771,7 @@ pub(crate) fn parse_range(v: &str) -> Result<Range> {
 fn parse_namespace_declarations(e: &BytesStart<'_>, d: Decoder) -> Result<Vec<(String, String)>> {
     let mut declarations = Vec::new();
     let mut names = HashSet::new();
-    for attribute in e.attributes().with_checks(true) {
+    for attribute in e.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let name = String::from_utf8_lossy(attribute.key.as_ref()).into_owned();
         if name != "xmlns" && !name.starts_with("xmlns:") {
@@ -1791,7 +1792,7 @@ fn parse_namespace_declarations(e: &BytesStart<'_>, d: Decoder) -> Result<Vec<(S
 }
 fn attr(e: &BytesStart<'_>, name: &[u8], d: Decoder) -> Result<Option<String>> {
     let mut value = None;
-    for a in e.attributes().with_checks(true) {
+    for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
         if a.key.as_ref() != name {
             continue;

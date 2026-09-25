@@ -11,6 +11,7 @@ use super::{
 };
 use crate::auto_filter::{parse_auto_filter_fragment, write_auto_filter_fragment};
 use crate::error::Result;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::SeenNames;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -547,7 +548,7 @@ fn make_node(
     // Expanded names borrowed from the resolver and the tag: checking each
     // one costs O(log n), where scanning `attributes` would cost O(n).
     let mut expanded = SeenNames::new();
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let qname = item.key.as_ref();
         if qname == b"xmlns" || qname.starts_with(b"xmlns:") {

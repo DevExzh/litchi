@@ -8,6 +8,7 @@ use super::{
 };
 use crate::Result;
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
@@ -178,7 +179,7 @@ fn semantic_element(
         .to_owned();
     let mut attributes = Vec::new();
     let mut bytes = 0usize;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let raw = attribute.key.as_ref();
         if raw == b"xmlns" || raw.starts_with(b"xmlns:") {
@@ -523,7 +524,7 @@ fn parse_def_attrs(element: &BytesStart<'_>, decoder: Decoder) -> Result<(Id, St
 fn attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<Vec<(String, String)>> {
     let mut output = Vec::new();
     let mut bytes = 0usize;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if output.len() >= MAX_ATTRIBUTES {
             return Err(limit("table-style attribute count", MAX_ATTRIBUTES));

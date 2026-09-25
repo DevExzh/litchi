@@ -17,6 +17,7 @@ use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use std::io::{self, BufRead, Read};
 
+use crate::xml_attributes::BytesStartExt as _;
 use namespaces::{Namespaces, Prefixed};
 
 mod namespaces;
@@ -2568,7 +2569,7 @@ fn inspect_attributes(
     // this counter keeps quick-xml's duplicate check, whose cost grows with
     // the names already seen in the tag, bounded by that limit on its own.
     let mut element_attributes = 0usize;
-    for attribute_result in tag.attributes() {
+    for attribute_result in tag.checked_attributes() {
         element_attributes = checked_add(
             element_attributes,
             1,

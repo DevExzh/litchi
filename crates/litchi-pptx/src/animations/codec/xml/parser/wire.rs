@@ -14,6 +14,7 @@ use super::validation::{
 };
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -368,7 +369,7 @@ fn p14_attribute(
     resolver: &NamespaceResolver,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != expected {
             continue;

@@ -10,6 +10,7 @@ use super::validation::{
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -577,7 +578,7 @@ fn known_attributes(
     allowed: &[&str],
 ) -> Result<HashMap<String, String>> {
     let mut values = HashMap::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = decode_name(attribute.key.as_ref())?;
         if is_namespace_attribute(&key) {
@@ -599,7 +600,7 @@ fn known_attributes(
 }
 
 fn validate_any_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let value = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
@@ -610,7 +611,7 @@ fn validate_any_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result
 }
 
 fn no_non_namespace_attributes(element: &BytesStart<'_>) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if !is_namespace_attribute(&decode_name(attribute.key.as_ref())?) {
             return Err(invalid("unexpected attribute on modern Comment container"));
@@ -625,7 +626,7 @@ fn namespace_declarations_from(
     exclude_prefix: Option<&str>,
 ) -> Result<Vec<NamespaceDeclaration>> {
     let mut result = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = decode_name(attribute.key.as_ref())?;
         let prefix = if key == "xmlns" {

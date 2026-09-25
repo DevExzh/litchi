@@ -2,6 +2,7 @@ use super::super::model::NamespaceDeclaration;
 use super::super::{MAX_BYTES, MAX_DEPTH, MAX_NODES, MAX_STRING_BYTES};
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -231,7 +232,7 @@ pub(super) fn namespace_declarations(
     decoder: Decoder,
 ) -> Result<Vec<NamespaceDeclaration>> {
     let mut output = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = std::str::from_utf8(attribute.key.as_ref()).map_err(xml_error)?;
         let Some(prefix) = key
@@ -260,7 +261,7 @@ pub(super) fn attributes(
     decoder: Decoder,
 ) -> Result<Vec<(String, String)>> {
     let mut output = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = std::str::from_utf8(attribute.key.as_ref()).map_err(xml_error)?;
         if key == "xmlns" || key.starts_with("xmlns:") {

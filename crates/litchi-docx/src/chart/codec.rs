@@ -15,6 +15,7 @@ use super::model::{
 };
 use crate::error::{Error, Result};
 use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::SeenNames;
 use litchi_opc::PackURI;
 use litchi_opc::constants::relationship_type as rt;
@@ -381,7 +382,7 @@ fn element_info(
     // The expanded names in `values`, as `(namespace, local name)` bytes, so
     // that each duplicate check costs `O(log n)` rather than a scan of `values`.
     let mut expanded_names = SeenNames::new();
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let raw = item.key.as_ref();
         if raw == b"xmlns" || raw.starts_with(b"xmlns:") {

@@ -21,6 +21,7 @@ use std::fmt::Write as _;
 
 use super::super::model::{Paragraph, ParagraphSpacing, XmlData};
 use super::xml::{element_prefix, is_fragment_word_name};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[derive(Clone, Copy)]
 struct ByteRange {
@@ -333,7 +334,7 @@ fn spacing_has_unsupported_attributes(
     resolver: &NamespaceResolver,
     fragment_prefix: &Option<Option<Vec<u8>>>,
 ) -> Result<bool> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let raw_name = attribute.key.as_ref();
         if raw_name == b"xmlns" || raw_name.starts_with(b"xmlns:") {

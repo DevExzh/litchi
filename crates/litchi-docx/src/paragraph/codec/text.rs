@@ -29,6 +29,7 @@ use super::super::model::Paragraph;
 use super::xml::is_fragment_word_local_name;
 #[cfg(test)]
 use super::xml::is_fragment_word_name;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// Maximum nesting depth accepted when extracting paragraph text.
 const MAX_TEXT_SCAN_DEPTH: usize = 128;
@@ -562,7 +563,7 @@ impl SemanticTextXmlBudget {
             )));
         }
         let mut attribute_bytes = 0usize;
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
             let key = attribute.key.as_ref();
             attribute_bytes = attribute_bytes
@@ -733,7 +734,7 @@ fn semantic_event_bytes(event: &Event<'_>) -> usize {
 
 fn validate_semantic_attributes(element: &quick_xml::events::BytesStart<'_>) -> Result<()> {
     let mut total = 0usize;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         total = total
             .checked_add(attribute.key.as_ref().len())
@@ -758,7 +759,7 @@ fn validate_semantic_attribute_names(
     reader: &NsReader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
 ) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let name = attribute.key.as_ref();
         if name == b"xmlns" || name.starts_with(b"xmlns:") {

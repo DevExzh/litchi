@@ -2,6 +2,7 @@ use super::model::{PlaceholderSpec, SlideLayoutKind};
 use crate::shape::{PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderTypeExtension};
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::fmt::{self, Write as FmtWrite};
@@ -702,7 +703,7 @@ pub(super) fn remove_id_list_entry(
 pub(super) fn element_relationship_id(
     element: &quick_xml::events::BytesStart<'_>,
 ) -> Result<Option<String>> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -729,7 +730,7 @@ pub(super) fn next_shape_id(xml: &[u8]) -> Result<u32> {
                     return Err(invalid("part XML resource limit exceeded"));
                 }
                 if local_name(element.name().as_ref()) == b"cNvPr" {
-                    for attribute in element.attributes().with_checks(true) {
+                    for attribute in element.checked_attributes() {
                         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                         if attribute.key.as_ref() == b"id" {
                             let value = std::str::from_utf8(attribute.value.as_ref())

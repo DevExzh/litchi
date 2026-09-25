@@ -16,6 +16,7 @@ use quick_xml::reader::NsReader;
 
 use crate::error::{Error, Result};
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -355,7 +356,7 @@ fn parse_selected(xml: &[u8]) -> Result<Option<Margins>> {
 
 fn parse_margins(element: &BytesStart<'_>, decoder: Decoder) -> Result<Margins> {
     let mut values = [None; 6];
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_ref().contains(&b':') || attribute.key.as_ref() == b"xmlns" {
             continue;

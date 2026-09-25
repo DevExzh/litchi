@@ -3,6 +3,7 @@ use crate::packuri::PackURI;
 use crate::payload::PartPayload;
 pub use crate::payload::PayloadHandle;
 use crate::rel::{Relationship, Relationships};
+use crate::xml_attributes::BytesStartExt as _;
 use memchr::memmem;
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
@@ -569,7 +570,7 @@ impl XmlPart {
                     if e.local_name().as_ref() == element_name_bytes =>
                 {
                     let mut attrs = HashMap::new();
-                    for attr in e.attributes() {
+                    for attr in e.checked_attributes() {
                         let attribute = attr?;
                         let key = std::str::from_utf8(attribute.key.as_ref())?;
                         let value = attribute.decoded_and_normalized_value(

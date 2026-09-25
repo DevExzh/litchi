@@ -25,6 +25,7 @@ use crate::timelines::{
     Views, load_timeline_caches, load_timelines, store_timeline_caches, store_worksheet_timelines,
     write_timeline_cache_definition, write_timelines,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const SLICER_CACHE_EXTENSION_URI: &str = "{BBE1A952-AA13-448E-AADC-164F8A28A991}";
 const X14: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
@@ -1140,7 +1141,7 @@ fn attribute_value(
     name: &str,
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<Option<String>> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|e| invalid(e.to_string()))?;
         if attribute.key.as_ref() == name.as_bytes() {
             return Ok(Some(

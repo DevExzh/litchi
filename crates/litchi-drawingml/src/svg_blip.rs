@@ -20,6 +20,7 @@ use quick_xml::{
 use thiserror::Error as ThisError;
 
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// Transitional `[MS-ODRAWXML]` SVG namespace.
 pub const NAMESPACE: &str = "http://schemas.microsoft.com/office/drawing/2016/SVG/main";
@@ -1550,7 +1551,7 @@ pub mod codec {
                 .ok_or_else(|| invalid("SVG contextual root is truncated"))?
         };
         let mut declared = Vec::new();
-        for attribute in element.attributes() {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             let Some(prefix) = attribute.key.as_namespace_binding() else {
                 continue;
@@ -1672,7 +1673,7 @@ pub mod codec {
         }
         let reference = reference(element, reader)?;
         let mut attributes = Vec::new();
-        for attribute in element.attributes() {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             let raw_name = attribute.key.as_ref();
             if raw_name == b"xmlns"
@@ -1799,7 +1800,7 @@ pub mod codec {
         }
         let reference = contextual_reference(element, decoder, &resolver)?;
         let mut attributes = Vec::new();
-        for attribute in element.attributes() {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             let raw_name = attribute.key.as_ref();
             if raw_name == b"xmlns"
@@ -1854,7 +1855,7 @@ pub mod codec {
     ) -> Result<Reference> {
         let mut embedded = None;
         let mut linked = None;
-        for attribute in element.attributes() {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             let local = attribute.key.local_name();
             if local.as_ref() != b"embed" && local.as_ref() != b"link" {
@@ -2180,7 +2181,7 @@ pub mod codec {
         scope: &ContextualScope<'_>,
         element: &BytesStart<'_>,
     ) -> Result<()> {
-        for attribute in element.attributes() {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             let raw_name = attribute.key.as_ref();
             if raw_name == b"xmlns" || raw_name.starts_with(b"xmlns:") {
@@ -2418,7 +2419,7 @@ pub mod codec {
         element: &BytesStart<'_>,
         reader: &NsReader<R>,
     ) -> Result<Reference> {
-        for attribute in element.attributes() {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             if (attribute.key.local_name().as_ref() == b"embed"
                 || attribute.key.local_name().as_ref() == b"link")
@@ -2454,7 +2455,7 @@ pub mod codec {
     ) -> Result<Vec<Namespace>> {
         let mut result = Vec::new();
         let mut prefixes = SeenNames::new();
-        for attribute in element.attributes() {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             let raw = attribute.key.into_inner();
             let prefix = if raw == b"xmlns" {

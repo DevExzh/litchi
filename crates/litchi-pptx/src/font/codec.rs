@@ -8,6 +8,7 @@ use super::{
 };
 use crate::error::{Error, Result};
 use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::PackURI;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -362,7 +363,7 @@ pub(super) fn parse_face(
     strings: &mut usize,
 ) -> Result<String> {
     let mut id = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let qualified = attribute.key.as_ref();
         if qualified == b"xmlns" || qualified.starts_with(b"xmlns:") {
@@ -399,7 +400,7 @@ pub(super) fn collect_unqualified_attributes(
     strings: &mut usize,
 ) -> Result<HashMap<String, String>> {
     let mut result = HashMap::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let qualified = attribute.key.as_ref();
         if qualified == b"xmlns" || qualified.starts_with(b"xmlns:") {

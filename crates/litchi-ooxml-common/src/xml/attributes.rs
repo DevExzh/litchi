@@ -17,9 +17,19 @@
 //! [`first_wins`] yields what a lenient reader relies on — every qualified
 //! name once, at its first occurrence — at a cost of `O(n log n)` comparisons
 //! for `n` attributes, and parses every value as written.
+//!
+//! A reader that stops at a tag's first attribute error uses
+//! [`BytesStartExt::checked_attributes`] instead: quick-xml's items up to and
+//! including that error, with its duplicate check replaced by an ordered map
+//! from the 33rd name on (record 0770; defined in `litchi_opc::xml_attributes`,
+//! which this module re-exports). Above 32 names quick-xml's own check hashes
+//! names with an unkeyed hasher and rescans every earlier name on each hash
+//! hit, so its worst case grows with the square of the tag even for readers
+//! that stop at the first error.
 
 use std::collections::{BTreeMap, BTreeSet};
 
+pub use litchi_opc::xml_attributes::{BytesStartExt, CheckedAttributes};
 use quick_xml::events::BytesStart;
 use quick_xml::events::attributes::{AttrError, Attribute, Attributes};
 
@@ -53,10 +63,8 @@ const LINEAR_NAMES: usize = 32;
 /// than 32, and a linear scan of the names seen so far below that.
 #[must_use]
 pub fn first_wins<'a>(tag: &'a BytesStart<'_>) -> FirstWins<'a> {
-    let mut attributes = tag.attributes();
-    attributes.with_checks(false);
     FirstWins {
-        attributes,
+        attributes: tag.unchecked_attributes(),
         base: tag,
         seen: FirstSeen::default(),
     }
@@ -70,8 +78,7 @@ pub fn first_wins<'a>(tag: &'a BytesStart<'_>) -> FirstWins<'a> {
 /// compares the result with it.
 #[must_use]
 pub fn count_up_to(tag: &BytesStart<'_>, maximum: usize) -> usize {
-    tag.attributes()
-        .with_checks(false)
+    tag.unchecked_attributes()
         .take(maximum.saturating_add(1))
         .count()
 }
@@ -277,6 +284,7 @@ mod tests {
 
     type Item = Result<(Vec<u8>, Vec<u8>), AttrError>;
 
+    #[allow(clippy::disallowed_methods)]
     fn checked(tag: &BytesStart<'_>) -> Vec<Item> {
         tag.attributes()
             .map(|item| {

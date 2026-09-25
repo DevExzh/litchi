@@ -8,6 +8,7 @@ use super::super::{
 };
 use crate::error::{Error, Result};
 use litchi_ooxml_common::custom_xml::valid_guid;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::decode_xml_reference;
 use quick_xml::Writer;
 use quick_xml::encoding::Decoder;
@@ -522,7 +523,7 @@ pub(super) fn uid_attr(
     resolver: &NamespaceResolver,
 ) -> Result<Option<String>> {
     let mut result = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let (attribute_namespace, _) = resolver.resolve_attribute(attribute.key);
         if attribute.key.local_name().as_ref() == b"uid"
@@ -552,7 +553,7 @@ pub(crate) fn optional_attr(
     decoder: Decoder,
 ) -> Result<Option<String>> {
     let mut result = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_ref() == name {
             if result.is_some() {

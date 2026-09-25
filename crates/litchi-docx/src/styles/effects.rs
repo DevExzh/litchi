@@ -21,6 +21,7 @@ use quick_xml::{Reader, XmlVersion};
 
 use crate::styles::{Style, Styles, Type};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[cfg(test)]
 mod test_trace {
@@ -2497,7 +2498,7 @@ fn relationship_element_id(
     element: &quick_xml::events::BytesStart<'_>,
     decoder: quick_xml::Decoder,
 ) -> Result<String> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         if attribute.key.as_ref() == b"Id" {
             return attribute
@@ -3046,7 +3047,7 @@ fn root_namespace(element: &quick_xml::events::BytesStart<'_>) -> Result<String>
         .iter()
         .position(|byte| *byte == b':')
         .map_or(&b""[..], |index| &name[..index]);
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let key = attribute.key.as_ref();
         let matches = if prefix.is_empty() {

@@ -33,6 +33,7 @@ use crate::column::{self, Assignments, Flags};
 use crate::error::{Result, allocation, invalid};
 use crate::layout::{self, Defaults};
 use crate::row;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(super) fn parse_processed_defaults(
     content: &str,
@@ -234,7 +235,7 @@ fn scan_cell_attributes<'a>(
         value_metadata: None,
         cell_type: None,
     };
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| litchi_ooxml_common::XmlError::Malformed(error.to_string()))?;
         if attribute.key.prefix().is_some() {

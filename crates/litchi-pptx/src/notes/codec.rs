@@ -7,6 +7,7 @@ use super::{
 };
 use crate::{Error, Result};
 use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
@@ -470,7 +471,7 @@ fn inspect_element(
             "invalid {expected_root} root or namespace"
         )));
     }
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let raw = item.key.as_ref();
         if raw == b"xmlns" || raw.starts_with(b"xmlns:") {

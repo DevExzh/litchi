@@ -23,6 +23,7 @@ use quick_xml::{XmlVersion, encoding::Decoder};
 
 use super::super::model::{RunProperties, RunUnderline, RunUnderlineColor};
 use super::xml::is_fragment_word_name;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(super) fn update_run_properties(
     props: &mut RunProperties,
@@ -37,7 +38,7 @@ pub(super) fn update_run_properties(
     }
 
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() == b"val" {
             value = Some(attribute.value);
@@ -273,7 +274,7 @@ fn run_underline_attribute(
     fragment_prefix: &Option<Option<Vec<u8>>>,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         if !is_fragment_word_name(&namespace, attribute.key, name, fragment_prefix) {

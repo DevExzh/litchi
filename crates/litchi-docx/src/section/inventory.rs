@@ -6,6 +6,7 @@ use crate::error::{Error, Result};
 use crate::namespace::is_wordprocessing_namespace;
 use litchi_core::xml::ReaderOrigin;
 use litchi_core::{Position, SourceVersion};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -1217,7 +1218,7 @@ fn validate_namespace_bindings(
             String::from_utf8_lossy(prefix.as_ref())
         )));
     }
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         validate_qname(attribute.key.as_ref(), "main-document", "attribute")?;
         let prefix = attribute.key.prefix();
@@ -1280,7 +1281,7 @@ fn inspect_reference(
             "section has too many header/footer references".into(),
         ));
     }
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"id" {
             continue;
@@ -1366,7 +1367,7 @@ fn namespace_declarations(
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<Vec<RelationshipBinding>> {
     let mut bindings = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let attribute_prefix = attribute
             .key
@@ -1488,7 +1489,7 @@ fn root_declares_prefix(source: &[u8], prefix: &[u8]) -> Result<bool> {
             .map_err(|error| Error::Xml(error.to_string()))?
         {
             Event::Start(element) | Event::Empty(element) => {
-                for attribute in element.attributes() {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     let declares_prefix = if prefix.is_empty() {
                         attribute.key.prefix().is_none()

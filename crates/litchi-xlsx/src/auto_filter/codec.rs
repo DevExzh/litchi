@@ -15,6 +15,7 @@ use super::model::{
     MAX_ITEMS, MAX_SORT_CONDITIONS, MAX_TEXT_CHARS, MAX_UNKNOWN_BYTES, OpaqueFields, Operator,
     Payload, Range, STRICT, State, Top10, UnknownAttribute, UnknownElement, Values, opaque_mut,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 struct ColumnBuilder {
     column_id: u32,
@@ -1223,7 +1224,7 @@ fn unknown_attributes(
     known: &[&[u8]],
 ) -> Result<Option<Box<OpaqueFields>>> {
     let mut opaque = OpaqueFields::default();
-    for attribute in e.attributes().with_checks(true) {
+    for attribute in e.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let name = attribute.key.as_ref();
         if name == b"xmlns" || name.starts_with(b"xmlns:") || known.contains(&name) {
@@ -1810,7 +1811,7 @@ fn parse_cell(v: &str) -> Result<(u32, u32)> {
 
 fn optional_attr(e: &BytesStart<'_>, n: &[u8], d: Decoder) -> Result<Option<String>> {
     let mut r = None;
-    for a in e.attributes().with_checks(true) {
+    for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
         if a.key.as_ref() == n {
             if r.is_some() {

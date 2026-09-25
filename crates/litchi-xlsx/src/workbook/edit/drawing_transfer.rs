@@ -14,6 +14,7 @@ use quick_xml::writer::Writer;
 
 use super::{GraphAction, GraphChange, Workbook, Worksheet, allocation, invalid};
 use crate::error::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const XDR: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
 const STRICT_XDR: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing";
@@ -702,7 +703,7 @@ fn parse_anchor(xml: &[u8], span: &AnchorSpan) -> Result<Anchor> {
         }
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(xml_error)?;
                     if relationship_namespace(&resolver.resolve_attribute(attribute.key).0) {
                         let value = attribute
@@ -988,7 +989,7 @@ fn inspect_worksheet_child(
         if state.drawing_reference.is_some() {
             return Err(invalid("worksheet has duplicate drawing references"));
         }
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             if relationship_namespace(&resolver.resolve_attribute(attribute.key).0)
                 && attribute.key.local_name().as_ref() == b"id"

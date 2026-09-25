@@ -23,6 +23,7 @@ use crate::package::validate_document_main_content_type;
 use crate::settings::DocumentSettings;
 
 use super::Package;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAGIC: &[u8; 8] = b"LDXPCPY\0";
 const REMOVAL_MAGIC: &[u8; 8] = b"LDXPREM\0";
@@ -1810,7 +1811,7 @@ const fn scope_local(scope: Scope) -> &'static [u8] {
 }
 
 fn validate_attributes(start: &BytesStart<'_>, scope: Scope, word_namespace: &[u8]) -> Result<()> {
-    for attribute in start.attributes() {
+    for attribute in start.checked_attributes() {
         let attribute = attribute.map_err(|_error| Error::Refused(Refusal::ComplexDocument))?;
         let key = attribute.key.as_ref();
         let value = attribute.value.as_ref();

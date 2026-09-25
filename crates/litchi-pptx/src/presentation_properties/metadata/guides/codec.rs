@@ -3,6 +3,7 @@
 use super::model::{Color, ColorKind, Guide, Guides, List, Orientation};
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -361,7 +362,7 @@ fn presentation_namespace(namespace: &ResolveResult<'_>) -> Option<&'static str>
 
 fn element_uri(element: &BytesStart<'_>, decoder: Decoder) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_ref() == b"uri" {
             if value.is_some() {
@@ -614,7 +615,7 @@ fn make_node(element: &BytesStart<'_>, decoder: Decoder, stack: &[Node]) -> Resu
         .map(|node| node.bindings.clone())
         .unwrap_or_default();
     let mut raw = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         raw.push((
             std::str::from_utf8(attribute.key.as_ref())

@@ -23,6 +23,7 @@ use crate::presentation::embedded::{
 use super::super::model::Persistence;
 use super::super::{ACTIVEX_NAMESPACE, MAX_SLIDE_XML_BYTES};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const AX: &[u8] = ACTIVEX_NAMESPACE;
 const RELATIONSHIPS: &[u8] = REL;
@@ -515,7 +516,7 @@ fn find_attribute(
     kind: AttributeKind,
 ) -> Result<Option<SourceAttribute>> {
     let mut found = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != local {
             continue;

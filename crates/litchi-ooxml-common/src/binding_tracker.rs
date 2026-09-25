@@ -39,6 +39,7 @@
 //! entry is made at most once per binding, by a lookup, and removed when its
 //! scope closes.
 
+use crate::xml::attributes::BytesStartExt as _;
 use quick_xml::events::BytesStart;
 use quick_xml::events::attributes::Attribute;
 use quick_xml::name::{
@@ -292,7 +293,7 @@ impl BindingTracker {
             return Ok(());
         }
         let mut count = 0usize;
-        for attribute in element.attributes().with_checks(false) {
+        for attribute in element.unchecked_attributes() {
             let Ok(attribute) = attribute else {
                 break;
             };
@@ -678,7 +679,7 @@ pub fn with_in_scope_namespaces<'element>(
         return element.clone();
     }
     let mut declared: Vec<&[u8]> = Vec::new();
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let Ok(attribute) = attribute else {
             break;
         };

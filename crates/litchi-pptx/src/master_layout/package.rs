@@ -19,6 +19,7 @@ use super::model::{
     AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID, PlaceholderSpec,
     SlideLayoutKind,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 // ============================================================================
 // Authoring operations
@@ -596,7 +597,7 @@ fn push_layout_id_entry(
 ) -> Result<()> {
     let mut layout_id = None;
     let mut relationship_id = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -715,7 +716,7 @@ fn push_master_id_entry(
 ) -> Result<()> {
     let mut id = None;
     let mut relationship_id = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| Error::Xml(error.to_string()))?;

@@ -15,6 +15,7 @@ use std::fmt::Write as FmtWrite;
 
 use super::model::{Extensions, Id, Ids, WORD_2010_NAMESPACE};
 use super::validation::{parse_id, parse_on_off};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MC_NAMESPACE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
@@ -163,7 +164,7 @@ fn parse_attributes(
     text_id: &mut Option<Id>,
     no_spell_err: &mut Option<bool>,
 ) -> Result<()> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let local = attribute.key.local_name();
         let known = matches!(local.as_ref(), b"paraId" | b"textId" | b"noSpellErr");

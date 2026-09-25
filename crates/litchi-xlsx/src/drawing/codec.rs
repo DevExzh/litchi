@@ -23,6 +23,7 @@ use super::model::{Chart, Drawing, Object, Picture, Unknown, UnknownKind};
 use super::source::{MAX_RELATIONSHIP_ID_BYTES, RelationshipDialect};
 use crate::error::{Error, Result, allocation};
 use crate::raw::namespace::relationship_attribute_value;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::{
     decode_xml_reference, is_drawingml_chart_name, is_drawingml_name, is_ncname,
     unqualified_attribute_value, xsd_token_atom,
@@ -1035,7 +1036,7 @@ fn check_positive_coordinate(value: i64, description: &str) -> Result<()> {
 }
 
 fn check_attribute_lengths(element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Invalid(error.to_string()))?;
         if attribute.value.as_ref().len() > MAX_STRING_BYTES {
             return Err(limit("drawing attribute"));
@@ -1142,7 +1143,7 @@ fn required_core_content_part_relationship(
     let expected =
         drawing_dialect.ok_or_else(|| invalid("contentPart appears before the drawing root"))?;
     let mut found = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Invalid(error.to_string()))?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;

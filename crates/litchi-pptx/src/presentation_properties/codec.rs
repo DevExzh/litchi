@@ -13,6 +13,7 @@ use super::{
 };
 use crate::{Error, Result};
 use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::{
     Reader, XmlVersion,
     encoding::Decoder,
@@ -189,7 +190,7 @@ fn make_node(e: &BytesStart<'_>, d: Decoder, stack: &[Node]) -> Result<Node> {
         .to_string();
     let mut bindings = stack.last().map(|n| n.bindings.clone()).unwrap_or_default();
     let mut raw = Vec::new();
-    for a in e.attributes().with_checks(true) {
+    for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
         raw.push((
             std::str::from_utf8(a.key.as_ref())

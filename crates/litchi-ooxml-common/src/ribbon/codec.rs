@@ -12,6 +12,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 
 use super::model::{Family, Limits, UI2_NAMESPACE, V2007_NAMESPACE, V2010_NAMESPACE, Version};
+use crate::xml::attributes::BytesStartExt as _;
 
 pub(super) fn validate_xml(xml: &[u8], family: Family, limits: &Limits) -> Result<Version> {
     if xml.len() > limits.xml_bytes {
@@ -189,7 +190,7 @@ fn validate_attributes(
     limits: &Limits,
 ) -> Result<()> {
     let mut expanded = HashSet::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         count_node(nodes, limits)?;
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let value = attribute
@@ -345,7 +346,7 @@ fn validate_declaration(declaration: &BytesDecl<'_>) -> Result<()> {
         .map_err(|error| Error::Xml(format!("invalid Ribbon XML declaration: {error}")))?;
     let raw = BytesStart::from_content(declaration_text, 3);
     let mut state = 0u8;
-    for attribute in raw.attributes().with_checks(true) {
+    for attribute in raw.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.prefix().is_some() {
             return Err(Error::Invalid(format!(

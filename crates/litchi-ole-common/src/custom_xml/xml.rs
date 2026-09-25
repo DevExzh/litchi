@@ -6,6 +6,7 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::model::{Limits, Result, RootName, invalid, limit, xml_error};
+use crate::xml_attributes::BytesStartExt as _;
 
 #[derive(Clone, Copy)]
 enum Utf16Encoding {
@@ -187,7 +188,7 @@ pub(crate) fn required_attribute(
     local_name: &[u8],
 ) -> Result<String> {
     let mut value = None;
-    for attribute_result in element.attributes().with_checks(true) {
+    for attribute_result in element.checked_attributes() {
         let attribute = attribute_result.map_err(|error| xml_error(error.to_string()))?;
         let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
         if local.as_ref() == local_name
@@ -220,7 +221,7 @@ pub(crate) fn reject_other_attributes(
     // retained Properties stream; `allowed` documents the known fields and
     // keeps duplicate-required-attribute checks at their call sites.
     let _ = allowed;
-    for attribute_result in element.attributes().with_checks(true) {
+    for attribute_result in element.checked_attributes() {
         let attribute = attribute_result.map_err(|error| xml_error(error.to_string()))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;

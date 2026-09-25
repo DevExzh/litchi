@@ -11,6 +11,7 @@ use crate::error::{Error, Result};
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 
 use super::model::{Settings, Text};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -229,7 +230,7 @@ fn parse_selected(xml: &[u8]) -> Result<Option<Settings>> {
 fn parse_settings(element: &BytesStart<'_>, decoder: Decoder) -> Result<Settings> {
     let mut settings = Settings::default();
     let mut seen = [false; 4];
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_ref().contains(&b':') {
             continue;
@@ -259,7 +260,7 @@ fn parse_settings(element: &BytesStart<'_>, decoder: Decoder) -> Result<Settings
 }
 
 fn validate_child_attributes(element: &BytesStart<'_>) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if !attribute.key.as_ref().contains(&b':') {
             return Err(invalid(

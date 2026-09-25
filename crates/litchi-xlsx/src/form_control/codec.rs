@@ -30,6 +30,7 @@ use super::model::{
     is_xml_10_char, validate_multi_selection, validate_xml_text,
 };
 use super::{FORM_CONTROL_NAMESPACE, Limits, Result, allocation, invalid, limit};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const ROOT: &[u8] = b"formControlPr";
 const ITEM_LIST: &[u8] = b"itemLst";
@@ -3008,8 +3009,7 @@ fn parse_root_attributes(
     namespaces: &mut Vec<NamespaceBinding>,
     opaque_bytes: &mut usize,
 ) -> Result<()> {
-    let mut attributes_binding = element.attributes();
-    let attributes = attributes_binding.with_checks(true);
+    let attributes = element.checked_attributes();
     let mut count = 0usize;
     for attribute in attributes {
         let attribute =
@@ -3164,8 +3164,7 @@ fn parse_item_list_attributes(
     unknown: &mut Vec<OpaqueAttribute>,
 ) -> Result<()> {
     let mut count = 0usize;
-    let mut attributes_binding = element.attributes();
-    let attributes = attributes_binding.with_checks(true);
+    let attributes = element.checked_attributes();
     for attribute in attributes {
         let attribute = attribute
             .map_err(|error| invalid(format!("form-control itemLst attribute error: {error}")))?;
@@ -3226,7 +3225,7 @@ fn parse_item_attributes(
     let mut value = None::<String>;
     let mut opaque = false;
     let mut count = 0usize;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("form-control item attribute error: {error}")))?;
         count = count
@@ -3299,8 +3298,7 @@ fn parse_item_attributes(
 }
 
 fn check_opaque_attribute_budget(element: &BytesStart<'_>, limits: Limits) -> Result<()> {
-    let mut attributes_binding = element.attributes();
-    let attributes = attributes_binding.with_checks(true);
+    let attributes = element.checked_attributes();
     let mut count = 0usize;
     for attribute in attributes {
         attribute
@@ -3321,8 +3319,7 @@ fn check_opaque_attribute_budget(element: &BytesStart<'_>, limits: Limits) -> Re
 
 fn extension_list_container_diagnostic(element: &BytesStart<'_>, limits: Limits) -> Result<bool> {
     check_opaque_attribute_budget(element, limits)?;
-    let mut attributes_binding = element.attributes();
-    let attributes = attributes_binding.with_checks(true);
+    let attributes = element.checked_attributes();
     let mut diagnostic = false;
     for attribute in attributes {
         let attribute = attribute
@@ -3345,8 +3342,7 @@ fn validate_extension_element(
     let mut valid = matches!(namespace, ResolveResult::Bound(Namespace(value))
         if namespace_uri_matches(value, b"http://schemas.openxmlformats.org/spreadsheetml/2006/main"))
         && local.into_inner() == b"ext";
-    let mut attributes_binding = element.attributes();
-    let attributes = attributes_binding.with_checks(true);
+    let attributes = element.checked_attributes();
     let mut uri_seen = false;
     for attribute in attributes {
         let attribute = attribute
@@ -3420,7 +3416,7 @@ fn namespace_context_for_element(
     retained: &mut RetainedBudget,
 ) -> Result<Arc<[NamespaceBinding]>> {
     let mut declaration_count = 0usize;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("form-control namespace attribute error: {error}")))?;
         if attribute.key.as_namespace_binding().is_some() {
@@ -3429,8 +3425,7 @@ fn namespace_context_for_element(
                 .ok_or_else(|| invalid("form-control namespace binding count overflow"))?;
         }
     }
-    let mut attributes_binding = element.attributes();
-    let attributes = attributes_binding.with_checks(true);
+    let attributes = element.checked_attributes();
     let mut additions = Vec::<NamespaceBinding>::new();
     let _addition_storage = if declaration_count == 0 {
         0

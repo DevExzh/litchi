@@ -8,6 +8,7 @@ use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use super::model::{Slide, SlideNameIndex, Snapshot, capture, invalid};
 use super::patch::Patch;
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// One failure-atomic edit rooted in an immutable opened-package snapshot.
 #[derive(Clone)]
@@ -1750,7 +1751,7 @@ fn shape_relationship_ids(
             .map_err(|error| Error::Xml(error.to_string()))?
         {
             quick_xml::events::Event::Start(element) | quick_xml::events::Event::Empty(element) => {
-                for attribute in element.attributes() {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     let key = attribute.key.as_ref();
                     if key == b"xmlns" || key.starts_with(b"xmlns:") {

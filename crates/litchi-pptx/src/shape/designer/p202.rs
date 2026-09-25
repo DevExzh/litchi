@@ -9,6 +9,7 @@ use quick_xml::reader::NsReader;
 
 use super::{DrawingProperties, Limits, P202_NAMESPACE, Tag, Tags};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const P202: &[u8] = P202_NAMESPACE.as_bytes();
 
@@ -350,7 +351,7 @@ fn parse_editable(
     limits: Limits,
 ) -> Result<Option<bool>> {
     let mut editable = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let name = attribute.key.as_ref();
         if name == b"edtDesignElem" {
@@ -381,7 +382,7 @@ fn parse_tag(
 ) -> Result<Tag> {
     let mut name = None;
     let mut value = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = attribute.key.as_ref();
         if key != b"name" && key != b"val" {
@@ -418,7 +419,7 @@ fn parse_tag(
 }
 
 fn validate_no_attributes(element: &BytesStart<'_>, limits: Limits) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = attribute.key.as_ref();
         if key != b"xmlns" && !key.starts_with(b"xmlns:") {

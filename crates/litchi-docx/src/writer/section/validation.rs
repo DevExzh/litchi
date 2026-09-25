@@ -13,6 +13,7 @@ use super::model::{
     MAX_PAGE_BORDER_ART_SIZE, MAX_PAGE_BORDER_LINE_SIZE, MAX_PAGE_BORDER_SPACE, SectionProperties,
     Style,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(super) fn validate_header_footer_xml(xml: &str, header: bool) -> Result<()> {
     use quick_xml::reader::NsReader;
@@ -159,7 +160,7 @@ fn validate_attributes<R: BufRead>(
     let resolver = reader.resolver().clone();
     let mut seen = std::collections::HashSet::new();
     let mut seen_raw = std::collections::HashSet::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if !seen_raw.insert(attribute.key.as_ref().to_vec()) {
             return Err(Error::InvalidFormat(

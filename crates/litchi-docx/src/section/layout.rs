@@ -15,6 +15,7 @@ use crate::error::{Error, Result};
 use crate::namespace::is_wordprocessing_namespace;
 use litchi_core::xml::ReaderOrigin;
 use litchi_core::{Position, SourceVersion};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::{SourceArtifact, SourceArtifactFingerprint, SourceLineage};
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
@@ -1043,7 +1044,7 @@ fn word_attribute_info_from_element(
         },
         _ => None,
     };
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let local = attribute.key.local_name();
         let prefix = attribute

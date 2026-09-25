@@ -18,6 +18,7 @@
 
 use crate::error::{Error, Result};
 use crate::namespace::is_wordprocessing_namespace;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesEnd, BytesStart};
@@ -93,7 +94,7 @@ pub(super) fn paragraph_attribute(
     name: &[u8],
     decoder: Decoder,
 ) -> Result<String> {
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() == name {
             return attribute
@@ -116,7 +117,7 @@ pub(super) fn word_attribute_value(
     fragment_prefix: &Option<Option<Vec<u8>>>,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         if !is_fragment_word_name(&namespace, attribute.key, name, fragment_prefix) {

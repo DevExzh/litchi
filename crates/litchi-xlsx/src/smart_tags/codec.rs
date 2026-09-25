@@ -12,6 +12,7 @@ use quick_xml::reader::NsReader;
 use super::model::{Cell, Collection, Conformance, Property, Tag};
 use super::{MAX_DEPTH, MAX_XML_BYTES, STRICT, TRANSITIONAL};
 use crate::error::{Error, Result, allocation, invalid};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Scope {
@@ -467,7 +468,7 @@ fn parse_cell(
     resolver: &NamespaceResolver,
 ) -> Result<Address> {
     let mut reference = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
@@ -498,7 +499,7 @@ fn parse_tag(
     let mut type_id = None;
     let mut deleted = None;
     let mut xml_based = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
@@ -545,7 +546,7 @@ fn parse_property(
 ) -> Result<Property> {
     let mut key = None;
     let mut value = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
@@ -579,7 +580,7 @@ fn parse_property(
 }
 
 fn reject_attributes(element: &BytesStart<'_>, name: &str) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if !is_namespace_declaration(attribute.key.as_ref()) {
             return Err(invalid(format!(

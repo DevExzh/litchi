@@ -10,6 +10,7 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use crate::error::{Result, allocation, invalid};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const EXTENDED: &[u8] =
     b"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties";
@@ -652,7 +653,7 @@ fn tag(element: &BytesStart<'_>, decoder: Decoder) -> Result<Tag> {
         .map_err(|error| invalid(format!("property element name is not UTF-8: {error}")))?
         .to_owned();
     let mut attributes = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| invalid(format!("property attribute is not UTF-8: {error}")))?

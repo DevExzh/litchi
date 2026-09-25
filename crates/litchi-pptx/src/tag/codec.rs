@@ -8,6 +8,7 @@ use super::{
     ROOT_EMPTY_CLOSE, ROOT_OPEN, Result, STRICT, STRICT_TEXT, TAG_CLOSE, TAG_OPEN, XML_DECL,
     allocation, invalid,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -238,7 +239,7 @@ fn parse_attributes(
     let mut namespaces = Vec::new();
     let mut extensions = Vec::new();
     let mut seen = HashSet::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(xml_error)?

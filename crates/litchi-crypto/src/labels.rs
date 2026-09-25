@@ -8,6 +8,7 @@ use std::fmt;
 
 use bitflags::bitflags;
 use litchi_core::xml::ReaderOrigin;
+use litchi_ole_common::xml_attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::{Reader, XmlVersion};
 
@@ -450,7 +451,7 @@ fn parse_label(
     let mut site_id = None;
     let mut content_bits = None;
     let mut removed = None;
-    for raw_attribute in element.attributes().with_checks(true) {
+    for raw_attribute in element.checked_attributes() {
         let attribute = raw_attribute.map_err(|error| xml_error(error.to_string()))?;
         if is_namespace_attribute(attribute.key.as_ref()) {
             continue;
@@ -626,7 +627,7 @@ fn validate_root(
         return Err(invalid("labelList uses the wrong namespace"));
     }
     let mut prefixes = HashSet::new();
-    for raw_attribute in root.attributes().with_checks(true) {
+    for raw_attribute in root.checked_attributes() {
         let attribute = raw_attribute.map_err(|error| xml_error(error.to_string()))?;
         if !is_namespace_attribute(attribute.key.as_ref()) {
             return Err(invalid("labelList has an unexpected attribute"));
@@ -756,7 +757,7 @@ fn optional_attribute(
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<Option<String>, Error> {
     let mut value = None;
-    for raw_attribute in element.attributes().with_checks(true) {
+    for raw_attribute in element.checked_attributes() {
         let attribute = raw_attribute.map_err(|error| xml_error(error.to_string()))?;
         if attribute.key.as_ref() == key {
             let normalized = attribute
@@ -772,7 +773,7 @@ fn optional_attribute(
 }
 
 fn reject_non_namespace_attributes(element: &BytesStart<'_>) -> Result<(), Error> {
-    for raw_attribute in element.attributes().with_checks(true) {
+    for raw_attribute in element.checked_attributes() {
         let attribute = raw_attribute.map_err(|error| xml_error(error.to_string()))?;
         if !is_namespace_attribute(attribute.key.as_ref()) {
             return Err(invalid("element has an unexpected attribute"));

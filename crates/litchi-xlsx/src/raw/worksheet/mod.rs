@@ -28,6 +28,7 @@ use crate::cell::{Store, Text};
 use crate::error::{Result, invalid};
 use crate::layout::Defaults;
 use litchi_ooxml_common::mce::{self, process_ooxml};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, PrefixDeclaration, ResolveResult};
 
@@ -204,7 +205,7 @@ impl MceRewriteEquivalence {
             return false;
         }
         let mut declarations = 0usize;
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let Ok(attribute) = attribute else {
                 // Duplicate or malformed attributes are refused while reading.
                 return false;

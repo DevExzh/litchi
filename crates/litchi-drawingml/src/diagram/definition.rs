@@ -9,6 +9,7 @@
 use crate::diagram::{DGM_NAMESPACE, DGM_NAMESPACE_STRICT};
 use crate::{Error, Result};
 use litchi_ooxml_common::mce::process_str;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -190,7 +191,7 @@ impl DefinitionScan<'_> {
 }
 
 fn attribute(element: &BytesStart<'_>, name: &str) -> Result<Option<String>> {
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         if item.key.local_name().as_ref() == name.as_bytes() {
             let value = std::str::from_utf8(item.value.as_ref()).map_err(xml_error)?;

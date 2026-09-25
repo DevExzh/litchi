@@ -21,6 +21,8 @@ use super::{
     INKML_NAMESPACE, MAX_ATTRIBUTE_VALUE_BYTES, MAX_BRUSH_PROPERTIES, MAX_CONTEXTS, MAX_DEPTH,
     MAX_NODES, MAX_SOURCE_BYTES, MAX_TOKEN_BYTES, MAX_TRACES, NAMESPACE,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use litchi_ooxml_common::xml::attributes::first_wins;
 
 const MAX_NAMESPACE_DECLARATIONS: usize = 256;
 const MAX_ATTRIBUTES_PER_ELEMENT: usize = 256;
@@ -905,7 +907,7 @@ fn attr<R: std::io::BufRead>(
     reader: &NsReader<R>,
 ) -> Result<Option<String>> {
     let mut result = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.prefix().is_some() {
             continue;
@@ -1039,7 +1041,7 @@ fn validate_element<R: std::io::BufRead>(
         return Err(invalid("InkML element name is invalid"));
     }
     let mut attribute_keys = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute_keys.len() >= MAX_ATTRIBUTES_PER_ELEMENT {
             return Err(limit(
@@ -1249,7 +1251,7 @@ fn validate_reference(reference: &BytesRef<'_>) -> Result<()> {
 }
 
 fn has_namespace_declaration(element: &BytesStart<'_>, prefix: &[u8]) -> bool {
-    element.attributes().any(|attribute| {
+    first_wins(element).any(|attribute| {
         let Ok(attribute) = attribute else {
             return false;
         };

@@ -24,6 +24,7 @@ use quick_xml::reader::Reader;
 
 use super::model::Drawing;
 use crate::error::{Error, Result, allocation, invalid as xlsx_invalid};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value, xsd_token_atom};
 
 const SPREADSHEET_DRAWING: &[u8] =
@@ -2289,7 +2290,7 @@ impl<'a> Scanner<'a> {
         decoder: Decoder,
     ) -> Result<()> {
         let mut found = Vec::<RelationshipReference>::new();
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             if attribute.key.as_namespace_binding().is_some() {
                 continue;
@@ -2766,7 +2767,7 @@ impl Namespaces {
     fn preflight(&self, element: &BytesStart<'_>, decoder: Decoder) -> Result<usize> {
         let mut attributes = 0usize;
         let mut declarations = 0usize;
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             attributes = attributes
                 .checked_add(1)
@@ -2826,7 +2827,7 @@ impl Namespaces {
         shared_declarations
             .try_reserve_exact(declarations)
             .map_err(|source| allocation("drawing source shared namespace context", source))?;
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             let Some(prefix) = attribute.key.as_namespace_binding() else {
                 continue;
@@ -3021,7 +3022,7 @@ fn namespace_complete_element_fragment(
             Event::Start(element) | Event::Empty(element) => {
                 let end = position(&reader, origin)?;
                 let mut declared = Vec::<Vec<u8>>::new();
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(xml_error)?;
                     let Some(prefix) = attribute.key.as_namespace_binding() else {
                         continue;
@@ -3105,7 +3106,7 @@ fn extension_uri(element: &BytesStart<'_>, decoder: Decoder) -> Result<(bool, Ve
     let mut uri = None::<Vec<u8>>;
     let mut decoded = None::<String>;
     let mut malformed_attributes = false;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;
@@ -3160,7 +3161,7 @@ fn relationship_attribute(
     decoder: Decoder,
 ) -> Result<Option<(String, RelationshipDialect)>> {
     let mut found = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;
@@ -3218,7 +3219,7 @@ fn required_core_content_part_relationship(
         Some(DrawingDialect::Transitional) | None => RelationshipDialect::Transitional,
     };
     let mut found = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;
@@ -3275,7 +3276,7 @@ fn relationship_dialect_attribute(
     local_name: &[u8],
 ) -> Result<Option<RelationshipDialect>> {
     let mut found = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_namespace_binding().is_some()
             || attribute.key.local_name().as_ref() != local_name
@@ -3305,7 +3306,7 @@ fn validate_start_attributes(
     decoder: Decoder,
 ) -> Result<()> {
     let mut seen = Vec::<(Vec<u8>, Vec<u8>)>::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;
@@ -3490,7 +3491,7 @@ fn bounded_unqualified_attribute(
     max_bytes: usize,
     label: &str,
 ) -> Result<Option<String>> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_namespace_binding().is_some()
             || attribute.key.prefix().is_some()

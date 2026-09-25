@@ -16,6 +16,7 @@ use super::model::{
     VolatileDependencyType, VolatileMain, VolatileReference, VolatileTopic, VolatileType,
     VolatileValue,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 impl VolatileDependencies {
     pub fn parse(xml: &[u8]) -> Result<Self> {
@@ -648,7 +649,7 @@ fn required_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8]) -> Result<String> {
 
 fn optional_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8]) -> Result<Option<String>> {
     let mut value = None;
-    for a in e.attributes().with_checks(true) {
+    for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
         if a.key.as_ref() == n {
             if value.is_some() {
@@ -665,7 +666,7 @@ fn optional_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8]) -> Result<Option<Stri
 }
 
 fn only_attrs(e: &BytesStart<'_>, allowed: &[&[u8]]) -> Result<()> {
-    for a in e.attributes().with_checks(true) {
+    for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
         let k = a.key.as_ref();
         if k == b"xmlns" || k.starts_with(b"xmlns:") {
@@ -683,7 +684,7 @@ fn only_attrs(e: &BytesStart<'_>, allowed: &[&[u8]]) -> Result<()> {
 
 fn namespace_attributes(e: &BytesStart<'_>, d: Decoder) -> Result<Vec<(String, String)>> {
     let mut values = Vec::new();
-    for a in e.attributes().with_checks(true) {
+    for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
         let key = std::str::from_utf8(a.key.as_ref()).map_err(xml_error)?;
         if key.starts_with("xmlns:") && key != "xmlns:xml" {

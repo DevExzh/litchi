@@ -17,6 +17,7 @@ use super::model::{
 use super::{
     MAX_DATA_REFERENCES, STRICT_MAIN, STRICT_REL, TRANSITIONAL_MAIN, TRANSITIONAL_REL, invalid,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Scope {
@@ -273,7 +274,7 @@ fn parse_consolidation_attributes(
     element: &BytesStart<'_>,
 ) -> Result<ConsolidationBuilder> {
     let mut value = ConsolidationBuilder::default();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid dataConsolidate attribute: {error}")))?;
         if is_namespace_declaration(attribute.key.as_ref()) {
@@ -318,7 +319,7 @@ fn parse_data_refs_attributes(
     element: &BytesStart<'_>,
 ) -> Result<Option<u32>> {
     let mut count = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|error| invalid(format!("invalid dataRefs attribute: {error}")))?;
         if is_namespace_declaration(attribute.key.as_ref()) {
@@ -352,7 +353,7 @@ fn parse_data_ref_attributes(
     let mut sheet = None;
     let mut reference = None;
     let mut relationship_id = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|error| invalid(format!("invalid dataRef attribute: {error}")))?;
         if is_namespace_declaration(attribute.key.as_ref()) {

@@ -14,3 +14,19 @@ too-many-arguments-threshold = 12
 type-complexity-threshold = 500
 
 source-item-ordering = ["module", "trait"]
+
+# quick-xml's own duplicate-attribute check pre-filters a tag's names with an
+# unkeyed hash from its 33rd name on and rescans every earlier name on each
+# hit, so its worst case grows with the square of the tag. Crates that read
+# untrusted OOXML or OLE2 XML deny these methods outside their tests
+# (`#![cfg_attr(not(test), deny(clippy::disallowed_methods))]`) and iterate
+# through `BytesStartExt` instead (record 0770); the workspace allows the lint
+# everywhere else.
+disallowed-methods = [
+  { path = "quick_xml::events::BytesStart::attributes", reason = "quick-xml's duplicate check is quadratic on hostile tags: use `BytesStartExt::checked_attributes` (stops at the first error), `first_wins` (reads past errors) or `BytesStartExt::unchecked_attributes` (record 0770)" },
+  { path = "quick_xml::events::BytesStart::html_attributes", reason = "quick-xml's duplicate check is quadratic on hostile tags (record 0770)" },
+  { path = "quick_xml::events::BytesPI::attributes", reason = "quick-xml's duplicate check is quadratic on hostile tags (record 0770)" },
+  { path = "quick_xml::events::attributes::Attributes::new", reason = "quick-xml's duplicate check is quadratic on hostile tags (record 0770)" },
+  { path = "quick_xml::events::attributes::Attributes::html", reason = "quick-xml's duplicate check is quadratic on hostile tags (record 0770)" },
+  { path = "quick_xml::events::attributes::Attributes::with_checks", reason = "turning quick-xml's duplicate check on brings back its quadratic worst case; use `BytesStartExt` (record 0770)" },
+]

@@ -10,6 +10,7 @@
 use crate::error::{Error, Result};
 use crate::namespace::is_wordprocessing_namespace;
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -716,7 +717,7 @@ fn external_relationship_id(
     relationships: &[RelationshipState],
 ) -> Result<Option<String>> {
     let mut id = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"id" {
             continue;
@@ -771,7 +772,7 @@ fn validate_removable_wrapper_attributes(
     resolver: &NamespaceResolver,
 ) -> Result<()> {
     let mut seen = 0u8;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let raw_name = attribute.key.as_ref();
         if raw_name == b"xmlns" || raw_name.starts_with(b"xmlns:") {

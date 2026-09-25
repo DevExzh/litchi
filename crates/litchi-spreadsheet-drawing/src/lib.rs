@@ -1,6 +1,9 @@
 //! Shared `SpreadsheetML` drawing primitives.
 
 #![forbid(unsafe_code)]
+// quick-xml's checked attribute iteration is quadratic on hostile tags; read
+// attributes through `BytesStartExt` (record 0770, workspace `clippy.toml`).
+#![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 
 pub mod chart;
 pub mod shape;

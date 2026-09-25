@@ -33,6 +33,9 @@
 //! activates them.
 
 #![forbid(unsafe_code)]
+// quick-xml's checked attribute iteration is quadratic on hostile tags; see
+// `xml_attributes` and the workspace `clippy.toml` (record 0770).
+#![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 
 pub mod atomic;
 
@@ -57,6 +60,7 @@ pub mod sign;
 pub mod source_backed;
 /// Read-only, bounded OPC package validation.
 pub mod validation;
+pub mod xml_attributes;
 pub mod xml_splice;
 
 // Re-export commonly used types

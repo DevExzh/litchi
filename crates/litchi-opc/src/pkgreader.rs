@@ -14,6 +14,7 @@ use crate::packuri::{PACKAGE_URI, PackURI};
 use crate::payload::{DeferredPartSource, PartPayload};
 use crate::phys_pkg::PhysPkgReader;
 use crate::rel::{TargetMode, relationship_target_components};
+use crate::xml_attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -2144,7 +2145,7 @@ fn inspect_relationship_element(
     let mut type_attribute = None;
     let mut target_attribute = None;
     let mut target_mode = TargetMode::Internal;
-    for attribute_result in element.attributes() {
+    for attribute_result in element.checked_attributes() {
         let attribute = attribute_result.map_err(|error| {
             OpcError::InvalidRelationshipsManifest(format!(
                 "invalid Relationship attribute: {error}"

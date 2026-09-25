@@ -11,6 +11,7 @@ use super::{
     MAX_DEPTH, MAX_EXTENSION_BYTES, MAX_NODES, MAX_PART_BYTES, SHOW_DATA_TYPE_ICONS_NAMESPACE,
     Target, invalid,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -310,7 +311,7 @@ fn parse_target_attributes(
 ) -> crate::Result<ShowDataTypeIcons> {
     let mut visible = true;
     let mut seen = false;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let key = attribute.key.as_ref();
         if key == b"visible" {

@@ -26,6 +26,7 @@ use super::{
     CustomData, CustomDataView, DATA_CONTENT_TYPE, DATA_RELATIONSHIP_TYPE, PROPERTIES_CONTENT_TYPE,
     PROPERTIES_RELATIONSHIP_TYPE, RemovalDisposition,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAX_STORAGES: usize = 4_096;
 const MAX_UID_UNITS: usize = 65_535;
@@ -1944,7 +1945,7 @@ fn existing_content_type_removals(
             continue;
         }
         let mut part_name = None;
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
             if attribute.key.as_ref() != b"PartName" {
                 continue;

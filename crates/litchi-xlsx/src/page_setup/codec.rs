@@ -15,6 +15,7 @@ use super::model::{
     Comments, Copies, Dpi, ErrorMode, FirstPage, Fit, MAX_MEASURE_BYTES, Measure, Order,
     Orientation, Paper, RelId, Scale, Setup,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// Serialize one relationship-free core `pageSetup` element.
 #[must_use]
@@ -394,7 +395,7 @@ fn parse_setup(
     let mut setup = Setup::default();
     let mut printer_settings = None;
     let mut seen = [false; 18];
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let qualified_name = attribute.key.as_ref();
         if qualified_name == b"xmlns" || qualified_name.starts_with(b"xmlns:") {

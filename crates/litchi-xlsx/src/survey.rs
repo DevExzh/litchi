@@ -21,6 +21,7 @@ use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
 use crate::error::{Error, Result, invalid};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 mod source;
 
@@ -2016,7 +2017,7 @@ fn validate_element_names(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) ->
         return Err(invalid("unbound Survey element prefix"));
     }
     let mut expanded = HashSet::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let value = attribute
             .normalized_value(XmlVersion::Implicit1_0)
@@ -2053,8 +2054,7 @@ fn xstring(value: &str, field: &str) -> Result<Box<str>> {
 
 fn attrs(element: &BytesStart<'_>) -> Result<Vec<(Vec<u8>, String)>> {
     element
-        .attributes()
-        .with_checks(true)
+        .checked_attributes()
         .map(|raw_attribute| {
             let attribute = raw_attribute.map_err(xml_error)?;
             let decoded_value = attribute
@@ -2068,8 +2068,7 @@ fn attrs(element: &BytesStart<'_>) -> Result<Vec<(Vec<u8>, String)>> {
 
 fn raw_attributes(element: &BytesStart<'_>) -> Result<Vec<RawAttribute>> {
     element
-        .attributes()
-        .with_checks(true)
+        .checked_attributes()
         .map(|raw_attribute| {
             let attribute = raw_attribute.map_err(xml_error)?;
             let name = std::str::from_utf8(attribute.key.as_ref())

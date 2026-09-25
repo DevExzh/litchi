@@ -17,6 +17,7 @@ use quick_xml::{Reader, XmlVersion};
 use super::model::{List, Show};
 use crate::presentation_properties::metadata::escape_xml;
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) const MAX_BYTES: usize = 8 * 1024 * 1024;
 const MAX_NODES: usize = 100_000;
@@ -752,7 +753,7 @@ fn attributes(
 ) -> Result<Vec<(String, String)>> {
     let mut values = Vec::new();
     let mut seen = HashSet::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| Error::Xml(error.to_string()))?

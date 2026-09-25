@@ -12,6 +12,7 @@ use quick_xml::reader::NsReader;
 
 use crate::error::{Result, invalid};
 use litchi_ooxml_common::mce::process_str;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const TRANSITIONAL_MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_MAIN: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -262,7 +263,7 @@ fn parse_sheet_calc_pr_attributes(
     element: &BytesStart<'_>,
 ) -> Result<Properties> {
     let mut full_calc_on_load = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid sheetCalcPr attribute: {error}")))?;
         if is_namespace_declaration(attribute.key.as_ref()) {

@@ -15,6 +15,7 @@ use super::validation::{
 };
 use crate::tag::{Conformance, replace_xml};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const PML_TRANSITIONAL: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const PML_STRICT: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
@@ -591,7 +592,7 @@ fn validate_design_attributes(
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<()> {
     let mut seen_value = false;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let name = attribute.key.as_ref();
         if name == b"val" {

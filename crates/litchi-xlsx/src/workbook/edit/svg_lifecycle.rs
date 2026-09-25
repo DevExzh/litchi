@@ -30,6 +30,7 @@ use super::svg::PictureSelector;
 use super::{Workbook, allocation, invalid};
 use crate::drawing::source::{self, ElementRange, SourceDrawing, SvgOwnerState};
 use crate::error::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 mod relationship_ids;
 mod topology;
@@ -4988,7 +4989,7 @@ fn manifest_svg_inventory(bytes: &[u8]) -> Result<(bool, HashSet<String>)> {
                 let mut extension = None;
                 let mut part_name = None;
                 let mut content_type = None;
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
                     let value = attribute
                         .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
@@ -5211,7 +5212,7 @@ fn ext_list_contains_only_owner(
             .ok_or_else(|| invalid("SVG owner XML offset exceeds usize"))?;
         match event {
             Event::Start(element) => {
-                if depth == 0 && element.attributes().next().is_some() {
+                if depth == 0 && element.checked_attributes().next().is_some() {
                     return Ok(false);
                 }
                 if depth == 1 {
@@ -5228,7 +5229,7 @@ fn ext_list_contains_only_owner(
                 depth = depth.saturating_add(1);
             },
             Event::Empty(element) => {
-                if depth == 0 && element.attributes().next().is_some() {
+                if depth == 0 && element.checked_attributes().next().is_some() {
                     return Ok(false);
                 }
                 if depth == 1 {
@@ -5294,7 +5295,7 @@ fn ext_list_contains_only_owner_ranges(
             .ok_or_else(|| invalid("SVG owner XML offset exceeds usize"))?;
         match event {
             Event::Start(element) => {
-                if depth == 0 && element.attributes().next().is_some() {
+                if depth == 0 && element.checked_attributes().next().is_some() {
                     return Ok(false);
                 }
                 if depth == 1 {
@@ -5308,7 +5309,7 @@ fn ext_list_contains_only_owner_ranges(
                     .ok_or_else(|| invalid("SVG extension depth overflows"))?;
             },
             Event::Empty(element) => {
-                if depth == 0 && element.attributes().next().is_some() {
+                if depth == 0 && element.checked_attributes().next().is_some() {
                     return Ok(false);
                 }
                 if depth == 1 {
@@ -5539,7 +5540,7 @@ fn manifest_has_override(bytes: &[u8], uri: &PackURI) -> Result<bool> {
             {
                 let mut part = None;
                 let mut content = None;
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
                     match attribute.key.local_name().as_ref() {
                         b"PartName" => {
@@ -5598,7 +5599,7 @@ fn manifest_has_default_svg(bytes: &[u8]) -> Result<bool> {
             {
                 let mut extension = None;
                 let mut content = None;
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
                     match attribute.key.local_name().as_ref() {
                         b"Extension" => {

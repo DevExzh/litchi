@@ -21,6 +21,7 @@ use super::{
     MAX_DEPTH, MAX_NAMESPACE_BYTES, MAX_NAMESPACE_DECLARATIONS, MAX_NODES, MAX_XML_BYTES,
     NAMESPACE, XML_NAMESPACE, XMLNS_NAMESPACE,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// Read one complete `themeFamily` fragment while retaining its source bytes.
 ///
@@ -164,7 +165,7 @@ fn is_drawingml_namespace(namespace: &[u8]) -> bool {
 
 fn validate_extension_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> Result<()> {
     let mut uri_seen = false;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if is_namespace_attribute(attribute.key) {
             continue;
@@ -478,7 +479,7 @@ fn parse_root_attributes(
     let mut name = None;
     let mut id = None;
     let mut variant_id = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if is_namespace_attribute(attribute.key) {
             continue;
@@ -520,7 +521,7 @@ fn validate_element_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]
     let mut count = 0usize;
     let mut namespaces = 0usize;
     let mut seen = Vec::<(Vec<u8>, Vec<u8>)>::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         count = count
             .checked_add(1)

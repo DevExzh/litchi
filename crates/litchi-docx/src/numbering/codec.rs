@@ -22,6 +22,7 @@ use super::transaction::Change;
 use super::validation;
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -749,7 +750,7 @@ fn relationship_attribute(
     resolver: &NamespaceResolver,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if !names.contains(&attribute.key.local_name().as_ref()) {
             continue;
@@ -834,7 +835,7 @@ fn effective_ignorable(
     inherited: Option<&Vec<Vec<u8>>>,
 ) -> Result<Vec<Vec<u8>>> {
     let mut direct = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"Ignorable" {
             continue;
@@ -861,7 +862,7 @@ fn restart_numbering_after_break(
     ignorable: &[Vec<u8>],
 ) -> Result<Option<bool>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"restartNumberingAfterBreak" {
             continue;
@@ -1460,7 +1461,7 @@ fn decoded_attribute_value(
     name: &[u8],
     decoder: Decoder,
 ) -> Result<String> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_ref() != name {
             continue;
@@ -1603,7 +1604,7 @@ fn word_attribute_value(
     resolver: &NamespaceResolver,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != name {
             continue;

@@ -10,6 +10,7 @@ use super::model::{Context, TextTarget};
 use crate::error::{Result, invalid};
 use crate::layout::{self, Defaults};
 use crate::row;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) fn parse_defaults_element(
     element: &BytesStart<'_>,
@@ -104,7 +105,7 @@ fn validate_defaults_attributes(
     element: &BytesStart<'_>,
     resolver: &NamespaceResolver,
 ) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let name = attribute.key.as_ref();
         if name == b"xmlns" || name.starts_with(b"xmlns:") {

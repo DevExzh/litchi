@@ -6,6 +6,7 @@
 
 use super::model::AnchorId;
 use crate::error::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
@@ -41,7 +42,7 @@ pub(crate) fn parse_word2010_anchor_id(
     decoder: Decoder,
 ) -> Result<Option<AnchorId>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"anchorId" {
             continue;

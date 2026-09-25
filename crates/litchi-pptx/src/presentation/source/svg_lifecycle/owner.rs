@@ -17,6 +17,7 @@ use quick_xml::name::QName;
 use quick_xml::reader::Reader;
 
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
@@ -144,7 +145,7 @@ impl Namespaces {
     fn preflight(&self, element: &BytesStart<'_>, decoder: Decoder) -> Result<(usize, usize)> {
         let mut attributes = 0usize;
         let mut declarations = 0usize;
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             attributes = attributes
                 .checked_add(1)
@@ -222,7 +223,7 @@ impl Namespaces {
                 resource: "SVG owner namespace context",
                 source,
             })?;
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             let Some(prefix) = attribute.key.as_namespace_binding() else {
                 continue;
@@ -413,7 +414,7 @@ fn root_fragment_namespace_info(fragment: &[u8]) -> Result<(usize, Vec<Vec<u8>>)
                     .offset(reader.buffer_position())
                     .ok_or_else(|| invalid("picture namespace root end exceeds usize"))?;
                 let mut declared = Vec::<Vec<u8>>::new();
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(xml_error)?;
                     let Some(prefix) = attribute.key.as_namespace_binding() else {
                         continue;
@@ -1138,7 +1139,7 @@ pub(super) fn namespace_complete_element_fragment(
                     .offset(reader.buffer_position())
                     .ok_or_else(|| invalid("picture namespace root end exceeds usize"))?;
                 let mut declared = Vec::<Vec<u8>>::new();
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(xml_error)?;
                     let Some(prefix) = attribute.key.as_namespace_binding() else {
                         continue;
@@ -1334,7 +1335,7 @@ fn is_name(
 
 fn extension_uri_is_supported(element: &BytesStart<'_>, decoder: Decoder) -> Result<bool> {
     let mut uri = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;
@@ -1370,7 +1371,7 @@ fn validate_start_attributes(
     decoder: Decoder,
 ) -> Result<()> {
     let mut seen: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;

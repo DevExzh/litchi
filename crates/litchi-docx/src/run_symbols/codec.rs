@@ -24,6 +24,7 @@ use super::validation::{
     MAX_XML_BYTES, MAX_XML_DEPTH, MAX_XML_NODES, MC_NAMESPACE, SYMEX_NAMESPACE, parse_char,
     validate_symbol, validate_symbols,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const SYMEX_PREFIX: &str = "w15sym";
 
@@ -342,7 +343,7 @@ fn parse_symbol(
 ) -> Result<Symbol> {
     let mut font = None;
     let mut character = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let local = attribute.key.local_name();
         if local.as_ref() != b"font" && local.as_ref() != b"char" {

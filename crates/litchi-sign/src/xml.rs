@@ -5,6 +5,7 @@
     reason = "XML model types and helpers are arranged in authoring, verification, and parser flow"
 )]
 
+use crate::xml_attributes::BytesStartExt as _;
 use crate::{
     Cert, Coverage, Error, Limits, Policy, Reference, Report, Result, Signer, Status, Weak,
 };
@@ -1380,7 +1381,7 @@ impl Document {
             .map_err(xml_error)?
             .to_string();
         let mut raw_attributes = Vec::new();
-        for attribute in start.attributes().with_checks(true) {
+        for attribute in start.checked_attributes() {
             if raw_attributes.len() >= limits.max_attributes() {
                 return Err(Error::Limit("XML attribute count exceeds policy".into()));
             }

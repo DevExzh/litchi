@@ -25,6 +25,7 @@ use crate::raw::namespace::{
 };
 use crate::raw::worksheet::edit::Action;
 use crate::workbook::{Flavor, Selector, Workbook, Worksheet, WorksheetKind};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAX_SCALAR_TRANSFER: u64 = 65_536;
 const MAX_SCALAR_TRANSFER_BYTES: usize = 16 * 1024 * 1024;
@@ -564,7 +565,7 @@ fn validate_strict_attributes(
     let mut formula_type = StrictFormulaType::Normal;
     let mut formula_ref_seen = false;
     let mut formula_index_seen = false;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|error| invalid(format!("invalid worksheet attribute: {error}")))?;
         if is_namespace_declaration(attribute.key) {

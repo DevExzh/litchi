@@ -16,6 +16,7 @@ use crate::error::{Result, invalid};
 use crate::raw::namespace::{
     STRICT_SPREADSHEETML_NAMESPACE, is_spreadsheetml_name, relationship_attribute_value,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
 
@@ -711,7 +712,7 @@ fn tag(element: &BytesStart<'_>, decoder: Decoder) -> Result<Tag> {
         .map_err(|error| invalid(format!("workbook element name is not UTF-8: {error}")))?
         .to_owned();
     let mut attributes = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| invalid(format!("workbook attribute name is not UTF-8: {error}")))?

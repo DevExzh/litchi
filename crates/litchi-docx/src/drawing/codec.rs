@@ -30,6 +30,7 @@ use crate::error::{Error, Result};
 use crate::namespace::is_wordprocessing_namespace;
 use litchi_core::unit::EMUS_PER_INCH;
 use litchi_drawingml::geom::Preset;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::first_wins;
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
@@ -324,7 +325,7 @@ fn is_word_element(
 
 fn parse_anchor_id(element: &BytesStart<'_>) -> Result<Option<AnchorId>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let raw_name = attribute.key.as_ref();
         let local_name = raw_name
@@ -386,7 +387,7 @@ fn inert_attribute(element: &BytesStart<'_>, name: &[u8]) -> Option<String> {
 /// behavior for malformed attributes and non-UTF-8 values.
 fn strict_attribute(element: &BytesStart<'_>, name: &[u8]) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_ref() == name {
             let decoded = std::str::from_utf8(&attribute.value).map_err(|error| {

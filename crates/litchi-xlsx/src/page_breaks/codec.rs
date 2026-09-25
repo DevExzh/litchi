@@ -20,6 +20,7 @@ use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibilit
 
 use super::{Axis, Break, Collection, PageBreaks};
 use crate::error::{Error, Result, allocation, invalid};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -528,7 +529,7 @@ fn reject_unknown_attribute_prefixes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
 ) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
@@ -549,7 +550,7 @@ fn collection_metadata(
     reader: &NsReader<&[u8]>,
     lossy_collection: &mut bool,
 ) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             *lossy_collection = true;
@@ -615,7 +616,7 @@ fn begin_collection(
     collection_metadata(element, reader, lossy_collection)?;
     let mut count = None;
     let mut manual_count = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_ref().contains(&b':') || attribute.key.as_ref() == b"xmlns" {
             continue;
@@ -660,7 +661,7 @@ fn parse_break(
     let mut maximum = None;
     let mut manual = None;
     let mut pivot = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_ref().contains(&b':') || attribute.key.as_ref() == b"xmlns" {
             continue;

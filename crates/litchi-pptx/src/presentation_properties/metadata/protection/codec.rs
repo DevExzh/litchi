@@ -4,6 +4,7 @@ use super::model::{Algorithm, Settings, Verifier};
 use crate::{Error, Result};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
 use rand::TryRng;
@@ -135,7 +136,7 @@ fn parse_verifier(
     let mut salt = None;
     let mut spins = None;
     let mut algorithm = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)

@@ -18,6 +18,7 @@ use super::super::{
     MAX_VALUES, R, RS, W, WS,
 };
 use super::validation::{invalid, split, xml_char, xml_error};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use std::mem::size_of;
 
 #[derive(Clone, Debug, Default)]
@@ -330,7 +331,7 @@ pub(in crate::glossary) fn make(
     validate_xml_value(&q, "qualified name")?;
     let parent = stack.last().map(|node| Arc::clone(&node.bindings));
     let mut raw = Vec::new();
-    for a in e.attributes().with_checks(true) {
+    for a in e.checked_attributes() {
         if raw.len() >= MAX_VALUES {
             return Err(invalid("glossary XML attribute limit exceeded"));
         }

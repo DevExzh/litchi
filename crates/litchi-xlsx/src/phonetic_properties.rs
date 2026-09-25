@@ -3,6 +3,7 @@
 use crate::error::{Error, Result};
 use crate::raw::namespace::is_spreadsheetml_name;
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -304,7 +305,7 @@ fn parse_attributes(
     let mut font_id = None;
     let mut phonetic_type = None;
     let mut alignment = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;

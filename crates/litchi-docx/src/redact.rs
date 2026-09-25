@@ -12,6 +12,7 @@ use crate::error::{Error, Result};
 use crate::namespace::is_wordprocessing_namespace;
 use crate::sanitize::{self, RelationshipState};
 use litchi_core::SourceVersion;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::SourceArtifactFingerprint;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -549,7 +550,7 @@ fn inspect_owner_element(
     }
     let is_hyperlink = is_word && local.as_ref() == b"hyperlink";
     let mut external_id = false;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (attribute_namespace, attribute_local) = resolver.resolve_attribute(attribute.key);
         if is_mce_namespace(&attribute_namespace) {

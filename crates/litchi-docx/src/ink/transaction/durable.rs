@@ -34,6 +34,7 @@ use super::{Destination, EditLimits, Patch, SemanticIntent, Snapshot};
 use crate::ink::Limits;
 use crate::package::story::{self, StoryKind};
 use crate::{Error, Package, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const FORMAT_NAME: &str = "litchi-docx/ink";
 const EDIT: &str = "ink.edit";
@@ -2847,7 +2848,7 @@ fn parse_relationships(bytes: &[u8], limits: Limits) -> Result<Vec<RelationshipS
                 let mut reltype = None;
                 let mut target = None;
                 let mut external = false;
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     let value = attribute
                         .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())?

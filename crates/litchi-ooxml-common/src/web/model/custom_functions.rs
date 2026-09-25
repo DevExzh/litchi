@@ -12,6 +12,7 @@ use super::super::{
 };
 use super::{Limits, MAX_WEB_EXTENSION_ITEMS};
 use crate::Error;
+use crate::xml::attributes::BytesStartExt as _;
 use litchi_core::xml::ReaderOrigin;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -633,7 +634,7 @@ fn push_custom_id(list: &mut CustomFunctionList, id: String, limits: &Limits) ->
 }
 
 fn reject_no_attributes(element: &BytesStart<'_>, name: &str) -> Result<()> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if !is_namespace_attribute(attribute.key.as_ref()) {
             return invalid(format!("{name} has an unexpected attribute"));
@@ -648,7 +649,7 @@ fn parse_contains(
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<ContainsCustomFunctions> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if is_namespace_attribute(attribute.key.as_ref()) {
             continue;
@@ -679,7 +680,7 @@ fn parse_background(
 ) -> Result<BackgroundAppData> {
     let mut state = None;
     let mut runtime_id = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if is_namespace_attribute(attribute.key.as_ref()) {
             continue;

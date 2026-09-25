@@ -16,6 +16,7 @@ use super::model::{
     bounded, invalid, is_font_relationship, is_font_table_relationship, name_key,
     validate_table_value,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 impl Table {
     fn extract_from_part(part: &dyn Part, pkg: &OpcPackage) -> Result<Self> {
@@ -849,7 +850,7 @@ fn directly_used_font_names(package: &OpcPackage) -> Result<HashSet<String>> {
                     if nodes > MAX_NODES {
                         return Err(invalid("font-usage XML node limit exceeded"));
                     }
-                    for attribute in element.attributes().with_checks(true) {
+                    for attribute in element.checked_attributes() {
                         let attribute = attribute.map_err(xml_error)?;
                         if matches!(
                             attribute.key.local_name().as_ref(),

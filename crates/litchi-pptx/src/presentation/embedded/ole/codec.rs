@@ -5,6 +5,7 @@ use crate::presentation::embedded::{
     increment_nodes, invalid, limit,
 };
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::count_up_to;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -113,7 +114,7 @@ fn make_node(
         ResolveResult::Unbound => Vec::new(),
     };
     let mut attributes = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| crate::Error::Xml(error.to_string()))?;
         let (attribute_namespace, _) = resolver.resolve_attribute(attribute.key);
         let attribute_namespace = match attribute_namespace {

@@ -2,6 +2,7 @@
 
 use super::model::{BinaryBreak, BinarySubtractionBreak, Properties};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::{OMML_NAMESPACE_URI, xsd_token_atom};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -258,7 +259,7 @@ fn required_value(
     label: &str,
 ) -> Result<String> {
     let mut value = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;
@@ -286,7 +287,7 @@ fn required_value(
 }
 
 fn no_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]>, label: &str) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;

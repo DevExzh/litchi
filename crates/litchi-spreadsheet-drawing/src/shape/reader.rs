@@ -34,6 +34,7 @@ use litchi_ooxml_common::xml::{
 };
 
 use super::model::*;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const SPREADSHEET_DRAWING_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
@@ -882,7 +883,7 @@ impl Parser {
         known: &[&[u8]],
     ) -> Result<()> {
         let mut unknown = Vec::new();
-        for attribute in element.attributes() {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(|error| Error::Invalid(error.to_string()))?;
             let key = attribute.key.as_ref();
             if key == b"xmlns" || key.starts_with(b"xmlns:") {
@@ -1332,7 +1333,7 @@ fn bool_attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Re
 
 fn any_truthy_attribute(element: &BytesStart<'_>, decoder: Decoder) -> Result<bool> {
     let mut any = false;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Invalid(error.to_string()))?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)

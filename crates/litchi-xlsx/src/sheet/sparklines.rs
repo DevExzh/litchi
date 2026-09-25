@@ -14,6 +14,7 @@ use ryu::Buffer as RyuBuffer;
 use std::fmt::Write as FmtWrite;
 
 use crate::raw::namespace::is_spreadsheetml_name;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 pub use litchi_sheet::sparkline::{AxisType, EmptyCells, SparklineType};
 
@@ -1038,7 +1039,7 @@ fn extra_group_attributes(
         b"lineWeight",
     ];
     let mut extra = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute?;
         let key = attribute.key.as_ref();
         if key == b"xmlns" || key.starts_with(b"xmlns:") {

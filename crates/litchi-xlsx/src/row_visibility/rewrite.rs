@@ -11,6 +11,7 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use crate::error::{Result, allocation, invalid};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const TRANSITIONAL_SML: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_SML: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -281,7 +282,7 @@ fn parse_row(
     previous: u32,
 ) -> Result<u32> {
     let mut explicit = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid row-visibility attribute: {error}")))?;
         if attribute.key.as_ref() == b"r" {

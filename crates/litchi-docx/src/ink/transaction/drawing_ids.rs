@@ -7,6 +7,7 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(super) struct DrawingIds {
     used: HashSet<u32>,
@@ -43,7 +44,7 @@ impl DrawingIds {
                         },
                         _ => false,
                     };
-                    for attribute in element.attributes() {
+                    for attribute in element.checked_attributes() {
                         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                         if !matches!(attribute.key.as_ref(), b"id" | b"xml:id") {
                             continue;

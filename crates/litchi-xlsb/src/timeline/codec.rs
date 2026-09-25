@@ -10,6 +10,7 @@ use super::model::{Cache, Filter, FilterType, Level, PivotTable, Range, State, V
 use super::validation::{cache as validate_cache, views as validate_views};
 use crate::package::error::{Error, Result};
 use litchi_core::xml::escape_xml;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -65,7 +66,7 @@ fn attributes(
     element: &BytesStart<'_>,
 ) -> Result<BTreeMap<String, String>> {
     let mut result = BTreeMap::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|error| invalid(format!("invalid XML attribute: {error}")))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {

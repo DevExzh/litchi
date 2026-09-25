@@ -26,6 +26,7 @@ use super::super::model::{
 use super::run_properties::{parse_run_underline, update_run_properties};
 use super::text::extract_word_text;
 use super::xml::is_on;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 impl Run {
     /// Get the text content of this run.
@@ -56,7 +57,7 @@ impl Run {
             match reader.read_event() {
                 Ok(Event::Start(e) | Event::Empty(e)) if e.local_name().as_ref() == b"br" => {
                     let mut run_break = RunBreak::default();
-                    for attribute in e.attributes() {
+                    for attribute in e.checked_attributes() {
                         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                         let value = attribute
                             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())

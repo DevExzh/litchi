@@ -6,6 +6,7 @@ use super::model::{
     Transform, TransformKind, Variation,
 };
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -659,7 +660,7 @@ fn make_node(
     add_strings(strings, namespace.len() + name.len())?;
     let mut attributes = Vec::new();
     let mut namespace_declarations = Vec::new();
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let raw_name = item.key.as_ref();
         let value = item

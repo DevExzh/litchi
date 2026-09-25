@@ -5,6 +5,9 @@
 //! their package relationships and anchoring semantics.
 
 #![forbid(unsafe_code)]
+// quick-xml's checked attribute iteration is quadratic on hostile tags; read
+// attributes through `BytesStartExt` (record 0770, workspace `clippy.toml`).
+#![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 // Public DrawingML types intentionally mirror ECMA-376 names, builder
 // ownership, and boolean-rich schema records. Renaming or reshaping them here
 // would break every host format without changing wire correctness.

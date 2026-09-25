@@ -31,6 +31,7 @@ use super::model::{
 use super::validation::{
     MAX_STYLE_SETS, MAX_XML_BYTES, MAX_XML_DEPTH, MAX_XML_NODES, validate, validate_style_set,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const W14_PREFIX: &[u8] = b"w14";
 
@@ -604,7 +605,7 @@ fn parse_root_attributes(
     decoder: Decoder,
 ) -> Result<Parsed> {
     let mut value = None::<String>;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let name = attribute.key.as_ref();
         if name == b"xmlns" || name.starts_with(b"xmlns:") {
@@ -673,7 +674,7 @@ fn parse_style_set(
 ) -> Result<StyleSet> {
     let mut id = None::<u8>;
     let mut enabled = None::<bool>;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let name = attribute.key.as_ref();
         if name == b"xmlns" || name.starts_with(b"xmlns:") {

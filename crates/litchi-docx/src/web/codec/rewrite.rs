@@ -34,6 +34,7 @@ use super::super::model::{Border, BorderSide, Id, Layout, Screen};
 use super::super::transaction::Edit;
 use super::super::{MAX_XML_BYTES, MAX_XML_EVENTS, Result, invalid, is_wordprocessing_namespace};
 use crate::Error;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[derive(Debug, Clone)]
 struct Node {
@@ -580,7 +581,7 @@ fn attribute_value(xml: &[u8], node: &Node, name: &[u8]) -> Result<Option<String
         .map_err(|_source_error| invalid("web-settings attribute range is not UTF-8"))?;
     let element = BytesStart::from_content(content, name_len);
     let mut result = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != name {
             continue;

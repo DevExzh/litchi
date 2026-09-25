@@ -17,6 +17,7 @@ use super::{
 use crate::notes::SlideRootProof;
 use crate::shape::Scene;
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 // The semantic sink deliberately uses a smaller, stream-specific policy than
 // the general PresentationML part reader. It retains at most one selected
@@ -248,7 +249,7 @@ fn semantic_event_bytes(event: &Event<'_>) -> usize {
 
 fn validate_semantic_attributes(element: &quick_xml::events::BytesStart<'_>) -> Result<()> {
     let mut total = 0usize;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let attribute_bytes = attribute
             .key
@@ -277,7 +278,7 @@ fn validate_semantic_attribute_names(
     reader: &NsReader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
 ) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let name = attribute.key.as_ref();
         if name == b"xmlns" || name.starts_with(b"xmlns:") {

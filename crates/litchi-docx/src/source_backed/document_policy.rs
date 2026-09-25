@@ -20,6 +20,7 @@ use crate::settings::{STRICT_WORD_NAMESPACE, TRANSITIONAL_WORD_NAMESPACE};
 use crate::variables::{self, SettingsDialect};
 
 use super::Package;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const STRICT_SETTINGS_RELATIONSHIP: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/settings";
@@ -505,7 +506,7 @@ fn word_attribute_value(
     resolver: &NamespaceResolver,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != name {
             continue;
@@ -549,7 +550,7 @@ fn reject_settings_mce(
     if super::is_mce_namespace(namespace) {
         return Err(mce_refusal());
     }
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         super::validate_source_attribute_value(
             attribute.value.as_ref(),

@@ -55,6 +55,10 @@ if_same_then_else = "allow"
 manual_is_multiple_of = "allow"
 manual_saturating_arithmetic = "allow"
 needless_return = "allow"
+# `clippy.toml` disallows quick-xml's checked attribute iteration, whose
+# duplicate check is quadratic on hostile tags. The crates that read untrusted
+# OOXML and OLE2 XML deny it outside their tests (record 0770); others allow it.
+disallowed_methods = "allow"
 
 [workspace.dependencies]
 

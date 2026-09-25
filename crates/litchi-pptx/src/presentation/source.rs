@@ -5,6 +5,7 @@
 //! metadata. A slide body is loaded when a selected [`SourceSlide`] is read.
 
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use std::io::{Read, Write};
 #[cfg(any(unix, windows))]
 use std::path::Path;
@@ -4023,7 +4024,7 @@ fn validate_blip_extension_attributes(
 ) -> Result<bool> {
     let mut uri_seen = false;
     let mut svg_uri = false;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;
@@ -4108,7 +4109,7 @@ fn namespace_declarations(
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
     let mut declarations = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let Some(prefix) = attribute.key.as_namespace_binding() else {
             continue;
@@ -4191,7 +4192,7 @@ fn validate_blip_attributes(
     resolver: &quick_xml::name::NamespaceResolver,
 ) -> Result<()> {
     let mut cstate_seen = false;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;
@@ -4310,7 +4311,7 @@ fn is_opaque_drawing_extension(
 ) -> Result<bool> {
     let mut uri_seen = false;
     let mut native_uri = false;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;
@@ -4536,7 +4537,7 @@ fn validate_full_slide_blip_attributes(
 ) -> Result<()> {
     let mut embed_seen = false;
     let mut link_seen = false;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         package.check_execution()?;
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_namespace_binding().is_some() {

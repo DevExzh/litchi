@@ -16,6 +16,7 @@ use crate::document::{
     ParagraphTransfer, TransactionError, TransferGraph, TransferPart, TransferRefusal,
     TransferRelationship,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const TRANSITIONAL_RELATIONSHIPS_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -586,7 +587,7 @@ fn relationship_prefixes(xml: &[u8]) -> Result<BTreeSet<Vec<u8>>, TransactionErr
             .map_err(|error| crate::Error::Xml(error.to_string()))?
         {
             Event::Start(element) | Event::Empty(element) => {
-                for attribute_result in element.attributes() {
+                for attribute_result in element.checked_attributes() {
                     let attribute =
                         attribute_result.map_err(|error| crate::Error::Xml(error.to_string()))?;
                     let Some(prefix) = attribute.key.as_ref().strip_prefix(b"xmlns:") else {
@@ -637,7 +638,7 @@ fn stable_namespace_declarations(xml: &[u8]) -> Result<BTreeMap<String, String>,
             .map_err(|error| crate::Error::Xml(error.to_string()))?
         {
             Event::Start(element) | Event::Empty(element) => {
-                for attribute_result in element.attributes() {
+                for attribute_result in element.checked_attributes() {
                     let attribute =
                         attribute_result.map_err(|error| crate::Error::Xml(error.to_string()))?;
                     let raw_key = attribute.key.as_ref();
@@ -701,7 +702,7 @@ fn relationship_references(
         let resolver = reader.resolver().clone();
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                for attribute_result in element.attributes() {
+                for attribute_result in element.checked_attributes() {
                     let attribute =
                         attribute_result.map_err(|error| crate::Error::Xml(error.to_string()))?;
                     if is_relationship_reference(&resolver, attribute.key, relationship_prefixes) {
@@ -821,7 +822,7 @@ fn rewrite_element(
         .to_owned();
     let mut rewritten = BytesStart::new(name);
     let mut present = BTreeSet::new();
-    for attribute_result in source.attributes() {
+    for attribute_result in source.checked_attributes() {
         let attribute = attribute_result.map_err(|error| crate::Error::Xml(error.to_string()))?;
         let key = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|_error| TransactionError::Transfer(TransferRefusal::InvalidParagraphXml))?

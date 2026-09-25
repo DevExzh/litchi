@@ -30,6 +30,7 @@ use super::validation::{
     MAX_XML_BYTES, MAX_XML_DEPTH, MAX_XML_NODES, WORD_2012_NAMESPACE, parse_on_off, validate,
 };
 use crate::paragraph::codec::is_fragment_word_name;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ByteRange {
@@ -352,7 +353,7 @@ fn parse_collapsed(
     resolver: &NamespaceResolver,
 ) -> Result<Collapsed> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"val" {
             continue;

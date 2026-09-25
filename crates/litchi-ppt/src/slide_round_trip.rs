@@ -3,6 +3,7 @@
 use super::package::{Error, Result};
 use super::records::Record;
 use crate::consts::RecordType;
+use litchi_ole_common::xml_attributes::BytesStartExt as _;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type;
 use quick_xml::XmlVersion;
@@ -479,7 +480,7 @@ fn parse_color_mapping_values(
     decoder: Decoder,
 ) -> std::result::Result<ColorMappingValues, String> {
     let mut values = [None; 12];
-    for attribute_result in element.attributes().with_checks(true) {
+    for attribute_result in element.checked_attributes() {
         let attribute = attribute_result.map_err(|error| error.to_string())?;
         let index = match attribute.key.as_ref() {
             b"bg1" => 0,
@@ -755,7 +756,7 @@ fn validate_xml_attributes(
     element: &BytesStart<'_>,
     decoder: Decoder,
 ) -> std::result::Result<(), String> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         attribute
             .map_err(|error| error.to_string())?
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)

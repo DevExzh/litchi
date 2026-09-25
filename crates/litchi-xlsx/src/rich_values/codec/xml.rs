@@ -11,6 +11,7 @@ use std::collections::{BTreeMap, HashMap};
 use super::super::{
     MAX_DEPTH, MAX_NODES, MAX_STRING_BYTES, MAX_XML_BYTES, invalid, limit, xml_error,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Attribute {
@@ -250,7 +251,7 @@ fn make_node(
     // Expanded names borrowed from the resolver and the tag: checking each
     // one costs O(log n), where scanning `attributes` would cost O(n).
     let mut expanded = SeenNames::new();
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let qname = item.key.as_ref();
         if qname == b"xmlns" || qname.starts_with(b"xmlns:") {

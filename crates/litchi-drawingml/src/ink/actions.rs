@@ -17,6 +17,8 @@ use super::{
     ACTION_NAMESPACE, INKML_NAMESPACE, MAX_ATTRIBUTE_VALUE_BYTES, MAX_DEPTH, MAX_NODES,
     MAX_SOURCE_BYTES, MAX_TOKEN_BYTES, SourceSpan,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use litchi_ooxml_common::xml::attributes::first_wins;
 
 #[path = "actions_edit.rs"]
 pub mod edit;
@@ -1091,7 +1093,7 @@ fn validate_profile_attributes(
     element: &BytesStart<'_>,
     allowed: ProfileAttributeSet,
 ) -> Result<()> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = attribute.key.as_ref();
         if key == b"xmlns" || key.strip_prefix(b"xmlns:").is_some() {
@@ -1721,7 +1723,7 @@ fn optional_attr<R: std::io::BufRead>(
     reader: &NsReader<R>,
 ) -> Result<Option<String>> {
     let mut result = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.prefix().is_some() || attribute.key.local_name().as_ref() != name {
             continue;
@@ -1751,7 +1753,7 @@ fn optional_xml_id<R: std::io::BufRead>(
     reader: &NsReader<R>,
 ) -> Result<Option<Box<str>>> {
     let mut result = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_ref() != b"xml:id" {
             continue;
@@ -1884,7 +1886,7 @@ fn required_attr<R: std::io::BufRead>(
     reader: &NsReader<R>,
 ) -> Result<String> {
     let mut result = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.prefix().is_some() {
             continue;
@@ -2074,7 +2076,7 @@ fn validate_element<R: std::io::BufRead>(
         return Err(invalid("ink actions element name is invalid"));
     }
     let mut attribute_keys = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute_keys.len() >= MAX_ATTRIBUTES_PER_ELEMENT {
             return Err(limit(
@@ -2325,7 +2327,7 @@ fn validate_reference(reference: &BytesRef<'_>) -> Result<()> {
 }
 
 fn has_namespace_declaration(element: &BytesStart<'_>, prefix: &[u8]) -> bool {
-    element.attributes().any(|attribute| {
+    first_wins(element).any(|attribute| {
         let Ok(attribute) = attribute else {
             return false;
         };

@@ -18,6 +18,7 @@
 //! user-shapes, and extension resources; external targets are never fetched.
 
 use crate::package::error::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::Decoder;
 use quick_xml::XmlVersion;
@@ -769,7 +770,7 @@ fn relationship_attribute(
     decoder: Decoder,
     resolver: &NamespaceResolver,
 ) -> Result<Option<String>> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Encoding(error.to_string()))?;
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         let is_rel = matches!(

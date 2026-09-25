@@ -28,6 +28,7 @@ use super::model::{
 use super::validation::validate_opaque_xml;
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -868,7 +869,7 @@ fn optional_attribute(
     description: &str,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
         let key = attribute.key.as_ref();
         if key == b"xmlns" || key.starts_with(b"xmlns:") {
@@ -977,7 +978,7 @@ fn make_self_contained(
     bindings: &[(Option<Vec<u8>>, Vec<u8>)],
 ) -> Result<Vec<u8>> {
     let mut declared = HashSet::<Option<Vec<u8>>>::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
         if let Some(prefix) = attribute.key.as_namespace_binding() {
             declared.insert(match prefix {

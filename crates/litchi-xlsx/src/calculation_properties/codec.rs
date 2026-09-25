@@ -17,6 +17,7 @@ use super::features::{Feature, Features};
 use super::limits::Limits;
 use super::model::{Mode, Properties, ReferenceMode};
 use super::rewriter::{Layout, inspect_layout};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[cfg_attr(
     not(test),
@@ -398,7 +399,7 @@ fn parse_calc_attributes(
     check_attribute_count(element, limits)?;
     let mut builder = Properties::builder();
     let mut seen = [false; 13];
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
@@ -485,7 +486,7 @@ fn extension_uri(
 ) -> Result<Option<String>> {
     check_attribute_count(element, limits)?;
     let mut uri = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
@@ -512,7 +513,7 @@ fn parse_feature(
 ) -> Result<Feature> {
     check_attribute_count(element, limits)?;
     let mut name = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
@@ -572,7 +573,7 @@ fn no_attributes(
     label: &str,
 ) -> Result<()> {
     check_attribute_count(element, limits)?;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if !is_namespace_declaration(attribute.key.as_ref()) {
             let (namespace, local) = resolver.resolve_attribute(attribute.key);
@@ -588,7 +589,7 @@ fn no_attributes(
 
 fn check_attribute_count(element: &BytesStart<'_>, limits: &Limits) -> Result<()> {
     let mut count = 0usize;
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         attribute.map_err(xml_error)?;
         bump(&mut count, limits.max_attributes(), "attribute count")?;
     }
