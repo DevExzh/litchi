@@ -13018,8 +13018,27 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
         }
     }
 
-    if save_durability.is_some() && !cases.iter().any(|case| case.is_ordinary_save()) {
-        return Err("--save-durability applies only to the ordinary-save selectors".into());
+    if save_durability.is_some() {
+        // Refuse before any selector runs: a level applies only to the
+        // ordinary-save phases that save to a path.
+        if !cases.iter().any(|case| case.is_ordinary_save()) {
+            return Err("--save-durability applies only to the ordinary-save selectors".into());
+        }
+        if let Some(case) = cases.iter().find(|case| {
+            case.ordinary_save_plan().is_some_and(|(_, _, phase)| {
+                matches!(
+                    phase,
+                    ordinary_save::Phase::Edit | ordinary_save::Phase::CountingPublish
+                )
+            })
+        }) {
+            return Err(format!(
+                "--save-durability applies only to the *_lifecycle and *_atomic_publish \
+                 ordinary-save selectors, not to {}",
+                case.name()
+            )
+            .into());
+        }
     }
 
     Ok(Options {

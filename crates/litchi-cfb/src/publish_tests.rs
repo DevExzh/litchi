@@ -8,8 +8,8 @@
     reason = "focused publication tests use panic-on-failure assertions"
 )]
 
-use crate::writer::PublishSteps;
 use crate::writer::testing::CountingSteps;
+use crate::writer::{PublishFailure, PublishSteps, TemporaryIdentity, publish_staged};
 use crate::{
     OleError, OleWriter, OverlayError, OverlayLimits, SameLengthStreamOverlay, SequentialOleWriter,
     SequentialWriteError, SequentialWriteProgress, SharedOleFile, ValidatedOverlayPlan,
@@ -17,7 +17,7 @@ use crate::{
 use litchi_core::{Durability, OwnedSource, ReadAt, SourceVersion};
 use std::ffi::OsString;
 use std::fs::{self, File};
-use std::io::{self, Cursor};
+use std::io::{self, Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -467,5 +467,68 @@ fn sequential_identity_cleanup_holds_at_every_level() {
         let attacker_path = steps.attacker_path.unwrap();
         assert_eq!(fs::read(&attacker_path).unwrap(), b"attacker replacement");
         assert_eq!(fs::read(&destination).unwrap(), OLD_DESTINATION);
+    }
+}
+
+/// The one sibling temporary file of `destination` in `scratch`.
+fn staged_temporary(scratch: &Scratch) -> io::Result<PathBuf> {
+    let prefix = format!(".{DESTINATION}.litchi-cfb-");
+    let mut found = fs::read_dir(&scratch.0)?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<io::Result<Vec<_>>>()?
+        .into_iter()
+        .filter(|path| {
+            path.file_name()
+                .is_some_and(|name| name.to_string_lossy().starts_with(&prefix))
+        });
+    let temporary = found
+        .next()
+        .ok_or_else(|| io::Error::other("no staged temporary file"))?;
+    assert!(
+        found.next().is_none(),
+        "more than one staged temporary file"
+    );
+    Ok(temporary)
+}
+
+#[test]
+fn a_substituted_temporary_is_refused_before_rename_at_every_level() {
+    for durability in LEVELS {
+        let scratch = Scratch::new("identity-check");
+        let destination = scratch.seeded_destination();
+        let displaced = scratch.join("displaced.tmp");
+        let mut substituted = None;
+        let mut steps = CountingSteps::default();
+
+        let result = publish_staged(
+            &destination,
+            durability,
+            TemporaryIdentity::Checked,
+            &mut steps,
+            |staging| staging.write_all(b"staged artifact"),
+            |_staged_file, ()| {
+                // A sibling replaces the temporary name while the staged file
+                // is still open, after any file sync the level makes.
+                let temporary = staged_temporary(&scratch)?;
+                fs::rename(&temporary, &displaced)?;
+                fs::write(&temporary, b"attacker replacement")?;
+                substituted = Some(temporary);
+                Ok(())
+            },
+        );
+
+        assert!(
+            matches!(result, Err(PublishFailure::Identity { .. })),
+            "{durability:?}"
+        );
+        assert_eq!(steps.replaces, 0, "{durability:?} replaced the destination");
+        assert_eq!(steps.parent_syncs, 0);
+        assert_eq!(fs::read(&destination).unwrap(), OLD_DESTINATION);
+        // The identity-checked cleanup leaves the substituted file alone.
+        assert_eq!(
+            fs::read(substituted.unwrap()).unwrap(),
+            b"attacker replacement"
+        );
+        assert_eq!(fs::read(&displaced).unwrap(), b"staged artifact");
     }
 }

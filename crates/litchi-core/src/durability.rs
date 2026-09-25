@@ -17,8 +17,12 @@
 /// At every level the save:
 ///
 /// - writes byte-identical output;
-/// - checks the destination and stages the complete artifact in a sibling
-///   temporary file in the destination's own directory;
+/// - makes every check its route makes before publishing (for example the
+///   OOXML routes' refusal of symbolic-link and non-file destinations, the
+///   sequential CFB writer's candidate validation and temporary-file identity
+///   check, and a generic overlay source's fingerprint recheck);
+/// - stages the complete artifact in a sibling temporary file in the
+///   destination's own directory;
 /// - replaces the destination with one same-directory rename, so a failure or
 ///   crash **before** the rename leaves the old destination untouched, and,
 ///   where the filesystem renames atomically, a concurrent reader of the
@@ -42,12 +46,14 @@
 /// filesystem-specific; on an ordinary journaling local filesystem:
 ///
 /// - [`Full`](Self::Full): the destination names the complete new file.
-/// - [`FileOnly`](Self::FileOnly): the destination names either the complete
-///   old file or the complete new file; the replacement itself may be lost,
-///   and a leftover temporary file may remain beside it.
+/// - [`FileOnly`](Self::FileOnly): the destination names either what it
+///   named before the save (the complete old file, or nothing if it did not
+///   exist) or the complete new file; the replacement itself may be lost, and
+///   a leftover temporary file may remain beside it.
 /// - [`NoSync`](Self::NoSync): nothing is promised. The destination may name
-///   the old file, the new file, or, on a filesystem that does not write file
-///   data before the rename that exposes it, a truncated or zero-filled file.
+///   what it named before the save, the new file, or, on a filesystem that
+///   does not write file data before the rename that exposes it, a truncated
+///   or zero-filled file.
 ///
 /// A process crash or kill, as opposed to an operating-system crash, needs no
 /// synchronization: once the save has returned, the new file is visible and
