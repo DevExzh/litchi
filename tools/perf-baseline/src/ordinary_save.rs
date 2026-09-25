@@ -39,12 +39,16 @@
 //! the `rename` that replaces the destination, and the parent-directory sync.
 //! Like 0497's atomic arm the destination directory is prepared before the
 //! clock starts and the readback, the digest and the cleanup happen after it
-//! stops. `counting_publish` is the sink variant: the same edited owner is
-//! serialized through the format's documented sequential entry point into a
-//! bounded counting sink, and the result reports the byte split 0593's
-//! copy-versus-regenerate accounting implies — how many output payload bytes
-//! this save deflated, how many it stored, how many are byte-identical to the
-//! source archive's own member payload, and the total output.
+//! stops. With `--save-durability LEVEL` (change 0761) the two phases that
+//! save to a path call `save_with_durability(path, LEVEL)` instead, and the
+//! interval drops exactly the synchronizations that level skips; the report
+//! names the level and its steps. `counting_publish` is the sink variant: the
+//! same edited owner is serialized through the format's documented sequential
+//! entry point into a bounded counting sink, and the result reports the byte
+//! split 0593's copy-versus-regenerate accounting implies — how many output
+//! payload bytes this save deflated, how many it stored, how many are
+//! byte-identical to the source archive's own member payload, and the total
+//! output.
 //!
 //! **What the byte split is and is not.** It is derived from the two archives,
 //! not from production instrumentation: `litchi-opc`'s `OpcOperationAccounting`
@@ -529,13 +533,20 @@ const ATOMIC_STEPS_NO_SYNC: &str = "litchi_opc::atomic::replace_with_durability(
                                     permission preservation, persist (rename) over the \
                                     destination; no sync_all and no parent-directory sync";
 
+const ATOMIC_STEPS_UNLISTED: &str = "litchi_opc::atomic::replace_with_durability at a \
+                                     litchi_core::Durability level this harness has no step \
+                                     list for";
+
 /// The atomic publication steps a save at `durability` takes; `None` is the
 /// documented `save`, which is the full level.
 fn atomic_steps(durability: Option<litchi_core::Durability>) -> &'static str {
     match durability {
+        None | Some(litchi_core::Durability::Full) => ATOMIC_STEPS,
         Some(litchi_core::Durability::FileOnly) => ATOMIC_STEPS_FILE_ONLY,
         Some(litchi_core::Durability::NoSync) => ATOMIC_STEPS_NO_SYNC,
-        _ => ATOMIC_STEPS,
+        // `Durability` is non-exhaustive: a future level is labelled as such,
+        // never with another level's steps.
+        Some(_) => ATOMIC_STEPS_UNLISTED,
     }
 }
 

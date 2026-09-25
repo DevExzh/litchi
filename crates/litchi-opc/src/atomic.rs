@@ -180,7 +180,9 @@ impl PublishSteps for SystemSteps {
     }
 }
 
-#[cfg(test)]
+// Only the unix-gated parent-sync failure test uses this entry point; gating it
+// the same way keeps the Windows test build free of dead code.
+#[cfg(all(test, unix))]
 fn replace_with_impl<E, S>(
     path: &Path,
     write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
@@ -305,17 +307,20 @@ mod testing {
     use super::{PublishSteps, sync_parent};
 
     /// Real steps whose parent synchronization is a caller hook; the shape of
-    /// the pre-0761 private test entry point.
+    /// the pre-0761 private test entry point, whose only test is unix-only.
+    #[cfg(unix)]
     pub(super) struct ParentSyncHook<S> {
         sync: Option<S>,
     }
 
+    #[cfg(unix)]
     impl<S> ParentSyncHook<S> {
         pub(super) fn new(sync: S) -> Self {
             Self { sync: Some(sync) }
         }
     }
 
+    #[cfg(unix)]
     impl<S> PublishSteps for ParentSyncHook<S>
     where
         S: FnOnce(&Path) -> io::Result<()>,
@@ -837,5 +842,17 @@ mod tests {
             );
             assert_eq!(fs::read(&target).expect("read target"), b"original");
         }
+    }
+
+    #[test]
+    fn committed_converts_into_the_typed_core_variant() {
+        let error: litchi_core::Error = OpcError::Committed {
+            source: io::Error::other("directory sync failed"),
+        }
+        .into();
+        assert!(
+            matches!(&error, litchi_core::Error::Committed(source) if source.to_string() == "directory sync failed"),
+            "{error:?}"
+        );
     }
 }

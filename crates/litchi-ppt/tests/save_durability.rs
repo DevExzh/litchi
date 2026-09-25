@@ -16,7 +16,30 @@ use litchi_ppt::writer::Writer;
 
 const LEVELS: [Durability; 3] = [Durability::Full, Durability::FileOnly, Durability::NoSync];
 
-fn scratch_directory() -> PathBuf {
+/// A private directory removed on drop, including after a failed assertion.
+struct ScratchDirectory(PathBuf);
+
+impl std::ops::Deref for ScratchDirectory {
+    type Target = PathBuf;
+
+    fn deref(&self) -> &PathBuf {
+        &self.0
+    }
+}
+
+impl AsRef<std::path::Path> for ScratchDirectory {
+    fn as_ref(&self) -> &std::path::Path {
+        &self.0
+    }
+}
+
+impl Drop for ScratchDirectory {
+    fn drop(&mut self) {
+        drop(std::fs::remove_dir_all(&self.0));
+    }
+}
+
+fn scratch_directory() -> ScratchDirectory {
     static NEXT: AtomicU64 = AtomicU64::new(0);
     let directory = std::env::temp_dir().join(format!(
         "litchi-ppt-0761-{}-{}",
@@ -24,7 +47,7 @@ fn scratch_directory() -> PathBuf {
         NEXT.fetch_add(1, Ordering::Relaxed)
     ));
     std::fs::create_dir(&directory).unwrap();
-    directory
+    ScratchDirectory(directory)
 }
 
 #[test]
@@ -54,5 +77,4 @@ fn every_level_publishes_the_default_save_bytes() {
 
     Package::open(directory.join("no-sync.ppt")).unwrap();
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 4);
-    std::fs::remove_dir_all(directory).unwrap();
 }
