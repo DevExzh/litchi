@@ -12,6 +12,8 @@ mod scope;
 #[cfg(test)]
 mod bounds_tests;
 #[cfg(test)]
+mod shared_names_tests;
+#[cfg(test)]
 mod tests;
 
 pub use codec::{
@@ -21,7 +23,7 @@ pub use codec::{
 pub use fragment::{InScopeNamespaces, self_contained_fragment};
 pub use model::{
     ATTRIBUTES_PER_ELEMENT_CEILING, Capabilities, DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT, Error,
-    Limits, NAMESPACE, Name, OffsetLimits, Output, Report,
+    ExpandedName, Limits, NAMESPACE, Name, NamespaceUri, OffsetLimits, Output, Report,
 };
 pub use stream::{
     ActiveFlow, EventLimitExceeded, InputLimitExceeded, RawAttribute, RawElement, RawElementKind,

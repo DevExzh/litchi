@@ -30,12 +30,22 @@
 //! identities form a stack; a directive layer holds only identities of URIs
 //! bound by its element or an ancestor, and is dropped when that element
 //! closes, so it never sees a released identity reused.
+//!
+//! Two identities in scope are equal exactly when their URIs are: equal URIs
+//! bound by different prefixes share one, and the URIs with a fixed identity
+//! -- no namespace, the `xml` namespace and the `xmlns` namespace -- keep it
+//! whichever prefix binds them. So a check that compares identities decides
+//! what the same check comparing URI text decides.
+//!
+//! The scope stores one copy of each URI in scope, in the form its processor
+//! asks for ([`UriStore`]): the in-memory processor a `String`, the stream a
+//! [`NamespaceUri`] that every name it expands in the namespace shares.
 
 use core::hash::{BuildHasher, BuildHasherDefault, Hasher};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, TryReserveError};
 use std::hash::RandomState;
 
-use super::model::{Capabilities, Error, NAMESPACE, XML_NS};
+use super::model::{Capabilities, Error, NAMESPACE, NamespaceUri, XML_NS, XMLNS_NAMESPACE};
 
 /// Declarations a lookup walks, innermost first, before it asks the index. It
 /// covers every declaration in scope in the repository's real documents, whose
@@ -51,6 +61,9 @@ pub(super) const NO_NAMESPACE: UriId = usize::MAX;
 
 /// The namespace the `xml` prefix is bound to by definition.
 pub(super) const XML_URI: UriId = usize::MAX - 1;
+
+/// The namespace of namespace declarations, [`XMLNS_NAMESPACE`].
+pub(super) const XMLNS_URI: UriId = usize::MAX - 2;
 
 /// No entry, in the collision chains of [`Scope::uri_index`].
 const NONE: usize = usize::MAX;
@@ -76,12 +89,53 @@ impl Uri<'_> {
         text: XML_NS,
         id: XML_URI,
     };
+    /// The namespace of namespace declarations.
+    pub(super) const XMLNS: Uri<'static> = Uri {
+        text: XMLNS_NAMESPACE,
+        id: XMLNS_URI,
+    };
+}
+
+/// How a [`Scope`] stores the one copy it keeps of each URI in scope.
+pub(super) trait UriStore: Sized {
+    /// Copy `text`, reporting allocation failure.
+    fn copy(text: &str) -> Result<Self, TryReserveError>;
+
+    /// The stored URI.
+    fn text(&self) -> &str;
+}
+
+impl UriStore for String {
+    fn copy(text: &str) -> Result<Self, TryReserveError> {
+        let mut owned = Self::new();
+        owned.try_reserve_exact(text.len())?;
+        owned.push_str(text);
+        Ok(owned)
+    }
+
+    #[inline]
+    fn text(&self) -> &str {
+        self
+    }
+}
+
+impl UriStore for NamespaceUri {
+    fn copy(text: &str) -> Result<Self, TryReserveError> {
+        #[cfg(test)]
+        counter::copied(text.len());
+        Self::try_copy(text)
+    }
+
+    #[inline]
+    fn text(&self) -> &str {
+        self.as_str()
+    }
 }
 
 /// One distinct namespace URI in scope and the facts about it.
 #[derive(Debug)]
-struct UriEntry {
-    text: String,
+struct UriEntry<T> {
+    text: T,
     /// The keyed hash of `text`: the entry's key in the index.
     key: u64,
     /// The entry the index held for the same key before this one, or
@@ -146,26 +200,28 @@ fn packed(prefix: &str) -> u64 {
 /// The [`packed`] key of every prefix longer than seven bytes.
 const LONG_PREFIX: u64 = u64::MAX;
 
-/// The bindings in scope at the element being processed.
+/// The bindings in scope at the element being processed, each URI stored
+/// once as a `T`.
 #[derive(Debug)]
-pub(super) struct Scope {
+pub(super) struct Scope<T = String> {
     /// Each prefix's bindings, outermost first, with the depth of the element
     /// that declared each.
     prefixes: BTreeMap<String, Vec<(usize, UriId)>>,
     /// Every binding in `prefixes`, in the order it was added.
     added: Vec<Added>,
     /// The distinct URIs in scope, by identity; a stack.
-    uris: Vec<UriEntry>,
+    uris: Vec<UriEntry<T>>,
     /// Keyed URI hash to the latest identity with that hash.
     uri_index: Index,
     /// Keys every hash, so that its collisions cannot be chosen.
     keys: RandomState,
-    /// The facts of [`XML_URI`] and [`NO_NAMESPACE`].
+    /// The facts of [`XML_URI`], [`XMLNS_URI`] and [`NO_NAMESPACE`].
     xml: Facts,
+    xmlns: Facts,
     none: Facts,
 }
 
-impl Scope {
+impl<T: UriStore> Scope<T> {
     /// An empty scope for a processor with `capabilities`.
     pub(super) fn new(capabilities: &Capabilities) -> Self {
         Self {
@@ -175,6 +231,7 @@ impl Scope {
             uri_index: Index::default(),
             keys: RandomState::new(),
             xml: Facts::of(XML_NS, capabilities),
+            xmlns: Facts::of(XMLNS_NAMESPACE, capabilities),
             none: Facts::of("", capabilities),
         }
     }
@@ -212,6 +269,7 @@ impl Scope {
     }
 
     /// The namespace `prefix` is bound to in scope.
+    #[cfg(test)]
     pub(super) fn get(&self, prefix: &str) -> Option<&str> {
         self.resolve(prefix).map(|uri| uri.text)
     }
@@ -222,8 +280,9 @@ impl Scope {
         match id {
             NO_NAMESPACE => Uri::NONE,
             XML_URI => Uri::XML,
+            XMLNS_URI => Uri::XMLNS,
             _ => Uri {
-                text: &self.uris[id].text,
+                text: self.uris[id].text.text(),
                 id,
             },
         }
@@ -234,6 +293,7 @@ impl Scope {
         match id {
             NO_NAMESPACE => self.none,
             XML_URI => self.xml,
+            XMLNS_URI => self.xmlns,
             _ => self.uris[id].facts,
         }
     }
@@ -332,10 +392,19 @@ impl Scope {
         Ok(())
     }
 
-    /// The identity of `text` in scope: an existing one with the same bytes,
-    /// or a new one. The URI is hashed once and compared only with URIs in
-    /// scope with the same keyed hash.
+    /// The identity of `text` in scope: the fixed identity of a URI that has
+    /// one, otherwise an existing one with the same bytes or a new one. The
+    /// URI is hashed once and compared only with URIs in scope with the same
+    /// keyed hash.
     fn intern(&mut self, text: &str, capabilities: &Capabilities) -> Result<UriId, Error> {
+        // Whichever prefix binds them. Each comparison reads at most the
+        // constant's bytes.
+        match text {
+            "" => return Ok(NO_NAMESPACE),
+            XML_NS => return Ok(XML_URI),
+            XMLNS_NAMESPACE => return Ok(XMLNS_URI),
+            _ => {},
+        }
         #[cfg(test)]
         counter::uri_bytes(text.len());
         let key = self.keys.hash_one(text);
@@ -344,7 +413,7 @@ impl Scope {
             let entry = &mut self.uris[candidate];
             #[cfg(test)]
             counter::uri_bytes(text.len());
-            if entry.text == text {
+            if entry.text.text() == text {
                 entry.refs += 1;
                 return Ok(candidate);
             }
@@ -356,9 +425,7 @@ impl Scope {
         };
         self.uris.try_reserve(1).map_err(allocation)?;
         self.uri_index.try_reserve(1).map_err(allocation)?;
-        let mut owned = String::new();
-        owned.try_reserve_exact(text.len()).map_err(allocation)?;
-        owned.push_str(text);
+        let owned = T::copy(text).map_err(allocation)?;
         let id = self.uris.len();
         let hidden = self.uri_index.insert(key, id).unwrap_or(NONE);
         self.uris.push(UriEntry {
@@ -423,6 +490,20 @@ impl Scope {
                 }
             }
             self.release(binding.uri);
+        }
+    }
+}
+
+impl Scope<NamespaceUri> {
+    /// The URI of `id`, sharing the scope's copy: cloning it never copies the
+    /// URI.
+    #[inline]
+    pub(super) fn namespace(&self, id: UriId) -> NamespaceUri {
+        match id {
+            NO_NAMESPACE => NamespaceUri::NONE,
+            XML_URI => NamespaceUri::from_static(XML_NS),
+            XMLNS_URI => NamespaceUri::from_static(XMLNS_NAMESPACE),
+            _ => self.uris[id].text.clone(),
         }
     }
 }
@@ -492,11 +573,26 @@ pub(super) mod counter {
     thread_local! {
         static LOOKUPS: Cell<usize> = const { Cell::new(0) };
         static URI_BYTES: Cell<usize> = const { Cell::new(0) };
+        static COPIED: Cell<usize> = const { Cell::new(0) };
     }
 
     /// Count `bytes` of namespace URI hashed or compared.
     pub(super) fn uri_bytes(bytes: usize) {
         URI_BYTES.with(|count| count.set(count.get() + bytes));
+    }
+
+    /// Count `bytes` of input the MCE stream copied: names, values and
+    /// namespace URIs.
+    pub(in crate::mce) fn copied(bytes: usize) {
+        COPIED.with(|count| count.set(count.get() + bytes));
+    }
+
+    /// Run `work` and return its result with the bytes the MCE stream and
+    /// its scope copied.
+    pub(in crate::mce) fn counted_copies<T>(work: impl FnOnce() -> T) -> (T, usize) {
+        COPIED.with(|count| count.set(0));
+        let result = work();
+        (result, COPIED.with(Cell::get))
     }
 
     /// Run `work` and return its result with the namespace URI bytes the
