@@ -207,6 +207,12 @@ fn build_case(name: &str) -> Result<Case, Box<dyn Error>> {
             input: long_uri_tokens((1 << 20) - 64, 4_000).into_bytes(),
             run: run_mce_stream_count,
         },
+        // `mce_stream_long_uri` with a 64-byte URI: the same attributes,
+        // elements and events, so the two differ only in the URI's length.
+        "mce_stream_short_uri" => Case {
+            input: long_uri(64, "", 4, 1_000).into_bytes(),
+            run: run_mce_stream_count,
+        },
         // Benign controls: real producer parts that name the MCE namespace,
         // read from the repository's fixtures (run from the worktree root).
         "mce_benign_worksheet" => Case {
