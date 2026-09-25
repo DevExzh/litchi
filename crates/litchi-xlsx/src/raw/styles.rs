@@ -4,8 +4,8 @@ use std::io::BufRead;
 
 use litchi_ooxml_common::{
     mce::{
-        Capabilities, Name, SemanticElement, SemanticEnd, SemanticEvent, StreamError, StreamLimits,
-        process_markup_compatibility_stream_with_observers,
+        Capabilities, ExpandedName, NamespaceUri, SemanticElement, SemanticEnd, SemanticEvent,
+        StreamError, StreamLimits, process_markup_compatibility_stream_with_observers,
     },
     xml::unqualified_attribute_value,
 };
@@ -188,7 +188,8 @@ pub(crate) fn stream_count(
 #[derive(Debug)]
 struct StreamFrame {
     context: Context,
-    namespace: String,
+    /// Shares the stream's copy of the URI rather than copying it.
+    namespace: NamespaceUri,
     local_name: String,
 }
 
@@ -279,7 +280,7 @@ impl StreamCounter {
         Ok(())
     }
 
-    fn push(&mut self, context: Context, name: &Name) -> Result<()> {
+    fn push(&mut self, context: Context, name: &ExpandedName) -> Result<()> {
         if self.stack.len() >= self.max_depth {
             return Err(invalid(format!(
                 "styles XML exceeds {} levels",
@@ -290,11 +291,7 @@ impl StreamCounter {
             .try_reserve(1)
             .map_err(|source| allocation("styles XML element stack", source))?;
 
-        let mut namespace = String::new();
-        namespace
-            .try_reserve(name.namespace.len())
-            .map_err(|source| allocation("styles XML element namespace", source))?;
-        namespace.push_str(&name.namespace);
+        let namespace = name.namespace.clone();
 
         let mut local_name = String::new();
         local_name
@@ -393,7 +390,7 @@ fn semantic_count(element: &SemanticElement<'_>) -> Result<Option<u32>> {
     Ok(value)
 }
 
-fn is_spreadsheetml_name_semantic(name: &Name, local_name: &[u8]) -> bool {
+fn is_spreadsheetml_name_semantic(name: &ExpandedName, local_name: &[u8]) -> bool {
     name.local_name.as_bytes() == local_name
         && (name.namespace.as_bytes() == crate::raw::namespace::SPREADSHEETML_NAMESPACE
             || name.namespace.as_bytes() == crate::raw::namespace::STRICT_SPREADSHEETML_NAMESPACE)

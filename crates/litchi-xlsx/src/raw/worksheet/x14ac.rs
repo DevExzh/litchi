@@ -19,8 +19,8 @@ use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use litchi_ooxml_common::mce::{
-    ActiveFlow, Capabilities, Name, RawElement, RawElementKind, SemanticElement, SemanticEvent,
-    StreamError, StreamLimits, process_markup_compatibility_stream_with_observers,
+    ActiveFlow, Capabilities, ExpandedName, RawElement, RawElementKind, SemanticElement,
+    SemanticEvent, StreamError, StreamLimits, process_markup_compatibility_stream_with_observers,
     process_markup_compatibility_stream_with_stoppable_observers,
 };
 
@@ -311,7 +311,7 @@ fn map_mce_stream_error(
 struct PendingCandidate {
     kind: RawElementKind,
     qualified_name: Box<[u8]>,
-    expanded_name: Name,
+    expanded_name: ExpandedName,
     decoded_value: Box<str>,
     sequence: u64,
 }
@@ -527,9 +527,10 @@ fn copy_string(value: &str, resource: &'static str) -> Result<String> {
     Ok(copy)
 }
 
-fn copy_name(value: &Name, resource: &'static str) -> Result<Name> {
-    Ok(Name {
-        namespace: copy_string(value.namespace.as_str(), resource)?,
+/// A copy of `value` whose namespace shares the stream's copy of the URI.
+fn copy_name(value: &ExpandedName, resource: &'static str) -> Result<ExpandedName> {
+    Ok(ExpandedName {
+        namespace: value.namespace.clone(),
         local_name: copy_string(value.local_name.as_str(), resource)?,
     })
 }

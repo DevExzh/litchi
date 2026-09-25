@@ -4,6 +4,19 @@
 //! does not create a normalized XML buffer: every event is consumed from the
 //! caller's `BufRead`, and observer values are valid only for the duration of
 //! their callback.
+//!
+//! # Names and their namespaces
+//!
+//! A document chooses its namespace URIs, and one declaration can put any
+//! number of element and attribute names, and compatibility-directive
+//! targets, in its namespace. The stream copies and hashes a URI once per
+//! declaration: each name it expands is an [`ExpandedName`] whose
+//! [`NamespaceUri`] shares that copy, and every check it makes of a name --
+//! duplicate attributes, ignorable and understood namespaces, preservation
+//! and processing targets, extension elements -- compares the namespace's
+//! identity in scope (`scope::UriId`), never its bytes. So an element,
+//! attribute or directive token costs the same whatever the length of its
+//! namespace URI.
 
 use quick_xml::{
     Reader, XmlVersion,
@@ -19,15 +32,14 @@ use std::{
     sync::Arc,
 };
 
+pub use super::model::XMLNS_NAMESPACE;
 use super::model::{
-    ATTRIBUTES_PER_ELEMENT_CEILING, Capabilities, Error, Limits, NAMESPACE, Name, Report, XML_NS,
+    ATTRIBUTES_PER_ELEMENT_CEILING, Capabilities, Error, ExpandedName, Limits, Name, NamespaceUri,
+    Report, XML_NS,
 };
 use super::patterns::{NamePattern, Patterns};
-use super::scope::{Scope, has_duplicate_prefix};
+use super::scope::{NO_NAMESPACE, Scope, Uri, UriId, XMLNS_URI, has_duplicate_prefix};
 use crate::xml_name::{self, QualifiedName};
-
-/// XML namespace used by namespace declaration attributes.
-pub const XMLNS_NAMESPACE: &str = "http://www.w3.org/2000/xmlns/";
 
 const DEFAULT_MAX_EVENTS: usize = 1_000_000;
 const DEFAULT_MAX_EVENT_BYTES: usize = 8 * 1024 * 1024;
@@ -229,7 +241,7 @@ pub struct RawAttribute<'a> {
     pub qualified_name: Cow<'a, [u8]>,
     /// Expanded attribute name. Namespace declarations use
     /// [`XMLNS_NAMESPACE`].
-    pub expanded_name: Name,
+    pub expanded_name: ExpandedName,
     /// Attribute value bytes exactly as encoded in the source event.
     pub raw_value: Cow<'a, [u8]>,
     /// XML-decoded and line-normalized attribute value.
@@ -264,7 +276,7 @@ pub struct RawElement<'a> {
     /// Qualified lexical element name in the callback-scoped event snapshot.
     pub qualified_name: Cow<'a, [u8]>,
     /// Namespace-expanded element name.
-    pub expanded_name: Name,
+    pub expanded_name: ExpandedName,
     /// Every source-order attribute, including `xmlns` and `mc:*` attrs.
     pub attributes: Vec<RawAttribute<'a>>,
 }
@@ -289,7 +301,7 @@ pub struct SemanticAttribute<'a> {
     /// Qualified lexical attribute name in the callback-scoped event snapshot.
     pub qualified_name: Cow<'a, [u8]>,
     /// Expanded attribute name.
-    pub expanded_name: Name,
+    pub expanded_name: ExpandedName,
     /// Source value bytes.
     pub raw_value: Cow<'a, [u8]>,
     /// Decoded attribute value.
@@ -316,7 +328,7 @@ pub struct SemanticElement<'a> {
     /// Qualified lexical element name in the callback-scoped event snapshot.
     pub qualified_name: Cow<'a, [u8]>,
     /// Namespace-expanded element name.
-    pub expanded_name: Name,
+    pub expanded_name: ExpandedName,
     /// Attributes after MCE directive and ignorable filtering.
     pub attributes: Vec<SemanticAttribute<'a>>,
 }
@@ -341,7 +353,7 @@ pub struct SemanticEnd<'a> {
     /// Qualified lexical end name in the callback-scoped event snapshot.
     pub qualified_name: Cow<'a, [u8]>,
     /// Namespace-expanded name inherited from the corresponding start tag.
-    pub expanded_name: Name,
+    pub expanded_name: ExpandedName,
 }
 
 impl<'a> SemanticEnd<'a> {
@@ -1593,7 +1605,7 @@ impl Namespaces {
         &self,
         local: Vec<(String, String)>,
         limits: &StreamLimits,
-        scope: &Scope,
+        scope: &Scope<NamespaceUri>,
         depth: usize,
     ) -> Result<Self, Error> {
         if local.is_empty() {
@@ -1643,40 +1655,49 @@ impl Namespaces {
 /// cross-check of [`Scope`] against the declaration chain gives up.
 const CROSS_CHECKED_DECLARATIONS: usize = 256;
 
-/// Prefix resolution at the element being processed: [`Scope`] answers, and
-/// debug builds cross-check its answer against the element's declaration
-/// chain while that walk stays short.
+/// Prefix resolution at the element being processed: [`Scope`] answers, with
+/// the namespace's identity, and debug builds cross-check the URI against the
+/// element's declaration chain while that walk stays short.
 #[derive(Clone, Copy)]
 struct Resolver<'a> {
-    scope: &'a Scope,
+    scope: &'a Scope<NamespaceUri>,
     chain: &'a Namespaces,
 }
 
 impl<'a> Resolver<'a> {
-    fn get(self, prefix: &str) -> Option<&'a str> {
-        let bound = self.scope.get(prefix);
+    /// The namespace `prefix` is bound to, with its identity.
+    fn resolve(self, prefix: &str) -> Option<Uri<'a>> {
+        let bound = self.scope.resolve(prefix);
         debug_assert!(
             self.chain
                 .walk(prefix, CROSS_CHECKED_DECLARATIONS)
-                .is_none_or(|walked| walked == bound),
+                .is_none_or(|walked| walked == bound.map(|uri| uri.text)),
             "the prefix index disagrees with the declaration chain for {prefix:?}"
         );
         bound
+    }
+
+    /// The scope's shared copy of the URI of `uri`.
+    fn namespace(self, uri: Uri<'_>) -> NamespaceUri {
+        self.scope.namespace(uri.id)
     }
 }
 
 /// Resolve prefixes against `scope`, cross-checked against the element's
 /// declaration chain `chain` in debug builds.
-const fn resolver<'a>(scope: &'a Scope, chain: &'a Namespaces) -> Resolver<'a> {
+const fn resolver<'a>(scope: &'a Scope<NamespaceUri>, chain: &'a Namespaces) -> Resolver<'a> {
     Resolver { scope, chain }
 }
 
+/// One element's compatibility directives, by namespace identity. A layer
+/// holds only identities of URIs its element or an ancestor binds, and is
+/// dropped when that element closes, before the scope can reuse them.
 struct DirectiveLayer {
     parent: Option<Arc<DirectiveLayer>>,
-    ignorable: HashSet<String>,
-    process: Patterns<String>,
-    preserve_elements: Patterns<String>,
-    preserve_attributes: Patterns<String>,
+    ignorable: HashSet<UriId>,
+    process: Patterns<UriId>,
+    preserve_elements: Patterns<UriId>,
+    preserve_attributes: Patterns<UriId>,
 }
 
 #[derive(Clone)]
@@ -1697,10 +1718,10 @@ impl Context {
         }
     }
 
-    fn is_ignorable(&self, namespace: &str) -> bool {
+    fn is_ignorable(&self, namespace: UriId) -> bool {
         let mut layer = self.directives.as_deref();
         while let Some(current) = layer {
-            if current.ignorable.contains(namespace) {
+            if current.ignorable.contains(&namespace) {
                 return true;
             }
             layer = current.parent.as_deref();
@@ -1708,13 +1729,18 @@ impl Context {
         false
     }
 
-    fn matches(&self, name: &Name, select: impl Fn(&DirectiveLayer) -> &Patterns<String>) -> bool {
+    fn matches(
+        &self,
+        namespace: UriId,
+        local: &str,
+        select: impl Fn(&DirectiveLayer) -> &Patterns<UriId>,
+    ) -> bool {
         let mut layer = self.directives.as_deref();
         while let Some(current) = layer {
-            if select(current).matches(name.namespace.as_str(), &name.local_name) {
+            if select(current).matches(&namespace, local) {
                 return true;
             }
-            if current.ignorable.contains(&name.namespace) {
+            if current.ignorable.contains(&namespace) {
                 return false;
             }
             layer = current.parent.as_deref();
@@ -1722,16 +1748,16 @@ impl Context {
         false
     }
 
-    fn processes(&self, name: &Name) -> bool {
-        self.matches(name, |layer| &layer.process)
+    fn processes(&self, namespace: UriId, local: &str) -> bool {
+        self.matches(namespace, local, |layer| &layer.process)
     }
 
-    fn preserves_element(&self, name: &Name) -> bool {
-        self.matches(name, |layer| &layer.preserve_elements)
+    fn preserves_element(&self, namespace: UriId, local: &str) -> bool {
+        self.matches(namespace, local, |layer| &layer.preserve_elements)
     }
 
-    fn preserves_attribute(&self, name: &Name) -> bool {
-        self.matches(name, |layer| &layer.preserve_attributes)
+    fn preserves_attribute(&self, namespace: UriId, local: &str) -> bool {
+        self.matches(namespace, local, |layer| &layer.preserve_attributes)
     }
 }
 
@@ -1759,7 +1785,7 @@ struct Frame {
     mode: Mode,
     active: bool,
     qualified_name: String,
-    expanded_name: Name,
+    expanded_name: ExpandedName,
 }
 
 struct RawFrame {
@@ -1772,9 +1798,20 @@ struct RawFrame {
 
 struct ElementData<'a> {
     qualified_name: Cow<'a, [u8]>,
-    expanded_name: Name,
+    expanded_name: ExpandedName,
+    /// The identity of `expanded_name`'s namespace in the scope.
+    name_namespace: UriId,
     namespace: Namespaces,
-    attrs: Vec<RawAttribute<'a>>,
+    attrs: Vec<ParsedAttribute<'a>>,
+}
+
+/// One attribute of the element being processed: the attribute the raw
+/// observer sees, and the identity of its namespace in the scope while the
+/// element's start tag is processed ([`XMLNS_URI`] for a namespace
+/// declaration).
+struct ParsedAttribute<'a> {
+    raw: RawAttribute<'a>,
+    namespace: UriId,
 }
 
 struct Processor<'a> {
@@ -1793,8 +1830,9 @@ struct Processor<'a> {
     report: StreamReport,
     /// The bindings in scope at the element being processed; it follows the
     /// raw element stack, which the semantic stack mirrors until recovery
-    /// abandons the semantic flow.
-    scope: Scope,
+    /// abandons the semantic flow. Each URI in scope is stored once, and the
+    /// names expanded in its namespace share that copy.
+    scope: Scope<NamespaceUri>,
 }
 
 impl<'a> Processor<'a> {
@@ -1910,7 +1948,7 @@ impl<'a> Processor<'a> {
                     RawElementKind::Start
                 },
                 qualified_name: Cow::Borrowed(data.qualified_name.as_ref()),
-                expanded_name: clone_bounded_name(
+                expanded_name: clone_shared_name(
                     &data.expanded_name,
                     self.limits,
                     "MCE stream raw expanded element name",
@@ -1961,7 +1999,7 @@ impl<'a> Processor<'a> {
                     semantic_attrs(
                         &mut data.attrs,
                         &context,
-                        self.capabilities,
+                        &self.scope,
                         false,
                         self.limits,
                         &mut self.report,
@@ -1979,19 +2017,14 @@ impl<'a> Processor<'a> {
             return self.close_start(context, mode, parent_active, data, empty);
         }
 
-        let directives = collect_directives(&data.attrs, self.limits)?;
+        let directives = collect_directives(&data.attrs, &self.scope, self.limits)?;
         let directive_tokens = directives.tokens;
-        apply_directives(
-            &mut context,
-            directives,
-            self.capabilities,
-            self.limits,
-            &self.scope,
-        )?;
-        let is_extension = self.capabilities.extensions.contains(&data.expanded_name);
+        apply_directives(&mut context, directives, self.limits, &self.scope)?;
+        let namespace = data.name_namespace;
+        let is_extension = self.is_extension(&data)?;
         context.opaque = is_extension;
 
-        validate_alternate_attributes_if_needed(&data, &context, self.capabilities)?;
+        validate_alternate_attributes_if_needed(&data, &context, &self.scope)?;
 
         if let Some(parent) = self.stack.last_mut()
             && let Mode::Alt {
@@ -2000,10 +2033,8 @@ impl<'a> Processor<'a> {
                 fallback,
             } = &mut parent.mode
         {
-            if data.expanded_name.namespace != NAMESPACE {
-                if context.is_ignorable(&data.expanded_name.namespace)
-                    && !self.capabilities.understands(&data.expanded_name.namespace)
-                {
+            if !self.scope.is_mce(namespace) {
+                if context.is_ignorable(namespace) && !self.scope.understood(namespace) {
                     self.report.ignored_elements = self
                         .report
                         .ignored_elements
@@ -2039,10 +2070,10 @@ impl<'a> Processor<'a> {
                         }) {
                             return Err(limit("directive tokens"));
                         }
-                        let namespace = resolver(&self.scope, &context.ns)
-                            .get(prefix)
+                        let required = resolver(&self.scope, &context.ns)
+                            .resolve(prefix)
                             .ok_or_else(|| bad("unbound Requires prefix"))?;
-                        supported &= self.capabilities.understands(namespace);
+                        supported &= self.scope.understood(required.id);
                     }
                     if count == 0 {
                         return Err(bad("empty Requires"));
@@ -2082,7 +2113,7 @@ impl<'a> Processor<'a> {
         let mut active = parent_active;
         let mode = if is_extension {
             Mode::Emit
-        } else if data.expanded_name.namespace == NAMESPACE {
+        } else if self.scope.is_mce(namespace) {
             match data.expanded_name.local_name.as_str() {
                 "AlternateContent" => {
                     self.report.alternate_content_count = self
@@ -2098,21 +2129,20 @@ impl<'a> Processor<'a> {
                 },
                 _ => return Err(bad("Choice/Fallback outside AlternateContent")),
             }
-        } else if context.is_ignorable(&data.expanded_name.namespace)
-            && !self.capabilities.understands(&data.expanded_name.namespace)
-        {
-            if context.preserves_element(&data.expanded_name) {
+        } else if context.is_ignorable(namespace) && !self.scope.understood(namespace) {
+            let local = data.expanded_name.local_name.as_str();
+            if context.preserves_element(namespace, local) {
                 self.report.preserved_elements = self
                     .report
                     .preserved_elements
                     .checked_add(1)
                     .ok_or_else(|| limit("stream report counters"))?;
                 Mode::Emit
-            } else if context.processes(&data.expanded_name) {
+            } else if context.processes(namespace, local) {
                 for attr in &data.attrs {
-                    if attr.expanded_name.namespace == XML_NS
+                    if self.scope.is_xml(attr.namespace)
                         && matches!(
-                            attr.expanded_name.local_name.as_str(),
+                            attr.raw.expanded_name.local_name.as_str(),
                             "base" | "lang" | "space"
                         )
                     {
@@ -2146,7 +2176,7 @@ impl<'a> Processor<'a> {
                 semantic_attrs(
                     &mut data.attrs,
                     &context,
-                    self.capabilities,
+                    &self.scope,
                     !is_extension,
                     self.limits,
                     &mut self.report,
@@ -2453,7 +2483,7 @@ impl<'a> Processor<'a> {
                     RawElementKind::Start
                 },
                 qualified_name: Cow::Borrowed(data.qualified_name.as_ref()),
-                expanded_name: clone_bounded_name(
+                expanded_name: clone_shared_name(
                     &data.expanded_name,
                     self.limits,
                     "MCE stream raw expanded element name",
@@ -2493,7 +2523,7 @@ impl<'a> Processor<'a> {
         let directive_bytes = if inherited_opaque {
             0
         } else {
-            raw_directive_bytes(&data.attrs, &data.expanded_name, self.limits)?
+            raw_directive_bytes(data, &self.scope, self.limits)?
         };
         let frame_name_bytes = data.qualified_name.as_ref().len();
         let context_bytes = parent_context_bytes
@@ -2511,10 +2541,9 @@ impl<'a> Processor<'a> {
         let qualified_name = str::from_utf8(data.qualified_name.as_ref()).map_err(xml_error)?;
         let qualified_name =
             clone_bounded_string(qualified_name, self.limits, "MCE stream raw frame name")?;
-        let current_opaque =
-            inherited_opaque || self.capabilities.extensions.contains(&data.expanded_name);
+        let current_opaque = inherited_opaque || self.is_extension(data)?;
         let alternate_content = !current_opaque
-            && data.expanded_name.namespace == NAMESPACE
+            && self.scope.is_mce(data.name_namespace)
             && data.expanded_name.local_name == "AlternateContent";
         self.raw_stack.push(RawFrame {
             ns: data.namespace.clone(),
@@ -2653,6 +2682,30 @@ impl<'a> Processor<'a> {
         }
     }
 
+    /// Whether the element is one of the profile's extension elements, kept
+    /// as an opaque branch.
+    ///
+    /// Only a namespace an extension element lives in, a URI the caller
+    /// chose, is compared with the extension names.
+    fn is_extension(&self, data: &ElementData<'_>) -> Result<bool, Error> {
+        if !self.scope.has_extensions(data.name_namespace) {
+            return Ok(false);
+        }
+        let name = Name {
+            namespace: clone_bounded_name_part(
+                &data.expanded_name.namespace,
+                self.limits,
+                "MCE stream extension element name",
+            )?,
+            local_name: clone_bounded_name_part(
+                &data.expanded_name.local_name,
+                self.limits,
+                "MCE stream extension element name",
+            )?,
+        };
+        Ok(self.capabilities.extensions.contains(&name))
+    }
+
     fn parse_element<'b>(
         &mut self,
         element: &BytesStart<'b>,
@@ -2702,26 +2755,26 @@ impl<'a> Processor<'a> {
                 .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
                 .map_err(xml_error)?;
             reserve_amortized(&mut preliminary, 1, "MCE stream attributes")?;
-            preliminary.push(RawAttribute {
-                qualified_name: clone_bounded_bytes(
-                    attribute.key.as_ref(),
-                    self.limits,
-                    "MCE stream attribute name",
-                )?,
-                expanded_name: Name {
-                    namespace: String::new(),
-                    local_name: String::new(),
+            preliminary.push(ParsedAttribute {
+                raw: RawAttribute {
+                    qualified_name: clone_bounded_bytes(
+                        attribute.key.as_ref(),
+                        self.limits,
+                        "MCE stream attribute name",
+                    )?,
+                    expanded_name: ExpandedName::default(),
+                    raw_value: clone_bounded_bytes(
+                        attribute.value.as_ref(),
+                        self.limits,
+                        "MCE stream attribute value",
+                    )?,
+                    decoded_value: clone_bounded_text(
+                        decoded.as_ref(),
+                        self.limits,
+                        "MCE stream decoded attribute value",
+                    )?,
                 },
-                raw_value: clone_bounded_bytes(
-                    attribute.value.as_ref(),
-                    self.limits,
-                    "MCE stream attribute value",
-                )?,
-                decoded_value: clone_bounded_text(
-                    decoded.as_ref(),
-                    self.limits,
-                    "MCE stream decoded attribute value",
-                )?,
+                namespace: NO_NAMESPACE,
             });
         }
         let local = local_namespaces(&preliminary, self.limits)?;
@@ -2734,12 +2787,14 @@ impl<'a> Processor<'a> {
             self.scope.push(depth, &layer.local, self.capabilities)?;
         }
         let names = resolver(&self.scope, &namespace);
-        let expanded_name = expand(qualified, names, true, self.limits)?;
+        let (expanded_name, name_namespace) = expand(qualified, names, true, self.limits)?;
         check_expanded_name(&expanded_name, self.limits)?;
         for attribute in &mut preliminary {
-            attribute.expanded_name =
-                expand_attribute(attribute.qualified_name.as_ref(), names, self.limits)?;
-            check_expanded_name(&attribute.expanded_name, self.limits)?;
+            let (expanded_name, namespace) =
+                expand_attribute(attribute.raw.qualified_name.as_ref(), names, self.limits)?;
+            attribute.raw.expanded_name = expanded_name;
+            attribute.namespace = namespace;
+            check_expanded_name(&attribute.raw.expanded_name, self.limits)?;
         }
         Ok(ElementData {
             qualified_name: clone_bounded_bytes(
@@ -2748,6 +2803,7 @@ impl<'a> Processor<'a> {
                 "MCE stream element name",
             )?,
             expanded_name,
+            name_namespace,
             namespace,
             attrs: preliminary,
         })
@@ -2755,24 +2811,24 @@ impl<'a> Processor<'a> {
 }
 
 fn raw_directive_bytes(
-    attrs: &[RawAttribute<'_>],
-    element_name: &Name,
+    data: &ElementData<'_>,
+    scope: &Scope<NamespaceUri>,
     limits: &StreamLimits,
 ) -> Result<usize, Error> {
     let mut bytes = 0usize;
     let mut tokens = 0usize;
-    for attribute in attrs {
-        if is_namespace_attribute(attribute.qualified_name.as_ref()) {
+    let is_choice = scope.is_mce(data.name_namespace) && data.expanded_name.local_name == "Choice";
+    for attribute in &data.attrs {
+        if is_namespace_attribute(attribute.raw.qualified_name.as_ref()) {
             continue;
         }
-        let is_requires = element_name.namespace == NAMESPACE
-            && element_name.local_name == "Choice"
-            && attribute.expanded_name.namespace.is_empty()
+        let is_requires = is_choice
+            && attribute.namespace == NO_NAMESPACE
             && semantic_attr_name(attribute) == b"Requires";
-        if attribute.expanded_name.namespace != NAMESPACE && !is_requires {
+        if !scope.is_mce(attribute.namespace) && !is_requires {
             continue;
         }
-        let value = attribute.decoded_value.as_ref();
+        let value = attribute.raw.decoded_value.as_ref();
         bytes = bytes
             .checked_add(value.len())
             .and_then(|value_bytes| value_bytes.checked_add(1))
@@ -2790,18 +2846,26 @@ fn raw_directive_bytes(
     Ok(bytes)
 }
 
+/// Refuse two attributes with one expanded name.
+///
+/// Two names are equal exactly when their namespace identities in scope and
+/// their local names are, so the set hashes, with a random key, each local
+/// name and an integer, never a namespace URI.
 fn validate_duplicate_attributes(
-    attrs: &[RawAttribute<'_>],
+    attrs: &[ParsedAttribute<'_>],
     limits: &StreamLimits,
 ) -> Result<(), Error> {
-    let mut seen: HashSet<&Name> = HashSet::new();
+    let mut seen: HashSet<(UriId, &str)> = HashSet::new();
     try_reserve_set(&mut seen, attrs.len(), "MCE stream attributes")?;
     for attribute in attrs {
-        if is_namespace_attribute(attribute.qualified_name.as_ref()) {
+        if is_namespace_attribute(attribute.raw.qualified_name.as_ref()) {
             continue;
         }
-        check_expanded_name(&attribute.expanded_name, limits)?;
-        if !seen.insert(&attribute.expanded_name) {
+        check_expanded_name(&attribute.raw.expanded_name, limits)?;
+        if !seen.insert((
+            attribute.namespace,
+            attribute.raw.expanded_name.local_name.as_str(),
+        )) {
             return Err(bad("duplicate attribute"));
         }
     }
@@ -2811,14 +2875,14 @@ fn validate_duplicate_attributes(
 impl<'a> SemanticEvent<'a> {
     fn from_element(
         qualified_name: &'a [u8],
-        expanded_name: &Name,
+        expanded_name: &ExpandedName,
         empty: bool,
         attrs: Vec<SemanticAttribute<'a>>,
         limits: &StreamLimits,
     ) -> Result<Self, Error> {
         let element = SemanticElement {
             qualified_name: Cow::Borrowed(qualified_name),
-            expanded_name: clone_bounded_name(
+            expanded_name: clone_shared_name(
                 expanded_name,
                 limits,
                 "MCE stream semantic expanded element name",
@@ -2860,12 +2924,13 @@ fn invoke_active<ActiveE, Active>(
 }
 
 fn borrow_raw_attribute<'a>(
-    attr: &'a RawAttribute<'_>,
+    attr: &'a ParsedAttribute<'_>,
     limits: &StreamLimits,
 ) -> Result<RawAttribute<'a>, Error> {
+    let attr = &attr.raw;
     Ok(RawAttribute {
         qualified_name: Cow::Borrowed(attr.qualified_name.as_ref()),
-        expanded_name: clone_bounded_name(
+        expanded_name: clone_shared_name(
             &attr.expanded_name,
             limits,
             "MCE stream raw expanded attribute name",
@@ -2876,7 +2941,7 @@ fn borrow_raw_attribute<'a>(
 }
 
 fn clone_raw_attributes<'a>(
-    attrs: &'a [RawAttribute<'_>],
+    attrs: &'a [ParsedAttribute<'_>],
     limits: &StreamLimits,
 ) -> Result<Vec<RawAttribute<'a>>, Error> {
     let mut cloned = Vec::new();
@@ -2891,9 +2956,9 @@ fn clone_raw_attributes<'a>(
 }
 
 fn semantic_attrs<'a>(
-    attrs: &'a mut [RawAttribute<'_>],
+    attrs: &'a mut [ParsedAttribute<'_>],
     context: &Context,
-    capabilities: &Capabilities,
+    scope: &Scope<NamespaceUri>,
     filter: bool,
     limits: &StreamLimits,
     report: &mut StreamReport,
@@ -2901,10 +2966,12 @@ fn semantic_attrs<'a>(
     let mut output = Vec::new();
     reserve_vec(&mut output, attrs.len(), "MCE stream semantic attributes")?;
     for attr in attrs.iter_mut() {
+        let namespace = attr.namespace;
+        let attr = &mut attr.raw;
         if is_namespace_attribute(attr.qualified_name.as_ref()) {
             continue;
         }
-        if filter && attr.expanded_name.namespace == NAMESPACE {
+        if filter && scope.is_mce(namespace) {
             report.ignored_attributes = report
                 .ignored_attributes
                 .checked_add(1)
@@ -2912,36 +2979,24 @@ fn semantic_attrs<'a>(
             continue;
         }
         if filter
-            && !attr.expanded_name.namespace.is_empty()
-            && context.is_ignorable(&attr.expanded_name.namespace)
-            && !capabilities.understands(&attr.expanded_name.namespace)
-            && !context.preserves_attribute(&attr.expanded_name)
+            && namespace != NO_NAMESPACE
+            && context.is_ignorable(namespace)
+            && !scope.understood(namespace)
         {
-            report.ignored_attributes = report
-                .ignored_attributes
-                .checked_add(1)
-                .ok_or_else(|| limit("stream report counters"))?;
-            continue;
-        }
-        if filter
-            && !attr.expanded_name.namespace.is_empty()
-            && context.is_ignorable(&attr.expanded_name.namespace)
-            && !capabilities.understands(&attr.expanded_name.namespace)
-            && context.preserves_attribute(&attr.expanded_name)
-        {
+            if !context.preserves_attribute(namespace, &attr.expanded_name.local_name) {
+                report.ignored_attributes = report
+                    .ignored_attributes
+                    .checked_add(1)
+                    .ok_or_else(|| limit("stream report counters"))?;
+                continue;
+            }
             report.preserved_attributes = report
                 .preserved_attributes
                 .checked_add(1)
                 .ok_or_else(|| limit("stream report counters"))?;
         }
         check_expanded_name(&attr.expanded_name, limits)?;
-        let expanded_name = std::mem::replace(
-            &mut attr.expanded_name,
-            Name {
-                namespace: String::new(),
-                local_name: String::new(),
-            },
-        );
+        let expanded_name = std::mem::take(&mut attr.expanded_name);
         output.push(SemanticAttribute {
             qualified_name: Cow::Borrowed(attr.qualified_name.as_ref()),
             expanded_name,
@@ -2956,11 +3011,12 @@ fn semantic_attrs<'a>(
 }
 
 fn local_namespaces(
-    attrs: &[RawAttribute<'_>],
+    attrs: &[ParsedAttribute<'_>],
     limits: &StreamLimits,
 ) -> Result<Vec<(String, String)>, Error> {
     let mut local = Vec::new();
     for attr in attrs {
+        let attr = &attr.raw;
         let qualified = str::from_utf8(attr.qualified_name.as_ref()).map_err(xml_error)?;
         if qualified == "xmlns" {
             check_name_bytes(attr.raw_value.as_ref(), limits)?;
@@ -3011,17 +3067,18 @@ struct DirectiveValues {
 }
 
 fn collect_directives(
-    attrs: &[RawAttribute<'_>],
+    attrs: &[ParsedAttribute<'_>],
+    scope: &Scope<NamespaceUri>,
     limits: &StreamLimits,
 ) -> Result<DirectiveValues, Error> {
     let mut values = Vec::new();
     let mut tokens = 0usize;
     for attr in attrs {
-        if is_namespace_attribute(attr.qualified_name.as_ref())
-            || attr.expanded_name.namespace != NAMESPACE
+        if is_namespace_attribute(attr.raw.qualified_name.as_ref()) || !scope.is_mce(attr.namespace)
         {
             continue;
         }
+        let attr = &attr.raw;
         let kind = match attr.expanded_name.local_name.as_str() {
             "Ignorable" => DirectiveKind::Ignorable,
             "ProcessContent" => DirectiveKind::ProcessContent,
@@ -3052,9 +3109,8 @@ fn collect_directives(
 fn apply_directives(
     context: &mut Context,
     values: DirectiveValues,
-    capabilities: &Capabilities,
     limits: &StreamLimits,
-    scope: &Scope,
+    scope: &Scope<NamespaceUri>,
 ) -> Result<(), Error> {
     let additional_context_bytes = directive_bytes(&values)?;
     if context
@@ -3080,17 +3136,14 @@ fn apply_directives(
             }
             check_name_bytes(prefix.as_bytes(), limits)?;
             let uri = resolver(scope, &context.ns)
-                .get(prefix)
+                .resolve(prefix)
                 .ok_or_else(|| bad("unbound Ignorable prefix"))?;
-            if uri == NAMESPACE {
+            if scope.is_mce(uri.id) {
                 return Err(bad("MCE cannot be ignorable"));
             }
             try_reserve_set(&mut local_ignorable, 1, "MCE stream Ignorable directives")?;
-            local_ignorable.insert(clone_bounded_name_part(
-                uri,
-                limits,
-                "stream Ignorable namespace",
-            )?);
+            check_uri_bytes(uri.text, limits)?;
+            local_ignorable.insert(uri.id);
         }
     }
     let mut new_ignorable = HashSet::new();
@@ -3100,12 +3153,8 @@ fn apply_directives(
         "MCE stream effective Ignorable directives",
     )?;
     for namespace in &local_ignorable {
-        if !context.is_ignorable(namespace) {
-            new_ignorable.insert(clone_bounded_name_part(
-                namespace,
-                limits,
-                "MCE stream Ignorable namespace",
-            )?);
+        if !context.is_ignorable(*namespace) {
+            new_ignorable.insert(*namespace);
         }
     }
 
@@ -3119,7 +3168,7 @@ fn apply_directives(
                 for token in directive.value.split_whitespace() {
                     let target = parse_target(token, resolver(scope, &context.ns), true, limits)?;
                     if !local_ignorable.contains(target.namespace())
-                        && !context.is_ignorable(target.namespace())
+                        && !context.is_ignorable(*target.namespace())
                     {
                         return Err(bad("ProcessContent target is not effectively ignorable"));
                     }
@@ -3166,11 +3215,11 @@ fn apply_directives(
                     }
                     check_name_bytes(prefix.as_bytes(), limits)?;
                     let namespace = resolver(scope, &context.ns)
-                        .get(prefix)
+                        .resolve(prefix)
                         .ok_or_else(|| bad("unbound MustUnderstand prefix"))?;
-                    if !capabilities.understands(namespace) {
+                    if !scope.understood(namespace.id) {
                         return Err(Error::MustUnderstand(clone_bounded_name_part(
-                            namespace,
+                            namespace.text,
                             limits,
                             "MustUnderstand namespace",
                         )?));
@@ -3206,9 +3255,9 @@ fn apply_directives(
 fn validate_alternate_attributes_if_needed(
     data: &ElementData<'_>,
     context: &Context,
-    capabilities: &Capabilities,
+    scope: &Scope<NamespaceUri>,
 ) -> Result<(), Error> {
-    if data.expanded_name.namespace != NAMESPACE {
+    if !scope.is_mce(data.name_namespace) {
         return Ok(());
     }
     let kind = match data.expanded_name.local_name.as_str() {
@@ -3218,25 +3267,26 @@ fn validate_alternate_attributes_if_needed(
         _ => return Ok(()),
     };
     for attr in &data.attrs {
-        if is_namespace_attribute(attr.qualified_name.as_ref()) {
+        if is_namespace_attribute(attr.raw.qualified_name.as_ref()) {
             continue;
         }
-        let name = &attr.expanded_name;
-        if name.namespace.is_empty() {
-            if kind == 1 && name.local_name == "Requires" {
+        let namespace = attr.namespace;
+        let local = attr.raw.expanded_name.local_name.as_str();
+        if namespace == NO_NAMESPACE {
+            if kind == 1 && local == "Requires" {
                 continue;
             }
             return Err(bad("unexpected unprefixed AlternateContent attribute"));
         }
-        if name.namespace == XML_NS && matches!(name.local_name.as_str(), "lang" | "space") {
+        if scope.is_xml(namespace) && matches!(local, "lang" | "space") {
             return Err(bad(
                 "xml:lang and xml:space are forbidden on AlternateContent markup",
             ));
         }
-        if name.namespace == NAMESPACE || name.namespace == XML_NS {
+        if scope.is_mce(namespace) || scope.is_xml(namespace) {
             continue;
         }
-        if !capabilities.understands(&name.namespace) && !context.is_ignorable(&name.namespace) {
+        if !scope.understood(namespace) && !context.is_ignorable(namespace) {
             return Err(bad(
                 "AlternateContent attribute namespace is neither understood nor ignorable",
             ));
@@ -3245,20 +3295,20 @@ fn validate_alternate_attributes_if_needed(
     Ok(())
 }
 
-fn semantic_attr_name<'a>(attr: &'a RawAttribute<'_>) -> &'a [u8] {
-    attr.qualified_name.as_ref()
+fn semantic_attr_name<'a>(attr: &'a ParsedAttribute<'_>) -> &'a [u8] {
+    attr.raw.qualified_name.as_ref()
 }
 
-fn attr_value<'a>(attrs: &'a [RawAttribute<'_>], name: &str) -> Result<Option<&'a str>, Error> {
+fn attr_value<'a>(attrs: &'a [ParsedAttribute<'_>], name: &str) -> Result<Option<&'a str>, Error> {
     let mut value = None;
     for attr in attrs {
-        if attr.expanded_name.namespace.is_empty()
+        if attr.namespace == NO_NAMESPACE
             && str::from_utf8(semantic_attr_name(attr)).map_err(xml_error)? == name
         {
             if value.is_some() {
                 return Err(bad("duplicate attribute"));
             }
-            value = Some(attr.decoded_value.as_ref());
+            value = Some(attr.raw.decoded_value.as_ref());
         }
     }
     Ok(value)
@@ -3268,61 +3318,65 @@ fn is_namespace_attribute(name: &[u8]) -> bool {
     name == b"xmlns" || name.starts_with(b"xmlns:")
 }
 
-fn expand_attribute(q: &[u8], ns: Resolver<'_>, limits: &StreamLimits) -> Result<Name, Error> {
+/// The expanded name of the attribute `q` and its namespace's identity.
+fn expand_attribute(
+    q: &[u8],
+    ns: Resolver<'_>,
+    limits: &StreamLimits,
+) -> Result<(ExpandedName, UriId), Error> {
     let lexical = str::from_utf8(q).map_err(xml_error)?;
-    if lexical == "xmlns" {
-        return Ok(Name {
-            namespace: clone_bounded_name_part(
-                XMLNS_NAMESPACE,
-                limits,
-                "MCE stream namespace name",
-            )?,
-            local_name: clone_bounded_name_part("xmlns", limits, "MCE stream attribute name")?,
-        });
-    }
-    if let Some(prefix) = lexical.strip_prefix("xmlns:") {
-        return Ok(Name {
-            namespace: clone_bounded_name_part(
-                XMLNS_NAMESPACE,
-                limits,
-                "MCE stream namespace name",
-            )?,
-            local_name: clone_bounded_name_part(prefix, limits, "MCE stream namespace prefix")?,
-        });
+    let declared = if lexical == "xmlns" {
+        Some("xmlns")
+    } else {
+        lexical.strip_prefix("xmlns:")
+    };
+    if let Some(local) = declared {
+        check_uri_bytes(XMLNS_NAMESPACE, limits)?;
+        let resource = if lexical == "xmlns" {
+            "MCE stream attribute name"
+        } else {
+            "MCE stream namespace prefix"
+        };
+        let name = ExpandedName {
+            namespace: NamespaceUri::from_static(XMLNS_NAMESPACE),
+            local_name: clone_bounded_name_part(local, limits, resource)?,
+        };
+        return Ok((name, XMLNS_URI));
     }
     expand(lexical, ns, false, limits)
 }
 
+/// The expanded name of the element (`element`) or attribute `q` and its
+/// namespace's identity. The name shares the scope's copy of its URI.
 fn expand(
     q: &str,
     namespaces: Resolver<'_>,
     element: bool,
     limits: &StreamLimits,
-) -> Result<Name, Error> {
+) -> Result<(ExpandedName, UriId), Error> {
     let qualified = QualifiedName::try_from(q).map_err(|_| bad("invalid QName"))?;
     let prefix = qualified.prefix().unwrap_or_default();
     let local = qualified.local();
-    let namespace = if prefix.is_empty() {
+    let uri = if prefix.is_empty() {
         if element {
-            clone_bounded_name_part(
-                namespaces.get("").unwrap_or_default(),
-                limits,
-                "MCE stream namespace URI",
-            )?
+            let uri = namespaces.resolve("").unwrap_or(Uri::NONE);
+            check_uri_bytes(uri.text, limits)?;
+            uri
         } else {
-            String::new()
+            Uri::NONE
         }
     } else {
-        namespaces
-            .get(prefix)
-            .map(|value| clone_bounded_name_part(value, limits, "MCE stream namespace URI"))
-            .transpose()?
-            .ok_or_else(|| bad("unbound prefix"))?
+        let bound = namespaces.resolve(prefix);
+        if let Some(uri) = bound {
+            check_uri_bytes(uri.text, limits)?;
+        }
+        bound.ok_or_else(|| bad("unbound prefix"))?
     };
-    Ok(Name {
-        namespace,
+    let name = ExpandedName {
+        namespace: namespaces.namespace(uri),
         local_name: clone_bounded_name_part(local, limits, "MCE stream local name")?,
-    })
+    };
+    Ok((name, uri.id))
 }
 
 fn parse_target(
@@ -3330,7 +3384,7 @@ fn parse_target(
     namespaces: Resolver<'_>,
     wildcard: bool,
     limits: &StreamLimits,
-) -> Result<NamePattern<String>, Error> {
+) -> Result<NamePattern<UriId>, Error> {
     check_name_bytes(token.as_bytes(), limits)?;
     let (prefix, local) = token
         .split_once(':')
@@ -3340,12 +3394,14 @@ fn parse_target(
     }
     check_name_bytes(prefix.as_bytes(), limits)?;
     check_name_bytes(local.as_bytes(), limits)?;
-    let namespace = namespaces
-        .get(prefix)
-        .map(|value| clone_bounded_name_part(value, limits, "MCE stream namespace URI"))
-        .transpose()?
-        .ok_or_else(|| bad("unbound compatibility target prefix"))?;
-    if namespace == NAMESPACE {
+    let bound = namespaces.resolve(prefix);
+    if let Some(uri) = bound {
+        check_uri_bytes(uri.text, limits)?;
+    }
+    let namespace = bound
+        .ok_or_else(|| bad("unbound compatibility target prefix"))?
+        .id;
+    if namespaces.scope.is_mce(namespace) {
         return Err(bad("compatibility target cannot use the MCE namespace"));
     }
     if local == "*" {
@@ -3369,7 +3425,7 @@ fn check_name_bytes(name: &[u8], limits: &StreamLimits) -> Result<(), Error> {
     Ok(())
 }
 
-fn check_expanded_name(name: &Name, limits: &StreamLimits) -> Result<(), Error> {
+fn check_expanded_name(name: &ExpandedName, limits: &StreamLimits) -> Result<(), Error> {
     if name
         .namespace
         .len()
@@ -3389,6 +3445,8 @@ fn clone_bounded_string(
     if value.len() > limits.max_context_bytes {
         return Err(limit("stream context bytes"));
     }
+    #[cfg(test)]
+    super::scope::counter::copied(value.len());
     let mut cloned = String::new();
     cloned
         .try_reserve_exact(value.len())
@@ -3405,6 +3463,8 @@ fn clone_bounded_bytes<'a>(
     if value.len() > limits.max_event_bytes {
         return Err(limit("stream event bytes"));
     }
+    #[cfg(test)]
+    super::scope::counter::copied(value.len());
     let mut cloned = Vec::new();
     cloned
         .try_reserve_exact(value.len())
@@ -3421,6 +3481,8 @@ fn clone_bounded_text<'a>(
     if value.len() > limits.max_event_bytes {
         return Err(limit("stream event bytes"));
     }
+    #[cfg(test)]
+    super::scope::counter::copied(value.len());
     let mut cloned = String::new();
     cloned
         .try_reserve_exact(value.len())
@@ -3437,6 +3499,8 @@ fn clone_bounded_name_part(
     if value.len() > limits.max_name_bytes {
         return Err(limit("stream name bytes"));
     }
+    #[cfg(test)]
+    super::scope::counter::copied(value.len());
     let mut cloned = String::new();
     cloned
         .try_reserve_exact(value.len())
@@ -3445,16 +3509,28 @@ fn clone_bounded_name_part(
     Ok(cloned)
 }
 
-fn clone_bounded_name(
-    value: &Name,
+/// A copy of `value` for an observer: the namespace shares the scope's copy
+/// of the URI, and the local name is copied. The bound on the whole name also
+/// bounds the URI, which the stream copied here before it shared it.
+fn clone_shared_name(
+    value: &ExpandedName,
     limits: &StreamLimits,
     resource: &'static str,
-) -> Result<Name, Error> {
+) -> Result<ExpandedName, Error> {
     check_expanded_name(value, limits)?;
-    Ok(Name {
-        namespace: clone_bounded_name_part(&value.namespace, limits, resource)?,
+    Ok(ExpandedName {
+        namespace: value.namespace.clone(),
         local_name: clone_bounded_name_part(&value.local_name, limits, resource)?,
     })
+}
+
+/// The bound a copy of the namespace URI `uri` had to fit, checked where the
+/// stream copied a URI before it shared one: without reading its bytes.
+fn check_uri_bytes(uri: &str, limits: &StreamLimits) -> Result<(), Error> {
+    if uri.len() > limits.max_name_bytes {
+        return Err(limit("stream name bytes"));
+    }
+    Ok(())
 }
 
 fn directive_bytes(values: &DirectiveValues) -> Result<usize, Error> {

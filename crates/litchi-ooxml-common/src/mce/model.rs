@@ -1,6 +1,15 @@
 //! Typed vocabulary and bounded policies for markup-compatibility preprocessing.
 
-use std::{borrow::Cow, collections::HashSet, collections::TryReserveError};
+use std::{
+    borrow::{Borrow, Cow},
+    cmp::Ordering,
+    collections::HashSet,
+    collections::TryReserveError,
+    fmt,
+    hash::{Hash, Hasher},
+    ops::Deref,
+    sync::Arc,
+};
 use thiserror::Error as ThisError;
 
 /// Markup Compatibility namespace from ISO/IEC 29500-3.
@@ -8,11 +17,249 @@ pub const NAMESPACE: &str = "http://schemas.openxmlformats.org/markup-compatibil
 
 pub(crate) const XML_NS: &str = "http://www.w3.org/XML/1998/namespace";
 
+/// XML namespace used by namespace declaration attributes.
+pub const XMLNS_NAMESPACE: &str = "http://www.w3.org/2000/xmlns/";
+
 /// An expanded XML name used by MCE preservation and extension policies.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Name {
     pub namespace: String,
     pub local_name: String,
+}
+
+/// The namespace URI of an [`ExpandedName`] delivered by the MCE stream.
+///
+/// A document chooses its namespace URIs, and one declaration can put any
+/// number of names in its namespace. The stream copies a URI once, when a
+/// declaration binds it, and every name it expands in that namespace refers
+/// to that copy, so a name costs the same whatever the length of its URI:
+/// cloning a `NamespaceUri` never copies the URI.
+///
+/// It reads as its text: it dereferences to `str`, and compares, orders,
+/// hashes, displays and debug-prints exactly as that text does. The empty
+/// URI is no namespace.
+#[derive(Clone, Default)]
+pub struct NamespaceUri(Storage);
+
+#[derive(Clone, Default)]
+enum Storage {
+    /// No namespace: the empty URI.
+    #[default]
+    None,
+    /// A URI with static text, such as the `xml` or `xmlns` namespace.
+    Static(&'static str),
+    /// A URI copied from a document, shared by the names in its namespace.
+    Shared(Arc<String>),
+}
+
+impl NamespaceUri {
+    /// No namespace: the empty URI.
+    pub const NONE: Self = Self(Storage::None);
+
+    /// A namespace URI with static text; `""` is no namespace.
+    #[must_use]
+    pub const fn from_static(uri: &'static str) -> Self {
+        if uri.is_empty() {
+            Self::NONE
+        } else {
+            Self(Storage::Static(uri))
+        }
+    }
+
+    /// Copy `uri` into storage that its clones share.
+    ///
+    /// # Errors
+    ///
+    /// The allocation failure when the copy cannot be reserved.
+    pub(crate) fn try_copy(uri: &str) -> Result<Self, TryReserveError> {
+        if uri.is_empty() {
+            return Ok(Self::NONE);
+        }
+        let mut text = String::new();
+        text.try_reserve_exact(uri.len())?;
+        text.push_str(uri);
+        Ok(Self(Storage::Shared(Arc::new(text))))
+    }
+
+    /// The URI; empty for no namespace.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        match &self.0 {
+            Storage::None => "",
+            Storage::Static(text) => text,
+            Storage::Shared(text) => text.as_str(),
+        }
+    }
+
+    /// Whether this is no namespace, the empty URI.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        matches!(self.0, Storage::None)
+    }
+
+    /// Whether `self` and `other` refer to one copy of their URI, which
+    /// implies that they are equal. Names the stream expands in one
+    /// namespace share a copy while a declaration keeps it in scope.
+    #[must_use]
+    pub fn shares_storage_with(&self, other: &Self) -> bool {
+        match (&self.0, &other.0) {
+            (Storage::None, Storage::None) => true,
+            (Storage::Static(left), Storage::Static(right)) => core::ptr::eq(*left, *right),
+            (Storage::Shared(left), Storage::Shared(right)) => Arc::ptr_eq(left, right),
+            _ => false,
+        }
+    }
+}
+
+impl Deref for NamespaceUri {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl AsRef<str> for NamespaceUri {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Borrow<str> for NamespaceUri {
+    fn borrow(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl fmt::Debug for NamespaceUri {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(self.as_str(), f)
+    }
+}
+
+impl fmt::Display for NamespaceUri {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self.as_str(), f)
+    }
+}
+
+impl PartialEq for NamespaceUri {
+    fn eq(&self, other: &Self) -> bool {
+        self.shares_storage_with(other) || self.as_str() == other.as_str()
+    }
+}
+
+impl Eq for NamespaceUri {}
+
+impl PartialOrd for NamespaceUri {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for NamespaceUri {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.shares_storage_with(other) {
+            return Ordering::Equal;
+        }
+        self.as_str().cmp(other.as_str())
+    }
+}
+
+impl Hash for NamespaceUri {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_str().hash(state);
+    }
+}
+
+impl PartialEq<str> for NamespaceUri {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<&str> for NamespaceUri {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<String> for NamespaceUri {
+    fn eq(&self, other: &String) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl PartialEq<NamespaceUri> for str {
+    fn eq(&self, other: &NamespaceUri) -> bool {
+        self == other.as_str()
+    }
+}
+
+impl PartialEq<NamespaceUri> for &str {
+    fn eq(&self, other: &NamespaceUri) -> bool {
+        *self == other.as_str()
+    }
+}
+
+impl PartialEq<NamespaceUri> for String {
+    fn eq(&self, other: &NamespaceUri) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl From<&str> for NamespaceUri {
+    fn from(uri: &str) -> Self {
+        Self::from(uri.to_owned())
+    }
+}
+
+impl From<String> for NamespaceUri {
+    fn from(uri: String) -> Self {
+        if uri.is_empty() {
+            Self::NONE
+        } else {
+            Self(Storage::Shared(Arc::new(uri)))
+        }
+    }
+}
+
+impl From<NamespaceUri> for String {
+    fn from(uri: NamespaceUri) -> Self {
+        match uri.0 {
+            Storage::None => Self::new(),
+            Storage::Static(text) => text.to_owned(),
+            Storage::Shared(text) => {
+                Arc::try_unwrap(text).unwrap_or_else(|text| text.as_str().to_owned())
+            },
+        }
+    }
+}
+
+/// A namespace-expanded element or attribute name delivered by the MCE
+/// stream.
+///
+/// Its namespace is a [`NamespaceUri`], which shares the stream's one copy of
+/// the URI, so the stream's events cost the same whatever the length of the
+/// URIs a document chooses. [`Name`] is the owned form that the processing
+/// policy ([`Capabilities`]) takes.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+pub struct ExpandedName {
+    /// The namespace URI; empty when the name is in no namespace.
+    pub namespace: NamespaceUri,
+    /// The local part of the name.
+    pub local_name: String,
+}
+
+impl ExpandedName {
+    /// The name `local_name` in `namespace`.
+    #[must_use]
+    pub fn new(namespace: impl Into<NamespaceUri>, local_name: impl Into<String>) -> Self {
+        Self {
+            namespace: namespace.into(),
+            local_name: local_name.into(),
+        }
+    }
 }
 
 /// Namespaces understood by a caller and extension elements retained as opaque

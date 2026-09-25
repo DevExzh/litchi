@@ -430,7 +430,7 @@ mod preservation_tests {
 #[cfg(test)]
 mod streaming_0410_name_ownership_tests {
     use super::super::{
-        Capabilities, Error, Name,
+        Capabilities, Error, ExpandedName,
         stream::{
             SemanticEvent, StreamError, StreamLimits,
             process_markup_compatibility_stream_with_observers,
@@ -493,14 +493,8 @@ mod streaming_0410_name_ownership_tests {
         assert_eq!(
             raw_element_names,
             vec![
-                Name {
-                    namespace: String::new(),
-                    local_name: "r".to_owned(),
-                },
-                Name {
-                    namespace: "urn:p".to_owned(),
-                    local_name: "item".to_owned(),
-                },
+                ExpandedName::new("", "r"),
+                ExpandedName::new("urn:p", "item"),
             ]
         );
         assert!(
@@ -511,46 +505,25 @@ mod streaming_0410_name_ownership_tests {
         assert_eq!(
             active_element_names,
             vec![
-                Name {
-                    namespace: String::new(),
-                    local_name: "r".to_owned(),
-                },
-                Name {
-                    namespace: "urn:p".to_owned(),
-                    local_name: "item".to_owned(),
-                },
+                ExpandedName::new("", "r"),
+                ExpandedName::new("urn:p", "item"),
             ]
         );
         assert_eq!(
             active_attribute_names,
             vec![
-                vec![Name {
-                    namespace: "urn:x".to_owned(),
-                    local_name: "keep".to_owned(),
-                }],
+                vec![ExpandedName::new("urn:x", "keep")],
                 vec![
-                    Name {
-                        namespace: "urn:x".to_owned(),
-                        local_name: "keep".to_owned(),
-                    },
-                    Name {
-                        namespace: String::new(),
-                        local_name: "plain".to_owned(),
-                    },
+                    ExpandedName::new("urn:x", "keep"),
+                    ExpandedName::new("", "plain"),
                 ],
             ]
         );
         assert_eq!(
             active_end_names,
             vec![
-                Name {
-                    namespace: "urn:p".to_owned(),
-                    local_name: "item".to_owned(),
-                },
-                Name {
-                    namespace: String::new(),
-                    local_name: "r".to_owned(),
-                },
+                ExpandedName::new("urn:p", "item"),
+                ExpandedName::new("", "r"),
             ]
         );
     }
@@ -1174,7 +1147,7 @@ mod fixture_tests {
 #[cfg(test)]
 mod streaming_0360_tests {
     use super::super::{
-        Capabilities, Error, Name,
+        Capabilities, Error, ExpandedName, Name,
         stream::{
             RawElement, RawElementKind, SemanticEvent, StreamError, StreamLimits, StreamReport,
             process_markup_compatibility_stream,
@@ -1188,7 +1161,7 @@ mod streaming_0360_tests {
 
     const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
-    fn streaming_0360_expanded(name: &Name) -> String {
+    fn streaming_0360_expanded(name: &ExpandedName) -> String {
         format!("{}:{}", name.namespace, name.local_name)
     }
 
@@ -1776,7 +1749,7 @@ mod streaming_0361_raw_attribute_tests {
                     (
                         String::from_utf8_lossy(attribute.name()).into_owned(),
                         attribute.value().to_vec(),
-                        attribute.expanded_name.namespace.clone(),
+                        attribute.expanded_name.namespace.to_string(),
                         attribute.expanded_name.local_name.clone(),
                     )
                 }));
@@ -2131,7 +2104,7 @@ mod streaming_0361_raw_recovery_tests {
                 if name == "p:inside" || is_sentinel {
                     expanded.push((
                         name,
-                        element.expanded_name.namespace.clone(),
+                        element.expanded_name.namespace.to_string(),
                         element.expanded_name.local_name.clone(),
                     ));
                 }

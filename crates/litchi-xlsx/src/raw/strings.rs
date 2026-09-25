@@ -3,7 +3,7 @@
 use std::io::BufRead;
 
 use litchi_ooxml_common::mce::{
-    Capabilities, Name, SemanticElement, SemanticEvent, StreamError, StreamLimits,
+    Capabilities, ExpandedName, SemanticElement, SemanticEvent, StreamError, StreamLimits,
     process_markup_compatibility_stream_with_observers,
 };
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
@@ -550,7 +550,7 @@ fn is_spreadsheetml_element(element: &SemanticElement<'_>, local_name: &[u8]) ->
     is_spreadsheetml_element_name(&element.expanded_name, local_name)
 }
 
-fn is_spreadsheetml_element_name(name: &Name, local_name: &[u8]) -> bool {
+fn is_spreadsheetml_element_name(name: &ExpandedName, local_name: &[u8]) -> bool {
     (name.namespace.as_bytes() == SPREADSHEETML_NAMESPACE
         || name.namespace.as_bytes() == STRICT_SPREADSHEETML_NAMESPACE)
         && (local_name.is_empty() || name.local_name.as_bytes() == local_name)
