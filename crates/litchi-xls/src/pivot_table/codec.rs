@@ -707,7 +707,7 @@ pub fn parse_sxvi(data: &[u8]) -> Result<PivotViewItem> {
 ///  6  u16  isxvd       (base field index)
 ///  8  u16  isxvi       (base item index)
 /// 10  u16  ifmt        (number format)
-/// 12  u16  cchName
+/// 12  u16  cchName     (0xFFFF = not present)
 /// 14  var  name
 /// ```
 /// # Errors
@@ -727,10 +727,16 @@ pub fn parse_sxdi(data: &[u8]) -> Result<PivotDataItem> {
     let base_field_index = binary::read_u16_le_at(data, 6)?;
     let base_item_index = binary::read_u16_le_at(data, 8)?;
     let num_format_index = binary::read_u16_le_at(data, 10)?;
-    let cch_name = binary::read_u16_le_at(data, 12)? as usize;
+    let cch_name = binary::read_u16_le_at(data, 12)?;
 
+    // cchName 0xFFFF means stName is absent ([MS-XLS] 2.4.278): the data item
+    // takes its cache field's name, and this model holds it as empty.
     let mut offset = 14;
-    let name = read_xl_string_no_cch(data, &mut offset, cch_name)?;
+    let name = if cch_name == u16::MAX {
+        String::new()
+    } else {
+        read_xl_string_no_cch(data, &mut offset, usize::from(cch_name))?
+    };
     if offset != data.len() {
         return Err(cache_invalid(SXDI_TYPE, "trailing SXDI payload"));
     }

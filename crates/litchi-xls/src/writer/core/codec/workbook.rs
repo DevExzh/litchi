@@ -168,23 +168,26 @@ impl Writer {
     /// # Errors
     ///
     /// Refuses the whole list, leaving the previous one in place, when an
-    /// extension's `xf_index` names no XF record the workbook writes; when
-    /// its record would be longer than one BIFF8 record holds
+    /// extension's `xf_index` names no style, default or cell-format XF
+    /// record (the writer's own pivot-table XFs follow those and move as
+    /// cell formats are added, so they cannot be named); when its record
+    /// would be longer than one BIFF8 record holds
     /// ([`Error::RecordTooLong`]; `XFExt` has no continuation); or when the
     /// workbook already has more than the 4050 XF records an `XFCRC` record
-    /// allows ([`Error::TooMany`]). An XF record, once written, stays
-    /// written, so an index accepted here stays valid.
+    /// allows ([`Error::TooMany`]). Such an XF record, once written, keeps
+    /// its index, so an index accepted here stays valid.
     pub fn set_xf_extensions(&mut self, xf_extensions: Vec<crate::XfExt>) -> Result<()> {
         if !xf_extensions.is_empty() {
-            let xf_count = self.fmt.xf_record_count();
-            if xf_count > MAX_XF_RECORDS_WITH_XFCRC {
+            if self.fmt.xf_record_count() > MAX_XF_RECORDS_WITH_XFCRC {
                 return Err(xfcrc_capacity_error());
             }
+            let xf_count = self.fmt.user_xf_record_count();
             for extension in &xf_extensions {
                 if usize::from(extension.xf_index()) >= xf_count {
                     return Err(Error::InvalidData(format!(
-                        "XFExt references XF index {} but only {xf_count} XF records are written",
-                        extension.xf_index()
+                        "XFExt references XF index {} but the workbook's style and cell-format XF records end at {}",
+                        extension.xf_index(),
+                        xf_count - 1
                     )));
                 }
                 record_len("XFExt", extension.to_payload()?.len())?;

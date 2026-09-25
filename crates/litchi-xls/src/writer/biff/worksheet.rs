@@ -869,7 +869,8 @@ pub(crate) enum HyperlinkKind {
 }
 
 /// The kind of a hyperlink target and the text written for it, or `None`
-/// for an empty target, which writes no hyperlink.
+/// for an empty target (including a bare `internal:`), which writes no
+/// hyperlink.
 ///
 /// Surrounding whitespace is not part of a target. A target is internal when
 /// it starts with `internal:` (which is not written), or when it is not a
@@ -885,14 +886,12 @@ pub(crate) fn classify_hyperlink(url: &str) -> Option<(HyperlinkKind, &str)> {
         || trimmed.starts_with("mailto:");
     let is_internal = trimmed.starts_with("internal:")
         || (!is_web_like && trimmed.contains('!') && !trimmed.contains("://"));
-    Some(if is_internal {
-        (
-            HyperlinkKind::Internal,
-            trimmed.strip_prefix("internal:").unwrap_or(trimmed),
-        )
+    if is_internal {
+        let location = trimmed.strip_prefix("internal:").unwrap_or(trimmed);
+        (!location.is_empty()).then_some((HyperlinkKind::Internal, location))
     } else {
-        (HyperlinkKind::Web, trimmed)
-    })
+        Some((HyperlinkKind::Web, trimmed))
+    }
 }
 
 /// Refuses a hyperlink target an `HLink` record cannot hold: one with a NUL

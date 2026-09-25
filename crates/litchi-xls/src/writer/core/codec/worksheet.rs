@@ -76,6 +76,21 @@ impl Writer {
             built_in_code: Some(0x0D),
         };
 
+        // A new `_FilterDatabase` name must fit the reader's 65,535 `Lbl`
+        // records; a worksheet's existing one is replaced.
+        let replaces_name = self
+            .defined_names
+            .iter()
+            .any(|n| n.is_built_in && n.built_in_code == Some(0x0D) && n.local_sheet == Some(itab));
+        if !replaces_name
+            && self.defined_names.len() + self.defined_name_records.len() >= usize::from(u16::MAX)
+        {
+            return Err(Error::TooMany {
+                collection: "defined names",
+                limit: usize::from(u16::MAX),
+            });
+        }
+
         let worksheet = self
             .worksheets
             .get_mut(sheet)
@@ -591,11 +606,13 @@ impl Writer {
 
     /// # Errors
     ///
-    /// Refuses, when it is called, a range outside the BIFF8 grid and a rule
+    /// Refuses, when it is called, a range outside the BIFF8 grid; a rule
     /// whose formulas the write could not encode (the tokenizer rejects one,
-    /// or a string constant is longer than 255 UTF-16 code units); a refused
-    /// rule leaves the worksheet unchanged. Also returns an error for an
-    /// unknown worksheet.
+    /// or a string constant is longer than 255 UTF-16 code units) or whose
+    /// `CFRule` record would not fit one record; and a 32,769th
+    /// conditional-format group on the worksheet (their identifiers are 15
+    /// bits). A refused rule leaves the worksheet unchanged. Also returns an
+    /// error for an unknown worksheet.
     pub fn add_conditional_format(&mut self, sheet: usize, cf: ConditionalFormat) -> Result<()> {
         if cf.first_row > cf.last_row
             || cf.first_col > cf.last_col

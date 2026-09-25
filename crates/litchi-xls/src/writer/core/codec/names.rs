@@ -182,9 +182,10 @@ impl Writer {
     pub fn add_defined_name_record(&mut self, options: DefinedNameRecordOptions) -> Result<usize> {
         options.validate(self.worksheets.len())?;
         if self.defined_names.len() + self.defined_name_records.len() >= usize::from(u16::MAX) {
-            return Err(Error::InvalidData(
-                "defined name count exceeds BIFF8 bound".to_string(),
-            ));
+            return Err(Error::TooMany {
+                collection: "defined names",
+                limit: usize::from(u16::MAX),
+            });
         }
         let index = self.defined_name_records.len();
         self.defined_name_records
@@ -204,9 +205,10 @@ impl Writer {
         options.validate(self.worksheets.len())?;
         named_range::validate_future_records(&future, options.serialized_name())?;
         if self.defined_names.len() + self.defined_name_records.len() >= usize::from(u16::MAX) {
-            return Err(Error::InvalidData(
-                "defined name count exceeds BIFF8 bound".to_string(),
-            ));
+            return Err(Error::TooMany {
+                collection: "defined names",
+                limit: usize::from(u16::MAX),
+            });
         }
         let index = self.defined_name_records.len();
         self.defined_name_records.push((options, future));

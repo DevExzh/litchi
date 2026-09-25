@@ -209,6 +209,12 @@ fn hyperlink_targets_with_nul_are_refused_and_empty_targets_remove_the_link() {
     );
     writer.set_hyperlink(sheet, 0, 1, "  ").unwrap();
     assert_eq!(written(&mut writer), before);
+    // A bare `internal:` names no location, so it is empty too.
+    writer
+        .set_hyperlink(sheet, 0, 1, "internal:Links!A1")
+        .unwrap();
+    writer.set_hyperlink(sheet, 0, 1, " internal: ").unwrap();
+    assert_eq!(written(&mut writer), before);
 }
 
 #[test]
@@ -496,26 +502,84 @@ fn fonts_the_reader_refuses_are_refused_when_registered() {
     }
 }
 
+/// A style with its own font: heights 20 through 8191 twips are all valid,
+/// and none of the heights used below is the default font's 200.
+fn style_with_height(height: u16) -> CellStyle {
+    CellStyle {
+        font: Font {
+            height,
+            ..Font::default()
+        },
+        ..CellStyle::default()
+    }
+}
+
 #[test]
-fn a_workbook_holds_1022_fonts_and_the_next_style_is_refused() {
+fn a_workbook_holds_1022_distinct_fonts_and_the_next_one_is_refused() {
     let (mut writer, sheet) = one_sheet_writer("Fonts");
     // Four default fonts and 1,018 added ones.
     let mut last = 0;
-    for _ in 0..1018 {
-        last = writer.add_cell_style(CellStyle::default()).unwrap();
+    for ordinal in 0..1018 {
+        last = writer
+            .add_cell_style(style_with_height(1000 + ordinal))
+            .unwrap();
     }
     writer
         .write_number_with_format(sheet, 1, 0, 1.0, last)
         .unwrap();
     let before = written(&mut writer);
     assert_eq!(
-        too_many(writer.add_cell_style(CellStyle::default())),
+        too_many(writer.add_cell_style(style_with_height(1000 + 1018))),
         ("fonts", 1022)
     );
     assert_eq!(written(&mut writer), before);
+    // A style whose font the table already holds still fits.
+    writer.add_cell_style(style_with_height(1000)).unwrap();
     let workbook = read(before);
     assert_eq!(workbook.fonts().len(), 1022);
     assert_eq!(workbook.fonts().last().unwrap().index(), 1022);
+    assert_eq!(workbook.fonts().last().unwrap().height_twips(), 1000 + 1017);
+}
+
+/// Styles share an equal font instead of adding one each, so the 1022-font
+/// bound limits distinct fonts, not styles.
+#[test]
+fn styles_share_an_equal_font() {
+    let (mut writer, sheet) = one_sheet_writer("Fonts");
+    let bold = Font {
+        name: "Georgia".to_string(),
+        weight: 700,
+        ..Font::default()
+    };
+    for ordinal in 0..3000u32 {
+        let style = writer
+            .add_cell_style(CellStyle {
+                font: bold.clone(),
+                number_format: Some(format!("0.{}", "0".repeat(ordinal as usize % 20 + 1))),
+                text_wrap: ordinal % 2 == 0,
+                ..CellStyle::default()
+            })
+            .unwrap();
+        writer
+            .write_number_with_format(sheet, 1 + ordinal, 0, 1.0, style)
+            .unwrap();
+    }
+    // The default font's style resolves to font 0.
+    let plain = writer.add_cell_style(CellStyle::default()).unwrap();
+    writer
+        .write_number_with_format(sheet, 0, 1, 1.0, plain)
+        .unwrap();
+    let workbook = read(written(&mut writer));
+    assert_eq!(workbook.fonts().len(), 5);
+    assert_eq!(workbook.fonts()[4].name(), "Georgia");
+    let worksheet = workbook.xls_worksheet(0).unwrap();
+    let xfs = workbook.formatting().extended_formats();
+    for row in [1, 1500, 3000] {
+        let cell = worksheet.get_cell(row, 0).unwrap();
+        assert_eq!(xfs[usize::from(cell.xf_index())].font_index(), 5);
+    }
+    let cell = worksheet.get_cell(0, 1).unwrap();
+    assert_eq!(xfs[usize::from(cell.xf_index())].font_index(), 0);
 }
 
 // --- Number formats, cell formats and XF indices ---------------------------
@@ -576,8 +640,37 @@ fn cell_formats_naming_no_font_or_number_format_are_refused() {
         invalid_data(writer.add_cell_format(format));
         assert_eq!(written(&mut writer), before);
     }
+    // Identifiers through 81 are built in, as the reader resolves them.
+    for builtin in [49, 50, 56, 81] {
+        let (mut builtin_writer, sheet) = one_sheet_writer("Formats");
+        let format = builtin_writer
+            .add_cell_format(ExtendedFormat {
+                format_index: builtin,
+                ..ExtendedFormat::default()
+            })
+            .unwrap();
+        builtin_writer
+            .write_number_with_format(sheet, 1, 0, 45_000.0, format)
+            .unwrap();
+        let workbook = read(written(&mut builtin_writer));
+        let cell = workbook.xls_worksheet(0).unwrap().get_cell(1, 0).unwrap();
+        assert_eq!(
+            workbook.formatting().extended_formats()[usize::from(cell.xf_index())]
+                .number_format_id(),
+            builtin
+        );
+    }
+    invalid_data(writer.add_cell_format(ExtendedFormat {
+        format_index: 82,
+        ..ExtendedFormat::default()
+    }));
     let custom = writer.register_number_format("0.0\"k\"").unwrap();
-    let style = writer.add_cell_style(CellStyle::default()).unwrap();
+    let style = writer
+        .add_cell_style(CellStyle {
+            font: font_named("Times"),
+            ..CellStyle::default()
+        })
+        .unwrap();
     assert_eq!(style, 1);
     let format = writer
         .add_cell_format(ExtendedFormat {
@@ -1253,4 +1346,138 @@ fn a_replaced_formula_cell_writes_what_it_holds_now() {
         worksheet.get_cell(2, 0).unwrap().formula_bytes(),
         Some(expected("MAX(1,2)").as_slice())
     );
+}
+
+/// User `XFExt` records may name style, default and cell-format XFs; the
+/// writer's pivot-table XFs follow those and move as formats are added.
+#[test]
+fn xf_extensions_cannot_name_the_pivot_xfs() {
+    let (mut writer, sheet) = pivot_writer();
+    writer
+        .add_pivot_table(sheet, pivot_config("Sales", "Values"))
+        .unwrap();
+    let before = written(&mut writer);
+    for index in [21, 63, 64, 66] {
+        invalid_data(writer.set_xf_extensions(vec![XfExt::try_new(index, Vec::new()).unwrap()]));
+        assert_eq!(written(&mut writer), before);
+    }
+    writer
+        .set_xf_extensions(vec![XfExt::try_new(20, vec![ExtProp::Indent(1)]).unwrap()])
+        .unwrap();
+    let workbook = read(written(&mut writer));
+    let indices = workbook
+        .formatting()
+        .xf_extensions()
+        .iter()
+        .map(XfExt::xf_index)
+        .collect::<Vec<_>>();
+    assert_eq!(indices, [20, 64, 65, 66]);
+}
+
+/// An empty data-item name is written as absent (`cchName` 0xFFFF,
+/// [MS-XLS] 2.4.278), and the reader now reads it so.
+#[test]
+fn an_empty_data_item_name_round_trips() {
+    let (mut writer, sheet) = pivot_writer();
+    let mut config = pivot_config("Sales", "Values");
+    config.data_items[0].name = String::new();
+    writer.add_pivot_table(sheet, config).unwrap();
+    let workbook = read(written(&mut writer));
+    let table = &workbook.worksheet_pivot_tables(0).unwrap()[0];
+    assert_eq!(table.data_items[0].name, "");
+}
+
+fn grouping_config(base_items: usize) -> PivotTableConfig {
+    let mut config = pivot_config("Grouped", "Values");
+    config.fields = vec![
+        PivotFieldConfig {
+            axis: 0,
+            subtotal_count: 0,
+            subtotal_flags: 0,
+            items: Vec::new(),
+            name: None,
+            cache_name: "Base".to_string(),
+            cache_items: (0..base_items)
+                .map(|item| PivotCacheItem::from(format!("I{item}").as_str()))
+                .collect(),
+            is_numeric: false,
+            grouping: None,
+        },
+        PivotFieldConfig {
+            axis: 1,
+            subtotal_count: 0,
+            subtotal_flags: 0,
+            items: Vec::new(),
+            name: None,
+            cache_name: "Group".to_string(),
+            cache_items: Vec::new(),
+            is_numeric: false,
+            grouping: Some(litchi_xls::PivotCacheGrouping::Discrete(
+                litchi_xls::PivotCacheDiscreteGrouping {
+                    base_field_index: 0,
+                    group_items: vec!["Low".into(), "High".into()],
+                    item_to_group: (0..base_items)
+                        .map(|item| u16::from(item % 2 == 1))
+                        .collect(),
+                },
+            )),
+        },
+    ];
+    config.data_items = Vec::new();
+    config.source_data = Vec::new();
+    config.source_last_row = 0;
+    config.source_last_col = 0;
+    config
+}
+
+/// The cache stream is built when the table is added, so a grouping whose
+/// `SXGroupInfo` record (two bytes per base item) cannot fit is refused then;
+/// no API removes a pivot table, so a write-time refusal would stop every
+/// later write.
+#[test]
+fn a_pivot_cache_record_that_cannot_fit_is_refused_when_the_table_is_added() {
+    for base_items in [4111, 4112] {
+        let (mut writer, sheet) = pivot_writer();
+        writer
+            .add_pivot_table(sheet, grouping_config(base_items))
+            .unwrap();
+        let workbook = read(written(&mut writer));
+        assert_eq!(workbook.worksheet_pivot_tables(0).unwrap().len(), 1);
+    }
+    let (mut writer, sheet) = pivot_writer();
+    let before = written(&mut writer);
+    assert_eq!(
+        record_too_long(writer.add_pivot_table(sheet, grouping_config(4113))),
+        ("SXGroupInfo", 8226, 8224)
+    );
+    assert_eq!(written(&mut writer), before);
+}
+
+/// Litchi's reader reads at most 4,096 fields per view and no overlapping
+/// views on one worksheet; the writer refuses what it would not read back.
+#[test]
+fn pivot_tables_the_reader_would_refuse_are_refused_when_added() {
+    let (mut writer, sheet) = pivot_writer();
+    writer
+        .add_pivot_table(sheet, pivot_config("Sales", "Values"))
+        .unwrap();
+    let before = written(&mut writer);
+    let mut overlapping = pivot_config("Other", "Values");
+    overlapping.first_col = 1;
+    overlapping.last_col = 2;
+    overlapping.first_data_col = 2;
+    invalid_data(writer.add_pivot_table(sheet, overlapping));
+    let mut wide = pivot_config("Wide", "Values");
+    wide.first_row = 20;
+    wide.last_row = 22;
+    wide.first_header_row = 20;
+    wide.first_data_row = 21;
+    let extra = wide.fields[1].clone();
+    wide.fields.resize(4097, extra);
+    wide.source_data = Vec::new();
+    assert_eq!(
+        too_many(writer.add_pivot_table(sheet, wide)),
+        ("PivotTable fields", 4096)
+    );
+    assert_eq!(written(&mut writer), before);
 }

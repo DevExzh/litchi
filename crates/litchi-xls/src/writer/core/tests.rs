@@ -1101,15 +1101,12 @@ fn a_string_cell_longer_than_an_sst_entry_is_refused_before_any_output() {
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_string(sheet, 0, 0, "fits").unwrap();
     for value in ["x".repeat(0x1_0000), format!("{}😀", "a".repeat(0xFFFE))] {
-        writer.worksheets[sheet].cells.insert(
-            (5, 2),
-            WritableCell::new(
-                CellPos::try_new(5, 2).unwrap(),
-                CellValue::String(value),
-                0,
-                None,
-            ),
-        );
+        writer.worksheets[sheet].add_cell(WritableCell::new(
+            CellPos::try_new(5, 2).unwrap(),
+            CellValue::String(value),
+            0,
+            None,
+        ));
         let mut output = Cursor::new(Vec::new());
         let result = writer.write_to(&mut output);
         assert!(

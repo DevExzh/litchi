@@ -5,7 +5,77 @@ use super::super::{
     Writer,
 };
 use crate::error::{Error, Result};
+use crate::pivot_table::{
+    MAX_PIVOT_EXTENSION_BYTES, MAX_PIVOT_FIELDS, MAX_PIVOT_ITEMS, MAX_PIVOT_VIEWS_PER_SHEET,
+};
 use crate::writer::formatting::MAX_XF_RECORDS_WITH_XFCRC;
+
+/// Refuses a pivot table litchi's reader would refuse to read back: more
+/// fields or items than it reads in one view, more views than it reads on
+/// one worksheet, or an output range that overlaps another view's.
+fn check_reader_bounds(
+    worksheet: &super::super::WritableWorksheet,
+    config: &PivotTableConfig,
+) -> Result<()> {
+    if config.fields.len() > MAX_PIVOT_FIELDS {
+        return Err(Error::TooMany {
+            collection: "PivotTable fields",
+            limit: MAX_PIVOT_FIELDS,
+        });
+    }
+    if config
+        .fields
+        .iter()
+        .map(|field| field.items.len())
+        .sum::<usize>()
+        > MAX_PIVOT_ITEMS
+    {
+        return Err(Error::TooMany {
+            collection: "PivotTable items",
+            limit: MAX_PIVOT_ITEMS,
+        });
+    }
+    if worksheet.pivot_tables.len() >= MAX_PIVOT_VIEWS_PER_SHEET {
+        return Err(Error::TooMany {
+            collection: "PivotTable views of a worksheet",
+            limit: MAX_PIVOT_VIEWS_PER_SHEET,
+        });
+    }
+    if worksheet.pivot_tables.iter().any(|existing| {
+        config.first_row <= existing.last_row
+            && existing.first_row <= config.last_row
+            && config.first_col <= existing.last_col
+            && existing.first_col <= config.last_col
+    }) {
+        return Err(Error::InvalidData(
+            "PivotTable output range overlaps another PivotTable on the worksheet".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Refuses a view whose `QsiSXTag`, `SXViewEx9` and `SXAddl` payloads pass
+/// the bytes litchi's reader reads for one view.
+fn check_view_extension_bytes(view: &[u8]) -> Result<()> {
+    let mut offset = 0;
+    let mut extension_bytes = 0usize;
+    while let Some(header) = view.get(offset..offset + 4) {
+        let kind = u16::from_le_bytes([header[0], header[1]]);
+        let len = usize::from(u16::from_le_bytes([header[2], header[3]]));
+        if matches!(kind, 0x0802 | 0x0810 | 0x0864) {
+            extension_bytes += len;
+        }
+        offset += 4 + len;
+    }
+    if extension_bytes > MAX_PIVOT_EXTENSION_BYTES {
+        return Err(Error::RecordTooLong {
+            record: "PivotTable view extension (QsiSXTag, SXViewEx9 and SXAddl)",
+            bytes: extension_bytes,
+            limit: MAX_PIVOT_EXTENSION_BYTES,
+        });
+    }
+    Ok(())
+}
 
 impl Writer {
     /// Add a pivot table definition to a worksheet.
@@ -38,9 +108,11 @@ impl Writer {
         if self.fmt.xf_record_count_with(0, true) > MAX_XF_RECORDS_WITH_XFCRC {
             return Err(super::workbook::xfcrc_capacity_error());
         }
-        if sheet >= self.worksheets.len() {
-            return Err(Error::WorksheetNotFound(format!("Sheet {sheet}")));
-        }
+        let worksheet = self
+            .worksheets
+            .get(sheet)
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        check_reader_bounds(worksheet, &config)?;
 
         // Generate pivot output cells BEFORE consuming config.fields / config.data_items.
         // Excel validates that DIMENSIONS and cell content are consistent with the
@@ -134,15 +206,13 @@ impl Writer {
             page_entries: config.page_entries,
             source_data: config.source_data,
         };
-        // The workbook write emits the view with this call; running it into a
-        // sink now refuses a view no record can hold before anything changes,
-        // since no API removes a pivot table.
-        crate::writer::core::stream::write_pivot_table_view(
-            &mut std::io::sink(),
-            &table,
-            0,
-            false,
-        )?;
+        // The workbook write emits the view and the cache with these calls;
+        // running them now refuses a table no record can hold before anything
+        // changes, since no API removes a pivot table.
+        let mut view = Vec::new();
+        crate::writer::core::stream::write_pivot_table_view(&mut view, &table, 0, false)?;
+        check_view_extension_bytes(&view)?;
+        crate::writer::core::stream::write_pivot_cache(&mut std::io::sink(), &table, 1)?;
 
         let worksheet = self
             .worksheets

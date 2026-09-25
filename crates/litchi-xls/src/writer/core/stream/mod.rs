@@ -9,6 +9,6 @@ mod semantic;
 mod shared_strings;
 mod validation;
 
-pub(crate) use self::codec::{generate_workbook_stream, write_pivot_table_view};
+pub(crate) use self::codec::{generate_workbook_stream, write_pivot_cache, write_pivot_table_view};
 pub(crate) use self::semantic::WorkbookStreams;
 pub(crate) use self::shared_strings::SharedStringTable;
