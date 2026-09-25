@@ -20,6 +20,7 @@ use quick_xml::reader::NsReader;
 use super::model::{Slide, Snapshot, invalid};
 use super::patch::Patch;
 use crate::{Error, Result, SlideCopyRefusal};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MIN_SLIDE_ID: u32 = 256;
 const MAX_SLIDE_ID: u32 = 2_147_483_647;
@@ -1003,7 +1004,7 @@ fn validate_xml_surface(xml: &[u8], surface: XmlSurface) -> Result<()> {
                         "DrawingML tables can reference presentation-global style identities without an OPC edge",
                     );
                 }
-                for attribute in element.attributes() {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     let key = attribute.key.as_ref();
                     if key == b"xmlns" || key.starts_with(b"xmlns:") {
@@ -1106,7 +1107,7 @@ pub(super) fn reject_mce(xml: &[u8], context: &'static str) -> Result<()> {
                         format!("{context} contains markup-compatibility markup"),
                     );
                 }
-                for attribute in element.attributes() {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     let key = attribute.key.as_ref();
                     let is_declaration = key == b"xmlns" || key.starts_with(b"xmlns:");

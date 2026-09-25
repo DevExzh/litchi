@@ -49,6 +49,7 @@ pub(crate) use writer::{
 };
 
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::decode_xml_reference;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -458,7 +459,7 @@ fn xml_node(
     resolver: &NamespaceResolver,
 ) -> Result<XmlNode> {
     let mut attributes = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let raw_key = attribute.key.as_ref();
         if raw_key == b"xmlns" || raw_key.starts_with(b"xmlns:") {

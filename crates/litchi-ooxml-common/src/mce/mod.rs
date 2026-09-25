@@ -1,6 +1,10 @@
 //! Shared markup-compatibility preprocessing for OOXML parts.
 
 pub mod alternative;
+// The stream reads attributes with quick-xml's duplicate check off, under its
+// per-event attribute limit, and checks expanded names in a keyed set. Record
+// 0771 is rewriting that file, so record 0770 allows it here.
+#[allow(clippy::disallowed_methods)]
 pub mod stream;
 
 mod codec;

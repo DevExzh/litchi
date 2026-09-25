@@ -17,6 +17,7 @@ use quick_xml::reader::NsReader;
 
 use super::source::SourceBackedPresentationEditor;
 use crate::{Error, Result, SlideOrderRefusal};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAX_XML_DEPTH: usize = 256;
 const MAX_XML_NODES: usize = 1_000_000;
@@ -832,7 +833,7 @@ fn has_mce_attribute(
     element: &quick_xml::events::BytesStart<'_>,
     resolver: &quick_xml::name::NamespaceResolver,
 ) -> Result<bool> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;
@@ -855,7 +856,7 @@ fn has_mce_attribute(
 }
 
 fn validate_root_attributes(element: &quick_xml::events::BytesStart<'_>) -> Result<()> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let key = attribute.key.as_ref();
         if key == b"xmlns" || key.starts_with(b"xmlns:") {

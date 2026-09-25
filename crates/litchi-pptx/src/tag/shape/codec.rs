@@ -32,6 +32,7 @@ use crate::tag::{
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{OffsetLimits, active_offsets};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::{OpcPackage, PackURI, Part as OpcPart, XmlPart};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -1085,7 +1086,7 @@ pub(super) fn anchor_id(
 ) -> Result<(String, Range<usize>)> {
     let mut relationship_id = None;
     let mut qualified_name = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         if local.as_ref() != b"id" {

@@ -14,6 +14,7 @@ use super::snapshot::Snapshot;
 use super::{Commit, Patch};
 use crate::error::{Error, Result, TabEditBlock, allocation, invalid};
 use crate::{Selector, Visibility, WorksheetKind, raw};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAX_EDIT_XML_BYTES: usize = 32 * 1024 * 1024;
 const MAX_EDIT_XML_DEPTH: usize = 128;
@@ -537,7 +538,7 @@ fn observe_element(
     if matches!(owner, XmlOwner::Workbook)
         && raw::namespace::is_spreadsheetml_name(namespace, element.name(), b"workbookProtection")
     {
-        for attribute in element.attributes() {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
             if attribute.key.as_ref() != b"lockStructure" {
                 continue;

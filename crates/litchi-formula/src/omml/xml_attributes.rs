@@ -36,6 +36,8 @@ const LINEAR_NAMES: usize = 32;
 /// tag without duplicate names this yields exactly what `tag.attributes()`
 /// yields.
 #[must_use]
+// quick-xml's iterator with its duplicate check off: this module checks.
+#[allow(clippy::disallowed_methods)]
 pub(crate) fn first_wins<'a>(tag: &'a BytesStart<'_>) -> FirstWins<'a> {
     let mut attributes = tag.attributes();
     attributes.with_checks(false);
@@ -118,6 +120,7 @@ mod tests {
 
     type Item = Result<(Vec<u8>, Vec<u8>), AttrError>;
 
+    #[allow(clippy::disallowed_methods)]
     fn checked(tag: &BytesStart<'_>) -> Vec<Item> {
         tag.attributes()
             .map(|item| {

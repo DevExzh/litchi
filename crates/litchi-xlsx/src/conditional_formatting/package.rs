@@ -13,6 +13,7 @@ use super::model::{
     Association, Color, ColorRole, DifferentialRef, Formatting, Payload, Rule, Source, Value,
 };
 use crate::error::{Error, Result, allocation, invalid};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -670,7 +671,7 @@ fn reject_compatibility_attributes(
     element: &BytesStart<'_>,
     resolver: &NamespaceResolver,
 ) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         if exact(&namespace, MCE) || exact(&namespace, X14) {
@@ -773,7 +774,7 @@ fn validate_owner_element(
         b"color" => &[b"rgb", b"indexed", b"theme", b"tint", b"auto"],
         _ => return Err(invalid("unknown conditional-formatting owner element")),
     };
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let name = attribute.key.as_ref();
         if name == b"xmlns" || name.starts_with(b"xmlns:") {

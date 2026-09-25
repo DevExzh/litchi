@@ -6,6 +6,7 @@
 
 use super::super::model::{Child, Conformance, Frameset, Settings};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::Part;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -66,7 +67,7 @@ pub(super) fn required_relationship_id(
     const STRICT_RELATIONSHIPS: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships";
 
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"id" {
             continue;

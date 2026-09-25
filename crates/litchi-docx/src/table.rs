@@ -19,6 +19,7 @@ use crate::namespace::{
 use crate::paragraph::{Paragraph, extract_word_text};
 use crate::revision::Revision;
 use litchi_core::XmlSlice;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use smallvec::SmallVec;
@@ -127,7 +128,7 @@ fn word_cell_property_value(
                     }
                 };
                 let mut value = None;
-                for attribute in element.attributes() {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     if attribute.key.local_name().as_ref() == b"val" {
                         let raw = std::str::from_utf8(attribute.value.as_ref())

@@ -7,6 +7,7 @@ use super::{
 };
 use crate::error::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::{OpcPackage, OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart, PackURI};
 use quick_xml::{events::Event, reader::NsReader};
 use std::collections::{HashMap, HashSet};
@@ -313,7 +314,7 @@ pub(super) fn prepare(
                     let namespace = reader.resolver().resolve_element(element.name()).0;
                     let core = matches!(namespace, quick_xml::name::ResolveResult::Bound(ns) if ns.as_ref() == SML.as_bytes() || ns.as_ref() == STRICT_SML.as_bytes());
                     if depth == 1 && core && element.local_name().as_ref() == b"connection" {
-                        for attr in element.attributes().with_checks(true) {
+                        for attr in element.checked_attributes() {
                             let attr = attr.map_err(xml_error)?;
                             if attr.key.as_ref() == b"id" {
                                 let value = attr
@@ -541,7 +542,7 @@ fn check_formulas(xml: &[u8]) -> Result<()> {
                     feature: "Data Model removal with unresolved consumer markup compatibility",
                 });
             }
-            for attribute in element.attributes().with_checks(true) {
+            for attribute in element.checked_attributes() {
                 let attribute = attribute.map_err(xml_error)?;
                 let element_namespace = reader.resolver().resolve_element(element.name()).0;
                 let core = matches!(element_namespace, quick_xml::name::ResolveResult::Bound(ns) if ns.as_ref() == SML.as_bytes() || ns.as_ref() == STRICT_SML.as_bytes());

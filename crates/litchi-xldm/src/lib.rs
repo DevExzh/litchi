@@ -7,6 +7,10 @@
 //! decrypted, evaluated, or used for I/O. The nested metadata owner is
 //! responsible for the typed section 2.5 model.
 
+// quick-xml's checked attribute iteration is quadratic on hostile tags; read
+// attributes through `BytesStartExt` (record 0770, workspace `clippy.toml`).
+#![cfg_attr(not(test), deny(clippy::disallowed_methods))]
+
 mod error;
 
 pub mod compression;
@@ -24,6 +28,7 @@ mod seen_names;
 mod semantic;
 mod tabular_paths;
 mod validation;
+mod xml_attributes;
 
 #[cfg(test)]
 mod tests;

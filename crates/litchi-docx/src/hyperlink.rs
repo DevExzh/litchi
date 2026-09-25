@@ -11,6 +11,7 @@
 //! This module provides types and methods for accessing hyperlinks in Word documents.
 //! Hyperlinks can point to external URLs, email addresses, or internal document locations (bookmarks).
 use crate::error::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::rel::Relationships;
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
@@ -187,7 +188,7 @@ impl Hyperlink {
                         current_anchor = None;
                         current_tooltip = None;
 
-                        for attr in e.attributes() {
+                        for attr in e.checked_attributes() {
                             let attr = attr.map_err(|error| Error::Xml(error.to_string()))?;
                             let value = attr
                                 .decoded_and_normalized_value(

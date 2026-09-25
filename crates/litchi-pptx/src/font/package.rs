@@ -15,6 +15,7 @@ use super::{
 use crate::error::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits, OffsetLimits, active_offsets};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, Part};
 use quick_xml::XmlVersion;
@@ -562,7 +563,7 @@ pub(super) fn embedding_enabled(xml: &[u8]) -> Result<bool> {
                 {
                     return Err(invalid("expected a PresentationML presentation root"));
                 }
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(xml_error)?;
                     if attribute.key.as_ref() == b"embedTrueTypeFonts" {
                         let value = attribute

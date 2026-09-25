@@ -5,6 +5,7 @@
 //! without changing the public chart model.
 
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::{SeenNames, first_wins};
 use litchi_ooxml_common::xml::{is_drawingml_chart_name, is_drawingml_name};
 use quick_xml::XmlVersion;
@@ -65,7 +66,7 @@ impl<R: BufRead> ChartXmlReader<R> {
             b"http://purl.oclc.org/ooxml/officeDocument/relationships";
 
         let mut value = None;
-        for attribute in element.attributes() {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
             if attribute.key.local_name().as_ref() != name {
                 continue;
@@ -205,7 +206,7 @@ impl<R: BufRead> ChartXmlReader<R> {
                     }
                     self.saw_root = true;
                     self.root_namespace_attributes.clear();
-                    for attribute in element.attributes() {
+                    for attribute in element.checked_attributes() {
                         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                         let name = attribute.key.as_ref();
                         if name == b"xmlns" || name.starts_with(b"xmlns:") {

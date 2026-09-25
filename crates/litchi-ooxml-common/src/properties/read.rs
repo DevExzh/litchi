@@ -9,6 +9,7 @@ use super::{
 use crate::{Error, Result};
 use litchi_opc::{OpcPackage, SourceBackedPackage};
 
+use crate::xml::attributes::BytesStartExt as _;
 use crate::xml::decode_xml_reference;
 use quick_xml::{
     XmlVersion,
@@ -385,7 +386,7 @@ fn keyword_lang(
     element: &BytesStart<'_>,
 ) -> Result<Option<keyword::Lang>> {
     let mut language = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|error| Error::Xml(format!("invalid keyword attribute: {error}")))?;
         let raw_key = attribute.key.as_ref();
@@ -515,7 +516,7 @@ fn validate_attributes(
     property: Option<CoreProperty>,
 ) -> Result<()> {
     let mut has_w3cdtf = false;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| Error::Xml(format!("invalid core property attribute: {error}")))?;
         let raw_key = attribute.key.as_ref();

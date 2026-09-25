@@ -13,6 +13,7 @@ use super::model::{
 };
 use super::patterns::{NamePattern, Patterns};
 use super::scope::{Scope, Uri, UriId, has_duplicate_prefix, sorted_prefixes};
+use crate::xml::attributes::BytesStartExt as _;
 use crate::xml_name;
 
 type R<T> = Result<T, Error>;
@@ -873,7 +874,7 @@ fn start(
         .max_attributes_per_element
         .min(ATTRIBUTES_PER_ELEMENT_CEILING);
     let mut attributes = 0usize;
-    for a in e.attributes().with_checks(true) {
+    for a in e.checked_attributes() {
         // Counted before the item is inspected: quick-xml has checked this
         // attribute's name against the tag's earlier ones, a cost that grows
         // with their number, so the limit bounds that work for the tag.

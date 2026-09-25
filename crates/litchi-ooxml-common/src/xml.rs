@@ -9,6 +9,7 @@ use quick_xml::reader::Reader;
 use thiserror::Error;
 
 use crate::binding_tracker::{BindingTracker, BindingTrackerError};
+use crate::xml::attributes::BytesStartExt as _;
 
 pub mod attributes;
 
@@ -122,7 +123,7 @@ pub fn unqualified_attribute_value(
     decoder: Decoder,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| XmlError::Malformed(error.to_string()))?;
         if attribute.key.prefix().is_none() && attribute.key.local_name().as_ref() == name {
             if value.is_some() {

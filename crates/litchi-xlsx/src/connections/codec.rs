@@ -12,6 +12,7 @@ use super::namespace::{NamespaceContext, NamespaceDecl, NamespaceLimits};
 use crate::error::{Error as XlsxError, Result as XlsxResult};
 use litchi_core::sheet::Result;
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::{
     Reader, XmlVersion,
     encoding::Decoder,
@@ -452,7 +453,7 @@ fn preflight_element(
     }
     let mut local_namespace_bytes = 0usize;
     let mut attribute_count = 0usize;
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| XlsxError::Invalid(error.to_string()))?;
         attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
             xml_resource_limit(
@@ -828,7 +829,7 @@ fn make(
         .map(|node| node.context.clone())
         .unwrap_or_else(|| NamespaceContext::root(namespace_limits));
     let mut raw = Vec::new();
-    for a in e.attributes().with_checks(true) {
+    for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
         if raw.len() >= max_attributes {
             return Err(invalid("connections XML attribute limit exceeded"));
@@ -3678,7 +3679,7 @@ fn fragment_has_default_namespace_declaration(fragment: &[u8], end: usize) -> Re
     );
     match reader.read_event() {
         Ok(Event::Start(element) | Event::Empty(element)) => {
-            for attribute in element.attributes().with_checks(true) {
+            for attribute in element.checked_attributes() {
                 if attribute.map_err(xml_error)?.key.as_ref() == b"xmlns" {
                     return Ok(true);
                 }
@@ -4901,7 +4902,7 @@ fn has_mce_namespace_declaration(source: &[u8]) -> Result<bool> {
         match reader.read_event() {
             Ok(Event::Start(element) | Event::Empty(element)) => {
                 let decoder = reader.decoder();
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(xml_error)?;
                     let key = attribute.key.as_ref();
                     if key != b"xmlns" && !key.starts_with(b"xmlns:") {

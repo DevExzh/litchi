@@ -18,6 +18,7 @@ use super::super::super::required_u32;
 use super::MCE;
 use super::snapshot::{Attribute, Tag};
 use crate::error::{Result, invalid};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) fn write_tag(
     output: &mut Vec<u8>,
@@ -75,7 +76,7 @@ pub(crate) fn tag(element: &BytesStart<'_>, decoder: Decoder) -> Result<Tag> {
         .map_err(|error| invalid(format!("worksheet element name is not UTF-8: {error}")))?
         .to_owned();
     let mut attributes = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| invalid(format!("worksheet attribute name is not UTF-8: {error}")))?
@@ -109,7 +110,7 @@ pub(crate) fn cell_tag(element: &BytesStart<'_>, decoder: Decoder) -> Result<Opt
 
     let mut r_value: Option<Cow<'_, str>> = None;
     let mut attributes: Option<Vec<Attribute>> = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let attribute_name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| invalid(format!("worksheet attribute name is not UTF-8: {error}")))?;

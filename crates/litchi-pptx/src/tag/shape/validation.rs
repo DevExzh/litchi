@@ -5,6 +5,7 @@ use crate::tag::pml;
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, OffsetLimits, active_offsets};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::Part as OpcPart;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
@@ -137,7 +138,7 @@ pub(super) fn shape_mce_capabilities() -> Capabilities {
 }
 
 pub(super) fn has_non_namespace_attrs(element: &BytesStart<'_>) -> Result<bool> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let name = attribute.key.as_ref();
         if name != b"xmlns" && !name.starts_with(b"xmlns:") {

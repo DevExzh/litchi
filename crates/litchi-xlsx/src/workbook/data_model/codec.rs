@@ -23,6 +23,7 @@ use super::{
     MAX_TIME_GROUPINGS, MAX_TOTAL_STRING_BYTES, MAX_XML_BYTES, MODEL_TIME_GROUPINGS_EXTENSION_URI,
     MODEL_TIME_GROUPINGS_NAMESPACE, SML, STRICT_SML, X15, invalid, limit, xml_error,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
 
@@ -1441,7 +1442,7 @@ pub(crate) fn rewrite_load_version(
                     && resolved(reader.resolver().resolve_element(element.name()).0)? == X15
                 {
                     let lexical = version.to_string();
-                    for attribute in element.attributes().with_checks(true) {
+                    for attribute in element.checked_attributes() {
                         let attribute = attribute.map_err(xml_error)?;
                         if attribute.key.as_ref() == b"minVersionLoad" {
                             let range = crate::source_attributes::value_span(
@@ -1552,7 +1553,7 @@ fn extension_uri(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<Option<String>> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.local_name().as_ref() == b"uri" {
             return Ok(Some(
@@ -1607,7 +1608,7 @@ fn validate_opaque_element(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -
     // their product, and this subtree has no per-tag attribute cap. The loop
     // below stops at the first duplicate.
     let mut expanded = HashSet::new();
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         // Opaque markup is retained byte-for-byte, so do not decode or
         // normalize the value. We still need to enforce XML's entity rules;
@@ -1895,7 +1896,7 @@ fn make_node(
     // Expanded names borrowed from the resolver and the tag: checking each
     // one costs O(log n), where scanning `attributes` would cost O(n).
     let mut expanded = SeenNames::new();
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let qname = item.key.as_ref();
         if qname == b"xmlns" || qname.starts_with(b"xmlns:") {
@@ -1965,7 +1966,7 @@ fn opaque_capture(
         }
     }
     let mut local: HashSet<&[u8]> = HashSet::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if let Some(prefix) = attribute.key.as_namespace_binding() {
             local.insert(match prefix {
@@ -2385,7 +2386,7 @@ fn xml_attribute_range(
     namespace: &str,
     name: &str,
 ) -> Result<Option<Range<usize>>> {
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let (attribute_namespace, local) = reader.resolver().resolve_attribute(item.key);
         if resolved(attribute_namespace)? == namespace && local.as_ref() == name.as_bytes() {

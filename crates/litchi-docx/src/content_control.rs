@@ -34,6 +34,7 @@ use crate::error::{Error, Result};
 use crate::namespace::{is_wordprocessing_namespace, word_attribute_value};
 use litchi_ooxml_common::custom_xml::valid_guid;
 use litchi_ooxml_common::mce::{self, Capabilities};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -1575,7 +1576,7 @@ fn extension_attribute_value(
     resolver: &NamespaceResolver,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != name {
             continue;
@@ -1610,7 +1611,7 @@ fn exact_extension_attribute_value(
     resolver: &NamespaceResolver,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != name {
             continue;
@@ -1834,7 +1835,7 @@ fn choice_is_supported(
     capabilities: &Capabilities,
 ) -> Result<bool> {
     let mut requires = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_ref() == b"Requires" {
             requires = Some(
@@ -1884,7 +1885,7 @@ fn extend_ignorable(
     metadata: &mut usize,
     namespace_bindings: &mut usize,
 ) -> Result<()> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"Ignorable" {
             continue;
@@ -1960,7 +1961,7 @@ fn require_ignorable_extensions(
     }
     let mut checksum_seen = false;
     let mut formatting_seen = false;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let local = attribute.key.local_name();
         let (namespace, _) = resolver.resolve_attribute(attribute.key);

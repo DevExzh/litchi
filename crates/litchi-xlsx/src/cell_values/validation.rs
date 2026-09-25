@@ -43,6 +43,7 @@ use quick_xml::reader::NsReader;
 
 use crate::error::{Error, Result, allocation, invalid};
 use crate::raw;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const TRANSITIONAL_SML: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_SML: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -479,7 +480,7 @@ fn scan_attributes(
     local: &[u8],
     refuse_relationships: bool,
 ) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid value-only XML attribute: {error}")))?;
         if !refuse_relationships {

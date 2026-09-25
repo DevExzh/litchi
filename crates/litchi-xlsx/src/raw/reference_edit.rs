@@ -16,6 +16,7 @@ use quick_xml::reader::NsReader;
 use crate::error::{Error, RenameBlock, Result, allocation, invalid};
 use crate::raw::formula;
 use crate::raw::namespace::relationship_attribute_value;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
 const SML: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -362,7 +363,7 @@ fn attribute_replacement(
     let has_relationship = (direct_carrier || hyperlink)
         && relationship_attribute_value(element, b"id", decoder, resolver)?.is_some();
     let mut changed = Vec::<(Box<str>, String)>::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| invalid(format!("sheet-reference attribute is not UTF-8: {error}")))?;
@@ -616,7 +617,7 @@ fn tag(element: &BytesStart<'_>, decoder: Decoder) -> Result<Tag> {
         })?
         .to_owned();
     let mut attributes = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| invalid(format!("sheet-reference attribute is not UTF-8: {error}")))?

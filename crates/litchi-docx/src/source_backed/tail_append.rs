@@ -47,6 +47,7 @@ use crate::settings::DocumentSettings;
 use crate::streaming::{append_character, escaped_character_len, is_plain_text_character};
 
 use super::Package;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[cfg(test)]
 mod attribute_tests;
@@ -1711,7 +1712,7 @@ fn settings_namespace_len(namespace: ResolveResult<'_>) -> usize {
 fn settings_namespace_declarations(element: &BytesStart<'_>) -> Result<(usize, usize)> {
     let mut bytes = 0usize;
     let mut count = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|_| Error::Scan("settings XML attribute is invalid".into()))?;
         let key = attribute.key.as_ref();
@@ -1767,7 +1768,7 @@ fn settings_event_owned_bytes(
             maximum: u64::MAX - 1,
         })?;
     let mut attributes = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|_| Error::Scan("settings XML attribute is invalid".into()))?;
         let key = attribute.key.as_ref();
@@ -1803,7 +1804,7 @@ fn settings_mce_directive_facts(
     let mut tokens = 0usize;
     let mut owned = 0usize;
     let mut qualified_prefix = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|_| Error::Scan("settings XML attribute is invalid".into()))?;
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
@@ -3391,7 +3392,7 @@ fn validate_xml_declaration(declaration: &BytesDecl<'_>) -> std::result::Result<
         std::str::from_utf8(declaration.as_ref()).map_err(|_| ScanError::Parser)?;
     let raw = BytesStart::from_content(declaration_text, 3);
     let mut state = 0_u8;
-    for attribute in raw.attributes().with_checks(true) {
+    for attribute in raw.checked_attributes() {
         let attribute = attribute.map_err(|_| ScanError::Parser)?;
         if attribute.key.prefix().is_some() {
             return Err(ScanError::Semantic(
@@ -3525,7 +3526,7 @@ fn validate_opaque_attributes<R>(
     // counting through quick-xml's checked iterator rescans the earlier names
     // at every repeated name, `O(n²)` on a tag of repeats.
     let mut seen = Vec::<(&[u8], &[u8])>::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|_| ScanError::Parser)?;
         validate_qname(attribute.key.as_ref())?;
         let key = attribute.key.as_ref();
@@ -3575,7 +3576,7 @@ fn validate_attributes(
     frame: FrameKind,
     word_namespace: &[u8],
 ) -> std::result::Result<(), ScanError> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|_| ScanError::Parser)?;
         validate_qname(attribute.key.as_ref())?;
         let key = attribute.key.as_ref();

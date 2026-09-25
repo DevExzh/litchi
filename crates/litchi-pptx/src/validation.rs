@@ -24,6 +24,7 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use crate::namespace;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const INGRESS: &str = "pptx.package.ingress";
 const CATALOG: &str = "pptx.package.loaded_relationships_content_types";
@@ -891,7 +892,7 @@ fn validate_attributes(
         numeric_id: None,
         relationship_id: None,
     };
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|_| XmlInspectionError::Malformed)?;
         validate_xml_text(attribute.value.as_ref())?;
         let value = attribute

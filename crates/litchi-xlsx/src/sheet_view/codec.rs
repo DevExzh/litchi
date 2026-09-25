@@ -21,6 +21,7 @@ use super::model::{
 };
 use crate::data_type_icons::ShowDataTypeIcons;
 use crate::data_type_icons::{SHOW_DATA_TYPE_ICONS_NAMESPACE, Target, codec::observe_event};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAX_VIEWS: usize = 1024;
 const MAX_SELECTION_RANGES: usize = 32_767;
@@ -898,7 +899,7 @@ fn parse_extension(element: &BytesStart<'_>, decoder: Decoder) -> Result<Extensi
 
 fn attr(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_ref() != name {
             continue;

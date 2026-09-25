@@ -36,6 +36,7 @@ use crate::document::{
 };
 
 use super::Package;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const TRANSITIONAL_WORD_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -2382,7 +2383,7 @@ impl NamespaceContext {
         }
 
         let mut namespace_attributes = Vec::new();
-        for attribute in start.attributes().with_checks(true) {
+        for attribute in start.checked_attributes() {
             let attribute = attribute.map_err(|error| {
                 Error::Document(crate::Error::Xml(format!(
                     "invalid story attribute: {error}"
@@ -2462,7 +2463,7 @@ impl NamespaceContext {
             }
         }
 
-        for attribute in start.attributes().with_checks(true) {
+        for attribute in start.checked_attributes() {
             let attribute = attribute.map_err(|error| {
                 Error::Document(crate::Error::Xml(format!(
                     "invalid story attribute: {error}"
@@ -2711,7 +2712,7 @@ fn word_attribute(
     local_name: &[u8],
 ) -> Option<Result<Vec<u8>>> {
     let mut selected = None;
-    for attribute in start.attributes().with_checks(true) {
+    for attribute in start.checked_attributes() {
         let attribute = match attribute {
             Ok(attribute) => attribute,
             Err(error) => {
@@ -4374,7 +4375,7 @@ fn reject_word_dialect_attributes(
     context: &NamespaceContext,
     word_namespace: &[u8],
 ) -> Result<()> {
-    for attribute in start.attributes().with_checks(true) {
+    for attribute in start.checked_attributes() {
         let attribute = attribute.map_err(|error| {
             Error::Document(crate::Error::Xml(format!(
                 "invalid story attribute: {error}"

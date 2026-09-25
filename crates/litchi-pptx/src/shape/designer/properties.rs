@@ -17,6 +17,7 @@ use quick_xml::reader::NsReader;
 
 use super::{DrawingProperties, Limits, P202_NAMESPACE, PROPERTIES_EXTENSION_URI};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const PML_TRANSITIONAL: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const PML_STRICT: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
@@ -943,7 +944,7 @@ fn extension_uri(
     limits: Limits,
 ) -> Result<Option<String>> {
     let mut result = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_ref() == b"uri" {
             if result.is_some() {
@@ -967,7 +968,7 @@ fn extension_uri(
 }
 
 fn has_extra_attributes(element: &BytesStart<'_>, allowed: Option<&[u8]>) -> Result<bool> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = attribute.key.as_ref();
         if is_namespace_declaration(key) || allowed.is_some_and(|allowed| key == allowed) {

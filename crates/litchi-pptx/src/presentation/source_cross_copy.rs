@@ -28,6 +28,7 @@ use sha2::{Digest, Sha256};
 use super::source::{SourceBackedPresentation, SourceBackedPresentationEditor};
 use crate::parts::{PresentationPart, SlideReference};
 use crate::{Error, Result, SlideCopyRefusal};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAX_XML_DEPTH: usize = 256;
 const MAX_XML_NODES: usize = 1_000_000;
@@ -2664,7 +2665,7 @@ fn direct_embedded_images(
                     };
                     let mut uri_seen = false;
                     let mut chart_uri_matches = false;
-                    for attribute in element.attributes() {
+                    for attribute in element.checked_attributes() {
                         check_execution(execution_context)?;
                         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                         let key = attribute.key.as_ref();
@@ -2724,7 +2725,7 @@ fn direct_embedded_images(
                     };
                     let mut chart_relationship_id = None;
                     let mut chart_relationship_key = None;
-                    for attribute in element.attributes() {
+                    for attribute in element.checked_attributes() {
                         check_execution(execution_context)?;
                         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                         let key = attribute.key.as_ref();
@@ -2882,7 +2883,7 @@ fn direct_embedded_images(
                     };
                     let mut blip_relationship_id = None;
                     let mut blip_relationship_key = None;
-                    for attribute in element.attributes() {
+                    for attribute in element.checked_attributes() {
                         check_execution(execution_context)?;
                         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                         let key = attribute.key.as_ref();
@@ -5071,7 +5072,7 @@ fn validate_xml_with_policy(
                         );
                     }
                     let mut value_seen = false;
-                    for attribute in element.attributes() {
+                    for attribute in element.checked_attributes() {
                         check_execution(execution_context)?;
                         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                         let key = attribute.key.as_ref();
@@ -5156,7 +5157,7 @@ fn validate_xml_with_policy(
                 } else {
                     None
                 };
-                for attribute in element.attributes() {
+                for attribute in element.checked_attributes() {
                     check_execution(execution_context)?;
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     attribute

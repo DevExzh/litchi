@@ -11,6 +11,7 @@ use crate::limits::{ReadLimits, ReadResource};
 use crate::packuri::PackURI;
 use crate::pkgreader::is_xml_id;
 use crate::source_backed::{PartData, SourceLineage, SourceSnapshot};
+use crate::xml_attributes::BytesStartExt as _;
 use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource, SourceVersion};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesDecl, BytesStart, Event, attributes::Attribute};
@@ -1099,7 +1100,7 @@ pub(crate) fn validate_source_declaration(
     let mut seen_encoding = false;
     let mut seen_standalone = false;
     let mut attribute_count = 0usize;
-    for attribute_result in start.attributes().with_checks(true) {
+    for attribute_result in start.checked_attributes() {
         attribute_count = attribute_count
             .checked_add(1)
             .ok_or_else(|| invalid_source("source XML declaration attribute count overflows"))?;
@@ -1177,7 +1178,7 @@ fn validate_source_element(
     let mut seen_keys: std::collections::HashSet<&[u8]> = std::collections::HashSet::new();
     let mut seen_expanded: std::collections::HashSet<(Option<&[u8]>, &[u8])> =
         std::collections::HashSet::new();
-    for attribute_result in element.attributes().with_checks(true) {
+    for attribute_result in element.checked_attributes() {
         attribute_count = attribute_count
             .checked_add(1)
             .ok_or_else(|| invalid_source("source XML attribute count overflows"))?;

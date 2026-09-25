@@ -15,6 +15,7 @@ use super::codec::{
     collapse_whitespace, is_namespace_declaration, reject_unsafe_event, xml_error,
 };
 use super::{Features, Limits, Mode, Properties, ReferenceMode};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
 
@@ -1162,7 +1163,7 @@ fn raw_extension_attributes(
 ) -> Result<(Option<String>, bool)> {
     let mut uri = None;
     let mut unknown = false;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
@@ -1187,7 +1188,7 @@ fn has_process_content(
     element: &BytesStart<'_>,
     resolver: &quick_xml::name::NamespaceResolver,
 ) -> Result<bool> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
@@ -1204,7 +1205,7 @@ fn has_process_content(
 
 fn check_attributes(element: &BytesStart<'_>, limits: &Limits) -> Result<()> {
     let mut count = 0usize;
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         attribute.map_err(xml_error)?;
         count = count
             .checked_add(1)

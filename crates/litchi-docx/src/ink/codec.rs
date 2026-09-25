@@ -16,6 +16,7 @@ use quick_xml::reader::NsReader;
 
 use crate::package::story::StoryDialect;
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const TRANSITIONAL_WORD: &[u8] = b"http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const STRICT_WORD: &[u8] = b"http://purl.oclc.org/ooxml/wordprocessingml/main";
@@ -696,7 +697,7 @@ fn choice_requires_kind(
     resolver: &NamespaceResolver,
 ) -> Option<GraphicDataKind> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.ok()?;
         if attribute.key.as_ref() != b"Requires" {
             continue;
@@ -833,7 +834,7 @@ fn read_anchor(
     relationship_namespace: &[u8],
 ) -> Result<Anchor> {
     let mut relationship_id = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"id" {
             continue;
@@ -1070,7 +1071,7 @@ fn graphic_data_kind(
     resolver: &NamespaceResolver,
 ) -> Option<GraphicDataKind> {
     let mut uri = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.ok()?;
         if attribute.key.as_ref() != b"uri" {
             continue;

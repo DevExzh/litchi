@@ -6,6 +6,9 @@
 //! crate owns bounded `XMLDSig` processing and cryptographic key handling.
 
 #![forbid(unsafe_code)]
+// quick-xml's checked attribute iteration is quadratic on hostile tags; read
+// attributes through `BytesStartExt` (record 0770, workspace `clippy.toml`).
+#![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 #![allow(
     clippy::missing_errors_doc,
     reason = "all fallible public APIs use the crate's typed Error taxonomy documented at the variant level"
@@ -27,6 +30,7 @@
 
 pub mod cfb;
 pub mod xml;
+mod xml_attributes;
 
 use chrono::DateTime;
 use p256::ecdsa::{SigningKey as EcSigningKey, VerifyingKey as EcVerifyingKey};

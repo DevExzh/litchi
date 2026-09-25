@@ -7,6 +7,7 @@ use crate::error::OpcError;
 use crate::limits::ReadResource;
 use crate::source_backed::content_types_plan::collapse_xml_token;
 use crate::source_backed::escaped_xml_attribute_len;
+use crate::xml_attributes::BytesStartExt as _;
 use litchi_core::xml::ReaderOrigin;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
@@ -403,7 +404,7 @@ pub(crate) fn without_part_overrides(
             },
             Event::Empty(element) if depth == 1 && element.local_name().as_ref() == b"Override" => {
                 let mut part_name = None;
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| {
                         OpcError::InvalidContentTypesManifest(error.to_string())
                     })?;

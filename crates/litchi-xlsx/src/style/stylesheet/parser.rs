@@ -15,6 +15,7 @@ use super::{
     Script, Styles, Underline,
 };
 use crate::error::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 
 const SPREADSHEETML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -950,7 +951,7 @@ fn parse_xf_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<Cel
 fn parse_alignment(element: &BytesStart<'_>, decoder: Decoder) -> Result<Alignment> {
     let mut alignment = Alignment::new();
     let mut seen = 0u16;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Invalid(error.to_string()))?;
         let qualified = attribute.key.as_ref();
         if qualified == b"xmlns" || qualified.starts_with(b"xmlns:") {

@@ -25,6 +25,7 @@
 /// Styles - document styles and formatting definitions.
 use crate::error::{Error, Result};
 use crate::numbering::Paragraph;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::first_wins;
 use litchi_opc::part::Part;
 use quick_xml::events::Event;
@@ -678,7 +679,7 @@ fn required_style_value(
     element: &quick_xml::events::BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<String> {
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() == b"val" {
             return attribute

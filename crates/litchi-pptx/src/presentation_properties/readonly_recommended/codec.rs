@@ -15,6 +15,7 @@ use quick_xml::{XmlVersion, encoding::Decoder, reader::NsReader};
 use super::{EXTENSION_URI, NAMESPACE};
 use crate::presentation_properties::{P_NS, P_STRICT, Properties};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) const MAX_BYTES: usize = 8 * 1024 * 1024;
 const MAX_DEPTH: usize = 128;
@@ -521,7 +522,7 @@ fn parse_value_attr(
     let raw = element.as_ref();
     let mut value = None;
     let mut span = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_ref() != b"val" {
             continue;
@@ -547,7 +548,7 @@ fn namespace_matches(namespace: &[u8], local: &[u8], expected: &[u8]) -> bool {
 }
 
 fn extension_uri(element: &BytesStart<'_>, decoder: Decoder) -> Result<String> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_ref() == b"uri" {
             return attribute

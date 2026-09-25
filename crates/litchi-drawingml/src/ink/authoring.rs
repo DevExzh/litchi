@@ -23,6 +23,7 @@ use super::{
     MAX_SOURCE_BYTES, MAX_TOKEN_BYTES, MAX_TRACES, Metadata, NAMESPACE, SemanticType, SourceSpan,
     read_metadata, read_shared,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAX_AUTHORING_BRUSHES: usize = MAX_BRUSH_PROPERTIES;
 const MAX_AUTHORING_ID_BYTES: usize = MAX_TOKEN_BYTES;
@@ -857,7 +858,7 @@ fn preflight_attributes(element: &BytesStart<'_>, limits: AuthoringLimits) -> Re
     let mut has_inkml_namespace = false;
     let mut has_msink_namespace = false;
     let mut has_emma_namespace = false;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("InkML import attribute scan failed: {error}")))?;
         count = count.checked_add(1).ok_or_else(|| {
@@ -1292,7 +1293,7 @@ fn required_attribute(
     field: &'static str,
 ) -> Result<String> {
     let mut value = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("InkML canonical attribute scan failed: {error}")))?;
         if attribute.key.as_ref() == name {

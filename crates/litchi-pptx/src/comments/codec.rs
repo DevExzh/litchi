@@ -8,6 +8,7 @@ use crate::{Error, Result};
 use chrono::{DateTime, NaiveDateTime};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -435,7 +436,7 @@ fn make_node(
         .to_owned();
     let mut attributes = Vec::new();
     let mut seen = HashSet::new();
-    for attribute_value in element.attributes().with_checks(true) {
+    for attribute_value in element.checked_attributes() {
         let attribute_value = attribute_value.map_err(xml_error)?;
         let name = std::str::from_utf8(attribute_value.key.as_ref())
             .map_err(xml_error)?

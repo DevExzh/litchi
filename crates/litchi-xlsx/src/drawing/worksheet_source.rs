@@ -23,6 +23,7 @@ use quick_xml::name::{PrefixDeclaration, QName};
 use quick_xml::reader::Reader;
 
 use crate::error::{Result, allocation, invalid};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::count_up_to;
 use litchi_ooxml_common::xml::{decode_xml_reference, is_ncname};
 
@@ -617,7 +618,7 @@ fn relationship_id(
     limits: WorksheetSourceLimits,
 ) -> Result<String> {
     let mut relationship_id = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;
@@ -681,7 +682,7 @@ impl NamespaceState {
     ) -> Result<usize> {
         let mut attributes = 0usize;
         let mut declarations = 0usize;
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
             if attribute.key.as_ref().len() > MAX_NAME_BYTES {
                 return Err(invalid("worksheet XML attribute name is too large"));
@@ -739,7 +740,7 @@ impl NamespaceState {
             .map_err(|source| allocation("worksheet namespace bindings", source))?;
         let scope = self.changes.len();
         self.scopes.push(scope);
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
             let Some(declaration) = attribute.key.as_namespace_binding() else {
                 continue;
@@ -779,7 +780,7 @@ impl NamespaceState {
         expanded
             .try_reserve_exact(count_up_to(element, max_attributes))
             .map_err(|source| allocation("worksheet expanded attribute names", source))?;
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
             if attribute.key.as_namespace_binding().is_some() {
                 continue;
@@ -881,7 +882,7 @@ fn validate_declaration(declaration: &BytesDecl<'_>) -> Result<()> {
     let start = BytesStart::from_content(content, 3);
     let mut state = 0u8;
     let mut attributes = 0usize;
-    for attribute in start.attributes().with_checks(true) {
+    for attribute in start.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("worksheet XML declaration is invalid: {error}")))?;
         attributes = attributes

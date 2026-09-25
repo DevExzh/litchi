@@ -8,6 +8,7 @@ use crate::{Error, Result};
 use chrono::{DateTime, NaiveDateTime};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -477,7 +478,7 @@ fn root_namespaces(
 ) -> Result<Vec<Namespace>> {
     let mut output = Vec::new();
     let mut seen = HashSet::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = std::str::from_utf8(attribute.key.as_ref()).map_err(xml_error)?;
         if key != "xmlns" && !key.starts_with("xmlns:") {
@@ -506,7 +507,7 @@ fn known_attributes(
 ) -> Result<Vec<(String, String)>> {
     let mut output = Vec::new();
     let mut seen = HashSet::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = std::str::from_utf8(attribute.key.as_ref()).map_err(xml_error)?;
         if key == "xmlns" || key.starts_with("xmlns:") {
@@ -545,7 +546,7 @@ fn extension_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<()
 }
 
 fn validate_any_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let value = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)

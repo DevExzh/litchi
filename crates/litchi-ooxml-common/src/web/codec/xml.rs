@@ -7,6 +7,7 @@ use super::super::{
 use super::super::{Event, Reader, XmlVersion};
 use super::semantic::{enforce_count_with, escape_attr, invalid, limit, parse_bool};
 use crate::mce::process_markup_compatibility;
+use crate::xml::attributes::BytesStartExt as _;
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use std::collections::{HashMap, HashSet};
@@ -318,7 +319,7 @@ fn used_namespace_prefixes(raw: &[u8]) -> Result<HashSet<String>> {
                     .map_err(|error| Error::Xml(error.to_string()))?;
                 let (prefix, _) = split_qname(name);
                 prefixes.insert(prefix.to_owned());
-                for attribute in element.attributes() {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     let name = std::str::from_utf8(attribute.key.as_ref())
                         .map_err(|error| Error::Xml(error.to_string()))?;
@@ -567,7 +568,7 @@ pub(in crate::web) fn push_element(
     let mut local_namespaces = HashMap::new();
     let mut raw_attributes = Vec::new();
     let mut declared_prefixes = HashSet::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| Error::Xml(error.to_string()))?

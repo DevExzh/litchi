@@ -20,6 +20,7 @@ use super::schema::{
     SUMMARY_FORMAT_ID, VT_NS, checked_depth, checked_increment, checked_total, count_node, invalid,
     limit,
 };
+use crate::xml::attributes::BytesStartExt as _;
 use crate::{Error, Result};
 
 struct PendingProperty {
@@ -396,7 +397,7 @@ fn validate_root(
         )));
     }
     let mut count = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         count = checked_increment(count, "custom-properties XML attributes")?;
         if count > MAX_ATTRIBUTES {
             return Err(limit(
@@ -435,7 +436,7 @@ fn parse_property_attributes(
     let mut pid = None;
     let mut format_id = None;
     let mut count = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         count = checked_increment(count, "custom-properties XML attributes")?;
         if count > MAX_ATTRIBUTES {
             return Err(limit(
@@ -502,7 +503,7 @@ fn parse_property_attributes(
 
 fn validate_value_attributes(element: &BytesStart<'_>) -> Result<()> {
     let mut count = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         count = checked_increment(count, "custom-properties XML attributes")?;
         if count > MAX_ATTRIBUTES {
             return Err(limit(

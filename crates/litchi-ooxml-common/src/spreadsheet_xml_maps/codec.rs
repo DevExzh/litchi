@@ -10,6 +10,7 @@ use super::model::{
 };
 use super::validation::{validate_xml_map_info_ref_with_limits, validate_xml_map_info_with_limits};
 use crate::Result;
+use crate::xml::attributes::BytesStartExt as _;
 use crate::xml::attributes::first_wins;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -703,7 +704,7 @@ fn required_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8]) -> Result<String> {
 }
 fn optional_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8]) -> Result<Option<String>> {
     let mut value = None;
-    for a in e.attributes().with_checks(true) {
+    for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
         if a.key.as_ref() == n {
             if value.is_some() {
@@ -771,7 +772,7 @@ fn required_u32_attr(e: &BytesStart<'_>, d: Decoder, n: &[u8]) -> Result<u32> {
     })
 }
 fn only_attrs(e: &BytesStart<'_>, allowed: &[&[u8]]) -> Result<()> {
-    for a in e.attributes().with_checks(true) {
+    for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
         let k = a.key.as_ref();
         if k == b"xmlns" || k.starts_with(b"xmlns:") {
@@ -788,7 +789,7 @@ fn only_attrs(e: &BytesStart<'_>, allowed: &[&[u8]]) -> Result<()> {
 }
 fn namespace_attributes(e: &BytesStart<'_>, d: Decoder) -> Result<Vec<(String, String)>> {
     let mut values = Vec::new();
-    for a in e.attributes().with_checks(true) {
+    for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
         let key = std::str::from_utf8(a.key.as_ref()).map_err(xml_error)?;
         if key == "xmlns" || key.starts_with("xmlns:") {

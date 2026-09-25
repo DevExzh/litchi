@@ -18,6 +18,7 @@
 )]
 use super::*;
 
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::decode_xml_reference;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -83,7 +84,7 @@ impl Field {
                             let mut dirty = None;
                             let mut locked = None;
 
-                            for attr in e.attributes() {
+                            for attr in e.checked_attributes() {
                                 let attr = attr
                                     .map_err(|error| Error::Xml(error.to_string()))?;
                                 let value = attr
@@ -1349,7 +1350,7 @@ impl PendingSimpleField {
         let mut instruction = None;
         let mut dirty = false;
         let mut locked = false;
-        for attribute in element.attributes() {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
             let value = attribute
                 .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)

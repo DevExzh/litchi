@@ -29,6 +29,7 @@ use litchi_drawingml::diagram::{
     STRICT_DIAGRAM_LAYOUT_REL, STRICT_DIAGRAM_QUICK_STYLE_REL,
 };
 use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::part::Part;
 use litchi_opc::{OpcPackage, PackURI};
@@ -515,7 +516,7 @@ fn rel_ids(
     conformance: DiagramConformance,
 ) -> Result<DiagramAnchor> {
     let mut anchor = DiagramAnchor::default();
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let raw = item.key.as_ref();
         if raw == b"xmlns" || raw.starts_with(b"xmlns:") {
@@ -544,7 +545,7 @@ fn rel_ids(
 }
 
 fn attribute(element: &BytesStart<'_>, name: &str) -> Result<Option<String>> {
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         if item.key.local_name().as_ref() == name.as_bytes() {
             let value = std::str::from_utf8(item.value.as_ref()).map_err(xml_error)?;

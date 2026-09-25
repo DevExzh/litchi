@@ -22,6 +22,7 @@ use quick_xml::{
 };
 
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// `[MS-ODRAWXML]` §2.44 target namespace.
 pub const NAMESPACE: &str = "http://schemas.microsoft.com/office/drawing/2015/06/chart";
@@ -415,7 +416,7 @@ fn preflight_namespace_limits(xml: &[u8]) -> Result<()> {
             Event::Start(element) | Event::Empty(element) => {
                 validate_qname_prefix(element.name().into_inner())?;
                 let mut declarations = 0usize;
-                for raw_attribute in element.attributes() {
+                for raw_attribute in element.checked_attributes() {
                     let attribute = raw_attribute.map_err(xml_error)?;
                     validate_qname_prefix(attribute.key.into_inner())?;
                     if !is_namespace_attribute(attribute.key) {
@@ -524,7 +525,7 @@ fn local_namespace_prefixes(xml: &[u8]) -> Result<Vec<Vec<u8>>> {
         .map_err(xml_event_error)?;
     match event {
         Event::Start(element) | Event::Empty(element) => {
-            for raw_attribute in element.attributes() {
+            for raw_attribute in element.checked_attributes() {
                 let attribute = raw_attribute.map_err(xml_error)?;
                 if !is_namespace_attribute(attribute.key) {
                     continue;
@@ -677,7 +678,7 @@ fn attribute_projection(
     reader: &NsReader<&[u8]>,
 ) -> Result<ParsedAttribute> {
     let mut selected = None;
-    for raw_attribute in element.attributes() {
+    for raw_attribute in element.checked_attributes() {
         let attribute = raw_attribute.map_err(xml_error)?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace_matches = match namespace {
@@ -1230,7 +1231,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
 }
 
 fn only_namespace_attributes(element: &BytesStart<'_>) -> Result<bool> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if !is_namespace_attribute(attribute.key) {
             return Ok(false);
@@ -1272,7 +1273,7 @@ fn validate_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> Re
     let mut count = 0usize;
     let mut seen = HashSet::<&[u8]>::new();
     let mut expanded = HashSet::<(Vec<u8>, Vec<u8>)>::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         count = count
             .checked_add(1)
             .ok_or_else(|| invalid("formatcode2 attribute count overflow"))?;
@@ -1429,7 +1430,7 @@ fn validate_declaration(declaration: &BytesDecl<'_>) -> Result<()> {
     let mut seen_encoding = false;
     let mut seen_standalone = false;
     let mut phase = 0u8;
-    for raw_attribute in start.attributes() {
+    for raw_attribute in start.checked_attributes() {
         let attribute = raw_attribute.map_err(xml_error)?;
         match attribute.key.as_ref() {
             b"version" => {

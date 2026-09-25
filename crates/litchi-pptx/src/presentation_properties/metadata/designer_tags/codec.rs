@@ -10,6 +10,7 @@ use quick_xml::reader::NsReader;
 use super::{Limits, Tag, Tags};
 use crate::shape::designer::{P202_NAMESPACE, TAGS_EXTENSION_URI};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const PML_STRICT: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
@@ -499,7 +500,7 @@ fn attributes(
     let mut uri = None;
     let mut namespace_declarations = Vec::new();
     let mut non_namespace = 0usize;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_ref().len() > limits.attribute_bytes()
             || attribute.value.len() > limits.attribute_bytes()

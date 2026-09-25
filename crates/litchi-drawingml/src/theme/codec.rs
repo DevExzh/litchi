@@ -15,6 +15,7 @@ use super::model::{
     Color, Face, FontSet, Override, Palette, Slot, System, Theme, validate_fonts, validate_name,
     validate_palette,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub const NAMESPACE: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
 pub const STRICT_NAMESPACE: &str = "http://purl.oclc.org/ooxml/drawingml/main";
@@ -1170,7 +1171,7 @@ fn ensure_supported_attributes(
     allowed: &[&[u8]],
     source_namespace: &[u8],
 ) -> Result<()> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let key = attribute.key.as_ref();
         if key == b"xmlns" || key.starts_with(b"xmlns:") {

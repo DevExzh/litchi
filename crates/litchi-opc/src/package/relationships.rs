@@ -7,6 +7,7 @@ use super::{
 };
 use crate::rel::Relationships;
 use crate::source_backed::escaped_xml_attribute_len;
+use crate::xml_attributes::BytesStartExt as _;
 use crate::{
     OpcError, OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart, PackURI, ReadLimits,
     ReadResource, Result, TargetMode,
@@ -859,7 +860,7 @@ fn relationship_id(
     element: &quick_xml::events::BytesStart<'_>,
     decoder: quick_xml::Decoder,
 ) -> Result<String> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         if attribute.key.as_ref() == b"Id" {
             return attribute
@@ -965,7 +966,7 @@ impl OwnedRelationships {
                 Event::Start(element) | Event::Empty(element) => {
                     if depth == 1 && element.local_name().as_ref() == b"Relationship" {
                         let mut remove = false;
-                        for attribute in element.attributes().with_checks(true) {
+                        for attribute in element.checked_attributes() {
                             let attribute =
                                 attribute.map_err(|error| invalid(error.to_string()))?;
                             if attribute.key.as_ref() == b"Id" {
@@ -1590,7 +1591,7 @@ fn check_relationship_attributes(
     decoder: quick_xml::Decoder,
     limits: ReadLimits,
 ) -> Result<()> {
-    for attribute_result in element.attributes() {
+    for attribute_result in element.checked_attributes() {
         let attribute = attribute_result.map_err(|error| invalid(error.to_string()))?;
         limits.check(
             ReadResource::XmlAttributeBytes,

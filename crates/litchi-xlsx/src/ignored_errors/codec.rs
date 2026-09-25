@@ -8,6 +8,7 @@ use crate::error::{Error, Result};
 use crate::raw::namespace::is_spreadsheetml_name;
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
 use litchi_ooxml_common::private::{in_scope_declarations, with_in_scope_namespaces};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::Writer;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -467,7 +468,7 @@ fn parse_ignored_error(
     let mut sqref = None;
     let mut flags = [false; 9];
     let mut seen_flags = [false; 9];
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
@@ -615,7 +616,7 @@ fn parse_extension(
     resolver: &NamespaceResolver,
 ) -> Result<IgnoredErrorsExtension> {
     let mut uri = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;
@@ -646,7 +647,7 @@ fn parse_extension(
 }
 
 fn reject_attributes(element: &BytesStart<'_>, name: &str) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if !is_namespace_declaration(attribute.key.as_ref()) {
             return Err(invalid(format!(

@@ -19,6 +19,7 @@ use super::model::{
     Protection, ProtectionPasswordVerifier, ProtectionRangeReference, ProtectionRangeReferenceKind,
     ProtectionRangeSqref, StrongProtectionPasswordVerifier,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 pub(crate) const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -425,7 +426,7 @@ fn parse_sheet_protection(
     let mut value = Protection::default();
     let mut credential = RawCredential::default();
     let mut seen = HashSet::new();
-    for attr in element.attributes() {
+    for attr in element.checked_attributes() {
         let attr = attr.map_err(xml_error)?;
         if namespace_declaration(attr.key.as_ref()) {
             continue;
@@ -488,7 +489,7 @@ fn parse_pending_range(
     let mut security_descriptor = None;
     let mut credential = RawCredential::default();
     let mut seen = HashSet::new();
-    for attr in element.attributes() {
+    for attr in element.checked_attributes() {
         let attr = attr.map_err(xml_error)?;
         if namespace_declaration(attr.key.as_ref()) {
             continue;
@@ -1290,7 +1291,7 @@ fn attribute(
     name: &[u8],
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attr in element.attributes() {
+    for attr in element.checked_attributes() {
         let attr = attr.map_err(xml_error)?;
         if namespace_declaration(attr.key.as_ref()) {
             continue;

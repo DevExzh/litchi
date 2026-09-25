@@ -49,6 +49,7 @@ use crate::source_attributes::{
     append_escaped_xstring, escaped_xstring_len, try_escaped_xstring, validate_xml_characters,
     value_span,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 mod relationships;
 use relationships::RelationshipIndex;
@@ -5983,7 +5984,7 @@ fn begin_namespace_scope(
         .ok_or_else(|| invalid("PivotTable XML namespace depth overflows"))?;
     resolver.set_level(level);
     let mut declarations = 0usize;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let key = attribute.key.as_ref();
         validate_qname(key, limits, "PivotTable XML namespace declaration")?;
@@ -6054,7 +6055,7 @@ fn parse_ignorable_namespaces(
     limits: XmlScanLimits,
 ) -> Result<Vec<NamespaceRef>> {
     let mut namespaces: Vec<NamespaceRef> = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let (resolved, local) = resolver.resolve_attribute(attribute.key)?;
         if local.as_ref() != b"Ignorable" {
@@ -6216,7 +6217,7 @@ fn parse_attrs(
     limits: XmlScanLimits,
 ) -> Result<Vec<XmlAttribute>> {
     let mut attrs = Vec::<XmlAttribute>::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let key_bytes = attribute.key.as_ref();
         validate_qname(key_bytes, limits, "PivotTable XML attribute")?;

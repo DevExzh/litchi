@@ -23,6 +23,7 @@ use super::{
     MAX_COMMENTS, MAX_EXTENSION_BYTES, MAX_EXTENSIONS, MAX_MENTIONS, MAX_PART_BYTES, MAX_PERSONS,
     MAX_XML_DEPTH,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2018/threadedcomments";
 const XML_HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#;
@@ -715,7 +716,7 @@ fn raw_attributes(
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<Vec<RawAttribute>> {
     let mut attributes = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Encoding(error.to_string()))?;
         let name = attribute.key.as_ref();
         if name == b"xmlns" || known.iter().any(|item| *item == name) {

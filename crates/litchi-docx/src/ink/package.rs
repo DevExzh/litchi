@@ -20,6 +20,7 @@ use super::trace::{self, Channel, TraceFormat};
 use super::{Annotation, CONTENT_TYPE, Limits, Location, Snapshot};
 use crate::package::story::{StoryDialect, StoryKind, capture};
 use crate::{Error, Package, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const STRICT_CUSTOM_XML: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/customXml";
 const MAX_PROFILE_ATTRIBUTES: usize = 256;
@@ -1109,7 +1110,7 @@ fn is_profile_brush_property(name: &str) -> bool {
 
 fn emma_mode_is_ink(element: &BytesStart<'_>, resolver: &NamespaceResolver) -> Result<bool> {
     let mut mode = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if local.as_ref() != b"mode"
@@ -1135,7 +1136,7 @@ fn emma_mode_is_ink(element: &BytesStart<'_>, resolver: &NamespaceResolver) -> R
 
 fn validate_profile_attributes(element: &BytesStart<'_>) -> Result<()> {
     let mut count = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         count = count.checked_add(1).ok_or_else(|| {
             exceeded(
@@ -1209,7 +1210,7 @@ fn record_projection(
 
 fn xml_id(element: &BytesStart<'_>) -> Result<Option<String>> {
     let mut result = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_ref() != b"xml:id" {
             continue;
@@ -1229,7 +1230,7 @@ fn xml_id(element: &BytesStart<'_>) -> Result<Option<String>> {
 
 fn profile_attr(element: &BytesStart<'_>, name: &[u8]) -> Result<Option<String>> {
     let mut result = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.prefix().is_some() || attribute.key.local_name().as_ref() != name {
             continue;

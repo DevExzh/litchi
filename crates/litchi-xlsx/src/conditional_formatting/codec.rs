@@ -28,6 +28,7 @@ use std::borrow::Cow;
 
 use std::collections::{HashMap, HashSet};
 
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use smallvec::SmallVec;
 use std::fmt;
 
@@ -1302,7 +1303,7 @@ fn valid_cell(raw: &str) -> bool {
 }
 fn optional_attr(e: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<String>> {
     let mut value = None;
-    for a in e.attributes().with_checks(true) {
+    for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
         if a.key.local_name().as_ref() == name {
             if value.is_some() {

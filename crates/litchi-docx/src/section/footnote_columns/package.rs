@@ -28,6 +28,7 @@ use quick_xml::reader::NsReader;
 
 use super::codec::Context;
 use super::transaction::Snapshot;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAX_PART_NODES: usize = 1_000_000;
 const MAX_PART_DEPTH: usize = 128;
@@ -172,7 +173,7 @@ fn direct_ignorable(
     decoder: Decoder,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"Ignorable" {
             continue;

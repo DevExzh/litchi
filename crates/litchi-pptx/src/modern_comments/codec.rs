@@ -8,6 +8,7 @@ mod authors {
     use super::super::{MAX_AUTHORS, MAX_BYTES, MAX_DEPTH, MAX_NODES, MAX_STRING_BYTES, P188};
     use crate::{Error, Result};
     use litchi_core::xml::ReaderOrigin;
+    use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
     use litchi_ooxml_common::{custom_xml::valid_guid, mce::process_ooxml};
     use quick_xml::encoding::Decoder;
     use quick_xml::events::{BytesStart, Event};
@@ -327,7 +328,7 @@ mod authors {
         allowed: &[&str],
     ) -> Result<HashMap<String, String>> {
         let mut values = HashMap::new();
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             let key = decode_name(attribute.key.as_ref())?;
             if is_namespace_attribute(&key) {
@@ -349,7 +350,7 @@ mod authors {
     }
 
     fn validate_any_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             let value = attribute
                 .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
@@ -360,7 +361,7 @@ mod authors {
     }
 
     fn no_non_namespace_attributes(element: &BytesStart<'_>) -> Result<()> {
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             if !is_namespace_attribute(&decode_name(attribute.key.as_ref())?) {
                 return Err(invalid(
@@ -377,7 +378,7 @@ mod authors {
         exclude_prefix: Option<&str>,
     ) -> Result<Vec<NamespaceDeclaration>> {
         let mut result = Vec::new();
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             let key = decode_name(attribute.key.as_ref())?;
             let prefix = if key == "xmlns" {

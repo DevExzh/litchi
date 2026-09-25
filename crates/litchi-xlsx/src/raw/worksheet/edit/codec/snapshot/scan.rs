@@ -25,6 +25,7 @@ use crate::raw::worksheet::{
     lane, merge_successor, optional_bool, optional_u32, parse_a1, parse_one_based_row, x14ac,
 };
 use crate::{error::allocation, merge};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FrameKind {
@@ -1729,7 +1730,7 @@ fn shared_formula_attributes_supported(element: &BytesStart<'_>) -> Result<bool>
     let mut seen_t = false;
     let mut seen_ref = false;
     let mut seen_si = false;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;

@@ -13,6 +13,7 @@ use quick_xml::reader::NsReader;
 use super::model::{Id, Shape, State};
 use super::{CREATION_EXTENSION_URI, MODIFICATION_EXTENSION_URI, NAMESPACE};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
@@ -569,7 +570,7 @@ fn finish(
 
 fn parse_id(element: &BytesStart<'_>, decoder: quick_xml::encoding::Decoder) -> Result<Id> {
     let mut value = None;
-    for attribute_result in element.attributes().with_checks(true) {
+    for attribute_result in element.checked_attributes() {
         let parsed_attribute = attribute_result.map_err(|error| Error::Xml(error.to_string()))?;
         let name = parsed_attribute.key.as_ref();
         if name == b"xmlns" || name.starts_with(b"xmlns:") {

@@ -22,6 +22,7 @@ use super::{
 };
 use crate::comments::{MAX_DEPTH, MAX_NODES, MAX_PART_BYTES, MAX_STRING_BYTES, PML, STRICT_PML};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) const MAX_OFFSETS: usize = MAX_NODES;
 
@@ -997,7 +998,7 @@ fn make_node(
     let mut spans = AttributeSpans::new(element.as_ref());
     let mut attrs = Vec::new();
     let mut seen = HashSet::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = String::from_utf8(attribute.key.as_ref().to_vec())
             .map_err(|_| invalid("legacy comment collaboration attribute is not UTF-8"))?;

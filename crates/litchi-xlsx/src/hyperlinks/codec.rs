@@ -10,6 +10,7 @@ use quick_xml::reader::{NsReader, Reader};
 
 use super::model::{Hyperlink, HyperlinkReference, validate_text};
 use crate::error::{Result, allocation, invalid};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const TRANSITIONAL_MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_MAIN: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -370,7 +371,7 @@ fn require_name(
 }
 
 fn validate_container_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid XLSX hyperlinks attribute: {error}")))?;
         validate_raw_name(attribute.key.as_ref(), "hyperlinks attribute name")?;
@@ -407,7 +408,7 @@ fn push_hyperlink(
     let mut location = None;
     let mut display = None;
     let mut tooltip = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid XLSX hyperlink attribute: {error}")))?;
         validate_raw_name(attribute.key.as_ref(), "hyperlink attribute name")?;
@@ -651,7 +652,7 @@ fn validate_exclusive_relationship_references(
             .map_err(|error| invalid(format!("invalid XLSX worksheet hyperlink XML: {error}")))?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| {
                         invalid(format!(
                             "invalid XLSX worksheet relationship attribute: {error}"
@@ -704,7 +705,7 @@ fn read_relationship_id(
     element: &BytesStart<'_>,
     conformance: Conformance,
 ) -> Result<Option<String>> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid XLSX hyperlink attribute: {error}")))?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
@@ -1242,7 +1243,7 @@ fn root_namespace(element: &BytesStart<'_>) -> Result<&'static str> {
         .split(|byte| *byte == b':')
         .next()
         .unwrap_or_default();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid XLSX worksheet root attribute: {error}")))?;
         if attribute.key.as_ref() == b"xmlns"

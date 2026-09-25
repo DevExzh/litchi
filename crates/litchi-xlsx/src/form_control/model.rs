@@ -17,6 +17,7 @@ use super::{
     MAX_FORMULA_BYTES, MAX_ITEM_VALUE_BYTES, MAX_OPAQUE_BYTES, MAX_RETAINED_BYTES, MAX_XML_DEPTH,
     MAX_XML_EVENTS, Result, allocation, invalid,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// A schema enum value that keeps a bounded unknown lexical token on read.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2399,8 +2400,7 @@ fn validate_opaque_attributes(
     resolver: &NamespaceResolver,
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<()> {
-    let mut attributes = element.attributes();
-    let attributes = attributes.with_checks(true);
+    let attributes = element.checked_attributes();
     let mut count = 0usize;
     for attribute in attributes {
         count = count

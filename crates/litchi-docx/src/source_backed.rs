@@ -103,6 +103,7 @@ use crate::variables;
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
 use litchi_core::{ExecutionContext, ExecutionError, ReadAt, Reservation, Resource, SourceVersion};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     BlobPart, PackURI, Part, PartData, PartView, SourceArtifact, SourceArtifactFingerprint,
@@ -2756,7 +2757,7 @@ fn validate_source_section_element(
 ) -> Result<()> {
     ensure_source_mce_element(resolver, decoder, namespace, element, "section inventory")?;
 
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         validate_source_section_attribute_value(attribute.value.as_ref())?;
     }
@@ -2787,7 +2788,7 @@ fn ensure_source_mce_element(
         });
     }
 
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         validate_source_attribute_value(
             attribute.value.as_ref(),

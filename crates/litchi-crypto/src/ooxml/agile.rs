@@ -29,6 +29,7 @@ use super::{
     AgileCipher, AgileHash, Error, IntegrityPolicy, IntegrityStatus, Limits, Mode, Result,
     SPEC_MAX_SPIN_COUNT, container, declared_size, malformed, password_bytes,
 };
+use litchi_ole_common::xml_attributes::BytesStartExt as _;
 
 const BLOCK: usize = 16;
 const SALT_BYTES: usize = 16;
@@ -1587,7 +1588,7 @@ fn exact_attributes(
         ));
     }
     let mut seen = 0u16;
-    for raw_attribute in element.attributes().with_checks(true) {
+    for raw_attribute in element.checked_attributes() {
         count(total, limits.max_xml_attributes, "Agile XML attributes")?;
         let attribute = raw_attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let value = attribute

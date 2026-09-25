@@ -10,6 +10,7 @@ use quick_xml::reader::NsReader;
 
 use crate::transition::{Kind, Transition};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
@@ -68,7 +69,7 @@ fn has_mce_markup(xml: &[u8]) -> Result<bool> {
                 if is_markup_element(&namespace) {
                     return Ok(true);
                 }
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     let (namespace, _) = reader.resolver().resolve_attribute(attribute.key);
                     if is_markup_element(&namespace) {
@@ -660,7 +661,7 @@ fn root_has_namespace(root: &[u8], prefix: &str, expected: &str) -> Result<bool>
         _ => return Err(invalid("AlternateContent root opening tag is unavailable")),
     };
     let expected_name = format!("xmlns:{prefix}");
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_ref() != expected_name.as_bytes() {
             continue;
@@ -1755,7 +1756,7 @@ fn validate_transition_element(
         return Err(unsupported_transition());
     };
     let mut seen = Vec::<Vec<u8>>::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_ref() == b"xmlns"
             || matches!(attribute.key.prefix(), Some(prefix) if prefix.as_ref() == b"xmlns")

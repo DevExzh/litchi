@@ -16,6 +16,7 @@ use super::model::{
     WebPublishItems, WebSourceType,
 };
 use super::model::{SML, STRICT_SML};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
 const MAX_NODES: usize = 500_000;
@@ -1165,7 +1166,7 @@ fn make_node(
     // Expanded names borrowed from the resolver and the tag: checking each
     // one costs O(log n), where scanning `attributes` would cost O(n).
     let mut expanded = SeenNames::new();
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let qname = item.key.as_ref();
         if qname == b"xmlns" || qname.starts_with(b"xmlns:") {

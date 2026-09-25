@@ -5,6 +5,7 @@
 //! particular, extension descendants are never rebuilt from a lossy tree.
 
 use super::model::{ExtensionList, Properties};
+use crate::xml::attributes::BytesStartExt as _;
 use crate::xml::attributes::count_up_to;
 use crate::{Error, Result, XmlError};
 use litchi_core::xml::ReaderOrigin;
@@ -365,7 +366,7 @@ impl NamespaceState {
             .try_reserve(1)
             .map_err(|source| allocation("Custom Data XML namespace scopes", source))?;
         self.scopes.push((self.bindings.len(), self.bytes));
-        for item in element.attributes().with_checks(true) {
+        for item in element.checked_attributes() {
             let item = item.map_err(xml_error)?;
             let key = item.key.as_ref();
             let Some(prefix) = namespace_declaration_prefix(key)? else {
@@ -599,7 +600,7 @@ fn extension_root_opening(xml: &[u8], limits: &Limits) -> Result<(Range<usize>, 
         declared
             .try_reserve(attribute_count)
             .map_err(|source| allocation("Custom Data extension declarations", source))?;
-        for item in element.attributes().with_checks(true) {
+        for item in element.checked_attributes() {
             let item = item.map_err(xml_error)?;
             if let Some(prefix) = namespace_declaration_prefix(item.key.as_ref())? {
                 declared.push(prefix);
@@ -1656,7 +1657,10 @@ fn element_attributes(
     allow_inherited_namespaces: bool,
     limits: &Limits,
 ) -> Result<Vec<Attribute>> {
-    let attribute_count = element.attributes().count();
+    // Counted without quick-xml's duplicate check, which reads on after a
+    // duplicate at a cost that grows with the names before it (record 0770);
+    // `NamespaceState::enter` has refused the same count over the limit.
+    let attribute_count = count_up_to(element, limits.attributes);
     check_limit(
         limits,
         "XML attribute count",
@@ -1668,9 +1672,9 @@ fn element_attributes(
         .try_reserve(attribute_count)
         .map_err(|source| allocation("Custom Data XML attributes", source))?;
     let mut seen = HashSet::<(String, String)>::new();
-    seen.try_reserve(element.attributes().count())
+    seen.try_reserve(attribute_count)
         .map_err(|source| allocation("Custom Data XML attribute identities", source))?;
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let key = item.key.as_ref();
         check_limit(

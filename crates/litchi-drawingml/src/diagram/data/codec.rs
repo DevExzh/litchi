@@ -13,6 +13,7 @@ use super::{
     DML_NAMESPACE_STRICT, DiagramDataModel, Id, MAX_CONNECTIONS, MAX_DATA_MODEL_XML, MAX_DEPTH,
     MAX_NODES, MAX_POINTS, MAX_TEXT_BYTES, Point, PointType,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 impl DiagramDataModel {
     /// Parse a `dgm:dataModel` document (transitional or Strict namespace).
@@ -742,7 +743,7 @@ fn xml_token(value: &str) -> &str {
 /// Unnamespaced, unescaped `(local name, value)` attribute pairs.
 fn attributes(element: &BytesStart<'_>) -> Result<Vec<(String, String)>> {
     let mut values = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let raw = attribute.key.as_ref();
         if raw == b"xmlns" || raw.starts_with(b"xmlns:") {

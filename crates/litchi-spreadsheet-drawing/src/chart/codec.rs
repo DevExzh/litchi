@@ -4,6 +4,7 @@ use super::anchor::Anchor;
 use super::model::Chart;
 use crate::{Error, Result};
 use litchi_drawingml::chart::{axis::Axis, model::Chart as ChartModel, plot_area::TypeGroup};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -100,7 +101,7 @@ pub(crate) fn user_shapes_ids(xml: &[u8]) -> Result<HashSet<String>> {
                     }
                     saw_root = true;
                 }
-                for attribute_result in element.attributes() {
+                for attribute_result in element.checked_attributes() {
                     let attribute =
                         attribute_result.map_err(|error| Error::Encoding(error.to_string()))?;
                     let (attribute_namespace, _) =
@@ -651,7 +652,7 @@ pub(crate) fn fragment_ids(chart: &ChartModel) -> Result<HashSet<String>> {
                 .map_err(|error| Error::Encoding(error.to_string()))?;
             match event {
                 Event::Start(ref element) | Event::Empty(ref element) => {
-                    for attribute_result in element.attributes() {
+                    for attribute_result in element.checked_attributes() {
                         let attribute =
                             attribute_result.map_err(|error| Error::Encoding(error.to_string()))?;
                         let (attribute_namespace, _) =

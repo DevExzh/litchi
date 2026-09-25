@@ -14,6 +14,7 @@ use quick_xml::reader::NsReader;
 use crate::error::{Result, invalid};
 use crate::raw::formula;
 use crate::raw::namespace::relationship_attribute_value;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
 const SML: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -215,7 +216,7 @@ fn scan_attributes(
     let has_relationship = (direct_carrier || hyperlink)
         && relationship_attribute_value(element, b"id", decoder, resolver)?.is_some();
 
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let attribute_name = attribute.key.local_name();
         let local = std::str::from_utf8(attribute_name.as_ref()).map_err(|error| {

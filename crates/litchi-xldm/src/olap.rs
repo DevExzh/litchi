@@ -16,6 +16,7 @@ use quick_xml::reader::Reader;
 use super::metadata::{MetadataFileKind, MetadataModel};
 use super::seen_names::SeenNames;
 use super::{GeneratedNameKind, Storage, classify_generated_path};
+use crate::xml_attributes::BytesStartExt as _;
 
 const MAX_OLAP_XML_BYTES: usize = 32 * 1024 * 1024;
 const MAX_OLAP_NODES: usize = 750_000;
@@ -1109,7 +1110,7 @@ fn make_node(
     // Names borrowed from the tag: checking each one costs O(log n), where
     // scanning `attributes` would cost O(n).
     let mut seen = SeenNames::default();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = std::str::from_utf8(attribute.key.as_ref())
             .map_err(xml_error)?

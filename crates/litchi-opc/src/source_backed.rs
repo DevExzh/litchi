@@ -19,6 +19,7 @@ use crate::pkgreader::{
     ValidationCatalogError, ValidationCatalogPhase, indexed_archive_with_limits, is_xml_id,
 };
 use crate::rel::{Relationship, Relationships, TargetMode};
+use crate::xml_attributes::BytesStartExt as _;
 use crate::xml_splice::SourceXmlPart;
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
@@ -736,7 +737,7 @@ fn inspect_relationship_append_root_attributes(
     // the element's attributes.
     let mut seen_keys: HashSet<&[u8]> = HashSet::new();
     let mut seen_expanded: HashSet<(Option<&[u8]>, &[u8])> = HashSet::new();
-    for attribute_result in element.attributes() {
+    for attribute_result in element.checked_attributes() {
         attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
             relationship_manifest_append_error(
                 member_name,
@@ -857,7 +858,7 @@ fn inspect_relationship_append_child(
     // A keyed set: a list scanned per attribute costs time quadratic in
     // the element's attributes.
     let mut seen_keys: HashSet<&[u8]> = HashSet::new();
-    for attribute_result in element.attributes() {
+    for attribute_result in element.checked_attributes() {
         attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
             relationship_manifest_append_error(
                 member_name,

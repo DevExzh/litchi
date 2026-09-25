@@ -23,6 +23,7 @@ use super::{
     validate_full_slide_picture_relationships, validate_source_slide_root,
 };
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 mod owner;
 use owner::{ByteRange, ElementRange, PictureLayout};
@@ -1250,7 +1251,7 @@ fn ext_list_contains_only_svg(xml: &[u8], ext_list: &ElementRange, svg: ByteRang
         .read_event()
         .map_err(|error| Error::Xml(error.to_string()))?;
     if let Event::Start(element) | Event::Empty(element) = opening_event {
-        if element.attributes().with_checks(true).next().is_some() {
+        if element.checked_attributes().next().is_some() {
             return Ok(false);
         }
     } else {
@@ -1591,7 +1592,7 @@ fn relationship_id_is_referenced_elsewhere(
                 let in_selected_extension = selected_extension
                     .is_some_and(|range| event_start >= range.start && event_end <= range.end);
                 if !in_selected_extension {
-                    for attribute in element.attributes().with_checks(true) {
+                    for attribute in element.checked_attributes() {
                         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                         let value = attribute
                             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())

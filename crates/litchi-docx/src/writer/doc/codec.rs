@@ -14,6 +14,7 @@ use quick_xml::events::{BytesStart, Event};
 use std::fmt::Write as FmtWrite;
 
 use super::model::{MutableDocument, Protection};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 impl MutableDocument {
     pub(super) fn write_document_prefix(&self, xml: &mut String) {
@@ -188,7 +189,7 @@ fn element_preserves_space(
     inherited: bool,
 ) -> Result<bool> {
     let mut preserve = inherited;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_ref() != b"xml:space" {
             continue;
@@ -217,7 +218,7 @@ fn write_compact_start(
 ) -> Result<()> {
     output.push('<');
     push_utf8(output, element.name().as_ref())?;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         output.push(' ');
         push_utf8(output, attribute.key.as_ref())?;

@@ -11,6 +11,7 @@ use quick_xml::reader::NsReader;
 
 use crate::error::{Result, invalid};
 use litchi_ooxml_common::mce::process_str;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const TRANSITIONAL_MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_MAIN: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -313,7 +314,7 @@ fn parse_cell_watch_attributes(
     element: &BytesStart<'_>,
 ) -> Result<CellWatchReference> {
     let mut reference = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|error| invalid(format!("invalid cellWatch attribute: {error}")))?;
         if is_namespace_declaration(attribute.key.as_ref()) {
@@ -362,7 +363,7 @@ pub fn write_cell_watches(
 }
 
 fn reject_attributes(element: &BytesStart<'_>, name: &str) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|error| invalid(format!("invalid {name} attribute: {error}")))?;
         if !is_namespace_declaration(attribute.key.as_ref()) {

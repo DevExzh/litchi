@@ -16,6 +16,7 @@ use crate::content_type::{ContentType, ContentTypeMap, validate_content_type};
 use crate::error::{OpcError, Result};
 use crate::limits::{ReadLimits, ReadResource};
 use crate::packuri::PackURI;
+use crate::xml_attributes::BytesStartExt as _;
 use litchi_core::xml::ReaderOrigin;
 use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource};
 use quick_xml::XmlVersion;
@@ -767,7 +768,7 @@ fn override_part_name(
     decoder: quick_xml::Decoder,
 ) -> Result<PackURI> {
     let mut part_name = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|error| OpcError::InvalidContentTypesManifest(error.to_string()))?;
         if attribute.key.as_ref() == b"PartName" {
@@ -788,7 +789,7 @@ fn default_extension(
     element: &quick_xml::events::BytesStart<'_>,
     decoder: quick_xml::Decoder,
 ) -> Result<String> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|error| OpcError::InvalidContentTypesManifest(error.to_string()))?;
         if attribute.key.as_ref() == b"Extension" {

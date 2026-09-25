@@ -807,6 +807,10 @@ struct PlainAttributes<'a> {
     reference: Option<&'a str>,
 }
 
+// quick-xml's duplicate check is on only for tags that may declare namespaces,
+// and every path through the loop below returns at or before the second
+// attribute, so the check compares at most one pair of names (record 0770).
+#[allow(clippy::disallowed_methods)]
 fn plain_attributes<'a>(
     element: &'a BytesStart<'_>,
     _decoder: Decoder,

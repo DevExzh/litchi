@@ -23,6 +23,7 @@ use super::{MAX_INTERVALS, MAX_TYPES, valid_xml10};
 use crate::rich_values::{
     MAX_OUTPUT_BYTES, MAX_STRING_BYTES, MAX_XML_BYTES, RICH_DATA_2, SPREADSHEETML,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const TYPE_NAME_MAX_CHARS: usize = 255;
 
@@ -866,7 +867,7 @@ fn empty_target_is_in_context(stack: &[Frame], info: &ElementInfo) -> bool {
 
 fn type_name(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<String> {
     let mut result = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(super::super::xml_error)?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
@@ -904,7 +905,7 @@ fn parse_interval_attributes(
     let mut resource_id_int = None;
     let mut resource_id_str = None;
     let mut interval = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(super::super::xml_error)?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
@@ -944,7 +945,7 @@ fn no_non_namespace_attributes(
     element: &BytesStart<'_>,
     owner: &str,
 ) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(super::super::xml_error)?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;

@@ -15,6 +15,7 @@ use crate::{
 };
 
 use super::{Angle, Point, Size, Transform, validation};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// Maximum accepted serialized transform fragment.
 pub(crate) const MAX_XML_BYTES: usize = 1 << 20;
@@ -355,7 +356,7 @@ fn validate_attributes(
     allowed: &[&[u8]],
     description: &str,
 ) -> Result<()> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let raw = attribute.key.as_ref();
         if raw == b"xmlns" || raw.starts_with(b"xmlns:") {

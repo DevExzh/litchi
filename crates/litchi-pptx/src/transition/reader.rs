@@ -21,6 +21,7 @@ use super::model::{
     MAX_PRESET_NAME_BYTES, Morph, Ms, Origin, Preserved, Preset, Prism, Raw, Reveal, Ripple, Shape,
     Shred, ShredPattern, Side, Speed, Spokes, Transition,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const PRESENTATIONML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PRESENTATIONML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
@@ -476,7 +477,7 @@ fn parse_attributes(
     let mut seen_click = false;
     let mut seen_after = false;
 
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let key = attribute.key;
         let value = attribute
@@ -872,7 +873,7 @@ fn bounded_attribute_value(
     decoder: Decoder,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.prefix().is_none() && attribute.key.local_name().as_ref() == name {
             if value.is_some() {
@@ -1035,7 +1036,7 @@ fn raw_is_portable(xml: &str) -> Result<bool> {
                 if unknown_prefix_is_nonportable(&namespace) {
                     return Ok(false);
                 }
-                for attribute in element.attributes() {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     let (namespace, _) = resolver.resolve_attribute(attribute.key);
                     if unknown_prefix_is_nonportable(&namespace) {

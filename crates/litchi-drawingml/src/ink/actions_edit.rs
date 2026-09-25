@@ -30,6 +30,7 @@ use super::{
     ActionProperty, ActionType, DataChild, LengthUnit, Profile, RootChild, SourceSpan, TimeUnit,
     read_profile, read_profile_owned,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 impl ActionType {
     /// Construct a checked custom action type.
@@ -2081,7 +2082,7 @@ fn validate_payload_attributes_with_namespaces<R: std::io::BufRead>(
     // about the whole tag. Read its declarations once, on the first such
     // attribute, rather than scanning the tag again for each of them.
     let mut declared_prefixes = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
         let raw_key = attribute.key.as_ref();
         let key = std::str::from_utf8(raw_key).map_err(|error| xml_error(error.to_string()))?;
@@ -2269,7 +2270,7 @@ fn validate_payload_element(
         return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
     }
     let mut attributes = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
         attributes = attributes.checked_add(1).ok_or_else(|| {
             limit(
@@ -4506,7 +4507,7 @@ fn check_profile_attributes(
     if element.name().as_ref().len() > limits.max_scalar_bytes {
         return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
     }
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
         if attribute.key.as_ref().len() > limits.max_scalar_bytes
             || attribute.value.as_ref().len() > limits.max_scalar_bytes
@@ -5286,7 +5287,7 @@ fn index_opaque_payload(profile: &Profile, span: SourceSpan, index: &mut IdIndex
                         .checked_add(end)
                         .ok_or_else(|| invalid("ink action opaque payload offset overflow"))?,
                 );
-                for attribute in element.attributes() {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
                     let key = attribute.key.as_ref();
                     if key == b"xmlns" || key.strip_prefix(b"xmlns:").is_some() || key == b"xml:id"
@@ -5465,7 +5466,7 @@ fn index_draft_opaque_references(
             .map_err(|error| xml_error(error.to_string()))?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                for attribute in element.attributes() {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
                     let key = attribute.key.as_ref();
                     if key == b"xml:id" || key == b"xmlns" || key.strip_prefix(b"xmlns:").is_some()
@@ -5593,7 +5594,7 @@ fn collect_opaque_ids(payload: &[u8], ids: &mut Vec<Box<str>>) -> Result<()> {
             .map_err(|error| xml_error(error.to_string()))?
         {
             Event::Start(element) | Event::Empty(element) => {
-                for attribute in element.attributes() {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
                     if attribute.key.as_ref() != b"xml:id" {
                         continue;

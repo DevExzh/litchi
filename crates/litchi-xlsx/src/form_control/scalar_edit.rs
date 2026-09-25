@@ -27,6 +27,7 @@ use crate::raw;
 use crate::source_payload::SourcePayload;
 use crate::workbook::source::validate_sheet_graph;
 use crate::{Selector, WorksheetKind};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const VML_NAMESPACE: &[u8] = b"urn:schemas-microsoft-com:vml";
 const EXCEL_NAMESPACE: &[u8] = b"urn:schemas-microsoft-com:office:excel";
@@ -1502,7 +1503,7 @@ fn shape_id_matches(
     expected: &str,
 ) -> Result<bool> {
     let mut value = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         if is_namespace_declaration(attribute.key.as_ref()) {
             continue;

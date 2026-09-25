@@ -10,6 +10,7 @@ use super::model::{DateTime, Properties};
 use crate::presentation_properties::metadata::escape_xml;
 use crate::presentation_properties::metadata::is_presentationml_name;
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAX_PART_XML_BYTES: usize = 1024 * 1024;
 const MAX_XML_NODES: usize = 4096;
@@ -157,7 +158,7 @@ impl Properties {
 }
 
 fn from_root(element: &BytesStart<'_>, decoder: Decoder) -> Result<Properties> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.prefix().is_some() {
             continue;

@@ -27,6 +27,7 @@ use super::model::{
     MAX_XML, Pitch, RS, RT, Signature, Style, Table, WS, WT, XMLNS, bounded, invalid, raw, rel_ns,
     validate_attr_name, validate_table_value, word_ns,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 impl Table {
     ///
@@ -145,7 +146,7 @@ fn make_node(
     let mut scope = parent.clone();
     let mut raw = Vec::new();
     let mut names = HashSet::new();
-    for a in e.attributes().with_checks(true) {
+    for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
         let n = std::str::from_utf8(a.key.as_ref())
             .map_err(xml_error)?

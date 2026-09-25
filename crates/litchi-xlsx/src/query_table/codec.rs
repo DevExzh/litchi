@@ -16,6 +16,7 @@ use super::model::{
     Refresh, STRICT, SortBy, SortCondition, SortMethod, SortState, TRANSITIONAL, Table,
     XmlAttribute, XmlNode, invalid,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAX_PART_BYTES: usize = 8 * 1024 * 1024;
 const MAX_TEXT_BYTES: usize = 1024 * 1024;
@@ -198,7 +199,7 @@ fn make_node(
     };
     let mut attributes = Vec::new();
     let mut names = HashSet::new();
-    for attribute in start.attributes().with_checks(true) {
+    for attribute in start.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(xml_error)?

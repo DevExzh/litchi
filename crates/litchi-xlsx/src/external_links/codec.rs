@@ -23,6 +23,7 @@ use super::model::{
     Target, Workbook, X14,
 };
 use super::{invalid, limit};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 impl Link {
     /// Serialize this link as a canonical transitional `SpreadsheetML` external-link part.
@@ -2796,7 +2797,7 @@ fn bounded_relationship_attribute_value(
     description: &str,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Invalid(error.to_string()))?;
         if attribute.key.local_name().as_ref() != name {
             continue;
@@ -2853,7 +2854,7 @@ fn bounded_unqualified_attribute_value(
     description: &str,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Invalid(error.to_string()))?;
         if attribute.key.prefix().is_some() || attribute.key.local_name().as_ref() != name {
             continue;

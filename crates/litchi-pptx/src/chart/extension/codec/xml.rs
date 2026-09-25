@@ -7,6 +7,7 @@ use super::limits::{
 };
 use super::semantic::parse_data_graph;
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -517,7 +518,7 @@ pub(super) fn attributes(
     strings: &mut usize,
 ) -> Result<Vec<Attribute>> {
     let mut values = Vec::new();
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         if item.key.as_ref() == b"xmlns" || item.key.as_ref().starts_with(b"xmlns:") {
             continue;

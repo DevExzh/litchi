@@ -4,6 +4,7 @@ use crate::constants::namespace;
 use crate::error::{OpcError, Result};
 use crate::limits::{ReadLimits, ReadResource};
 use crate::packuri::PackURI;
+use crate::xml_attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -359,7 +360,7 @@ fn required_attributes(
 ) -> Result<(String, String)> {
     let mut key_value = None;
     let mut content_type = None;
-    for attribute_result in element.attributes() {
+    for attribute_result in element.checked_attributes() {
         let attribute = attribute_result?;
         limits.check(
             ReadResource::XmlAttributeBytes,

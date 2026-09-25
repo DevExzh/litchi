@@ -8,6 +8,7 @@ use super::model::{Anchor, BlackWhiteMode};
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -865,7 +866,7 @@ fn relationship_value_span(
     resolver: &quick_xml::name::NamespaceResolver,
 ) -> Result<Range<usize>> {
     let mut selected = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"id" {
             continue;
@@ -996,7 +997,7 @@ fn black_white_mode(
 ) -> Result<(Option<BlackWhiteMode>, Option<Box<[u8]>>)> {
     let mut value = None;
     let mut key = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if local.as_ref() != b"bwMode"
@@ -1023,7 +1024,7 @@ fn black_white_mode(
 
 fn validate_attributes(element: &BytesStart<'_>) -> Result<()> {
     let mut count = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         count = count
             .checked_add(1)

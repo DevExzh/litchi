@@ -16,6 +16,7 @@ use super::model::{
 use super::package::{
     SPREADSHEETML_NAMESPACE as SML, STRICT_SPREADSHEETML_NAMESPACE as SML_STRICT,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(super) const XDA: &str = "http://schemas.microsoft.com/office/spreadsheetml/2017/dynamicarray";
 const XLRD: &str = "http://schemas.microsoft.com/office/spreadsheetml/2017/richdata";
@@ -610,7 +611,7 @@ fn node(
     // Expanded names borrowed from the resolver and the tag: checking each
     // one costs O(log n), where scanning `values` would cost O(n).
     let mut expanded = SeenNames::new();
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         if item.key.as_ref() == b"xmlns" || item.key.as_ref().starts_with(b"xmlns:") {
             continue;

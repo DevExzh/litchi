@@ -20,6 +20,7 @@ use crate::Workbook;
 use crate::package::error::{Error, Result};
 use crate::raw::{Header, Limits as RawLimits, Records, Writer as BinaryWriter, kind};
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, PackURI, Part, TargetMode};
 use quick_xml::XmlVersion;
@@ -1042,7 +1043,7 @@ fn inspect_element(
         )?;
         current.endpoints.push(id);
     }
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if relationship_namespace(&resolver.resolve_attribute(attribute.key).0) {
             let value = attribute
@@ -1063,7 +1064,7 @@ fn namespace_declarations(
     decoder: quick_xml::Decoder,
 ) -> Result<BTreeMap<String, String>> {
     let mut values = BTreeMap::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| Error::Encoding(format!("namespace name is not UTF-8: {error}")))?;
@@ -1349,7 +1350,7 @@ fn rewrite_element(
     };
     let mut rewritten = BytesStart::new(element_name);
     let mut present = BTreeSet::new();
-    for attribute in source.attributes().with_checks(true) {
+    for attribute in source.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| Error::Encoding(format!("drawing attribute is not UTF-8: {error}")))?
@@ -1666,7 +1667,7 @@ fn compact_xml(source: &[u8]) -> Result<Vec<u8>> {
 }
 
 fn xml_space(element: &BytesStart<'_>) -> Result<Option<bool>> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| {
             Error::Encoding(format!(
                 "invalid chart XML attribute during compaction: {error}"

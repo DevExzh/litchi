@@ -21,6 +21,7 @@ use quick_xml::reader::{NsReader, Reader};
 
 use crate::error::{Error, Result};
 use crate::namespace::{STRICT_WORDPROCESSINGML_NAMESPACE, WORDPROCESSINGML_NAMESPACE};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const STRICT_WORDPROCESSING_DRAWING: &[u8] =
     b"http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing";
@@ -2106,7 +2107,7 @@ impl<'a> Scanner<'a> {
         element: &BytesStart<'_>,
         range: std::ops::Range<usize>,
     ) -> Result<()> {
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             let (namespace, _) = reader.resolver().resolve_attribute(attribute.key);
             let dialect = match namespace {
@@ -2524,7 +2525,7 @@ fn svg_relationship_dialect(
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 let mut dialect = None;
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(xml_error)?;
                     let local = attribute.key.local_name();
                     if local.as_ref() != b"embed" && local.as_ref() != b"link" {
@@ -2565,7 +2566,7 @@ fn relationship_dialect_for_prefix(
     decoder: Decoder,
     context: &NamespaceContext,
 ) -> Result<Option<RelationshipDialect>> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let Some(binding) = attribute.key.as_namespace_binding() else {
             continue;
@@ -2605,7 +2606,7 @@ fn extend_namespace_context(
     decoder: Decoder,
 ) -> Result<NamespaceContext> {
     let mut declarations = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let Some(prefix) = attribute.key.as_namespace_binding() else {
             continue;
@@ -2634,7 +2635,7 @@ fn extend_namespace_context(
 
 fn namespace_declaration_bytes(element: &BytesStart<'_>, decoder: Decoder) -> Result<usize> {
     let mut bytes = 0usize;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let Some(prefix) = attribute.key.as_namespace_binding() else {
             continue;
@@ -2661,7 +2662,7 @@ fn validate_attributes(
     let mut count = 0usize;
     let mut declarations = 0usize;
     let mut expanded_names: Vec<(Box<[u8]>, Box<[u8]>)> = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         count = count
             .checked_add(1)
@@ -2796,7 +2797,7 @@ fn extension_uri(element: &BytesStart<'_>, decoder: Decoder) -> Result<(bool, Bo
     let mut admitted = false;
     let mut malformed = false;
     let mut lexical = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;
@@ -2845,7 +2846,7 @@ fn relationship_attribute(
     local: &[u8],
 ) -> Result<Option<(Box<str>, RelationshipDialect)>> {
     let mut result = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.local_name().as_ref() != local {
             continue;
@@ -2886,7 +2887,7 @@ fn unqualified_attribute(
     decoder: Decoder,
 ) -> Result<Option<String>> {
     let mut result = None;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_ref() == local {
             if result.is_some() {

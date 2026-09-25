@@ -11,6 +11,7 @@ use quick_xml::reader::NsReader;
 
 use crate::error::{Result, allocation, invalid};
 use crate::web::{Binding, Bindings, MAX_BINDINGS, MAX_STRING_BYTES};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) mod check;
 
@@ -551,7 +552,7 @@ fn attribute(
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         if attribute.key.prefix().is_none() && attribute.key.local_name().as_ref() == name {
             if value.is_some() {
@@ -569,7 +570,7 @@ fn attribute(
 }
 
 fn reject_attributes(element: &BytesStart<'_>) -> Result<()> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         if !is_namespace_declaration(attribute.key.as_ref()) {
             return Err(invalid("unexpected XML attribute"));
@@ -579,7 +580,7 @@ fn reject_attributes(element: &BytesStart<'_>) -> Result<()> {
 }
 
 fn reject_other_attributes(element: &BytesStart<'_>, permitted: &[u8]) -> Result<()> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         if !is_namespace_declaration(attribute.key.as_ref())
             && (attribute.key.prefix().is_some()

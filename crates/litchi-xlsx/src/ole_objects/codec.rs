@@ -16,6 +16,7 @@ use super::model::{
     OleObjectRelationshipKind, OleObjectUpdate, OleObjects, SML, STRICT_SML, X14, validate_value,
 };
 use super::{invalid, limit, xml_error};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[derive(Clone)]
 struct Attribute {
@@ -709,7 +710,7 @@ fn raw_attribute_value(
     namespace: &str,
     name: &str,
 ) -> Result<Option<String>> {
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         if item.key.as_ref() == b"xmlns" || item.key.as_ref().starts_with(b"xmlns:") {
             continue;
@@ -736,7 +737,7 @@ fn raw_attributes(
     element: &BytesStart<'_>,
 ) -> Result<Vec<RawAttribute>> {
     let mut expanded = Vec::new();
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let qname = item.key.as_ref();
         if qname == b"xmlns" || qname.starts_with(b"xmlns:") {
@@ -1232,7 +1233,7 @@ fn make_node(
     // Expanded names borrowed from the resolver and the tag: checking each
     // one costs O(log n), where scanning `attributes` would cost O(n).
     let mut expanded = SeenNames::new();
-    for item in element.attributes().with_checks(true) {
+    for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let qname = item.key.as_ref();
         if qname == b"xmlns" || qname.starts_with(b"xmlns:") {

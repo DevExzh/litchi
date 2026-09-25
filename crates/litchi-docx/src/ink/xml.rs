@@ -10,6 +10,7 @@ use quick_xml::{
 };
 
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAX_ATTRIBUTES: usize = 256;
 const MAX_ATTRIBUTE_BYTES: usize = 1024 * 1024;
@@ -115,7 +116,7 @@ pub(super) fn element(element: &BytesStart<'_>, resolver: &NamespaceResolver) ->
 
     let mut count = 0usize;
     let mut names = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         count = count
             .checked_add(1)

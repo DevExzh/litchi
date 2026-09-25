@@ -14,6 +14,7 @@ use super::super::{
 };
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::SeenNames;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -382,7 +383,7 @@ pub(crate) fn relationship_ids_in_xml(xml: &[u8]) -> Result<HashSet<String>> {
             .map_err(xml_error)?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(xml_error)?;
                     let (namespace, _) = resolver.resolve_attribute(attribute.key);
                     if matches!(namespace, ResolveResult::Bound(Namespace(value)) if matches!(value, b"http://schemas.openxmlformats.org/officeDocument/2006/relationships" | b"http://purl.oclc.org/ooxml/officeDocument/relationships"))
@@ -574,7 +575,7 @@ fn make_node(
     // Expanded names borrowed from the resolver and the tag: checking each
     // one costs O(log n), where scanning `attrs` would cost O(n).
     let mut expanded = SeenNames::new();
-    for item in e.attributes().with_checks(true) {
+    for item in e.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let raw = item.key.as_ref();
         if raw == b"xmlns" || raw.starts_with(b"xmlns:") {

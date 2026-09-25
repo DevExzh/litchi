@@ -10,6 +10,7 @@ use crate::error::{Error, Result};
 use crate::namespace::scan_word_element_ranges;
 use crate::paragraph::extract_word_text;
 use litchi_core::XmlSlice;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::part::Part;
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -270,7 +271,7 @@ fn parse_comment_metadata(xml_bytes: &[u8]) -> Result<Option<CommentMetadata>> {
     let mut author = String::new();
     let mut initials = None;
     let mut date = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         match attribute.key.local_name().as_ref() {
             b"id" => {

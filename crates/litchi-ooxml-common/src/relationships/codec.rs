@@ -7,6 +7,7 @@ use quick_xml::events::BytesStart;
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 
 use super::Id;
+use crate::xml::attributes::BytesStartExt as _;
 
 /// Transitional OOXML relationships namespace.
 pub const TRANSITIONAL_NAMESPACE: &[u8] =
@@ -30,7 +31,7 @@ pub fn attribute_value(
     resolver: &NamespaceResolver,
 ) -> Result<Option<String>, XmlError> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| XmlError::Malformed(error.to_string()))?;
         if attribute.key.local_name().as_ref() != name {
             continue;

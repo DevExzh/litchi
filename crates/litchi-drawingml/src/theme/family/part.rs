@@ -45,6 +45,8 @@ use super::{
     NAMESPACE as FAMILY_NAMESPACE, XML_NAMESPACE, codec as family_codec,
 };
 use crate::theme::codec as theme_codec;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use litchi_ooxml_common::xml::attributes::first_wins;
 
 /// The normative extension URI from `[MS-ODRAWXML]` §2.2.8.
 pub const EXTENSION_URI: &str = FAMILY_NAMESPACE;
@@ -562,7 +564,7 @@ fn empty_container_after_removal(
     let Event::Start(element) = reader.read_event().map_err(xml_error)? else {
         return Err(invalid("Theme container opening tag is missing"));
     };
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let name = attribute.key.as_ref();
         if namespace_declaration(name).is_none() && !(extension && name == b"uri") {
@@ -1525,7 +1527,7 @@ fn validate_end_name(element: &quick_xml::events::BytesEnd<'_>) -> Result<()> {
 
 fn extension_uri(element: &BytesStart<'_>) -> Result<Option<String>> {
     let mut uri = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if attribute.key.as_ref() == b"uri" {
             if uri.is_some() {
@@ -2255,7 +2257,7 @@ fn apply_namespace_declarations(
     reader: &NsReader<&[u8]>,
 ) -> Result<usize> {
     let mut added = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let raw = attribute.key.as_ref();
         let Some(prefix) = namespace_declaration(raw) else {
@@ -2307,7 +2309,7 @@ fn validate_element_attributes(
 ) -> Result<()> {
     let mut count = 0usize;
     let mut seen = Vec::<(Vec<u8>, Vec<u8>)>::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         count += 1;
         if count > MAX_ATTRIBUTES {
@@ -2381,8 +2383,7 @@ fn namespace_declaration(raw: &[u8]) -> Option<&[u8]> {
 }
 
 fn namespace_declaration_names(element: &BytesStart<'_>) -> Vec<Vec<u8>> {
-    element
-        .attributes()
+    first_wins(element)
         .flatten()
         .filter_map(|attribute| {
             namespace_declaration(attribute.key.as_ref()).map(ToOwned::to_owned)

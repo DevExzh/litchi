@@ -14,7 +14,11 @@
 //! repeat the original's outside the one element an edit replaced.
 
 #![forbid(unsafe_code)]
+// quick-xml's checked attribute iteration is quadratic on hostile tags; read
+// attributes through `BytesStartExt` (record 0770, workspace `clippy.toml`).
+#![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 
 pub mod audit;
+mod xml_attributes;
 
 pub use xml_minifier_macros::{minified_xml, minified_xml_format, minified_xml_str};

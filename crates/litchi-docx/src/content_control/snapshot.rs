@@ -40,6 +40,7 @@ use super::{
     BindingFlavor, FORMATTING_ALLOWED_NAMESPACE, Inventory, Limits, Lock,
     STORE_ITEM_CHECKSUM_NAMESPACE, content_control_capabilities,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const WORD: &[u8] = b"http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const WORD_STRICT: &[u8] = b"http://purl.oclc.org/ooxml/wordprocessingml/main";
@@ -662,7 +663,7 @@ fn lock_value(
     resolver: &NamespaceResolver,
 ) -> Result<Lock> {
     let mut value = None;
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         if attribute.key.local_name().as_ref() != b"val" || !is_word(&namespace) {
@@ -730,7 +731,7 @@ fn mce_directives(
     let mut local_ignorable = Vec::<Vec<u8>>::new();
     let mut process = Vec::<ProcessTarget>::new();
     let mut tokens = 0usize;
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         if !is_namespace(&namespace, MCE) {
@@ -913,7 +914,7 @@ fn exact_attribute(
     let mut found = None;
     let mut count = 0usize;
     let mut attributes = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         attributes = checked_add(attributes, 1, "content-control attribute count")?;
         if attributes > MAX_ATTRIBUTES {

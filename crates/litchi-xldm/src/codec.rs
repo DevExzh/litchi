@@ -10,6 +10,7 @@ use super::model::{
 use super::semantic::parse_backup_log;
 use super::validation::{validate_allocations, validate_backup_log, validate_paths};
 use crate::error::{Error, Result, allocation};
+use crate::xml_attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
 
@@ -1325,7 +1326,7 @@ fn make_node(element: &BytesStart<'_>) -> Result<Node> {
         .map_err(xml_error)?
         .to_owned();
     let mut attributes = 0usize;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = attribute.key.as_ref();
         if key != b"xmlns" && !key.starts_with(b"xmlns:") {

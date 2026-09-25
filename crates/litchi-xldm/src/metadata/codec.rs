@@ -24,6 +24,7 @@ use super::model::{
     RelationshipPolicy,
 };
 use super::model::{hybrid_width, no_split_width};
+use crate::xml_attributes::BytesStartExt as _;
 
 const MAX_METADATA_BYTES: usize = 16 * 1024 * 1024;
 const MAX_XML_NODES: usize = 500_000;
@@ -264,7 +265,7 @@ fn make_xml_node(
     // Names borrowed from the tag: checking each one costs O(log n), where
     // scanning `attributes` would cost O(n).
     let mut seen = SeenNames::default();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let key = std::str::from_utf8(attribute.key.as_ref())
             .map_err(xml_error)?

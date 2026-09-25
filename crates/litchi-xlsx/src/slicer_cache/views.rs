@@ -2,6 +2,7 @@
 
 use crate::error::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use quick_xml::XmlVersion;
@@ -600,7 +601,7 @@ fn parse_known_attributes(
     let mut values = Vec::new();
     let mut extensions = Vec::new();
     let mut extension_bytes = 0usize;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(xml_error)?

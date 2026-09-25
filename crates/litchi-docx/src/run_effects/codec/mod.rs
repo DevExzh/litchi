@@ -30,6 +30,7 @@ use super::model::{
     Reflection, RelativeRect, RgbColor, Scene3d, SchemeColor, SchemeColorValue, Shade, Shadow,
     SphereCoords, TextFill, TextOutline,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// Word 2010 run-effect namespace.
 pub const NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2010/wordml";
@@ -329,7 +330,7 @@ fn node_from_start(
     resolver: &quick_xml::name::NamespaceResolver,
 ) -> Result<Node> {
     let mut attrs = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let key = attribute.key.as_ref();
         let local = String::from_utf8_lossy(attribute.key.local_name().as_ref()).into_owned();

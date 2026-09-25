@@ -1,6 +1,9 @@
 //! Shared OOXML functionality that is independent of DOCX, PPTX, XLSX, and XLSB.
 
 #![forbid(unsafe_code)]
+// quick-xml's checked attribute iteration is quadratic on hostile tags; read
+// attributes through `BytesStartExt` (record 0770, workspace `clippy.toml`).
+#![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 // Shared OOXML models deliberately retain schema vocabulary and ownership.
 // Retrofitting generic API heuristics here would create breaking changes for
 // every format facade without altering the bounded wire behavior.

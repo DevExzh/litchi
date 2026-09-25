@@ -18,6 +18,7 @@ use super::model::{
     ImageType, Item, Layout, Link, Owner, Percentage, Properties, Relationship, Section, Slide,
     Summary, Target, Unknown, Zoom,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) const MAX_OWNER_BYTES: usize = 64 * 1024 * 1024;
 pub(crate) const MAX_OWNER_NODES: usize = 1_000_000;
@@ -412,7 +413,7 @@ fn apply_namespace_declarations(
     namespaces: &mut HashMap<String, String>,
 ) -> Result<Vec<(String, Option<String>)>> {
     let mut changes = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let name = attribute.key.as_ref();
         let prefix = if name == b"xmlns" {
@@ -966,7 +967,7 @@ fn dom_frame(
     let local = String::from_utf8(element.local_name().as_ref().to_vec())
         .map_err(|_err| Error::Invalid("zoom DOM element name is not UTF-8".into()))?;
     let mut attrs = Vec::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;

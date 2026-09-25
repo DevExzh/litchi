@@ -21,6 +21,8 @@ use litchi_core::{
     Limits as CoreLimits, ReadAt, RepairAvailability, ValidateReport, ValidationCheck,
     ValidationIssue, ValidationLimits, ValidationReportError,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use litchi_ooxml_common::xml::attributes::first_wins;
 use litchi_opc::{
     OpcError, PartView, ReadLimits, SourceBackedPackage,
     constants::{content_type as ct, relationship_type as rt},
@@ -1094,7 +1096,7 @@ fn is_valid_xml_characters(bytes: &[u8]) -> bool {
 }
 
 fn is_valid_element_attributes(element: &quick_xml::events::BytesStart<'_>) -> bool {
-    element.attributes().with_checks(true).all(|attribute| {
+    element.checked_attributes().all(|attribute| {
         attribute.is_ok_and(|attribute| {
             is_valid_xml_characters(attribute.value.as_ref())
                 && is_valid_xml_reference_bytes(attribute.value.as_ref())
@@ -1106,7 +1108,7 @@ fn has_unknown_attribute_namespace<R: io::BufRead>(
     element: &quick_xml::events::BytesStart<'_>,
     reader: &NsReader<R>,
 ) -> bool {
-    element.attributes().with_checks(true).any(|attribute| {
+    first_wins(element).any(|attribute| {
         attribute.is_ok_and(|attribute| {
             let key = attribute.key.as_ref();
             // Namespace declarations are consumed by NsReader itself and are

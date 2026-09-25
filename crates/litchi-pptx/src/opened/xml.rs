@@ -13,6 +13,7 @@ use quick_xml::reader::NsReader;
 
 use super::model::{Slide, invalid};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAX_XML_DEPTH: usize = 256;
 const MAX_XML_NODES: usize = 1_000_000;
@@ -176,7 +177,7 @@ fn element_preserves_space(
     inherited: bool,
 ) -> Result<bool> {
     let mut preserve = inherited;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_ref() != b"xml:space" {
             continue;
@@ -205,7 +206,7 @@ fn write_compact_start(
 ) -> Result<()> {
     output.push(b'<');
     output.extend_from_slice(element.name().as_ref());
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         output.push(b' ');
         output.extend_from_slice(attribute.key.as_ref());
@@ -1153,7 +1154,7 @@ pub(crate) fn connector_connection_ids(source: &[u8]) -> Result<BTreeSet<u32>> {
                 if matches!(element.local_name().as_ref(), b"stCxn" | b"endCxn") =>
             {
                 let mut identity = None;
-                for attribute in element.attributes() {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     if attribute.key.as_ref() != b"id" {
                         continue;
@@ -1208,7 +1209,7 @@ fn write_remapped_shape_start(
     let is_identity = element.local_name().as_ref() == b"cNvPr";
     let is_connection = matches!(element.local_name().as_ref(), b"stCxn" | b"endCxn");
     let mut attributes = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let decoded = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
@@ -1568,7 +1569,7 @@ fn parse_slide_id(
         .ok_or_else(|| invalid("opened-presentation slide ID lacks r:id"))?;
     let mut relationship_attribute_name = None;
     let mut relationship_namespace = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"id" {
             continue;

@@ -36,6 +36,7 @@ use quick_xml::reader::NsReader;
 use crate::{Error, Result};
 
 use super::{AttributeSpan, Conflict, Id, Inventory, Kind, Limits, Metadata, Range, Scope, Span};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const W14: &[u8] = b"http://schemas.microsoft.com/office/word/2010/wordml";
 const W: &[u8] = b"http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -440,7 +441,7 @@ fn process_content_directives(
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
     let mut names = Vec::new();
     let per_directive_limit = limits.max_attributes.min(4096);
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         if !matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == MC)
@@ -803,7 +804,7 @@ fn push_offset(offsets: &mut Vec<u32>, start: usize, max: usize) -> Result<()> {
 
 fn validate_lexical_attributes(element: &BytesStart<'_>, limits: Limits) -> Result<()> {
     let mut count = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         count = count
             .checked_add(1)
@@ -917,7 +918,7 @@ fn range_end_id(
     let mut id = None;
     let mut span = None;
     let mut count = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|e| Error::Xml(e.to_string()))?;
         count = count
             .checked_add(1)
@@ -989,7 +990,7 @@ fn metadata(
     let mut author_span = None;
     let mut date_span = None;
     let mut count = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|e| Error::Xml(e.to_string()))?;
         count = count
             .checked_add(1)
@@ -1227,7 +1228,7 @@ fn declares_w14_ignorable(
     decoder: quick_xml::encoding::Decoder,
     resolver: &NamespaceResolver,
 ) -> Result<bool> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|e| Error::Xml(e.to_string()))?;
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         if !matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == MC)
@@ -1263,7 +1264,7 @@ fn namespace_declarations(
     declarations
         .try_reserve_exact(max.min(16))
         .map_err(alloc("conflict MCE namespace declarations"))?;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|e| Error::Xml(e.to_string()))?;
         let key = attribute.key.as_ref();
         let prefix = if key == b"xmlns" {

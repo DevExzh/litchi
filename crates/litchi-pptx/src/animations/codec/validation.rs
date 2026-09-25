@@ -6,6 +6,7 @@ use super::super::model::{
     SequenceContext,
 };
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{QName, ResolveResult};
@@ -293,7 +294,7 @@ pub(super) fn attribute(
 
 pub(super) fn check_attribute_count(element: &BytesStart<'_>) -> Result<()> {
     let mut count = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         attribute.map_err(|error| Error::Xml(error.to_string()))?;
         count += 1;
         if count > MAX_TIMING_ATTRIBUTES {

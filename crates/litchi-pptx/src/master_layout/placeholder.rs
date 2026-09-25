@@ -26,6 +26,7 @@ use super::codec::{
 use super::model::PlaceholderSpec;
 use crate::shape::{Key, PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderTypeExtension, Scene};
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const P232: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2023/02/main";
 const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -1988,7 +1989,7 @@ fn raw_prefix(name: &[u8]) -> Vec<u8> {
 fn validate_extension_uri(element: &BytesStart<'_>, decoder: Decoder) -> Result<String> {
     let uri = unqualified_attribute_value(element, b"uri", decoder)?;
     let mut seen_uri = false;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let key = attribute.key.as_ref();
         if key == b"xmlns" || key.starts_with(b"xmlns:") {

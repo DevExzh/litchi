@@ -12,6 +12,9 @@
 //! [`table::style`] owns typed table-style catalogs and their package graph.
 
 #![forbid(unsafe_code)]
+// quick-xml's checked attribute iteration is quadratic on hostile tags; read
+// attributes through `BytesStartExt` (record 0770, workspace `clippy.toml`).
+#![cfg_attr(not(test), deny(clippy::disallowed_methods))]
 #![allow(
     clippy::arbitrary_source_item_ordering,
     reason = "the public facade and OOXML models are grouped by presentation feature and schema order"

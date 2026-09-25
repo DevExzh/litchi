@@ -9,6 +9,7 @@ use crate::chart::plot_area::PlotArea;
 use crate::chart::series::{DataLabel, Marker};
 use crate::chart::types::DisplayBlanks;
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::is_drawingml_chart_name;
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
@@ -34,7 +35,7 @@ fn validate_chart_xml_fragment(xml: &[u8], expected_root: &[u8], description: &s
                 let has_expected_root =
                     is_drawingml_chart_name(&namespace, element.name(), expected_root);
                 drop(namespace);
-                for attribute in element.attributes() {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     if matches!(
                         reader.resolver().resolve_attribute(attribute.key).0,

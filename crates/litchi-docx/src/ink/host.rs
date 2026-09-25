@@ -21,6 +21,7 @@ use super::Limits;
 use super::codec::{self, Anchor, Form};
 use crate::package::story::StoryDialect;
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const TRANSITIONAL_WORD: &[u8] = b"http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const STRICT_WORD: &[u8] = b"http://purl.oclc.org/ooxml/wordprocessingml/main";
@@ -985,7 +986,7 @@ fn graphic_data_kind(
     resolver: &NamespaceResolver,
 ) -> Option<GraphicKind> {
     let mut result = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.ok()?;
         if attribute.key.as_ref() != b"uri"
             || !matches!(
@@ -1393,7 +1394,7 @@ fn validate_group_metadata(
     };
     super::xml::element(element, resolver)?;
     let mut attributes = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;
@@ -1459,7 +1460,7 @@ fn collect_attributes(
     limits: Limits,
 ) -> Result<()> {
     super::xml::element(element, resolver)?;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, element.decoder())

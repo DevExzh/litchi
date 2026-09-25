@@ -28,6 +28,7 @@ use super::host;
 use super::{Limits, xml};
 use crate::package::story::StoryDialect;
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const TRANSITIONAL_WORD: &[u8] = b"http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const STRICT_WORD: &[u8] = b"http://purl.oclc.org/ooxml/wordprocessingml/main";
@@ -1314,7 +1315,7 @@ fn fallback_image_attribute(
     dialect: StoryDialect,
 ) -> Result<Option<Range<usize>>> {
     let mut selected = None;
-    for raw_attribute in element.attributes().with_checks(true) {
+    for raw_attribute in element.checked_attributes() {
         let attribute = raw_attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         let supported =
@@ -1452,7 +1453,7 @@ fn selected_relationship_attribute(
         relationship_namespace(dialect)
     };
     let mut selected = None;
-    for raw_attribute in element.attributes().with_checks(true) {
+    for raw_attribute in element.checked_attributes() {
         let attribute = raw_attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (attribute_namespace, local) = resolver.resolve_attribute(attribute.key);
         if local.as_ref() != b"id" || !is_namespace(&attribute_namespace, relationship_namespace) {

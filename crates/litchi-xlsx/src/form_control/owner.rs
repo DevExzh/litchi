@@ -14,6 +14,7 @@
 
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     EffectiveTopology, OpcPackage, OwnedRelationships, PackURI, PartData, ReadLimits, ReadResource,
@@ -4817,7 +4818,7 @@ fn validate_namespace_bindings_and_count_events<const PRESERVE_DUPLICATE_WORK_CH
 }
 
 fn validate_namespace_declarations(element: &BytesStart<'_>) -> OwnerResult<()> {
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| owner_invalid(error.to_string()))?;
         let Some(binding) = attribute.key.as_namespace_binding() else {
             continue;
@@ -5454,7 +5455,7 @@ fn mce_choice_supported(
     limits: &OwnerLimits,
 ) -> OwnerResult<bool> {
     let mut requires = None;
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| owner_invalid(error.to_string()))?;
         if attribute.key.as_ref() == b"Requires" {
             requires = Some(decode_attribute_bounded(
@@ -5585,7 +5586,7 @@ fn reject_mixed_dialect(
             Event::Start(element) | Event::Empty(element) => {
                 let (namespace, _) = resolver.resolve_element(element.name());
                 let mut strict_attribute = false;
-                for attribute in element.attributes().with_checks(false) {
+                for attribute in element.unchecked_attributes() {
                     let attribute = attribute.map_err(|error| owner_invalid(error.to_string()))?;
                     let (namespace, _) = resolver.resolve_attribute(attribute.key);
                     if is_ns(&namespace, STRICT_REL) {
@@ -6666,7 +6667,7 @@ fn parse_control(
     let mut shape = None;
     let mut rel_id = None;
     let mut name = None;
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| owner_invalid(error.to_string()))?;
         let value = bounded_name(
             decode_attribute_bounded(
@@ -6718,7 +6719,7 @@ fn attr_rel_id(
     decoder: quick_xml::encoding::Decoder,
     limits: &OwnerLimits,
 ) -> OwnerResult<Option<String>> {
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| owner_invalid(error.to_string()))?;
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if local.as_ref() == b"id" {
@@ -6944,7 +6945,7 @@ fn preflight_control_relationship_id(
     decoder: quick_xml::encoding::Decoder,
     limits: &OwnerLimits,
 ) -> OwnerResult<Option<String>> {
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| owner_invalid(error.to_string()))?;
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if local.as_ref() != b"id" {
@@ -7242,7 +7243,7 @@ fn parse_drawing_shape(
 ) -> OwnerResult<DrawingShape> {
     let mut id = None;
     let mut name = None;
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| owner_invalid(error.to_string()))?;
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if !matches!(namespace, ResolveResult::Unbound) {
@@ -7361,7 +7362,7 @@ fn validate_unique_vml_attributes(
     seen.try_reserve(8.min(super::MAX_ATTRIBUTES))
         .map_err(|source| owner_alloc("VML attribute identity index", source))?;
     let mut count = 0usize;
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| owner_invalid(error.to_string()))?;
         count = count
             .checked_add(1)
@@ -9107,7 +9108,7 @@ fn attr_unqualified(
     limits: &OwnerLimits,
     resource: &'static str,
 ) -> OwnerResult<Option<String>> {
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| owner_invalid(error.to_string()))?;
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if matches!(namespace, ResolveResult::Unbound) && local.as_ref() == wanted {
@@ -9131,7 +9132,7 @@ fn attr_qualified(
     limits: &OwnerLimits,
     resource: &'static str,
 ) -> OwnerResult<Option<String>> {
-    for attribute in element.attributes().with_checks(false) {
+    for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| owner_invalid(error.to_string()))?;
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if is_ns(&namespace, wanted_ns) && local.as_ref() == wanted_local {

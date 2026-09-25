@@ -17,6 +17,7 @@ use super::model::{
     validate_headers, validate_log, validate_users,
 };
 use super::{invalid, limit, xml_error};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[derive(Clone, Debug)]
 struct Node {
@@ -466,7 +467,7 @@ fn make_node(
         .into();
     let mut attrs = Vec::new();
     let mut seen = HashSet::new();
-    for a in e.attributes().with_checks(true) {
+    for a in e.checked_attributes() {
         let a = a.map_err(xml_error)?;
         if a.key.as_ref() == b"xmlns" || a.key.as_ref().starts_with(b"xmlns:") {
             continue;

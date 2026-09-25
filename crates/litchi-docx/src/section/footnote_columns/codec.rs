@@ -36,6 +36,7 @@ use super::validation::{
     self, has_ignorable_prefix, is_inherited_markup_compatibility, is_word_2012_element,
     is_word_value_attribute,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const ROOT: &[u8] = b"sectPr";
 const EXTENSION: &[u8] = b"footnoteColumns";
@@ -525,7 +526,7 @@ fn parse_extension(
 ) -> Result<(Layout, Vec<u8>)> {
     let mut value = None;
     let mut prefix = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != VALUE {
             continue;
@@ -649,7 +650,7 @@ fn root_ignorable_value(
     decoder: Decoder,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"Ignorable" {
             continue;

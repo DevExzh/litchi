@@ -20,6 +20,7 @@ use crate::error::{Error, Result};
 use crate::raw::namespace::is_spreadsheetml_name;
 use crate::sheet_protection::{ProtectionPasswordVerifier, StrongProtectionPasswordVerifier};
 use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
 const MAX_DEPTH: usize = 256;
@@ -334,7 +335,7 @@ fn parse_protection_element(
     let mut revisions = RawCredential::default();
     let mut seen = HashSet::new();
 
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         if namespace_declaration(attribute.key.as_ref()) {
             continue;

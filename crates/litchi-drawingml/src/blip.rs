@@ -5,6 +5,7 @@ use std::{fmt, fmt::Write as _};
 use quick_xml::{Reader, events::BytesStart, events::Event};
 
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// Write an embedded-image reference, escaping the relationship ID.
 /// # Errors
@@ -49,7 +50,7 @@ pub fn write_embed_id(
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn read_embed(element: &BytesStart<'_>) -> Result<Option<String>> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"embed" {
             continue;

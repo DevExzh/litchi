@@ -8,6 +8,7 @@ use quick_xml::reader::NsReader;
 use super::namespace::is_spreadsheetml_name;
 use super::worksheet::lane;
 use crate::error::{Error, Result, allocation};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// Re-emit changed XML without declaration/root or inter-element formatting.
 ///
@@ -208,7 +209,7 @@ fn compact_events(
             Event::Start(element) => {
                 let local = element.local_name();
                 let mut explicit = None;
-                for attribute in element.attributes().with_checks(true) {
+                for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(xml_error)?;
                     if attribute.key.as_ref() == b"xml:space" {
                         explicit = Some(attribute.value.as_ref() == b"preserve");
@@ -348,7 +349,7 @@ fn write_start(writer: &mut Writer<Vec<u8>>, element: &BytesStart<'_>, empty: bo
     let qualified_name = element.name();
     let name = std::str::from_utf8(qualified_name.as_ref()).map_err(xml_error)?;
     let mut normalized = BytesStart::new(name);
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         normalized.push_attribute(attribute.map_err(xml_error)?);
     }
     writer

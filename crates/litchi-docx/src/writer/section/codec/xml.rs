@@ -31,6 +31,7 @@ use super::super::model::{
     SectionProperties, SectionTextDirection, SectionVerticalAlignment, Style, ZOrder,
 };
 use super::package::{write_reference, write_references};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(super) const TRANSITIONAL_WORD_NAMESPACE: &str =
     "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -1383,7 +1384,7 @@ fn root_metadata(xml: &str) -> Result<RootMetadata> {
     let mut seen_attributes = std::collections::HashSet::new();
     let mut seen_raw_attributes = std::collections::HashSet::new();
     let mut seen_bindings = std::collections::HashSet::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let name = attribute.key.as_ref();
         if !seen_raw_attributes.insert(name.to_vec()) {
@@ -2040,7 +2041,7 @@ fn decode_attributes(metadata: &RootMetadata, xml: &str) -> Result<Vec<DecodedAt
     let mut result = Vec::new();
     let mut seen_attributes = std::collections::HashSet::new();
     let mut seen_raw_attributes = std::collections::HashSet::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if !seen_raw_attributes.insert(attribute.key.as_ref().to_vec()) {
             return Err(Error::InvalidFormat(

@@ -16,6 +16,7 @@ use super::model::{
     MAX_STRING_BYTES, Props, STRICT_NAMESPACE, STRICT_PROPS_RELATIONSHIP, STRICT_RELATIONSHIP,
     TRANSITIONAL_NAMESPACE, TRANSITIONAL_PROPS_RELATIONSHIP, TRANSITIONAL_RELATIONSHIP,
 };
+use crate::xml::attributes::BytesStartExt as _;
 
 /// Parse a Custom XML Data Storage Properties part with bounded MCE handling.
 /// # Errors
@@ -418,7 +419,7 @@ fn inspect_element(
     });
 
     let mut seen = HashSet::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let value = attribute
             .decoded_and_normalized_value(version, reader.decoder())
@@ -458,7 +459,7 @@ fn resolve_props_element(
         .to_owned();
     let mut attributes = Vec::new();
     let mut seen = HashSet::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let value = attribute
             .decoded_and_normalized_value(version, reader.decoder())
@@ -720,7 +721,7 @@ fn validate_declaration(declaration: &BytesDecl<'_>) -> Result<XmlVersion> {
         std::str::from_utf8(declaration.as_ref()).map_err(|error| Error::Xml(error.to_string()))?;
     let raw = BytesStart::from_content(declaration_text, 3);
     let mut declaration_state = 0u8;
-    for attribute in raw.attributes().with_checks(true) {
+    for attribute in raw.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.prefix().is_some() {
             return invalid(format!(

@@ -15,6 +15,7 @@ use super::model::{
     NamespaceBinding, OpaqueFields, RangeReference, STRICT_MAIN, Scenario, TRANSITIONAL_MAIN,
     UnknownAttribute, UnknownElement, checked_xstring,
 };
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Scope {
@@ -463,7 +464,7 @@ fn parse_scenarios_attributes(
     element: &BytesStart<'_>,
 ) -> Result<CollectionBuilder> {
     let mut value = CollectionBuilder::default();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|error| invalid(format!("invalid scenarios attribute: {error}")))?;
         if is_namespace_declaration(attribute.key.as_ref()) {
@@ -501,7 +502,7 @@ fn parse_scenario_attributes(
     element: &BytesStart<'_>,
 ) -> Result<ScenarioBuilder> {
     let mut value = ScenarioBuilder::default();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|error| invalid(format!("invalid scenario attribute: {error}")))?;
         if is_namespace_declaration(attribute.key.as_ref()) {
@@ -555,7 +556,7 @@ fn parse_input_cell_attributes(
     let mut input_value = None;
     let mut number_format_id = None;
     let mut opaque = OpaqueFields::default();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute =
             attribute.map_err(|error| invalid(format!("invalid inputCells attribute: {error}")))?;
         if is_namespace_declaration(attribute.key.as_ref()) {
@@ -695,7 +696,7 @@ fn add_namespace_declarations(
     element: &mut BytesStart<'static>,
 ) -> Result<()> {
     let mut declared = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid unknown scenario attribute: {error}")))?;
         if is_namespace_declaration(attribute.key.as_ref()) {

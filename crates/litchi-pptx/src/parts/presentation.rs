@@ -12,6 +12,7 @@ use super::{
     validate_content_type,
 };
 use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// One entry in the presentation's ordered slide list.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -399,7 +400,7 @@ impl<'a> PresentationPart<'a> {
 }
 
 fn reject_slide_id_list_attributes(element: &quick_xml::events::BytesStart<'_>) -> Result<()> {
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let key = attribute.key.as_ref();
         if key != b"xmlns" && !key.starts_with(b"xmlns:") {

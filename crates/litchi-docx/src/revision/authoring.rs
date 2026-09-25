@@ -40,6 +40,7 @@ use quick_xml::{
 use crate::package::story::{StoryLimits, capture};
 use crate::{Error, Package, Result};
 use litchi_ooxml_common::properties::time::DateTime;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::PackURI;
 
 const W_TRANSITIONAL: &[u8] = b"http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -2310,7 +2311,7 @@ fn parse_metadata(
     let mut date = None;
     let mut name = None;
     let mut displaced_by_custom_xml = false;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         if !is_word_namespace(&namespace) {
@@ -2408,7 +2409,7 @@ fn parse_range_end_metadata(
 ) -> Result<Metadata> {
     let mut id = None;
     let mut displaced_by_custom_xml = false;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         if !is_word_namespace(&namespace) {
@@ -2458,7 +2459,7 @@ fn validate_attributes(
     _metadata: bool,
 ) -> Result<()> {
     let mut count = 0usize;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         count = count
             .checked_add(1)
@@ -2502,7 +2503,7 @@ fn collect_hoisted_attributes(
         .get(start..end)
         .ok_or_else(|| invalid("tracked revision opening tag is outside its source"))?;
     let raw_attributes = raw_tag_attributes(tag, limits)?;
-    let mut attributes = element.attributes();
+    let mut attributes = element.checked_attributes();
     let mut namespace_declarations = Vec::new();
     let mut scope_attributes = Vec::new();
     for raw in raw_attributes {

@@ -25,6 +25,7 @@ use quick_xml::reader::Reader;
 
 use super::model::{Error, Limits};
 use crate::private::BindingTracker;
+use crate::xml::attributes::BytesStartExt as _;
 
 type R<T> = Result<T, Error>;
 
@@ -363,7 +364,7 @@ fn root_insertion_point(fragment: &[u8]) -> R<(usize, Vec<Box<[u8]>>)> {
                     .checked_sub(closing)
                     .ok_or_else(|| bad("fragment root start tag is truncated"))?;
                 let mut declared = Vec::new();
-                for attribute in element.attributes().with_checks(false) {
+                for attribute in element.unchecked_attributes() {
                     let Ok(attribute) = attribute else {
                         break;
                     };

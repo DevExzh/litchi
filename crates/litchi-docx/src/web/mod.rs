@@ -23,6 +23,7 @@ pub use package::{apply_commit, apply_patch, load, load_snapshot, put, remove};
 pub use transaction::{Commit, Patch, Snapshot, Transaction};
 
 pub(super) use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
@@ -92,7 +93,7 @@ pub(super) fn word_attribute_value(
     resolver: &NamespaceResolver,
 ) -> Result<Option<String>> {
     let mut value = None;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != name {
             continue;

@@ -11,6 +11,7 @@ use super::model::{Graph, Reference};
 use crate::presentation_properties::metadata::{escape_xml, new_guid};
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::OpcPackage;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
@@ -730,7 +731,7 @@ fn attributes_ns(
 ) -> Result<Vec<Attribute>> {
     let mut values = Vec::new();
     let mut seen = HashSet::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = match namespace {
@@ -766,7 +767,7 @@ fn attributes(
 ) -> Result<Vec<(String, String)>> {
     let mut values = Vec::new();
     let mut seen = HashSet::new();
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| Error::Xml(error.to_string()))?

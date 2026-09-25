@@ -52,6 +52,7 @@
 use crate::error::{Error, Result};
 use crate::namespace::is_wordprocessing_namespace;
 use litchi_ooxml_common::properties::time::DateTime;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::decode_xml_reference;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
@@ -697,7 +698,7 @@ pub(crate) fn parse_revisions_with_limits(
         let mut id = None;
         let mut original_numbering = None;
 
-        for (index, attr) in element.attributes().enumerate() {
+        for (index, attr) in element.checked_attributes().enumerate() {
             check("attributes", index.saturating_add(1), limits.max_attributes)?;
             let attr = attr.map_err(|error| Error::Xml(error.to_string()))?;
             let local_name = attr.key.local_name();

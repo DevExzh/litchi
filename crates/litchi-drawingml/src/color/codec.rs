@@ -10,6 +10,7 @@ use super::model::{
     Preset, Rgb, ScRgb, Scheme, System, Transform, Transformed, Unknown, Value, write_hex,
 };
 use super::validation;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub use super::validation::{MAX_DEPTH, MAX_NODES, MAX_TRANSFORMS, MAX_XML_BYTES};
 
@@ -393,7 +394,7 @@ fn attributes(
     allowed: &[&[u8]],
 ) -> Result<Option<Vec<(Vec<u8>, String)>>> {
     let mut values: Vec<(Vec<u8>, String)> = Vec::new();
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let key = attribute.key.as_ref();
         if key == b"xmlns" || key.starts_with(b"xmlns:") {

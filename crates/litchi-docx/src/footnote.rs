@@ -15,6 +15,7 @@ use crate::error::{Error, Result};
 use crate::namespace::{NamespaceBindings, scan_word_element_ranges_with_context};
 use crate::paragraph::{Paragraph, extract_word_text};
 use litchi_core::XmlSlice;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::part::Part;
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -372,7 +373,7 @@ fn parse_note_metadata(xml_bytes: &[u8]) -> Result<(Option<u32>, NoteType)> {
 
     let mut id = None;
     let mut note_type = NoteType::Normal;
-    for attribute in element.attributes() {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         match attribute.key.local_name().as_ref() {
             b"id" => {

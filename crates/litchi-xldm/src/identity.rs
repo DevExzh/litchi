@@ -28,6 +28,7 @@ use super::olap::{OlapDocument, OlapError, OlapModel, OlapObjectKind};
 use super::{
     FileEntry, FileGroupClass, GeneratedNameKind, Storage, StorageProfile, classify_generated_path,
 };
+use crate::xml_attributes::BytesStartExt as _;
 
 const MAX_IDENTITY_ITEMS: usize = 500_000;
 /// Aggregate bytes charged before any retained identity strings or indexes are
@@ -2028,7 +2029,7 @@ fn relationship_xml_frame(
     }
     if name == b"XMObject" {
         let mut is_relationship = false;
-        for attribute in start.attributes() {
+        for attribute in start.checked_attributes() {
             let attribute = attribute.map_err(|error| {
                 OlapError::new(format!("relationship XML attribute is invalid: {error}"))
             })?;

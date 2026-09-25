@@ -12,6 +12,7 @@ use quick_xml::{
 
 use super::super::{Error, NAMESPACE};
 use super::model::{Alternatives, Kind, Limits, Span, Stored};
+use crate::xml::attributes::BytesStartExt as _;
 use crate::{xml::decode_xml_reference, xml_name};
 
 /// Read and validate one self-contained `mc:AlternateContent` element.
@@ -286,7 +287,7 @@ fn choice_requires<R: BufRead>(
     reader: &NsReader<R>,
     element: &BytesStart<'_>,
 ) -> Result<String, Error> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_ref() == b"Requires" {
             return attribute
@@ -347,7 +348,7 @@ fn validate_attributes<R: BufRead>(
     policy: AttributePolicy,
 ) -> Result<(), Error> {
     let mut requires = false;
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let raw_name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| Error::Xml(error.to_string()))?;
