@@ -287,148 +287,7 @@ pub(crate) fn generate_workbook_stream(
         for (pt, identity) in all_pts.iter().zip(all_identities) {
             // LO uses 1-based IDs: maPCInfo.mnStrmId = nListIdx + 1.
             let id = identity.stream_id;
-
-            // PIVOTCACHEDEFINITION in globals: SxStreamID + SXVS + DCONREF
-            biff::write_sx_stream_id(&mut stream, id)?;
-            biff::write_sxvs(&mut stream, pt.source_type)?;
-            biff::write_dconref(
-                &mut stream,
-                pt.source_first_row,
-                pt.source_last_row,
-                crate::utils::truncate_u16_to_u8(pt.source_first_col),
-                crate::utils::truncate_u16_to_u8(pt.source_last_col),
-                &pt.source_sheet_name,
-            )?;
-            biff::write_pivot_cache_sxaddl_block(&mut stream)?;
-
-            // Build per-field cache info from the dedicated cache_items lists.
-            // cache_name is the source column header (SXFDB name).
-            // cache_items are the unique source data values (SXSTRING records).
-            // Count unique numeric values per numeric field from source_data.
-            let unique_numeric_counts: Vec<u16> = pt
-                .fields
-                .iter()
-                .enumerate()
-                .map(|(fi, f)| {
-                    if !f.is_numeric {
-                        return 0;
-                    }
-                    let mut vals: Vec<u64> = pt
-                        .source_data
-                        .iter()
-                        .filter_map(|row| {
-                            row.get(fi).and_then(|v| match v {
-                                super::super::PivotCacheValue::Number(n) => Some(n.to_bits()),
-                                _ => None,
-                            })
-                        })
-                        .collect();
-                    vals.sort_unstable();
-                    vals.dedup();
-                    crate::utils::truncate_usize_to_u16(vals.len())
-                })
-                .collect();
-
-            let cache_fields: Vec<biff::PivotCacheFieldInfo<'_>> = pt
-                .fields
-                .iter()
-                .enumerate()
-                .zip(unique_numeric_counts.iter())
-                .map(|((field_index, f), &uniq_count)| biff::PivotCacheFieldInfo {
-                    name: &f.cache_name,
-                    items: &f.cache_items,
-                    is_numeric: f.is_numeric,
-                    unique_numeric_count: uniq_count,
-                    grouping: f.grouping.as_ref(),
-                    group_child: pt.fields.iter().position(|candidate| matches!(&candidate.grouping, Some(crate::PivotCacheGrouping::Discrete(value)) if usize::from(value.base_field_index) == field_index)).map(crate::utils::truncate_usize_to_u16),
-                    is_source_field: !matches!(f.grouping, Some(crate::PivotCacheGrouping::Discrete(_))),
-                })
-                .collect();
-
-            // Build source rows: split each PivotCacheValue row into
-            // string_indices (for SXDBB) and numeric_values (for SXNUM).
-            let num_string_fields = pt
-                .fields
-                .iter()
-                .filter(|f| {
-                    !f.cache_items.is_empty()
-                        && !matches!(f.grouping, Some(crate::PivotCacheGrouping::Discrete(_)))
-                })
-                .count();
-            let num_numeric_fields = pt
-                .fields
-                .iter()
-                .filter(|f| f.is_numeric && f.cache_items.is_empty() && f.grouping.is_none())
-                .count();
-            let mut row_item_indices: Vec<Vec<u16>> = Vec::with_capacity(pt.source_data.len());
-            let mut row_numeric_values: Vec<Vec<f64>> = Vec::with_capacity(pt.source_data.len());
-            for (row_index, row) in pt.source_data.iter().enumerate() {
-                let mut si = Vec::with_capacity(num_string_fields);
-                let mut nv = Vec::with_capacity(num_numeric_fields);
-                let mut values = row.iter();
-                for (field_index, field) in pt.fields.iter().enumerate() {
-                    if matches!(field.grouping, Some(crate::PivotCacheGrouping::Discrete(_))) {
-                        continue;
-                    }
-                    let val = values.next().ok_or_else(|| {
-                        Error::InvalidData(format!(
-                            "PivotCache source row {row_index} is missing a value for field {field_index}"
-                        ))
-                    })?;
-                    let is_num = field.is_numeric
-                        && field.cache_items.is_empty()
-                        && field.grouping.is_none();
-                    match val {
-                        super::super::PivotCacheValue::StringIndex(idx) if !is_num => {
-                            si.push(u16::from(*idx));
-                        },
-                        super::super::PivotCacheValue::SharedItemIndex(idx) if !is_num => {
-                            si.push(*idx);
-                        },
-                        super::super::PivotCacheValue::Number(v) if is_num => nv.push(*v),
-                        value if !is_num => {
-                            let item = match value {
-                                super::super::PivotCacheValue::Number(number) => {
-                                    Some(crate::PivotCacheItem::Number(*number))
-                                },
-                                _ => value.shared_item(),
-                            };
-                            if let Some(item) = item
-                                && let Some(index) = field
-                                    .cache_items
-                                    .iter()
-                                    .position(|candidate| candidate == &item)
-                            {
-                                si.push(crate::utils::truncate_usize_to_u16(index));
-                            }
-                        },
-                        _ => {}, // type mismatch — skip
-                    }
-                }
-                if values.next().is_some() {
-                    return Err(Error::InvalidData(format!(
-                        "PivotCache source row {row_index} has more values than source fields"
-                    )));
-                }
-                row_item_indices.push(si);
-                row_numeric_values.push(nv);
-            }
-            let source_rows: Vec<biff::PivotCacheSourceRow<'_>> = row_item_indices
-                .iter()
-                .zip(row_numeric_values.iter())
-                .map(|(si, nv)| biff::PivotCacheSourceRow {
-                    item_indices: si.as_slice(),
-                    numeric_values: nv.as_slice(),
-                })
-                .collect();
-
-            let record_count = u32::from(pt.source_last_row.saturating_sub(pt.source_first_row));
-            let cache_stream = biff::generate_pivot_cache_stream(&biff::PivotCacheStreamInfo {
-                stream_id: id,
-                record_count,
-                fields: &cache_fields,
-                source_rows: &source_rows,
-            })?;
+            let cache_stream = write_pivot_cache(&mut stream, pt, id)?;
             pivot_caches.push((id, cache_stream));
         }
     }
@@ -1521,4 +1380,158 @@ pub(crate) fn write_pivot_table_view<W: std::io::Write>(
     biff::write_selection(stream)?;
     biff::write_sheet_ext(stream)?;
     Ok(())
+}
+
+/// Write one pivot cache's definition records (`PIVOTCACHEDEFINITION`:
+/// `SXStreamID`, `SXVS`, `DConRef` and its `SXAddl` block) into `globals`,
+/// and return its cache stream (`_SX_DB_CUR/nnnn`).
+///
+/// `add_pivot_table` runs this into a sink when the table is added, so every
+/// refusal it can make happens then, before the writer changes.
+pub(crate) fn write_pivot_cache<W: std::io::Write>(
+    globals: &mut W,
+    pt: &super::super::worksheet::WritablePivotTable,
+    id: u16,
+) -> Result<Vec<u8>> {
+    // PIVOTCACHEDEFINITION in globals: SxStreamID + SXVS + DCONREF
+    biff::write_sx_stream_id(globals, id)?;
+    biff::write_sxvs(globals, pt.source_type)?;
+    biff::write_dconref(
+        globals,
+        pt.source_first_row,
+        pt.source_last_row,
+        crate::utils::truncate_u16_to_u8(pt.source_first_col),
+        crate::utils::truncate_u16_to_u8(pt.source_last_col),
+        &pt.source_sheet_name,
+    )?;
+    biff::write_pivot_cache_sxaddl_block(globals)?;
+
+    // Build per-field cache info from the dedicated cache_items lists.
+    // cache_name is the source column header (SXFDB name).
+    // cache_items are the unique source data values (SXSTRING records).
+    // Count unique numeric values per numeric field from source_data.
+    let unique_numeric_counts: Vec<u16> = pt
+        .fields
+        .iter()
+        .enumerate()
+        .map(|(fi, f)| {
+            if !f.is_numeric {
+                return 0;
+            }
+            let mut vals: Vec<u64> = pt
+                .source_data
+                .iter()
+                .filter_map(|row| {
+                    row.get(fi).and_then(|v| match v {
+                        super::super::PivotCacheValue::Number(n) => Some(n.to_bits()),
+                        _ => None,
+                    })
+                })
+                .collect();
+            vals.sort_unstable();
+            vals.dedup();
+            crate::utils::truncate_usize_to_u16(vals.len())
+        })
+        .collect();
+
+    let cache_fields: Vec<biff::PivotCacheFieldInfo<'_>> = pt
+        .fields
+        .iter()
+        .enumerate()
+        .zip(unique_numeric_counts.iter())
+        .map(|((field_index, f), &uniq_count)| biff::PivotCacheFieldInfo {
+            name: &f.cache_name,
+            items: &f.cache_items,
+            is_numeric: f.is_numeric,
+            unique_numeric_count: uniq_count,
+            grouping: f.grouping.as_ref(),
+            group_child: pt.fields.iter().position(|candidate| matches!(&candidate.grouping, Some(crate::PivotCacheGrouping::Discrete(value)) if usize::from(value.base_field_index) == field_index)).map(crate::utils::truncate_usize_to_u16),
+            is_source_field: !matches!(f.grouping, Some(crate::PivotCacheGrouping::Discrete(_))),
+        })
+        .collect();
+
+    // Build source rows: split each PivotCacheValue row into
+    // string_indices (for SXDBB) and numeric_values (for SXNUM).
+    let num_string_fields = pt
+        .fields
+        .iter()
+        .filter(|f| {
+            !f.cache_items.is_empty()
+                && !matches!(f.grouping, Some(crate::PivotCacheGrouping::Discrete(_)))
+        })
+        .count();
+    let num_numeric_fields = pt
+        .fields
+        .iter()
+        .filter(|f| f.is_numeric && f.cache_items.is_empty() && f.grouping.is_none())
+        .count();
+    let mut row_item_indices: Vec<Vec<u16>> = Vec::with_capacity(pt.source_data.len());
+    let mut row_numeric_values: Vec<Vec<f64>> = Vec::with_capacity(pt.source_data.len());
+    for (row_index, row) in pt.source_data.iter().enumerate() {
+        let mut si = Vec::with_capacity(num_string_fields);
+        let mut nv = Vec::with_capacity(num_numeric_fields);
+        let mut values = row.iter();
+        for (field_index, field) in pt.fields.iter().enumerate() {
+            if matches!(field.grouping, Some(crate::PivotCacheGrouping::Discrete(_))) {
+                continue;
+            }
+            let val = values.next().ok_or_else(|| {
+                Error::InvalidData(format!(
+                    "PivotCache source row {row_index} is missing a value for field {field_index}"
+                ))
+            })?;
+            let is_num =
+                field.is_numeric && field.cache_items.is_empty() && field.grouping.is_none();
+            match val {
+                super::super::PivotCacheValue::StringIndex(idx) if !is_num => {
+                    si.push(u16::from(*idx));
+                },
+                super::super::PivotCacheValue::SharedItemIndex(idx) if !is_num => {
+                    si.push(*idx);
+                },
+                super::super::PivotCacheValue::Number(v) if is_num => nv.push(*v),
+                value if !is_num => {
+                    let item = match value {
+                        super::super::PivotCacheValue::Number(number) => {
+                            Some(crate::PivotCacheItem::Number(*number))
+                        },
+                        _ => value.shared_item(),
+                    };
+                    if let Some(item) = item
+                        && let Some(index) = field
+                            .cache_items
+                            .iter()
+                            .position(|candidate| candidate == &item)
+                    {
+                        si.push(crate::utils::truncate_usize_to_u16(index));
+                    }
+                },
+                _ => {}, // type mismatch — skip
+            }
+        }
+        if values.next().is_some() {
+            return Err(Error::InvalidData(format!(
+                "PivotCache source row {row_index} has more values than source fields"
+            )));
+        }
+        row_item_indices.push(si);
+        row_numeric_values.push(nv);
+    }
+    let source_rows: Vec<biff::PivotCacheSourceRow<'_>> = row_item_indices
+        .iter()
+        .zip(row_numeric_values.iter())
+        .map(|(si, nv)| biff::PivotCacheSourceRow {
+            item_indices: si.as_slice(),
+            numeric_values: nv.as_slice(),
+        })
+        .collect();
+
+    let record_count = u32::from(pt.source_last_row.saturating_sub(pt.source_first_row));
+    let cache_stream = biff::generate_pivot_cache_stream(&biff::PivotCacheStreamInfo {
+        stream_id: id,
+        record_count,
+        fields: &cache_fields,
+        source_rows: &source_rows,
+    })?;
+    Ok(cache_stream)
 }

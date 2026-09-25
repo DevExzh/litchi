@@ -248,7 +248,8 @@ pub(super) struct Hyperlink {
 pub(super) struct WritableWorksheet {
     /// Worksheet name
     pub name: String,
-    /// Cells to write (indexed by (row, col))
+    /// Cells to write (indexed by (row, col)). Stage a cell only through
+    /// [`Self::add_cell`], which keeps `formula_tokens` in step.
     pub cells: HashMap<(u32, u16), WritableCell>,
     /// The encoded tokens of the formula cells `write_formula*` staged, by
     /// cell, so the write does not tokenize them a second time. `add_cell`,

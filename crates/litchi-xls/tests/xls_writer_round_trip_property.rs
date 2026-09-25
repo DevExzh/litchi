@@ -296,15 +296,22 @@ fn record(expected: &mut Expected, call: &Call, accepted: &Accepted) {
                 .insert((*sheet, *row, *col), (ExpectedValue::Formula(encoded), 0));
         },
         (Call::Hyperlink(sheet, row, col, url), _) => {
+            // Surrounding whitespace is not part of a target, and an empty
+            // target (a bare `internal:` too) removes the cell's link.
             let trimmed = url.trim();
-            if trimmed.is_empty() {
-                expected.hyperlinks.remove(&(*sheet, *row, *col));
-            } else {
-                let link = match trimmed.strip_prefix("internal:") {
-                    Some(location) => Link::Location(location.to_string()),
-                    None => Link::Url(trimmed.to_string()),
-                };
-                expected.hyperlinks.insert((*sheet, *row, *col), link);
+            let link = match trimmed.strip_prefix("internal:") {
+                Some("") => None,
+                Some(location) => Some(Link::Location(location.to_string())),
+                None if trimmed.is_empty() => None,
+                None => Some(Link::Url(trimmed.to_string())),
+            };
+            match link {
+                Some(link) => {
+                    expected.hyperlinks.insert((*sheet, *row, *col), link);
+                },
+                None => {
+                    expected.hyperlinks.remove(&(*sheet, *row, *col));
+                },
             }
         },
         (Call::AutoFilter(sheet, _), _) => {

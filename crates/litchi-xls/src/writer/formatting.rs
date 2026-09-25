@@ -40,6 +40,10 @@ pub(crate) const MAX_XF_RECORDS_WITH_XFCRC: usize = 4050;
 /// number-format style XFs that precede user cell XFs.
 const FIXED_XF_RECORDS: usize = 15 + 1 + 5;
 
+/// The largest number-format identifier litchi's reader resolves as built in,
+/// without a `Format` record.
+const MAX_BUILTIN_NUMBER_FORMAT_ID: u16 = 81;
+
 /// The first XF index the pivot-table XFs may take.
 const PIVOT_XF_START_INDEX: usize = 64;
 
@@ -659,13 +663,35 @@ impl FormattingManager {
                 format.font_index
             )));
         }
-        if !self.contains_number_format_id(format.format_index) {
+        // Identifiers through 81 are built in (the reader resolves them
+        // without a `Format` record); the rest must be registered.
+        if format.format_index > MAX_BUILTIN_NUMBER_FORMAT_ID
+            && !self.contains_number_format_id(format.format_index)
+        {
             return Err(Error::InvalidData(format!(
                 "cell format refers to number format {}, which is neither built in nor registered",
                 format.format_index
             )));
         }
         Ok(())
+    }
+
+    /// The `FontIndex` of a font equal to `font` in every field the `Font`
+    /// record stores, if the table holds one.
+    fn existing_font_index(&self, font: &Font) -> Option<u16> {
+        self.fonts
+            .iter()
+            .position(|candidate| {
+                candidate.height == font.height
+                    && candidate.weight == font.weight
+                    && candidate.italic == font.italic
+                    && candidate.underline == font.underline
+                    && candidate.color_index == font.color_index
+                    && candidate.name == font.name
+            })
+            .and_then(|physical| {
+                u16::try_from(if physical < 4 { physical } else { physical + 1 }).ok()
+            })
     }
 
     /// The identifier the next added cell format takes, or
@@ -749,8 +775,9 @@ impl FormattingManager {
     /// Register a high-level `CellStyle` and return its internal style index.
     ///
     /// This helper wires fonts, number formats, and XF properties together:
-    /// - The provided font is appended to the FONT table and its index stored
-    ///   in the resulting `ExtendedFormat`.
+    /// - The provided font is appended to the FONT table, unless an equal
+    ///   font is already there, and its index stored in the resulting
+    ///   `ExtendedFormat`.
     /// - If a number format pattern is specified, it is registered via
     ///   `register_number_format` and the resulting index is stored in
     ///   `ExtendedFormat.format_index`.
@@ -774,7 +801,13 @@ impl FormattingManager {
         } = style;
 
         font.validate()?;
-        let font_index = self.next_font_index()?;
+        // Styles share a font the table already holds, so the 1022 fonts a
+        // workbook can address bound distinct fonts, not styles.
+        let existing_font = self.existing_font_index(&font);
+        let font_index = match existing_font {
+            Some(index) => index,
+            None => self.next_font_index()?,
+        };
         let xf_index = self.next_format_index()?;
         let format_slot = match number_format.as_deref() {
             Some(pattern) => Some(self.number_format_slot(pattern)?),
@@ -791,7 +824,9 @@ impl FormattingManager {
                 index
             },
         };
-        self.fonts.push(font);
+        if existing_font.is_none() {
+            self.fonts.push(font);
+        }
         self.formats.push(ExtendedFormat {
             font_index,
             format_index,
@@ -979,6 +1014,12 @@ impl FormattingManager {
         }
 
         Ok(())
+    }
+
+    /// The XF records of the style, default and user cell formats, which
+    /// keep their indices; pivot padding and pivot XFs follow them.
+    pub(crate) fn user_xf_record_count(&self) -> usize {
+        xf_record_count_for(self.formats.len(), false)
     }
 
     /// Total number of XF records `write_formats` emits, including the

@@ -477,7 +477,7 @@ mod tests {
                     0,
                     None,
                 );
-                writer.worksheets[sheet].cells.insert((3, 1), cell);
+                writer.worksheets[sheet].add_cell(cell);
                 let result = SharedStringTable::build(&writer.worksheets);
                 if fits {
                     let table = result.unwrap();
