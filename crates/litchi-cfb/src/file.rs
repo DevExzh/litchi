@@ -466,9 +466,12 @@ pub struct OleFile<R: Read + Seek> {
     /// table read and one `u32` per sector of the longest chain read: 1/128
     /// (512-byte sectors) or 1/1024 (4096-byte sectors) of a FAT-chained
     /// stream's bytes, and at most 64 for a validated mini stream's chain.
-    /// A read frees either buffer once its capacity exceeds
-    /// [`RETAINED_CHAIN_SCRATCH_BYTES`], so a long-lived reader never pins
-    /// more than that per buffer after its reads.
+    /// A read frees the chain (sector) buffer once its capacity exceeds
+    /// [`RETAINED_CHAIN_SCRATCH_BYTES`]. The visited map is deliberately kept
+    /// (freeing it would bring back a table-sized clear per read); its bound is
+    /// one bit per entry of the larger table read, i.e. 1/32 of that table's
+    /// memory, which can exceed [`RETAINED_CHAIN_SCRATCH_BYTES`] for very large
+    /// files (e.g. a v4 file over 32 GiB has more than 8.4M FAT entries).
     stream_chain: EndChainScratch,
 }
 
