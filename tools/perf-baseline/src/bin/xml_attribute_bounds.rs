@@ -24,7 +24,7 @@ use std::time::Instant;
 
 use litchi_ooxml_common::mce::{
     Capabilities, Limits as MceLimits, SemanticEvent, StreamLimits, process_markup_compatibility,
-    process_markup_compatibility_stream_with_observers,
+    process_markup_compatibility_stream, process_markup_compatibility_stream_with_observers,
 };
 use litchi_opc::{BlobPart, PackURI};
 use sha2::{Digest, Sha256};
@@ -176,6 +176,19 @@ fn build_case(name: &str) -> Result<Case, Box<dyn Error>> {
             input: long_uri((1 << 20) - 64, r#" mc:Ignorable="z""#, 4, 1_000).into_bytes(),
             run: run_mce_stream_count,
         },
+        // The review's probe inputs, as its probe built them: attributes in a
+        // namespace with a long URI beside a short ignorable namespace, with
+        // the baseline capabilities; 1,000 under a 4 MiB URI through the
+        // processor, 4 x 1,000 under a 1,040,000-byte URI through the stream
+        // with an observer that only counts events.
+        "mce_review_long_uri" => Case {
+            input: review_long_uri(4 << 20, 1_000).into_bytes(),
+            run: run_mce_codec_baseline,
+        },
+        "mce_stream_review_long_uri" => Case {
+            input: review_long_uri(1_040_000, 4_000).into_bytes(),
+            run: run_mce_stream_review,
+        },
         // Benign controls: real producer parts that name the MCE namespace,
         // read from the repository's fixtures (run from the worktree root).
         "mce_benign_worksheet" => Case {
@@ -227,6 +240,27 @@ fn long_uri(uri_bytes: usize, directives: &str, elements: usize, attributes: usi
         r#"<r xmlns:mc="{MC}" xmlns:z="{uri}"{directives}>{}</r>"#,
         element.repeat(elements)
     )
+}
+
+/// The review's long-URI probe input: `p` bound to `urn:` followed by
+/// `u_count` `u`s, beside an ignorable `x`, around elements of at most 1,000
+/// attributes in `p` until `attributes` are written.
+fn review_long_uri(u_count: usize, attributes: usize) -> String {
+    let uri = format!("urn:{}", "u".repeat(u_count));
+    let mut xml =
+        format!(r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" xmlns:p="{uri}" mc:Ignorable="x">"#);
+    let per = attributes.min(1_000);
+    let mut written = 0;
+    while written < attributes {
+        xml.push_str("<e");
+        for index in 0..per {
+            let _ = write!(xml, r#" p:a{index}="""#);
+        }
+        xml.push_str("/>");
+        written += per;
+    }
+    xml.push_str("</r>");
+    xml
 }
 
 fn declaration_flood(count: usize) -> String {
@@ -355,6 +389,26 @@ fn run_mce_stream_count(input: &[u8]) -> String {
     match result {
         Ok(report) => format!("ok:{raw:?}:{semantic:?}:{report:?}"),
         Err(error) => format!("err:{error}:{raw:?}:{semantic:?}"),
+    }
+}
+
+/// The MCE stream as the review's probe ran it: baseline capabilities and an
+/// active observer that only counts events.
+fn run_mce_stream_review(input: &[u8]) -> String {
+    let mut events = 0usize;
+    let mut cursor = Cursor::new(input);
+    let result = process_markup_compatibility_stream(
+        &mut cursor,
+        &Capabilities::ooxml_baseline(),
+        &StreamLimits::default(),
+        |_event| {
+            events += 1;
+            Ok::<(), Infallible>(())
+        },
+    );
+    match result {
+        Ok(report) => format!("ok:{events}:{report:?}"),
+        Err(error) => format!("err:{error}:{events}"),
     }
 }
 
