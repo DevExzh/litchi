@@ -57,5 +57,24 @@
     "git worktree list": "only the branch worktree 0762-streaming-compression-and-leases remains for these records",
     "df -h /home after the removals": "1022 GB available"
   },
-  "order": "record and packet of 0763 committed (e1050573d5) before the removals above; this verification committed afterwards"
+  "order": "record and packet of 0763 committed (e1050573d5) before the removals above; this verification committed afterwards",
+  "review_corrections_cleanup": {
+    "performed": "2026-09-24/25, after the review corrections and their record updates were committed (3f4e7f5d71, 7b0bd40c02, b03105a670)",
+    "removed": [
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/targets/0762-review-fix",
+        "bytes": 4517284383,
+        "what": "fresh debug target directory (no debug information, no incremental state) of the review re-run: tests, clippy, rustdoc and mutation-check builds"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/scratch/0762/*",
+        "bytes": 679061,
+        "what": "test logs of the re-run (counts kept in both gates.txt files) and TMPDIR"
+      }
+    ],
+    "kept": [
+      "/home/zhuhe/code/litchi-worktrees/scratch/review-0762 (the reviewer's notes and probe sources; not created by this record)"
+    ],
+    "verified_after_removal": "no targets/0762* or targets/0763* directory remains; scratch/0762 has 0 entries; df -h /home: 1009 GB available"
+  }
 }
