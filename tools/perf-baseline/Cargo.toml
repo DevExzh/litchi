@@ -32,6 +32,15 @@ name = "xml_attribute_bounds"
 path = "src/bin/xml_attribute_bounds.rs"
 
 [[bin]]
+name = "attribute_checks"
+path = "src/bin/attribute_checks.rs"
+
+# Needs the changed library (record 0770): not built for the base.
+[[bin]]
+name = "attribute_checks_equivalence"
+path = "src/bin/attribute_checks_equivalence.rs"
+
+[[bin]]
 name = "xlsb_crud"
 path = "src/bin/xlsb_crud.rs"
 required-features = ["xlsb-crud"]
@@ -75,5 +84,11 @@ serde_json = "1"
 sha2 = "0.11"
 soapberry-zip = { path = "../../crates/soapberry-zip" }
 rustix = { version = "1.1.4", features = ["fs", "param"] }
+
+[lints.clippy]
+# The workspace `clippy.toml` disallows quick-xml's checked attribute iteration
+# for the library crates that opt in (record 0770); the harness measures and
+# cross-checks those crates and keeps quick-xml's own API.
+disallowed_methods = "allow"
 
 [workspace]
