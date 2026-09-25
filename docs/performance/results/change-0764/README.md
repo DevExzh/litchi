@@ -14,6 +14,7 @@ Base `1d1044e3ac`; branch `perf/0764-xml-attribute-dos-hardening`.
 | `site-timings/` | W1's debug-build timings of its new hostile-input tests against the base code and against the fix; W4's malformed-input probes on the base code and on the fix. |
 | `quick-xml-probe/` | A 70-line program against quick-xml 0.41 showing its recovery after a duplicate attribute and the cost of a lenient reader on repeated names; `output.txt` is its output on this host. |
 | `scripts/` | `abba.py` (one ABBA series), `run_abba.sh` (the campaign), `compare_differential.py`. |
+| `review/` | The review follow-up: `long-uri/` (the harness's long-URI cases and the MCE benign controls, before `5aac78a870` and after `2a5d896000`, one process per arm, with `summary.txt`), `review-inputs/` (the review's probe inputs, two ABBA rounds, with `perf stat` counters and `summary.txt`), `benign-regression/` (the first identity build's worksheet regression and its removal: counters, callgrind `memcmp` callers, `notes.txt`), `differential-compare.json` and `differential-full-reports.sha256` (the before/after differential, byte-identical), `binaries.sha256`, `gates.txt` and `tests.txt` (per test binary). |
 | `gates.txt` | Gate commands and exit codes. |
 | `cleanup.json` | What was removed after the evidence was copied here. |
 | `log-sections.md` | Paragraphs for HOTSPOTS.md, REPORT.md and GOAL_AUDIT.md. |

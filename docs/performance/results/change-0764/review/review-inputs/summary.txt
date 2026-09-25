@@ -1,0 +1,8 @@
+before  r1 mce_review_long_uri          4204324 612.402 ms {'instructions': 10932001922, 'cycles': 2737511742} ok:cd46fd7be499918e38594ae635b1f0508fdb298195657da915907b1682f8ba78
+after   r1 mce_review_long_uri          4204324 19.513 ms {'instructions': 467241195, 'cycles': 83655182} ok:cd46fd7be499918e38594ae635b1f0508fdb298195657da915907b1682f8ba78
+after   r2 mce_review_long_uri          4204324 19.015 ms {'instructions': 467241103, 'cycles': 82607623} ok:cd46fd7be499918e38594ae635b1f0508fdb298195657da915907b1682f8ba78
+before  r2 mce_review_long_uri          4204324 612.119 ms {'instructions': 10932000074, 'cycles': 2737320755} ok:cd46fd7be499918e38594ae635b1f0508fdb298195657da915907b1682f8ba78
+before  r1 mce_stream_review_long_uri   1079702 3728.876 ms {'instructions': 31653324021, 'cycles': 9998245489} ok:6:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0
+after   r1 mce_stream_review_long_uri   1079702 3723.607 ms {'instructions': 31658162638, 'cycles': 10000649081} ok:6:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0
+after   r2 mce_stream_review_long_uri   1079702 3725.019 ms {'instructions': 31658004417, 'cycles': 9999995640} ok:6:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0
+before  r2 mce_stream_review_long_uri   1079702 3722.623 ms {'instructions': 31653667001, 'cycles': 9989584105} ok:6:StreamReport { alternate_content_count: 0, selected_choices: 0, selected_fallbacks: 0

@@ -1,0 +1,48 @@
+Record 0764, review follow-up: the benign-worksheet regression of the first
+identity build and its removal. Case `mce_benign_worksheet` (the 1.56 MB
+Excel worksheet, MCE processor, baseline capabilities), core 16.
+
+Legs: before = xab-before (5aac78a870); after = xab-after (the first build of
+the identity table, before packed prefix keys); after-final = xab-after-final
+(2a5d896000). Hashes in ../binaries.sha256. The before and after-final JSON
+reports of the final run are in ../long-uri/.
+
+1. First identity build, 40 samples after 3 warmups, perf stat per process
+   (43 runs; the per-run numbers divide by 43):
+     before  14.047 ms  instructions/run 289,684,091  cycles/run 62,956,459
+     after   20.587 ms  instructions/run 277,487,022  cycles/run 92,703,298
+   Instructions -4.2%, cycles +47%: not added work.
+   stat-*.csv, stat2-*.csv (branch, cache and TLB misses: branch misses
+   1.78 M -> 1.84 M in total, dTLB misses 6,231 -> 6,696; neither explains
+   1.3 G more cycles).
+
+2. AMD dispatch-slot counters (amd-*.csv, totals over 43 runs):
+     de_no_dispatch_per_slot.no_ops_from_frontend  5.14 G -> 10.31 G
+     de_no_dispatch_per_slot.backend_stalls        4.36 G ->  7.32 G
+   Front-end stalls doubled. A perf record on the front-end event put the
+   extra stalls in __memcmp_evex_movbe (1,006 -> 5,648 samples) and
+   BuildHasher::hash_one (534 -> 2,433).
+
+3. Layout and inlining were ruled out: the regression stayed with
+   `Resolver::resolve` forced out of line (20.99 -> 21.37 ms), with
+   `ignorable_in` forced out of line (20.23 ms), and in builds of both legs
+   with forced alignment (RUSTFLAGS "-C llvm-args=-align-all-functions=6
+   -C llvm-args=-align-all-nofallthru-blocks=5"; xab-align-a/-b), two rounds:
+     align-a (before)  13.754 / 13.784 ms   instructions/run 289.7 M
+     align-b (after)   20.328 / 20.158 ms   instructions/run 276.5 M
+   while mce_long_uri_ignorable ran 1,399.1 / 1,404.3 ms -> 17.1 / 17.2 ms in
+   the same builds.
+
+4. callgrind (callgrind-memcmp.txt, 3 runs of the case): the after leg calls
+   memcmp 205,242 times from `Resolver::resolve` (the new lookup walk
+   comparing short prefixes as strings); the before leg makes 11,403 calls
+   from `start`.
+
+5. Fix: prefixes of at most seven bytes are packed with their length into one
+   u64 and compared as integers first (`scope::packed`). With it (xab-after-v3,
+   then after-final):
+     before       14.312 ms  instructions/run 289.9 M
+     after-v3     13.716 ms  instructions/run 274.4 M
+   final run, 9 samples after 2 warmups (../long-uri/summary.txt):
+     before       14.059 ms  instructions/run 290.5 M  cycles/run 63.3 M
+     after-final  13.058 ms  instructions/run 274.6 M  cycles/run 59.2 M

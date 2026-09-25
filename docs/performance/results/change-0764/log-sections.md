@@ -29,7 +29,14 @@ shadowed MCE declaration chain 1,408 → 22.5 ms; MCE hoisting 172.9 → 15.8 ms
 Benign real parts: MCE −1.3% to −2.3% instructions. Left: quick-xml's unkeyed
 large-tag pre-filter at the ~560 fail-fast sites outside the audit and MCE
 (bounded only by tag size), per-event resolver clones and per-node binding
-clones (namespace-scope costs).
+clones (namespace-scope costs). After an independent review, the MCE
+processor gives each in-scope namespace URI an identity (hashed once with a
+per-scope key, facts computed at declaration), so name checks no longer read
+the URI: the review's 1,000 attributes under a 4 MiB URI 612.3 → 19.3 ms,
+1,409.8 → 16.9 ms when that namespace is ignorable; the benign worksheet 14.06
+→ 13.06 ms. Also left: the MCE stream still copies and hashes the URI per
+attribute (3.72 s on the review's 1.08 MB input), which needs its public event
+names to share their namespace (a breaking change).
 
 ---
 
@@ -50,7 +57,13 @@ instructions; the audit +0.5% instructions. Two harness controls exceed 5% in
 wall time with unchanged timed instructions (`docx_semantic_full_text/medium`
 1.055, same instructions; `xlsx_first_cell/tiny` 1.052, +0.55% instructions
 from inlining of untouched code). A differential over 12,881 real XML members
-and 20,000 generated MCE documents gives byte-identical reports.
+and 20,000 generated MCE documents gives byte-identical reports. After an
+independent review, namespace identities in the MCE processor make its name
+checks independent of the URI's length: the review's input (1,000 attributes
+under a 4 MiB namespace URI) 612.3 → 19.3 ms, the same with the namespace
+ignorable 1,409.8 → 16.9 ms, the real worksheet 14.06 → 13.06 ms, the
+differential again byte-identical; the MCE stream's cost on long URIs is
+unchanged (3.72 s on the review's 1.08 MB input) and listed as remaining.
 
 ---
 
@@ -71,4 +84,11 @@ among 7,529 real members; the largest element has 43 attributes). Reported
 residual exposure: quick-xml's unkeyed large-tag duplicate pre-filter at
 fail-fast sites the limit does not cover, and quick-xml's duplicate recovery
 defect for lenient readers outside the survey (upstream reports drafted in the
-record).
+record). After an independent review: a hard ceiling of 4,096 attributes per
+element for the MCE processor and stream (`mce::ATTRIBUTES_PER_ELEMENT_CEILING`,
+ADR 0005), the SVG blip duplicate-declaration refusal restored for an empty
+prefix (`xmlns:` beside `xmlns`, now refused in both orders), the complex-field
+marker's refusal of a malformed attribute restored, and per-scope namespace
+identities in the MCE processor; the MCE stream's per-attribute cost on long
+namespace URIs is a further reported residual (bounded by its 1 MiB name
+limit).

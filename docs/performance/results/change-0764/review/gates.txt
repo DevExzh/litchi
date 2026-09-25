@@ -1,0 +1,33 @@
+# Gates for the 0764 review follow-up (5aac78a870, 2a5d896000, 8f9d089677, 7ee62b67d5)
+# Environment: CARGO_TARGET_DIR=targets/0764 (fresh), CARGO_INCREMENTAL=0, CARGO_PROFILE_DEV_DEBUG=0, CARGO_BUILD_JOBS=6, TMPDIR under the scratch dir.
+# The library gates ran on 8f9d089677; 7ee62b67d5 only adds harness cases (its clippy and fmt below).
+
+$ cargo fmt --all --check
+exit=0
+
+$ cargo clippy -p litchi-ooxml-common -p litchi-drawingml -p litchi-docx -p litchi-pptx -p litchi-xlsx --lib --no-deps --locked --offline -- -D warnings
+    Finished `dev` profile [unoptimized] target(s) in 22.95s
+exit=0
+
+$ cargo clippy -p litchi-ooxml-common -p litchi-drawingml -p litchi-docx -p litchi-xlsx --all-targets --no-deps --locked --offline -- -D warnings
+    Finished `dev` profile [unoptimized] target(s) in 27.50s
+exit=0
+
+$ RUSTDOCFLAGS="-D warnings" cargo doc -p litchi-ooxml-common -p litchi-drawingml -p litchi-docx -p litchi-pptx -p litchi-xlsx --no-deps --locked --offline
+   Generated /home/zhuhe/code/litchi-worktrees/targets/0764/doc/litchi_docx/index.html and 4 other files
+exit=0
+
+$ cargo clippy --manifest-path tools/perf-baseline/Cargo.toml --bin xml_attribute_bounds --no-deps --locked --offline -- -D warnings   (on 7ee62b67d5)
+    Finished `dev` profile [unoptimized] target(s) in 33.02s
+exit=0
+
+$ cargo fmt --all --check   (final tree, with this record)
+exit=0
+
+$ (cd tools/perf-baseline && cargo fmt --check)   (final tree)
+exit=0
+
+$ cargo test -p litchi-ooxml-common -p litchi-drawingml -p litchi-docx -p litchi-pptx -p litchi-xlsx -p litchi-xlsb -p litchi-spreadsheet-drawing --locked --offline --no-fail-fast   (on 8f9d089677)
+passed 6889 failed 0 ignored 49
+test binaries: 275, doc-test runs: 7
+exit=0

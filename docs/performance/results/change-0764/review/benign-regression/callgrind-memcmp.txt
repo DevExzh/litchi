@@ -1,0 +1,32 @@
+== callgrind, mce_benign_worksheet, 3 runs, xab-before: callers of memcmp
+    343,152 ( 0.03%)  < ???:quick_xml::events::attributes::IterState::check_for_duplicates (34,254x) 
+    159,651 ( 0.01%)  < ???:litchi_ooxml_common::mce::codec::start (11,403x) 
+        682 ( 0.00%)  < ???:alloc::collections::btree::map::BTreeMap<K,V,A>::insert (40x) 
+        393 ( 0.00%)  < ???:litchi_ooxml_common::mce::codec::contains_mce_namespace (24x) 
+        336 ( 0.00%)  < ???:alloc::collections::btree::map::BTreeMap<K,V,A>::remove (27x) 
+        336 ( 0.00%)  < ???:litchi_ooxml_common::mce::scope::Scope::remove_from (27x) 
+        198 ( 0.00%)  < ???:litchi_ooxml_common::mce::scope::Scope::push (18x) 
+        108 ( 0.00%)  < ???:core::slice::sort::shared::smallsort::insertion_sort_shift_left (12x) 
+         58 ( 0.00%)  < ???:alloc::vec::Vec<T,A>::dedup_by (2x) 
+         42 ( 0.00%)  < ???:litchi_ooxml_common::mce::codec::apply_directives (3x) 
+         19 ( 0.00%)  < ???:soapberry_zip::office::ArchiveReader::read_with_accounting (1x) 
+         14 ( 0.00%)  < ???:hashbrown::map::HashMap<K,V,S,A>::insert (1x) 
+  3,929,116 ( 0.33%)  *  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe 
+1,174,543,334 (100.0%)  PROGRAM TOTALS
+
+== callgrind, mce_benign_worksheet, 3 runs, xab-after: callers of memcmp
+  1,892,847 ( 0.17%)  < ???:litchi_ooxml_common::mce::codec::Resolver::resolve (205,242x) 
+    456,240 ( 0.04%)  < ???:<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match (45,624x) 
+    343,166 ( 0.03%)  < ???:quick_xml::events::attributes::IterState::check_for_duplicates (34,254x) 
+        682 ( 0.00%)  < ???:alloc::collections::btree::map::BTreeMap<K,V,A>::insert (40x) 
+        393 ( 0.00%)  < ???:litchi_ooxml_common::mce::codec::contains_mce_namespace (24x) 
+        336 ( 0.00%)  < ???:litchi_ooxml_common::mce::scope::Scope::remove_from (27x) 
+        336 ( 0.00%)  < ???:alloc::collections::btree::map::BTreeMap<K,V,A>::remove (27x) 
+        333 ( 0.00%)  < ???:litchi_ooxml_common::mce::scope::Facts::of (18x) 
+        198 ( 0.00%)  < ???:litchi_ooxml_common::mce::scope::Scope::push (18x) 
+        108 ( 0.00%)  < ???:core::slice::sort::shared::smallsort::insertion_sort_shift_left (12x) 
+         58 ( 0.00%)  < ???:alloc::vec::Vec<T,A>::dedup_by (2x) 
+         19 ( 0.00%)  < ???:soapberry_zip::office::ArchiveReader::read_with_accounting (1x) 
+  4,655,340 ( 0.41%)  *  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe 
+1,131,073,800 (100.0%)  PROGRAM TOTALS
+
