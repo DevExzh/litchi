@@ -1,0 +1,9 @@
+# started on Thu Sep 24 19:27:15 2026
+
+12363401681,,instructions:u,551917257,84.00,,
+2683702587,,cycles:u,551533429,84.00,,
+1777788,,branch-misses:u,551500398,84.00,,
+0,,L1-icache-load-misses:u,551462988,84.00,,
+0,,L1-dcache-load-misses:u,551492079,84.00,,
+<not supported>,,LLC-load-misses:u,0,100.00,,
+6231,,dTLB-load-misses:u,524558239,79.00,,

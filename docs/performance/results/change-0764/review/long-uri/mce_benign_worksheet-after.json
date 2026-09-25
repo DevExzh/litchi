@@ -1,0 +1,22 @@
+{
+  "case": "mce_benign_worksheet",
+  "elapsed_ns": [
+    13035938,
+    13061998,
+    13069299,
+    12982598,
+    13057758,
+    13503111,
+    13040938,
+    13107649,
+    12956008
+  ],
+  "input_bytes": 1558391,
+  "input_sha256": "cd3ce3aeb829f703d1a5f7ede39deb22136d0ad1eef858f5e9ee1220656485ce",
+  "outcomes": [
+    "ok:66f116e95d74d01545fe5319484cebbd4475f2d61db7b78d5822c5c557e7a1fd"
+  ],
+  "p50_ns": 13057758,
+  "samples": 9,
+  "warmup": 2
+}

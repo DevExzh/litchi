@@ -78,3 +78,5 @@ test tests::fresh_writer_corpora_are_deterministic_and_identify_the_packaged_str
 test result: FAILED. 552 passed; 2 failed; 1 ignored; 0 measured; 0 filtered out; finished in 670.12s
 (both are the known failures at base 1d1044e3ac listed in the wave briefing)
 exit=101
+
+# The review follow-up's gates and test counts are in review/gates.txt and review/tests.txt.

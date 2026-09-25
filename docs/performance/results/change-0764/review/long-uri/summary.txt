@@ -1,0 +1,16 @@
+before       mce_benign_worksheet           14.059 ms {'instructions': 290457002, 'cycles': 63326343}
+before       mce_benign_document            1.837 ms {'instructions': 35977255, 'cycles': 8478815}
+before       mce_stream_benign_worksheet    83.412 ms {'instructions': 1272964193, 'cycles': 372742658}
+before       mce_long_uri_plain             5.367 ms {'instructions': 102471032, 'cycles': 25475776}
+before       mce_long_uri_ignorable         1409.827 ms {'instructions': 22685122291, 'cycles': 6299572949}
+before       mce_long_uri_preserved         1405.539 ms {'instructions': 22706943946, 'cycles': 6269574509}
+before       mce_stream_long_uri            2731.561 ms {'instructions': 10939845489, 'cycles': 4769775779}
+before       mce_stream_long_uri_ignorable  4072.12 ms {'instructions': 32964089251, 'cycles': 10754190982}
+after-final  mce_benign_worksheet           13.058 ms {'instructions': 274551544, 'cycles': 59164798}
+after-final  mce_benign_document            1.783 ms {'instructions': 36059644, 'cycles': 8212623}
+after-final  mce_stream_benign_worksheet    81.439 ms {'instructions': 1290452387, 'cycles': 363739415}
+after-final  mce_long_uri_plain             6.087 ms {'instructions': 113006759, 'cycles': 28656674}
+after-final  mce_long_uri_ignorable         16.865 ms {'instructions': 456852465, 'cycles': 76803589}
+after-final  mce_long_uri_preserved         16.82 ms {'instructions': 456961437, 'cycles': 76607157}
+after-final  mce_stream_long_uri            2725.461 ms {'instructions': 10942695005, 'cycles': 4782731486}
+after-final  mce_stream_long_uri_ignorable  4079.9 ms {'instructions': 32967946689, 'cycles': 10760495536}

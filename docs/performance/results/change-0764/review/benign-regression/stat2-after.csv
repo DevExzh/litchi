@@ -1,0 +1,9 @@
+# started on Thu Sep 24 19:27:15 2026
+
+11839113158,,instructions:u,760974937,83.00,,
+3942922723,,cycles:u,761109207,83.00,,
+1836459,,branch-misses:u,761959156,83.00,,
+0,,L1-icache-load-misses:u,761892746,83.00,,
+0,,L1-dcache-load-misses:u,761991786,83.00,,
+<not supported>,,LLC-load-misses:u,0,100.00,,
+6696,,dTLB-load-misses:u,761856708,83.00,,

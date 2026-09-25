@@ -1,0 +1,52 @@
+{
+ "packages": [
+  2035,
+  2035
+ ],
+ "members": [
+  12881,
+  12881
+ ],
+ "generated": [
+  20000,
+  20000
+ ],
+ "compared_keys": 157627,
+ "checks": {
+  "audit_authored": 12881,
+  "audit_compact": 12881,
+  "audit_source": 12881,
+  "docx_styles": 341,
+  "mce_bare": 32881,
+  "mce_baseline": 12881,
+  "mce_understood": 20000,
+  "stream_bare": 20000,
+  "stream_baseline": 12881,
+  "stream_understood": 20000
+ },
+ "outcomes_before": {
+  "audit_authored:err": 8708,
+  "audit_authored:ok": 4173,
+  "audit_compact:err": 8708,
+  "audit_compact:ok": 4173,
+  "audit_source:err": 29,
+  "audit_source:ok": 12852,
+  "docx_styles:err": 10,
+  "docx_styles:ok": 331,
+  "mce_bare:err": 9424,
+  "mce_bare:ok": 23457,
+  "mce_baseline:err": 25,
+  "mce_baseline:ok": 12856,
+  "mce_understood:err": 9399,
+  "mce_understood:ok": 10601,
+  "stream_bare:err": 9163,
+  "stream_bare:ok": 10837,
+  "stream_baseline:err": 66,
+  "stream_baseline:ok": 12815,
+  "stream_understood:err": 9163,
+  "stream_understood:ok": 10837
+ },
+ "missing_after": [],
+ "missing_before": [],
+ "differing": []
+}

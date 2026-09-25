@@ -1,0 +1,8 @@
+# started on Thu Sep 24 19:28:35 2026
+
+4014150836,,cycles:u,780284920,83.00,,
+7319941292,,de_no_dispatch_per_slot.backend_stalls:u,780853899,83.00,,
+10312329740,,de_no_dispatch_per_slot.no_ops_from_frontend:u,780903219,83.00,,
+65304725,,ls_bad_status2.stli_other:u,780886639,83.00,,
+1842336711,,ls_stlf:u,780870138,83.00,,
+3427726,,ex_ret_brn_misp:u,780311230,83.00,,

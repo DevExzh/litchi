@@ -12,6 +12,11 @@
     {"path": "/home/zhuhe/code/litchi-worktrees/0764-before-src", "what": "detached before-leg worktree at 1d1044e3ac with only the harness commits applied", "size": "12 GiB", "method": "git worktree remove --force"},
     {"path": "/home/zhuhe/code/litchi-worktrees/scratch/0764/*", "what": "measured binaries (hashes in binaries.sha256), the two 44 MB differential reports (hashes in differential/full-reports.sha256), raw ABBA output (copied here), census JSON (summary copied), perf and callgrind data, probe build", "size": "312 MiB"}
   ],
+  "removed_after_the_review_follow_up": [
+    {"path": "/home/zhuhe/code/litchi-worktrees/targets/0764", "what": "the fresh target dir of the review follow-up: debug test builds of seven crates, clippy and rustdoc output, release harness builds of both legs, and the two forced-alignment builds (align-before, align-after)", "size": "8.7 GiB"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/0764-fix2-before-src", "what": "detached before-leg worktree at 5aac78a870 with the review harness copied in", "size": "12 GiB", "method": "git worktree remove --force"},
+    {"path": "/home/zhuhe/code/litchi-worktrees/scratch/0764/*", "what": "measured binaries (hashes in review/binaries.sha256), the two 44 MB differential reports (hashes in review/differential-full-reports.sha256), perf and callgrind data (callers of memcmp copied to review/benign-regression/), probe reports, the test log (counts in review/tests.txt)", "size": "114 MiB"}
+  ],
   "kept": [
     "worktree /home/zhuhe/code/litchi-worktrees/0764-xml-attribute-dos-hardening and branch perf/0764-xml-attribute-dos-hardening",
     "branches perf/0764-w1 .. perf/0764-w4 (the sub-implementers' original commits; their content is on the record branch under new hashes)"

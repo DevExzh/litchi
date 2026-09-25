@@ -1,0 +1,22 @@
+{
+  "case": "mce_review_long_uri",
+  "elapsed_ns": [
+    17973252,
+    18994776,
+    19193617,
+    19079317,
+    19020677,
+    19015446,
+    18998067,
+    19005736,
+    19032667
+  ],
+  "input_bytes": 4204324,
+  "input_sha256": "b430f9d15f5982e02d047d3739b3e4e8ed26deadccfd3ad02ac1d360da6d44ae",
+  "outcomes": [
+    "ok:cd46fd7be499918e38594ae635b1f0508fdb298195657da915907b1682f8ba78"
+  ],
+  "p50_ns": 19015446,
+  "samples": 9,
+  "warmup": 2
+}
