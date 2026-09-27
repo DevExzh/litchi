@@ -93,7 +93,7 @@ fn expanded_duplicates_are_checked_in_opaque_descendants() {
     }
 
     let mut input = Cursor::new(xml.as_bytes());
-    let stream = super::stream::process_markup_compatibility_stream(
+    let stream = process_markup_compatibility_stream(
         &mut input,
         &capabilities,
         &StreamLimits::default(),
