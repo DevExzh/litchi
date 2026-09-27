@@ -1,0 +1,16 @@
+{
+  "prior_packet": "../change-0792",
+  "prior_seal": "5ccb3aa48b556a8c38b14a5cacc0804fc5586e9079f8236cc948aca29d7d89fa",
+  "probe_reference_files": {
+    "Cargo.lock": "3828dd46cddb7b5f3b0e838051b1c8d70140c1deb0ead723cd7ce991e0c5fb07",
+    "Cargo.toml.template": "b10720785e30f36fb88eba8bec657aec50b9e88e8dd5c4c4d48df1c37d2c8c7e",
+    "src/allocation_metrics.rs": "6cb160d82e0b03e62a68a945bc2fa787baac41220253fdedb55ad1af37de7728",
+    "src/counting_allocator.rs": "da8d759612b20fcf7e1a63bf82ada108c1e8e0e3668e57315a9cc21dbe416dfa",
+    "src/main.rs": "99bbf7e2e0e5c41c7f9b81d69bcc96631f9ef1981f076ac947853202d57edfe5"
+  },
+  "production_source": {
+    "bytes": 1182921,
+    "path": "../change-0792/build-after/source.json",
+    "sha256": "2cafad53432f42f3a39c938b7433f9b7f18e8c569554acc2a738342b2866e899"
+  }
+}

@@ -1,0 +1,88 @@
+[
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/Cargo.toml"
+    ],
+    "ended": 1790540665.5226958,
+    "exit_code": 0,
+    "log": {
+      "bytes": 8304,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0793/build/control.log",
+      "sha256": "641f5d21b59994c0e2f1ad70f9bb3b861351c475e2f109f3309df0f4de4e98fc"
+    },
+    "name": "control",
+    "started": 1790540572.4736187
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/Cargo.toml",
+      "--features",
+      "capture-profile"
+    ],
+    "ended": 1790540675.9704754,
+    "exit_code": 0,
+    "log": {
+      "bytes": 4707,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0793/build/profile.log",
+      "sha256": "a6c91b88d202182917fd94cee853cc1d09b4e55c8eef92e3c0377c090213310b"
+    },
+    "name": "profile",
+    "started": 1790540665.72719
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/Cargo.toml",
+      "--features",
+      "allocator-metrics"
+    ],
+    "ended": 1790540686.325717,
+    "exit_code": 0,
+    "log": {
+      "bytes": 1841,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0793/build/allocation.log",
+      "sha256": "e1fed7186286302195439fb6b4de42698d5a639da57160b1c6e5917c59c7ae9a"
+    },
+    "name": "allocation",
+    "started": 1790540676.1734354
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0793/probe-src/Cargo.toml",
+      "--features",
+      "allocator-metrics,capture-profile"
+    ],
+    "ended": 1790540696.7264855,
+    "exit_code": 0,
+    "log": {
+      "bytes": 1841,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0793/build/profile-allocation.log",
+      "sha256": "e6aef037f57c0699df70e83b7e19b31f1a01d2e8fd66eaff7c6552d23f519d54"
+    },
+    "name": "profile-allocation",
+    "started": 1790540686.529883
+  }
+]
