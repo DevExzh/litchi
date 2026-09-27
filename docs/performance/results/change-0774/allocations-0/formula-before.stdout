@@ -1,0 +1,6 @@
+heaptrack output will be written to "/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/docs/performance/results/change-0774/allocations-0/formula-before.zst"
+starting application, this might take some time...
+{"schema":"xls-formula-probe-v1","case":"formula","cells":20000,"warmup":0,"samples":1,"samples_ns":[238082647],"output_bytes":1159680,"output_sha256":"6d2f9ea72f843d7cae22d93cfa0207fa3d76d7bf44fd837317383a77071be1f0"}
+Heaptrack finished! Now run the following to investigate the data:
+
+  heaptrack --analyze "/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/docs/performance/results/change-0774/allocations-0/formula-before.zst"

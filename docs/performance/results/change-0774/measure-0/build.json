@@ -1,0 +1,18 @@
+[
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/docs/performance/results/change-0774/measure-0/before/Cargo.toml"
+    ],
+    "exit": 101,
+    "started": 1790472554.8217733,
+    "ended": 1790472594.6057465,
+    "log": "build-before.log",
+    "sha256": "ff34d49fd5bf6f3d952a7fb18070bedd359c3081cdf6d9c93c5fe8d4abe6da3e"
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "before": {
+    "path": "/home/zhuhe/code/litchi-target-0774-release-before/release/xls-formula-probe",
+    "bytes": 1650136,
+    "sha256": "8cb724462cb852a97f710353a704d3f04bdf65393848c509f15c3eff56a066e4",
+    "lock_sha256": "9f31a0062e30e100037f8aaff4e7ce53709e9992201c4e029f07f91ae1f5b527"
+  },
+  "after": {
+    "path": "/home/zhuhe/code/litchi-target-0774-release-after/release/xls-formula-probe",
+    "bytes": 1648472,
+    "sha256": "1ea2675895b5501dde60575c2e6b4a1697ce269fbad4f63c4987ea766e7b3627",
+    "lock_sha256": "9f31a0062e30e100037f8aaff4e7ce53709e9992201c4e029f07f91ae1f5b527"
+  }
+}

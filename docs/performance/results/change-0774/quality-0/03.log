@@ -1,0 +1,12 @@
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/crates/litchi-core)
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/crates/litchi-codepage)
+    Checking litchi-biff v0.0.1 (/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/crates/litchi-biff)
+    Checking litchi-odraw v0.0.1 (/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/crates/litchi-odraw)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/crates/litchi-cfb)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/crates/litchi-ole-common)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/crates/litchi-ograph)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/crates/litchi-vba)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/crates/litchi-sign)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/crates/litchi-crypto)
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi-worktrees/0774-xls-writer-integration/crates/litchi-xls)
+    Finished `dev` profile [unoptimized] target(s) in 11.26s

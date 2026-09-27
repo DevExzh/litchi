@@ -1,0 +1,113 @@
+{
+  "scope": "One whole-process instrumented sample per case and leg; histogram count sum equals printed allocation calls; peak heap is tool-rounded; no instrumented timing claim.",
+  "rows": [
+    {
+      "case": "formula",
+      "leg": "before",
+      "allocation_calls": 642449,
+      "allocated_bytes_from_histogram": 48078704,
+      "temporary_allocations": 119639,
+      "reported_peak_heap": "10.18M",
+      "histogram": "formula-before.histogram",
+      "histogram_sha256": "8539f8d6b5a2f59e373bad973f13414e50d9605dbc7b8da7a5f328b54ed1e053",
+      "command": [
+        "heaptrack_print",
+        "-f",
+        "docs/performance/results/change-0774/allocations-0/formula-before.zst",
+        "-H",
+        "docs/performance/results/change-0774/allocations-0/formula-before.histogram",
+        "-p",
+        "0",
+        "-a",
+        "0",
+        "-T",
+        "0"
+      ],
+      "decode_exit": 0,
+      "log": "formula-before.histogram.log",
+      "log_sha256": "19f8f30c98811272cc6e298f2d7d287a8e2a0bd6b69d37d1ece37036657a7ffd",
+      "output_sha256": "6d2f9ea72f843d7cae22d93cfa0207fa3d76d7bf44fd837317383a77071be1f0"
+    },
+    {
+      "case": "formula",
+      "leg": "after",
+      "allocation_calls": 502471,
+      "allocated_bytes_from_histogram": 33140823,
+      "temporary_allocations": 219630,
+      "reported_peak_heap": "10.18M",
+      "histogram": "formula-after.histogram",
+      "histogram_sha256": "7004499bb6adf4e3d0e16bbede504b6493c14ad7764190e83e145a476a2170b9",
+      "command": [
+        "heaptrack_print",
+        "-f",
+        "docs/performance/results/change-0774/allocations-0/formula-after.zst",
+        "-H",
+        "docs/performance/results/change-0774/allocations-0/formula-after.histogram",
+        "-p",
+        "0",
+        "-a",
+        "0",
+        "-T",
+        "0"
+      ],
+      "decode_exit": 0,
+      "log": "formula-after.histogram.log",
+      "log_sha256": "cb7775cf70143c43ab893da01f08ac119ef38108ebfb246f43d3d7ead5f5083f",
+      "output_sha256": "6d2f9ea72f843d7cae22d93cfa0207fa3d76d7bf44fd837317383a77071be1f0"
+    },
+    {
+      "case": "numeric",
+      "leg": "before",
+      "allocation_calls": 43465,
+      "allocated_bytes_from_histogram": 19372562,
+      "temporary_allocations": 649,
+      "reported_peak_heap": "9.35M",
+      "histogram": "numeric-before.histogram",
+      "histogram_sha256": "a73eedd7379543fbd65877a0f562a1d89d732e86517cfffddec02ecb0a0fd041",
+      "command": [
+        "heaptrack_print",
+        "-f",
+        "docs/performance/results/change-0774/allocations-0/numeric-before.zst",
+        "-H",
+        "docs/performance/results/change-0774/allocations-0/numeric-before.histogram",
+        "-p",
+        "0",
+        "-a",
+        "0",
+        "-T",
+        "0"
+      ],
+      "decode_exit": 0,
+      "log": "numeric-before.histogram.log",
+      "log_sha256": "514717303dedb4325b0bd32034f6d8def85037c417b18a70ea6fc0e40bc94fe6",
+      "output_sha256": "cdf2ac87fc21a9e6666e730aed3d1565d687d45133df0a7c7722767723d41b1f"
+    },
+    {
+      "case": "numeric",
+      "leg": "after",
+      "allocation_calls": 43463,
+      "allocated_bytes_from_histogram": 19372449,
+      "temporary_allocations": 649,
+      "reported_peak_heap": "9.35M",
+      "histogram": "numeric-after.histogram",
+      "histogram_sha256": "beda77c622ab0b49c9d7cf1a5968e49c11150e85327b87788fa052246a09b8d2",
+      "command": [
+        "heaptrack_print",
+        "-f",
+        "docs/performance/results/change-0774/allocations-0/numeric-after.zst",
+        "-H",
+        "docs/performance/results/change-0774/allocations-0/numeric-after.histogram",
+        "-p",
+        "0",
+        "-a",
+        "0",
+        "-T",
+        "0"
+      ],
+      "decode_exit": 0,
+      "log": "numeric-after.histogram.log",
+      "log_sha256": "0be8cbd02a5ccfba4776beb71818548b922b0aa503567d0999d07e0ad6723fd7",
+      "output_sha256": "cdf2ac87fc21a9e6666e730aed3d1565d687d45133df0a7c7722767723d41b1f"
+    }
+  ]
+}

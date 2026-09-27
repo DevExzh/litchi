@@ -1,0 +1,16 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "tools/check_perf_claims.py",
+    "--registry",
+    "docs/performance/claim-registry-v1.json",
+    "--repo-root",
+    ".",
+    "--mode",
+    "structural"
+  ],
+  "exit": 0,
+  "log": "claims.log",
+  "sha256": "d177de7a6873547948916da34ab01d49111cee9b69e92b31ef756ac5b7f52850"
+}

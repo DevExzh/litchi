@@ -1,0 +1,4 @@
+{
+  "source_unchanged": true,
+  "scope": "Whole process including startup, input generation, single serialization and post-timer SHA; instrumented times excluded from native statistics."
+}
