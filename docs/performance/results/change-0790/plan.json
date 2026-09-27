@@ -1,0 +1,151 @@
+{
+  "acceptance": [
+    "All child identities, checksums, mapped sizes, affinity, exit statuses and raw artifact hashes pass.",
+    "Detailed direct wait4 triples and twelve self samples match trace exactly for all four traced controls.",
+    "For every direct child, startup self high water is below launcher pre-fork self high water; all direct startup values are below the minimum0789direct startup17708KiB.",
+    "Known anonymous growth equals payload for no-worker full observations.",
+    "Report all direct/time self/exit/residency differences without requiring cross-process equality or calling phase snapshots transient peaks."
+  ],
+  "affinities": {
+    "all": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "single": [
+      0
+    ]
+  },
+  "cases": [
+    {
+      "mib": 0,
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "mib": 4,
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "mib": 4,
+      "touch": "main",
+      "workers": 4
+    },
+    {
+      "mib": 4,
+      "touch": "workers",
+      "workers": 4
+    },
+    {
+      "mib": 4,
+      "touch": "workers",
+      "workers": 32
+    },
+    {
+      "mib": 64,
+      "touch": "main",
+      "workers": 0
+    }
+  ],
+  "expected": {
+    "full_snapshots": 312,
+    "identity_snapshots": 288,
+    "matrix_children": 96,
+    "qualification_checks": 7,
+    "trace_children": 4
+  },
+  "orders": [
+    [
+      "direct-identity",
+      "direct-full",
+      "time-identity",
+      "time-full"
+    ],
+    [
+      "time-full",
+      "time-identity",
+      "direct-full",
+      "direct-identity"
+    ]
+  ],
+  "phases": [
+    "startup",
+    "mapped",
+    "touched",
+    "workers_joined",
+    "unmapped",
+    "final"
+  ],
+  "purpose": "Qualify low-memory ordinary-fork launcher; no production candidate or adoption policy change",
+  "schema": "litchi.fork-launcher-calibration.0790.v1",
+  "statistics": "Two repeats, descriptive only; no bootstrap, no performance estimate",
+  "trace_options": [
+    "-v",
+    "-e",
+    "abbrev=execve",
+    "-f",
+    "-qq",
+    "-e",
+    "trace=execve,getrusage,wait4"
+  ],
+  "traces": [
+    {
+      "affinity": "single",
+      "launcher": "direct",
+      "mib": 0,
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "affinity": "all",
+      "launcher": "direct",
+      "mib": 0,
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "affinity": "single",
+      "launcher": "direct",
+      "mib": 64,
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "affinity": "all",
+      "launcher": "direct",
+      "mib": 64,
+      "touch": "main",
+      "workers": 0
+    }
+  ]
+}

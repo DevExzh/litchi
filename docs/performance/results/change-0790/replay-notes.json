@@ -1,0 +1,12 @@
+{
+  "acceptance": "fail",
+  "capture_retries": 0,
+  "failed_controls": [
+    "traces/000",
+    "traces/001",
+    "traces/002"
+  ],
+  "initial_analyzer": "The first replay asserted the frozen universal startup comparison and stopped on trace0. Before any derived output was written, the analyzer was changed to retain criterion failures as data. The criterion itself, frozen plan, and raw captures are unchanged.",
+  "production_changes": false,
+  "raw_captures_unchanged": true
+}

@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0790 — ordinary-fork memory control
+
+[0790](0790-fork-launcher-calibration.md) A 96-child matrix and four direct wait4 traces remove inherited startup high water in all ordinary direct children and reproduce resource-counter/residency gaps. Three traced controls fail the frozen “must decrease” criterion; all failures and topology limits remain explicit.
+
 ## 0789 — known-page RSS calibration
 
 [0789](0789-rss-accounting-calibration.md) A standalone 272-child matrix plus eight separately scoped traces reproduces resource-counter versus resident-page differences. All 280 children and 864 full snapshots validate; this is calibration, with no library speedup or adoption claim.

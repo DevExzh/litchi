@@ -1,0 +1,87 @@
+{
+  "binary": {
+    "bytes": 40416,
+    "path": "/home/zhuhe/code/litchi-target-0790/binary",
+    "sha256": "0539037bd6db38169f7e033b142a0c67a5ae705acc0a36c149faa84bdfeb88ec"
+  },
+  "commands": [
+    {
+      "command": [
+        "/usr/bin/cc",
+        "-std=c11",
+        "-O2",
+        "-g",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pthread",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0790/probe.c",
+        "-o",
+        "/home/zhuhe/code/litchi-target-0790/binary"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 0,
+        "path": "build-binary.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "command": [
+        "/usr/bin/cc",
+        "-std=c11",
+        "-O2",
+        "-g",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0790/launcher.c",
+        "-o",
+        "/home/zhuhe/code/litchi-target-0790/launcher"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 0,
+        "path": "build-launcher.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "command": [
+        "/usr/bin/cc",
+        "-std=c11",
+        "-O2",
+        "-g",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fsanitize=address,undefined",
+        "-fno-omit-frame-pointer",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0790/launcher.c",
+        "-o",
+        "/home/zhuhe/code/litchi-target-0790/sanitized_launcher"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 0,
+        "path": "build-sanitized_launcher.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "inputs": {
+    "bytes": 854,
+    "path": "frozen-inputs.json",
+    "sha256": "ca2fb6c4a5718a0f32ea1205af17d07199844115fc5610433b7c4151edf03e0f"
+  },
+  "launcher": {
+    "bytes": 23960,
+    "path": "/home/zhuhe/code/litchi-target-0790/launcher",
+    "sha256": "25b7b4cdc573cd5f8af336baa411f133e45d4960e90e4a2f9d171a77073676fb"
+  },
+  "sanitized_launcher": {
+    "bytes": 41648,
+    "path": "/home/zhuhe/code/litchi-target-0790/sanitized_launcher",
+    "sha256": "ea957fbb897e054b212e07f0e79ba7e6c49d131db47e391a94ad45f4815c85c1"
+  }
+}

@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0790 — external measurement control only
+
+[0790](0790-fork-launcher-calibration.md) The standalone fork launcher adds no Office CRUD capability, native producer evidence, or coverage promotion. Its 100-child calibration supports category-15 memory-measurement interpretation only.
+
 ## 0789 — measurement calibration only
 
 [0789](0789-rss-accounting-calibration.md) The standalone known-page probe supplies supporting category-15 measurement evidence. It performs no Office CRUD operation, promotes no registry row, and adds no native producer/provider/scaling coverage.

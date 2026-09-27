@@ -1,0 +1,4 @@
+* -text
+**/* -text
+*.log -whitespace
+*.txt -whitespace

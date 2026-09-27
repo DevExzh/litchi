@@ -1,0 +1,64 @@
+{
+  "affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ],
+  "meminfo": "MemTotal:       129447068 kB\nMemFree:        14201524 kB\nMemAvailable:   90249336 kB\nBuffers:         4953620 kB\nCached:         94572948 kB\nSwapCached:            0 kB\nActive:         19714976 kB\nInactive:       86715324 kB\nActive(anon):   16848884 kB\nInactive(anon): 19655176 kB\nActive(file):    2866092 kB\nInactive(file): 67060148 kB\nUnevictable:       25748 kB\nMlocked:            9032 kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:              1688 kB\nWriteback:             0 kB\nAnonPages:       6929040 kB\nMapped:           821204 kB\nShmem:          29578832 kB\nKReclaimable:    7315532 kB\nSlab:            8434892 kB\nSReclaimable:    7315532 kB\nSUnreclaim:      1119360 kB\nKernelStack:       28000 kB\nPageTables:        76588 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    64723532 kB\nCommitted_AS:   43095192 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       47148 kB\nVmallocChunk:          0 kB\nPercpu:            42880 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:    301056 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:    374784 kB\nFilePmdMapped:     18432 kB\nCmaTotal:              0 kB\nCmaFree:          197756 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:      235948 kB\nDirectMap2M:    27688960 kB\nDirectMap1G:    103809024 kB\n",
+  "page_size": 4096,
+  "tools": {
+    "/usr/bin/cc": {
+      "sha256": "864711037b900acdb7a449cf48d912cefa935b527fb60c767ccb956779e66136",
+      "version": "cc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"
+    },
+    "/usr/bin/strace": {
+      "sha256": "66e7dbc556b949ba29efc6b02948580857b9a9c99adacf949cdc10c57d930fc5",
+      "version": "strace -- version 6.19"
+    },
+    "/usr/bin/taskset": {
+      "sha256": "f3ae0ca36e0a8a892fee6ed3f72f6058fc07991e49b03fe6d1f796989d8777c2",
+      "version": "taskset from util-linux 2.41.3"
+    },
+    "/usr/bin/time": {
+      "sha256": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88",
+      "version": "time (GNU Time) UNKNOWN"
+    }
+  },
+  "uname": [
+    "Linux",
+    "ip-172-31-39-190",
+    "7.0.0-1012-aws",
+    "#12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026",
+    "x86_64",
+    ""
+  ]
+}

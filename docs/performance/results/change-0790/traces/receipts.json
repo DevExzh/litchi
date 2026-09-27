@@ -1,0 +1,22 @@
+[
+  {
+    "bytes": 2173,
+    "path": "traces/000.json",
+    "sha256": "31cded52ede1a872e483b4efb09aaedec52430e3e08f36c0460b47707c61a00e"
+  },
+  {
+    "bytes": 2255,
+    "path": "traces/001.json",
+    "sha256": "62b99523fd3dc9f6285683651d972998e6db8e8a6fb111b31af386de42c45c79"
+  },
+  {
+    "bytes": 2179,
+    "path": "traces/002.json",
+    "sha256": "36a9442998cd4e138e65d2623c459a3f2685620eea5029c70777807119fb8ad5"
+  },
+  {
+    "bytes": 2269,
+    "path": "traces/003.json",
+    "sha256": "a063df35025aed504ac439907a72e3f5c4c185381419406ef578d7c91c375543"
+  }
+]
