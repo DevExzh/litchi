@@ -1,0 +1,24 @@
+   Compiling memchr v2.8.3
+   Compiling quick-xml v0.41.0
+   Compiling attribute-census-hook-tests v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0798/hook-test-src)
+error[E0618]: expected function, found `BytesStart<'_>`
+  --> src/census_tests_0798.rs:72:15
+   |
+ 8 | fn tag(content: &str) -> BytesStart<'static> {
+   | -------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+...
+61 |     let tag = tag("e a=\"1\" b=\"2\"");
+   |         --- `tag` has type `BytesStart<'_>`
+...
+72 |     let tag = tag("e a=\"1\"");
+   |               ^^^-------------
+   |               |
+   |               call expression requires function
+   |
+  ::: src/xml_attributes/tests.rs:48:1
+   |
+48 | fn tag(content: &str) -> BytesStart<'static> {
+   | -------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+
+For more information about this error, try `rustc --explain E0618`.
+error: could not compile `attribute-census-hook-tests` (lib test) due to 1 previous error

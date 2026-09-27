@@ -1,0 +1,103 @@
+{
+  "cases": [
+    {
+      "mode": "capture",
+      "shape": "tiny"
+    },
+    {
+      "mode": "commit",
+      "shape": "tiny"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "tiny"
+    },
+    {
+      "mode": "capture",
+      "shape": "medium"
+    },
+    {
+      "mode": "commit",
+      "shape": "medium"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "medium"
+    },
+    {
+      "mode": "capture",
+      "shape": "large"
+    },
+    {
+      "mode": "commit",
+      "shape": "large"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "large"
+    },
+    {
+      "mode": "capture",
+      "shape": "vendor"
+    },
+    {
+      "mode": "commit",
+      "shape": "vendor"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "vendor"
+    },
+    {
+      "mode": "capture",
+      "shape": "unicode-vendor"
+    },
+    {
+      "mode": "commit",
+      "shape": "unicode-vendor"
+    },
+    {
+      "mode": "lifecycle",
+      "shape": "unicode-vendor"
+    }
+  ],
+  "census": {
+    "blocks": 2,
+    "case_orders": [
+      "forward",
+      "reverse"
+    ],
+    "leg": "after",
+    "samples": 1,
+    "warmup": 0
+  },
+  "claims": {
+    "allocation_calls": false,
+    "native_latency": false,
+    "production_adoption": false,
+    "public_workflow_speedup": false,
+    "scope": "OPC checked-iterator instances in the calling thread during generated PPTX operation regions"
+  },
+  "control": {
+    "blocks": 1,
+    "leg": "before",
+    "samples": 1,
+    "warmup": 0
+  },
+  "counts": {
+    "reports": 45,
+    "samples": 45
+  },
+  "cpu": 12,
+  "qualification": {
+    "exact_semantic_and_output_parity": true,
+    "instance_conservation": true,
+    "live_at_finish_zero": true,
+    "overflow_absent": true,
+    "repeat_histograms_equal": true
+  },
+  "schema": "litchi.performance.0798.v1",
+  "source_allowlist": [
+    "crates/litchi-opc/src/xml_attributes.rs"
+  ]
+}

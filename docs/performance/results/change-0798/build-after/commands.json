@@ -1,0 +1,93 @@
+[
+  {
+    "command": [
+      "rustfmt",
+      "--check",
+      "--edition",
+      "2024",
+      "--config",
+      "skip_children=true",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0798/probe-src/src/main.rs"
+    ],
+    "ended": 1790551529.410892,
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/build-after/0.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "started": 1790551529.3847482
+  },
+  {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0798/probe-src/Cargo.toml",
+      "--bin",
+      "namespace-uri-probe",
+      "--features",
+      "attribute-census"
+    ],
+    "ended": 1790551607.2501032,
+    "exit_code": 0,
+    "log": {
+      "bytes": 523,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/build-after/1.log",
+      "sha256": "4412edd66809286d2abd14adf3e7819185ef1f19356146194c416969c2854317"
+    },
+    "started": 1790551529.6055403
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0798/probe-src/Cargo.toml",
+      "--bin",
+      "namespace-uri-probe",
+      "--features",
+      "attribute-census"
+    ],
+    "ended": 1790551621.5725584,
+    "exit_code": 0,
+    "log": {
+      "bytes": 523,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/build-after/2.log",
+      "sha256": "259b4f8778bc05fa3d8d29756ff8343a4e590b3ab68a1a6abea5d7c840a69e20"
+    },
+    "started": 1790551607.4493465
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0798/probe-src/Cargo.toml",
+      "--bin",
+      "namespace-uri-probe",
+      "--features",
+      "attribute-census",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "ended": 1790551622.095484,
+    "exit_code": 0,
+    "log": {
+      "bytes": 190,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/build-after/3.log",
+      "sha256": "b3ab13d3dbe95059848b2ffcefc44e13730bacf4b35af8b45bf9bc3f38e6687e"
+    },
+    "started": 1790551621.7694902
+  }
+]

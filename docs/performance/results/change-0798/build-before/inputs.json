@@ -1,0 +1,34 @@
+{
+  "frozen": {
+    "architecture-inputs.json": "a34e8c65bc5bd230911bc87156f16c9fc7add6338d757d47160082f9769fca10",
+    "build.py": "c67d1ad0e7ae1ce78b63d7847af8da0b10d84d990212e47348ea6f38b25566b7",
+    "capture.py": "7627c1d6623e414de8a1f3f1739c49f17541dcc070cd88d7afa511255229ee36",
+    "custody.py": "e8a8790e6a60bccff8a5d907203fb9ba103f8e68834541adad129df583de3d9e",
+    "host.json": "c8ea30c7d51490b6cbe0b8f09b3eb23b6d4022b05509e9a74ed1a08f52eb95fa",
+    "inheritance.json": "df81f5ad2d273707c2f5b296295c574ac78b3abbce7a418463c636860e97777c",
+    "lock-generation.json": "3b9cb400f115faf53038432fbc7dde78dcbc6e9c627902554cccfd97723622dd",
+    "lock-generation.log": "288fef36769f0a4e7cdb58e4f0619dac7c5961a7bf83e6c27160ab1bb570696f",
+    "origin.json": "7b1585bdd2efa16ebe20fdc54ce598b497a25dd7ef5f50256c024141c915e730",
+    "plan.json": "4a51ba8d3e56474172199ecebc3f6b2e2670b116e6670243656522f201066b37",
+    "probe-inheritance.json": "98a5572472eba3cfdf622608e889dd057e0bc26e476ac53be8c9898af8f1028e",
+    "quality.py": "883b426d8a8ef496ead2a79388fd373300f96a67ed1011273016c0f19729db74",
+    "quality/complete.json": "f8e6f1b3d1bee2fdcd740fa1a4f8a6222bd824b5186f2972792efd4c9d57df56"
+  },
+  "instrumentation": {
+    "after/canonical_tests.rs": "c3084e1bcb2ee10171745a373d4cc8b843922770e186fd6d6d470bf798bcef1b",
+    "after/census_tests_0798.rs": "603c9b4aabf72663e1fb102e8574f45ba0c19b299a2346093b8cfc29e9102783",
+    "after/xml_attributes.rs": "25dfea29056f4e714136aefb1c0dc536211a86457ee2c52edc9d84284314a89f",
+    "before/canonical_tests.rs": "c3084e1bcb2ee10171745a373d4cc8b843922770e186fd6d6d470bf798bcef1b",
+    "before/xml_attributes.rs": "079d4ce211eab7fa0755528e1ab7a03468fc23d622e3555cc97f39bd18689821",
+    "design.md": "c8e40853b028978e5bbff26285c81588e80b779f3c72d65bfaae76ad898d6c12",
+    "manifest.json": "74b1199d7dbfa3bcb84f103871440fb3d4d42fb6ab286b4a1cd0a039b9acb09a"
+  },
+  "probe": {
+    "Cargo.lock": "3e8c73ff292567e4e0aa9272e9973f9f545bdeb913ad7868dfdcbe8d4382cdd3",
+    "Cargo.toml": "17c6a37fd636ba292f4f15a89bbd41261e4789b314bfa27f1e428aa92e1c6fe4",
+    "Cargo.toml.template": "2f4397015b459035a87f3f00cfdae313d442562af38a558f7ac3544196912b33",
+    "src/allocation_metrics.rs": "6cb160d82e0b03e62a68a945bc2fa787baac41220253fdedb55ad1af37de7728",
+    "src/counting_allocator.rs": "da8d759612b20fcf7e1a63bf82ada108c1e8e0e3668e57315a9cc21dbe416dfa",
+    "src/main.rs": "d26289ad21798dc1718991c85c2a3f73d5ea1e3acca3e9a94231288765d02759"
+  }
+}

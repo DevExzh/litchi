@@ -1,0 +1,9 @@
+{
+  "fix": "rename test helper tag to make_tag",
+  "production_changed": false,
+  "quality_prefix_after": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/quality-failed-0",
+  "quality_prefix_before": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/quality",
+  "reason": "E0618 local tag binding shadowed test helper function",
+  "source_prefix_after": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/hook-test-src-failed-0",
+  "source_prefix_before": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/hook-test-src"
+}

@@ -1,0 +1,74 @@
+{
+  "inputs": {
+    "Cargo.lock": "2b380fe1e23c75871232e780075631f8e08294e0e36763f41ec2a5ead2c9b3af",
+    "Cargo.toml": "22c502ac011af03f8d39ab0d2d6e7c2904d94a55408e3ccce3fcd19a80b9acfe",
+    "src/census_tests_0798.rs": "603c9b4aabf72663e1fb102e8574f45ba0c19b299a2346093b8cfc29e9102783",
+    "src/lib.rs": "df268247aaf11975f6cc7a8452dd3966d362a470e1e8c3d1cd5ac510f83f671e",
+    "src/xml_attributes.rs": "25dfea29056f4e714136aefb1c0dc536211a86457ee2c52edc9d84284314a89f",
+    "src/xml_attributes/tests.rs": "c3084e1bcb2ee10171745a373d4cc8b843922770e186fd6d6d470bf798bcef1b"
+  },
+  "rows": [
+    {
+      "command": [
+        "cargo",
+        "generate-lockfile",
+        "--offline",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0798/hook-test-src/Cargo.toml"
+      ],
+      "ended": 1790551289.8021245,
+      "exit_code": 0,
+      "log": {
+        "bytes": 66,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/quality/0.log",
+        "sha256": "b3ba9ced33cd350838421664dee5405f6fcf09bbc8a87dfaeeec6f49f024fa39"
+      },
+      "started": 1790551289.7733061
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0798/hook-test-src/Cargo.toml",
+        "--",
+        "--test-threads=2",
+        "--skip",
+        "every_copy_of_the_module_is_the_canonical_code"
+      ],
+      "ended": 1790551291.5093822,
+      "exit_code": 0,
+      "log": {
+        "bytes": 2642,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/quality/1.log",
+        "sha256": "17b6c9d4bdac248f74edc957f3cab5a87e57efb6fdef90569d3aeb8f90994b99"
+      },
+      "started": 1790551289.8023388
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0798/hook-test-src/Cargo.toml",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "ended": 1790551291.706911,
+      "exit_code": 0,
+      "log": {
+        "bytes": 197,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/quality/2.log",
+        "sha256": "b2bf9f3916a838f204365ceb478175b87c45b945bcc5fa11169f4845c65fd40c"
+      },
+      "started": 1790551291.5097036
+    }
+  ],
+  "scope": "Exact OPC helper/parser plus diagnostic hook tests; excludes canonical-copy filesystem test because instrumentation is OPC-only"
+}

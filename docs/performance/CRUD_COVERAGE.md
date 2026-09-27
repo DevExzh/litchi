@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0798 — bounded generated-workflow census
+
+[0798](0798-pptx-attribute-consumption-census.md) The OPC caller-thread census covers five existing PPTX fixtures and capture/commit/lifecycle regions. Other owners, skipped iterators and threads are excluded. No real-producer, cold/range, concurrency, or CRUD coverage is promoted.
+
 ## 0797 — helper preflight, no coverage promotion
 
 [0797](0797-xml-first-attribute-preflight.md) Exact helper copies pass isolated differential and boundary tests, but this does not establish full production-crate or public-workflow behavior. No CRUD or producer coverage is promoted.

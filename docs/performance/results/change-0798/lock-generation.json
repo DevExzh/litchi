@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "generate-lockfile",
+    "--offline",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0798/probe-src/Cargo.toml"
+  ],
+  "ended": 1790551230.2231002,
+  "exit_code": 0,
+  "lock": {
+    "bytes": 30232,
+    "path": "docs/performance/results/change-0798/probe-src/Cargo.lock",
+    "sha256": "3e8c73ff292567e4e0aa9272e9973f9f545bdeb913ad7868dfdcbe8d4382cdd3"
+  },
+  "started": 1790551230.0996525
+}

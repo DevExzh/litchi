@@ -1,0 +1,15 @@
+{
+  "files": {
+    "Cargo.lock": "3e8c73ff292567e4e0aa9272e9973f9f545bdeb913ad7868dfdcbe8d4382cdd3",
+    "Cargo.toml": "17c6a37fd636ba292f4f15a89bbd41261e4789b314bfa27f1e428aa92e1c6fe4",
+    "Cargo.toml.template": "2f4397015b459035a87f3f00cfdae313d442562af38a558f7ac3544196912b33",
+    "src/allocation_metrics.rs": "6cb160d82e0b03e62a68a945bc2fa787baac41220253fdedb55ad1af37de7728",
+    "src/counting_allocator.rs": "da8d759612b20fcf7e1a63bf82ada108c1e8e0e3668e57315a9cc21dbe416dfa",
+    "src/main.rs": "45e913d2eaefec04d91220560cdc2b9925cb0c5d338b42b10192951c7e13b800"
+  },
+  "fix": "Scoped dead_code allowance on inherited allocation_metrics module; blank doc paragraph. No workflow or census behavior change.",
+  "original": "build-before",
+  "probe_archive": "probe-src-failed-0",
+  "reason": "Control build/check passed; Clippy rejected unused inherited allocation APIs and doc-list continuation.",
+  "retained": "build-before-failed-0"
+}

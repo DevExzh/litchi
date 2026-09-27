@@ -1,0 +1,36 @@
+   Compiling attribute-census-hook-tests v0.0.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0798/hook-test-src)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.31s
+     Running unittests src/lib.rs (/home/zhuhe/code/litchi-target-0798/hook-tests/debug/deps/attribute_census_hook_tests-fdbe21e5024292c6)
+
+running 22 tests
+test xml_attributes::census_tests_0798::checked_error_is_terminal_even_when_unchecked_scan_finds_tail ... ok
+test xml_attributes::census_tests_0798::clone_resets_local_counts_and_preserves_prefix_lineage ... ok
+test xml_attributes::census_tests_0798::counter_policy_saturates_without_wrapping ... ok
+test xml_attributes::census_tests_0798::disabled_census_does_not_retain_a_row ... ok
+test xml_attributes::census_tests_0798::first_only_and_no_consumption_are_partial_early_drops ... ok
+test xml_attributes::census_tests_0798::foreign_thread_cannot_mutate_the_calling_thread_session ... ok
+test xml_attributes::census_tests_0798::full_consumption_records_end_and_unchecked_lexical_scan ... ok
+test xml_attributes::census_tests_0798::generation_overflow_is_reported_as_saturation ... ok
+test xml_attributes::census_tests_0798::live_instances_are_reported_when_finish_precedes_drop ... ok
+test xml_attributes::census_tests_0798::stale_iterators_from_a_previous_session_are_not_counted ... ok
+test xml_attributes::tests::a_late_duplicate_costs_n_log_n_comparisons ... ok
+test xml_attributes::tests::a_duplicate_anywhere_is_reported_where_quick_xml_reports_it ... ok
+test xml_attributes::tests::comparisons_grow_by_about_the_factor_of_names ... ok
+test xml_attributes::tests::a_tag_of_distinct_names_costs_n_log_n_comparisons_in_any_order ... ok
+test xml_attributes::tests::malformed_attributes_around_the_switch_yield_what_quick_xml_yields ... ok
+test xml_attributes::tests::nothing_is_yielded_after_the_first_error ... ok
+test xml_attributes::tests::quick_xml_checks_the_first_names_and_this_iterator_the_rest ... ok
+test xml_attributes::tests::quick_xml_yields_values_borrowed_from_the_tag ... ok
+test xml_attributes::tests::every_short_tail_after_the_switch_yields_what_quick_xml_yields ... ok
+test xml_attributes::tests::unchecked_attributes_are_quick_xml_without_its_check ... ok
+test xml_attributes::tests::well_formed_tags_yield_what_quick_xml_yields ... ok
+test xml_attributes::tests::random_tags_yield_what_quick_xml_yields ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 1.36s
+
+   Doc-tests attribute_census_hook_tests
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

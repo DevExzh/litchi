@@ -1,0 +1,9 @@
+{
+  "fix": "pass self.tag instead of &self.tag",
+  "production_changed": false,
+  "quality_prefix_after": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/quality-failed-1",
+  "quality_prefix_before": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/quality",
+  "reason": "Clippy needless_borrow in diagnostic Drop hook",
+  "source_prefix_after": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/hook-test-src-failed-1",
+  "source_prefix_before": "/home/zhuhe/code/litchi/docs/performance/results/change-0798/hook-test-src"
+}

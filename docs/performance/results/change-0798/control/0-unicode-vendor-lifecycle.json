@@ -1,0 +1,74 @@
+{
+  "schema": "litchi.pptx.attribute-census-probe.v1",
+  "tool": "attribute-census-probe-0798",
+  "mode": "lifecycle",
+  "shape": "unicode-vendor",
+  "slides": 12,
+  "shapes_per_slide": 8,
+  "timing_scope": "Package::opened_presentation, edit, set_shape_text, commit, apply_opened_presentation_commit, and Package::to_bytes",
+  "marker": "litchi-perf-0780-static-mce-capabilities",
+  "source": {
+    "bytes": 42370,
+    "sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a"
+  },
+  "fixture": {
+    "injection": "same-length-valid-utf8-unknown-uris",
+    "slide_parts": 12,
+    "replaced_text_tags": 96,
+    "namespace_declarations": 6,
+    "namespaced_attributes": 6,
+    "namespace_uris": [
+      "urn:vendor:éuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+      "urn:vendor:éuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+      "urn:vendor:éuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+      "urn:vendor:éuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+      "urn:vendor:éuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+      "urn:vendor:éuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu"
+    ],
+    "attribute_names": [
+      "vP:probeP",
+      "vPS:probePS",
+      "vA:probeA",
+      "vAS:probeAS",
+      "vR:probeR",
+      "vRS:probeRS"
+    ]
+  },
+  "warmup": 0,
+  "samples_requested": 1,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_ns": 2211891,
+      "metrics": {
+        "elapsed_ns": 2211891,
+        "shapes_per_slide": 8,
+        "slides": 12
+      },
+      "source_sha256": "1b18f9837140109e64aba0f28ab23e69e86e52df71360d9773d5b8fd4aae426a",
+      "output": {
+        "bytes": 42386,
+        "sha256": "e6b516c103604d8f1de75861eb1bd36bbf2c39f055d2a11c75acf3f1b1231ac8"
+      },
+      "verification": {
+        "semantic_check": true,
+        "reopened": true,
+        "expected_text": "litchi-perf-0780-static-mce-capabilities",
+        "actual_text": "litchi-perf-0780-static-mce-capabilities",
+        "semantic_text_bytes": 5075,
+        "semantic_text_sha256": "2e7350fb61cb462b0bc2dfe426628cedfa6a0fae9509c7204959984cf59c9f7f",
+        "readback_bytes": 42386,
+        "readback_sha256": "e6b516c103604d8f1de75861eb1bd36bbf2c39f055d2a11c75acf3f1b1231ac8",
+        "marker_matches": true,
+        "unknown_namespace_check": true,
+        "unknown_namespace_occurrences": 96
+      }
+    }
+  ],
+  "allocator": {
+    "binary": "before-probe",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  }
+}
