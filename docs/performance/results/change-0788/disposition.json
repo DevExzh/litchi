@@ -1,0 +1,32 @@
+{
+  "analysis": {
+    "bytes": 9832485,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/analysis.json",
+    "sha256": "146bc2b57b86c763d938a450b7a84fef1c8bb6ade89d8a5ed050f3a9e20e7d55"
+  },
+  "candidate_retained_only_in_archive": true,
+  "cleanup": {
+    "bytes": 1243,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/cleanup.json",
+    "sha256": "04afc22603e60532a3f9a9a7381e4dfcb5429db9ee140cc5cbf649c20eed4840"
+  },
+  "decision": "diagnostic-only",
+  "heap_analysis": {
+    "bytes": 4774409,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/heap-analysis.json",
+    "sha256": "cc16fd3c0a61c2b26b9908c6748cb6d86d52d7c3af631689eb54f1799bd7b74a"
+  },
+  "memory_analysis": {
+    "bytes": 16402412,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/memory-analysis.json",
+    "sha256": "286bc951372dd8a8b245c75e3d61fd067750114f56d631e060a4cb753ab336ff"
+  },
+  "previous_0787_rejection_remains_authoritative": true,
+  "reason": "The fresh native RSS pairs do not reproduce the historical rejection, and every instrumented child exposes a GNU-time versus observed-residency disagreement. The original RSS cause remains unresolved. No adoption or threshold revision; exact baseline restored.",
+  "restored_source": {
+    "bytes": 1182921,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/restored-source.json",
+    "sha256": "cc425326e092ad1f35136b0fa0c6ee5afd66fc54bb86e66031a22e6d4c5901a0"
+  },
+  "schema": "litchi.cached-part-memory-disposition.0788.v1"
+}

@@ -1,0 +1,17 @@
+{
+  "capture_correction": {
+    "bytes": 1322,
+    "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/capture-correction.json",
+    "sha256": "ce181f5b47d8580dc4f83a0c4a9bccbd656263227bab4470b827de1a087fc85e"
+  },
+  "corrections": [
+    "Parse the Linux smaps_rollup synthetic header before numeric counters.",
+    "Decode GNU time %R as minor faults; only the documented ten qualification-before sidecars retain the legacy elapsed_seconds key.",
+    "Parse the installed heaptrack temporary-memory-allocation label; distinguish rounded print sizes from exact histogram and unmerged peak-stack sums.",
+    "Verify restored production against both qualified baseline and live filesystem bytes.",
+    "Use exact executable cleanup witnesses after target removal; serialize stable custody_verified rather than environment-dependent present or custody-mode fields.",
+    "Refresh the aggregate analysis reference after the memory-analysis custody representation changed; all native statistics remain identical."
+  ],
+  "raw_measurements_modified": false,
+  "scope": "Offline verifier and presentation corrections; no native reports, raw traces, snapshots, schedule, plan, or adoption decision changed."
+}

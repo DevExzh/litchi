@@ -1,5 +1,9 @@
 # Performance CRUD coverage
 
+## 0788 — category 15 residency and allocation diagnostics
+
+[0788](0788-cached-part-memory-attribution.md) Adds first/last-sample residency snapshots, source/resource checks, and whole-child allocation profiles for bounded ordered Part reads. No native-format CRUD, physical-cold/range, or cross-session coverage promotion is claimed.
+
 ## 0787 — category 15 paired cache-control evidence
 
 [0787](0787-cached-part-scheduling.md) Fresh and primed ordered Part reads cover three payload sizes, two task floors and widths 1/2/4/8/32. All 22,200 measured samples verify exact bytes/order and finite budgets. Rejection preserves production; native Office CRUD, cold/range and cross-session coverage remain open.

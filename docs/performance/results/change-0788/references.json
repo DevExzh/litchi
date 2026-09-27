@@ -1,0 +1,14 @@
+{
+  "checked_utc_date": "2026-09-27",
+  "sources": [
+    {
+      "url": "https://www.kernel.org/doc/html/latest/filesystems/proc.html",
+      "claim": "Scalable RSS accounting is asynchronous; smaps page-table scanning provides a precise point-in-time snapshot. It does not capture an operation peak."
+    },
+    {
+      "url": "https://man7.org/linux/man-pages/man5/proc_pid_statm.5.html",
+      "claim": "Resident page counters may be inaccurate; smaps or smaps_rollup are recommended for accurate detailed values."
+    }
+  ],
+  "scope": "This motivates independent measurements, not a conclusion that the 0787 rejection was spurious."
+}

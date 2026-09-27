@@ -1,0 +1,34 @@
+[package]
+name = "litchi-perf-execution"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+default = []
+source-metrics = []
+
+[[bin]]
+name = "cached-part-memory"
+path = "main.rs"
+
+[dependencies]
+litchi-cfb = { path = "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/crates/litchi-cfb", features = ["write"] }
+litchi-core = { path = "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/crates/litchi-core" }
+litchi-opc = { path = "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/crates/litchi-opc" }
+rustix = { version = "1.1.4", default-features = false, features = ["time"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+soapberry-zip = { path = "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/crates/soapberry-zip" }
+
+# This is an independent evidence project. The build driver invokes Cargo
+# with this materialized manifest explicitly.
+[workspace]
+
+[profile.release]
+opt-level = 3
+debug = 1
+lto = "thin"
+codegen-units = 1
+incremental = false

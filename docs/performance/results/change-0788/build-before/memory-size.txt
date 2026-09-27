@@ -1,0 +1,43 @@
+/home/zhuhe/code/litchi-target-0788/before-memory  :
+section                  size      addr
+.interp                    28       736
+.note.ABI-tag              32       764
+.note.gnu.build-id         36       796
+.dynsym                  1992       832
+.gnu.version              166      2824
+.gnu.version_r            288      2992
+.gnu.hash                  28      3280
+.dynstr                  1244      3308
+.rela.dyn               60504      4552
+.rela.plt                  48     65056
+.rodata                160712     65104
+.gcc_except_table       45348    225816
+.debug_gdb_scripts         34    271164
+.eh_frame_hdr           20340    271200
+.eh_frame              145296    291544
+.text                 1581707    440944
+.init                      27   2022652
+.fini                      13   2022680
+.plt                       48   2022704
+.tdata                     40   2026848
+.tbss                     144   2026888
+.fini_array                 8   2026888
+.init_array                16   2026896
+.data.rel.ro            38848   2026912
+.dynamic                  448   2065760
+.got                     5488   2066208
+.got.plt                   40   2071696
+.relro_padding            840   2071736
+.tm_clone_table             0   2075832
+.data                    2632   2075832
+.bss                      296   2078464
+.comment                  177         0
+.debug_abbrev           13579         0
+.debug_info           3737120         0
+.debug_aranges          42720         0
+.debug_ranges         1294800         0
+.debug_str            4280276         0
+.debug_line           1189477         0
+Total                12624840
+
+

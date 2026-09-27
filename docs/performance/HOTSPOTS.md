@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0788 — qualify RSS accounting before reconsidering cached scheduling
+
+[0788](0788-cached-part-memory-attribution.md) The prior small cached RSS regression does not reproduce in fresh native pairs. Late target snapshots differ by only 0/4 KiB, while every instrumented child exposes a time-versus-residency discrepancy. Allocation counts fall but whole-child intercepted peaks can rise. The candidate remains rejected; reconcile memory measurement before a new adoption experiment.
+
 ## 0787 — cached scheduler mechanism confirmed, memory guard blocks adoption
 
 [0787](0787-cached-part-scheduling.md) Avoiding private thread creation after all-ready cache admission removes most cache-hit latency. Whole-child small/primed width-4 RSS nevertheless increases 5.70%; the candidate is rejected. Attribute that memory effect before reconsidering, without treating guest instruction counts as native CPU fractions.

@@ -1,0 +1,119 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/probe-src/Cargo.toml",
+      "--",
+      "--check"
+    ],
+    "ended": 1790532815.6486845,
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/quality-0/00.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "started": 1790532815.6041687
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/probe-src/Cargo.toml",
+      "--all-features",
+      "--all-targets"
+    ],
+    "ended": 1790532825.762634,
+    "exit_code": 0,
+    "log": {
+      "bytes": 2893,
+      "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/quality-0/01.log",
+      "sha256": "d69ad6b7bcab7fada50613c0166403ab292a39b729411f0eee4bf323e2834a70"
+    },
+    "started": 1790532815.845499
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/probe-src/Cargo.toml",
+      "--all-features",
+      "--",
+      "--test-threads=2"
+    ],
+    "ended": 1790532837.6775854,
+    "exit_code": 0,
+    "log": {
+      "bytes": 2948,
+      "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/quality-0/02.log",
+      "sha256": "c56825d09dff39cb546a80a47e40b0957bc21a30f44359db10d3022fbeeb3161"
+    },
+    "started": 1790532825.9560583
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/probe-src/Cargo.toml",
+      "--all-features",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "ended": 1790532842.7124708,
+    "exit_code": 0,
+    "log": {
+      "bytes": 209,
+      "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/quality-0/03.log",
+      "sha256": "904e7db07840aa217848fb7efc36e55aded887517ec8bd521265e51b9a9f9445"
+    },
+    "started": 1790532842.448388
+  },
+  {
+    "command": [
+      "cargo",
+      "doc",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/probe-src/Cargo.toml",
+      "--all-features",
+      "--no-deps"
+    ],
+    "ended": 1790532843.5046172,
+    "exit_code": 0,
+    "log": {
+      "bytes": 300,
+      "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/quality-0/04.log",
+      "sha256": "72b3582f6776aca70600a20bea0cff45e11c09ef596e2fdafe4e1d3c234b4a0a"
+    },
+    "started": 1790532842.9118621
+  },
+  {
+    "command": [
+      "python3",
+      "-B",
+      "tools/check_crate_boundaries.py"
+    ],
+    "ended": 1790533108.4112682,
+    "exit_code": 0,
+    "log": {
+      "bytes": 565,
+      "path": "/home/zhuhe/code/litchi-worktrees/0788-cached-part-memory/docs/performance/results/change-0788/quality-0/05.log",
+      "sha256": "9e0e2ab2ac2ef6b534622708ed674217fb34b69d81a73eb96caa3d7dfd0bedc1"
+    },
+    "started": 1790532843.7011266
+  }
+]

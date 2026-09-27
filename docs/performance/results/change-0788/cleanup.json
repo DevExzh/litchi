@@ -1,0 +1,32 @@
+{
+  "binaries": [
+    {
+      "bytes": 13042504,
+      "path": "/home/zhuhe/code/litchi-target-0788/before-memory",
+      "sha256": "d7c94ff3c88b12270031c770cd8f8a817be770f47660606f9a4b52e7fa646835"
+    },
+    {
+      "bytes": 12904296,
+      "path": "/home/zhuhe/code/litchi-target-0788/before-native",
+      "sha256": "a302a28d946d67aaaccd5e55d0f4eff9a307eefafa894533d58470b42351c4a9"
+    },
+    {
+      "bytes": 13062176,
+      "path": "/home/zhuhe/code/litchi-target-0788/after-memory",
+      "sha256": "217a0758faf98b34da414d71c0a19abd4d8aa0c263c52848578f02d5ae9afff2"
+    },
+    {
+      "bytes": 12923968,
+      "path": "/home/zhuhe/code/litchi-target-0788/after-native",
+      "sha256": "735df29a3b18220272d50a3e296d81c29b899f06340ed991af53187ed52d91b8"
+    }
+  ],
+  "executables_verified_before_removal": true,
+  "schema": "litchi.cached-part-memory-cleanup.0788.v1",
+  "source_restored_files": 9196,
+  "target": "/home/zhuhe/code/litchi-target-0788",
+  "target_absent_after_removal": true,
+  "target_bytes_before_removal": 847553767,
+  "verified": true,
+  "worktree_removal": "Owned worktree, branch, copied root lock and three exact third-party symlinks are removed after evidence commit integration; main report records closure."
+}

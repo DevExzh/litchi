@@ -1,0 +1,384 @@
+{
+  "affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ],
+  "bootstrap": {
+    "ci": 0.95,
+    "indexes": [
+      249,
+      9749
+    ],
+    "resamples": 10000,
+    "seed": 788078
+  },
+  "expected_counts": {
+    "all_reports": 220,
+    "all_samples": 5092,
+    "heaptrack_reports": 16,
+    "heaptrack_samples": 480,
+    "memory_off_reports": 32,
+    "memory_off_samples": 496,
+    "memory_on_reports": 32,
+    "memory_on_samples": 496,
+    "native_reports": 120,
+    "native_samples": 3600,
+    "qualification_reports": 20,
+    "qualification_samples": 20
+  },
+  "heaptrack": {
+    "binary": "native",
+    "cases": [
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "fresh",
+        "task_floor": 0,
+        "workers": 4
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 4
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 65536,
+        "workers": 4
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 32
+      }
+    ],
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ]
+    ],
+    "print_merge_backtraces": false,
+    "repeats": 2,
+    "samples": 30,
+    "timings_or_rss_pooled_with_native": false,
+    "warmup": 3
+  },
+  "interpretation": [
+    "Native fresh pairs are a new experiment, never pooled with 0787.",
+    "Kernel RSS high-water, point-in-time smaps and intercepted allocation peak measure different scopes.",
+    "Anonymous mappings are not assumed to be heap or worker stacks without independent evidence.",
+    "All native and diagnostic outputs verify identical logical payload order/bytes and finite task/permit accounting.",
+    "Counter disagreement or a different rerun does not overturn the 0787 rejection."
+  ],
+  "memory": {
+    "ack": "exact two bytes +\\n",
+    "after_package_drop_scope": "after package and context drops; local source Arc, root budget, URIs remain alive",
+    "cases": [
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "fresh",
+        "task_floor": 0,
+        "workers": 4
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 4
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 65536,
+        "workers": 4
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 32
+      }
+    ],
+    "global_phases": [
+      "startup",
+      "corpus_ready",
+      "warmup_done",
+      "samples_done",
+      "report_written",
+      "report_dropped"
+    ],
+    "measured_samples": "first and last only; first==last once; no warmup markers",
+    "orders": [
+      [
+        "off-before",
+        "on-before",
+        "off-after",
+        "on-after"
+      ],
+      [
+        "on-after",
+        "off-after",
+        "on-before",
+        "off-before"
+      ]
+    ],
+    "proc_files": [
+      "smaps",
+      "smaps_rollup",
+      "maps",
+      "status",
+      "stat"
+    ],
+    "protocols": [
+      {
+        "samples": 1,
+        "warmup": 0
+      },
+      {
+        "samples": 30,
+        "warmup": 3
+      }
+    ],
+    "repeats": 2,
+    "sample_phases": [
+      "package_ready",
+      "after_preload",
+      "after_operation",
+      "after_batch_drop",
+      "after_package_drop"
+    ],
+    "snapshots_expected": 432,
+    "task_ids": true,
+    "timings_pooled_with_native": false
+  },
+  "native": {
+    "blocks": 6,
+    "cases": [
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "fresh",
+        "task_floor": 0,
+        "workers": 1
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "fresh",
+        "task_floor": 0,
+        "workers": 4
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "fresh",
+        "task_floor": 0,
+        "workers": 8
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "fresh",
+        "task_floor": 0,
+        "workers": 32
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 1
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 4
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 8
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 32
+      },
+      {
+        "route": "parts",
+        "shape": "large",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 4
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 65536,
+        "workers": 4
+      }
+    ],
+    "orders": [
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "after",
+        "before"
+      ],
+      [
+        "before",
+        "after"
+      ]
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "purpose": "Diagnostic attribution only; exact rejected 0787 candidate always restored. No adoption or threshold revision.",
+  "qualification": {
+    "cases": [
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "fresh",
+        "task_floor": 0,
+        "workers": 1
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "fresh",
+        "task_floor": 0,
+        "workers": 4
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "fresh",
+        "task_floor": 0,
+        "workers": 8
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "fresh",
+        "task_floor": 0,
+        "workers": 32
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 1
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 4
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 8
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 32
+      },
+      {
+        "route": "parts",
+        "shape": "large",
+        "state": "primed",
+        "task_floor": 0,
+        "workers": 4
+      },
+      {
+        "route": "parts",
+        "shape": "small",
+        "state": "primed",
+        "task_floor": 65536,
+        "workers": 4
+      }
+    ],
+    "legs": [
+      "before",
+      "after"
+    ],
+    "samples": 1,
+    "warmup": 0
+  },
+  "schema": "litchi.cached-part-memory.0788.v1"
+}

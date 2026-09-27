@@ -1,0 +1,41 @@
+{
+  "candidate_receipt": {
+    "path": "../change-0787/candidate/archive-receipt.json",
+    "sha256": "3d0cfe75b72cf70d42cf6e314fcb30cb9ad57ea24411c1515a1bb19e2f748ab9"
+  },
+  "files": [
+    {
+      "before_bytes": 919523,
+      "before_sha256": "029dac7bc5dbe173a333bd35f316ec79286e8c15432f0766bc3bbc48ce0c1df3",
+      "candidate_bytes": 924086,
+      "candidate_sha256": "c237b79364c261a0216632a5a991e2ae522622191c4fdddc2a9458776770fbe1",
+      "path": "crates/litchi-opc/src/source_backed.rs"
+    },
+    {
+      "before_bytes": 42039,
+      "before_sha256": "57461fc249e7f9b6729affecd50ebf2685ddea658f0b2b2dfd67085a0eae0491",
+      "candidate_bytes": 47216,
+      "candidate_sha256": "e4bb877c1aa54d5cf13617b547ce33a2aff63c6a7cf2a3984d49aa384b85922b",
+      "path": "crates/litchi-opc/src/source_backed/batch.rs"
+    },
+    {
+      "before_bytes": 46597,
+      "before_sha256": "b6309038bcc105373b80c7dfeee4da3e3b62dc2d21f6239552f9e5fdf53d0137",
+      "candidate_bytes": 59431,
+      "candidate_sha256": "9d4a580e71e86e74d586ebedc78960b3028247baaca8f01f4266e9af8a04abad",
+      "path": "crates/litchi-opc/tests/source_backed_batch.rs"
+    }
+  ],
+  "historical_commit": "f50e22fc3b649c1cc3b964db71b667ebf4028a36",
+  "historical_quality": {
+    "claim": "The exact candidate production source already passed six gates including 994 tests. Fresh probe-specific validation remains required.",
+    "path": "../change-0787/quality.json",
+    "sha256": "00f1597834534858deeb7584884b322852986e7dc6ac7687cab5c837d03a5243"
+  },
+  "patch": {
+    "path": "../change-0787/candidate/model.patch",
+    "sha256": "c2e6e891fc6ee05364a8cfe2d04999763681a2e92e5b74f6c4226b389b5e098a"
+  },
+  "purpose": "Attribution only. Rebuild the exact rejected candidate, then restore baseline regardless of new measurements. No adoption or threshold revision in this batch.",
+  "schema": "litchi.cached-part-memory-candidate.0788.v1"
+}

@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0788 — memory accounting diagnostics
+
+[0788](0788-cached-part-memory-attribution.md) The exact rejected cache candidate is rebuilt for ten native cases and separate phase/allocation diagnostics: 220 reports, 5,092 samples, and 432 snapshots. GNU time maximum RSS falls below acknowledged residency in all 32 instrumented children; the original RSS cause remains unresolved.
+
 ## 0787 — paired cached-Part scheduling experiment
 
 [0787](0787-cached-part-scheduling.md) A 60-case before/after matrix retains six native paired blocks, separate source observers, current baseline Callgrind diagnostics and before/after thread counts. All output/resource checks and six quality gates pass; a small cached RSS guard failure prevents adoption.
