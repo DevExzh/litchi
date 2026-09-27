@@ -1,0 +1,114 @@
+[
+  {
+    "lane": "native",
+    "case": "pptx_cross_copy_plain_lifecycle",
+    "samples": 1,
+    "warmups": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0741-baseline/release/litchi-perf-baseline",
+      "--warmup",
+      "0",
+      "--samples",
+      "1",
+      "--case",
+      "pptx_cross_copy_plain_lifecycle",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0741/baseline-qualification/00.json"
+    ],
+    "started": 1790094008.1863613,
+    "ended": 1790094008.5729733,
+    "exit": 0,
+    "files": {
+      "00.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "00.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "00.json": "13cef3ee45a8199d628b72236497a14bf967e9eda16168e8742095162c39f696"
+    }
+  },
+  {
+    "lane": "native",
+    "case": "pptx_cross_copy_media_rich_lifecycle",
+    "samples": 1,
+    "warmups": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0741-baseline/release/litchi-perf-baseline",
+      "--warmup",
+      "0",
+      "--samples",
+      "1",
+      "--case",
+      "pptx_cross_copy_media_rich_lifecycle",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0741/baseline-qualification/01.json"
+    ],
+    "started": 1790094008.5747602,
+    "ended": 1790094011.8568258,
+    "exit": 0,
+    "files": {
+      "01.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "01.json": "84ed64c0ae18c724b9dd29cc610bf3a6b16bb1e2b22be6f7e45d1ab21233a1fe",
+      "01.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "lane": "allocation",
+    "case": "pptx_cross_copy_plain_lifecycle",
+    "samples": 1,
+    "warmups": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0741-baseline/release/litchi-perf-baseline-alloc",
+      "--warmup",
+      "0",
+      "--samples",
+      "1",
+      "--case",
+      "pptx_cross_copy_plain_lifecycle",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0741/baseline-qualification/02.json"
+    ],
+    "started": 1790094011.858773,
+    "ended": 1790094012.2497826,
+    "exit": 0,
+    "files": {
+      "02.json": "31eed3100cf60a8759424fa9ba3fed4b49084f3c5ce4ec592211def18a46853d",
+      "02.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "02.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "lane": "allocation",
+    "case": "pptx_cross_copy_media_rich_lifecycle",
+    "samples": 1,
+    "warmups": 0,
+    "command": [
+      "taskset",
+      "-c",
+      "12",
+      "/home/zhuhe/code/litchi-target-0741-baseline/release/litchi-perf-baseline-alloc",
+      "--warmup",
+      "0",
+      "--samples",
+      "1",
+      "--case",
+      "pptx_cross_copy_media_rich_lifecycle",
+      "--json",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0741/baseline-qualification/03.json"
+    ],
+    "started": 1790094012.251474,
+    "ended": 1790094015.5206861,
+    "exit": 0,
+    "files": {
+      "03.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "03.json": "905f154e0cc38b51333d83bec757d45ef5bf06b776b24293e358c6c0f9bdf0ed",
+      "03.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+]

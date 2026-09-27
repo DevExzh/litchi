@@ -1,0 +1,134 @@
+{
+  "pptx_cross_copy_plain_lifecycle": {
+    "case": "pptx_cross_copy_plain_lifecycle",
+    "corpus": {
+      "name": "pptx_cross_copy_plain_lifecycle",
+      "generator": "litchi-pptx-cross-slide-copy-evidence-v1",
+      "package_format": "PPTX/OPC/ZIP",
+      "shape": "plain",
+      "payload_kind": "deterministic-slide-text",
+      "compression": "deflate",
+      "entry_count": 23,
+      "archive_member_count": 41,
+      "entry_bytes": 76,
+      "uncompressed_payload_bytes": 84715,
+      "archive_bytes": 30539,
+      "archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+      "target_entry": "source-slide:2/destination-slide:1/position:1",
+      "target_payload_bytes": 76,
+      "target_payload_sha256": "9ac62cfc7da10f3c8e81c97cbb04d527499792f9eb629336bc11378788f719aa",
+      "xlsx": null
+    },
+    "sink": {
+      "accepted_bytes": 31545,
+      "write_calls": 1,
+      "largest_write": 31545,
+      "write_size_buckets": {
+        "bytes_0": 0,
+        "bytes_1_to_512": 0,
+        "bytes_513_to_4096": 0,
+        "bytes_4097_to_16384": 0,
+        "bytes_16385_to_65536": 1,
+        "bytes_over_65536": 0
+      }
+    },
+    "cross_copy": {
+      "implementation": "Package::from_vec + opened::CrossSlideCopyPlan + Package::apply_cross_slide_copy_plan + OpcPackage::to_stream",
+      "timing_scope": "lifecycle_ns and operation_metrics cover owned source/destination ingress, opened snapshots, plan, atomic cross-copy commit, and final OPC sequential publication; corpus clones and sink reservation are outside; plan/commit/publication are nested diagnostics; reopen and all semantic/package/closure/refusal/source checks are outside",
+      "performance_claim": "none: opt-in correctness, lifecycle, and operation-allocation evidence only; no release ABBA, speedup, RSS, physical-I/O, or full-retention memory claim",
+      "source_archive_sha256": "8ab4513642f48d99fa46e83b2c2764e8b20d417d3933ce3d5efe0825b21f918e",
+      "destination_archive_sha256": "85fff18da5a020ed3f26897a58cdc839255ba769f89a3dea75c1de55e859ec6f",
+      "expected_output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22",
+      "source_slide": 2,
+      "destination_slide": 1,
+      "insertion_position": 1,
+      "source_slide_name": "Slide 258",
+      "destination_slide_name": "Slide 257",
+      "destination_slide_count_before": 2,
+      "destination_slide_count_after": 3,
+      "planned_part_count": 1,
+      "planned_bytes": 1419,
+      "external_relationship_count": 0,
+      "collision_remapped_parts": 1,
+      "gates": {
+        "semantic_output_verified": true,
+        "package_topology_verified": true,
+        "dependency_closure_verified": true,
+        "source_immutability_verified": true,
+        "collision_remap_verified": true,
+        "durable_patch_round_trip_verified": true,
+        "borrowed_provenance_refusal_verified": true,
+        "stale_source_refusal_verified": true,
+        "stale_destination_refusal_verified": true,
+        "foreign_source_refusal_verified": true
+      }
+    },
+    "output_sha256": "3e9ae2805a5dfd8e57ceff4a3662a2772f4197850252f7a23df8e6525d58ee22"
+  },
+  "pptx_cross_copy_media_rich_lifecycle": {
+    "case": "pptx_cross_copy_media_rich_lifecycle",
+    "corpus": {
+      "name": "pptx_cross_copy_media_rich_lifecycle",
+      "generator": "litchi-pptx-cross-slide-copy-evidence-v1",
+      "package_format": "PPTX/OPC/ZIP",
+      "shape": "media-rich",
+      "payload_kind": "deterministic-incompressible-media-and-slide-text",
+      "compression": "deflate",
+      "entry_count": 31,
+      "archive_member_count": 49,
+      "entry_bytes": 76,
+      "uncompressed_payload_bytes": 16866277,
+      "archive_bytes": 16814664,
+      "archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "target_entry": "source-slide:2/destination-slide:1/position:1",
+      "target_payload_bytes": 76,
+      "target_payload_sha256": "9ac62cfc7da10f3c8e81c97cbb04d527499792f9eb629336bc11378788f719aa",
+      "xlsx": null
+    },
+    "sink": {
+      "accepted_bytes": 33599873,
+      "write_calls": 513,
+      "largest_write": 65536,
+      "write_size_buckets": {
+        "bytes_0": 0,
+        "bytes_1_to_512": 0,
+        "bytes_513_to_4096": 0,
+        "bytes_4097_to_16384": 0,
+        "bytes_16385_to_65536": 513,
+        "bytes_over_65536": 0
+      }
+    },
+    "cross_copy": {
+      "implementation": "Package::from_vec + opened::CrossSlideCopyPlan + Package::apply_cross_slide_copy_plan + OpcPackage::to_stream",
+      "timing_scope": "lifecycle_ns and operation_metrics cover owned source/destination ingress, opened snapshots, plan, atomic cross-copy commit, and final OPC sequential publication; corpus clones and sink reservation are outside; plan/commit/publication are nested diagnostics; reopen and all semantic/package/closure/refusal/source checks are outside",
+      "performance_claim": "none: opt-in correctness, lifecycle, and operation-allocation evidence only; no release ABBA, speedup, RSS, physical-I/O, or full-retention memory claim",
+      "source_archive_sha256": "830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b",
+      "destination_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "expected_output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "source_slide": 2,
+      "destination_slide": 1,
+      "insertion_position": 1,
+      "source_slide_name": "Slide 258",
+      "destination_slide_name": "Slide 257",
+      "destination_slide_count_before": 2,
+      "destination_slide_count_after": 3,
+      "planned_part_count": 9,
+      "planned_bytes": 16784397,
+      "external_relationship_count": 0,
+      "collision_remapped_parts": 9,
+      "gates": {
+        "semantic_output_verified": true,
+        "package_topology_verified": true,
+        "dependency_closure_verified": true,
+        "source_immutability_verified": true,
+        "collision_remap_verified": true,
+        "durable_patch_round_trip_verified": true,
+        "borrowed_provenance_refusal_verified": true,
+        "stale_source_refusal_verified": true,
+        "stale_destination_refusal_verified": true,
+        "foreign_source_refusal_verified": true
+      }
+    },
+    "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f"
+  }
+}

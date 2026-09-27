@@ -1,0 +1,54 @@
+{
+  "runs": [
+    {
+      "command": [
+        "cargo",
+        "generate-lockfile",
+        "--offline",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0741/legacy-fixture/Cargo.toml"
+      ],
+      "exit": 0,
+      "started": 1790094703.9135275,
+      "ended": 1790094704.0049818,
+      "log": "legacy-capture-0.log",
+      "sha256": "288fef36769f0a4e7cdb58e4f0619dac7c5961a7bf83e6c27160ab1bb570696f"
+    },
+    {
+      "command": [
+        "cargo",
+        "run",
+        "--release",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0741/legacy-fixture/Cargo.toml",
+        "--",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0741/legacy-fixture/captured"
+      ],
+      "exit": 0,
+      "started": 1790094704.005113,
+      "ended": 1790094704.9010642,
+      "log": "legacy-capture-1.log",
+      "sha256": "9be7d734daf08d5df5286b700a0b3a726822ceae8825f7092caf5c795fe7cb65"
+    }
+  ],
+  "binary": "/home/zhuhe/code/litchi-target-0741-baseline/release/change0741-legacy-fixture",
+  "binary_sha256": "66dcb9e3c851564dc21c781c57593d3912282323d055206a65d12c911f6a10bb",
+  "binary_bytes": 65459968,
+  "source_sha256": "0efa756c06209664538f2819b501d4b234da2214e621f891d1dd05dc26190e32",
+  "generator": {
+    "legacy-fixture/Cargo.lock": "a16010940f164060e7b3c157671337cd589cfafba94a32885b98d97a768c43df",
+    "legacy-fixture/README.md": "d407e78d78a13d9a95d4b848c934ba89e2c38be73c080efdc6ca0515556a884b",
+    "legacy-fixture/Cargo.toml": "8f79b94ca59ef13e0868c64c59f40c2cd8027ceb3cbebd3464ccb377511bee83",
+    "legacy-fixture/src/main.rs": "548717ff4bfb4733b167fcf397d939d007aa06d82f01e67dd9518461053dc3d1"
+  },
+  "captured": {
+    "legacy-fixture/captured/expected-target.pptx": "ef7ae02f68964aa96071903b8d3481502882a20e416cc5201b94acd936ed88b6",
+    "legacy-fixture/captured/source.pptx": "d39dbc9fa63f17b3e1efd3e22e1dac6ffeb9e471b6aa27486669538e9a33d61a",
+    "legacy-fixture/captured/destination.pptx": "afc1033306bb423742c9d057b7a50a7e4cbb546a0a7737b66ae299cd2ba30b15",
+    "legacy-fixture/captured/forward.patch": "b5b5b24b01b5ae49911f5f05e938978d2ff0f683cf61b939fe26246f903dfb45",
+    "legacy-fixture/captured/MANIFEST.tsv": "103c028ec31abfab484ac2a16eb9f8dc0b4fff6e31149fef441e5f27d74e6397",
+    "legacy-fixture/captured/inverse.patch": "e74c5bcaeacafcfb21e3f6ba37cc607a3a1b346f43d8c13d223a9f70291c56af"
+  }
+}

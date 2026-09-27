@@ -1,0 +1,34 @@
+[
+  {
+    "command": [
+      "cargo",
+      "generate-lockfile",
+      "--offline",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0741/legacy-fixture/Cargo.toml"
+    ],
+    "exit": 0,
+    "started": 1790094703.9135275,
+    "ended": 1790094704.0049818,
+    "log": "legacy-capture-0.log",
+    "sha256": "288fef36769f0a4e7cdb58e4f0619dac7c5961a7bf83e6c27160ab1bb570696f"
+  },
+  {
+    "command": [
+      "cargo",
+      "run",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0741/legacy-fixture/Cargo.toml",
+      "--",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0741/legacy-fixture/captured"
+    ],
+    "exit": 0,
+    "started": 1790094704.005113,
+    "ended": 1790094704.9010642,
+    "log": "legacy-capture-1.log",
+    "sha256": "9be7d734daf08d5df5286b700a0b3a726822ceae8825f7092caf5c795fe7cb65"
+  }
+]
