@@ -1,0 +1,258 @@
+{
+  "ack": "+\n",
+  "affinities": {
+    "all": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "single": [
+      0
+    ]
+  },
+  "build_flags": [
+    "-std=c11",
+    "-O2",
+    "-g",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-pthread"
+  ],
+  "cases": [
+    {
+      "mib": 0,
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "mib": 0,
+      "touch": "main",
+      "workers": 4
+    },
+    {
+      "mib": 0,
+      "touch": "workers",
+      "workers": 4
+    },
+    {
+      "mib": 1,
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "mib": 1,
+      "touch": "main",
+      "workers": 4
+    },
+    {
+      "mib": 1,
+      "touch": "workers",
+      "workers": 4
+    },
+    {
+      "mib": 4,
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "mib": 4,
+      "touch": "main",
+      "workers": 4
+    },
+    {
+      "mib": 4,
+      "touch": "workers",
+      "workers": 4
+    },
+    {
+      "mib": 16,
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "mib": 16,
+      "touch": "main",
+      "workers": 4
+    },
+    {
+      "mib": 16,
+      "touch": "workers",
+      "workers": 4
+    },
+    {
+      "mib": 64,
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "mib": 64,
+      "touch": "main",
+      "workers": 4
+    },
+    {
+      "mib": 64,
+      "touch": "workers",
+      "workers": 4
+    },
+    {
+      "mib": 4,
+      "touch": "main",
+      "workers": 32
+    },
+    {
+      "mib": 4,
+      "touch": "workers",
+      "workers": 32
+    }
+  ],
+  "expected": {
+    "checkpoints": 1656,
+    "identity_snapshots": 816,
+    "matrix_children": 272,
+    "matrix_full_snapshots": 816,
+    "trace_children": 4,
+    "trace_full_snapshots": 24
+  },
+  "orders": [
+    [
+      "direct-identity",
+      "direct-full",
+      "time-identity",
+      "time-full"
+    ],
+    [
+      "time-full",
+      "time-identity",
+      "direct-full",
+      "direct-identity"
+    ]
+  ],
+  "phases": [
+    "startup",
+    "mapped",
+    "touched",
+    "workers_joined",
+    "unmapped",
+    "final"
+  ],
+  "protocol": "RSS0789 phase pid self_maxrss_kib minflt majflt mapped_bytes checksum; ACK0789 phase pid self_maxrss_kib minflt majflt",
+  "purpose": "Qualify memory accounting with known resident anonymous pages; no library candidate, adoption, or policy revision.",
+  "qualification": [
+    "mib_over_limit",
+    "workers_over_limit",
+    "unknown_touch",
+    "workers_touch_without_workers",
+    "eof_ack",
+    "wrong_ack"
+  ],
+  "qualification_scope": "Nine checks outside the 276 successful accounting children: six negative cases and three ASan/UBSan protocol/page-integrity cases; sanitizer values never pooled.",
+  "repeats": 2,
+  "sanitizer_flags": [
+    "-fsanitize=address,undefined",
+    "-fno-omit-frame-pointer"
+  ],
+  "sanitizer_qualification": [
+    {
+      "mib": 0,
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "mib": 64,
+      "touch": "workers",
+      "workers": 4
+    },
+    {
+      "mib": 4,
+      "touch": "main",
+      "workers": 32
+    }
+  ],
+  "schema": "litchi.rss-accounting-calibration.0789.v1",
+  "scope": [
+    "All native children and syscall traces run serially under root.",
+    "No phase snapshot captures an unobserved transient peak.",
+    "Self getrusage, direct parent wait4, GNU time child wait4, and strace wrapper aggregate usage remain explicitly distinct.",
+    "Two repeats describe controlled observations, not confidence intervals or performance gains.",
+    "All worker threads join before any post-touch snapshot.",
+    "No source/test/API changes or lowered 0787 adoption guard."
+  ],
+  "snapshot_full": [
+    "smaps",
+    "smaps_rollup",
+    "maps",
+    "status",
+    "stat",
+    "task_ids",
+    "exe"
+  ],
+  "snapshot_identity": [
+    "stat",
+    "task_ids",
+    "exe"
+  ],
+  "traces": [
+    {
+      "affinity": "single",
+      "launcher": "time",
+      "mib": 0,
+      "observer": "full",
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "affinity": "all",
+      "launcher": "time",
+      "mib": 0,
+      "observer": "full",
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "affinity": "single",
+      "launcher": "time",
+      "mib": 64,
+      "observer": "full",
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "affinity": "all",
+      "launcher": "time",
+      "mib": 64,
+      "observer": "full",
+      "touch": "main",
+      "workers": 0
+    }
+  ]
+}

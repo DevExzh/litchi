@@ -1,0 +1,86 @@
+{
+  "affinity": "all",
+  "binary": {
+    "bytes": 40416,
+    "path": "/home/zhuhe/code/litchi-target-0789/probe",
+    "sha256": "a2c647f3334ca12cc5abac1bbde2985b69306b2bb9fd8ab1c05eacf841cc3aef"
+  },
+  "case": {
+    "mib": 64,
+    "touch": "main",
+    "workers": 0
+  },
+  "command": [
+    "/usr/bin/taskset",
+    "-c",
+    "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+    "/usr/bin/strace",
+    "-v",
+    "-f",
+    "-qq",
+    "-e",
+    "trace=execve,getrusage,wait4",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0789/trace-detail/003.strace.log",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0789/trace-detail/003.time.txt",
+    "/home/zhuhe/code/litchi-target-0789/probe",
+    "--mib",
+    "64",
+    "--workers",
+    "0",
+    "--touch",
+    "main"
+  ],
+  "ended": 1790535683.8687823,
+  "error": null,
+  "gnu_time": {
+    "bytes": 14,
+    "path": "trace-detail/003.time.txt",
+    "sha256": "603e0f8fdc06ef6e5d18e0f2a3674a62e4f73620dffe5b3a9fa0393af69bb16e"
+  },
+  "index": 3,
+  "launcher": "time",
+  "observer": "full",
+  "points": {
+    "bytes": 3664,
+    "path": "trace-detail/003.points.json.gz",
+    "sha256": "3878717072b34d49a9075986397e756c1946adaf66b7a3beb0f8fa4f8cd9f79e"
+  },
+  "repeat": 0,
+  "schema": "litchi.rss-accounting-child.0789.v1",
+  "spawn_method": "os.posix_spawn taskset exec",
+  "started": 1790535683.8472152,
+  "stderr": {
+    "bytes": 0,
+    "path": "trace-detail/003.stderr.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "strace": {
+    "bytes": 6997,
+    "path": "trace-detail/003.strace.log",
+    "sha256": "9629edda077ad8bbbcd8d5fb8ffe4eab5cbb90a484547af26221cebbff12f37b"
+  },
+  "trace": true,
+  "transcript": {
+    "bytes": 507,
+    "path": "trace-detail/003.transcript.txt",
+    "sha256": "c08e2dda64b9b0d9c441fa666cc059cd8d07707587c605af3d5df124130c9df8"
+  },
+  "wait4": {
+    "exit_code": 0,
+    "pid": 562404,
+    "rusage": {
+      "major_faults": 0,
+      "maxrss_kib": 67016,
+      "minor_faults": 16948,
+      "system_seconds": 0.012513,
+      "user_seconds": 0.005083
+    },
+    "status": 0
+  },
+  "wrapper_pid": 562404
+}

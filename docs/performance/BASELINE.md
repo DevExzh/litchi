@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0789 — known-page RSS calibration
+
+[0789](0789-rss-accounting-calibration.md) A standalone 272-child matrix plus eight separately scoped traces reproduces resource-counter versus resident-page differences. All 280 children and 864 full snapshots validate; this is calibration, with no library speedup or adoption claim.
+
 ## 0788 — memory accounting diagnostics
 
 [0788](0788-cached-part-memory-attribution.md) The exact rejected cache candidate is rebuilt for ten native cases and separate phase/allocation diagnostics: 220 reports, 5,092 samples, and 432 snapshots. GNU time maximum RSS falls below acknowledged residency in all 32 instrumented children; the original RSS cause remains unresolved.

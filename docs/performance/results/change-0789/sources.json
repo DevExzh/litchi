@@ -1,0 +1,254 @@
+{
+  "schema": "litchi.rss-accounting-source-review.0789.v1",
+  "checked_utc_date": "2026-09-27",
+  "host": {
+    "uname": "7.0.0-1012-aws",
+    "online_cpus": 32,
+    "page_size": 4096,
+    "time_binary": {
+      "path": "/usr/bin/time",
+      "package": "time",
+      "version": "1.9-0.4",
+      "sha256": "919efdcc04c1dbc7a1479c2f3310d491c95f028e1762a84c47810ac0ec1c0d88",
+      "dynamic_symbol": "wait3@GLIBC_2.2.5"
+    },
+    "host_header_files": {
+      "/usr/src/linux-aws-headers-7.0.0-1012/include/linux/mm.h": "92c812f7d025c2edafba391fcbda7e2f62ff2763c0d2682dbb02696d194b1f59",
+      "/usr/src/linux-aws-headers-7.0.0-1012/include/linux/percpu_counter.h": "4a107bc381b3b5425b8ff441f7487d97ba6883dc6f5b426c4bd361ad7cbef896",
+      "/usr/src/linux-aws-headers-7.0.0-1012/include/uapi/linux/resource.h": "42f158b8dbdb7ad125a7d8c294e58a7f1a0a14107522fbaa2bb7fd92f1ba1922"
+    }
+  },
+  "sources": [
+    {
+      "id": "gnu-time-v1.9-resuse",
+      "kind": "upstream-source",
+      "url": "https://git.savannah.gnu.org/cgit/time.git/tree/src/resuse.c?id=d0a4b03f564a282da1efa981dc806b47c94871a2",
+      "revision": "d0a4b03f564a282da1efa981dc806b47c94871a2",
+      "lines": "81-92",
+      "claim": "GNU Time v1.9 obtains the child rusage through wait3 and stores it in the report structure."
+    },
+    {
+      "id": "gnu-time-v1.9-format",
+      "kind": "upstream-source",
+      "url": "https://git.savannah.gnu.org/cgit/time.git/tree/src/time.c?id=d0a4b03f564a282da1efa981dc806b47c94871a2",
+      "revision": "d0a4b03f564a282da1efa981dc806b47c94871a2",
+      "lines": "507-509",
+      "claim": "%M prints ru_maxrss through the configured KiB accessor and does not read procfs."
+    },
+    {
+      "id": "gnu-time-v1.9-units",
+      "kind": "upstream-source",
+      "url": "https://git.savannah.gnu.org/cgit/time.git/tree/configure.ac?id=d0a4b03f564a282da1efa981dc806b47c94871a2",
+      "revision": "d0a4b03f564a282da1efa981dc806b47c94871a2",
+      "lines": "77-104",
+      "claim": "Linux is configured as returning ru_maxrss in KiB; the rusage-kb accessor is therefore a no-op conversion."
+    },
+    {
+      "id": "gnu-time-v1.9-rusage-kb",
+      "kind": "upstream-source",
+      "url": "https://git.savannah.gnu.org/cgit/time.git/tree/src/rusage-kb.h?id=d0a4b03f564a282da1efa981dc806b47c94871a2",
+      "revision": "d0a4b03f564a282da1efa981dc806b47c94871a2",
+      "lines": "22-69",
+      "claim": "The Linux ru_maxrss unit assumption and the direct maxrss accessor are explicit."
+    },
+    {
+      "id": "gnu-time-v1.9-fork-exec",
+      "kind": "upstream-source",
+      "url": "https://git.savannah.gnu.org/cgit/time.git/tree/src/time.c?id=d0a4b03f564a282da1efa981dc806b47c94871a2",
+      "revision": "d0a4b03f564a282da1efa981dc806b47c94871a2",
+      "lines": "730-746",
+      "claim": "GNU Time v1.9 creates the measured command with ordinary fork and then execvp."
+    },
+    {
+      "id": "glibc-wait3",
+      "kind": "upstream-source",
+      "url": "https://sourceware.org/git/?p=glibc.git;a=blob;f=posix/wait3.c;hb=HEAD",
+      "lines": "24-40",
+      "claim": "glibc implements wait3 by calling wait4 with WAIT_ANY."
+    },
+    {
+      "id": "glibc-linux-wait4",
+      "kind": "upstream-source",
+      "url": "https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/unix/sysv/linux/wait4.c;hb=HEAD",
+      "lines": "22-60",
+      "claim": "The Linux glibc wait4 implementation passes the rusage pointer to the wait4 system call when the ABI is available."
+    },
+    {
+      "id": "glibc-posix-spawn",
+      "kind": "upstream-source",
+      "url": "https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/unix/sysv/linux/spawni.c;hb=refs/tags/glibc-2.43",
+      "revision": "glibc-2.43",
+      "lines": "31-47,389-438",
+      "claim": "Linux posix_spawn uses clone with CLONE_VM and CLONE_VFORK, so the child shares the caller's memory space until execve or _exit and the caller is suspended."
+    },
+    {
+      "id": "linux-v7-exec-mmap",
+      "kind": "upstream-source",
+      "url": "https://github.com/torvalds/linux/blob/v7.0/fs/exec.c",
+      "revision": "v7.0",
+      "lines": "837-898",
+      "claim": "Linux exec_mmap records the old address space's RSS high-water in signal->maxrss before releasing the old mm."
+    },
+    {
+      "id": "linux-v7-copy-signal",
+      "kind": "upstream-source",
+      "url": "https://github.com/torvalds/linux/blob/v7.0/kernel/fork.c",
+      "revision": "v7.0",
+      "lines": "1693-1708,2217-2224",
+      "claim": "An ordinary non-thread fork creates a fresh zeroed signal structure before copying the child's memory state."
+    },
+    {
+      "id": "linux-v7-dup-mm",
+      "kind": "upstream-source",
+      "url": "https://github.com/torvalds/linux/blob/v7.0/kernel/fork.c",
+      "revision": "v7.0",
+      "lines": "1515-1537,1575-1584",
+      "claim": "A fork without CLONE_VM duplicates the mm and resets the child mm high-water RSS to its current approximate RSS."
+    },
+    {
+      "id": "linux-v7-getrusage",
+      "kind": "upstream-source",
+      "url": "https://github.com/torvalds/linux/blob/v7.0/kernel/sys.c",
+      "revision": "v7.0",
+      "lines": "1846-1943",
+      "claim": "Linux getrusage uses the signal high-water fields, obtains live mm high-water through setmax_mm_hiwater_rss, and converts pages to KiB."
+    },
+    {
+      "id": "linux-v7-wait4-exit",
+      "kind": "upstream-source",
+      "url": "https://github.com/torvalds/linux/blob/v7.0/kernel/exit.c",
+      "revision": "v7.0",
+      "lines": "930-939,1240-1264,1846-1915",
+      "claim": "Linux records group maxrss at exit and returns child rusage from wait4 using RUSAGE_BOTH."
+    },
+    {
+      "id": "linux-v7-mm-counters",
+      "kind": "upstream-source",
+      "url": "https://github.com/torvalds/linux/blob/v7.0/include/linux/mm.h",
+      "revision": "v7.0",
+      "lines": "3061-3161",
+      "claim": "get_mm_rss uses the approximate per-cpu-counter read, while get_mm_rss_sum and setmax_mm_hiwater_rss expose the distinct paths."
+    },
+    {
+      "id": "linux-v7-proc-task-mem",
+      "kind": "upstream-source",
+      "url": "https://github.com/torvalds/linux/blob/v7.0/fs/proc/task_mmu.c",
+      "revision": "v7.0",
+      "lines": "37-84,1329-1368,1397-1470",
+      "claim": "proc status sums RSS components and takes the maximum of cached high-water and current RSS; smaps uses a page-table walk."
+    },
+    {
+      "id": "linux-v7-percpu-counter",
+      "kind": "upstream-source",
+      "url": "https://github.com/torvalds/linux/blob/v7.0/lib/percpu_counter.c",
+      "revision": "v7.0",
+      "lines": "93-184,255-263",
+      "claim": "Per-cpu updates are batched, the sum path folds every online/dying CPU local value, and the default batch is max(32, nr_online_cpus()*2)."
+    },
+    {
+      "id": "linux-v7-percpu-header",
+      "kind": "upstream-source",
+      "url": "https://github.com/torvalds/linux/blob/v7.0/include/linux/percpu_counter.h",
+      "revision": "v7.0",
+      "lines": "81-125",
+      "claim": "The read accessor returns the shared count while the sum accessor invokes the full per-cpu sum."
+    },
+    {
+      "id": "linux-v7-resource-uapi",
+      "kind": "upstream-source",
+      "url": "https://github.com/torvalds/linux/blob/v7.0/include/uapi/linux/resource.h",
+      "revision": "v7.0",
+      "lines": "19-24",
+      "claim": "RUSAGE_BOTH is the internal rusage selector used by sys_wait4."
+    },
+    {
+      "id": "man-getrusage",
+      "kind": "primary-documentation",
+      "url": "https://man7.org/linux/man-pages/man2/getrusage.2.html",
+      "claim": "Linux documents ru_maxrss in KiB and distinguishes child accounting from a process-tree maximum."
+    },
+    {
+      "id": "man-wait4",
+      "kind": "primary-documentation",
+      "url": "https://man7.org/linux/man-pages/man2/wait4.2.html",
+      "claim": "wait3 is a library function implemented on Linux over wait4 and returns child rusage."
+    },
+    {
+      "id": "kernel-proc-rss",
+      "kind": "primary-documentation",
+      "url": "https://www.kernel.org/doc/html/latest/filesystems/proc.html",
+      "claim": "The proc documentation distinguishes scalable RSS counters from smaps page-table scanning."
+    }
+  ],
+  "capture_validation": {
+    "source": "matrix/*.json and matrix/*.points.json.gz",
+    "direct_rows": 136,
+    "direct_wait4_equals_largest_self_sample": true,
+    "direct_full_startup": {
+      "rows": 68,
+      "self_maxrss_kib": [17708, 19372],
+      "status_vmrss_kib": [1804, 1816],
+      "status_vmhwm_kib": [1804, 1816]
+    },
+    "gnu_time_full_startup": {
+      "rows": 68,
+      "self_maxrss_kib": [1364, 1480],
+      "status_vmrss_kib": [1804, 1816],
+      "status_vmhwm_kib": [1804, 1816]
+    },
+    "gnu_time_4m_workers32_full": [
+      {
+        "matrix": "matrix/131",
+        "repeat": 0,
+        "affinity": "all",
+        "gnu_time_maxrss_kib": 4296,
+        "max_smaps_rss_kib": 6080,
+        "max_status_vmhwm_kib": 6080,
+        "smaps_minus_gnu_time_kib": 1784
+      },
+      {
+        "matrix": "matrix/135",
+        "repeat": 0,
+        "affinity": "single",
+        "gnu_time_maxrss_kib": 6132,
+        "max_smaps_rss_kib": 6084,
+        "max_status_vmhwm_kib": 6132,
+        "smaps_minus_gnu_time_kib": -48
+      },
+      {
+        "matrix": "matrix/264",
+        "repeat": 1,
+        "affinity": "all",
+        "gnu_time_maxrss_kib": 4040,
+        "max_smaps_rss_kib": 6080,
+        "max_status_vmhwm_kib": 6080,
+        "smaps_minus_gnu_time_kib": 2040
+      },
+      {
+        "matrix": "matrix/268",
+        "repeat": 1,
+        "affinity": "single",
+        "gnu_time_maxrss_kib": 6132,
+        "max_smaps_rss_kib": 6080,
+        "max_status_vmhwm_kib": 6132,
+        "smaps_minus_gnu_time_kib": -52
+      }
+    ]
+  },
+  "interpretation": {
+    "verified": [
+      "The installed GNU Time binary enters through wait3 and formats %M from wait-provided ru_maxrss.",
+      "The installed package is configured for Linux ru_maxrss KiB semantics according to the matching upstream v1.9 source.",
+      "The host kernel headers use approximate per-cpu reads for get_mm_rss and summed per-cpu reads for proc memory reporting.",
+      "The upstream v7.0 per-cpu counter batch is max(32, online CPUs * 2), which is 64 pages for this 32-CPU host.",
+      "All 136 direct rows have parent wait4 ru_maxrss equal to the largest probe self ru_maxrss sample; this verifies direct-path agreement but not launcher independence.",
+      "The capture records os.posix_spawn taskset exec, and upstream glibc/Linux sources document the CLONE_VM/CLONE_VFORK, exec_mmap, ordinary fork, and dup_mm paths used to interpret that topology."
+    ],
+    "inference": [
+      "Unflushed RSS per-cpu residues are a plausible explanation for the 0788 GNU-time-to-proc gaps; the 0789 known-page and affinity controls must test it.",
+      "The direct taskset exec can retain the capture process's prior mm high-water in the probe signal maxrss, while GNU Time's ordinary fork resets that inherited signal state; the direct 17--19 MiB startup samples versus roughly 1.8 MiB proc RSS match this source-backed interpretation.",
+      "Direct wait4 and GNU-time %M must not be pooled as interchangeable observations in this packet because their launcher topologies differ; use an ordinary fork/exec or fresh low-high-water helper for the decisive same-topology comparison.",
+      "The exact Ubuntu AWS kernel and glibc vendor C-source correspondence was not independently diffed, so upstream source behavior is not asserted as a complete vendor-source proof."
+    ]
+  }
+}

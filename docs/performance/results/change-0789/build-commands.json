@@ -1,0 +1,46 @@
+[
+  {
+    "command": [
+      "/usr/bin/cc",
+      "-std=c11",
+      "-O2",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-pthread",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0789/probe.c",
+      "-o",
+      "/home/zhuhe/code/litchi-target-0789/probe"
+    ],
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "build-probe.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "command": [
+      "/usr/bin/cc",
+      "-std=c11",
+      "-O2",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-pthread",
+      "-fsanitize=address,undefined",
+      "-fno-omit-frame-pointer",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0789/probe.c",
+      "-o",
+      "/home/zhuhe/code/litchi-target-0789/probe-sanitized"
+    ],
+    "exit_code": 0,
+    "log": {
+      "bytes": 0,
+      "path": "build-probe-sanitized.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+]

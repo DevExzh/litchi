@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0789 — RSS counter path identified
+
+[0789](0789-rss-accounting-calibration.md) GNU time exactly matches traced kernel wait4 values. The 4 MiB/32-worker full-observer case has a 1,784/2,040 KiB gap across all CPUs versus −48/−52 KiB on one CPU, supporting per-CPU accounting effects. Historical candidate causality remains unresolved; predeclare independent memory observations before any new experiment.
+
 ## 0788 — qualify RSS accounting before reconsidering cached scheduling
 
 [0788](0788-cached-part-memory-attribution.md) The prior small cached RSS regression does not reproduce in fresh native pairs. Late target snapshots differ by only 0/4 KiB, while every instrumented child exposes a time-versus-residency discrepancy. Allocation counts fall but whole-child intercepted peaks can rise. The candidate remains rejected; reconcile memory measurement before a new adoption experiment.

@@ -1,0 +1,23 @@
+{
+  "owned_worktree_created": false,
+  "preexisting_worktrees_preserved": true,
+  "production_modified": false,
+  "removed_binaries": [
+    {
+      "bytes": 40416,
+      "path": "/home/zhuhe/code/litchi-target-0789/probe",
+      "sha256": "a2c647f3334ca12cc5abac1bbde2985b69306b2bb9fd8ab1c05eacf841cc3aef"
+    },
+    {
+      "bytes": 105800,
+      "path": "/home/zhuhe/code/litchi-target-0789/probe-sanitized",
+      "sha256": "3eaa8e6c6886a56c588210b874761f24e98fc5018cb95b28d13aebf60e2c59fe"
+    }
+  ],
+  "removed_bytecode_directories": [
+    "__pycache__"
+  ],
+  "removed_bytes": 146216,
+  "target": "/home/zhuhe/code/litchi-target-0789",
+  "target_removed": true
+}

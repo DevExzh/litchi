@@ -1,0 +1,40 @@
+{
+  "cases": [
+    {
+      "affinity": "single",
+      "launcher": "time",
+      "mib": 0,
+      "observer": "full",
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "affinity": "all",
+      "launcher": "time",
+      "mib": 0,
+      "observer": "full",
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "affinity": "single",
+      "launcher": "time",
+      "mib": 64,
+      "observer": "full",
+      "touch": "main",
+      "workers": 0
+    },
+    {
+      "affinity": "all",
+      "launcher": "time",
+      "mib": 64,
+      "observer": "full",
+      "touch": "main",
+      "workers": 0
+    }
+  ],
+  "change": "Add strace -v only to frozen capture implementation",
+  "counts": "280 total children including supplement; original matrix 272 + original trace 4 unchanged; supplement 24 full checkpoints excluded from original analyzer counts.",
+  "expected_children": 4,
+  "purpose": "The four original traces abbreviate rusage as ellipses. Preserve them as call-path evidence; capture four additional, separately labeled -v traces to expose exact wait4 counters. No matrix rerun or replacement."
+}

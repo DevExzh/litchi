@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0789 — memory calibration narrows the next experiment
+
+[0789](0789-rss-accounting-calibration.md) The source-backed counter mechanism now has known-page, affinity, launcher, and syscall evidence. The original candidate remains rejected and its historical RSS cause unresolved. OLE2/OOXML remain active, ODF deferred, iWork excluded, and the broad goal open.
+
 ## 0788 — rejected candidate retained only as diagnostic evidence
 
 [0788](0788-cached-part-memory-attribution.md) The original small-process RSS cause remains unresolved. Counter disagreement and allocation/residency evidence narrow the next investigation without adopting the candidate or changing its failed policy. OLE2/OOXML remain active, ODF deferred, and iWork excluded; the broad performance goal stays open.

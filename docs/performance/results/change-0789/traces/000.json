@@ -1,0 +1,85 @@
+{
+  "affinity": "single",
+  "binary": {
+    "bytes": 40416,
+    "path": "/home/zhuhe/code/litchi-target-0789/probe",
+    "sha256": "a2c647f3334ca12cc5abac1bbde2985b69306b2bb9fd8ab1c05eacf841cc3aef"
+  },
+  "case": {
+    "mib": 0,
+    "touch": "main",
+    "workers": 0
+  },
+  "command": [
+    "/usr/bin/taskset",
+    "-c",
+    "0",
+    "/usr/bin/strace",
+    "-f",
+    "-qq",
+    "-e",
+    "trace=execve,getrusage,wait4",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0789/traces/000.strace.log",
+    "/usr/bin/time",
+    "-f",
+    "%M %R %F",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0789/traces/000.time.txt",
+    "/home/zhuhe/code/litchi-target-0789/probe",
+    "--mib",
+    "0",
+    "--workers",
+    "0",
+    "--touch",
+    "main"
+  ],
+  "ended": 1790535649.160847,
+  "error": null,
+  "gnu_time": {
+    "bytes": 10,
+    "path": "traces/000.time.txt",
+    "sha256": "3dfad6f85bf1cd829076767b381b407eaab2923d2623cdac9d570711be44bf91"
+  },
+  "index": 0,
+  "launcher": "time",
+  "observer": "full",
+  "points": {
+    "bytes": 3361,
+    "path": "traces/000.points.json.gz",
+    "sha256": "e18d6cc2d270741c253de8f66883b1ff2c5af23262f9f154905d0a96ac9caef0"
+  },
+  "repeat": 0,
+  "schema": "litchi.rss-accounting-child.0789.v1",
+  "spawn_method": "os.posix_spawn taskset exec",
+  "started": 1790535649.154856,
+  "stderr": {
+    "bytes": 0,
+    "path": "traces/000.stderr.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "strace": {
+    "bytes": 2020,
+    "path": "traces/000.strace.log",
+    "sha256": "9d48ea2c46c89c819eb7c4ce990825f75095cc8b8146c7a3f1bc51d44d8fd816"
+  },
+  "trace": true,
+  "transcript": {
+    "bytes": 430,
+    "path": "traces/000.transcript.txt",
+    "sha256": "55c1193f5496acc1a6f39859864afc9899cec0babfee5790a236453f80e46ab0"
+  },
+  "wait4": {
+    "exit_code": 0,
+    "pid": 561897,
+    "rusage": {
+      "major_faults": 0,
+      "maxrss_kib": 17680,
+      "minor_faults": 566,
+      "system_seconds": 0.0018939999999999999,
+      "user_seconds": 0.0009209999999999999
+    },
+    "status": 0
+  },
+  "wrapper_pid": 561897
+}
